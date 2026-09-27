@@ -1,0 +1,11 @@
+{
+  "note": "Known verdicts for past renders (light theme only). calibrate.py must reproduce every label before the judge is trusted.",
+  "images": [
+    {"image": "finance-v3-neon.jpg", "case": "finance", "expect": {"R-surfaces": false}},
+    {"image": "finance-v4-mismatched-categories.jpg", "case": "finance", "expect": {"R-finance-categories": false, "R-surfaces": true}},
+    {"image": "finance-v5.jpg", "case": "finance", "expect": {"R-surfaces": true, "R-finance-categories": true, "R-font": true, "R-hierarchy": true}},
+    {"image": "music-v5-loose-text-buttons.jpg", "case": "music", "expect": {"R-controls": false, "R-font": false}},
+    {"image": "music-v6-merged-toolbar.jpg", "case": "music", "expect": {"R-controls": false}},
+    {"image": "music-v8.jpg", "case": "music", "expect": {"R-controls": true, "R-font": true, "R-surfaces": true, "R-hierarchy": true, "R-music-actions": true}}
+  ]
+}

@@ -1,0 +1,515 @@
+{
+  "skill_name": "android-design",
+  "evals": [
+    {
+      "id": 1,
+      "name": "music",
+      "surface": "phone",
+      "prompt": "A \"Now playing\" screen for a music app called \"Tempo\". Phone, compact width; light and dark should both work. Show the current track with its album art (use the provided image R.drawable.album_art), title \"Golden Hour\" by \"Mara Vale\" from the album \"Late Summer\", playback progress (1:24 of 3:52), the playback controls (play/pause, previous, next, shuffle, repeat, like), and three actions: lyrics, the queue, and song credits. Lyrics, queue, and credits each open over the player (they are actions for the current page, not views that replace the player). The track is currently playing. In-memory state only.",
+      "expected_output": "Art-led hero player; play/pause is the one strong fill; the three page actions sit in a floating toolbar of icon buttons (or two in the app bar); content color from the art; Google Sans Flex title",
+      "files": [
+        {
+          "from": "assets/album_art.jpg",
+          "to": "app/src/main/res/drawable-nodpi/album_art.jpg"
+        }
+      ],
+      "assertions": [
+        {
+          "id": "C-build",
+          "text": "The project builds and the fixed eval renders are produced",
+          "type": "code"
+        },
+        {
+          "id": "C-contract",
+          "text": "EvalScreen() exists and no longer shows the template placeholder",
+          "type": "code"
+        },
+        {
+          "id": "C-theme",
+          "text": "Uses MaterialExpressiveTheme (not plain MaterialTheme as the app theme)",
+          "type": "code"
+        },
+        {
+          "id": "C-font",
+          "text": "Bundles Google Sans Flex (res/font) and uses it in the typography",
+          "type": "code"
+        },
+        {
+          "id": "C-alpha",
+          "text": "No copy(alpha = ...) on colors in screen code",
+          "type": "code"
+        },
+        {
+          "id": "C-hex",
+          "text": "No hard-coded Color(0x...) outside theme files",
+          "type": "code"
+        },
+        {
+          "id": "C-palette",
+          "text": "No PaletteStyle.Expressive or PaletteStyle.Vibrant on a brand scheme",
+          "type": "code"
+        },
+        {
+          "id": "C-replaced",
+          "text": "No replaced components (NavigationBar, segmented buttons, medium or large top app bar, BottomAppBar, navigation drawer, small FAB)",
+          "type": "code"
+        },
+        {
+          "id": "R-hierarchy",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-fill",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-surfaces",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-controls",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-font",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-platform",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-text",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-dark",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-idea",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-music-actions",
+          "text": "Lyrics, queue, and credits read as three separate, tappable controls: icon buttons in a floating toolbar, or at most two in the app bar. Not loose text buttons, and not one wide pill that looks like a single button.",
+          "type": "rubric"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "finance",
+      "surface": "phone",
+      "prompt": "The home screen of a personal expense tracker called \"Pocket\". Phone, compact width; light and dark should both work. Show how much was spent this month ($1,284.50) against a monthly budget ($2,000), spending by category (Food $412, Transport $186, Home $520, Fun $166.50), the 8 most recent transactions (fake merchants, categories, dates, amounts), and a way to add a new expense. In-memory state only.",
+      "expected_output": "One clear hero (the total or the add action), calm neutral surfaces, category colors distinct and consistent everywhere, charts in solid roles",
+      "files": [],
+      "assertions": [
+        {
+          "id": "C-build",
+          "text": "The project builds and the fixed eval renders are produced",
+          "type": "code"
+        },
+        {
+          "id": "C-contract",
+          "text": "EvalScreen() exists and no longer shows the template placeholder",
+          "type": "code"
+        },
+        {
+          "id": "C-theme",
+          "text": "Uses MaterialExpressiveTheme (not plain MaterialTheme as the app theme)",
+          "type": "code"
+        },
+        {
+          "id": "C-font",
+          "text": "Bundles Google Sans Flex (res/font) and uses it in the typography",
+          "type": "code"
+        },
+        {
+          "id": "C-alpha",
+          "text": "No copy(alpha = ...) on colors in screen code",
+          "type": "code"
+        },
+        {
+          "id": "C-hex",
+          "text": "No hard-coded Color(0x...) outside theme files",
+          "type": "code"
+        },
+        {
+          "id": "C-palette",
+          "text": "No PaletteStyle.Expressive or PaletteStyle.Vibrant on a brand scheme",
+          "type": "code"
+        },
+        {
+          "id": "C-replaced",
+          "text": "No replaced components (NavigationBar, segmented buttons, medium or large top app bar, BottomAppBar, navigation drawer, small FAB)",
+          "type": "code"
+        },
+        {
+          "id": "R-hierarchy",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-fill",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-surfaces",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-controls",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-font",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-platform",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-text",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-dark",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-idea",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-finance-categories",
+          "text": "Each category keeps one visible color everywhere it appears (chart, legend, list badges), and the four categories are distinguishable by hue. Chart segments are clearly visible against their background.",
+          "type": "rubric"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "settings",
+      "surface": "phone",
+      "prompt": "The Settings screen of a notes app called \"Jot\". Phone, compact width; light and dark should both work. Include: Appearance (theme: system/light/dark, use dynamic color, text size), Notifications (reminders on/off, daily summary on/off), Backup & sync (auto sync on/off, last synced \"2 min ago\", a \"Back up now\" action). The signed-in account (Sam Rivera, sam@example.com) and \"About Jot\" (version, privacy policy, licenses) each have their own screen elsewhere in the app; only design the Settings screen itself. In-memory state only.",
+      "expected_output": "Grouped segmented rows with gaps, switches for on/off, a connected button group for the theme, no version or licenses rows, one strong fill at most",
+      "files": [],
+      "assertions": [
+        {
+          "id": "C-build",
+          "text": "The project builds and the fixed eval renders are produced",
+          "type": "code"
+        },
+        {
+          "id": "C-contract",
+          "text": "EvalScreen() exists and no longer shows the template placeholder",
+          "type": "code"
+        },
+        {
+          "id": "C-theme",
+          "text": "Uses MaterialExpressiveTheme (not plain MaterialTheme as the app theme)",
+          "type": "code"
+        },
+        {
+          "id": "C-font",
+          "text": "Bundles Google Sans Flex (res/font) and uses it in the typography",
+          "type": "code"
+        },
+        {
+          "id": "C-alpha",
+          "text": "No copy(alpha = ...) on colors in screen code",
+          "type": "code"
+        },
+        {
+          "id": "C-hex",
+          "text": "No hard-coded Color(0x...) outside theme files",
+          "type": "code"
+        },
+        {
+          "id": "C-palette",
+          "text": "No PaletteStyle.Expressive or PaletteStyle.Vibrant on a brand scheme",
+          "type": "code"
+        },
+        {
+          "id": "C-replaced",
+          "text": "No replaced components (NavigationBar, segmented buttons, medium or large top app bar, BottomAppBar, navigation drawer, small FAB)",
+          "type": "code"
+        },
+        {
+          "id": "R-hierarchy",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-fill",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-surfaces",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-controls",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-font",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-platform",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-text",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-dark",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-idea",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-settings-platform",
+          "text": "Follows Android settings conventions: no app version, licenses, or account management rows (a link row to the account or About screen is fine); on/off settings use switches; the theme choice is a connected button group or radio choice, not a lone radio button; rows are grouped with section headings.",
+          "type": "rubric"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "trek",
+      "surface": "phone",
+      "prompt": "The trip screen of a travel planner called \"Wander\", for an upcoming trek: \"Everest Base Camp Trek\", 12 days, Oct 14 to Oct 25, starting in 20 days, 4 travelers. Use the provided cover photo R.drawable.trip_cover (a snowy Himalayan camp with yellow tents). Show today's plan preview for Day 1 (Kathmandu to Lukla flight 06:30, trek to Phakding 8 km, 3 to 4 hours, altitude 2,610 m), the day-by-day itinerary (at least 6 days with place names and altitudes: Phakding 2,610 m, Namche Bazaar 3,440 m, Namche acclimatization day, Tengboche 3,860 m, Dingboche 4,410 m, Lobuche 4,940 m), a packing checklist progress (18 of 32 items packed), and a way to open the full packing list and to share the trip. Phone, compact width; light and dark should both work. In-memory state only.",
+      "expected_output": "Photo-led layout with a visual idea tied to the trek, distinct forms for summary, plan, and itinerary, calm surfaces",
+      "files": [
+        {
+          "from": "assets/trek_cover.jpg",
+          "to": "app/src/main/res/drawable-nodpi/trip_cover.jpg"
+        }
+      ],
+      "assertions": [
+        {
+          "id": "C-build",
+          "text": "The project builds and the fixed eval renders are produced",
+          "type": "code"
+        },
+        {
+          "id": "C-contract",
+          "text": "EvalScreen() exists and no longer shows the template placeholder",
+          "type": "code"
+        },
+        {
+          "id": "C-theme",
+          "text": "Uses MaterialExpressiveTheme (not plain MaterialTheme as the app theme)",
+          "type": "code"
+        },
+        {
+          "id": "C-font",
+          "text": "Bundles Google Sans Flex (res/font) and uses it in the typography",
+          "type": "code"
+        },
+        {
+          "id": "C-alpha",
+          "text": "No copy(alpha = ...) on colors in screen code",
+          "type": "code"
+        },
+        {
+          "id": "C-hex",
+          "text": "No hard-coded Color(0x...) outside theme files",
+          "type": "code"
+        },
+        {
+          "id": "C-palette",
+          "text": "No PaletteStyle.Expressive or PaletteStyle.Vibrant on a brand scheme",
+          "type": "code"
+        },
+        {
+          "id": "C-replaced",
+          "text": "No replaced components (NavigationBar, segmented buttons, medium or large top app bar, BottomAppBar, navigation drawer, small FAB)",
+          "type": "code"
+        },
+        {
+          "id": "R-hierarchy",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-fill",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-surfaces",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-controls",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-font",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-platform",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-text",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-dark",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-idea",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-trek-forms",
+          "text": "Different information gets different forms (for example a summary, a timeline, and an itinerary are not all the same card), and text over the photo stays readable.",
+          "type": "rubric"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "widget",
+      "surface": "widget",
+      "prompt": "A home screen widget for a habit tracker called \"Rise\", built with Jetpack Glance as `class EvalWidget : GlanceAppWidget()` in package com.example.evalapp. It shows the current streak (12 days), today's progress (3 of 5 habits done), and a button to mark the next habit (\"Stretch\") as done. It must work at 2x2 and 4x2 sizes (use SizeMode.Responsive) and in light and dark. In-memory data only; no configuration activity needed.",
+      "expected_output": "Fills its bounds, a bold hero number, a clear header, the action as a real button with a 48dp target, more detail at 4x2 than 2x2",
+      "files": [],
+      "assertions": [
+        {
+          "id": "C-build",
+          "text": "The project builds and the widget renders at both sizes",
+          "type": "code"
+        },
+        {
+          "id": "C-contract",
+          "text": "EvalWidget exists as a GlanceAppWidget",
+          "type": "code"
+        },
+        {
+          "id": "C-alpha",
+          "text": "No copy(alpha = ...) on colors",
+          "type": "code"
+        },
+        {
+          "id": "C-hex",
+          "text": "No hard-coded Color(0x...) outside theme files",
+          "type": "code"
+        },
+        {
+          "id": "R-hierarchy",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-text",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-dark",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-widget-quality",
+          "text": "Fills the widget bounds with no large empty areas; the streak number is the bold hero; there is a header with the app icon, and the title where space allows (Google: icon always, title when space allows); the mark-done action is a visible button; the 4x2 size reveals more than the 2x2 size instead of just scaling. (Rounded corners are clipped by the launcher and not visible in these renders; ignore corners.)",
+          "type": "rubric"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "wear",
+      "surface": "wear",
+      "prompt": "A Wear OS workout screen for a running app called \"Stride\", built with Wear Compose Material 3 as `@Composable fun EvalWearScreen()` in package com.example.evalapp.wear (include its theme). The run is in progress: elapsed time 12:34, pace 5:12 /km, heart rate 148 bpm, distance 2.41 km. Provide pause and lap actions. It must work on small and large round watches and with larger text.",
+      "expected_output": "Black background, the elapsed time as the hero in numeral type, one prominent action (an edge-hugging button or a clear primary), everything fits the round screen at small size and large font",
+      "files": [],
+      "assertions": [
+        {
+          "id": "C-build",
+          "text": "The project builds and the Wear renders are produced",
+          "type": "code"
+        },
+        {
+          "id": "C-contract",
+          "text": "EvalWearScreen() exists and no longer shows the template placeholder",
+          "type": "code"
+        },
+        {
+          "id": "C-alpha",
+          "text": "No copy(alpha = ...) on colors",
+          "type": "code"
+        },
+        {
+          "id": "C-hex",
+          "text": "No hard-coded Color(0x...) outside theme files",
+          "type": "code"
+        },
+        {
+          "id": "R-hierarchy",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-controls",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-text",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-quality",
+          "text": "Black background; the elapsed time is the clear hero; one prominent action with other actions lower emphasis; nothing is clipped by the round edge on the small watch or with larger text; no dense grid of data.",
+          "type": "rubric"
+        }
+      ]
+    }
+  ]
+}
