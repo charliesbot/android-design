@@ -1,0 +1,12 @@
+# Disconnection indicators
+Source: https://developer.android.com/design/ui/wear/guides/m2-5/behaviors-and-patterns/disconnect
+
+Disconnection indicators let users know when a Wear OS device is disconnected from its companion phone or the internet.
+
+## Usage
+
+When Wear OS device are disconnected, your app can lose some functionality. To indicate this, use an offline indicator.
+
+An offline indicator at the top of a view helps users identify that some functionality in the app may be not be available. Your app can gray out or hide the functions that are not available when disconnected.
+
+An offline indicator at the bottom of a list or a scroll view lets users know that no more content can be loaded while the app is disconnected.

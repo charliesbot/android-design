@@ -2,6 +2,8 @@
 
 A page-by-page ledger of every official source behind the android-design skill and whether its guidance reached the research docs ([material-3.md](material-3.md), [material-3-components.md](material-3-components.md), [material-3-wear-os.md](material-3-wear-os.md), [android-ui-design-guides.md](android-ui-design-guides.md)). Built September 2026 from the full route lists of m3.material.io (site manifest) and developer.android.com/design/ui (site navigation), plus the six official videos and two design.google articles. Each batch was audited by reading the scraped page and checking the research docs for its substance, not just its topic.
 
+Each route's fetched page lives in `sources/` (`/components/buttons/specs` is in `sources/m3.material.io/pages/components/buttons.md`, `/design/ui/mobile/...` in `sources/developer.android.com/design/ui/mobile/....md`). `scripts/check_coverage.py` checks that every distilled row has its source and that every source has a row.
+
 Legend: `[x]` distilled, `[~]` partly distilled (missing points listed), `[ ]` not distilled, `[-]` skipped with a reason. Each batch ends with its "Gaps worth distilling," ranked by impact on agent-built UI. Update a row when a gap is filled.
 
 History: the first audit found 266 distilled, 133 partial, and 13 missing routes. A gap-fill pass in September 2026 closed all of them. Each batch's intro paragraph and "Gaps worth distilling" list describe the audit before that pass; the rows and the summary table show the current status.
@@ -16,12 +18,12 @@ History: the first audit found 266 distilled, 133 partial, and 13 missing routes
 | m3.material.io: Components (A to L) | 69 | 0 | 0 | 0 |
 | m3.material.io: Components (L to T) | 76 | 0 | 0 | 0 |
 | m3.material.io blog, videos, and articles | 22 | 0 | 0 | 98 |
-| developer.android.com/design/ui: Mobile, desktop, large screens, widgets | 39 | 0 | 0 | 9 |
-| developer.android.com/design/ui: Gallery | 33 | 0 | 0 | 8 |
+| developer.android.com/design/ui: Mobile, desktop, large screens, widgets | 39 | 0 | 0 | 10 |
+| developer.android.com/design/ui: Gallery | 33 | 0 | 0 | 9 |
 | developer.android.com/design/ui: Wear OS (current guides) | 46 | 0 | 0 | 4 |
-| developer.android.com/design/ui: Wear OS (components and M2.5 guides) | 38 | 0 | 0 | 16 |
+| developer.android.com/design/ui: Wear OS (components and M2.5 guides) | 37 | 0 | 0 | 17 |
 | Out of scope: developer.android.com/design/ui platforms | 0 | 0 | 0 | 144 |
-| **Total** | **412** | **0** | **0** | **308** |
+| **Total** | **411** | **0** | **0** | **311** |
 
 ## m3.material.io: Foundations (excluding Layout)
 
@@ -681,6 +683,7 @@ Result: 48 routes checked. 25 are fully distilled, 17 are partly distilled, 6 ar
 - [-] /design/ui/large-screens; returns the same hub content as /design/ui/desktop, no guidance of its own
 
 ### Mobile: hub, components, samples
+- [-] /design/ui; landing page with links only
 - [-] /design/ui/mobile; hub page with links only
 - [-] /design/ui/mobile/guides/components/material-overview; lists Material's component categories and defers to Material (already in material-3-components.md)
 - [-] /design/ui/mobile/samples; link list (Now in Android, Jetchat, Jetcaster, Reply)
@@ -754,6 +757,8 @@ Result: 48 routes checked. 25 are fully distilled, 17 are partly distilled, 6 ar
 ## developer.android.com/design/ui: Gallery
 
 The docs cover the Gallery mainly through the "Gallery patterns by app category" table in android-ui-design-guides.md (Desktop and large screens) and the canonical layouts in material-3.md (Scaffold). Most of the 41 pages are short one-liners, and that table captures them. Four areas are missing. Pawparazzi's Grid and FlexBox guidance and the tabletop above-and-below-the-fold rule are the biggest. Multi-window is never named in any research doc, although six pages recommend it. Stylus hover details are also missing.
+
+- [-] /design/ui/gallery; hub page with links only
 
 ### Creativity
 - [-] /design/ui/gallery/creativity/concepts; results-only case study (70% more tablet time) plus boilerplate links to list-detail and the Figma kit
@@ -923,7 +928,7 @@ Summary: 54 URLs checked. 20 fully distilled, 14 partly distilled, 3 not distill
 - [-] /design/ui/wear/samples; links to GitHub samples (Compose starter, Golden tile, Horologist), no guidance
 
 ### Current components
-- [x] /design/ui/wear/guides/components/dialogs → material-3-wear-os.md (Behaviors: Dialogs)
+- [-] /design/ui/wear/guides/components/dialogs; now redirects to /design/ui/wear/guides/m2-5/components/dialogs, covered below
 
 ### M2.5 behaviors and patterns
 - [x] /design/ui/wear/guides/m2-5/behaviors-and-patterns/clipping → material-3-wear-os.md (Behaviors: Clipping; Adaptive sizes)
