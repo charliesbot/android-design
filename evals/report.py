@@ -1,4 +1,4 @@
-"""Writes report.html for one eval run: scores per case and renders beside the committed baseline."""
+"""Writes one eval run's results: report.html (scores and renders beside the committed baseline) and summary.md."""
 import html
 from pathlib import Path
 
@@ -52,4 +52,20 @@ figcaption{{color:var(--muted);font-size:13px;text-align:center}} pre{{white-spa
 </style></head><body><h1>android-design evals</h1>{''.join(sections)}</body></html>"""
     path = out / "report.html"
     path.write_text(page)
+    return path
+
+
+def write_summary(out: Path, results):
+    """Writes summary.md, a plain scores table plus every failure, for terminals and CI summaries."""
+    lines = ["| Case | Surface | Code checks | Rubric |", "| --- | --- | --- | --- |"]
+    for r in results:
+        c_pass, c_total = score(r["checks"])
+        j_pass, j_total = score(r["judge"])
+        lines.append(f"| {r['name']} | {r['surface']} | {c_pass}/{c_total} | {j_pass}/{j_total} |")
+    failed = [(r["name"], k, v.get("detail") or v.get("reason") or "")
+              for r in results for k, v in {**r["checks"], **r["judge"]}.items() if not v["pass"]]
+    lines += ["", "Failures:" if failed else "No failures."]
+    lines += [f"- {name} {item}: {reason}" for name, item, reason in failed]
+    path = out / "summary.md"
+    path.write_text("\n".join(lines) + "\n")
     return path

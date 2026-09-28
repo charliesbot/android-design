@@ -8,7 +8,6 @@ Checks that agents following the skill still produce screens that meet its rules
 cd evals
 python3 calibrate.py          # once per rubric change: the judge must reproduce every label
 python3 run.py                # all cases; or --cases music,finance
-open ~/.cache/android-design-evals/<timestamp>/report.html
 python3 promote.py ~/.cache/android-design-evals/<timestamp>   # accept a run as the new baseline
 ```
 
@@ -21,7 +20,7 @@ A full run is about 6 headless agents plus the judge calls, 10 to 20 minutes wit
 3. The runner restores the fixed render harness (in case the agent edited it), re-renders, then scores:
    - `checks.py`: deterministic code checks (`C-*` assertions).
    - `judge.py`: a model grades the renders against `rubric.md` (`R-*` assertions).
-4. `report.py` writes `report.html` with scores, failures, and renders beside `baseline/`.
+4. `report.py` writes `report.html` with scores, failures, and renders beside `baseline/`, plus `summary.md` with the scores table and every failure. The runner prints the summary and opens the report (pass `--no-open` to skip it).
 
 ## Files
 
