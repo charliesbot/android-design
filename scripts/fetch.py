@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fetches every official source page into sources/ as Markdown.
 
-Usage: fetch.py [--only m3,blog,design-ui,articles,videos]
+Usage: fetch.py [--only m3,blog,design-ui,articles,videos] [--allow-shrink]
 
 Each page becomes one file at sources/<domain>/<route>.md whose first lines are its title and URL.
 Output is deterministic (no dates, stable ordering), so `git diff sources/` after a fetch shows
@@ -46,8 +46,16 @@ def get(url, attempts=3):
                 raise
 
 
-def write_all(folder, pages):
-    """Replaces folder with exactly `pages` ({relative path: text}), so removed pages show up as deletions."""
+def write_all(folder, pages, allow_shrink=False):
+    """Replaces folder with exactly `pages` ({relative path: text}), so removed pages show up as deletions.
+
+    Refuses a result with no pages or under half the saved ones: that usually means the site's format changed
+    and parsing failed, not that Google removed its pages. Pass allow_shrink after confirming a real removal.
+    """
+    saved = sum(1 for _ in folder.rglob("*.md")) if folder.exists() else 0
+    if saved and not allow_shrink and (not pages or len(pages) < saved / 2):
+        sys.exit(f"{folder.relative_to(ROOT)}: fetched {len(pages)} pages but {saved} are saved, nothing written. "
+                 "If Google really removed them, rerun with --allow-shrink.")
     if folder.exists():
         shutil.rmtree(folder)
     for relative, text in pages.items():
@@ -226,7 +234,7 @@ def render_m3(data, slug):
     return "\n\n".join(line for line in lines if line.strip())
 
 
-def fetch_m3():
+def fetch_m3(allow_shrink):
     version, manifest = m3_bundle()
     entries = sorted((e for e in manifest if e.get("exportedCarbonFileId") and e.get("slug") not in ("", "search.html")),
                      key=lambda e: e["slug"])
@@ -235,10 +243,10 @@ def fetch_m3():
         data = json.loads(get(f"{M3}/_dsm/content/m3/{version}/{entry['exportedCarbonFileId']}"))
         return entry["slug"] + ".md", render_m3(data, entry["slug"])
 
-    write_all(SOURCES / "m3.material.io" / "pages", fetch_parallel(entries, one))
+    write_all(SOURCES / "m3.material.io" / "pages", fetch_parallel(entries, one), allow_shrink)
 
 
-def fetch_blog():
+def fetch_blog(allow_shrink):
     _, manifest = m3_bundle()
     posts = sorted((e for e in manifest if "document_id" in e), key=lambda e: e["slug"])
 
@@ -259,7 +267,7 @@ def fetch_blog():
                 parts.append(f"[VIDEO] {(video.get('caption') or '').strip()}")
         return post["slug"] + ".md", page(data.get("title") or post["slug"], f"{M3}/blog/{post['slug']}", "\n\n".join(parts))
 
-    write_all(SOURCES / "m3.material.io" / "blog", fetch_parallel(posts, one))
+    write_all(SOURCES / "m3.material.io" / "blog", fetch_parallel(posts, one), allow_shrink)
 
 
 # developer.android.com: the design/ui navigation is only rendered into hub pages, and the sitemaps list a
@@ -298,7 +306,7 @@ def crawl_design_ui():
     return html
 
 
-def fetch_design_ui():
+def fetch_design_ui(allow_shrink):
     pages = {}
     for route, html in sorted(crawl_design_ui().items()):
         # Guides wrap their text in the article body; hub and landing pages only have <main>.
@@ -308,10 +316,10 @@ def fetch_design_ui():
                  or re.search(r"<title[^>]*>(.*?)</title>", html, re.S))
         title = html_to_md(title.group(1)).split(" | ")[0] if title else route.rsplit("/", 1)[-1]
         pages[route.lstrip("/") + ".md"] = page(title, ANDROID + route, html_to_md(body.group(1) if body else html))
-    write_all(SOURCES / "developer.android.com", pages)
+    write_all(SOURCES / "developer.android.com", pages, allow_shrink)
 
 
-def fetch_articles():
+def fetch_articles(allow_shrink):
     def one(url):
         html = get(url)
         main = re.search(r"<main[^>]*>(.*?)</main>", html, re.S)
@@ -319,10 +327,10 @@ def fetch_articles():
         title = html_to_md(title.group(1)).split(" - ")[0] if title else url
         return url.split("design.google/", 1)[1] + ".md", page(title, url, html_to_md(main.group(1) if main else html))
 
-    write_all(SOURCES / "design.google", fetch_parallel(ARTICLES, one, workers=2))
+    write_all(SOURCES / "design.google", fetch_parallel(ARTICLES, one, workers=2), allow_shrink)
 
 
-def fetch_videos():
+def fetch_videos(allow_shrink):
     if not shutil.which("yt-dlp"):
         sys.exit("videos need yt-dlp (brew install yt-dlp)")
 
@@ -343,7 +351,7 @@ def fetch_videos():
                 spoken.append(line)
         return video_id + ".md", page(title, url, "\n".join(spoken))
 
-    write_all(SOURCES / "youtube.com", fetch_parallel(VIDEOS, one, workers=3))
+    write_all(SOURCES / "youtube.com", fetch_parallel(VIDEOS, one, workers=3), allow_shrink)
 
 
 FETCHERS = {"m3": fetch_m3, "blog": fetch_blog, "design-ui": fetch_design_ui, "articles": fetch_articles, "videos": fetch_videos}
@@ -352,10 +360,11 @@ FETCHERS = {"m3": fetch_m3, "blog": fetch_blog, "design-ui": fetch_design_ui, "a
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", help="comma-separated subset of: " + ", ".join(FETCHERS))
+    parser.add_argument("--allow-shrink", action="store_true", help="accept a fetch with far fewer pages than saved")
     args = parser.parse_args()
     names = args.only.split(",") if args.only else list(FETCHERS)
     for name in names:
-        FETCHERS[name]()
+        FETCHERS[name](args.allow_shrink)
 
 
 if __name__ == "__main__":

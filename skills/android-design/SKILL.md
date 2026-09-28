@@ -17,6 +17,8 @@ The through-line: **a screen feels designed when emphasis is spent deliberately.
 
 Quotes and rules marked **(Google)** come from Google's guidance. Rules marked **(default)** are this skill's starting points: follow them unless the screen's direction gives a reason not to.
 
+**Surfaces.** The design judgment here applies to every surface. The theme setup, fonts, and component names are for phone, tablet, and desktop apps. Wear OS uses its own theme, Roboto Flex, and Wear components ([references/wear-os.md](references/wear-os.md)); home screen widgets use `GlanceTheme` and Glance components ([references/widgets.md](references/widgets.md)). Where those references differ from this file, they win for their surface.
+
 ## Why stock Compose code looks generic
 
 Three causes, each fixable:
@@ -128,7 +130,7 @@ Their v1-to-v2 lesson: ungrouped settings of similar size and inconsistent color
 
 - Use the role scale: **Display** for short important text and numerals, **Headline** for short high-emphasis text on phones, **Title** for secondary regions, **Body** for reading, **Label** inside components. Most screens need about five styles; pick sizes with clear contrast between them, not near-duplicates.
 - **Emphasized styles** (`MaterialTheme.typography.displayLargeEmphasized` through `labelSmallEmphasized`) are heavier variants. Components don't use them by default; apply them to the primary button label, selected items, unread items, key numbers, and headlines. "Give extra impact to a headline, or subtly strengthen text of the same size."
-- **Use Google Sans Flex for every style** (this skill's standard, not a Google requirement). It is open source on Google Fonts since November 2025, most of the shipped Expressive apps sampled for this skill use it, and its shapes echo the Material shape library. Six variable axes: weight (1 to 1000), width (25 to 151), optical size (6 to 144), slant (0 to -10), grade (0 to 100), and roundness (`ROND`, 0 to 100). Bundle the variable font and set axes per style ([references/theming.md](references/theming.md#google-sans-flex)).
+- **Use Google Sans Flex for every style** in phone, tablet, and desktop apps (this skill's standard, not a Google requirement; Wear uses Roboto Flex). It is open source on Google Fonts since November 2025, most of the shipped Expressive apps sampled for this skill use it, and its shapes echo the Material shape library. Six variable axes: weight (1 to 1000), width (25 to 151), optical size (6 to 144), slant (0 to -10), grade (0 to 100), and roundness (`ROND`, 0 to 100). Bundle the variable font and set axes per style ([references/theming.md](references/theming.md#google-sans-flex)).
 - **Expressive voices on large styles, the text voice on small:** give Display and Headline the voice that serves the direction; keep Body and Label on default axes so they stay highly readable. Be careful at Title.
 - **The hero title or number must read as Google Sans Flex** (default): its character comes through strong axis settings (heavy weight, very narrow or very wide width, or high roundness). A medium weight at a middle width looks like any sans; keep the calm voices for secondary text.
 - **Axes carry feeling and meaning.** Google describes weight as ranging from "calm as a whisper" to "loud and rugged" and roundness as "personal, playful." In their research with 3,000+ readers, taller, more elegant (narrower) styles read as more premium and engaging. Axes also carry state: heavy in a filled container for the selected item, light for the rest, at the same size so nothing reflows. Grade adds emphasis without changing width.
@@ -287,8 +289,8 @@ When the render contradicts the direction or the hierarchy, fix the largest mism
 
 Code checks, separately:
 
-- [ ] `MaterialExpressiveTheme` with the color source from section 4, and Google Sans Flex on every text style.
-- [ ] Components from the right column of section 9's table.
+- [ ] Theme and type for the surface: phone, tablet, and desktop use `MaterialExpressiveTheme` with the color source from section 4 and Google Sans Flex on every text style; Wear and widgets follow their references.
+- [ ] Components from the right column of section 9's table (Wear and widgets: the components their references name).
 - [ ] Text and icons use their intended role pairs: no `copy(alpha = ...)`, no hard-coded hex colors.
 - [ ] Custom animations use `MaterialTheme.motionScheme`, not `tween()`.
 - [ ] Navigation, dismissal, and selection match the chosen Android component's semantics (section 12); content drawn edge-to-edge.
