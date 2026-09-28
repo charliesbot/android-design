@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Runs the android-design evals end to end.
 
-Usage: run.py [--cases music,finance] [--parallel 3] [--judge-runs 1] [--out DIR]
+Usage: run.py [--cases music,finance] [--parallel 3] [--judge-runs 1] [--out DIR] [--no-open]
 
 For each case: copy the template project, let a headless agent build the brief while following the
 skill, re-render offscreen, run the code checks and the screenshot judge, then write results.json and
@@ -11,6 +11,7 @@ import argparse
 import json
 import shutil
 import subprocess
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -18,7 +19,7 @@ from pathlib import Path
 
 from checks import run as run_checks
 from judge import judge
-from report import write_report
+from report import write_report, write_summary
 
 HERE = Path(__file__).resolve().parent
 SKILL_DIR = HERE.parent / "skills" / "android-design"
@@ -112,6 +113,7 @@ def main():
     parser.add_argument("--parallel", type=int, default=3)
     parser.add_argument("--judge-runs", type=int, default=1)
     parser.add_argument("--out")
+    parser.add_argument("--no-open", action="store_true", help="don't open the report when the run finishes")
     args = parser.parse_args()
 
     spec = json.loads((HERE / "evals.json").read_text())["evals"]
@@ -126,7 +128,10 @@ def main():
 
     (out / "results.json").write_text(json.dumps({"run": stamp, "cases": results}, indent=2))
     report = write_report(out, results, HERE / "baseline")
+    print(write_summary(out, results).read_text())
     print(f"report: {report}")
+    if not args.no_open and sys.platform == "darwin":
+        subprocess.run(["open", str(report)])
 
 
 if __name__ == "__main__":
