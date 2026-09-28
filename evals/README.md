@@ -22,6 +22,8 @@ A full run is about 6 headless agents plus the judge calls, 10 to 20 minutes wit
    - `judge.py`: a model grades the renders against `rubric.md` (`R-*` assertions).
 4. `report.py` writes `report.html` with scores, failures, and renders beside `baseline/`, plus `summary.md` with the scores table and every failure. The runner prints the summary and opens the report (pass `--no-open` to skip it).
 
+Agents design something different on every run, so one failed item on one run is a signal, not a regression. Treat it as a regression only when the same item fails again or first fails right after a skill change, and compare against earlier runs before changing the skill to fix it.
+
 ## Files
 
 | File | Job |
