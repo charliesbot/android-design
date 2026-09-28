@@ -3,8 +3,10 @@
 
 Usage: check_coverage.py
 
-Fails when a distilled or partly distilled ledger row has no source file (the evidence is missing), and
-lists source files that no ledger row mentions (new upstream pages that still need a verdict).
+Fails when a distilled or partly distilled ledger row has no source file (the evidence is missing), or when
+a source file has no ledger row (a new upstream page that still needs a verdict).
+
+A pass means the ledger and sources/ agree. It says nothing about freshness; that comes from running fetch.py.
 """
 import re
 import sys
@@ -74,13 +76,13 @@ def main():
 
     for title, items in (("Distilled rows without a source file", missing),
                          ("Rows in an unknown form", unknown),
-                         ("Source files with no ledger row (new pages to review)", unlisted)):
+                         ("Source files with no ledger row (new pages: add a row with a verdict)", unlisted)):
         if items:
             print(f"{title} ({len(items)}):")
             print("  " + "\n  ".join(items))
-    if missing or unknown:
+    if missing or unknown or unlisted:
         sys.exit(1)
-    print(f"ok: every distilled row has its source; {len(unlisted)} source files await a ledger row")
+    print("ok: every distilled row has its source, and every source has a row")
 
 
 if __name__ == "__main__":

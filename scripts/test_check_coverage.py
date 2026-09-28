@@ -39,5 +39,31 @@ class M3SourceTest(unittest.TestCase):
         self.assertFalse(self.resolve("/components/renamed-chips").exists())
 
 
+class UnlistedSourceTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        sources = root / "sources"
+        pages = sources / "m3.material.io" / "pages"
+        pages.mkdir(parents=True)
+        (pages / "styles.md").write_text("# Styles\n")
+        self.new_page = pages / "brand-new.md"
+        self.ledger = root / "source-coverage.md"
+        self.ledger.write_text("## m3.material.io: Styles\n- [x] /styles -> material-3.md (Styles)\n")
+        for name, value in (("ROOT", root), ("SOURCES", sources), ("M3_PAGES", pages), ("LEDGER", self.ledger)):
+            patcher = mock.patch.object(check_coverage, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_every_source_listed_passes(self):
+        check_coverage.main()
+
+    def test_new_page_without_a_ledger_row_fails(self):
+        self.new_page.write_text("# Brand new\n")
+        with self.assertRaises(SystemExit):
+            check_coverage.main()
+
+
 if __name__ == "__main__":
     unittest.main()

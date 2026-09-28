@@ -23,8 +23,20 @@ Distill from the files in `sources/`, not from memory or a fresh web fetch, so e
 
 1. Run `python3 scripts/fetch.py` (about 90 seconds; `--only m3,blog,design-ui,articles,videos` for a subset). Output is deterministic, so any change in `git diff --stat sources/` is a real upstream change.
 2. For each changed page, read its diff and update the research docs, then the skill, where the guidance changed. Deleted pages usually moved; find the new route before dropping anything.
-3. Run `python3 scripts/check_coverage.py`. It fails when a distilled ledger row has no source file and lists new pages with no ledger row. Give each new page a row with a verdict.
+3. Run `python3 scripts/check_coverage.py`. It fails when a distilled ledger row has no source file or a source file has no ledger row. Give each new page a row with a verdict.
 4. Commit `sources/` together with the research and skill changes it caused, so the history shows what changed upstream and what it changed here.
+
+Fetch monthly and after major Material or Android announcements. Quarterly, look for new design.google articles and official talks: `fetch.py` fetches those from fixed lists, so it cannot discover new ones. If a fetch stops because it got far fewer pages than are saved, check whether the site's format changed before rerunning with `--allow-shrink`.
+
+## Deliberate decisions
+
+These are settled. Don't flag them in reviews unless the reasoning no longer holds.
+
+- **Google Sans Flex on every phone, tablet, and desktop text style** is the owner's standard, not Google's; the skill says so, and the eval rubric enforces it on purpose.
+- **Rules come from Google's docs, not apps.** Shipped apps, including Google's own, are examples of one implementation. A pattern seen in an app becomes a rule only when a Google source states it.
+- **Git is the source inventory.** `sources/` files carry no dates or hashes so unchanged pages diff clean; commit history records when each page changed.
+- **The coverage check proves agreement, not freshness.** A pass means the ledger and `sources/` match. Only running `fetch.py` shows whether Google changed anything.
+- **AI glasses, cars, TV, and XR are out of scope.** Their routes are listed as skipped in the ledger and never fetched.
 
 ## Verification
 
