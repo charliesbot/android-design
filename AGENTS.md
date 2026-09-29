@@ -1,6 +1,8 @@
 # Repository Purpose
 
-This is the home of the `android-design` agent skill: Material 3 Expressive design judgment for Jetpack Compose on phone, tablet, desktop, Wear OS, and widgets. The repository holds the skill, the research it is distilled from, and the evals that check it.
+This is the home of the `android-design` agent skill: Material 3 Expressive design judgment for Jetpack Compose. The repository holds the skill, the research it is distilled from, and the evals that check it.
+
+**Scope status:** phone, tablet, and desktop apps are the validated target. Wear OS and widget guidance exists (references, research, and eval cases) but its results do not yet meet the quality bar, so the skill marks it out of scope and its eval cases are parked. Raising it is future work: improve the references, unpark the cases, and widen the skill's description once their renders pass.
 
 It is charliesbot's personal repository. Optimize for the owner's workflow, not broad applicability.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Runs the android-design evals end to end.
 
-Usage: run.py [--cases music,finance] [--parallel 3] [--judge-runs 1] [--out DIR] [--no-open]
+Usage: run.py [--cases music,wear] [--parallel 3] [--judge-runs 1] [--out DIR] [--no-open]
 
 For each case: copy the template project, let a headless agent build the brief while following the
 skill, re-render offscreen, run the code checks and the screenshot judge, then write results.json and
@@ -109,7 +109,7 @@ def run_case(case, out, judge_runs):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cases", default="all")
+    parser.add_argument("--cases", help="comma-separated case names; default: every case not marked parked")
     parser.add_argument("--parallel", type=int, default=3)
     parser.add_argument("--judge-runs", type=int, default=1)
     parser.add_argument("--out")
@@ -117,8 +117,9 @@ def main():
     args = parser.parse_args()
 
     spec = json.loads((HERE / "evals.json").read_text())["evals"]
-    wanted = None if args.cases == "all" else set(args.cases.split(","))
-    cases = [c for c in spec if wanted is None or c["name"] in wanted]
+    # Parked cases cover surfaces outside the skill's current scope; they run only when named.
+    wanted = set(args.cases.split(",")) if args.cases else None
+    cases = [c for c in spec if (c["name"] in wanted if wanted else not c.get("parked"))]
     stamp = datetime.now().strftime("%Y-%m-%dT%H%M%S")
     out = Path(args.out) if args.out else Path.home() / ".cache" / "android-design-evals" / stamp
     out.mkdir(parents=True, exist_ok=True)

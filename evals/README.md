@@ -7,11 +7,11 @@ Checks that agents following the skill still produce screens that meet its rules
 ```bash
 cd evals
 python3 calibrate.py          # once per rubric change: the judge must reproduce every label
-python3 run.py                # all cases; or --cases music,finance
+python3 run.py                # every case not parked; or --cases music,wear
 python3 promote.py ~/.cache/android-design-evals/<timestamp>   # accept a run as the new baseline
 ```
 
-A full run is about 6 headless agents plus the judge calls, 10 to 20 minutes with `--parallel 3`. It needs the Android SDK (for Gradle) and the `claude` CLI, but no emulator: screens render offscreen.
+A full run is 4 headless agents (the phone cases) plus the judge calls, 10 to 20 minutes with `--parallel 3` and about $8. The `wear` and `widget` cases are marked `parked` in `evals.json` because those surfaces are outside the skill's current scope; they run only when named with `--cases`. It needs the Android SDK (for Gradle) and the `claude` CLI, but no emulator: screens render offscreen.
 
 ## How a case runs
 

@@ -2,8 +2,8 @@
 name: android-design
 description: >
   Material 3 Expressive design judgment for Android apps in Jetpack Compose, distilled from Google's
-  guidelines, UX research, and I/O talks. Use when designing, building, or reviewing Android or Wear OS
-  screens or home screen widgets; choosing components; setting up a theme (color, type, shape, motion); or when a Compose UI
+  guidelines, UX research, and I/O talks. Use when designing, building, or reviewing Android phone, tablet,
+  or desktop screens; choosing components; setting up a theme (color, type, shape, motion); or when a Compose UI
   looks generic and needs hierarchy, emphasis, or polish.
 ---
 
@@ -17,7 +17,7 @@ The through-line: **a screen feels designed when emphasis is spent deliberately.
 
 Quotes and rules marked **(Google)** come from Google's guidance. Rules marked **(default)** are this skill's starting points: follow them unless the screen's direction gives a reason not to.
 
-**Surfaces.** The design judgment here applies to every surface. The theme setup, fonts, and component names are for phone, tablet, and desktop apps. Wear OS uses its own theme, Roboto Flex, and Wear components ([references/wear-os.md](references/wear-os.md)); home screen widgets use `GlanceTheme` and Glance components ([references/widgets.md](references/widgets.md)). Where those references differ from this file, they win for their surface.
+**Surfaces.** This skill targets phone, tablet, and desktop apps. Wear OS and home screen widgets are not yet in scope: their references hold distilled Google guidance but have not reached this skill's quality bar. When building one anyway, start from that reference and check the result yourself. Wear OS uses its own theme, Roboto Flex, and Wear components ([references/wear-os.md](references/wear-os.md)); widgets use `GlanceTheme` and Glance components ([references/widgets.md](references/widgets.md)). Where those references differ from this file, they win for their surface.
 
 ## Why stock Compose code looks generic
 
@@ -317,5 +317,5 @@ Code checks, separately:
 - [references/theming.md](references/theming.md): read when setting up or changing a theme, color scheme, type scale, shapes, motion scheme, or spacing.
 - [references/components.md](references/components.md): read when choosing a component or writing one you haven't used in this session; its patterns section after choosing the composition.
 - [references/layout.md](references/layout.md): read when a screen must adapt to tablets, foldables, landscape, or desktop windows, or support mouse and keyboard.
-- [references/widgets.md](references/widgets.md): read before designing or reviewing a home screen widget.
-- [references/wear-os.md](references/wear-os.md): read before designing any Wear OS screen or tile.
+- [references/widgets.md](references/widgets.md): read before designing or reviewing a home screen widget (not yet in scope, see Surfaces).
+- [references/wear-os.md](references/wear-os.md): read before designing any Wear OS screen or tile (not yet in scope, see Surfaces).

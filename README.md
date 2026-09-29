@@ -1,6 +1,6 @@
 # android-design
 
-An agent skill for designing Android UI with Material 3 Expressive in Jetpack Compose: phone, tablet, desktop, Wear OS, and widgets. It gives an agent design judgment (hierarchy, color, type, shape, motion, and component choice), distilled from Google's official guidance.
+An agent skill for designing Android UI with Material 3 Expressive in Jetpack Compose, for phone, tablet, and desktop apps. Wear OS and widget guidance is included but not yet in scope. It gives an agent design judgment (hierarchy, color, type, shape, motion, and component choice), distilled from Google's official guidance.
 
 ## Install
 
@@ -20,7 +20,7 @@ Any agent that reads skills can also load `skills/android-design/SKILL.md` direc
 | `skills/android-design/` | The skill itself |
 | `docs/research/` | Distilled research from m3.material.io, developer.android.com/design/ui, and official videos and articles |
 | `docs/research/source-coverage.md` | Every official source page and whether its guidance reached the research |
-| `evals/` | Headless agents build six briefs, and the renders are checked against the skill's rules |
+| `evals/` | Headless agents build four phone briefs (plus parked Wear and widget briefs), and the renders are checked against the skill's rules |
 | `sources/` | Every official source page as Markdown, fetched by `scripts/fetch.py` |
 | `scripts/` | `fetch.py` refreshes `sources/`; `check_coverage.py` checks it against the coverage ledger |
 
