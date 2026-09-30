@@ -1,6 +1,7 @@
 {
-  "note": "Known verdicts for past renders (light theme only). calibrate.py must reproduce every label before the judge is trusted.",
+  "note": "Known verdicts for past renders and reference screenshots. calibrate.py must reproduce every label before the judge is trusted. music-content-color.png is the owner's supplied music-app collage: its now-playing screen pairs a full-screen burgundy palette with visible pink album art. It tests visual coherence, not proof of token usage or color extraction.",
   "images": [
+    {"image": "music-content-color.png", "case": "music", "expect": {"R-surfaces": true}},
     {"image": "finance-v3-neon.jpg", "case": "finance", "expect": {"R-surfaces": false}},
     {"image": "finance-v4-mismatched-categories.jpg", "case": "finance", "expect": {"R-finance-categories": false, "R-surfaces": true}},
     {"image": "finance-v5.jpg", "case": "finance", "expect": {"R-surfaces": true, "R-finance-categories": true, "R-font": true, "R-hierarchy": true}},
