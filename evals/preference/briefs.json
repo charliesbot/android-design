@@ -1,0 +1,41 @@
+{
+  "about": "Briefs for preference rounds: the owner picks the best and worst of several unsteered variants per brief. The four scored phone cases in evals.json run too; these add screen types they do not cover.",
+  "briefs": [
+    {
+      "name": "chat",
+      "surface": "phone",
+      "prompt": "A conversation screen in a messaging app called \"Relay\", open on a chat with \"Priya Nair\" (online now). Phone, compact width; light and dark should both work. Show about 10 messages over two days (\"Yesterday\" and \"Today\"), mixing sent and received, including one photo message placeholder, one reply that quotes an earlier message, and one message with a reaction. The latest sent message shows \"Read\". Include a message composer with an attach action and a send action, and a way to start a voice call and a video call. In-memory state only.",
+      "files": []
+    },
+    {
+      "name": "onboarding",
+      "surface": "phone",
+      "prompt": "The first screen a new user sees in a meditation app called \"Still\". Phone, compact width; light and dark should both work. It introduces the app in one short line of copy (you write it), shows that this is step 1 of 3, and offers \"Get started\" and \"I already have an account\". No images are provided; create the visual yourself with shapes, color, and type only. In-memory state only.",
+      "files": []
+    },
+    {
+      "name": "event-form",
+      "surface": "phone",
+      "prompt": "The \"New event\" screen of a calendar app called \"Plan\". Phone, compact width; light and dark should both work. Fields: title, all-day on/off, start (Thu, Oct 16, 2:00 PM) and end (Thu, Oct 16, 3:00 PM), repeat (Does not repeat), location, guests (two already added: Ana Lopez and Ben Okafor, plus a way to add more), a reminder (10 minutes before), a calendar color choice from 6 options, and a description. The user can save or discard the event. In-memory state only.",
+      "files": []
+    },
+    {
+      "name": "inbox",
+      "surface": "phone",
+      "prompt": "The inbox of an email app called \"Letter\". Phone, compact width; light and dark should both work. Show a search entry point, the signed-in account (avatar only), and 10 emails with sender, subject, a one-line preview, and time; 4 are unread, 2 are starred, and 1 has an attachment. The user can switch between Inbox, Starred, Sent, and Drafts as top-level destinations, and compose a new email. In-memory state only.",
+      "files": []
+    },
+    {
+      "name": "health",
+      "surface": "phone",
+      "prompt": "The \"Today\" screen of a health app called \"Pulse\". Phone, compact width; light and dark should both work. Show steps (7,842 of a 10,000 goal), active minutes (38 of 45), sleep last night (7 h 12 min, with time in deep, light, and REM sleep), resting heart rate (58 bpm, down 2 from last week), and water (5 of 8 glasses, with a way to log one more). The user can also see the last 7 days of steps. In-memory state only.",
+      "files": []
+    },
+    {
+      "name": "weather",
+      "surface": "phone",
+      "prompt": "The main screen of a weather app called \"Skies\", for Lisbon. Phone, compact width; light and dark should both work. Now: 22 degrees C, partly cloudy, feels like 23, high 25 and low 17. Show the next 12 hours (hourly temperature and condition), the next 7 days (condition, high, low), and details: UV index 6 (high), wind 14 km/h NW, humidity 58%, sunset 19:12, air quality 32 (good). The user can switch to another saved city. In-memory state only.",
+      "files": []
+    }
+  ]
+}

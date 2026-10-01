@@ -9,6 +9,7 @@ report.html. Output goes to ~/.cache/android-design-evals/<timestamp>/ unless --
 """
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -23,6 +24,7 @@ from report import write_report, write_summary
 
 HERE = Path(__file__).resolve().parent
 SKILL_DIR = HERE.parent / "skills" / "android-design"
+DEFAULT_SDK = Path.home() / "Library" / "Android" / "sdk"
 CONTRACTS = {
     "phone": "Implement the screen as `@Composable fun EvalScreen()` in package `com.example.evalapp` in the :app module, replacing the placeholder in EvalScreen.kt. It must apply the app's own theme. MainActivity already calls it.",
     "wear": "Implement the screen as `@Composable fun EvalWearScreen()` in package `com.example.evalapp.wear` in the :wear module, replacing the placeholder in EvalWearScreen.kt. It must apply its own Wear theme. MainActivity already calls it.",
@@ -35,12 +37,23 @@ def restore_harness(case, project):
     shutil.copytree(HERE / "overlays" / case["surface"], project, dirs_exist_ok=True)
 
 
+def android_sdk():
+    """The SDK Gradle should use, even when the runner's shell has no ANDROID_HOME."""
+    for name in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
+        if os.environ.get(name):
+            return Path(os.environ[name])
+    return DEFAULT_SDK if DEFAULT_SDK.is_dir() else None
+
+
 def prepare(case, case_dir):
     # The agent only ever sees copies of the skill and the template project, never the repo.
     shutil.copytree(SKILL_DIR, case_dir / "skill")
     project = case_dir / "project"
     shutil.copytree(HERE / "template", project)
     restore_harness(case, project)
+    sdk = android_sdk()
+    if sdk:
+        (project / "local.properties").write_text(f"sdk.dir={sdk}\n")
     for f in case.get("files", []):
         target = project / f["to"]
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -55,13 +68,15 @@ def prompt_for(case, skill_copy):
                 .replace("{{BRIEF}}", case["prompt"]))
 
 
-def run_case(case, out, judge_runs):
-    case_dir = out / case["name"]
+def build(case, case_dir):
+    """Lets a headless agent build the brief in a fresh copy of the template, then re-renders it.
+
+    Returns the project folder, the agent's cost, turns, and final message, and the render paths.
+    """
     if case_dir.exists():
         shutil.rmtree(case_dir)
     case_dir.mkdir(parents=True)
     project = prepare(case, case_dir)
-    started = time.time()
 
     try:
         agent = subprocess.run(
@@ -85,11 +100,18 @@ def run_case(case, out, judge_runs):
     renders = case_dir / "renders"
     if (project / "renders").exists():
         shutil.copytree(project / "renders", renders)
+    images = sorted(str(p) for p in renders.glob("*.png")) if renders.exists() else []
+    return project, agent_info, images
+
+
+def run_case(case, out, judge_runs):
+    started = time.time()
+    case_dir = out / case["name"]
+    project, agent_info, images = build(case, case_dir)
 
     checks = run_checks(project, case["surface"])
     (case_dir / "checks.json").write_text(json.dumps(checks, indent=2))
 
-    images = sorted(str(p) for p in renders.glob("*.png")) if renders.exists() else []
     rubric_ids = [a["id"] for a in case["assertions"] if a["type"] == "rubric"]
     if not images:
         verdict = {i: {"pass": False, "votes": "0/0", "reason": "no renders"} for i in rubric_ids}
