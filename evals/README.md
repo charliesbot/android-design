@@ -34,6 +34,7 @@ Agents design something different on every run, so one failed item on one run is
 | `calibration/` | Past renders with known verdicts; `calibrate.py` must reproduce them |
 | `baseline/` | The last accepted run's primary renders, compared in each report |
 | `template/`, `overlays/` | The project each agent starts from and the fixed render harness per surface |
+| `preference/` | Preference rounds: the owner picks between unsteered variants to refine the skill's taste (see its README) |
 
 Renders are offscreen (Compose Preview Screenshot Testing for phone and Wear, Robolectric for Glance widgets). They include system bars and dynamic color, but not motion, and widget corner clipping is not drawn. Check edge-to-edge behavior on an emulator when it matters.
 
