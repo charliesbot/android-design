@@ -3,11 +3,14 @@
 
 Usage: serve.py ROUND_DIR [--port 8765]
 
-Localhost only. Picks are written to ROUND_DIR/selections.json after every change, so closing the tab
-loses nothing and restarting resumes where you left off.
+Localhost only. Picks are saved atomically to ROUND_DIR/selections.json. Wait for the picker to confirm
+“All changes saved” before closing the tab. Failed saves can be retried while the tab stays open.
 """
 import argparse
 import json
+import os
+import tempfile
+import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -34,7 +37,26 @@ def round_state(root):
     return {"cases": cases, "selections": selections}
 
 
+def save_selection(root, case, pick):
+    """Called under the handler's lock, so concurrent requests cannot lose other picks."""
+    target = root / "selections.json"
+    selections = json.loads(target.read_text()) if target.exists() else {}
+    selections[case] = pick
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", dir=root, prefix=".selections-", suffix=".json", delete=False) as output:
+            temporary = Path(output.name)
+            json.dump(selections, output, indent=2)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, target)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
 def make_handler(root):
+    selections_lock = threading.Lock()
     class Handler(BaseHTTPRequestHandler):
         def send(self, status, body, content_type):
             self.send_response(status)
@@ -46,6 +68,8 @@ def make_handler(root):
         def do_GET(self):
             if self.path in ("/", "/index.html"):
                 return self.send(200, (HERE / "picker.html").read_bytes(), "text/html; charset=utf-8")
+            if self.path == "/saves.mjs":
+                return self.send(200, (HERE / "saves.mjs").read_bytes(), "text/javascript; charset=utf-8")
             if self.path == "/api/round":
                 return self.send(200, json.dumps(round_state(root)).encode(), "application/json")
             if self.path.startswith("/renders/"):
@@ -60,11 +84,18 @@ def make_handler(root):
         def do_POST(self):
             if self.path != "/api/select":
                 return self.send(404, b"not found", "text/plain")
-            pick = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            selections_file = root / "selections.json"
-            selections = json.loads(selections_file.read_text()) if selections_file.exists() else {}
-            selections[pick.pop("case")] = pick
-            selections_file.write_text(json.dumps(selections, indent=2))
+            try:
+                pick = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                if not isinstance(pick, dict) or not isinstance(pick.get("case"), str) or not pick["case"]:
+                    raise ValueError("missing case")
+                case = pick.pop("case")
+            except (ValueError, TypeError):
+                return self.send(400, b'{"error":"Invalid selection"}', "application/json")
+            try:
+                with selections_lock:
+                    save_selection(root, case, pick)
+            except (OSError, ValueError, TypeError):
+                return self.send(500, b'{"error":"Selection not saved"}', "application/json")
             self.send(200, b"{}", "application/json")
 
         def log_message(self, *args):
