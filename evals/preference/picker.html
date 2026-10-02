@@ -40,7 +40,7 @@
   .placeholder { height: 400px; display: grid; place-items: center; color: var(--muted); text-align: center; }
   .label { font-weight: 600; }
   .actions { display: flex; gap: 8px; }
-  .actions button, .nav button, .none { font: inherit; border-radius: 999px; padding: 6px 14px; cursor: pointer;
+  .actions button, .nav button, #retry-save, .none { font: inherit; border-radius: 999px; padding: 6px 14px; cursor: pointer;
     border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
   .actions .b.on { background: var(--best); border-color: var(--best); color: var(--panel); }
   .actions .w.on { background: var(--worst); border-color: var(--worst); color: var(--panel); }
@@ -77,11 +77,15 @@
   <span class="count" id="count"></span>
   <div class="dots" id="dots"></div>
   <div class="views" id="views"></div>
+  <span class="saved" id="saved" role="status" aria-live="polite"></span>
+  <button id="retry-save" type="button" hidden>Retry saving</button>
 </header>
 <main id="main"></main>
 <div class="lightbox" id="lightbox"><img alt=""></div>
 
-<script>
+<script type="module">
+import { PreferenceSaves } from "./saves.mjs";
+
 const VIEWS = [["light", "Light", "L"], ["dark", "Dark", "D"], ["font200", "200% text", "F"], ["wallpaper", "Wallpaper", "W"]];
 const GOOD = ["hierarchy", "color", "typography", "shape", "spacing", "layout", "components", "hero moment", "details", "feels native"];
 const BAD = ["weak hierarchy", "color", "typography", "shape", "spacing", "layout", "components", "generic", "too busy", "hard to read", "broken"];
@@ -96,6 +100,7 @@ async function load() {
   const firstOpen = round.cases.findIndex(c => !isDone(c.name));
   if (index === 0 && firstOpen > 0) index = firstOpen;
   render();
+  updateSaveStatus();
   if (round.cases.some(c => c.variants.some(v => v.status === "pending"))) setTimeout(refresh, 20000);
 }
 
@@ -111,18 +116,26 @@ function isDone(name) {
   return p && (p.best || p.none_good);
 }
 
-let saveTimer = null;
+function warnUnsaved(event) {
+  event.preventDefault();
+  event.returnValue = "";
+}
+
+function updateSaveStatus() {
+  const pending = saves.pending.size > 0;
+  document.getElementById("saved").textContent = saves.failed
+    ? "Changes not saved. Keep this tab open and retry."
+    : pending ? "Saving changes…" : "All changes saved";
+  document.getElementById("retry-save").hidden = !saves.failed;
+  if (pending) window.addEventListener("beforeunload", warnUnsaved);
+  else window.removeEventListener("beforeunload", warnUnsaved);
+}
+
+const saves = new PreferenceSaves(updateSaveStatus);
+document.getElementById("retry-save").onclick = () => saves.retry();
+
 function save(name) {
-  clearTimeout(saveTimer);
-  const status = document.getElementById("saved");
-  if (status) status.textContent = "saving";
-  saveTimer = setTimeout(async () => {
-    await fetch("/api/select", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ case: name, ...pickFor(name), at: new Date().toISOString() }) });
-    const s = document.getElementById("saved");
-    if (s) s.textContent = "saved";
-    renderHeader();
-  }, 250);
+  saves.enqueue(name, pickFor(name));
 }
 
 function renderHeader() {
@@ -226,7 +239,6 @@ function renderCase() {
     el("button", { class: "none" + (p.none_good ? " on" : ""), onclick: () => {
       p.none_good = !p.none_good; if (p.none_good) p.best = null; save(c.name); render();
     } }, "None are good ", el("kbd", {}, "N")),
-    el("span", { class: "saved", id: "saved" }, ""),
     el("button", { onclick: () => go(1) }, "Next →"),
   ));
 }
@@ -235,7 +247,7 @@ function renderSummary() {
   const main = document.getElementById("main");
   main.innerHTML = "";
   const done = round.cases.filter(c => isDone(c.name)).length;
-  main.append(el("h2", {}, done === round.cases.length ? "All picked. Tell Claude you're done." : `${round.cases.length - done} cases still need a pick.`));
+  main.append(el("h2", {}, done === round.cases.length ? "All picked. Wait for “All changes saved” before closing." : `${round.cases.length - done} cases still need a pick.`));
   const letter = id => id ? String.fromCharCode(64 + Number(id.slice(1))) : "–";
   const rows = round.cases.map((c, i) => {
     const p = round.selections[c.name] || empty();
