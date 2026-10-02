@@ -996,7 +996,9 @@ Principles:
   shape (a wave is not "the progress shape").
 - **Use abstract shapes sparingly.** "Shapes without clear meaning behind why
   they're different can add more visual clutter than delight." Not on
-  text-heavy containers.
+  text-heavy containers. "Ensure that shapes resonate with the product's
+  narrative. Consider the 'why' behind their inclusion": a shape earns its
+  place by connecting to the subject, not by filling space.
 - **Aesthetic moments are the most flexible use:** image crops, avatar masks,
   decorative graphics.
 - **Shape can be 2.5D:** layered shapes with different motion suggest depth.
