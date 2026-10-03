@@ -29,8 +29,6 @@ Any agent that reads skills can also load `skills/android-design/SKILL.md` direc
    compose-preview doctor
    ```
 
-MCP is optional.
-
 ## What is here
 
 | Path | Job |
