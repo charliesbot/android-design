@@ -15,15 +15,21 @@ Any agent that reads skills can also load `skills/android-design/SKILL.md` direc
 
 ## Requirements
 
-Install the [`compose-preview` CLI](https://github.com/yschimke/compose-ai-tools) and the [`compose-preview` and `compose-ui-builder` skills](https://github.com/yschimke/skills) before using visual workflows. MCP integration is optional; the preview skill supports the CLI directly.
+1. Install the [Compose preview CLI](https://github.com/yschimke/compose-ai-tools):
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/yschimke/skills/main/scripts/install.sh | bash -s -- --cli-only
-compose-preview --version
-compose-preview doctor
-```
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/yschimke/skills/main/scripts/install.sh | bash -s -- --cli-only
+   ```
 
-The skill assumes this setup is complete. `android-design` owns design judgment and exploration isolation; `compose-preview` owns rendering existing Compose code. `compose-ui-builder` owns catalog-backed design authoring when that workflow is requested. The builder's PNG/SVG export requires Java 21+, while checkout rendering requires Java 17+ and the project's Android toolchain.
+2. Install the [`compose-preview` and `compose-ui-builder` skills](https://github.com/yschimke/skills).
+
+3. Check your setup:
+
+   ```bash
+   compose-preview doctor
+   ```
+
+MCP is optional.
 
 ## What is here
 
