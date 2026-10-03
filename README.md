@@ -13,18 +13,17 @@ local = ['~/projects/android-design/skills']
 
 Any agent that reads skills can also load `skills/android-design/SKILL.md` directly.
 
-## Visual tooling prerequisites
+## Requirements
 
 Install the [`compose-preview` CLI](https://github.com/yschimke/compose-ai-tools) and the [`compose-preview` and `compose-ui-builder` skills](https://github.com/yschimke/skills) before using visual workflows. MCP integration is optional; the preview skill supports the CLI directly.
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/yschimke/skills/main/scripts/install.sh | bash -s -- --cli-only
 compose-preview --version
 compose-preview doctor
 ```
 
 The skill assumes this setup is complete. `android-design` owns design judgment and exploration isolation; `compose-preview` owns rendering existing Compose code. `compose-ui-builder` owns catalog-backed design authoring when that workflow is requested. The builder's PNG/SVG export requires Java 21+, while checkout rendering requires Java 17+ and the project's Android toolchain.
-
-Exploration currently uses a temporary copy of the bundled starter, leaving the target app unchanged. Installing the builder does not automatically switch exploration to a projectless workflow. The phone starter has been rendered with compose-preview 2.33.0, including light/dark and main-source previews. Wear remains outside the validated design scope. The existing screenshot harness is a maintenance check, not a fallback for the agent.
 
 ## What is here
 
