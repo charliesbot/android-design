@@ -3,8 +3,9 @@ name: android-design
 description: >
   Material 3 Expressive design judgment for Android apps in Jetpack Compose, distilled from Google's
   guidelines, UX research, and I/O talks. Use when designing, building, or reviewing Android phone, tablet,
-  or desktop screens; choosing components; setting up a theme (color, type, shape, motion); or when a Compose UI
-  looks generic and needs hierarchy, emphasis, or polish.
+  or desktop screens; exploring app ideas or redesign alternatives without editing the app; choosing components;
+  setting up a theme (color, type, shape, motion); or when a Compose UI looks generic and needs hierarchy,
+  emphasis, or polish.
 ---
 
 # Android Design
@@ -26,6 +27,16 @@ Three causes, each fixable:
 1. **Plain `MaterialTheme` is pre-Expressive.** It defaults to `MotionScheme.standard()` (minimal bounce), baseline shapes, and baseline type. Only `MaterialExpressiveTheme` defaults to expressive motion.
 2. **Many default components were replaced but not deprecated.** Medium/large top app bars, the bottom app bar, segmented buttons, the navigation drawer, and the small FAB still compile without warnings. See section 9.
 3. **Nobody decided what matters most.** Tokens can't make that decision. Section 0 does.
+
+## Visual tooling
+
+Assume the `compose-preview` CLI and the `compose-preview` and `compose-ui-builder` skills are installed. For rendering Compose code, read and follow `compose-preview`; it owns tool selection, rendering, and troubleshooting. For a UI Builder design authoring request, follow `compose-ui-builder`. This skill owns design decisions and the screen check. If a dependency is unavailable, report it and refer the user to this repository's README setup section rather than installing tools or substituting another renderer.
+
+## Exploration or implementation
+
+For brainstorming, redesign ideas, or visual alternatives before implementation, read [references/exploration.md](references/exploration.md) first. Build and render proposals in a temporary copy of the bundled Compose starter; the target app stays read-only. Use image generation only for assets, not as a substitute for rendered Compose UI. The starter also includes an experimental Wear shell for explicitly requested explorations, without widening this skill's validated scope.
+
+For implementation or review requests, work in the actual project under its own approval and branch rules. Both paths use the design decisions and screen check below.
 
 ## 0. Before writing UI
 
@@ -275,7 +286,7 @@ Watches build from black, use edge-hugging buttons, Roboto Flex with numeral and
 
 ## Screen check
 
-Look at the rendered screen, not the code. Capture it with `android screen` (see the `android-cli` skill) or a Compose preview screenshot. If you can't render it, report "visual quality unverified" instead of answering from code.
+Look at the rendered screen, not the code. Use the `compose-preview` skill to render and inspect Compose previews; for a UI Builder design, use the builder skill's visual verification workflow and identify the output type. If you can't render it, report "visual quality unverified" instead of answering from code.
 
 - Is the hierarchy obvious at first glance: does the eye land on the primary goal?
 - What gives the screen its character, and does every expressive choice serve the direction from section 0?
