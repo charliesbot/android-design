@@ -6,13 +6,19 @@ PRIMARY = {"phone": "light", "wear": "large", "widget": "light-4x2"}
 
 
 def score(items):
-    passed = sum(1 for v in items.values() if v["pass"])
+    passed = sum(1 for v in items.values() if v["pass"] is True)
     return passed, len(items)
 
 
 def failures(items):
-    rows = [f"<li><b>{html.escape(k)}</b>: {html.escape(v.get('detail') or v.get('reason') or '')}</li>"
-            for k, v in items.items() if not v["pass"]]
+    rows = []
+    for key, value in items.items():
+        if value["pass"] is True:
+            continue
+        detail = value.get("detail") or value.get("reason") or ""
+        if value["pass"] is None:
+            detail = "Pending: " + detail
+        rows.append(f"<li><b>{html.escape(key)}</b>: {html.escape(detail)}</li>")
     return f"<ul>{''.join(rows)}</ul>" if rows else "<p class=ok>All passed</p>"
 
 
@@ -30,7 +36,7 @@ def write_report(out: Path, results, baseline_dir: Path):
         cost = r["agent"]["cost"]
         sections.append(f"""
 <section>
-  <h2>{html.escape(r['name'])} <small>{r['surface']} · {r['minutes']} min · agent ${cost if cost is not None else '?'}</small></h2>
+  <h2>{html.escape(r['name'])} ({html.escape(r.get('status', 'legacy'))}) <small>{r['surface']} · {r['minutes']} min · agent ${cost if cost is not None else '?'}</small></h2>
   <p class=scores><span>Code checks {c_pass}/{c_total}</span><span>Rubric {j_pass}/{j_total}</span></p>
   <div class=grid><div><h3>Code check failures</h3>{failures(r['checks'])}</div><div><h3>Rubric failures</h3>{failures(r['judge'])}</div></div>
   <div class=shots>{base_img}{shots}</div>
@@ -57,14 +63,14 @@ figcaption{{color:var(--muted);font-size:13px;text-align:center}} pre{{white-spa
 
 def write_summary(out: Path, results):
     """Writes summary.md, a plain scores table plus every failure, for terminals and CI summaries."""
-    lines = ["| Case | Surface | Code checks | Rubric |", "| --- | --- | --- | --- |"]
+    lines = ["| Case | Surface | Status | Code checks | Rubric |", "| --- | --- | --- | --- | --- |"]
     for r in results:
         c_pass, c_total = score(r["checks"])
         j_pass, j_total = score(r["judge"])
-        lines.append(f"| {r['name']} | {r['surface']} | {c_pass}/{c_total} | {j_pass}/{j_total} |")
+        lines.append(f"| {r['name']} | {r['surface']} | {r.get('status', 'legacy')} | {c_pass}/{c_total} | {j_pass}/{j_total} |")
     failed = [(r["name"], k, v.get("detail") or v.get("reason") or "")
               for r in results for k, v in {**r["checks"], **r["judge"]}.items() if not v["pass"]]
-    lines += ["", "Failures:" if failed else "No failures."]
+    lines += ["", "Failures or pending judgments:" if failed else "No failures."]
     lines += [f"- {name} {item}: {reason}" for name, item, reason in failed]
     path = out / "summary.md"
     path.write_text("\n".join(lines) + "\n")

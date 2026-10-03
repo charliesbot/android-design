@@ -6,6 +6,10 @@ Read {{SKILL_DIR}}/SKILL.md fully, and read its reference files when it tells yo
 
 Do not read any other design skill or anything under ~/.claude/skills or ~/.agents/skills.
 
+## Execution agreement
+
+The brief, module boundary, and verification steps below are the approved plan for this disposable evaluation fixture. Implement them now without another planning-approval turn. This is not a target app checkout: do not create branches, commit, push, or open a pull request. Preserve the fixed harness. If a required tool or permission is unavailable, report the blocker accurately rather than bypassing it.
+
 ## Project
 
 You are in the project root. It is a small Compose project that already builds (AGP 9.4.1, compileSdk 37, material3 1.5.0-alpha29, Wear Compose 1.7.0, Glance 1.2.0). Work only in the module named in the contract below. You may add files, resources, and dependencies (app or wear build.gradle.kts and gradle/libs.versions.toml). Fonts may be downloaded from https://github.com/google/fonts and Material Symbols icons from https://github.com/google/material-design-icons.
@@ -18,7 +22,7 @@ Files under `*/src/screenshotTest/`, `*/src/test/`, and `eval-render.sh` belong 
 
 ## Rendering (the skill's screen check)
 
-Run `./eval-render.sh` from the project root. It renders your screen offscreen (no emulator) into `./renders/*.png`. Open the PNGs with the Read tool and look at them. Do not use adb or an emulator.
+Run `./eval-render.sh` from the project root. It renders your screen offscreen (no emulator) into `./renders/*.png`. Open the PNGs with your image-viewing tool and inspect them. Do not use adb or an emulator.
 
 ## The screen
 

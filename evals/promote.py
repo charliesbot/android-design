@@ -13,9 +13,12 @@ from report import PRIMARY
 HERE = Path(__file__).resolve().parent
 
 run = Path(sys.argv[1])
+results = json.loads((run / "results.json").read_text())["cases"]
+if not results or any(not case.get("judge") or any(v.get("pass") is None for v in case["judge"].values()) for case in results):
+    sys.exit("Cannot promote an incomplete visual assessment; finish judging first")
 baseline = HERE / "baseline"
 baseline.mkdir(exist_ok=True)
-for case in json.loads((run / "results.json").read_text())["cases"]:
+for case in results:
     source = run / case["name"] / "renders" / f"{PRIMARY[case['surface']]}.png"
     if not source.exists():
         print(f"skip {case['name']}: no {source.name}")

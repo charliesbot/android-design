@@ -13,6 +13,22 @@ local = ['~/projects/android-design/skills']
 
 Any agent that reads skills can also load `skills/android-design/SKILL.md` directly.
 
+## Requirements
+
+1. Install the [Compose preview CLI](https://github.com/yschimke/compose-ai-tools):
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/yschimke/skills/main/scripts/install.sh | bash -s -- --cli-only
+   ```
+
+2. Install the [`compose-preview` and `compose-ui-builder` skills](https://github.com/yschimke/skills).
+
+3. Check your setup:
+
+   ```bash
+   compose-preview doctor
+   ```
+
 ## What is here
 
 | Path | Job |

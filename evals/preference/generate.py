@@ -38,8 +38,8 @@ def prune(variant_dir, project):
         shutil.rmtree(build_dir, ignore_errors=True)
 
 
-def run_variant(case, variant_dir):
-    project, agent_info, images = build(case, variant_dir)
+def run_variant(case, variant_dir, backend, model=None):
+    project, agent_info, images = build(case, variant_dir, backend, model)
     checks = run_checks(project, case["surface"])
     prune(variant_dir, project)
     record = {**agent_info, "checks": checks, "renders": [Path(p).name for p in images]}
@@ -49,6 +49,8 @@ def run_variant(case, variant_dir):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--generator", choices=("claude", "codex"), required=True)
+    parser.add_argument("--generator-model")
     parser.add_argument("--variants", type=int, default=3)
     parser.add_argument("--cases", help="comma-separated brief names; default: all")
     parser.add_argument("--parallel", type=int, default=4)
@@ -72,7 +74,7 @@ def main():
 
     def safe(job):
         try:
-            run_variant(*job)
+            run_variant(*job, args.generator, args.generator_model)
         except Exception as error:  # one broken variant must not stop the round
             print(f"failed {job[1]}: {error}", flush=True)
 

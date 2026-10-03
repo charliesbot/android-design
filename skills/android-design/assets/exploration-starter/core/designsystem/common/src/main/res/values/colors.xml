@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand color values referenced from XML (manifest theme, splash screen, etc.).
+         Compose color tokens live in :core:designsystem:app or :core:designsystem:wear
+         once those modules are promoted. -->
+</resources>
