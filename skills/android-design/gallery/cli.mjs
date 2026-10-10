@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
+import { create, cleanup } from './workspace.mjs';
 import { publishRound, GalleryStore } from './store.mjs';
 import { startServer } from './server.mjs';
 
 const help = `Local design exploration gallery (Node.js 22+).
 
+node <skill>/gallery/cli.mjs create --project <repo> [--title "..."]
+  Copy the starter into <repo>/design-explorations/ and print the exploration path.
+node <skill>/gallery/cli.mjs cleanup <exploration> --project <repo> --yes
+  Delete a marked exploration after the user confirms.
 node <skill>/gallery/cli.mjs publish <exploration> <draft.json>
   Preserve the current project source and four PNGs per proposal as a new round.
   Image paths in the draft are relative to <exploration>/project.
@@ -22,10 +27,16 @@ Draft: {"title":"First directions","proposals":[{"id":"a","name":"Editorial",
 Rendering stays with Compose Preview CLI. Publish only after inspecting fresh renders.
 Approval never implements a design. Previous rounds are preserved.`;
 try {
-  const { values, positionals } = parseArgs({ options: { help: { type: 'boolean', short: 'h' }, port: { type: 'string' } }, allowPositionals: true });
+  const { values, positionals } = parseArgs({ options: { help: { type: 'boolean', short: 'h' }, port: { type: 'string' }, project: { type: 'string' }, title: { type: 'string' }, yes: { type: 'boolean' } }, allowPositionals: true });
   const [command, root, draft] = positionals;
   if (values.help || !command) console.log(help);
-  else if (command === 'publish' && root && draft && positionals.length === 3) {
+  else if (command === 'create' && root === undefined) {
+    console.log(create({ root: values.project, title: values.title }));
+  } else if (command === 'cleanup' && root && positionals.length === 2) {
+    if (!values.yes) throw new Error('Cleanup deletes source, feedback, history, and renders; confirm with the user, then pass --yes');
+    cleanup(root, values.project);
+    console.log(`Removed ${root}`);
+  } else if (command === 'publish' && root && draft && positionals.length === 3) {
     const round = publishRound(root, JSON.parse(readFileSync(draft, 'utf8')));
     console.log(`Published round ${round.id}: ${round.proposals.length} proposals. Source: ${root}/rounds/${round.id}/source`);
   } else if (command === 'status' && root && positionals.length === 2) {

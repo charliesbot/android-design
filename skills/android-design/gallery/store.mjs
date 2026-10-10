@@ -176,6 +176,13 @@ export class GalleryStore {
   }
 }
 
+export function initializeExploration(root, title) {
+  requireThat(typeof title === 'string' && title.trim().length > 0 && title.length <= 200, 'Title must contain 1 to 200 characters');
+  atomicJSON(join(root, MARKER), { version: 1, path: root });
+  atomicJSON(join(root, 'exploration.json'), { version: 1, title, rounds: [] });
+  atomicJSON(join(root, 'feedback.json'), { revision: 0, rounds: {}, approved: null });
+}
+
 export function publishRound(root, draft) {
   const store = new GalleryStore(root);
   return locked(store.root, () => {

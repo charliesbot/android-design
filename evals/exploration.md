@@ -15,12 +15,12 @@ python3 scripts/check_coverage.py
 
 Gallery tests exercise round snapshots, image validation, source integrity, atomic feedback, stale writes, approval, path safety, and HTTP origin/host boundaries. Node HTTP tests need loopback listening permission. No third-party Node packages are required.
 
-Create an exploration in an expendable Git repository with `scripts/explore.py create --project <fixture-repo>`. In the returned `project/`, configure the SDK if necessary and run:
+Create an exploration in an expendable Git repository with `node skills/android-design/gallery/cli.mjs create --project <fixture-repo>`. In the returned `project/`, configure the SDK if necessary and run:
 
 ```bash
 ./gradlew projects spotlessCheck :app:assembleDebug :wear:assembleDebug
-python3 render.py app
-python3 render.py wear
+node render.mjs app
+node render.mjs wear
 ```
 
 These are starter maintenance checks, not evidence that Compose Preview CLI works. Wear remains an experimental scaffold check, not design-quality approval. Never build inside the installed starter.
