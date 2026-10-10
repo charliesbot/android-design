@@ -101,3 +101,17 @@ test('static serving refuses traversal, symlinks, and directories', async t => {
   }
   assert.equal(await rawStatus(url, '/'), 200);
 });
+
+test('exposes a live agent session and hides an expired one', async t => {
+  const { root, draft } = fixture(t);
+  const store = new GalleryStore(root);
+  store.publish(draft);
+  const server = await startServer(root, 0);
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const url = `http://127.0.0.1:${server.address().port}`;
+  const read = async () => (await (await fetch(`${url}/api/exploration`)).json()).session;
+  store.writeSession('waiting', new Date(Date.now() + 60_000));
+  assert.equal((await read()).state, 'waiting');
+  store.writeSession('waiting', new Date(Date.now() - 1000));
+  assert.equal(await read(), null);
+});

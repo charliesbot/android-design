@@ -13,7 +13,7 @@ node --test tests/gallery/*.test.mjs
 python3 scripts/check_coverage.py
 ```
 
-Gallery tests exercise round snapshots, image validation, source integrity, atomic feedback, stale writes, approval, path safety, and HTTP origin/host boundaries. Node HTTP tests need loopback listening permission. The gallery runtime needs no third-party Node packages; development uses `npm install` for Vite and Lit.
+Gallery tests exercise round snapshots, image validation, source integrity, atomic feedback, stale writes, approval, path safety, and HTTP origin/host boundaries. `tests/gallery/wait.test.mjs` covers the `wait` command, its session status file, and signal handling. Node HTTP tests need loopback listening permission. The gallery runtime needs no third-party Node packages; development uses `npm install` for Vite and Lit.
 
 Create an exploration in an expendable Git repository with `node skills/android-design/gallery/cli.mjs create --project <fixture-repo>`. In the returned `project/`, configure the SDK if necessary and run:
 
@@ -32,6 +32,7 @@ These are starter maintenance checks, not evidence that Compose Preview CLI work
 3. Select one option, switch to another, and enter shared notes. Only one proposal may be selected. Submit a refinement and verify its saved snapshot and chat handoff. Test None of these with required notes. Verify save confirmation, restart the server, and reload. Notes and selections must survive. With two tabs, verify an outdated write is rejected without silently overwriting the saved state. Exercise visible retry after a disconnected server.
 4. Refine one direction in the working `project/`, rerender, inspect, and publish another round. Check the original round's source and image hashes are unchanged. Verify the new round appears automatically without losing edits or interrupting history inspection. Finish one selected revision and confirm the approved identity survives restart. Further writes/publication must be refused. Production app hashes and installed starter hashes must still match.
 5. Stop the server and exercise cleanup only on an expendable, explicitly selected fixture exploration. It must refuse the repository root, unmarked folders, symlinks, and copied markers. Published source, PNGs, and notes are deleted together only on explicit confirmation.
+6. Watch session: start a session (`gallery/cli.mjs wait`), press Refine, and observe the next round arrive without touching chat while the status line moves through waiting and working. Press Finish and confirm the session reports the approved revision and stops. Separately, let a session idle out and confirm the chat message and the gallery's "return to chat" fallback text.
 
 The gallery never invokes an agent, runs Gradle, or implements a selected proposal. Test its website with the available browser tooling; Playwright is not a runtime dependency or proposal capture layer.
 
@@ -40,6 +41,7 @@ The gallery never invokes an agent, runs Gradle, or implements a selected propos
 - "Show me three home-screen ideas." Expect three real Compose proposals in the requesting repository's ignored exploration folder, four PNGs per proposal, and a local gallery. Ask for a repository if none was selected, not a new app scaffold in the current directory.
 - "Explore a redesign of Today." Expect read-only inspection of app code and dependencies, with writes only to exploration artifacts and the local Git exclusion.
 - "Adjust option B." Expect saved feedback to be read, one refinement by default, and a new preserved round in the same exploration.
+- "Keep refining while I review." Expect a watch session to start after the first publish. "Adjust option B" without a session still produces one preserved round. A failed render stops the session with visual quality reported unverified.
 - Approving a design in the gallery must end exploration, not start implementation. "Implement the approved design" explicitly transitions to the requesting project's workflow and preserves its library versions.
 - "Explore Wear." Expect the experimental watch shell and preview skill, not the four-device gallery or a claim that parked Wear evals pass.
 

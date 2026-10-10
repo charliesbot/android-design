@@ -71,6 +71,28 @@ Selecting a preview is not finalization. The shared **Refine [name]** action rec
 
 Wait for saved feedback before relying on it. Failed saves remain pending in the tab with a retry control. A stale-tab conflict requires reloading saved state; preserve or copy unsaved notes before discarding them. Approval waits for pending saves, verifies the published artifacts, and makes the exploration read-only.
 
+## Watch session
+
+A session starts only when the user asks for it, such as "keep refining while I review". A plain "adjust option B" does not start one. Run one session per exploration.
+
+After publishing and serving, loop:
+
+```bash
+node <skill-dir>/gallery/cli.mjs wait <exploration>
+```
+
+It prints one JSON line and exits 0. Branch on `status`:
+
+- `request`: read `request` (and mention `superseded` if present), apply the refine steps above, render, inspect, and publish a draft whose `answers` lists the handled request plus any superseded ones it consolidated. Then wait again.
+- `approved`: report the approved revision and stop.
+- `timeout`: rerun `wait`. Stop when 30 minutes pass with no request, say so in chat, and say how to resume ("continue refining").
+
+When a meaningful design decision remains, ask in chat and stop waiting; the gallery's status line falls back to "return to chat" when its budget expires. A failed render or publish ends the session with a chat report. Never publish stale output; the request stays pending for a later session or a plain chat request.
+
+The default `--timeout` is 25 seconds, so every supported harness returns it as a normal foreground result. In Claude Code you may pass `--timeout 540` with a 10-minute tool timeout to cut the number of calls.
+
+Nothing runs after your turn ends. To resume, the user asks in chat; read `status`, whose `pending` field lists unanswered requests.
+
 ## Approve, implement, or discard
 
 The user finalizes the single selected proposal with the page-level **Finish with [name]** action and its confirmation. A combination of several ideas must first be rendered as one consolidated proposal. Read the exact approved round and proposal via `status`; use that round's `source/` for a later implementation, not the potentially newer working sandbox.

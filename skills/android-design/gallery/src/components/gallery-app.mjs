@@ -4,7 +4,7 @@ import './proposal-card.mjs';
 import './action-bar.mjs';
 import {
   DEVICE_LABELS, EMPTY_ENTRY, WAITING_TEXT, approvalText, canCancelDialog, canChooseNone, canFinish, canRefine,
-  confirmName, guardUnload, isLocked, mayReplace, nextRoundSelection, proposalKey, sameRounds, selectedProposal,
+  confirmName, guardUnload, isLocked, mayReplace, nextRoundSelection, proposalKey, sameRounds, sameSession, selectedProposal,
   shouldReload, showReload, showRetry, staleResult, statusText,
 } from '../state.mjs';
 
@@ -85,7 +85,7 @@ export class GalleryApp extends LitElement {
       this.connectionError = '';
       const incomingRounds = incoming.rounds.map(round => round.id);
       const newRounds = !sameRounds(incomingRounds, this.data?.rounds.map(round => round.id));
-      if (!shouldReload({ hadData: Boolean(this.data), newRounds, sameRevision: incoming.feedback.revision === revision, sameTitle: incoming.title === this.data?.title })) return;
+      if (!shouldReload({ hadData: Boolean(this.data), newRounds, sameRevision: incoming.feedback.revision === revision, sameTitle: incoming.title === this.data?.title, sameSession: sameSession(incoming.session, this.data?.session) })) return;
       this.roundId = nextRoundSelection({ previousRound: this.roundId, previousLatest: this.data?.rounds.at(-1)?.id, hadData: Boolean(this.data), incomingRounds });
       this.data = incoming;
       this.saves = new FeedbackSaves(incoming.feedback.revision, () => this.requestUpdate());
@@ -181,7 +181,7 @@ export class GalleryApp extends LitElement {
             .checked=${proposalKey(round, item) === entry.choice} .locked=${locked}
             @choose=${event => this.save(event.detail, this.draft().note)}></proposal-card>`)}
         </section>
-        ${data ? html`<action-bar .round=${round} .proposal=${proposal} .entry=${entry} .approved=${Boolean(approved)} .locked=${locked}
+        ${data ? html`<action-bar .round=${round} .proposal=${proposal} .entry=${entry} .session=${data.session} .approved=${Boolean(approved)} .locked=${locked}
           .refineEnabled=${canRefine({ locked, error: Boolean(error), entry })} .finishEnabled=${canFinish({ locked, error: Boolean(error), proposal })}
           .noneEnabled=${canChooseNone({ locked, round })} .actionError=${this.actionError}
           @note-input=${event => this.save(this.draft().choice, event.detail)} @none=${() => this.none()}

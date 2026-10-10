@@ -8,6 +8,7 @@ export class ActionBar extends LitElement {
     round: { attribute: false },
     proposal: { attribute: false },
     entry: { attribute: false },
+    session: { attribute: false },
     approved: { type: Boolean },
     locked: { type: Boolean },
     refineEnabled: { type: Boolean },
@@ -34,7 +35,7 @@ export class ActionBar extends LitElement {
         <button id="finish" type="button" ?disabled=${!this.finishEnabled} @click=${() => this.emit('finish')}>Finish</button>
         <button id="none" type="button" aria-pressed=${String(entry.choice === 'none')} ?disabled=${!this.noneEnabled} @click=${() => this.emit('none')}>None of these</button>
       </div>
-      <p id="request-status" role="status">${requestStatusText(entry)}</p>
+      <p id="request-status" role="status">${requestStatusText(entry, this.session)}</p>
       <p id="action-error" role="alert">${this.actionError}</p>
     </section>`;
   }
