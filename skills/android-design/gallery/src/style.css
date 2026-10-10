@@ -144,3 +144,6 @@ dialog::backdrop { background: #20212499; }
   .toolbar label:first-child { flex-basis: 100%; }
   #round { width: 100%; }
 }
+
+/* Lit components render in the light DOM; their hosts add no box of their own. */
+gallery-app, proposal-card, action-bar { display: contents; }

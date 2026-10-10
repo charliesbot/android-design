@@ -13,7 +13,7 @@ node --test tests/gallery/*.test.mjs
 python3 scripts/check_coverage.py
 ```
 
-Gallery tests exercise round snapshots, image validation, source integrity, atomic feedback, stale writes, approval, path safety, and HTTP origin/host boundaries. Node HTTP tests need loopback listening permission. No third-party Node packages are required.
+Gallery tests exercise round snapshots, image validation, source integrity, atomic feedback, stale writes, approval, path safety, and HTTP origin/host boundaries. Node HTTP tests need loopback listening permission. The gallery runtime needs no third-party Node packages; development uses `npm install` for Vite and Lit.
 
 Create an exploration in an expendable Git repository with `node skills/android-design/gallery/cli.mjs create --project <fixture-repo>`. In the returned `project/`, configure the SDK if necessary and run:
 

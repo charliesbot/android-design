@@ -31,7 +31,7 @@ https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600&display=sw
 Font source:
 https://fonts.gstatic.com/s/googlesans/v71/4UasrENHsxJlGDuGo1OIlJfC6l_24rlCK1Yo_Iqcsih3SAyH6cAwhX9RPjIUvbQoi-E.woff2
 
-License: `public/fonts/OFL.txt`, from
+License: `src/static/fonts/OFL.txt`, from
 https://github.com/google/fonts/blob/main/ofl/googlesans/OFL.txt.
 Characters outside the Latin subset use the system fallback.
 

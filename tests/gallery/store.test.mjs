@@ -2,15 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { GalleryStore, publishRound } from '../../skills/android-design/gallery/store.mjs';
+import { GalleryStore } from '../../skills/android-design/gallery/store.mjs';
 
 import { fixture } from './fixture.mjs';
 
 test('publication preserves source and images across rounds and restart', t => {
   const { root, draft } = fixture(t);
-  publishRound(root, draft);
+  new GalleryStore(root).publish(draft);
   writeFileSync(join(root, 'project/settings.gradle.kts'), 'revised');
-  publishRound(root, draft);
+  new GalleryStore(root).publish(draft);
   const data = new GalleryStore(root).read();
   assert.equal(data.rounds.length, 2);
   assert.equal(readFileSync(join(root, 'rounds/001/source/settings.gradle.kts'), 'utf8'), 'rootProject.name = "Test"');
@@ -19,7 +19,7 @@ test('publication preserves source and images across rounds and restart', t => {
 
 test('feedback uses optimistic revision and approval is terminal', t => {
   const { root, draft } = fixture(t);
-  publishRound(root, draft);
+  new GalleryStore(root).publish(draft);
   const store = new GalleryStore(root);
   let state = store.read().feedback;
   state = store.save({ revision: state.revision, roundId: '001', choice: '001/a', note: 'Keep hierarchy' });
@@ -28,14 +28,14 @@ test('feedback uses optimistic revision and approval is terminal', t => {
   state = store.approve({ revision: state.revision, key: '001/a' });
   assert.equal(new GalleryStore(root).read().feedback.approved.key, '001/a');
   assert.throws(() => store.save({ revision: state.revision, roundId: '001', choice: '001/a', note: 'late' }), /approved/);
-  assert.throws(() => publishRound(root, draft), /approved/);
+  assert.throws(() => new GalleryStore(root).publish(draft), /approved/);
 });
 
 test('publishing or unknown feedback cannot corrupt an existing exploration', t => {
   const { root, draft } = fixture(t);
   const original = readFileSync(join(root, 'exploration.json'), 'utf8');
   delete draft.proposals[0].images.tablet;
-  assert.throws(() => publishRound(root, draft), /four|tablet/);
+  assert.throws(() => new GalleryStore(root).publish(draft), /four|tablet/);
   assert.equal(readFileSync(join(root, 'exploration.json'), 'utf8'), original);
   assert.throws(() => new GalleryStore(root).save({ revision: 0, roundId: 'unknown', choice: null, note: '' }), /Unknown/);
 });
@@ -44,18 +44,18 @@ test('reject traversal, symlinks, duplicate ids, and invalid images', t => {
   for (const path of ['../feedback.json', '/etc/passwd']) {
     const { root, draft } = fixture(t);
     draft.proposals[0].images.phone = path;
-    assert.throws(() => publishRound(root, draft), /path|inside/);
+    assert.throws(() => new GalleryStore(root).publish(draft), /path|inside/);
   }
   const { root, draft } = fixture(t);
   symlinkSync(join(root, 'feedback.json'), join(root, 'project/link.png'));
   draft.proposals[0].images.phone = 'link.png';
-  assert.throws(() => publishRound(root, draft), /symlink/);
+  assert.throws(() => new GalleryStore(root).publish(draft), /symlink/);
   rmSync(join(root, 'project/link.png'));
   draft.proposals[0].images.phone = 'settings.gradle.kts';
-  assert.throws(() => publishRound(root, draft), /PNG/);
+  assert.throws(() => new GalleryStore(root).publish(draft), /PNG/);
   draft.proposals[0].images.phone = 'test.png';
   draft.proposals.push(draft.proposals[0]);
-  assert.throws(() => publishRound(root, draft), /Duplicate/);
+  assert.throws(() => new GalleryStore(root).publish(draft), /Duplicate/);
 });
 
 test('excludes build caches and secrets from source snapshots', t => {
@@ -64,14 +64,14 @@ test('excludes build caches and secrets from source snapshots', t => {
   writeFileSync(join(root, 'project/build/generated'), 'cache');
   writeFileSync(join(root, 'project/.env'), 'PRIVATE');
   writeFileSync(join(root, 'project/local.properties'), 'sdk.dir=private');
-  publishRound(root, draft);
+  new GalleryStore(root).publish(draft);
   const files = new GalleryStore(root).read().rounds[0].sourceFiles;
   assert.equal(files.some(f => /build|\.env|local.properties/.test(f.path)), false);
 });
 
 test('mutated published image is rejected rather than approved', t => {
   const { root, draft } = fixture(t);
-  publishRound(root, draft);
+  new GalleryStore(root).publish(draft);
   const store = new GalleryStore(root);
   store.save({ revision: 0, roundId: '001', choice: '001/a', note: '' });
   writeFileSync(join(root, 'rounds/001/images/a-phone.png'), 'different');
@@ -80,7 +80,7 @@ test('mutated published image is rejected rather than approved', t => {
 
 test('source mutation prevents approval and another store cannot overwrite a newer note', t => {
   const { root, draft } = fixture(t);
-  publishRound(root, draft);
+  new GalleryStore(root).publish(draft);
   const first = new GalleryStore(root), second = new GalleryStore(root);
   first.save({ revision: 0, roundId: '001', choice: '001/a', note: 'Newest note' });
   assert.throws(() => second.save({ revision: 0, roundId: '001', choice: null, note: 'Stale' }), /changed/);
@@ -93,7 +93,7 @@ test('source mutation prevents approval and another store cannot overwrite a new
 test('one choice per round, explicit refinement snapshots, and none-of-these requests', t => {
   const { root, draft } = fixture(t);
   draft.proposals.push({ ...draft.proposals[0], id: 'b', name: 'Alternative' });
-  publishRound(root, draft);
+  new GalleryStore(root).publish(draft);
   const store = new GalleryStore(root);
   store.save({ revision: 0, roundId: '001', choice: '001/a', note: 'First thought' });
   store.save({ revision: 1, roundId: '001', choice: '001/b', note: 'Use A colors' });
@@ -110,7 +110,7 @@ test('one choice per round, explicit refinement snapshots, and none-of-these req
   assert.equal(state.rounds['001'].requests[0].choice, '001/b');
   assert.equal(state.rounds['001'].requests[1].choice, 'none');
   assert.equal(new GalleryStore(root).read().feedback.rounds['001'].requests.length, 2);
-  publishRound(root, draft);
+  new GalleryStore(root).publish(draft);
   assert.equal(store.read().rounds.length, 2);
   assert.throws(() => store.save({ revision: state.revision, roundId: '002', choice: '001/b', note: '' }), /round/);
 });

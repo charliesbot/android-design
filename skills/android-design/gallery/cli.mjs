@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { create, cleanup } from './workspace.mjs';
-import { publishRound, GalleryStore } from './store.mjs';
+import { GalleryStore } from './store.mjs';
 import { startServer } from './server.mjs';
 
 const help = `Local design exploration gallery (Node.js 22+).
@@ -22,7 +22,10 @@ node <skill>/gallery/cli.mjs status <exploration>
 Draft: {"title":"First directions","proposals":[{"id":"a","name":"Editorial",
 "rationale":"Prioritizes reading.","images":{"phone":"renders/a-phone.png",
 "tablet":"renders/a-tablet.png","desktop":"renders/a-desktop.png",
-"foldable":"renders/a-foldable.png"}}]}
+"foldable":"renders/a-foldable.png"}}],
+"answers":[{"roundId":"001","at":"<request timestamp>"}]}
+Optional "answers" names the saved requests this round responds to; requests it
+does not name stay pending.
 
 Rendering stays with Compose Preview CLI. Publish only after inspecting fresh renders.
 Approval never implements a design. Previous rounds are preserved.`;
@@ -37,7 +40,7 @@ try {
     cleanup(root, values.project);
     console.log(`Removed ${root}`);
   } else if (command === 'publish' && root && draft && positionals.length === 3) {
-    const round = publishRound(root, JSON.parse(readFileSync(draft, 'utf8')));
+    const round = new GalleryStore(root).publish(JSON.parse(readFileSync(draft, 'utf8')));
     console.log(`Published round ${round.id}: ${round.proposals.length} proposals. Source: ${root}/rounds/${round.id}/source`);
   } else if (command === 'status' && root && positionals.length === 2) {
     console.log(JSON.stringify(new GalleryStore(root).read(), null, 2));

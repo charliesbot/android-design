@@ -1,13 +1,15 @@
 import test from 'node:test';
 import { get } from 'node:http';
 import assert from 'node:assert/strict';
+import { symlinkSync, rmSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { fixture } from './fixture.mjs';
-import { publishRound } from '../../skills/android-design/gallery/store.mjs';
+import { GalleryStore } from '../../skills/android-design/gallery/store.mjs';
 import { startServer } from '../../skills/android-design/gallery/server.mjs';
 
 async function setup(t) {
   const { root, draft } = fixture(t);
-  publishRound(root, draft);
+  new GalleryStore(root).publish(draft);
   const server = await startServer(root, 0);
   t.after(() => new Promise(resolve => server.close(resolve)));
   const url = `http://127.0.0.1:${server.address().port}`;
@@ -80,4 +82,22 @@ test('serves the local Google Sans font without opening arbitrary asset paths', 
   assert.equal(font.headers.get('content-type'), 'font/woff2');
   assert.equal(Buffer.from(await font.arrayBuffer()).subarray(0, 4).toString(), 'wOF2');
   assert.equal((await fetch(`${url}/fonts/unknown.woff2`)).status, 404);
+});
+
+const rawStatus = (url, path) => new Promise((resolve, reject) => {
+  // fetch normalizes dot segments, so send the path untouched.
+  get({ host: '127.0.0.1', port: new URL(url).port, path, headers: { host: new URL(url).host } }, response => { response.resume(); resolve(response.statusCode); }).on('error', reject);
+});
+
+test('static serving refuses traversal, symlinks, and directories', async t => {
+  const { url } = await setup(t);
+  const publicDir = fileURLToPath(new URL('../../skills/android-design/gallery/public/', import.meta.url));
+  const link = `${publicDir}zz-test-link.mjs`, dirLink = `${publicDir}zz-test-dir`;
+  t.after(() => { rmSync(link, { force: true }); rmSync(dirLink, { force: true }); });
+  symlinkSync(fileURLToPath(new URL('../../skills/android-design/gallery/store.mjs', import.meta.url)), link);
+  symlinkSync(fileURLToPath(new URL('../../skills/android-design/gallery/', import.meta.url)), dirLink);
+  for (const path of ['/assets/../../store.mjs', '/../store.mjs', '/%2e%2e/store.mjs', '/assets/%2e%2e/%2e%2e/store.mjs', '/%2e%2e%2fstore.mjs', '/zz-test-link.mjs', '/zz-test-dir/store.mjs', '/fonts', '/fonts/', '/assets']) {
+    assert.equal(await rawStatus(url, path), 404, path);
+  }
+  assert.equal(await rawStatus(url, '/'), 200);
 });

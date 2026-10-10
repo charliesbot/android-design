@@ -1,0 +1,16 @@
+{
+  "name": "android-design-gallery",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "node --test tests/gallery/*.test.mjs"
+  },
+  "dependencies": {
+    "lit": "^3.3.3"
+  },
+  "devDependencies": {
+    "vite": "^8.3.4"
+  }
+}

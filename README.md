@@ -23,13 +23,21 @@ Any agent that reads skills can also load `skills/android-design/SKILL.md` direc
 
 2. Install the [`compose-preview` and `compose-ui-builder` skills](https://github.com/yschimke/skills).
 
-3. For the local exploration gallery, install Node.js 22+. Node.js runs the gallery and the workspace helper; Python 3 runs the evals and the source scripts.
+3. For the local exploration gallery, install Node.js 22+. Node.js runs the gallery and the workspace helper; Python 3 runs the evals and the source scripts. The installed skill needs no build or `npm install`: it serves the committed build in `skills/android-design/gallery/public/`.
 
 4. Check your setup:
 
    ```bash
    compose-preview doctor
    ```
+
+### Developing the gallery frontend
+
+The frontend is Vite and Lit source in `skills/android-design/gallery/src/`, built into the committed `skills/android-design/gallery/public/`. `npm install` is for this development only.
+
+1. Serve an exploration: `node skills/android-design/gallery/cli.mjs serve <exploration> --port 8765`
+2. Run `npm run dev` and open the URL Vite prints. It proxies `/api` and `/images` to port 8765.
+3. Before committing, run `npm run build` and `npm test`.
 
 ## What is here
 
