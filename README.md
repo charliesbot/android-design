@@ -23,7 +23,9 @@ Any agent that reads skills can also load `skills/android-design/SKILL.md` direc
 
 2. Install the [`compose-preview` and `compose-ui-builder` skills](https://github.com/yschimke/skills).
 
-3. Check your setup:
+3. For the local exploration gallery, install Node.js 22+ and Python 3. The gallery uses Node.js and browser JavaScript; Python remains the workspace helper and eval runtime.
+
+4. Check your setup:
 
    ```bash
    compose-preview doctor
