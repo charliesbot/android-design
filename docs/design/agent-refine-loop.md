@@ -49,6 +49,8 @@ It exits 0 for all three so the agent branches on `status`, and non-zero only wh
 
 The command polls `feedback.json` and the round list about once a second. Polling matches the gallery's own three-second poll, needs no file watcher, and reads are safe because every write is an atomic rename. In the prototype a request submitted through the HTTP server was returned within one poll interval while the server's write lock was in use.
 
+An MCP server was considered instead of a CLI subcommand. The protocol is standard and Chai can register the server for every harness, so configuration is not the objection. The objections are cost and fit: the gallery is dependency-free Node with tests in `node --test`, and a subcommand keeps it that way, while MCP adds an SDK dependency, a long-lived process in every session, and an MCP client in the tests. MCP tool timeouts are also tighter and less uniform than shell timeouts (Codex fails a tool call after 60 seconds by default; Claude Code moves one to the background after 2 minutes; Antigravity documents none), which makes a blocking `wait` harder to tune. The one thing MCP would genuinely improve is `serve`, whose lifetime could follow the server process instead of a background shell command. Revisit MCP as a whole-gallery decision if that becomes a problem; it is out of scope here.
+
 ### Which request to answer
 
 A request is **pending** when no round answers it. The newest pending request wins; older pending ones are reported as `superseded` so the agent can mention that it consolidated them. This covers a user who refines twice on the same round with different notes (the gallery already blocks resubmitting identical notes) and a user who browses an earlier round and refines from there.
