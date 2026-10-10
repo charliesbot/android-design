@@ -53,11 +53,12 @@ After inspecting the current renders, write a round draft outside `project/`. Im
         "foldable": "app/build/compose-previews/renders/<foldable-file>.png"
       }
     }
-  ]
+  ],
+  "answers": [{ "roundId": "001", "at": "<request timestamp>" }]
 }
 ```
 
-Include every option in that round's `proposals` array. Then:
+Include every option in that round's `proposals` array. Optional `answers` names the saved requests (round id and request timestamp) this round responds to; requests it does not name stay pending. Then:
 
 ```bash
 node <skill-dir>/gallery/cli.mjs publish <exploration> <draft.json>

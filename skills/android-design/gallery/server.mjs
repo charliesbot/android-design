@@ -1,16 +1,33 @@
 import { createServer } from 'node:http';
-import { readFileSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
+import { extname, join, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { GalleryStore, GalleryError } from './store.mjs';
 
-const PUBLIC = new URL('./public/', import.meta.url);
-const ASSETS = new Map([
-  ['/', ['index.html', 'text/html; charset=utf-8']],
-  ['/app.mjs', ['app.mjs', 'text/javascript; charset=utf-8']],
-  ['/saves.mjs', ['saves.mjs', 'text/javascript; charset=utf-8']],
-  ['/select-arrows.svg', ['select-arrows.svg', 'image/svg+xml']],
-  ['/style.css', ['style.css', 'text/css; charset=utf-8']],
-  ['/fonts/google-sans-latin.woff2', ['fonts/google-sans-latin.woff2', 'font/woff2']],
-]);
+const PUBLIC = fileURLToPath(new URL('./public/', import.meta.url));
+const TYPES = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.png': 'image/png',
+  '.txt': 'text/plain; charset=utf-8', '.json': 'application/json',
+};
+// Serve a regular file under public/ only: no traversal, no symlinks, no directories.
+function asset(path) {
+  let relative;
+  try { relative = decodeURIComponent(path === '/' ? '/index.html' : path); } catch { return null; }
+  if (relative.includes('\0') || relative.includes('\\')) return null;
+  const file = resolve(PUBLIC, `.${relative}`);
+  if (!file.startsWith(PUBLIC)) return null;
+  try {
+    // Reject a symlink at any segment below public/, not only the last one.
+    let current = PUBLIC;
+    for (const segment of file.slice(PUBLIC.length).split(sep)) {
+      current = join(current, segment);
+      if (lstatSync(current).isSymbolicLink()) return null;
+    }
+    if (!lstatSync(file).isFile()) return null;
+    return [readFileSync(file), TYPES[extname(file).toLowerCase()] || 'application/octet-stream'];
+  } catch { return null; }
+}
 function send(response, status, body, type = 'application/json') {
   response.writeHead(status, {
     'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
@@ -44,13 +61,13 @@ export async function startServer(root, port = 0) {
       }
       const path = new URL(request.url, `http://${authority}`).pathname;
       if (request.method === 'GET') {
-        if (ASSETS.has(path)) {
-          const [file, type] = ASSETS.get(path);
-          return send(response, 200, readFileSync(new URL(file, PUBLIC)), type);
-        }
         if (path === '/api/exploration') return send(response, 200, store.read());
         const image = /^\/images\/(\d{3,})\/([a-z][a-z0-9-]{0,39})\/(phone|tablet|desktop|foldable)$/.exec(path);
         if (image) return send(response, 200, store.image(`${image[1]}/${image[2]}`, image[3]), 'image/png');
+        if (!path.startsWith('/api/')) {
+          const found = asset(path);
+          if (found) return send(response, 200, found[0], found[1]);
+        }
       }
       if ((request.method === 'PUT' && path === '/api/feedback') || (request.method === 'POST' && ['/api/approve', '/api/refine'].includes(path))) {
         if (request.headers['content-type'] !== 'application/json') throw new GalleryError('Use application/json', 403);

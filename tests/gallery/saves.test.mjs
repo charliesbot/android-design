@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FeedbackSaves } from '../../skills/android-design/gallery/public/saves.mjs';
+import { FeedbackSaves } from '../../skills/android-design/gallery/src/saves.mjs';
 
 const response = (revision, status = 200) => ({ ok: status === 200, status, json: async () => status === 200 ? { revision, proposals: {}, approved: null } : { error: 'Save failed' } });
 test('serializes writes, keeps newest edits, and updates revisions', async () => {
