@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Design exploration</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.mjs"></script>
+</head>
+<body>
+  <header>
+    <h1 id="title">Design exploration</h1>
+  </header>
+  <main>
+    <section class="toolbar" aria-label="View controls">
+      <label>Round <select id="round"><button type="button"><selectedcontent></selectedcontent></button></select></label>
+      <label>Device <select id="device"><button type="button"><selectedcontent></selectedcontent></button>
+        <option value="phone">Pixel 11</option><option value="tablet">Pixel Tablet</option>
+        <option value="desktop">Googlebook</option><option value="foldable">Z Fold8</option>
+      </select></label>
+    </section>
+    <div class="save-bar">
+      <p id="status" role="status" aria-live="polite">Loading exploration...</p>
+      <button id="retry" type="button" hidden>Retry saving</button>
+      <button id="reload" type="button" hidden>Reload saved state</button>
+    </div>
+    <p id="approval" class="approval" hidden></p>
+    <section id="proposals" class="proposals" aria-label="Design proposals"></section>
+    <section id="action-bar" class="action-bar" aria-label="Next step" hidden>
+      <h2 id="selection">Select a design</h2>
+      <label id="note-field" class="note-label" hidden><span id="note-label">What should change?</span>
+        <textarea id="note" rows="3" maxlength="10000"></textarea>
+      </label>
+      <div id="workflow-actions" class="actions">
+        <button id="refine" type="button" disabled>Refine</button>
+        <button id="finish" type="button" disabled>Finish</button>
+        <button id="none" type="button" aria-pressed="false">None of these</button>
+      </div>
+      <p id="request-status" role="status"></p>
+      <p id="action-error" role="alert"></p>
+    </section>
+  </main>
+  <dialog id="confirm" aria-labelledby="confirm-title">
+    <h2 id="confirm-title">Finish with this design?</h2><p id="confirm-name"></p>
+    <p>Finishing makes this exploration read-only. It does not modify your app.</p>
+    <div class="actions"><button id="cancel-approval" type="button">Keep exploring</button><button id="confirm-approval" type="button">Finish design</button></div>
+    <p id="confirm-error" role="alert"></p>
+  </dialog>
+  <dialog id="reload-confirm" aria-labelledby="reload-title">
+    <h2 id="reload-title">Reload saved feedback?</h2>
+    <p>Unsaved notes in this tab will be discarded. Copy them first if needed.</p>
+    <div class="actions"><form method="dialog"><button>Cancel</button></form><button id="discard-local" type="button">Reload saved feedback</button></div>
+  </dialog>
+</body>
+</html>

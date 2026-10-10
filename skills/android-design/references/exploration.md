@@ -1,47 +1,85 @@
-# Isolated design exploration
+# Visual design exploration
 
-Use this workflow for ideas, redesign proposals, or alternatives before implementation. The result is real Compose rendered from a disposable project, not an image-generated mockup or a verified integration into the user's app.
+For multiple proposals or an exploration request, use real Android Compose code and a local comparison website. The gallery displays the same PNGs you inspect, not an HTML recreation or generated UI image. Approval finishes exploration without implementing anything.
 
 ## Understand the brief
 
-For an existing app, read the relevant screen, nearby screens, theme, assets, and representative content. Treat the app as read-only: exploration needs no branch, build edits, or generated files there. Read existing screenshots when available. For a new idea, establish its primary task and sample content from the conversation.
+Read the requesting app's relevant screens, theme, assets, content, and dependency versions. Match the prompt's scope: a feature exploration preserves the surrounding visual language unless structural changes are needed; a redesign can go further. Answer section 0 of the skill for the directions. Unless the user specifies otherwise, start with three distinct compositions of the same task and content, not three recolorings.
 
-Identify the target surface. Ask when unclear. The starter contains phone/tablet and experimental Wear shells; their presence does not mean every exploration should target both. Wear can be explored on explicit request, but its design quality is not yet validated and its eval cases remain parked.
+Keep app code and dependencies unchanged. Proposals must transfer to the app's existing libraries: do not upgrade or downgrade the app to match the starter. Surface known incompatibilities before approval. Use representative data and non-sensitive assets, never credentials, databases, or personal data.
 
-Answer section 0 of the skill for the proposed directions. Unless the user specifies a count, prepare three distinct compositions with the same content and primary task, not three recolorings.
+## Create or resume
 
-## Create the workspace
+The gallery requires Node.js 22+; the existing workspace helper uses Python 3. Rendering belongs to the installed `compose-preview` skill and CLI. If a required tool is missing, report it rather than installing it silently or substituting a renderer.
 
-Resolve this installed skill's directory, then run:
-
-```bash
-python3 <skill-dir>/scripts/explore.py create
-```
-
-Use the returned absolute directory for every write and build. It is a unique `/tmp/android-design-explore-*` directory (`/private/tmp` on macOS). Tell the user its path so a later turn can resume it. Keep the installed template unchanged.
-
-The copy includes Gradle, the five `android-dev` core modules, phone and Wear shells, navigation, Koin, and fonts. `android-dev` and `android create` are not runtime dependencies. Rendering is delegated to the installed `compose-preview` skill; keep its commands and troubleshooting there rather than duplicating them here.
-
-## Compose and compare
-
-Read the starter README for code entry points. Work in the requested platform shell with sample state. Keep alternatives together in that shell; creating one feature module per alternative would confuse proposals with product capabilities. If a proposal becomes a multi-screen journey, follow `android-dev` for feature placement.
-
-Reuse only the necessary non-sensitive assets or representative data from the app. Do not copy credentials, local configuration, databases, or real personal data. Keep sample content fixed across alternatives. Use the actual fonts and platform theme, and preserve existing product constraints unless the brief calls for changing them.
-
-Give each alternative a named, sample-state `@Preview` in the requested shell's main source set, wrapped in its platform theme. Use matched viewport, theme, and state settings across alternatives; add smaller-window, large-font, and meaningful alternate-state previews for the screen check. The starter's `src/screenshotTest` previews and `render.py` belong to its maintenance harness, not this exploration workflow.
-
-Follow `compose-preview` to render those previews from the temporary workspace, targeting the requested shell. Keep all preview additions and tool-generated project files in this copy, not in the target app or installed starter.
-
-Open the resulting PNGs and perform the skill's screen check. Fix the largest mismatches and render again. Present each alternative's image with its defining decision and trade-off. Label Wear proposals experimental. If rendering fails, report "visual quality unverified" with the error; do not present stale screenshots as current.
-
-## Refine, implement, or discard
-
-Follow-up design revisions use the same temporary copy. Choosing a preferred direction is not by itself permission to modify the real app: ask whether to keep refining or implement if the intent is ambiguous. On an implementation request, follow that project's approval and branch rules, adapt the selected code to its architecture, and verify it there.
-
-Temporary storage can be removed by the OS and is not durable. Do not promise automatic cleanup at conversation end. Keep the workspace while revisions are active. After the user confirms discarding it, or confirms cleanup after implementation, run:
+Resolve the installed skill directory and run:
 
 ```bash
-python3 <skill-dir>/scripts/explore.py cleanup <returned-directory> --yes
+python3 <skill-dir>/scripts/explore.py create --project <requesting-repo> --title "Today screen redesign"
 ```
 
-Cleanup removes source and screenshots. The helper accepts only a marked exploration directory directly under `/tmp`, refuses symlinks and mismatched markers, and leaves the installed starter and app untouched. If the user wants to keep a proposal, export it to their requested location before cleanup.
+The helper copies the starter to `design-explorations/<unique-id>/project/` in that Git repository. It records a local Git exclusion without editing the tracked `.gitignore`. Tell the user the returned absolute exploration path. Keep the installed template and production app untouched. A new app idea still needs a user-selected repository; do not silently write to the skill repository.
+
+Resume the same exploration directory for revisions. `project/` is the working Compose sandbox; published `rounds/` are preserved source and image snapshots and must not be edited. Read saved selections and notes with:
+
+```bash
+node <skill-dir>/gallery/cli.mjs status <exploration>
+```
+
+The gallery includes phone, tablet, desktop, and wide-foldable layouts. Wear remains experimental and outside this gallery workflow; use the separate Wear shell and preview skill only when explicitly requested, without claiming validated Wear quality.
+
+## Compose, render, inspect
+
+The starter has one adaptive sample screen and four named main-source previews. For each proposal, create four named preview wrappers around the same composition, sample content, and theme. Preserve the starter's device settings and modeled-density labels; their rationale is in its README. Match viewport, content, state, and theme across alternatives. Add light/dark, large-font, or alternate-state previews when needed for the screen check; those supplement rather than replace the four gallery images.
+
+Follow `compose-preview` in `project/`, render the requested previews, and open their returned PNG paths. Inspect all four device layouts for each new or revised proposal against the skill's screen check. Do not infer visual quality from compilation. Use returned filenames, not guesses. On failure, stop publication and report visual quality unverified; never publish old output as a new revision. The starter's maintenance `render.py` is not an alternative agent renderer.
+
+## Publish and review
+
+After inspecting the current renders, write a round draft outside `project/`. Image paths are relative to `project/`, using the actual PNG locations returned by Compose Preview CLI:
+
+```json
+{
+  "title": "First directions",
+  "proposals": [
+    {
+      "id": "a",
+      "name": "Content first",
+      "rationale": "Prioritizes today's content over navigation.",
+      "images": {
+        "phone": "app/build/compose-previews/renders/<phone-file>.png",
+        "tablet": "app/build/compose-previews/renders/<tablet-file>.png",
+        "desktop": "app/build/compose-previews/renders/<desktop-file>.png",
+        "foldable": "app/build/compose-previews/renders/<foldable-file>.png"
+      }
+    }
+  ]
+}
+```
+
+Include every option in that round's `proposals` array. Then:
+
+```bash
+node <skill-dir>/gallery/cli.mjs publish <exploration> <draft.json>
+node <skill-dir>/gallery/cli.mjs serve <exploration>
+```
+
+Open the printed localhost URL for the user. Publication preserves source and four PNGs per proposal. Missing images fail publication; completed rounds are never overwritten. The website supports side-by-side comparison, device switching, one selected preview and a shared notes textbox per round, and previous rounds. New rounds appear automatically when the user is not editing notes or inspecting a dialog. Browsing an earlier round stays on that round. It does not launch an agent or execute builds.
+
+Selecting a preview is not finalization. The shared **Refine [name]** action records a request in `feedback.rounds[roundId].requests` with its proposal key, notes, and timestamp. **None of these** clears the proposal choice and requires notes before requesting new directions. The website tells the user to return to chat; it does not invoke an agent. Read the latest submitted request, not merely the currently edited selection, apply clear instructions, and ask a focused question only when a meaningful decision remains. Show alternatives when the decision is visual. Produce one refinement by default. Render, inspect, and publish it as a new round. Never rewrite an earlier round to conceal changes. The user can explicitly ask to explore several alternatives again.
+
+Wait for saved feedback before relying on it. Failed saves remain pending in the tab with a retry control. A stale-tab conflict requires reloading saved state; preserve or copy unsaved notes before discarding them. Approval waits for pending saves, verifies the published artifacts, and makes the exploration read-only.
+
+## Approve, implement, or discard
+
+The user finalizes the single selected proposal with the page-level **Finish with [name]** action and its confirmation. A combination of several ideas must first be rendered as one consolidated proposal. Read the exact approved round and proposal via `status`; use that round's `source/` for a later implementation, not the potentially newer working sandbox.
+
+Report the approved revision and stop. Approval does not authorize implementation or library version changes. A later explicit implementation request follows the requesting project's planning, branch, verification, and review rules. If the design cannot be preserved with its dependencies, ask rather than silently change the design or versions.
+
+Keep source, history, notes, and images until the user explicitly requests deletion. Stop the gallery server first, then run from the requesting repository:
+
+```bash
+python3 <skill-dir>/scripts/explore.py cleanup <exploration> --project <requesting-repo> --yes
+```
+
+Cleanup removes only a directly contained, identity-marked exploration and refuses symlinks or mismatched markers. It deletes every round and note, not just build outputs. It never deletes the installed starter or the requesting app.

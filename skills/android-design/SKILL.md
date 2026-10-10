@@ -34,7 +34,7 @@ Assume the `compose-preview` CLI and the `compose-preview` and `compose-ui-build
 
 ## Exploration or implementation
 
-For brainstorming, redesign ideas, or visual alternatives before implementation, read [references/exploration.md](references/exploration.md) first. Build and render proposals in a temporary copy of the bundled Compose starter; the target app stays read-only. Use image generation only for assets, not as a substitute for rendered Compose UI. The starter also includes an experimental Wear shell for explicitly requested explorations, without widening this skill's validated scope.
+For brainstorming, redesign ideas, or visual alternatives before implementation, read [references/exploration.md](references/exploration.md) first. Build and render proposals in a project-local, Git-ignored copy of the bundled Compose starter. Inspect the PNGs and publish them to the local Node.js comparison gallery; production app code and dependencies stay unchanged. Use image generation only for assets, not as a substitute for rendered Compose UI. The starter also includes an experimental Wear shell for explicitly requested explorations, without widening this skill's validated scope.
 
 For implementation or review requests, work in the actual project under its own approval and branch rules. Both paths use the design decisions and screen check below.
 
