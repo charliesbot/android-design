@@ -10,12 +10,12 @@ Keep app code and dependencies unchanged. Proposals must transfer to the app's e
 
 ## Create or resume
 
-The gallery requires Node.js 22+; the existing workspace helper uses Python 3. Rendering belongs to the installed `compose-preview` skill and CLI. If a required tool is missing, report it rather than installing it silently or substituting a renderer.
+The gallery and the workspace helper both require Node.js 22+. Rendering belongs to the installed `compose-preview` skill and CLI. If a required tool is missing, report it rather than installing it silently or substituting a renderer.
 
 Resolve the installed skill directory and run:
 
 ```bash
-python3 <skill-dir>/scripts/explore.py create --project <requesting-repo> --title "Today screen redesign"
+node <skill-dir>/gallery/cli.mjs create --project <requesting-repo> --title "Today screen redesign"
 ```
 
 The helper copies the starter to `design-explorations/<unique-id>/project/` in that Git repository. It records a local Git exclusion without editing the tracked `.gitignore`. Tell the user the returned absolute exploration path. Keep the installed template and production app untouched. A new app idea still needs a user-selected repository; do not silently write to the skill repository.
@@ -32,7 +32,7 @@ The gallery includes phone, tablet, desktop, and wide-foldable layouts. Wear rem
 
 The starter has one adaptive sample screen and four named main-source previews. For each proposal, create four named preview wrappers around the same composition, sample content, and theme. Preserve the starter's device settings and modeled-density labels; their rationale is in its README. Match viewport, content, state, and theme across alternatives. Add light/dark, large-font, or alternate-state previews when needed for the screen check; those supplement rather than replace the four gallery images.
 
-Follow `compose-preview` in `project/`, render the requested previews, and open their returned PNG paths. Inspect all four device layouts for each new or revised proposal against the skill's screen check. Do not infer visual quality from compilation. Use returned filenames, not guesses. On failure, stop publication and report visual quality unverified; never publish old output as a new revision. The starter's maintenance `render.py` is not an alternative agent renderer.
+Follow `compose-preview` in `project/`, render the requested previews, and open their returned PNG paths. Inspect all four device layouts for each new or revised proposal against the skill's screen check. Do not infer visual quality from compilation. Use returned filenames, not guesses. On failure, stop publication and report visual quality unverified; never publish old output as a new revision. The starter's maintenance `render.mjs` is not an alternative agent renderer.
 
 ## Publish and review
 
@@ -79,7 +79,7 @@ Report the approved revision and stop. Approval does not authorize implementatio
 Keep source, history, notes, and images until the user explicitly requests deletion. Stop the gallery server first, then run from the requesting repository:
 
 ```bash
-python3 <skill-dir>/scripts/explore.py cleanup <exploration> --project <requesting-repo> --yes
+node <skill-dir>/gallery/cli.mjs cleanup <exploration> --project <requesting-repo> --yes
 ```
 
 Cleanup removes only a directly contained, identity-marked exploration and refuses symlinks or mismatched markers. It deletes every round and note, not just build outputs. It never deletes the installed starter or the requesting app.

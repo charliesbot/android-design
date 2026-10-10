@@ -12,7 +12,7 @@ Make design exploration easier to compare, refine, and resume through a local ga
 
 Chat is useful for discussing a design but poor for comparing and inspecting several UI proposals. Requests for multiple designs or for exploration should open a local mini website that becomes the visual review surface. Ordinary implementation requests do not start an exploration.
 
-The new gallery uses Node.js for local serving and saving feedback, and JavaScript for its browser UI, not Python. This choice applies to the gallery only; it does not migrate the existing Python evaluation harness or change Compose Preview CLI's responsibility for rendering Android proposals.
+The gallery and the workspace helper use Node.js for local serving, saving feedback, and creating explorations, and JavaScript for the browser UI, not Python. The Python evaluation harness is unchanged, and so is Compose Preview CLI's responsibility for rendering Android proposals. (Updated 2026-10-10: the workspace helper moved to Node as well.)
 
 The prompt determines the scope. Exploring how to add a feature preserves the app's visual language and surrounding design unless the request or the feature calls for structural changes. A redesign can explore broader changes. Alternatives should represent different design approaches, not merely different colors.
 

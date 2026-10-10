@@ -1,6 +1,6 @@
 # Compose exploration starter
 
-Copy this project with the installed skill's `scripts/explore.py create`. Develop in the returned exploration's `project/` directory, not here or in production app code. This is an executable design sandbox, not a production app template or a claim of integration compatibility.
+Copy this project with the installed skill's `gallery/cli.mjs create`. Develop in the returned exploration's `project/` directory, not here or in production app code. This is an executable design sandbox, not a production app template or a claim of integration compatibility.
 
 ## Entry points
 
@@ -34,13 +34,13 @@ Device evidence: [Pixel 11 specs](https://store.google.com/product/pixel_11_spec
 
 ## Starter maintenance checks
 
-Requires Python 3, JDK 17+, Android SDK platform 37, and initial network access to resolve pinned dependencies. Set `ANDROID_HOME` or `ANDROID_SDK_ROOT` if the SDK is not in the standard macOS location. Dependencies and Gradle caches are machine-level tooling, not bundled in the skill.
+Requires Node.js 22+, JDK 17+, Android SDK platform 37, and initial network access to resolve pinned dependencies. Set `ANDROID_HOME` or `ANDROID_SDK_ROOT` if the SDK is not in the standard macOS location. Dependencies and Gradle caches are machine-level tooling, not bundled in the skill.
 
 ```bash
 ./gradlew projects
 ./gradlew :app:assembleDebug :wear:assembleDebug
-python3 render.py app
-python3 render.py wear
+node render.mjs app
+node render.mjs wear
 ./gradlew spotlessApply spotlessCheck
 ```
 
