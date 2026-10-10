@@ -106,8 +106,24 @@ export class GalleryStore {
       return round;
     });
     const data = { title: manifest.title, rounds, feedback: this.#feedback() };
-    return { ...data, pending: pendingRequests(data) };
+    return { ...data, pending: pendingRequests(data), session: this.#session() };
   }
+  // Session status is advisory and expires on its own, so a missing, corrupt, or
+  // stale file reads as no session instead of breaking the gallery.
+  #session() {
+    try {
+      const value = JSON.parse(readFileSync(this.#file('session.json'), 'utf8'));
+      const valid = value && ['waiting', 'working'].includes(value.state) && Number.isFinite(Date.parse(value.since)) && Number.isFinite(Date.parse(value.until));
+      return valid && Date.parse(value.until) > Date.now() ? { state: value.state, since: value.since, until: value.until } : null;
+    } catch { return null; }
+  }
+  // Session writes skip the feedback write lock and never touch feedback.json.
+  writeSession(state, until) {
+    requireThat(['waiting', 'working'].includes(state), 'Invalid session state');
+    requireThat(until instanceof Date && Number.isFinite(until.getTime()), 'Invalid session expiry');
+    atomicJSON(this.#file('session.json'), { state, since: new Date().toISOString(), until: until.toISOString() });
+  }
+  clearSession() { rmSync(this.#file('session.json'), { force: true }); }
   proposal(key) {
     requireThat(typeof key === 'string', 'Unknown proposal');
     const [roundId, id, extra] = key.split('/');

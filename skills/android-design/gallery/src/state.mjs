@@ -44,7 +44,15 @@ export function selectionText({ round, proposal, entry }) {
 }
 export const noteLabel = entry => entry.choice === 'none' ? 'What should we try instead?' : 'What should change?';
 export const refineLabel = entry => entry.choice === 'none' ? 'Request new directions' : 'Refine';
-export const requestStatusText = entry => requested(entry) ? 'Request saved. Return to chat to continue.' : '';
+export const REQUEST_SAVED_TEXT = 'Request saved. Return to chat to continue.';
+export const REQUEST_WAITING_TEXT = 'Request saved. The next round will appear here.';
+export const REQUEST_WORKING_TEXT = 'The agent is working on your request.';
+export function requestStatusText(entry, session) {
+  if (!requested(entry)) return '';
+  if (session?.state === 'working') return REQUEST_WORKING_TEXT;
+  if (session?.state === 'waiting') return REQUEST_WAITING_TEXT;
+  return REQUEST_SAVED_TEXT;
+}
 export const selectionLabel = checked => checked ? 'Selected' : 'Select';
 
 export function approvalText(data) {
@@ -66,7 +74,10 @@ export const staleResult = ({ busy, editsChanged, savesChanged, revisionChanged,
   Boolean(busy || editsChanged || savesChanged || revisionChanged || noteFocused || dialogOpen);
 
 export const sameRounds = (previous, incoming) => JSON.stringify(previous) === JSON.stringify(incoming);
-export const shouldReload = ({ hadData, newRounds, sameRevision, sameTitle }) => !hadData || newRounds || !sameRevision || !sameTitle;
+export const shouldReload = ({ hadData, newRounds, sameRevision, sameTitle, sameSession = true }) => !hadData || newRounds || !sameRevision || !sameTitle || !sameSession;
+
+// The agent session changes without a feedback revision, so compare it on its own.
+export const sameSession = (a, b) => (a === null || a === undefined) === (b === null || b === undefined) && a?.state === b?.state && a?.until === b?.until;
 
 // Follow the newest round only when the user was already viewing the latest one.
 export function nextRoundSelection({ previousRound, previousLatest, hadData, incomingRounds }) {
