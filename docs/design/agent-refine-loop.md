@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-Close the gap between pressing Refine in the gallery and the next round appearing, without turning the gallery into a chat client or a background service. The user starts a watch session in chat. The agent then runs a blocking `wait` command that returns when a refinement request is saved, answers it by revising, rendering, inspecting, and publishing, and waits again until the user presses Finish, the session idles out, or the turn ends. Nothing runs after the agent's turn ends; the existing "return to chat" path remains the fallback. This document records the investigation for [issue #9](https://github.com/charliesbot/android-design/issues/9); it authorizes planning, not implementation.
+Close the gap between pressing Refine in the gallery and the next round appearing, without turning the gallery into a chat client or a background service. The user starts a watch session in chat. The agent then runs a blocking `wait` command that returns when a refinement request is saved, answers it by revising, reviewing in the browser, and publishing, and waits again until the user presses Finish, the session idles out, or the turn ends. Nothing runs after the agent's turn ends; the existing "return to chat" path remains the fallback. This document records the investigation for [issue #9](https://github.com/charliesbot/android-design/issues/9); it authorizes planning, not implementation.
 
 ## Background
 
@@ -19,7 +19,7 @@ The issue asked three questions: whether an explicitly started watch session can
 The session is a loop the agent runs inside one turn, started by the user in chat ("keep refining while I review", "watch the gallery"). It is not started by the gallery, by a hook, or by a scheduler. A plain request such as "adjust option B" still works without a session.
 
 ```
-publish round N ─▶ serve (background) ─▶ wait ──▶ request ──▶ revise, render, inspect, publish N+1 ─┐
+publish round N ─▶ serve (background) ─▶ wait ──▶ request ──▶ revise, review, publish N+1 ─┐
                                           ▲  └──▶ approved ─▶ report the approved revision, stop     │
                                           │  └──▶ timeout ──▶ idle budget left? rerun wait : stop    │
                                           └───────────────────────────────────────────────────────────┘
@@ -64,7 +64,7 @@ With the link in place, the lost second request is returned by the next `wait` c
 
 ### Failure and stopping
 
-Failures stay in chat. If rendering, inspection, or publication fails, the agent reports in chat and stops the session rather than publishing stale images or retrying blindly; the exploration reference already forbids publishing old output as a new revision. The request stays pending, so a later session or a plain chat request picks it up.
+Failures stay in chat. If the build, browser review, or publication fails, the agent reports in chat and stops the session rather than publishing stale output or retrying blindly; the exploration reference already forbids publishing old output as a new revision. The request stays pending, so a later session or a plain chat request picks it up.
 
 The session stops when:
 
@@ -75,7 +75,7 @@ The session stops when:
 
 ### Session status in the gallery
 
-Decision: include a minimal status line, with expiry. Without it the user looking at the gallery cannot tell "the agent is rendering, which takes a few minutes" from "nobody is listening", and returning to chat to find out defeats the loop.
+Decision: include a minimal status line, with expiry. Without it the user looking at the gallery cannot tell "the agent is building a round, which takes a few minutes" from "nobody is listening", and returning to chat to find out defeats the loop.
 
 `wait` writes `session.json` in the exploration root on each transition: `{ "state": "waiting" | "working", "since": ..., "until": ... }`. `waiting` expires one minute after the command's timeout, so the gap between reruns does not flip the line; `working` is written when it exits with a request and lasts a fixed render budget (recommended 10 minutes). The server exposes the file in `/api/exploration` and the gallery renders one line next to the request status:
 
@@ -123,7 +123,7 @@ For the later implementation, not this document:
 - Store tests: `publish` stores `answers`; rounds without `answers` fall back to the timestamp rule; `session.json` expiry is respected by the server response.
 - Server test: `/api/exploration` includes session state and omits an expired one.
 - Gallery smoke check in `evals/exploration.md`: start a session, press Refine, observe the next round arrive without touching chat, observe the status line through waiting and working, press Finish, confirm the session reports the approved revision and stops. Separately, let a session idle out and confirm the chat message and the gallery fallback text.
-- Routing checks: "keep refining while I review" starts a session after the first publish; "adjust option B" without a session still produces one preserved round; a failed render stops the session with visual quality reported unverified.
+- Routing checks: "keep refining while I review" starts a session after the first publish; "adjust option B" without a session still produces one preserved round; a failed browser review stops the session with visual quality reported unverified.
 - Skill text: a "Watch session" subsection in `references/exploration.md` covering start, the loop, one session per exploration, stop conditions, and the idle budget. `SKILL.md` needs no new rule.
 
 ## Links

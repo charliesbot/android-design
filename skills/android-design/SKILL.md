@@ -30,11 +30,11 @@ Three causes, each fixable:
 
 ## Visual tooling
 
-Assume the `compose-preview` CLI and the `compose-preview` and `compose-ui-builder` skills are installed. For rendering Compose code, read and follow `compose-preview`; it owns tool selection, rendering, and troubleshooting. For a UI Builder design authoring request, follow `compose-ui-builder`. This skill owns design decisions and the screen check. If a dependency is unavailable, report it and refer the user to this repository's README setup section rather than installing tools or substituting another renderer.
+Exploration needs only Node.js 22+ and a browser in your harness. Implementing or reviewing real Compose code needs the `compose-preview` CLI and the `compose-preview` and `compose-ui-builder` skills: read and follow `compose-preview`, which owns tool selection, rendering, and troubleshooting. For a UI Builder design authoring request, follow `compose-ui-builder`. This skill owns design decisions and the screen check. If a dependency is unavailable, report it and refer the user to this repository's README setup section rather than installing tools or substituting another renderer.
 
 ## Exploration or implementation
 
-For brainstorming, redesign ideas, or visual alternatives before implementation, read [references/exploration.md](references/exploration.md) first. Build and render proposals in a project-local, Git-ignored copy of the bundled Compose starter. Inspect the PNGs and publish them to the local Node.js comparison gallery; production app code and dependencies stay unchanged. Use image generation only for assets, not as a substitute for rendered Compose UI. The starter also includes an experimental Wear shell for explicitly requested explorations, without widening this skill's validated scope.
+For brainstorming, redesign ideas, or visual alternatives before implementation, read [references/exploration.md](references/exploration.md) first. Proposals are HTML on the bundled Material 3 Expressive runtime, reviewed in the browser and published to the local Node.js comparison gallery; production app code and dependencies stay unchanged. Use image generation only for assets, not as a substitute for a proposal. Implementation ports the approved proposal into the app with [references/compose-mapping.md](references/compose-mapping.md). The Android starter's experimental Wear shell is for explicitly requested explorations, without widening this skill's validated scope.
 
 For implementation or review requests, work in the actual project under its own approval and branch rules. Both paths use the design decisions and screen check below.
 
@@ -334,3 +334,4 @@ Code checks, separately:
 - [references/layout.md](references/layout.md): read when a screen must adapt to tablets, foldables, landscape, or desktop windows, or support mouse and keyboard.
 - [references/widgets.md](references/widgets.md): read before designing or reviewing a home screen widget (not yet in scope, see Surfaces).
 - [references/wear-os.md](references/wear-os.md): read before designing any Wear OS screen or tile (not yet in scope, see Surfaces).
+- [references/compose-mapping.md](references/compose-mapping.md): read when porting an approved HTML proposal to Compose; maps each runtime element and token to its verified Compose API.
