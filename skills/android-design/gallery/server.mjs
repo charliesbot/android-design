@@ -10,10 +10,10 @@ const TYPES = {
   '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.png': 'image/png',
   '.txt': 'text/plain; charset=utf-8', '.json': 'application/json',
 };
-// Serve a regular file under public/ only: no traversal, no symlinks, no directories.
+// Serve a regular file under public/ only: no traversal, no symlinks, no directories. A path ending in / serves its index.html.
 function asset(path) {
   let relative;
-  try { relative = decodeURIComponent(path === '/' ? '/index.html' : path); } catch { return null; }
+  try { relative = decodeURIComponent(path.endsWith('/') ? `${path}index.html` : path); } catch { return null; }
   if (relative.includes('\0') || relative.includes('\\')) return null;
   const file = resolve(PUBLIC, `.${relative}`);
   if (!file.startsWith(PUBLIC)) return null;

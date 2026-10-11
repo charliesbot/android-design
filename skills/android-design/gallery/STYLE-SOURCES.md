@@ -47,3 +47,14 @@ The reference uses a JavaScript listbox. We retain native selects and progressiv
 style their picker with `appearance: base-select`. Unsupported browsers retain
 native menus. The gallery trigger is 48px rather than the reference's 40px for
 a larger hit target. Google Sans substitutes for Google Sans Text, as above.
+
+## Proposal runtime fonts and icons
+
+The proposal runtime (`runtime-src/`, built to `public/runtime/`) ships Google Sans Flex
+as a Latin-subset WOFF2 that keeps every variable axis. It is subset from the exploration
+starter's `google_sans_flex.ttf`; license: `public/runtime/fonts/OFL.txt`, from
+`assets/exploration-starter/licenses/google-sans-flex-OFL.txt`.
+
+Icons are Material Symbols Rounded, weight 400, from the `@material-symbols/svg-400` npm
+package, packed into `public/runtime/icons.svg` for the names in `runtime-src/icons.json`.
+License: Apache 2.0, `public/runtime/icons-LICENSE.txt`.

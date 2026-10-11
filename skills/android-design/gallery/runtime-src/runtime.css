@@ -1,0 +1,89 @@
+/*
+ * Proposal runtime styles. Linked by every exploration proposal as /runtime/runtime.css.
+ * Source: gallery/runtime-src/runtime.css, copied unchanged to gallery/public/runtime/.
+ */
+
+/* Google Sans Flex, Latin subset with every variable axis (OFL, see fonts/OFL.txt). */
+@font-face {
+  font-family: "Google Sans Flex";
+  src: url("fonts/GoogleSansFlex.woff2") format("woff2");
+  font-weight: 1 1000;
+  font-stretch: 25% 151%;
+  font-display: block;
+}
+
+/* @m3e/web has no typeface tokens, so the face is forced on every element. Shadow DOM inherits it. */
+*, *::before, *::after { font-family: "Google Sans Flex", sans-serif; }
+
+:root {
+  /* Stand-ins for the system bars, which do not exist on the web. A proposal sets them to the
+     status and navigation bar heights it wants to show; they default to 0. */
+  --p-inset-top: 0px;
+  --p-inset-bottom: 0px;
+}
+
+html, body { margin: 0; min-height: 100%; }
+body { font-size: 14px; line-height: 20px; letter-spacing: 0.25px; }
+m3e-theme {
+  display: block;
+  min-height: 100vh;
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+}
+
+/*
+ * Material 3 type roles: 15 baseline (.t-*) and 15 emphasized (.t-*-em).
+ * Every value is generated from runtime-src/type-scale.json, which is extracted from the pinned AndroidX
+ * Material 3 artifact (androidx.compose.material3:material3-android:1.5.0-alpha29, tokens.TypeScaleTokens).
+ * Each class therefore maps exactly to MaterialTheme.typography.<role> or <role>Emphasized in Compose.
+ * Re-extract when the starter's material3 version changes. @m3e/web's own type tokens differ in places
+ * (display-large tracking, title-medium-em line height) and are not used.
+ */
+.t-display-large { margin: 0; font-size: 57px; line-height: 64px; letter-spacing: -0.2px; font-weight: 400; }
+.t-display-medium { margin: 0; font-size: 45px; line-height: 52px; letter-spacing: 0; font-weight: 400; }
+.t-display-small { margin: 0; font-size: 36px; line-height: 44px; letter-spacing: 0; font-weight: 400; }
+.t-headline-large { margin: 0; font-size: 32px; line-height: 40px; letter-spacing: 0; font-weight: 400; }
+.t-headline-medium { margin: 0; font-size: 28px; line-height: 36px; letter-spacing: 0; font-weight: 400; }
+.t-headline-small { margin: 0; font-size: 24px; line-height: 32px; letter-spacing: 0; font-weight: 400; }
+.t-title-large { margin: 0; font-size: 22px; line-height: 28px; letter-spacing: 0; font-weight: 400; }
+.t-title-medium { margin: 0; font-size: 16px; line-height: 24px; letter-spacing: 0.2px; font-weight: 500; }
+.t-title-small { margin: 0; font-size: 14px; line-height: 20px; letter-spacing: 0.1px; font-weight: 500; }
+.t-body-large { margin: 0; font-size: 16px; line-height: 24px; letter-spacing: 0.5px; font-weight: 400; }
+.t-body-medium { margin: 0; font-size: 14px; line-height: 20px; letter-spacing: 0.2px; font-weight: 400; }
+.t-body-small { margin: 0; font-size: 12px; line-height: 16px; letter-spacing: 0.4px; font-weight: 400; }
+.t-label-large { margin: 0; font-size: 14px; line-height: 20px; letter-spacing: 0.1px; font-weight: 500; }
+.t-label-medium { margin: 0; font-size: 12px; line-height: 16px; letter-spacing: 0.5px; font-weight: 500; }
+.t-label-small { margin: 0; font-size: 11px; line-height: 16px; letter-spacing: 0.5px; font-weight: 500; }
+
+.t-display-large-em { margin: 0; font-size: 57px; line-height: 64px; letter-spacing: 0; font-weight: 500; }
+.t-display-medium-em { margin: 0; font-size: 45px; line-height: 52px; letter-spacing: 0; font-weight: 500; }
+.t-display-small-em { margin: 0; font-size: 36px; line-height: 44px; letter-spacing: 0; font-weight: 500; }
+.t-headline-large-em { margin: 0; font-size: 32px; line-height: 40px; letter-spacing: 0; font-weight: 500; }
+.t-headline-medium-em { margin: 0; font-size: 28px; line-height: 36px; letter-spacing: 0; font-weight: 500; }
+.t-headline-small-em { margin: 0; font-size: 24px; line-height: 32px; letter-spacing: 0; font-weight: 500; }
+.t-title-large-em { margin: 0; font-size: 22px; line-height: 28px; letter-spacing: 0; font-weight: 500; }
+.t-title-medium-em { margin: 0; font-size: 16px; line-height: 24px; letter-spacing: 0.15px; font-weight: 700; }
+.t-title-small-em { margin: 0; font-size: 14px; line-height: 20px; letter-spacing: 0.1px; font-weight: 700; }
+.t-body-large-em { margin: 0; font-size: 16px; line-height: 24px; letter-spacing: 0.15px; font-weight: 500; }
+.t-body-medium-em { margin: 0; font-size: 14px; line-height: 20px; letter-spacing: 0.25px; font-weight: 500; }
+.t-body-small-em { margin: 0; font-size: 12px; line-height: 16px; letter-spacing: 0.4px; font-weight: 500; }
+.t-label-large-em { margin: 0; font-size: 14px; line-height: 20px; letter-spacing: 0.1px; font-weight: 700; }
+.t-label-medium-em { margin: 0; font-size: 12px; line-height: 16px; letter-spacing: 0.5px; font-weight: 700; }
+.t-label-small-em { margin: 0; font-size: 11px; line-height: 16px; letter-spacing: 0.5px; font-weight: 700; }
+
+/* p-icon: one Material Symbols Rounded glyph from icons.svg. Size it with font-size. */
+p-icon { display: inline-flex; flex: none; width: 1em; height: 1em; font-size: 24px; vertical-align: middle; color: inherit; }
+p-icon svg { display: block; width: 100%; height: 100%; }
+
+/* p-floating-toolbar: an m3e-toolbar floating at the bottom center, 16px above the bottom inset. */
+p-floating-toolbar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--p-inset-bottom) + 16px);
+  transform: translateX(-50%);
+  z-index: 10;
+}
+p-floating-toolbar m3e-button {
+  --m3e-button-small-container-height: 48px;
+  --m3e-button-text-label-color: var(--md-sys-color-on-surface-variant);
+}

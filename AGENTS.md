@@ -42,7 +42,7 @@ These are settled. Don't flag them in reviews unless the reasoning no longer hol
 
 ## Verification
 
-After changing the skill, run the evals (`evals/README.md`). After changing the rubric, run `evals/calibrate.py` first. After changing `scripts/`, run `python3 -m unittest discover scripts`. After changing the gallery or workspace helper, run `npm test` (`node --test tests/gallery/*.test.mjs`). After changing `skills/android-design/gallery/src/`, run `npm run build` and commit `gallery/public/`.
+After changing the skill, run the evals (`evals/README.md`). After changing the rubric, run `evals/calibrate.py` first. After changing `scripts/`, run `python3 -m unittest discover scripts`. After changing the gallery or workspace helper, run `npm test` (`node --test tests/gallery/*.test.mjs`). After changing `skills/android-design/gallery/src/`, run `npm run build` and commit `gallery/public/`. After changing `skills/android-design/gallery/runtime-src/`, run `npm run build` and commit `gallery/public/runtime/`.
 
 ## Prose
 
