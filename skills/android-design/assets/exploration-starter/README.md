@@ -1,7 +1,19 @@
-# Compose exploration starter
+# Compose starter
 
-Copy this project with the installed skill's `gallery/cli.mjs create`. Develop in the returned exploration's `project/` directory, not here or in production app code. This is an executable design sandbox, not a production app template or a claim of integration compatibility.
+Copy this project with the installed skill's `gallery/cli.mjs create`. Use it to implement an approved HTML proposal as a Compose screen, and for the Wear OS shell. Exploration itself starts from `assets/proposal-starter`, not here. Develop in the returned copy's `project/` directory, not here or in production app code. This is an executable sandbox, not a production app template or a claim of integration compatibility.
 
+## Theme
+
+`AppTheme` in `app/.../theme/AppTheme.kt` takes the same inputs as the HTML runtime's `<m3e-theme>`, so porting a proposal's theme is a lookup:
+
+| `AppTheme` parameter | `<m3e-theme>` attribute | Notes |
+| --- | --- | --- |
+| `seed: Color` | `color` | Default `0xFF6750A4`. |
+| `style: PaletteStyle` | `variant` | Default `PaletteStyle.TonalSpot`. |
+| `darkTheme: Boolean` | `scheme` | Default follows the system. |
+| `dynamic: Boolean` | none | Default `false`. When true on API 31+, uses wallpaper colors instead of the seed. |
+
+The scheme comes from MaterialKolor (`rememberDynamicColorScheme`, spec 2025) with Material 3 Expressive motion and the bundled Google Sans Flex typography. `material-icons-extended` is included so every runtime icon has an `Icons.Rounded.*` counterpart.
 ## Entry points
 
 - `app/src/main/kotlin/com/example/designsandbox/ProposalScreen.kt`: phone/tablet proposal with sample state.

@@ -13,6 +13,7 @@ wearTooling = "1.0.0"
 activity = "1.13.0"
 core = "1.18.0"
 screenshot = "0.0.1-alpha16"
+materialKolor = "5.0.0-alpha07"
 
 koin = "4.1.0"
 room = "2.8.2"
@@ -32,7 +33,9 @@ compose-ui = { group = "androidx.compose.ui", name = "ui" }
 compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
+material-kolor = { module = "com.materialkolor:material-kolor", version.ref = "materialKolor" }
 wear-compose-material3 = { module = "androidx.wear.compose:compose-material3", version.ref = "wearCompose" }
 wear-compose-foundation = { module = "androidx.wear.compose:compose-foundation", version.ref = "wearCompose" }
 wear-tooling-preview = { module = "androidx.wear:wear-tooling-preview", version.ref = "wearTooling" }

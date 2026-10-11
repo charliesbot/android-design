@@ -38,6 +38,8 @@ dependencies {
   implementation(libs.compose.ui)
   implementation(libs.compose.foundation)
   implementation(libs.compose.material3)
+  implementation(libs.compose.material.icons.extended)
+  implementation(libs.material.kolor)
   implementation(libs.compose.ui.tooling.preview)
   implementation(libs.androidx.navigation3.runtime)
   implementation(libs.androidx.navigation3.ui)
