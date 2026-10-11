@@ -39,6 +39,16 @@ for (const [name, style, message] of cssRejections) {
   });
 }
 
+test('lint allows surface-dim and the fixed-dim roles that Compose has', t => {
+  const style = [
+    'a { color: var(--md-sys-color-surface-dim); }',
+    'b { color: var(--md-sys-color-primary-fixed-dim); }',
+    'c { color: var(--md-sys-color-secondary-fixed-dim); }',
+    'd { color: var(--md-sys-color-tertiary-fixed-dim); }',
+  ].join('\n');
+  publish(t, { style })();
+});
+
 test('lint allows voices, role variables, and neutral color keywords', t => {
   const style = [
     '.voice-hero { font-size: 40px; font-weight: 700; line-height: 48px; letter-spacing: 0; font-variation-settings: "wght" 700; }',

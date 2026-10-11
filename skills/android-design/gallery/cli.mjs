@@ -8,9 +8,11 @@ import { wait } from './watch.mjs';
 
 const help = `Local design exploration gallery (Node.js 22+).
 
-node <skill>/gallery/cli.mjs create --project <repo> [--title "..."]
-  Copy the HTML proposal starter into <repo>/design-explorations/ and print the exploration path.
-  Proposals are folders: <exploration>/project/proposals/<id>/index.html plus its files.
+node <skill>/gallery/cli.mjs create --project <repo> [--title "..."] [--starter html|android]
+  Copy a starter into <repo>/design-explorations/ and print the exploration path.
+  html (default): the HTML proposal starter. Proposals are folders:
+  <exploration>/project/proposals/<id>/index.html plus its files.
+  android: the Compose starter, for implementation sandboxes and the experimental Wear shell.
 node <skill>/gallery/cli.mjs cleanup <exploration> --project <repo> --yes
   Delete a marked exploration after the user confirms.
 node <skill>/gallery/cli.mjs publish <exploration> <draft.json>
@@ -38,11 +40,11 @@ does not name stay pending.
 Review each draft in the browser and run window.runtimeChecks() before publishing.
 Approval never implements a design. Previous rounds are preserved.`;
 try {
-  const { values, positionals } = parseArgs({ options: { help: { type: 'boolean', short: 'h' }, after: { type: 'string' }, timeout: { type: 'string' }, port: { type: 'string' }, project: { type: 'string' }, title: { type: 'string' }, yes: { type: 'boolean' } }, allowPositionals: true });
+  const { values, positionals } = parseArgs({ options: { help: { type: 'boolean', short: 'h' }, after: { type: 'string' }, timeout: { type: 'string' }, port: { type: 'string' }, project: { type: 'string' }, title: { type: 'string' }, starter: { type: 'string' }, yes: { type: 'boolean' } }, allowPositionals: true });
   const [command, root, draft] = positionals;
   if (values.help || !command) console.log(help);
   else if (command === 'create' && root === undefined) {
-    console.log(create({ root: values.project, title: values.title }));
+    console.log(create({ root: values.project, title: values.title, starter: values.starter }));
   } else if (command === 'cleanup' && root && positionals.length === 2) {
     if (!values.yes) throw new Error('Cleanup deletes proposal drafts, feedback, and history; confirm with the user, then pass --yes');
     cleanup(root, values.project);

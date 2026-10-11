@@ -164,6 +164,16 @@ class MappingTest(unittest.TestCase):
         self.assertEqual(len(roles), 53)
         self.assertEqual(len(set(roles)), 53)
 
+    def test_no_color_role_marked_none_exists_in_compose(self):
+        wrong = []
+        for heading, cells in self.rows:
+            if heading == "Color" and cells[0].startswith("`--md-sys-color-") and cells[1] == "none":
+                role = cells[0].strip("`")[len("--md-sys-color-"):]
+                camel = re.sub(r"-(\w)", lambda m: m.group(1).upper(), role)
+                if f"ColorScheme.{camel}" in self.known:
+                    wrong.append(cells[0])
+        self.assertEqual(wrong, [])
+
     def test_prose_has_no_em_dash(self):
         self.assertNotIn(chr(0x2014), self.text)
 

@@ -7,7 +7,11 @@ import { initializeExploration } from './store.mjs';
 export const PREFIX = 'android-design-explore-';
 export const MARKER = '.android-design-exploration.json';
 export const DIRECTORY = 'design-explorations';
-export const TEMPLATE = resolve(dirname(fileURLToPath(import.meta.url)), '../assets/proposal-starter');
+const ASSETS = resolve(dirname(fileURLToPath(import.meta.url)), '../assets');
+export const TEMPLATE = join(ASSETS, 'proposal-starter');
+export const ANDROID_TEMPLATE = join(ASSETS, 'exploration-starter');
+// Each starter names the file that proves a copy source is the right folder.
+const STARTERS = { html: [TEMPLATE, 'proposals/a/index.html'], android: [ANDROID_TEMPLATE, 'settings.gradle.kts'] };
 const SKIP = new Set(['build', '.gradle', '.kotlin', '.git', 'renders', 'local.properties', '__pycache__', 'screenshotTestDebug']);
 
 function git(root, ...args) {
@@ -32,11 +36,13 @@ function storage(root) {
   return destination;
 }
 
-export function create({ template = TEMPLATE, root, title = 'Design exploration' } = {}) {
-  template = realpathSync(resolve(template));
+export function create({ starter = 'html', template, root, title = 'Design exploration' } = {}) {
+  if (!Object.hasOwn(STARTERS, starter)) throw new Error(`Invalid --starter: expected html or android, got ${starter}`);
+  const [defaultTemplate, entryFile] = STARTERS[starter];
+  template = realpathSync(resolve(template ?? defaultTemplate));
   root = repository(root);
   if (typeof title !== 'string' || !title.trim() || title.length > 200) throw new Error('Title must contain 1 to 200 characters');
-  const entry = join(template, 'proposals/a/index.html');
+  const entry = join(template, entryFile);
   if (!existsSync(entry) || !statSync(entry).isFile()) throw new Error(`Missing starter: ${template}`);
   const base = storage(root);
   if (git(root, 'ls-files', '--', DIRECTORY)) throw new Error('Exploration storage is already tracked; leave it untouched');

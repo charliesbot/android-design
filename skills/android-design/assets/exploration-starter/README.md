@@ -1,6 +1,6 @@
 # Compose starter
 
-Copy this project with the installed skill's `gallery/cli.mjs create`. Use it to implement an approved HTML proposal as a Compose screen, and for the Wear OS shell. Exploration itself starts from `assets/proposal-starter`, not here. Develop in the returned copy's `project/` directory, not here or in production app code. This is an executable sandbox, not a production app template or a claim of integration compatibility.
+Copy this project with the installed skill's `gallery/cli.mjs create --starter android`. Use it to implement an approved HTML proposal as a Compose screen, and for the Wear OS shell. Exploration itself starts from `assets/proposal-starter`, not here. Develop in the returned copy's `project/` directory, not here or in production app code. This is an executable sandbox, not a production app template or a claim of integration compatibility.
 
 ## Theme
 

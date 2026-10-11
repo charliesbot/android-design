@@ -114,8 +114,8 @@ function lintCss(file, source) {
     if (HEX_COLOR.test(value) || COLOR_FUNCTION.test(value) || COLOR_WORD.test(value)) {
       fail(at, `Raw color in ${property}. Use var(--md-sys-color-*), or declare a named color once in a /* static colors */ block as --static-*`);
     }
-    // The theme emits *-dim roles that Compose's ColorScheme lacks; a proposal using one could not be ported (see compose-mapping.md).
-    const dim = /--md-sys-color-([\w-]+-dim)\b/.exec(value);
+    // The theme emits primary, secondary, tertiary, and error *-dim roles that Compose's ColorScheme lacks; a proposal using one could not be ported (see compose-mapping.md).
+    const dim = /--md-sys-color-((?:primary|secondary|tertiary|error)-dim)\b/.exec(value);
     if (dim) fail(at, `${dim[1]} has no Compose counterpart. Use another --md-sys-color-* role`);
     if (TYPE_PROPERTIES.has(property)) {
       const rule = [...stack].reverse().find(prelude => !prelude.startsWith('@'));

@@ -104,7 +104,7 @@ The HTML cell is the element and the attribute values that select the pattern. A
 | `m3e-slider` with two `m3e-slider-thumb` | `RangeSlider` | unverified | |
 | `m3e-slider-thumb` | see `m3e-slider` | unverified | |
 | `m3e-shape name="sunny"` | `Modifier.clip(MaterialShapes.Sunny.toShape())` | unverified | Name table below |
-| `p-floating-toolbar` | see the shims table | verified | The toggle buttons inside are the blind port's `HorizontalFloatingToolbar` with `ToggleButton` |
+| `p-floating-toolbar` | see the shims table | verified | The `m3e-toolbar` wrapper inside it is part of this row. The toggle buttons inside are the blind port's `HorizontalFloatingToolbar` with `ToggleButton` |
 | `m3e-button toggle` inside `p-floating-toolbar` | `ToggleButton(checked, onCheckedChange, colors = ToggleButtonDefaults.colors(containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.onSurfaceVariant, checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer, checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer))` | verified | Selected is tonal, others text; 48dp minimum height with `Modifier.heightIn(min = 48.dp)`; icon at `ToggleButtonDefaults.IconSize` |
 | `m3e-theme color variant scheme` | `MaterialExpressiveTheme(colorScheme = rememberDynamicColorScheme(seedColor, isDark, style = PaletteStyle.TonalSpot, specVersion = ColorSpec.SpecVersion.SPEC_2025), motionScheme = MotionScheme.expressive())` | unverified | Required by the page contract. See the color table for `variant` and `scheme` |
 | `p-icon` | `Icon(Icons.Rounded.Home, contentDescription = ...)` | unverified | `label` is the `contentDescription`; without it pass `null`. See the icons table |
@@ -218,7 +218,7 @@ Every role the runtime theme emits. `--md-sys-color-<role>` is the kebab-case of
 | `--md-sys-color-primary-container` | `MaterialTheme.colorScheme.primaryContainer` |  |
 | `--md-sys-color-on-primary-container` | `MaterialTheme.colorScheme.onPrimaryContainer` |  |
 | `--md-sys-color-primary-fixed` | `MaterialTheme.colorScheme.primaryFixed` |  |
-| `--md-sys-color-primary-fixed-dim` | none | No `ColorScheme` member in this material3 version: do not use |
+| `--md-sys-color-primary-fixed-dim` | `MaterialTheme.colorScheme.primaryFixedDim` |  |
 | `--md-sys-color-on-primary-fixed` | `MaterialTheme.colorScheme.onPrimaryFixed` |  |
 | `--md-sys-color-on-primary-fixed-variant` | `MaterialTheme.colorScheme.onPrimaryFixedVariant` |  |
 | `--md-sys-color-inverse-primary` | `MaterialTheme.colorScheme.inversePrimary` |  |
@@ -228,7 +228,7 @@ Every role the runtime theme emits. `--md-sys-color-<role>` is the kebab-case of
 | `--md-sys-color-secondary-container` | `MaterialTheme.colorScheme.secondaryContainer` |  |
 | `--md-sys-color-on-secondary-container` | `MaterialTheme.colorScheme.onSecondaryContainer` |  |
 | `--md-sys-color-secondary-fixed` | `MaterialTheme.colorScheme.secondaryFixed` |  |
-| `--md-sys-color-secondary-fixed-dim` | none | No `ColorScheme` member in this material3 version: do not use |
+| `--md-sys-color-secondary-fixed-dim` | `MaterialTheme.colorScheme.secondaryFixedDim` |  |
 | `--md-sys-color-on-secondary-fixed` | `MaterialTheme.colorScheme.onSecondaryFixed` |  |
 | `--md-sys-color-on-secondary-fixed-variant` | `MaterialTheme.colorScheme.onSecondaryFixedVariant` |  |
 | `--md-sys-color-tertiary` | `MaterialTheme.colorScheme.tertiary` |  |
@@ -237,7 +237,7 @@ Every role the runtime theme emits. `--md-sys-color-<role>` is the kebab-case of
 | `--md-sys-color-tertiary-container` | `MaterialTheme.colorScheme.tertiaryContainer` |  |
 | `--md-sys-color-on-tertiary-container` | `MaterialTheme.colorScheme.onTertiaryContainer` |  |
 | `--md-sys-color-tertiary-fixed` | `MaterialTheme.colorScheme.tertiaryFixed` |  |
-| `--md-sys-color-tertiary-fixed-dim` | none | No `ColorScheme` member in this material3 version: do not use |
+| `--md-sys-color-tertiary-fixed-dim` | `MaterialTheme.colorScheme.tertiaryFixedDim` |  |
 | `--md-sys-color-on-tertiary-fixed` | `MaterialTheme.colorScheme.onTertiaryFixed` |  |
 | `--md-sys-color-on-tertiary-fixed-variant` | `MaterialTheme.colorScheme.onTertiaryFixedVariant` |  |
 | `--md-sys-color-error` | `MaterialTheme.colorScheme.error` |  |

@@ -21,7 +21,7 @@ Run in an expendable Git repository. Needs Node.js 22+ and a browser in the harn
 
 1. Create an exploration with `node skills/android-design/gallery/cli.mjs create --project <fixture-repo>`. Record the production app and installed starter hashes.
 2. Author three distinct proposals in `project/proposals/`, each with its own seed color and a rationale; at least one layers three or more tactics and names them.
-3. Review each draft at `/draft/<id>/` in a browser at 411x923, 704x933, 1280x800, and 1440x900. Call `window.runtimeChecks()` at each size, fix every failure, and look at one screenshot per device. With no browser, the agent must report visual quality unverified.
+3. Review each draft at `/runtime/review/?src=/draft/<id>/` in a browser, which frames all four devices. Call `window.reviewChecks()`, fix every failure, treat `complete: false` as unverified, and look at one screenshot per device. With no browser, the agent must report visual quality unverified.
 4. Publish with `gallery/cli.mjs publish`. Separately, add a raw hex color, an inline `style=""`, or a type declaration outside a `.voice-*` class to a copy and confirm publish rejects it with file and line. Publishing never touches the original round.
 5. Gallery smoke check: serve, open the URL, and switch across the four devices; the frames resize in place and cross the 840px breakpoint. Change seed color, variant, and light or dark, and confirm nothing is saved after reload.
 6. Select one option, switch to another, and enter shared notes. Only one proposal may be selected. Submit a refinement and verify its saved snapshot and chat handoff. Test None of these with required notes. Verify save confirmation, restart the server, and reload. Notes and selections must survive. With two tabs, verify an outdated write is rejected without silently overwriting saved state. Exercise visible retry after a disconnected server.
@@ -35,11 +35,11 @@ The gallery never invokes an agent or implements a selected proposal. Test its w
 
 ## Agent routing checks
 
-- "Show me three home-screen ideas." Expect three HTML proposals in the requesting repository's ignored exploration folder, browser-reviewed with `runtimeChecks()`, and a local gallery. Ask for a repository if none was selected, not a new app scaffold in the current directory.
+- "Show me three home-screen ideas." Expect three HTML proposals in the requesting repository's ignored exploration folder, browser-reviewed with `reviewChecks()`, and a local gallery. Ask for a repository if none was selected, not a new app scaffold in the current directory.
 - "Explore a redesign of Today." Expect read-only inspection of app code and dependencies, with writes only to exploration artifacts and the local Git exclusion.
 - "Adjust option B." Expect saved feedback to be read, one refinement by default, and a new preserved round in the same exploration.
 - "Keep refining while I review." Expect a watch session to start after the first publish. "Adjust option B" without a session still produces one preserved round. A failed browser review stops the session with visual quality reported unverified.
 - Approving a design in the gallery must end exploration, not start implementation. "Implement the approved design" explicitly transitions to the requesting project's workflow, ports the proposal with `references/compose-mapping.md`, preserves its library versions, and compares the rendered Compose result with the approved proposal.
-- "Explore Wear." Expect the Android starter's experimental Wear shell and preview skill, not the four-device gallery or a claim that parked Wear evals pass.
+- "Explore Wear." Expect `create --starter android` and its experimental Wear shell and preview skill, not the four-device gallery or a claim that parked Wear evals pass.
 
 Run the existing design evals after changing skill instructions. Model-based checks send prompts, source context, and screenshots through the configured agent service; obtain the required execution permission before running them.

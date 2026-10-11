@@ -154,3 +154,98 @@ test('create copies the starter without the Android project', t => {
   assert.equal(existsSync(join(result, 'project/settings.gradle.kts')), false);
   assert.equal(existsSync(join(result, 'project/app')), false);
 });
+
+const MAPPING = readFileSync(fileURLToPath(new URL('../../skills/android-design/references/compose-mapping.md', import.meta.url)), 'utf8');
+const VARIANT_ATTRIBUTES = new Set(['variant', 'size', 'mode', 'shape', 'orientation', 'width', 'toggle', 'extended', 'vertical', 'multi', 'actionable']);
+// m3e-toolbar is only the wrapper inside p-floating-toolbar, which the verified p-floating-toolbar row covers.
+const COVERED_BY_PARENT = new Map([['m3e-toolbar', 'p-floating-toolbar']]);
+const EXEMPT = new Set(['m3e-theme', 'p-icon']);
+
+function attributesOf(text) {
+  const attributes = new Map();
+  for (const [, name, quoted] of text.matchAll(/([a-z][\w-]*)(?:="([^"]*)")?/g)) attributes.set(name, quoted ?? true);
+  return attributes;
+}
+
+function verifiedRows() {
+  const components = MAPPING.split('\n## ')[1];
+  return components.split('\n').filter(line => line.startsWith('|')).map(line => line.split('|').slice(1, -1).map(cell => cell.trim()))
+    .filter(cells => cells[2] === 'verified')
+    .map(([html, , , notes]) => {
+      const [self, context] = html.match(/`[^`]+`/g).map(span => span.slice(1, -1));
+      const [tag, ...rest] = self.split(' ');
+      const inside = context ? context.split(' ') : null;
+      return { tag, attributes: attributesOf(rest.join(' ')), inside: inside && { tag: inside[0], attributes: attributesOf(inside.slice(1).join(' ')) }, notes };
+    });
+}
+
+function elementsOf(html) {
+  const stack = [];
+  const elements = [];
+  for (const [, closing, tag, rest] of html.matchAll(/<(\/?)((?:m3e|p)-[a-z0-9-]+)([^>]*)>/g)) {
+    if (closing) { stack.pop(); continue; }
+    elements.push({ tag, attributes: attributesOf(rest), ancestors: [...stack] });
+    stack.push({ tag, attributes: attributesOf(rest) });
+  }
+  return elements;
+}
+
+function matches(row, element) {
+  if (row.tag !== element.tag) return false;
+  for (const [name, value] of row.attributes) if (element.attributes.get(name) !== value) return false;
+  for (const [name, value] of element.attributes) {
+    if (!VARIANT_ATTRIBUTES.has(name) || row.attributes.has(name)) continue;
+    if (!new RegExp(`\\b${value === true ? name : value}\\b`).test(row.notes)) return false;
+  }
+  if (row.inside) {
+    return element.ancestors.some(ancestor => ancestor.tag === row.inside.tag && [...row.inside.attributes].every(([name, value]) => ancestor.attributes.get(name) === value));
+  }
+  return true;
+}
+
+test('every component in the HTML starter matches a verified mapping row', () => {
+  const rows = verifiedRows();
+  assert.ok(rows.length >= 5);
+  const unverified = [];
+  for (const element of elementsOf(readFileSync(join(TEMPLATE, 'proposals/a/index.html'), 'utf8'))) {
+    if (EXEMPT.has(element.tag)) continue;
+    if (COVERED_BY_PARENT.has(element.tag) && element.ancestors.at(-1)?.tag === COVERED_BY_PARENT.get(element.tag)) continue;
+    if (!rows.some(row => matches(row, element))) {
+      unverified.push(`<${element.tag} ${[...element.attributes.keys()].filter(name => VARIANT_ATTRIBUTES.has(name)).map(name => `${name}=${element.attributes.get(name)}`).join(' ')}>`);
+    }
+  }
+  assert.deepEqual(unverified, []);
+});
+
+test('create --starter android copies the Compose project with the same skip list', t => {
+  const { root } = repo(t);
+  const result = create({ root, starter: 'android' });
+  assert.equal(existsSync(join(result, 'project/settings.gradle.kts')), true);
+  assert.equal(existsSync(join(result, 'project/app/build.gradle.kts')), true);
+  assert.equal(existsSync(join(result, 'project/proposals')), false);
+  for (const name of ['build', '.gradle', '.git', 'renders', 'local.properties']) {
+    assert.equal(existsSync(join(result, 'project', name)), false, name);
+  }
+  assert.equal(new GalleryStore(result).read().rounds.length, 0);
+});
+
+test('create rejects an unknown starter', t => {
+  const { root } = repo(t);
+  assert.throws(() => create({ root, starter: 'compose' }), /starter/);
+  assert.equal(existsSync(join(root, 'design-explorations')), false);
+});
+
+test('the CLI selects the starter and validates the value', t => {
+  const { root } = repo(t);
+  const cli = fileURLToPath(new URL('../../skills/android-design/gallery/cli.mjs', import.meta.url));
+  const run = (...args) => spawnSync('node', [cli, 'create', '--project', root, ...args], { encoding: 'utf8' });
+  const html = run();
+  assert.equal(html.status, 0, html.stderr);
+  assert.equal(existsSync(join(html.stdout.trim(), 'project/proposals/a/index.html')), true);
+  const android = run('--starter', 'android');
+  assert.equal(android.status, 0, android.stderr);
+  assert.equal(existsSync(join(android.stdout.trim(), 'project/settings.gradle.kts')), true);
+  const bad = run('--starter', 'wear');
+  assert.notEqual(bad.status, 0);
+  assert.match(bad.stderr, /--starter/);
+});

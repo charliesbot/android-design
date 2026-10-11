@@ -28,7 +28,7 @@ Resume the same exploration directory for revisions. Working drafts live in `pro
 node <skill-dir>/gallery/cli.mjs status <exploration>
 ```
 
-The gallery includes phone, foldable, tablet, and desktop frames. Wear stays outside this workflow; use the Android starter's experimental Wear shell only when explicitly requested, without claiming validated Wear quality.
+The gallery includes phone, foldable, tablet, and desktop frames. Wear stays outside this workflow; use the Android starter's experimental Wear shell (`create --starter android`) only when explicitly requested, without claiming validated Wear quality.
 
 ## Author proposals
 
@@ -39,22 +39,23 @@ A proposal is `proposals/<id>/index.html` and `style.css` on the runtime. Copy `
 - Color uses `--md-sys-color-*` roles. A non-role color (a dish or category color) goes in one `/* static colors */` block of `--static-*` properties.
 - Icons come from the runtime list through `<p-icon>`.
 - Corners come from the corner scale, spacing from the 8dp scale.
-- Components come only from `references/compose-mapping.md` rows marked `verified`.
+- Components come only from `references/compose-mapping.md` rows marked `verified`. Anything else is built from plain HTML layout with role tokens when it has a plain Compose layout counterpart (`Box`, `Row`, `Column`, `Text`, `Surface`); otherwise leave it out.
+- A large voice sets `line-height` to at least about 1.2 times its `font-size`.
 - No inline styles or scripts. One `index.html` and one `style.css` per proposal.
 - Mark the primary action `data-primary`.
 - Compact below 840px, expanded from 840px up.
 
 ## Review before publishing
 
-Do not judge from code alone. Start the gallery server and open each draft in your harness's browser:
+Do not judge from code alone. Browser tools cannot emulate exact viewports, so review through the gallery's review page, which frames the draft at all four devices (411x923, 704x933, 1280x800, 1440x900). Start the gallery server and open it:
 
 ```bash
 node <skill-dir>/gallery/cli.mjs serve <exploration>
 ```
 
-1. Open `/draft/<id>/` at each device viewport: 411x923, 704x933, 1280x800, 1440x900.
-2. Call `window.runtimeChecks()` at each size and fix every failure. Treat `unresolved` entries as unchecked, not passed.
-3. Look at one screenshot per device for hierarchy, character, and color balance, using the skill's screen check.
+1. Open `/runtime/review/?src=/draft/<id>/` in your harness's browser.
+2. Call `window.reviewChecks()` on that page and fix every failure. Treat `unresolved` entries as unchecked, not passed. A result with `complete: false` means some frame was not checked: treat it as not verified and report it.
+3. Take one screenshot per device from that page (or open a frame full size) and judge hierarchy, character, and color balance, using the skill's screen check.
 
 If the harness has no browser, report visual quality as unverified and do not claim the screen check passed. Publish only with the user's knowledge of that.
 
@@ -76,7 +77,7 @@ Write a round draft outside `project/`. The proposal folder is implied by the id
 }
 ```
 
-Include every option in that round's `proposals` array. Optional `answers` names the saved requests (round id and request timestamp) this round responds to; requests it does not name stay pending. Then:
+The round's `proposals` array lists only the proposals in that round. A refinement round reuses the working folder id of the proposal being refined (for example `b`). Optional `answers` names the saved requests this round responds to, each as `{roundId, at}` exactly as returned in `wait`'s `request` (and `superseded`) or in `status`'s `pending`; requests it does not name stay pending. Then:
 
 ```bash
 node <skill-dir>/gallery/cli.mjs publish <exploration> <draft.json>
