@@ -17,3 +17,4 @@
 .note-body p-icon { color: var(--md-sys-color-primary); }
 .note-body p { color: var(--md-sys-color-on-surface-variant); }
 .start { align-self: stretch; }
+.top { display: flex; align-items: center; justify-content: space-between; }

@@ -87,3 +87,13 @@ p-floating-toolbar m3e-button {
   --m3e-button-small-container-height: 48px;
   --m3e-button-text-label-color: var(--md-sys-color-on-surface-variant);
 }
+
+/*
+ * m3e-icon-button draws a 40px visual. Compose IconButton keeps a 48dp touch target around its 40dp visual, so
+ * the host gets a 48px minimum box with the visual centered. These are the library's own private properties,
+ * the same pair it sets inside m3e-toolbar, m3e-app-bar, and m3e-search-bar.
+ */
+m3e-icon-button {
+  --_icon-button-size: auto;
+  --_icon-button-min-size: 48px;
+}

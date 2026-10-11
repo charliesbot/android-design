@@ -21,17 +21,23 @@ The gallery CSP is `default-src 'self'`: no inline `<style>`, no `style=""`, no 
 | `runtime/fonts/` | `GoogleSansFlex.woff2` (Latin subset, all variable axes) and its OFL license |
 | `runtime/icons.svg` | Material Symbols Rounded sprite (weight 400, unfilled and filled), license in `icons-LICENSE.txt` |
 | `runtime/sample/` | A small page that uses only runtime pieces |
+| `runtime/checks-fixture/` | Known-bad and known-good component text (low-contrast and clipped button labels, clipped plain text) that `runtimeChecks()` must flag |
+| `runtime/review/` | The review page: one proposal in four exact device frames, with `reviewChecks()` |
 | `runtime/verify/` | One section per component in `references/compose-mapping.md`, with its variants, for comparing against Compose; it marks nothing verified |
 
-## Allowed components
+## Registered elements
 
-`m3e-theme`, `m3e-app-bar`, `m3e-button`, `m3e-button-group`, `m3e-icon-button`, `m3e-split-button`, `m3e-fab`, `m3e-fab-menu` (with `-item` and `-trigger`), `m3e-card`, `m3e-list` and the list item elements, the chip elements (`m3e-chip`, `m3e-assist-chip`, `m3e-filter-chip`, `m3e-input-chip`, `m3e-suggestion-chip` and their sets), `m3e-toolbar`, `m3e-nav-bar`, `m3e-nav-item`, `m3e-nav-rail`, `m3e-loading-indicator`, `m3e-circular-progress-indicator`, `m3e-linear-progress-indicator`, `m3e-shape`, `m3e-switch`, `m3e-slider`.
+The runtime registers these `@m3e/web` elements: `m3e-theme`, `m3e-app-bar`, `m3e-button`, `m3e-button-group`, `m3e-icon-button`, `m3e-split-button`, `m3e-fab`, `m3e-fab-menu` (with `-item` and `-trigger`), `m3e-card`, `m3e-list` and the list item elements, the chip elements (`m3e-chip`, `m3e-assist-chip`, `m3e-filter-chip`, `m3e-input-chip`, `m3e-suggestion-chip` and their sets), `m3e-toolbar`, `m3e-nav-bar`, `m3e-nav-item`, `m3e-nav-rail`, `m3e-loading-indicator`, `m3e-circular-progress-indicator`, `m3e-linear-progress-indicator`, `m3e-shape`, `m3e-switch`, `m3e-slider`.
+
+Registered does not mean usable. A proposal may use only the components `references/compose-mapping.md` marks verified. Anything else it builds from plain HTML layout (`div`, `span`, headings, lists) styled with role tokens, as long as the result has a plain Compose layout counterpart (`Box`, `Row`, `Column`, `Text`, `Surface`).
 
 Wrap the page in `<m3e-theme color="#RRGGBB" variant="tonal-spot" scheme="light">`. `m3e-icon` is not registered: use `p-icon`.
 
 ## Type roles
 
 One class per Material 3 role: `.t-display-large`, `.t-display-medium`, `.t-display-small`, `.t-headline-large|medium|small`, `.t-title-large|medium|small`, `.t-body-large|medium|small`, `.t-label-large|medium|small` (15), and the same names with an `-em` suffix for the emphasized roles (15). Sizes, line heights, tracking, and weights are generated from `type-scale.json`, extracted from the pinned AndroidX Material 3 artifact, so each class equals its Compose `MaterialTheme.typography` role exactly.
+
+Large voices: Google Sans Flex at heavy weights and large sizes needs a line height of at least about 1.2x the font size (`SKILL.md` section 5: "Line height about 1.2x on large styles"). The checker flags a tighter line box as overflow, because the glyph box then exceeds the box that holds it.
 
 ## Icons
 
@@ -52,11 +58,29 @@ The gallery's preview-only theme controls post `{type: "theme", color, variant, 
 `window.runtimeChecks()` returns one JSON object:
 
 ```
-{ pass, viewport, touchTargets: {checked, under48}, fonts: {offenders}, overflow,
+{ pass, complete, viewport, touchTargets: {checked, under48}, fonts: {offenders}, overflow,
   primary: {status, marked, largest, reason?}, fabs: {count, ok}, contrast: {fails, passed}, unresolved }
 ```
 
-`pass` is false when any check failed. Checks: interactive elements under 48x48 (a component is measured as a whole, other shadow roots are searched); text not in Google Sans Flex (`p-icon` excluded); text whose box clips it; the element marked `data-primary` must be the largest interactive element; at most one FAB; text contrast of 4.5:1 (3:1 at 24px and up, or bold at 18.66px and up). Cases it cannot resolve, such as a gradient or translucent background, a page with no `data-primary`, or an ancestor with opacity below 1, are listed in `unresolved` and are never counted as passes. Decorative text (`aria-hidden`) is exempt from overflow and contrast. Run it at each device size you review; it reads the live layout.
+`pass` is false when any check failed. `complete` is false when anything is in `unresolved`. Treat `complete: false` as not verified, whatever `pass` says: an unresolved case is never a pass.
+
+Checks: interactive elements under 48x48 (a component is measured as a whole, other shadow roots are searched); text not in Google Sans Flex (`p-icon` excluded); text whose box clips it; the element marked `data-primary` must be the largest interactive element; at most one FAB; text contrast of 4.5:1 (3:1 at 24px and up, or bold at 18.66px and up).
+
+Text is measured where it renders. Slotted text, such as a button label, is attributed to the element its slot places it under inside the component's shadow root (`m3e-button#cta > div.label`), not to the light-DOM host. Color and font come from that element, the fill from the first opaque background up the flat tree (slot, shadow ancestors, host, light ancestors), so a filled button is measured against its container, not the page. Clipping is tested on the shadow element that clips. Cases it cannot resolve, such as a gradient or translucent background, a page with no `data-primary`, or an ancestor with opacity below 1, are listed in `unresolved`. Decorative text (`aria-hidden`) is exempt from overflow and contrast. Run it at each device size you review; it reads the live layout.
+
+`m3e-icon-button` draws a 40px visual. `runtime.css` gives it the 48px minimum box Compose `IconButton` has, so a proposal needs no per-page CSS for the touch target.
+
+## Review page
+
+`/runtime/review/?src=/draft/<id>/` shows the proposal in four same-origin iframes at exactly 411x923, 704x933, 1280x800, and 1440x900, scaled to fit and labeled. Only `/draft/` and `/rounds/` paths are accepted. Browser tools cannot set exact viewports, so this page is how a review gets them. Each label links to the same device at full size (`&device=phone|tablet|laptop|desktop`) for screenshots.
+
+`await window.reviewChecks()` waits for every frame to load and its fonts to be ready, then calls each frame's `runtimeChecks()`:
+
+```
+{ src, devices: [{ id, viewport: [innerWidth, innerHeight], result }], pass, complete }
+```
+
+`pass` and `complete` fold every device's `result`. `complete: false` means not verified. The page uses no inline script or style, so it runs under the gallery CSP.
 
 ## Rebuild
 

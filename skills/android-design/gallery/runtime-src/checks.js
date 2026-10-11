@@ -1,5 +1,8 @@
-// window.runtimeChecks(): the in-page rule checker. Returns one JSON-safe object whose top-level
-// `pass` is false when any check failed. Cases it cannot resolve go in `unresolved`, never in passes.
+import { neededRatio, over, ratio } from './contrast.js';
+
+// window.runtimeChecks(): the in-page rule checker. Returns one JSON-safe object. `pass` is false when
+// any check failed. Cases it cannot resolve go in `unresolved`, never in passes, and make `complete` false:
+// a result with complete: false is not verified, whatever `pass` says.
 const INTERACTIVE = [
   'a[href]', 'button', 'input', 'select', 'textarea', 'summary', '[role=button]', '[role=link]', '[role=tab]',
   '[role=switch]', '[role=checkbox]', '[role=menuitem]', '[tabindex]:not([tabindex="-1"])',
@@ -11,19 +14,44 @@ const FAB = 'm3e-fab, m3e-fab-menu, [data-fab]';
 const MIN_TARGET = 48;
 
 const isFlex = family => /google sans flex/i.test(family.split(',')[0]);
+const label = el => (el.getAttribute?.('aria-label') || el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 30);
 const describe = el => {
-  const text = (el.getAttribute?.('aria-label') || el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 30);
+  const text = label(el);
   return el.localName + (el.id ? `#${el.id}` : '') + (text ? ` "${text}"` : '');
+};
+// An element inside a shadow root is named through its host: m3e-button#cta > div.label "Start".
+const path = el => {
+  const host = el.getRootNode().host;
+  const own = el.localName + (el.id ? `#${el.id}` : '') + (host && el.classList[0] ? `.${el.classList[0]}` : '');
+  return host ? `${path(host)} > ${own}` : own;
+};
+const describeFlat = el => {
+  const text = label(el);
+  return path(el) + (text ? ` "${text}"` : '');
 };
 const visible = el => {
   const rect = el.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return false;
   return el.checkVisibility ? el.checkVisibility({ visibilityProperty: true }) : getComputedStyle(el).visibility !== 'hidden';
 };
+
+// The parent a node is rendered under: a slotted node renders under its slot, a shadow root's child under
+// the host. Null when the node is not rendered (a light child of a host with no slot for it).
+function flatParent(node) {
+  if (node.assignedSlot) return node.assignedSlot;
+  const parent = node.parentNode;
+  if (!parent) return null;
+  if (parent instanceof ShadowRoot) return parent.host;
+  if (parent instanceof Element && parent.shadowRoot) return null;
+  return parent instanceof Element ? parent : null;
+}
+// The nearest flat-tree ancestor (self included) that has a layout box; slots and display: contents have none.
+function boxOf(el) {
+  for (let node = el; node; node = flatParent(node)) if (getComputedStyle(node).display !== 'contents') return node;
+  return null;
+}
 const hiddenFromAssistiveTech = el => {
-  for (let node = el; node; node = node.parentElement || node.getRootNode().host) {
-    if (node.getAttribute?.('aria-hidden') === 'true') return true;
-  }
+  for (let node = el; node; node = flatParent(node)) if (node.getAttribute?.('aria-hidden') === 'true') return true;
   return false;
 };
 
@@ -33,10 +61,11 @@ function walk(root, visit) {
     if (visit(el) !== false && el.shadowRoot) walk(el.shadowRoot, visit);
   }
 }
+// Visit every non-blank text node in light and shadow DOM.
 function walkText(root, visit) {
-  walk(root, el => {
-    for (const node of el.childNodes) if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) { visit(el); break; }
-  });
+  const direct = parent => { for (const node of parent.childNodes) if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) visit(node); };
+  if (root instanceof ShadowRoot) direct(root);
+  walk(root, el => { direct(el); });
 }
 
 // Any CSS color the browser can compute becomes sRGB through a 1x1 canvas.
@@ -51,17 +80,10 @@ function rgba(css) {
   const [r, g, b, a] = context.getImageData(0, 0, 1, 1).data;
   return { r, g, b, a: a / 255 };
 }
-const luminance = ({ r, g, b }) => {
-  const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-};
-const ratio = (a, b) => {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-};
-// The opaque color behind an element, or a reason it cannot be known.
+// The opaque color behind a rendering element, or a reason it cannot be known. Walks the flat tree, so the
+// painted fill inside a component's shadow root (a button's .base) is found before the page behind it.
 function backdrop(el) {
-  for (let node = el; node; node = node.parentElement || node.getRootNode().host) {
+  for (let node = el; node; node = flatParent(node)) {
     const style = getComputedStyle(node);
     if (parseFloat(style.opacity) < 1) return { reason: 'an ancestor has opacity below 1' };
     if (style.backgroundImage !== 'none') return { reason: 'background is an image or gradient' };
@@ -70,6 +92,21 @@ function backdrop(el) {
     if (color.a > 0) return { reason: 'background is translucent' };
   }
   return { reason: 'no opaque background found' };
+}
+
+// Is any part of the text drawn outside an ancestor that clips? Returns that ancestor, or null.
+// A scroll container ends the climb: its content is reachable.
+function clippedBy(textRect, el) {
+  for (let node = boxOf(el); node; node = boxOf(flatParent(node))) {
+    const style = getComputedStyle(node);
+    if (/auto|scroll/.test(style.overflowX + style.overflowY)) return null;
+    if (/hidden|clip/.test(style.overflowX + style.overflowY) && node !== document.documentElement) {
+      const box = node.getBoundingClientRect();
+      const [left, top] = [box.left + node.clientLeft, box.top + node.clientTop];
+      if (textRect.left < left - 1 || textRect.top < top - 1 || textRect.right > left + node.clientWidth + 1 || textRect.bottom > top + node.clientHeight + 1) return node;
+    }
+  }
+  return null;
 }
 
 export function runtimeChecks() {
@@ -104,32 +141,49 @@ export function runtimeChecks() {
 
   const fabs = [...document.querySelectorAll(FAB)].filter(el => !el.parentElement?.closest('m3e-fab-menu') && visible(el)).length;
 
-  // Text: every element that directly holds a text node, in light and shadow DOM.
+  // Text: every text node, in light and shadow DOM, measured where it renders (through its slot, in the
+  // flat tree): color, font, and clipping come from the rendering element, the fill from the first opaque
+  // background up the flat tree, including the shadow parts that paint a component's container.
   const fonts = [], overflow = [], contrast = { fails: [], passed: 0 };
-  walkText(document, el => {
-    if (el.closest('p-icon, m3e-icon') || !visible(el)) return;
+  const seen = new Set();
+  const once = (...keys) => { const key = keys.join('|'); if (seen.has(key)) return false; seen.add(key); return true; };
+  walkText(document, node => {
+    const el = flatParent(node);
+    if (!el || el.closest?.('p-icon, m3e-icon')) return;
     const style = getComputedStyle(el);
-    if (!isFlex(style.fontFamily)) fonts.push({ el: describe(el), font: style.fontFamily });
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const rect = range.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0 || style.visibility !== 'visible') return;
+    const name = describeFlat(boxOf(el) || el);
+    if (!isFlex(style.fontFamily) && once('font', name)) fonts.push({ el: name, font: style.fontFamily });
     if (hiddenFromAssistiveTech(el)) return; // decorative text is exempt from overflow and contrast
+
+    // Overflow: the box holding the text overflows itself, or an ancestor that clips cuts the text off.
+    const box = boxOf(el);
     const scrolls = /auto|scroll/.test(style.overflowX + style.overflowY);
-    if (!scrolls && style.display !== 'inline' && (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1)) {
-      overflow.push({ el: describe(el), scroll: [el.scrollWidth, el.scrollHeight], client: [el.clientWidth, el.clientHeight] });
+    if (box && !scrolls && getComputedStyle(box).display !== 'inline' && (box.scrollWidth > box.clientWidth + 1 || box.scrollHeight > box.clientHeight + 1)
+        && once('overflow', name)) {
+      overflow.push({ el: name, scroll: [box.scrollWidth, box.scrollHeight], client: [box.clientWidth, box.clientHeight] });
     }
+    const clipper = clippedBy(rect, el);
+    if (clipper && clipper !== box && once('overflow', name, 'clip')) overflow.push({ el: name, clippedBy: describeFlat(clipper) });
+
+    if (!once('contrast', name)) return;
     const back = backdrop(el);
-    if (!back.color) { unresolved.push({ check: 'contrast', el: describe(el), reason: back.reason }); return; }
-    const fg = rgba(style.color);
-    const text = fg.a < 1 ? { r: fg.r * fg.a + back.color.r * (1 - fg.a), g: fg.g * fg.a + back.color.g * (1 - fg.a), b: fg.b * fg.a + back.color.b * (1 - fg.a) } : fg;
-    const size = parseFloat(style.fontSize);
-    const large = size >= 24 || (size >= 18.66 && parseInt(style.fontWeight, 10) >= 700);
-    const need = large ? 3 : 4.5;
+    if (!back.color) { unresolved.push({ check: 'contrast', el: name, reason: back.reason }); return; }
+    const text = over(rgba(style.color), back.color);
+    const need = neededRatio(parseFloat(style.fontSize), parseInt(style.fontWeight, 10));
     const value = ratio(text, back.color);
-    if (value < need) contrast.fails.push({ el: describe(el), ratio: Math.round(value * 100) / 100, need });
+    if (value < need) contrast.fails.push({ el: name, ratio: Math.round(value * 100) / 100, need });
     else contrast.passed++;
   });
 
+  const complete = unresolved.length === 0;
   const pass = under48.length === 0 && fonts.length === 0 && overflow.length === 0 && primary.status !== 'fail' && fabs <= 1 && contrast.fails.length === 0;
   return JSON.parse(JSON.stringify({
     pass,
+    complete,
     viewport: [innerWidth, innerHeight],
     touchTargets: { checked: interactive.length, under48 },
     fonts: { offenders: fonts },

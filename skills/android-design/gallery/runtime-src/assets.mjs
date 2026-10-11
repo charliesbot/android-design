@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import subsetFont from 'subset-font';
 
@@ -13,6 +13,9 @@ const SYMBOLS = new URL('node_modules/@material-symbols/svg-400/', repo);
 // Basic Latin, Latin-1 Supplement, and the punctuation and symbols that appear in UI copy.
 const RANGES = [[0x20, 0x7e], [0xa0, 0xff], [0x2010, 0x2027], [0x2030, 0x203a], [0x2190, 0x2193], [0x2212, 0x2212], [0x20ac, 0x20ac], [0x2122, 0x2122]];
 const LATIN = RANGES.flatMap(([from, to]) => Array.from({ length: to - from + 1 }, (_, i) => String.fromCodePoint(from + i))).join('');
+
+// Folders copied unchanged to public/runtime/<name>/.
+const PAGES = ['sample', 'verify', 'checks-fixture', 'review'];
 
 async function sprite() {
   const names = JSON.parse(read(new URL('icons.json', here), 'utf8'));
@@ -37,10 +40,9 @@ export function runtimeAssets() {
       emit('icons.svg', await sprite());
       emit('icons-LICENSE.txt', read(new URL('LICENSE', SYMBOLS)));
       emit('runtime.css', read(new URL('runtime.css', here)));
-      emit('sample/index.html', read(new URL('sample/index.html', here)));
-      emit('sample/style.css', read(new URL('sample/style.css', here)));
-      emit('verify/index.html', read(new URL('verify/index.html', here)));
-      emit('verify/style.css', read(new URL('verify/style.css', here)));
+      for (const dir of PAGES) {
+        for (const name of readdirSync(fileURLToPath(new URL(`${dir}/`, here))).sort()) emit(`${dir}/${name}`, read(new URL(`${dir}/${name}`, here)));
+      }
     },
   };
 }
