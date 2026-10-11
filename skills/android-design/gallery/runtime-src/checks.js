@@ -109,6 +109,32 @@ function clippedBy(textRect, el) {
   return null;
 }
 
+// A page wider than its viewport is a layout bug: Android has no horizontal page scroll. Returns the widest
+// offenders (widest first, then shallowest, so the cause is named before its children), skipping anything inside a horizontal scroller the author made on purpose.
+function pageOverflowCheck() {
+  const width = innerWidth;
+  const scrollWidth = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
+  if (scrollWidth <= width + 1) return { fails: false, scrollWidth, offenders: [] };
+  const depth = el => { let n = 0; for (let node = flatParent(el); node; node = flatParent(node)) n++; return n; };
+  const inDeliberateScroller = el => {
+    for (let node = flatParent(el); node; node = flatParent(node)) {
+      if (node === document.documentElement || node === document.body) return false;
+      const style = getComputedStyle(node);
+      if (/auto|scroll/.test(style.overflowX) && node.getBoundingClientRect().width <= width + 1) return true;
+    }
+    return false;
+  };
+  const offenders = [];
+  walk(document, el => {
+    const style = getComputedStyle(el);
+    if (style.display === 'none' || style.display === 'contents' || style.position === 'fixed') return;
+    const right = el.getBoundingClientRect().right;
+    if (right > width + 1 && !inDeliberateScroller(el)) offenders.push({ el: describeFlat(el), right: Math.round(right), depth: depth(el) });
+  });
+  offenders.sort((a, b) => b.right - a.right || a.depth - b.depth);
+  return { fails: offenders.length > 0, scrollWidth, offenders: offenders.slice(0, 5).map(({ el, right }) => ({ el, right })) };
+}
+
 export function runtimeChecks() {
   const unresolved = [];
 
@@ -184,8 +210,10 @@ export function runtimeChecks() {
     else contrast.passed++;
   });
 
+  const pageOverflow = pageOverflowCheck();
+
   const complete = unresolved.length === 0;
-  const pass = under48.length === 0 && fonts.length === 0 && overflow.length === 0 && primary.status !== 'fail' && fabs <= 1 && contrast.fails.length === 0;
+  const pass = !pageOverflow.fails && under48.length === 0 && fonts.length === 0 && overflow.length === 0 && primary.status !== 'fail' && fabs <= 1 && contrast.fails.length === 0;
   return JSON.parse(JSON.stringify({
     pass,
     complete,
@@ -193,6 +221,7 @@ export function runtimeChecks() {
     touchTargets: { checked: interactive.length, under48 },
     fonts: { offenders: fonts },
     overflow,
+    pageOverflow,
     primary,
     fabs: { count: fabs, ok: fabs <= 1 },
     contrast,

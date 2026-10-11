@@ -58,13 +58,13 @@ The gallery's preview-only theme controls post `{type: "theme", color, variant, 
 `window.runtimeChecks()` returns one JSON object:
 
 ```
-{ pass, complete, viewport, touchTargets: {checked, under48}, fonts: {offenders}, overflow,
+{ pass, complete, viewport, touchTargets: {checked, under48}, fonts: {offenders}, overflow, pageOverflow: {fails, scrollWidth, offenders},
   primary: {status, marked, largest, reason?}, fabs: {count, ok}, contrast: {fails, passed}, unresolved }
 ```
 
 `pass` is false when any check failed. `complete` is false when anything is in `unresolved`. Treat `complete: false` as not verified, whatever `pass` says: an unresolved case is never a pass.
 
-Checks: interactive elements under 48x48 (a component is measured as a whole; its target is the larger of its host box and any `.touch` element in its shadow root, and the reported size is that union); text not in Google Sans Flex (`p-icon` excluded); text whose box clips it; the element marked `data-primary` must be the largest interactive element; at most one FAB; text contrast of 4.5:1 (3:1 at 24px and up, or bold at 18.66px and up).
+Checks: the page wider than its viewport (`pageOverflow`, a failure; names up to 5 elements past the right edge, widest first, except inside a deliberate horizontal scroller narrower than the viewport); interactive elements under 48x48 (a component is measured as a whole; its target is the larger of its host box and any `.touch` element in its shadow root, and the reported size is that union); text not in Google Sans Flex (`p-icon` excluded); text whose box clips it; the element marked `data-primary` must be the largest interactive element; at most one FAB; text contrast of 4.5:1 (3:1 at 24px and up, or bold at 18.66px and up).
 
 Text is measured where it renders. Slotted text, such as a button label, is attributed to the element its slot places it under inside the component's shadow root (`m3e-button#cta > div.label`), not to the light-DOM host. Color and font come from that element, the fill from the first opaque background up the flat tree (slot, shadow ancestors, host, light ancestors), so a filled button is measured against its container, not the page. Clipping is tested on the shadow element that clips. Cases it cannot resolve, such as a gradient or translucent background, a page with no `data-primary`, or an ancestor with opacity below 1, are listed in `unresolved`. Decorative text (`aria-hidden`) is exempt from overflow and contrast. Run it at each device size you review; it reads the live layout.
 

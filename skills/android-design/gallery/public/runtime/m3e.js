@@ -11948,6 +11948,43 @@ function Dy(e, t) {
 	return null;
 }
 function Oy() {
+	let e = innerWidth, t = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
+	if (t <= e + 1) return {
+		fails: !1,
+		scrollWidth: t,
+		offenders: []
+	};
+	let n = (e) => {
+		let t = 0;
+		for (let n = vy(e); n; n = vy(n)) t++;
+		return t;
+	}, r = (t) => {
+		for (let n = vy(t); n; n = vy(n)) {
+			if (n === document.documentElement || n === document.body) return !1;
+			let t = getComputedStyle(n);
+			if (/auto|scroll/.test(t.overflowX) && n.getBoundingClientRect().width <= e + 1) return !0;
+		}
+		return !1;
+	}, i = [];
+	return xy(document, (t) => {
+		let a = getComputedStyle(t);
+		if (a.display === "none" || a.display === "contents" || a.position === "fixed") return;
+		let o = t.getBoundingClientRect().right;
+		o > e + 1 && !r(t) && i.push({
+			el: gy(t),
+			right: Math.round(o),
+			depth: n(t)
+		});
+	}), i.sort((e, t) => t.right - e.right || e.depth - t.depth), {
+		fails: i.length > 0,
+		scrollWidth: t,
+		offenders: i.slice(0, 5).map(({ el: e, right: t }) => ({
+			el: e,
+			right: t
+		}))
+	};
+}
+function ky() {
 	let e = [], t = [];
 	xy(document, (e) => {
 		if (!e.matches(uy)) return !0;
@@ -12025,10 +12062,10 @@ function Oy() {
 			need: g
 		}) : l.passed++;
 	});
-	let f = e.length === 0, p = n.length === 0 && s.length === 0 && c.length === 0 && a.status !== "fail" && o <= 1 && l.fails.length === 0;
+	let f = Oy(), p = e.length === 0, m = !f.fails && n.length === 0 && s.length === 0 && c.length === 0 && a.status !== "fail" && o <= 1 && l.fails.length === 0;
 	return JSON.parse(JSON.stringify({
-		pass: p,
-		complete: f,
+		pass: m,
+		complete: p,
 		viewport: [innerWidth, innerHeight],
 		touchTargets: {
 			checked: t.length,
@@ -12036,6 +12073,7 @@ function Oy() {
 		},
 		fonts: { offenders: s },
 		overflow: c,
+		pageOverflow: f,
 		primary: a,
 		fabs: {
 			count: o,
@@ -12047,5 +12085,5 @@ function Oy() {
 }
 //#endregion
 //#region skills/android-design/gallery/runtime-src/m3e.js
-window.runtimeChecks = Oy;
+window.runtimeChecks = ky;
 //#endregion
