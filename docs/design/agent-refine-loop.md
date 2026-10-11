@@ -8,7 +8,7 @@ Close the gap between pressing Refine in the gallery and the next round appearin
 
 ## Background
 
-[Visual design exploration](visual-design-exploration.md) settled that the gallery never launches an agent and that Refine saves an explicit request the agent reads later. Today that read happens only when the user returns to chat and asks. The gallery shows "Request saved. Return to chat to continue." after a request, polls for new rounds every few seconds, and keeps unsaved edits when a round arrives. The store already provides everything a watcher needs: `feedback.json` carries a monotonically increasing `revision`, every write is an atomic rename under a write lock, requests carry a timestamp, and rounds carry `createdAt`.
+[Visual design exploration](visual-design-exploration-v2.md) settled that the gallery never launches an agent and that Refine saves an explicit request the agent reads later. Today that read happens only when the user returns to chat and asks. The gallery shows "Request saved. Return to chat to continue." after a request, polls for new rounds every few seconds, and keeps unsaved edits when a round arrives. The store already provides everything a watcher needs: `feedback.json` carries a monotonically increasing `revision`, every write is an atomic rename under a write lock, requests carry a timestamp, and rounds carry `createdAt`.
 
 The issue asked three questions: whether an explicitly started watch session can detect saved requests and publish the next round; how duplicates, failures, and Finish are handled; and whether any automation is needed after the agent's turn ends. A throwaway prototype of the `wait` command was run against the real store and HTTP server to answer the first two. It was not committed.
 
@@ -25,7 +25,7 @@ publish round N ─▶ serve (background) ─▶ wait ──▶ request ──�
                                           └───────────────────────────────────────────────────────────┘
 ```
 
-Every step the agent already performs between rounds (reading the request, applying clear feedback, asking a focused question when a real design decision remains, rendering, inspecting the PNGs, publishing) stays as written in the skill's exploration reference. The session only replaces "the user returns to chat" with "the agent is already listening". When a meaningful decision remains, the agent asks in chat as before; the user is told to check chat only when the gallery's status line says the session stopped.
+Every step the agent already performs between rounds (reading the request, applying clear feedback, asking a focused question when a real design decision remains, building, reviewing the proposal, publishing) stays as written in the skill's exploration reference. The session only replaces "the user returns to chat" with "the agent is already listening". When a meaningful decision remains, the agent asks in chat as before; the user is told to check chat only when the gallery's status line says the session stopped.
 
 One refinement per request remains the default. A request whose notes ask for several alternatives still produces one round with several proposals.
 
@@ -128,7 +128,7 @@ For the later implementation, not this document:
 
 ## Links
 
-- [Visual design exploration](visual-design-exploration.md): the gallery design this loop extends.
+- [Visual design exploration v2](visual-design-exploration-v2.md): the gallery design this loop extends.
 - [Exploration reference](../../skills/android-design/references/exploration.md): the agent steps the session repeats.
 - [Exploration checks](../../evals/exploration.md): where the smoke and routing checks will be added.
 - [Issue #9](https://github.com/charliesbot/android-design/issues/9): the investigation this document answers.
