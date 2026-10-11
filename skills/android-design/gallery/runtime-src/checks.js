@@ -113,11 +113,16 @@ export function runtimeChecks() {
   const unresolved = [];
 
   // Interactive elements: a matched host is measured as a whole, so its own shadow root is not searched.
+  // The target is the host box united with any .touch element in its shadow root (the 48dp minimum
+  // interactive size @m3e/web draws around a smaller visual), so a 40px button with a 48px .touch passes.
   const interactive = [];
   walk(document, el => {
     if (!el.matches(INTERACTIVE)) return true;
     if (visible(el)) {
-      const { width, height } = el.getBoundingClientRect();
+      const host = el.getBoundingClientRect();
+      const touch = el.shadowRoot?.querySelector('.touch')?.getBoundingClientRect();
+      const width = Math.max(host.width, touch?.width ?? 0);
+      const height = Math.max(host.height, touch?.height ?? 0);
       interactive.push({ el: describe(el), node: el, w: Math.round(width * 10) / 10, h: Math.round(height * 10) / 10, area: width * height });
     }
     return false;

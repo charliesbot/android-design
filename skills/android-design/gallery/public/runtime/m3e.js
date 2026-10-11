@@ -11952,13 +11952,13 @@ function Oy() {
 	xy(document, (e) => {
 		if (!e.matches(uy)) return !0;
 		if (_y(e)) {
-			let { width: n, height: r } = e.getBoundingClientRect();
+			let n = e.getBoundingClientRect(), r = e.shadowRoot?.querySelector(".touch")?.getBoundingClientRect(), i = Math.max(n.width, r?.width ?? 0), a = Math.max(n.height, r?.height ?? 0);
 			t.push({
 				el: my(e),
 				node: e,
-				w: Math.round(n * 10) / 10,
-				h: Math.round(r * 10) / 10,
-				area: n * r
+				w: Math.round(i * 10) / 10,
+				h: Math.round(a * 10) / 10,
+				area: i * a
 			});
 		}
 		return !1;
