@@ -15,8 +15,8 @@ function repo(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   assert.equal(git(root, 'init', '-q').status, 0);
   const template = join(root, 'starter');
-  mkdirSync(template);
-  writeFileSync(join(template, 'settings.gradle.kts'), 'starter');
+  mkdirSync(join(template, 'proposals/a'), { recursive: true });
+  writeFileSync(join(template, 'proposals/a/index.html'), 'starter');
   return { root, template };
 }
 
@@ -25,9 +25,9 @@ test('unique copies leave starter unchanged', t => {
   const first = create({ template, root });
   const second = create({ template, root });
   assert.notEqual(first, second);
-  writeFileSync(join(first, 'project/settings.gradle.kts'), 'proposal');
-  assert.equal(readFileSync(join(second, 'project/settings.gradle.kts'), 'utf8'), 'starter');
-  assert.equal(readFileSync(join(template, 'settings.gradle.kts'), 'utf8'), 'starter');
+  writeFileSync(join(first, 'project/proposals/a/index.html'), 'proposal');
+  assert.equal(readFileSync(join(second, 'project/proposals/a/index.html'), 'utf8'), 'starter');
+  assert.equal(readFileSync(join(template, 'proposals/a/index.html'), 'utf8'), 'starter');
 });
 
 test('generated artifacts are not copied', t => {
@@ -91,7 +91,7 @@ test('cleanup does not follow internal symlinks', t => {
   const result = create({ template, root });
   symlinkSync(template, join(result, 'outside'), 'dir');
   cleanup(result, root);
-  assert.equal(existsSync(join(template, 'settings.gradle.kts')), true);
+  assert.equal(existsSync(join(template, 'proposals/a/index.html')), true);
 });
 
 test('local git exclusion and initial gallery files', t => {
@@ -130,26 +130,27 @@ test('refuse non-repository, symlink storage and tracked storage', t => {
   assert.throws(() => create({ template, root }), /tracked/);
 });
 
-test('installed starter contains only portable inputs', () => {
-  const forbidden = new Set(['build', '.gradle', '.kotlin', '.git', 'local.properties', 'renders', 'screenshotTestDebug', '__pycache__']);
+test('installed starter is the HTML proposal starter and contains only portable inputs', () => {
+  const forbidden = new Set(['build', '.gradle', '.kotlin', '.git', 'local.properties', 'renders', 'node_modules', '__pycache__']);
   for (const entry of readdirSync(TEMPLATE, { recursive: true, withFileTypes: true })) {
     const path = join(entry.parentPath, entry.name);
     assert.equal(forbidden.has(entry.name), false, path);
     assert.equal(entry.isSymbolicLink(), false, path);
   }
-  for (const name of ['app', 'wear', 'core/model', 'core/domain', 'core/data', 'core/strings', 'core/designsystem/common']) {
-    assert.equal(existsSync(join(TEMPLATE, name, 'build.gradle.kts')), true, name);
+  for (const name of ['README.md', 'proposals/a/index.html', 'proposals/a/style.css']) {
+    assert.equal(lstatSync(join(TEMPLATE, name)).isFile(), true, name);
   }
-  for (const name of ['google_sans_flex', 'roboto_flex']) {
-    const font = join(TEMPLATE, 'core/designsystem/common/src/main/res/font', `${name}.ttf`);
-    assert.ok(lstatSync(font).size > 1000, font);
+  const page = readFileSync(join(TEMPLATE, 'proposals/a/index.html'), 'utf8');
+  for (const part of ['/runtime/runtime.css', '/runtime/m3e.js', '<m3e-theme', 'data-primary', '<p-floating-toolbar', '<p-icon', 'class="t-headline']) {
+    assert.ok(page.includes(part), part);
   }
+  assert.ok(readFileSync(join(TEMPLATE, 'proposals/a/style.css'), 'utf8').includes('min-width: 840px'));
 });
 
-test('four explicit logical device canvases', () => {
-  const source = readFileSync(join(TEMPLATE, 'app/src/main/kotlin/com/example/designsandbox/ProposalScreen.kt'), 'utf8');
-  for (const [width, height, dpi] of [[411, 923, 420], [1280, 800, 320], [1440, 900, 320], [704, 933, 420]]) {
-    assert.ok(source.includes(`spec:width=${width}dp,height=${height}dp,dpi=${dpi}`));
-  }
-  for (const name of ['Phone', 'Tablet', 'Desktop', 'Foldable']) assert.ok(source.includes(`fun Proposal${name}Preview()`));
+test('create copies the starter without the Android project', t => {
+  const { root } = repo(t);
+  const result = create({ root });
+  assert.equal(existsSync(join(result, 'project/proposals/a/index.html')), true);
+  assert.equal(existsSync(join(result, 'project/settings.gradle.kts')), false);
+  assert.equal(existsSync(join(result, 'project/app')), false);
 });

@@ -1,10 +1,49 @@
 // Pure decisions for the gallery page: the dynamic status and label text and every
 // enable/disable rule live here so components only render the answers.
 
-export const DEVICE_LABELS = { phone: 'Pixel 11', tablet: 'Pixel Tablet', desktop: 'Googlebook', foldable: 'Z Fold8' };
+// Device canvases in CSS px (equal to dp). Order is the switcher order; the key is its shortcut.
+export const DEVICES = [
+  { id: 'phone', kind: 'Phone', name: 'Pixel 11', width: 411, height: 923, radius: 28, key: '1' },
+  { id: 'foldable', kind: 'Foldable', name: 'Z Fold8', width: 704, height: 933, radius: 20, key: '2' },
+  { id: 'tablet', kind: 'Tablet', name: 'Pixel Tablet', width: 1280, height: 800, radius: 14, key: '3' },
+  { id: 'desktop', kind: 'Desktop', name: 'Googlebook', width: 1440, height: 900, radius: 10, key: '4' },
+];
+export const DEFAULT_DEVICE = DEVICES[0].id;
+export const deviceById = id => DEVICES.find(device => device.id === id) ?? DEVICES[0];
+export const deviceForKey = key => DEVICES.find(device => device.key === key);
+export const deviceLabel = device => `${device.kind}, ${device.name}`;
+export const deviceSize = device => `${device.width} by ${device.height}`;
+
+// Largest scale at which the whole device canvas fits the box, never enlarging past 1.
+// Zero means the box is not measured yet.
+export function frameScale({ availableWidth, maxHeight, device }) {
+  if (!(availableWidth > 0) || !(maxHeight > 0)) return 0;
+  return Math.min(1, availableWidth / device.width, maxHeight / device.height);
+}
+export const MAX_FRAME_HEIGHT_RATIO = 0.7;
+
+// Preview-only theme: only the fields the user touched are sent, so untouched ones keep
+// the proposal's own theme. Nothing here is saved to feedback.
+export const THEME_VARIANTS = ['tonal-spot', 'neutral', 'vibrant', 'expressive'];
+export const THEME_SCHEMES = ['light', 'dark'];
+export const DEFAULT_THEME_COLOR = '#6750a4';
+const THEME_VALID = {
+  color: value => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value),
+  variant: value => THEME_VARIANTS.includes(value),
+  scheme: value => THEME_SCHEMES.includes(value),
+};
+export function withThemeOverride(overrides, key, value) {
+  const next = { ...overrides };
+  if (THEME_VALID[key]?.(value)) next[key] = value; else delete next[key];
+  return next;
+}
+// Null when there is nothing to send.
+export function themeMessage(overrides) {
+  const fields = Object.keys(THEME_VALID).filter(key => THEME_VALID[key](overrides?.[key]));
+  return fields.length ? { type: 'theme', ...Object.fromEntries(fields.map(key => [key, overrides[key]])) } : null;
+}
 export const EMPTY_ENTRY = { choice: null, note: '', requests: [] };
 export const WAITING_TEXT = 'Waiting for proposals.';
-export const IMAGE_UNAVAILABLE_TEXT = 'Image unavailable.';
 
 export function optionName(round, proposalId) {
   let position = round.proposals.findIndex(proposal => proposal.id === proposalId) + 1;
@@ -62,8 +101,8 @@ export function approvalText(data) {
   return `Final: ${optionName(round, approved.key.split('/')[1])}, round ${approved.roundId}. Read-only.`;
 }
 export const confirmName = (round, proposal) => `${optionName(round, proposal.id)} / Round ${round.id}`;
-export const imageAlt = (name, device) => `${name} on ${DEVICE_LABELS[device]}`;
-export const imageURL = (round, proposal, device) => `/images/${round.id}/${proposal.id}/${device}`;
+export const frameTitle = (name, device) => `${name} on ${device.name}`;
+export const frameURL = (round, proposal) => `/rounds/${round.id}/${proposal.id}/`;
 
 // Never replace an editor while loading, typing, saving, confirming, or recovering an error.
 export const mayReplace = ({ loading, busy, dialogOpen, noteFocused, pendingSaves, error }) =>

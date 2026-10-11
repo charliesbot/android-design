@@ -7,7 +7,7 @@ import { initializeExploration } from './store.mjs';
 export const PREFIX = 'android-design-explore-';
 export const MARKER = '.android-design-exploration.json';
 export const DIRECTORY = 'design-explorations';
-export const TEMPLATE = resolve(dirname(fileURLToPath(import.meta.url)), '../assets/exploration-starter');
+export const TEMPLATE = resolve(dirname(fileURLToPath(import.meta.url)), '../assets/proposal-starter');
 const SKIP = new Set(['build', '.gradle', '.kotlin', '.git', 'renders', 'local.properties', '__pycache__', 'screenshotTestDebug']);
 
 function git(root, ...args) {
@@ -36,7 +36,8 @@ export function create({ template = TEMPLATE, root, title = 'Design exploration'
   template = realpathSync(resolve(template));
   root = repository(root);
   if (typeof title !== 'string' || !title.trim() || title.length > 200) throw new Error('Title must contain 1 to 200 characters');
-  if (!existsSync(join(template, 'settings.gradle.kts')) || !statSync(join(template, 'settings.gradle.kts')).isFile()) throw new Error(`Missing starter: ${template}`);
+  const entry = join(template, 'proposals/a/index.html');
+  if (!existsSync(entry) || !statSync(entry).isFile()) throw new Error(`Missing starter: ${template}`);
   const base = storage(root);
   if (git(root, 'ls-files', '--', DIRECTORY)) throw new Error('Exploration storage is already tracked; leave it untouched');
   // Local Git metadata keeps generated proposals out of commits without editing .gitignore.

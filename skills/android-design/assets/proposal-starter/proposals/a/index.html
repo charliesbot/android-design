@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Proposal A</title>
+  <link rel="stylesheet" href="/runtime/runtime.css">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="/runtime/m3e.js"></script>
+</head>
+<body>
+  <m3e-theme color="#6750A4" variant="tonal-spot" scheme="light">
+    <div class="layout">
+      <m3e-nav-rail class="rail">
+        <m3e-nav-item selected><p-icon slot="icon" name="home"></p-icon>Home</m3e-nav-item>
+        <m3e-nav-item><p-icon slot="icon" name="favorite"></p-icon>Saved</m3e-nav-item>
+        <m3e-nav-item><p-icon slot="icon" name="calendar_month"></p-icon>Plan</m3e-nav-item>
+      </m3e-nav-rail>
+      <main class="screen">
+        <h1 class="t-headline-large-em">Headline</h1>
+        <p class="t-body-large supporting">Replace this screen with the proposal.</p>
+        <m3e-button variant="filled" size="large" class="primary" data-primary>
+          <p-icon slot="icon" name="add"></p-icon>Primary action
+        </m3e-button>
+      </main>
+    </div>
+    <p-floating-toolbar class="toolbar">
+      <m3e-toolbar>
+        <m3e-button toggle selected variant="tonal"><p-icon slot="icon" name="home"></p-icon>Home</m3e-button>
+        <m3e-button toggle variant="text"><p-icon slot="icon" name="favorite"></p-icon>Saved</m3e-button>
+        <m3e-button toggle variant="text"><p-icon slot="icon" name="calendar_month"></p-icon>Plan</m3e-button>
+      </m3e-toolbar>
+    </p-floating-toolbar>
+  </m3e-theme>
+</body>
+</html>

@@ -46,3 +46,38 @@ test('request status text follows the agent session', () => {
   assert.equal(state.requestStatusText(requestedEntry, null), 'Request saved. Return to chat to continue.');
   assert.equal(state.requestStatusText(requestedEntry, { state: 'idle' }), 'Request saved. Return to chat to continue.');
 });
+test('devices: order, lookup, shortcuts, and exact canvases', () => {
+  assert.deepEqual(state.DEVICES.map(device => [device.id, device.width, device.height, device.key]), [
+    ['phone', 411, 923, '1'], ['foldable', 704, 933, '2'], ['tablet', 1280, 800, '3'], ['desktop', 1440, 900, '4'],
+  ]);
+  assert.equal(state.deviceById('tablet').name, 'Pixel Tablet');
+  assert.equal(state.deviceById('unknown').id, 'phone');
+  assert.equal(state.deviceById(null).id, 'phone');
+  assert.equal(state.deviceForKey('4').id, 'desktop');
+  assert.equal(state.deviceForKey('5'), undefined);
+  assert.equal(state.deviceLabel(state.deviceById('foldable')), 'Foldable, Z Fold8');
+  assert.equal(state.deviceSize(state.deviceById('phone')), '411 by 923');
+});
+test('frame scale fits width and height and never enlarges', () => {
+  const desktop = state.deviceById('desktop'), phone = state.deviceById('phone');
+  assert.equal(state.frameScale({ availableWidth: 720, maxHeight: 10000, device: desktop }), 0.5);
+  assert.equal(state.frameScale({ availableWidth: 10000, maxHeight: 450, device: desktop }), 0.5);
+  assert.equal(state.frameScale({ availableWidth: 10000, maxHeight: 10000, device: phone }), 1);
+  assert.equal(state.frameScale({ availableWidth: 0, maxHeight: 500, device: phone }), 0);
+  assert.equal(state.frameScale({ availableWidth: 300, maxHeight: NaN, device: phone }), 0);
+});
+test('frame title and url', () => {
+  assert.equal(state.frameTitle('Option A', state.deviceById('phone')), 'Option A on Pixel 11');
+  assert.equal(state.frameURL({ id: '001' }, { id: 'a' }), '/rounds/001/a/');
+});
+test('theme overrides keep only valid touched fields', () => {
+  assert.equal(state.themeMessage({}), null);
+  let overrides = state.withThemeOverride({}, 'color', '#B8321F');
+  overrides = state.withThemeOverride(overrides, 'scheme', 'dark');
+  assert.deepEqual(state.themeMessage(overrides), { type: 'theme', color: '#B8321F', scheme: 'dark' });
+  assert.deepEqual(state.withThemeOverride(overrides, 'color', 'red'), { scheme: 'dark' });
+  assert.deepEqual(state.withThemeOverride(overrides, 'variant', 'vibrant').variant, 'vibrant');
+  assert.deepEqual(state.withThemeOverride({ variant: 'vibrant' }, 'variant', ''), {});
+  assert.equal(state.withThemeOverride({}, 'scheme', 'auto').scheme, undefined);
+  assert.equal(state.themeMessage({ variant: 'rainbow', color: 'nope' }), null);
+});
