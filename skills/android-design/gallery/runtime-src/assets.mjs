@@ -39,6 +39,8 @@ export function runtimeAssets() {
       emit('runtime.css', read(new URL('runtime.css', here)));
       emit('sample/index.html', read(new URL('sample/index.html', here)));
       emit('sample/style.css', read(new URL('sample/style.css', here)));
+      emit('verify/index.html', read(new URL('verify/index.html', here)));
+      emit('verify/style.css', read(new URL('verify/style.css', here)));
     },
   };
 }

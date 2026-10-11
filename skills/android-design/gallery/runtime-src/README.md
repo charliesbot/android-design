@@ -21,6 +21,7 @@ The gallery CSP is `default-src 'self'`: no inline `<style>`, no `style=""`, no 
 | `runtime/fonts/` | `GoogleSansFlex.woff2` (Latin subset, all variable axes) and its OFL license |
 | `runtime/icons.svg` | Material Symbols Rounded sprite (weight 400, unfilled and filled), license in `icons-LICENSE.txt` |
 | `runtime/sample/` | A small page that uses only runtime pieces |
+| `runtime/verify/` | One section per component in `references/compose-mapping.md`, with its variants, for comparing against Compose; it marks nothing verified |
 
 ## Allowed components
 

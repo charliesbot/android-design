@@ -1,0 +1,94 @@
+/* Verify page for the proposal runtime. Layout only; every component keeps its library styling. */
+main { box-sizing: border-box; max-width: 1200px; margin: 0 auto; padding: 24px 16px 96px; }
+section { margin-top: 48px; scroll-margin-top: 16px; }
+.note { margin: 8px 0 16px; color: var(--md-sys-color-on-surface-variant); }
+.index { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 16px; }
+.index a { color: var(--md-sys-color-primary); text-decoration: none; }
+
+.cases { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.cases.wide { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.case { box-sizing: border-box; margin: 0; padding: 16px; display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--md-sys-color-outline-variant); border-radius: 12px; background: var(--md-sys-color-surface-container-low); min-width: 0; }
+.demo { flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 48px; }
+.case figcaption { color: var(--md-sys-color-on-surface-variant); overflow-wrap: anywhere; }
+
+/* Parts that are positioned or full height by default are bounded so they sit in a card. */
+.demo m3e-nav-rail { height: 320px; }
+.demo m3e-nav-bar { width: 100%; }
+.demo m3e-app-bar { width: 100%; }
+.demo m3e-list, .demo m3e-action-list, .demo m3e-selection-list, .demo m3e-card { width: 100%; }
+.demo m3e-slider { width: 100%; }
+.demo m3e-linear-progress-indicator { width: 100%; }
+.demo m3e-fab-menu { position: static; }
+.demo p-floating-toolbar { position: static; transform: none; }
+.demo m3e-toolbar[vertical] { height: 240px; }
+
+.swatch { --m3e-shape-size: 64px; --m3e-shape-container-color: var(--md-sys-color-primary); }
+.case:has(.swatch) { align-items: center; }
+.sample-type { display: block; color: var(--md-sys-color-on-surface); overflow-wrap: anywhere; }
+.role { display: block; width: 100%; height: 48px; border: 1px solid var(--md-sys-color-outline-variant); border-radius: 8px; }
+.corner { display: block; width: 64px; height: 64px; background: var(--md-sys-color-primary); }
+
+.role-background { background: var(--md-sys-color-background); }
+.role-on-background { background: var(--md-sys-color-on-background); }
+.role-surface { background: var(--md-sys-color-surface); }
+.role-surface-dim { background: var(--md-sys-color-surface-dim); }
+.role-surface-bright { background: var(--md-sys-color-surface-bright); }
+.role-surface-container-lowest { background: var(--md-sys-color-surface-container-lowest); }
+.role-surface-container-low { background: var(--md-sys-color-surface-container-low); }
+.role-surface-container { background: var(--md-sys-color-surface-container); }
+.role-surface-container-high { background: var(--md-sys-color-surface-container-high); }
+.role-surface-container-highest { background: var(--md-sys-color-surface-container-highest); }
+.role-on-surface { background: var(--md-sys-color-on-surface); }
+.role-surface-variant { background: var(--md-sys-color-surface-variant); }
+.role-on-surface-variant { background: var(--md-sys-color-on-surface-variant); }
+.role-outline { background: var(--md-sys-color-outline); }
+.role-outline-variant { background: var(--md-sys-color-outline-variant); }
+.role-inverse-surface { background: var(--md-sys-color-inverse-surface); }
+.role-inverse-on-surface { background: var(--md-sys-color-inverse-on-surface); }
+.role-primary { background: var(--md-sys-color-primary); }
+.role-primary-dim { background: var(--md-sys-color-primary-dim); }
+.role-on-primary { background: var(--md-sys-color-on-primary); }
+.role-primary-container { background: var(--md-sys-color-primary-container); }
+.role-on-primary-container { background: var(--md-sys-color-on-primary-container); }
+.role-primary-fixed { background: var(--md-sys-color-primary-fixed); }
+.role-primary-fixed-dim { background: var(--md-sys-color-primary-fixed-dim); }
+.role-on-primary-fixed { background: var(--md-sys-color-on-primary-fixed); }
+.role-on-primary-fixed-variant { background: var(--md-sys-color-on-primary-fixed-variant); }
+.role-inverse-primary { background: var(--md-sys-color-inverse-primary); }
+.role-secondary { background: var(--md-sys-color-secondary); }
+.role-secondary-dim { background: var(--md-sys-color-secondary-dim); }
+.role-on-secondary { background: var(--md-sys-color-on-secondary); }
+.role-secondary-container { background: var(--md-sys-color-secondary-container); }
+.role-on-secondary-container { background: var(--md-sys-color-on-secondary-container); }
+.role-secondary-fixed { background: var(--md-sys-color-secondary-fixed); }
+.role-secondary-fixed-dim { background: var(--md-sys-color-secondary-fixed-dim); }
+.role-on-secondary-fixed { background: var(--md-sys-color-on-secondary-fixed); }
+.role-on-secondary-fixed-variant { background: var(--md-sys-color-on-secondary-fixed-variant); }
+.role-tertiary { background: var(--md-sys-color-tertiary); }
+.role-tertiary-dim { background: var(--md-sys-color-tertiary-dim); }
+.role-on-tertiary { background: var(--md-sys-color-on-tertiary); }
+.role-tertiary-container { background: var(--md-sys-color-tertiary-container); }
+.role-on-tertiary-container { background: var(--md-sys-color-on-tertiary-container); }
+.role-tertiary-fixed { background: var(--md-sys-color-tertiary-fixed); }
+.role-tertiary-fixed-dim { background: var(--md-sys-color-tertiary-fixed-dim); }
+.role-on-tertiary-fixed { background: var(--md-sys-color-on-tertiary-fixed); }
+.role-on-tertiary-fixed-variant { background: var(--md-sys-color-on-tertiary-fixed-variant); }
+.role-error { background: var(--md-sys-color-error); }
+.role-error-dim { background: var(--md-sys-color-error-dim); }
+.role-on-error { background: var(--md-sys-color-on-error); }
+.role-error-container { background: var(--md-sys-color-error-container); }
+.role-on-error-container { background: var(--md-sys-color-on-error-container); }
+.role-scrim { background: var(--md-sys-color-scrim); }
+.role-surface-tint { background: var(--md-sys-color-surface-tint); }
+.role-shadow { background: var(--md-sys-color-shadow); }
+
+.corner-none { border-radius: 0px; }
+.corner-extra-small { border-radius: 4px; }
+.corner-small { border-radius: 8px; }
+.corner-medium { border-radius: 12px; }
+.corner-large { border-radius: 16px; }
+.corner-large-increased { border-radius: 20px; }
+.corner-extra-large { border-radius: 28px; }
+.corner-extra-large-increased { border-radius: 32px; }
+.corner-extra-extra-large { border-radius: 48px; }
+.corner-full { border-radius: 9999px; }
