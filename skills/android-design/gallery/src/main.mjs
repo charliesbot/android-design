@@ -1,2 +1,10 @@
+import '@m3e/web/theme';
+import '@m3e/web/button';
+import '@m3e/web/icon-button';
+import '@m3e/web/form-field';
+import '@m3e/web/select';
+import '@m3e/web/option';
+import '@m3e/web/switch';
+import '@m3e/web/dialog';
 import './style.css';
 import './components/gallery-app.mjs';

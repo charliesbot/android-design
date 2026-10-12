@@ -1,43 +1,36 @@
 import { LitElement, html } from 'lit';
-import { MAX_FRAME_HEIGHT_RATIO, frameScale, frameTitle, frameURL, optionName, proposalKey, selectionLabel, themeMessage } from '../state.mjs';
+import { frameScale, frameTitle, frameURL, optionName, themeMessage } from '../state.mjs';
 
-// One proposal: its live page at the device's exact viewport, scaled to the card.
-// Renders in the light DOM so global styles and the radio group apply.
-export class ProposalCard extends LitElement {
+// A live device viewport on the canvas. Zoom changes display scale, not layout width.
+export class ProposalCanvas extends LitElement {
   static properties = {
     round: { attribute: false },
     proposal: { attribute: false },
     device: { attribute: false },
     theme: { attribute: false },
     resets: { type: Number },
-    checked: { type: Boolean },
-    locked: { type: Boolean },
+    zoom: { type: Number },
     slotWidth: { state: true },
-    viewportHeight: { state: true },
+    slotHeight: { state: true },
     ready: { state: true },
   };
   constructor() {
     super();
+    this.zoom = 1;
     this.slotWidth = 0;
-    this.viewportHeight = window.innerHeight;
+    this.slotHeight = 0;
     this.ready = false;
     this.resizeFrame = undefined;
-    this.onResize = () => { this.viewportHeight = window.innerHeight; };
-    this.observer = new ResizeObserver(entries => { this.slotWidth = entries[0].contentRect.width; });
+    this.observer = new ResizeObserver(entries => { this.slotWidth = entries[0].contentRect.width; this.slotHeight = entries[0].contentRect.height; });
   }
   createRenderRoot() { return this; }
-  connectedCallback() {
-    super.connectedCallback();
-    window.addEventListener('resize', this.onResize);
-  }
   disconnectedCallback() {
     super.disconnectedCallback();
-    window.removeEventListener('resize', this.onResize);
     this.observer.disconnect();
     cancelAnimationFrame(this.resizeFrame);
   }
   firstUpdated() {
-    this.observer.observe(this.querySelector('.frame-slot'));
+    this.observer.observe(this.closest('.canvas-scroll'));
     // Enable transitions only after the first layout so frames do not animate in from default sizes.
     this.resizeFrame = requestAnimationFrame(() => { this.resizeFrame = requestAnimationFrame(() => { this.ready = true; }); });
   }
@@ -54,7 +47,7 @@ export class ProposalCard extends LitElement {
     frame.style.transform = `scale(${scale})`;
   }
   scale() {
-    return frameScale({ availableWidth: this.slotWidth, maxHeight: this.viewportHeight * MAX_FRAME_HEIGHT_RATIO, device: this.device });
+    return frameScale({ availableWidth: this.slotWidth, maxHeight: Math.max(1, this.slotHeight - 52), device: this.device }) * this.zoom;
   }
   updated(changed) {
     this.layout();
@@ -73,21 +66,14 @@ export class ProposalCard extends LitElement {
     const { round, proposal, device } = this;
     const name = optionName(round, proposal.id);
     const scale = this.scale();
-    return html`<article class="proposal">
-      <div class="card-heading"><h2>${name}</h2></div>
-      <p class="rationale">${proposal.rationale}</p>
+    return html`<article class="canvas-proposal" aria-label=${proposal.name}>
+      <div class="frame-caption"><span>${name}</span><h2>${proposal.name}</h2></div>
       <div class="frame-slot">
         <div class=${`frame-stage ${this.ready ? 'ready' : ''}`} ?hidden=${!scale}>
           <iframe src=${frameURL(round, proposal)} title=${frameTitle(name, device)} @load=${() => this.postTheme()}></iframe>
         </div>
       </div>
-      <label class="thumbnail">
-        <input type="radio" name="design" .value=${proposalKey(round, proposal)} aria-label=${`Select ${name}`}
-          .checked=${this.checked} ?disabled=${this.locked}
-          @change=${() => this.dispatchEvent(new CustomEvent('choose', { detail: proposalKey(round, proposal), bubbles: true }))}>
-        <span class="selection-label">${selectionLabel(this.checked)}</span>
-      </label>
     </article>`;
   }
 }
-customElements.define('proposal-card', ProposalCard);
+customElements.define('proposal-canvas', ProposalCanvas);

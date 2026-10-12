@@ -1,11 +1,11 @@
 import { LitElement, html } from 'lit';
 import { FeedbackSaves } from '../saves.mjs';
-import './proposal-card.mjs';
-import './action-bar.mjs';
+import './proposal-canvas.mjs';
+import './feedback-panel.mjs';
 import { deviceIcon } from '../icons.mjs';
 import {
-  DEFAULT_DEVICE, DEFAULT_THEME_COLOR, DEVICES, EMPTY_ENTRY, THEME_VARIANTS, WAITING_TEXT, approvalText, deviceById, deviceForKey, deviceLabel, deviceSize,
-  withThemeOverride, canCancelDialog, canChooseNone, canFinish, canRefine,
+  viewedProposal, canvasEntry, DEFAULT_DEVICE, DEFAULT_THEME_COLOR, DEVICES, EMPTY_ENTRY, THEME_VARIANTS, WAITING_TEXT, approvalText, deviceById, deviceForKey, deviceLabel, deviceSize,
+  withThemeOverride, rejectionChange, canChooseNone, canFinish, canRefine,
   confirmName, guardUnload, isLocked, mayReplace, nextRoundSelection, proposalKey, sameRounds, sameSession, selectedProposal,
   shouldReload, showReload, showRetry, staleResult, statusText,
 } from '../state.mjs';
@@ -18,6 +18,9 @@ function storedDevice() {
 // Owns the exploration data, feedback saves, polling, and the two dialogs.
 export class GalleryApp extends LitElement {
   static properties = {
+    activeKey: { state: true },
+    panelOpen: { state: true },
+    zoom: { state: true },
     data: { state: true },
     saves: { state: true },
     busy: { state: true },
@@ -33,6 +36,9 @@ export class GalleryApp extends LitElement {
   };
   constructor() {
     super();
+    this.activeKey = '';
+    this.panelOpen = true;
+    this.zoom = 1;
     this.data = undefined;
     this.saves = undefined;
     this.busy = false;
@@ -50,7 +56,7 @@ export class GalleryApp extends LitElement {
     this.approving = null;
     this.timer = undefined;
     this.onKeydown = event => {
-      if (event.ctrlKey || event.metaKey || event.altKey || event.target.closest?.('input, select, textarea, [contenteditable]')) return;
+      if (event.ctrlKey || event.metaKey || event.altKey || event.composedPath().some(node => node.matches?.('input, textarea, m3e-select, m3e-switch, [contenteditable]'))) return;
       const device = deviceForKey(event.key);
       if (device) this.chooseDevice(device.id);
     };
@@ -76,14 +82,24 @@ export class GalleryApp extends LitElement {
     // Option children render after the select, so apply the selected values here.
     const round = this.querySelector('#round'), variant = this.querySelector('#theme-variant');
     if (round && round.value !== this.roundId) round.value = this.roundId;
-    const wanted = this.theme.variant ?? '';
+    const wanted = this.theme.variant ?? 'own';
     if (variant && variant.value !== wanted) variant.value = wanted;
   }
 
   currentRound() { return this.data?.rounds.find(round => round.id === this.roundId); }
+  viewed() { return viewedProposal(this.currentRound(), this.activeKey, this.draft()); }
+  feedbackEntry() { return canvasEntry(this.currentRound(), this.viewed(), this.draft()); }
+  chooseProposal(key) {
+    this.activeKey = key;
+    if (!this.locked()) this.save(key, this.draft().note);
+  }
+  prepareFeedback() {
+    const entry = this.feedbackEntry();
+    if (entry.choice !== this.draft().choice) this.save(entry.choice, entry.note);
+  }
   draft() { return this.data?.feedback.rounds[this.roundId] || EMPTY_ENTRY; }
   noteFocused() { return document.activeElement === this.querySelector('#note'); }
-  dialogOpen() { return Boolean(this.querySelector('dialog[open]')); }
+  dialogOpen() { return [...this.querySelectorAll('m3e-dialog')].some(dialog => dialog.open); }
   error() { return this.saves?.error; }
   locked() { return isLocked({ busy: this.busy, approved: this.data?.feedback.approved }); }
 
@@ -150,13 +166,15 @@ export class GalleryApp extends LitElement {
     this.resets += 1;
   }
   async none() {
-    this.save('none', this.draft().note);
+    const change = rejectionChange(this.currentRound(), this.viewed(), this.draft());
+    this.activeKey = change.activeKey;
+    this.save(change.choice, this.draft().note);
     await this.updateComplete;
-    await this.querySelector('action-bar').focusNote();
+    await this.querySelector('feedback-panel').focusNote();
   }
   async retry() { if (this.saves?.error) await this.saves.retry(); else await this.load(); }
   async discardLocal() {
-    this.querySelector('#reload-confirm').close();
+    this.querySelector('#reload-confirm').hide();
     // Keep local notes and the conflict state until the replacement actually arrives.
     const oldSaves = this.saves;
     this.saves = undefined;
@@ -166,77 +184,104 @@ export class GalleryApp extends LitElement {
   }
   async refine() {
     if (this.busy) return;
+    this.prepareFeedback();
     this.actionError = '';
     try { await this.action('/api/refine', { roundId: this.currentRound().id }); }
     catch (error) { this.actionError = error.message; }
   }
   finish() {
+    this.prepareFeedback();
     const round = this.currentRound();
     this.approving = this.draft().choice;
     this.confirmLabel = confirmName(round, selectedProposal(round, this.draft()));
     this.confirmError = '';
-    this.querySelector('#confirm').showModal();
+    this.querySelector('#confirm').show();
   }
   async approve() {
     if (this.busy) return;
     this.dialogBusy = true;
-    try { await this.action('/api/approve', { key: this.approving }); this.querySelector('#confirm').close(); }
+    try { await this.action('/api/approve', { key: this.approving }); this.querySelector('#confirm').hide(); }
     catch (error) { this.confirmError = error.message; }
     finally { this.dialogBusy = false; }
   }
 
   render() {
     const { data, saves } = this;
-    const device = deviceById(this.device), round = this.currentRound(), entry = this.draft(), proposal = selectedProposal(round, entry);
+    const device = deviceById(this.device), round = this.currentRound(), entry = this.feedbackEntry(), proposal = this.viewed();
     const approved = data?.feedback.approved, locked = this.locked(), error = this.error();
-    const approval = approvalText(data);
     return html`
-      <header><h1 id="title">${data?.title ?? 'Design exploration'}</h1></header>
-      <main>
-        <section class="toolbar" aria-label="View controls">
-          <label>Round <select id="round" ?disabled=${this.busy} @change=${event => this.changeView('roundId', event)}><button type="button"><selectedcontent></selectedcontent></button>${(data?.rounds || []).map(item => html`<option value=${item.id}>${item.id} / ${item.title}</option>`)}</select></label>
-          <div class="device-switch" role="group" aria-label="Device">
-            ${DEVICES.map(item => html`<button type="button" class="device-button" aria-pressed=${item.id === device.id ? 'true' : 'false'}
-              aria-label=${deviceLabel(item)} title=${`${item.kind} (${item.key})`} @click=${() => this.chooseDevice(item.id)}>${deviceIcon(item.id)}</button>`)}
-            <span class="device-meta" aria-live="polite">${device.name}, ${deviceSize(device)}</span>
-          </div>
-          <div class="preview-theme" role="group" aria-label="Preview theme, not saved">
-            <span class="preview-note">Preview only, not saved</span>
-            <label>Seed color <input id="theme-color" type="color" .value=${this.theme.color ?? DEFAULT_THEME_COLOR} @input=${event => this.setTheme('color', event.target.value)}></label>
-            <label>Variant <select id="theme-variant" @change=${event => this.setTheme('variant', event.target.value)}><button type="button"><selectedcontent></selectedcontent></button><option value="">Proposal's own</option>${THEME_VARIANTS.map(value => html`<option value=${value}>${value}</option>`)}</select></label>
-            <label class="check"><input id="theme-dark" type="checkbox" .checked=${this.theme.scheme === 'dark'} @change=${event => this.setTheme('scheme', event.target.checked ? 'dark' : 'light')}> Dark</label>
-            <button id="theme-reset" type="button" ?disabled=${!Object.keys(this.theme).length} @click=${() => this.resetTheme()}>Reset</button>
-          </div>
-        </section>
+      <header class="app-header">
+        <div class="brand-mark" aria-hidden="true">✳</div>
+        <div class="heading"><span class="eyebrow">DESIGN EXPLORATION</span><h1 id="title">${data?.title ?? 'Your next direction'}</h1></div>
         <div class="save-bar">
-          <p id="status" role="status" aria-live="polite">${statusText({ error, connectionError: this.connectionError, pendingSaves: saves?.pending.size, loaded: Boolean(data) })}</p>
-          <button id="retry" type="button" ?hidden=${!showRetry({ error, connectionError: this.connectionError })} @click=${() => this.retry()}>Retry saving</button>
-          <button id="reload" type="button" ?hidden=${!showReload({ error })} @click=${() => this.querySelector('#reload-confirm').showModal()}>Reload saved state</button>
+          <span id="status" role="status" aria-live="polite">${statusText({ error, connectionError: this.connectionError, pendingSaves: saves?.pending.size, loaded: Boolean(data) })}</span>
+          <m3e-button id="retry" ?hidden=${!showRetry({ error, connectionError: this.connectionError })} @click=${() => this.retry()}>Retry</m3e-button>
+          <m3e-button id="reload" ?hidden=${!showReload({ error })} @click=${() => this.querySelector('#reload-confirm').show()}>Reload saved state</m3e-button>
         </div>
-        <p id="approval" class="approval" ?hidden=${!approved}>${approval}</p>
-        <section id="proposals" class="proposals" aria-label="Design proposals">
-          ${data && !round ? html`<p>${WAITING_TEXT}</p>` : ''}
-          ${(round?.proposals || []).map(item => html`<proposal-card .round=${round} .proposal=${item} .device=${device} .theme=${this.theme} .resets=${this.resets}
-            .checked=${proposalKey(round, item) === entry.choice} .locked=${locked}
-            @choose=${event => this.save(event.detail, this.draft().note)}></proposal-card>`)}
+        <m3e-button variant="tonal" aria-expanded=${String(this.panelOpen)} aria-controls="inspector" @click=${() => { this.panelOpen = !this.panelOpen; }}> ${this.panelOpen ? 'Hide panel' : 'Show panel'}</m3e-button>
+      </header>
+      <main class=${`workspace ${this.panelOpen ? '' : 'panel-closed'}`}>
+        <section class="canvas" aria-label="Design canvas">
+          <div class="canvas-toolbar">
+            <div class="device-switch" role="group" aria-label="Device">
+              ${DEVICES.map(item => html`<m3e-icon-button variant=${item.id === device.id ? 'filled' : 'standard'}
+                aria-pressed=${String(item.id === device.id)} aria-label=${deviceLabel(item)} title=${`${item.kind} (${item.key})`}
+                @click=${() => this.chooseDevice(item.id)}>${deviceIcon(item.id)}</m3e-icon-button>`)}
+            </div>
+            <div class="zoom-controls" role="group" aria-label="Canvas zoom">
+              <m3e-icon-button aria-label="Zoom out" ?disabled=${this.zoom <= 0.5} @click=${() => { this.zoom = Math.max(0.5, this.zoom - 0.25); }}>−</m3e-icon-button>
+              <m3e-button aria-label="Fit device to canvas" @click=${() => { this.zoom = 1; }}>${this.zoom === 1 ? 'Fit' : `${Math.round(this.zoom * 100)}% fit`}</m3e-button>
+              <m3e-icon-button aria-label="Zoom in" ?disabled=${this.zoom >= 2} @click=${() => { this.zoom = Math.min(2, this.zoom + 0.25); }}>+</m3e-icon-button>
+            </div>
+          </div>
+          <div class="canvas-navigation">
+            <m3e-form-field variant="outlined"><label slot="label">Round</label>
+              <m3e-select id="round" aria-label="Round" ?disabled=${this.busy || !round} @change=${event => this.changeView('roundId', event)}>
+                ${(data?.rounds || []).map(item => html`<m3e-option value=${item.id}>${item.id} / ${item.title}</m3e-option>`)}
+              </m3e-select>
+            </m3e-form-field>
+            <m3e-form-field variant="outlined"><label slot="label">Direction</label>
+              <m3e-select id="direction" aria-label="Direction" .value=${proposal ? proposalKey(round, proposal) : ''} ?disabled=${this.busy || !proposal}
+                @change=${event => this.chooseProposal(event.target.value)}>
+                ${(round?.proposals || []).map(item => html`<m3e-option value=${proposalKey(round, item)}>${item.name}</m3e-option>`)}
+              </m3e-select>
+            </m3e-form-field>
+          </div>
+          <p id="approval" class="approval" ?hidden=${!approved}>${approvalText(data)}</p>
+          <div class="canvas-scroll">
+            ${proposal ? html`<proposal-canvas .round=${round} .proposal=${proposal} .device=${device} .theme=${this.theme} .resets=${this.resets} .zoom=${this.zoom}></proposal-canvas>`
+              : html`<div class="empty-canvas"><span class="empty-mark" aria-hidden="true">✳</span><h2>Room for a new idea.</h2><p>${data ? WAITING_TEXT : 'Connecting to your exploration.'}</p><p>Ask your agent to explore a screen.<br>Your directions will appear here.</p></div>`}
+          </div>
+          <footer class="canvas-footer"><span>${device.name}</span><span>${deviceSize(device)} dp · Live preview</span></footer>
         </section>
-        ${data ? html`<action-bar .round=${round} .proposal=${proposal} .entry=${entry} .session=${data.session} .approved=${Boolean(approved)} .locked=${locked}
-          .refineEnabled=${canRefine({ locked, error: Boolean(error), entry })} .finishEnabled=${canFinish({ locked, error: Boolean(error), proposal })}
-          .noneEnabled=${canChooseNone({ locked, round })} .actionError=${this.actionError}
-          @note-input=${event => this.save(this.draft().choice, event.detail)} @none=${() => this.none()}
-          @refine=${() => this.refine()} @finish=${() => this.finish()}></action-bar>` : ''}
+        <aside id="inspector" class="inspector" ?hidden=${!this.panelOpen} aria-label="Preview and feedback">
+          <div class="panel-heading"><span class="eyebrow">WORKSPACE</span><h2>Make it yours</h2><p>Explore the details. Shape the next round.</p></div>
+          <section class="theme-panel" aria-labelledby="theme-title">
+            <h3 id="theme-title">Preview theme</h3><p class="supporting">Preview only. Request changes in your feedback to keep them.</p>
+            <label class="color-row" for="theme-color"><span>Seed color</span><input id="theme-color" type="color" .value=${this.theme.color ?? DEFAULT_THEME_COLOR} @input=${event => this.setTheme('color', event.target.value)}></label>
+            <m3e-form-field variant="outlined"><label slot="label">Palette</label><m3e-select id="theme-variant" aria-label="Palette" @change=${event => this.setTheme('variant', event.target.value)}><m3e-option value="own">Proposal's own</m3e-option>${THEME_VARIANTS.map(value => html`<m3e-option value=${value}>${value}</m3e-option>`)}</m3e-select></m3e-form-field>
+            <div class="switch-row"><span id="dark-label">Dark preview</span><m3e-switch id="theme-dark" aria-labelledby="dark-label" .checked=${this.theme.scheme === 'dark'} @change=${event => this.setTheme('scheme', event.target.checked ? 'dark' : 'light')}></m3e-switch></div>
+            <m3e-button id="theme-reset" ?disabled=${!Object.keys(this.theme).length} @click=${() => this.resetTheme()}>Reset preview</m3e-button>
+          </section>
+          ${proposal ? html`<section class="direction-detail"><span class="eyebrow">CURRENT DIRECTION</span><h3>${proposal.name}</h3><p>${proposal.rationale}</p></section>` : ''}
+          ${data ? html`<feedback-panel .round=${round} .proposal=${proposal} .entry=${entry} .session=${data.session} .approved=${Boolean(approved)} .locked=${locked}
+            .refineEnabled=${canRefine({ locked, error: Boolean(error), entry })} .finishEnabled=${canFinish({ locked, error: Boolean(error), proposal: entry.choice === 'none' ? undefined : proposal })}
+            .noneEnabled=${canChooseNone({ locked, round })} .actionError=${this.actionError}
+            @note-input=${event => this.save(entry.choice, event.detail)} @none=${() => this.none()}
+            @refine=${() => this.refine()} @finish=${() => this.finish()}></feedback-panel>` : ''}
+        </aside>
       </main>
-      <dialog id="confirm" aria-labelledby="confirm-title" @cancel=${event => { if (!canCancelDialog({ busy: this.busy })) event.preventDefault(); }}>
-        <h2 id="confirm-title">Finish with this design?</h2><p id="confirm-name">${this.confirmLabel}</p>
+      <m3e-dialog id="confirm" aria-labelledby="confirm-title" .disableClose=${this.busy}>
+        <h2 slot="header" id="confirm-title">Finish this direction?</h2><p id="confirm-name">${this.confirmLabel}</p>
         <p>Finishing makes this exploration read-only. It does not modify your app.</p>
-        <div class="actions"><button id="cancel-approval" type="button" ?disabled=${this.dialogBusy} @click=${() => this.querySelector('#confirm').close()}>Keep exploring</button><button id="confirm-approval" type="button" ?disabled=${this.dialogBusy} @click=${() => this.approve()}>Finish design</button></div>
+        <div slot="actions" class="actions"><m3e-button id="cancel-approval" ?disabled=${this.dialogBusy} @click=${() => this.querySelector('#confirm').hide()}>Keep exploring</m3e-button><m3e-button variant="filled" id="confirm-approval" ?disabled=${this.dialogBusy} @click=${() => this.approve()}>Finish design</m3e-button></div>
         <p id="confirm-error" role="alert">${this.confirmError}</p>
-      </dialog>
-      <dialog id="reload-confirm" aria-labelledby="reload-title">
-        <h2 id="reload-title">Reload saved feedback?</h2>
+      </m3e-dialog>
+      <m3e-dialog id="reload-confirm" aria-labelledby="reload-title">
+        <h2 slot="header" id="reload-title">Reload saved feedback?</h2>
         <p>Unsaved notes in this tab will be discarded. Copy them first if needed.</p>
-        <div class="actions"><form method="dialog"><button>Cancel</button></form><button id="discard-local" type="button" @click=${() => this.discardLocal()}>Reload saved feedback</button></div>
-      </dialog>`;
+        <div slot="actions" class="actions"><m3e-button @click=${() => this.querySelector('#reload-confirm').hide()}>Cancel</m3e-button><m3e-button id="discard-local" @click=${() => this.discardLocal()}>Reload saved feedback</m3e-button></div>
+      </m3e-dialog>`;
   }
 }
 customElements.define('gallery-app', GalleryApp);

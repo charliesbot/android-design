@@ -14,7 +14,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': { target, changeOrigin: true },
-      '/images': { target, changeOrigin: true },
+      '/runtime': { target, changeOrigin: true },
       '/rounds': { target, changeOrigin: true },
       '/draft': { target, changeOrigin: true },
     },

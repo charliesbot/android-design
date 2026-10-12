@@ -20,7 +20,6 @@ export function frameScale({ availableWidth, maxHeight, device }) {
   if (!(availableWidth > 0) || !(maxHeight > 0)) return 0;
   return Math.min(1, availableWidth / device.width, maxHeight / device.height);
 }
-export const MAX_FRAME_HEIGHT_RATIO = 0.7;
 
 // Preview-only theme: only the fields the user touched are sent, so untouched ones keep
 // the proposal's own theme. Nothing here is saved to feedback.
@@ -77,10 +76,6 @@ export function statusText({ error, connectionError, pendingSaves, loaded }) {
 export const showRetry = ({ error, connectionError }) => Boolean(connectionError || (error && !error.conflict));
 export const showReload = ({ error }) => Boolean(error?.conflict);
 
-export function selectionText({ round, proposal, entry }) {
-  if (proposal) return `${optionName(round, proposal.id)} selected`;
-  return entry.choice === 'none' ? 'Try another direction' : 'Select a design';
-}
 export const noteLabel = entry => entry.choice === 'none' ? 'What should we try instead?' : 'What should change?';
 export const refineLabel = entry => entry.choice === 'none' ? 'Request new directions' : 'Refine';
 export const REQUEST_SAVED_TEXT = 'Request saved. Return to chat to continue.';
@@ -92,7 +87,6 @@ export function requestStatusText(entry, session) {
   if (session?.state === 'waiting') return REQUEST_WAITING_TEXT;
   return REQUEST_SAVED_TEXT;
 }
-export const selectionLabel = checked => checked ? 'Selected' : 'Select';
 
 export function approvalText(data) {
   const approved = data?.feedback.approved;
@@ -125,5 +119,17 @@ export function nextRoundSelection({ previousRound, previousLatest, hadData, inc
   return incomingRounds.includes(previousRound) ? previousRound : latest;
 }
 
-export const canCancelDialog = ({ busy }) => !busy;
 export const guardUnload = ({ pendingSaves, busy }) => Boolean(pendingSaves || busy);
+
+// Viewing defaults to the saved choice, then the first proposal, without writing feedback.
+export function viewedProposal(round, activeKey, entry) {
+  return round?.proposals.find(item => proposalKey(round, item) === activeKey)
+    ?? selectedProposal(round, entry) ?? round?.proposals[0];
+}
+export function canvasEntry(round, proposal, entry) {
+  return { ...entry, choice: entry.choice === 'none' ? 'none' : proposal ? proposalKey(round, proposal) : null };
+}
+export const rejectionChange = (round, proposal, entry) => ({
+  activeKey: proposal ? proposalKey(round, proposal) : '',
+  choice: entry.choice === 'none' && proposal ? proposalKey(round, proposal) : 'none',
+});

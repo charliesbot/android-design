@@ -31,12 +31,20 @@ Any agent that reads skills can also load `skills/android-design/SKILL.md` direc
    compose-preview doctor
    ```
 
+### Gallery workspace
+
+The Material 3 Expressive gallery shows one live direction on a device canvas.
+Switch rounds and directions above the canvas, adjust device size or zoom, and
+open the side panel for theme previews and feedback. Finish requires confirmation
+and never implements the design. Empty explorations show an empty canvas.
+Google Sans Flex is shared with the proposal runtime, including its local font license.
+
 ### Developing the gallery frontend
 
 The frontend is Vite and Lit source in `skills/android-design/gallery/src/`, built into the committed `skills/android-design/gallery/public/`. `npm install` is for developing the gallery or the proposal runtime only.
 
 1. Serve an exploration: `node skills/android-design/gallery/cli.mjs serve <exploration> --port 8765`
-2. Run `npm run dev` and open the URL Vite prints. It proxies `/api` and `/images` to port 8765.
+2. Run `npm run dev` and open the URL Vite prints. It proxies the API, proposal pages, and shared runtime to port 8765.
 3. Before committing, run `npm run build` and `npm test`.
 
 ## What is here

@@ -21,8 +21,7 @@ test('serves rounds and saved feedback but not source or arbitrary files', async
   const { url } = await setup(t);
   assert.equal((await fetch(url)).status, 200);
   const arrows = await fetch(`${url}/select-arrows.svg`);
-  assert.equal(arrows.status, 200);
-  assert.equal(arrows.headers.get('content-type'), 'image/svg+xml');
+  assert.equal(arrows.status, 404);
   const data = await (await fetch(`${url}/api/exploration`)).json();
   assert.equal(data.rounds.length, 1);
   assert.equal((await fetch(`${url}/rounds/001/a/`)).headers.get('content-type'), 'text/html; charset=utf-8');
@@ -76,9 +75,9 @@ test('refinement saves an explicit request without finalizing', async t => {
   assert.equal(state.rounds['001'].requests[0].note, 'Try a quieter layout');
 });
 
-test('serves the local Google Sans font without opening arbitrary asset paths', async t => {
+test('serves the shared Google Sans Flex font without opening arbitrary asset paths', async t => {
   const { url } = await setup(t);
-  const font = await fetch(`${url}/fonts/google-sans-latin.woff2`);
+  const font = await fetch(`${url}/runtime/fonts/GoogleSansFlex.woff2`);
   assert.equal(font.status, 200);
   assert.equal(font.headers.get('content-type'), 'font/woff2');
   assert.equal(Buffer.from(await font.arrayBuffer()).subarray(0, 4).toString(), 'wOF2');

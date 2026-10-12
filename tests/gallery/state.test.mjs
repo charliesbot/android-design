@@ -8,7 +8,6 @@ test('names options and builds user-visible text', () => {
   const entry = { choice: 'none', note: 'x', requests: [{ choice: 'none', note: 'x' }] };
   assert.equal(state.requestStatusText(entry), 'Request saved. Return to chat to continue.');
   assert.equal(state.refineLabel(entry), 'Request new directions');
-  assert.equal(state.selectionText({ round, entry }), 'Try another direction');
   assert.equal(state.statusText({ pendingSaves: 1 }), 'Saving...');
   assert.equal(state.statusText({ loaded: true }), 'Saved');
 });
@@ -80,4 +79,30 @@ test('theme overrides keep only valid touched fields', () => {
   assert.deepEqual(state.withThemeOverride({ variant: 'vibrant' }, 'variant', ''), {});
   assert.equal(state.withThemeOverride({}, 'scheme', 'auto').scheme, undefined);
   assert.equal(state.themeMessage({ variant: 'rainbow', color: 'nope' }), null);
+});
+
+test('canvas resumes the saved direction without mutating feedback or approving', () => {
+  const entry = { choice: '001/b', note: 'Keep the headline', requests: [] };
+  assert.equal(state.viewedProposal(round, '', entry).id, 'b');
+  assert.equal(state.viewedProposal(round, '001/a', entry).id, 'a');
+  assert.equal(state.viewedProposal(round, 'stale/key', state.EMPTY_ENTRY).id, 'a');
+  assert.equal(state.viewedProposal(undefined, '', entry), undefined);
+  const effective = state.canvasEntry(round, round.proposals[0], state.EMPTY_ENTRY);
+  assert.equal(effective.choice, '001/a');
+  assert.equal(state.EMPTY_ENTRY.choice, null);
+  assert.deepEqual(entry, { choice: '001/b', note: 'Keep the headline', requests: [] });
+});
+test('new directions retain their feedback target even while a proposal is visible', () => {
+  const entry = { choice: 'none', note: 'Try warmer colors', requests: [] };
+  assert.equal(state.canvasEntry(round, round.proposals[0], entry).choice, 'none');
+  assert.equal(state.canvasEntry(undefined, undefined, state.EMPTY_ENTRY).choice, null);
+});
+test('rejecting directions can be undone without switching to a different proposal', () => {
+  assert.equal(state.rejectionChange(round, round.proposals[0], { choice: 'none' }).choice, '001/a');
+  assert.equal(state.rejectionChange(round, round.proposals[0], { choice: '001/a' }).choice, 'none');
+});
+test('rejecting preserves the viewed proposal even when its saved choice becomes none', () => {
+  const entry = { choice: '001/b', note: '', requests: [] };
+  const change = state.rejectionChange(round, round.proposals[1], entry);
+  assert.equal(state.viewedProposal(round, change.activeKey, { ...entry, choice: change.choice }).id, 'b');
 });
