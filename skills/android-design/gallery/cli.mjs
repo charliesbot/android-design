@@ -8,15 +8,19 @@ import { wait } from './watch.mjs';
 
 const help = `Local design exploration gallery (Node.js 22+).
 
-node <skill>/gallery/cli.mjs create --project <repo> [--title "..."]
-  Copy the starter into <repo>/design-explorations/ and print the exploration path.
+node <skill>/gallery/cli.mjs create --project <repo> [--title "..."] [--starter html|android]
+  Copy a starter into <repo>/design-explorations/ and print the exploration path.
+  html (default): the HTML proposal starter. Proposals are folders:
+  <exploration>/project/proposals/<id>/index.html plus its files.
+  android: the Compose starter, for implementation sandboxes and the experimental Wear shell.
 node <skill>/gallery/cli.mjs cleanup <exploration> --project <repo> --yes
   Delete a marked exploration after the user confirms.
 node <skill>/gallery/cli.mjs publish <exploration> <draft.json>
-  Preserve the current project source and four PNGs per proposal as a new round.
-  Image paths in the draft are relative to <exploration>/project.
+  Lint each listed proposal folder, then preserve it as a new round with file hashes.
+  Rejects a raw color, type declaration, style attribute, or inline style/script, naming file and line.
 node <skill>/gallery/cli.mjs serve <exploration> [--port 8765]
   Print a loopback-only URL. Open it in your browser; Ctrl-C stops the server.
+  Review a working draft at /draft/<id>/ before publishing; published rounds are at /rounds/<round>/<id>/.
 node <skill>/gallery/cli.mjs status <exploration>
   Read rounds, notes, selections, and approval as JSON for the agent.
 node <skill>/gallery/cli.mjs wait <exploration> [--after <revision>] [--timeout <seconds>]
@@ -27,28 +31,27 @@ node <skill>/gallery/cli.mjs wait <exploration> [--after <revision>] [--timeout 
   --after ignores requests already seen at or before that revision. SIGINT/SIGTERM exit silently.
 
 Draft: {"title":"First directions","proposals":[{"id":"a","name":"Editorial",
-"rationale":"Prioritizes reading.","images":{"phone":"renders/a-phone.png",
-"tablet":"renders/a-tablet.png","desktop":"renders/a-desktop.png",
-"foldable":"renders/a-foldable.png"}}],
+"rationale":"Prioritizes reading."}],
 "answers":[{"roundId":"001","at":"<request timestamp>"}]}
+The proposal folder is implied by the id. A draft with "images" is rejected.
 Optional "answers" names the saved requests this round responds to; requests it
 does not name stay pending.
 
-Rendering stays with Compose Preview CLI. Publish only after inspecting fresh renders.
+Review each draft in the browser and run window.runtimeChecks() before publishing.
 Approval never implements a design. Previous rounds are preserved.`;
 try {
-  const { values, positionals } = parseArgs({ options: { help: { type: 'boolean', short: 'h' }, after: { type: 'string' }, timeout: { type: 'string' }, port: { type: 'string' }, project: { type: 'string' }, title: { type: 'string' }, yes: { type: 'boolean' } }, allowPositionals: true });
+  const { values, positionals } = parseArgs({ options: { help: { type: 'boolean', short: 'h' }, after: { type: 'string' }, timeout: { type: 'string' }, port: { type: 'string' }, project: { type: 'string' }, title: { type: 'string' }, starter: { type: 'string' }, yes: { type: 'boolean' } }, allowPositionals: true });
   const [command, root, draft] = positionals;
   if (values.help || !command) console.log(help);
   else if (command === 'create' && root === undefined) {
-    console.log(create({ root: values.project, title: values.title }));
+    console.log(create({ root: values.project, title: values.title, starter: values.starter }));
   } else if (command === 'cleanup' && root && positionals.length === 2) {
-    if (!values.yes) throw new Error('Cleanup deletes source, feedback, history, and renders; confirm with the user, then pass --yes');
+    if (!values.yes) throw new Error('Cleanup deletes proposal drafts, feedback, and history; confirm with the user, then pass --yes');
     cleanup(root, values.project);
     console.log(`Removed ${root}`);
   } else if (command === 'publish' && root && draft && positionals.length === 3) {
     const round = new GalleryStore(root).publish(JSON.parse(readFileSync(draft, 'utf8')));
-    console.log(`Published round ${round.id}: ${round.proposals.length} proposals. Source: ${root}/rounds/${round.id}/source`);
+    console.log(`Published round ${round.id}: ${round.proposals.length} proposals. Files: ${root}/rounds/${round.id}/proposals`);
   } else if (command === 'status' && root && positionals.length === 2) {
     console.log(JSON.stringify(new GalleryStore(root).read(), null, 2));
   } else if (command === 'wait' && root && positionals.length === 2) {

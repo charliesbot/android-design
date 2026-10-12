@@ -2,9 +2,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync, readdirSync, lstatSync, realpathSync, existsSync, openSync, fsyncSync, closeSync } from 'node:fs';
 import { resolve, join, relative, isAbsolute, sep, dirname } from 'node:path';
 
-export const DEVICES = ['phone', 'tablet', 'desktop', 'foldable'];
 const MARKER = '.android-design-exploration.json';
 const SKIP = new Set(['build', '.gradle', '.kotlin', '.git', 'renders', 'local.properties', '__pycache__', 'screenshotTestDebug', 'node_modules', '.DS_Store']);
+const PROPOSAL_ID = /^[a-z][a-z0-9-]{0,39}$/;
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 export class GalleryError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
@@ -57,21 +57,97 @@ function locked(root, action) {
   }
   try { return action(); } finally { rmSync(lock, { recursive: true }); }
 }
+function skipped(name) {
+  return SKIP.has(name) || name.startsWith('.env') || /\.(pem|key|keystore|jks)$/.test(name);
+}
+// Regular files of a proposal folder with their bytes. Build caches and secrets are skipped; symlinks and special files are refused.
 function portableFiles(root, prefix = '') {
   return readdirSync(join(root, prefix), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name)).flatMap(entry => {
-    if (SKIP.has(entry.name) || entry.name.startsWith('.env') || /\.(pem|key|keystore|jks)$/.test(entry.name)) return [];
+    if (skipped(entry.name)) return [];
     const path = prefix ? `${prefix}/${entry.name}` : entry.name;
     requireThat(!entry.isSymbolicLink(), 'Refusing symlink in proposal source');
     if (entry.isDirectory()) return portableFiles(root, path);
     requireThat(entry.isFile(), 'Proposal source must contain regular files');
-    return [{ path, sha256: hash(readFileSync(join(root, path))) }];
+    const bytes = readFileSync(join(root, path));
+    return [{ path, sha256: hash(bytes), bytes }];
   });
 }
-function png(bytes) {
-  requireThat(bytes.length >= 33 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) && bytes.toString('ascii', 12, 16) === 'IHDR', 'Expected a rendered PNG');
-  const width = bytes.readUInt32BE(16), height = bytes.readUInt32BE(20);
-  requireThat(width > 0 && height > 0 && width <= 20000 && height <= 20000, 'Invalid PNG dimensions');
-  return { width, height, sha256: hash(bytes) };
+const listed = files => files.map(({ path, sha256 }) => ({ path, sha256 }));
+
+// Strict styling lint. Each rule keeps a proposal a lookup into Compose tokens (see assets/proposal-starter/README.md).
+const NAMED_COLORS = ('aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen').split(' ');
+const COLOR_WORD = new RegExp(`(?<![\\w-])(?:${NAMED_COLORS.join('|')})(?![\\w-])`, 'i');
+const COLOR_FUNCTION = /(?<![\w-])(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i;
+const HEX_COLOR = /#[0-9a-f]{3,8}(?![\w-])/i;
+const TYPE_PROPERTIES = new Set(['font', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'font-variation-settings']);
+const blank = text => text.replace(/[^\n]/g, ' ');
+const lineAt = (text, index) => text.slice(0, index).split('\n').length;
+
+function lintCss(file, source) {
+  const fail = (index, message) => { throw new GalleryError(`${file}:${lineAt(source, index)}: ${message}`, 422); };
+  const text = source.replace(/\/\*[\s\S]*?\*\//g, blank);
+  let staticStart = -1, staticEnd = -1;
+  const marker = /\/\*\s*static colors\s*\*\//.exec(source);
+  if (marker) {
+    const open = text.indexOf('{', marker.index);
+    let depth = 0, close = -1;
+    for (let i = open; open >= 0 && i < text.length; i++) {
+      if (text[i] === '{') depth++;
+      else if (text[i] === '}' && --depth === 0) { close = i; break; }
+    }
+    if (open >= 0 && close >= 0) { staticStart = open; staticEnd = close; }
+  }
+  const stack = [];
+  let start = 0;
+  const declaration = (end) => {
+    const raw = text.slice(start, end);
+    const colon = raw.indexOf(':');
+    if (!stack.length || colon < 0) return;
+    const property = raw.slice(0, colon).trim().toLowerCase();
+    const value = raw.slice(colon + 1).replace(/url\([^)]*\)/gi, '').replace(/"[^"]*"|'[^']*'/g, '');
+    const at = start + raw.search(/\S/);
+    const inStatic = start > staticStart && end <= staticEnd;
+    if (inStatic) {
+      if (!/^--static-[\w-]+$/.test(property)) fail(at, 'The /* static colors */ block may only declare --static-* custom properties');
+      return;
+    }
+    if (HEX_COLOR.test(value) || COLOR_FUNCTION.test(value) || COLOR_WORD.test(value)) {
+      fail(at, `Raw color in ${property}. Use var(--md-sys-color-*), or declare a named color once in a /* static colors */ block as --static-*`);
+    }
+    // The theme emits primary, secondary, tertiary, and error *-dim roles that Compose's ColorScheme lacks; a proposal using one could not be ported (see compose-mapping.md).
+    const dim = /--md-sys-color-((?:primary|secondary|tertiary|error)-dim)\b/.exec(value);
+    if (dim) fail(at, `${dim[1]} has no Compose counterpart. Use another --md-sys-color-* role`);
+    if (TYPE_PROPERTIES.has(property)) {
+      const rule = [...stack].reverse().find(prelude => !prelude.startsWith('@'));
+      if (!rule || !/^\.voice-[\w-]+$/.test(rule)) fail(at, `${property} is only allowed in a single-class .voice-* rule. Use a .t-* type role class instead`);
+    }
+  };
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '{') { stack.push(text.slice(start, i).trim().replace(/\s+/g, ' ')); start = i + 1; }
+    else if (char === ';') { declaration(i); start = i + 1; }
+    else if (char === '}') { declaration(i); stack.pop(); start = i + 1; }
+  }
+}
+
+function lintHtml(file, source) {
+  const text = source.replace(/<!--[\s\S]*?-->/g, blank);
+  const fail = (index, message) => { throw new GalleryError(`${file}:${lineAt(text, index)}: ${message}`, 422); };
+  for (const tag of text.matchAll(/<([a-zA-Z][\w-]*)\b[^>]*>/g)) {
+    const name = tag[1].toLowerCase();
+    if (name === 'style') fail(tag.index, 'Inline <style> is not allowed. Put styles in a .css file');
+    if (name === 'script' && !/\ssrc\s*=/i.test(tag[0])) fail(tag.index, 'Inline <script> is not allowed. Use <script src="...">');
+    const attribute = /\sstyle\s*=/i.exec(tag[0]);
+    if (attribute) fail(tag.index + attribute.index, 'style="" attributes are not allowed. Put styles in a .css file');
+  }
+}
+
+function lintProposal(id, files) {
+  for (const file of files) {
+    const label = `proposals/${id}/${file.path}`;
+    if (/\.css$/i.test(file.path)) lintCss(label, file.bytes.toString('utf8'));
+    else if (/\.html?$/i.test(file.path)) lintHtml(label, file.bytes.toString('utf8'));
+  }
 }
 
 export class GalleryStore {
@@ -102,7 +178,7 @@ export class GalleryStore {
     const manifest = this.#manifest();
     const rounds = manifest.rounds.map(id => {
       const round = readJSON(this.#file(`rounds/${id}/round.json`));
-      requireThat(round.id === id && Array.isArray(round.proposals) && Array.isArray(round.sourceFiles), 'Invalid round record', 422);
+      requireThat(round.id === id && Array.isArray(round.proposals), 'Invalid round record', 422);
       return round;
     });
     const data = { title: manifest.title, rounds, feedback: this.#feedback() };
@@ -134,20 +210,32 @@ export class GalleryStore {
     return { round, proposal };
   }
   #verifyRound(round) {
-    const files = portableFiles(this.#file(`rounds/${round.id}/source`));
-    requireThat(JSON.stringify(files) === JSON.stringify(round.sourceFiles), 'Published source changed; do not approve stale images', 409);
     for (const proposal of round.proposals) {
-      for (const device of DEVICES) this.image(`${round.id}/${proposal.id}`, device);
+      const files = listed(portableFiles(this.#file(`rounds/${round.id}/proposals/${proposal.id}`)));
+      requireThat(JSON.stringify(files) === JSON.stringify(proposal.files), 'Published proposal changed; do not approve stale files', 409);
     }
   }
-  image(key, device) {
-    requireThat(DEVICES.includes(device), 'Unknown device', 404);
-    const { proposal } = this.proposal(key);
-    const image = proposal.images[device];
-    requireThat(image, 'Missing image', 422);
-    const bytes = readFileSync(this.#file(image.path));
-    requireThat(hash(bytes) === image.sha256, 'Published image changed', 409);
-    return bytes;
+  // A published file, verified against round.json on every read.
+  publishedFile(roundId, proposalId, path) {
+    const { proposal } = this.proposal(`${roundId}/${proposalId}`);
+    const file = proposal.files.find(f => f.path === (path || proposal.entry));
+    requireThat(file, 'Unknown file', 404);
+    const bytes = readFileSync(this.#file(`rounds/${roundId}/proposals/${proposalId}/${file.path}`));
+    requireThat(hash(bytes) === file.sha256, 'Published file changed', 409);
+    return { path: file.path, bytes };
+  }
+  // A working draft file for the agent's review; no hash check.
+  draftFile(proposalId, path) {
+    requireThat(PROPOSAL_ID.test(proposalId), 'Unknown file', 404);
+    const parts = (path || 'index.html').split('/');
+    requireThat(parts.every(part => part && part !== '.' && part !== '..' && !part.includes('\\') && !part.includes('\0') && !skipped(part)), 'Unknown file', 404);
+    let full;
+    try { full = inside(this.root, `project/proposals/${proposalId}/${parts.join('/')}`); }
+    catch { throw new GalleryError('Unknown file', 404); }
+    let stat;
+    try { stat = lstatSync(full); } catch { throw new GalleryError('Unknown file', 404); }
+    requireThat(stat.isFile(), 'Unknown file', 404);
+    return { path: parts.join('/'), bytes: readFileSync(full) };
   }
   #update(revision, action) {
     return locked(this.root, () => {
@@ -193,47 +281,45 @@ export class GalleryStore {
   }
   publish(draft) {
     return locked(this.root, () => {
-      requireThat(this.#feedback().approved === null, 'Exploration is already approved', 409);
       const feedback = this.#feedback();
+      requireThat(feedback.approved === null, 'Exploration is already approved', 409);
+      requireThat(draft && typeof draft === 'object' && !Array.isArray(draft), 'Invalid draft');
       string(draft.title, 'round title');
       requireThat(Array.isArray(draft.proposals) && draft.proposals.length > 0 && draft.proposals.length <= 12, 'Provide 1 to 12 proposals');
+      requireThat(!('images' in draft), 'Drafts no longer take images; each proposal is the folder project/proposals/<id>/');
       const answers = this.#answers(draft.answers, feedback);
-      const project = this.#file('project');
-      const sourceFiles = portableFiles(project);
-      requireThat(sourceFiles.some(f => f.path === 'settings.gradle.kts'), 'Missing Compose project');
       const manifest = this.#manifest();
       const id = String(manifest.rounds.length + 1).padStart(3, '0');
       const destination = this.#file(`rounds/${id}`);
       requireThat(!existsSync(destination), 'Round already exists; refusing to overwrite', 409);
       const ids = new Set();
-      const proposals = draft.proposals.map(proposal => {
-        requireThat(typeof proposal.id === 'string' && /^[a-z][a-z0-9-]{0,39}$/.test(proposal.id), 'Invalid proposal id');
+      const snapshots = draft.proposals.map(proposal => {
+        requireThat(proposal && typeof proposal === 'object', 'Invalid proposal');
+        requireThat(typeof proposal.id === 'string' && PROPOSAL_ID.test(proposal.id), 'Invalid proposal id');
         requireThat(!ids.has(proposal.id), 'Duplicate proposal id'); ids.add(proposal.id);
         string(proposal.name, 'proposal name'); string(proposal.rationale, 'rationale', 1000);
-        requireThat(proposal.images && Object.keys(proposal.images).length === 4 && DEVICES.every(d => typeof proposal.images[d] === 'string'), 'Provide exactly four images: phone, tablet, desktop, foldable');
-        const images = Object.fromEntries(DEVICES.map(device => {
-          const source = inside(project, proposal.images[device]);
-          const bytes = readFileSync(source);
-          return [device, { path: `rounds/${id}/images/${proposal.id}-${device}.png`, ...png(bytes), bytes }];
-        }));
-        return { id: proposal.id, name: proposal.name, rationale: proposal.rationale, images };
+        requireThat(!('images' in proposal), `Proposal ${proposal.id}: drafts no longer take images; the proposal is the folder project/proposals/${proposal.id}/`);
+        let folder;
+        try { folder = this.#file(`project/proposals/${proposal.id}`); lstatSync(folder); }
+        catch (error) { if (error instanceof GalleryError) throw error; throw new GalleryError(`Missing proposal folder project/proposals/${proposal.id}/`); }
+        requireThat(lstatSync(folder).isDirectory(), `project/proposals/${proposal.id} must be a folder`);
+        const files = portableFiles(folder);
+        requireThat(files.some(f => f.path === 'index.html'), `Proposal ${proposal.id} needs project/proposals/${proposal.id}/index.html`);
+        lintProposal(proposal.id, files);
+        return { proposal, files };
       });
+      const proposals = snapshots.map(({ proposal, files }) => ({ id: proposal.id, name: proposal.name, rationale: proposal.rationale, entry: 'index.html', files: listed(files) }));
       const staging = this.#file(`.publish-${randomUUID()}`);
       try {
-        mkdirSync(join(staging, 'images'), { recursive: true });
-        mkdirSync(join(staging, 'source'));
-        for (const file of sourceFiles) {
-          const target = join(staging, 'source', file.path);
-          mkdirSync(dirname(target), { recursive: true });
-          const bytes = readFileSync(inside(project, file.path));
-          requireThat(hash(bytes) === file.sha256, 'Source changed during publication', 409);
-          writeFileSync(target, bytes, { mode: lstatSync(join(project, file.path)).mode & 0o777 });
+        for (const { proposal, files } of snapshots) {
+          for (const file of files) {
+            const target = join(staging, 'proposals', proposal.id, file.path);
+            mkdirSync(dirname(target), { recursive: true });
+            writeFileSync(target, file.bytes, { mode: 0o644 });
+          }
         }
-        for (const proposal of proposals) for (const image of Object.values(proposal.images)) {
-          writeFileSync(join(staging, 'images', image.path.split('/').at(-1)), image.bytes);
-          delete image.bytes;
-        }
-        const round = { id, title: draft.title, createdAt: new Date().toISOString(), sourceHash: hash(JSON.stringify(sourceFiles)), sourceFiles, proposals, ...(answers && { answers }) };
+        const sourceHash = hash(JSON.stringify(proposals.map(({ id, files }) => ({ id, files }))));
+        const round = { id, title: draft.title, createdAt: new Date().toISOString(), sourceHash, proposals, ...(answers && { answers }) };
         atomicJSON(join(staging, 'round.json'), round);
         mkdirSync(this.#file('rounds'), { recursive: true });
         renameSync(staging, destination);
@@ -242,7 +328,7 @@ export class GalleryStore {
         return round;
       } finally { rmSync(staging, { recursive: true, force: true }); }
     });
-    }
+  }
   #answers(value, feedback) {
     if (value === undefined) return undefined;
     requireThat(Array.isArray(value) && value.length <= 50, 'Invalid answers');

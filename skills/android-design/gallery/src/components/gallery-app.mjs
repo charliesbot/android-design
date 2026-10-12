@@ -2,11 +2,18 @@ import { LitElement, html } from 'lit';
 import { FeedbackSaves } from '../saves.mjs';
 import './proposal-card.mjs';
 import './action-bar.mjs';
+import { deviceIcon } from '../icons.mjs';
 import {
-  DEVICE_LABELS, EMPTY_ENTRY, WAITING_TEXT, approvalText, canCancelDialog, canChooseNone, canFinish, canRefine,
+  DEFAULT_DEVICE, DEFAULT_THEME_COLOR, DEVICES, EMPTY_ENTRY, THEME_VARIANTS, WAITING_TEXT, approvalText, deviceById, deviceForKey, deviceLabel, deviceSize,
+  withThemeOverride, canCancelDialog, canChooseNone, canFinish, canRefine,
   confirmName, guardUnload, isLocked, mayReplace, nextRoundSelection, proposalKey, sameRounds, sameSession, selectedProposal,
   shouldReload, showReload, showRetry, staleResult, statusText,
 } from '../state.mjs';
+
+const DEVICE_STORAGE_KEY = 'android-design.device';
+function storedDevice() {
+  try { return deviceById(localStorage.getItem(DEVICE_STORAGE_KEY)).id; } catch { return DEFAULT_DEVICE; }
+}
 
 // Owns the exploration data, feedback saves, polling, and the two dialogs.
 export class GalleryApp extends LitElement {
@@ -20,6 +27,8 @@ export class GalleryApp extends LitElement {
     dialogBusy: { state: true },
     roundId: { state: true },
     device: { state: true },
+    theme: { state: true },
+    resets: { state: true },
     confirmLabel: { state: true },
   };
   constructor() {
@@ -32,12 +41,19 @@ export class GalleryApp extends LitElement {
     this.confirmError = '';
     this.dialogBusy = false;
     this.roundId = '';
-    this.device = 'phone';
+    this.device = storedDevice();
+    this.theme = {};
+    this.resets = 0;
     this.confirmLabel = '';
     this.loading = false;
     this.edits = 0;
     this.approving = null;
     this.timer = undefined;
+    this.onKeydown = event => {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.target.closest?.('input, select, textarea, [contenteditable]')) return;
+      const device = deviceForKey(event.key);
+      if (device) this.chooseDevice(device.id);
+    };
     this.beforeUnload = event => {
       if (guardUnload({ pendingSaves: this.saves?.pending.size, busy: this.busy })) { event.preventDefault(); event.returnValue = ''; }
     };
@@ -46,19 +62,22 @@ export class GalleryApp extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     window.addEventListener('beforeunload', this.beforeUnload);
+    window.addEventListener('keydown', this.onKeydown);
     this.poll();
   }
   disconnectedCallback() {
     super.disconnectedCallback();
     window.removeEventListener('beforeunload', this.beforeUnload);
+    window.removeEventListener('keydown', this.onKeydown);
     clearTimeout(this.timer);
     this.stopped = true;
   }
   updated() {
     // Option children render after the select, so apply the selected values here.
-    const round = this.querySelector('#round'), device = this.querySelector('#device');
+    const round = this.querySelector('#round'), variant = this.querySelector('#theme-variant');
     if (round && round.value !== this.roundId) round.value = this.roundId;
-    if (device && device.value !== this.device) device.value = this.device;
+    const wanted = this.theme.variant ?? '';
+    if (variant && variant.value !== wanted) variant.value = wanted;
   }
 
   currentRound() { return this.data?.rounds.find(round => round.id === this.roundId); }
@@ -121,6 +140,15 @@ export class GalleryApp extends LitElement {
     this[key] = event.target.value;
     this.actionError = '';
   }
+  chooseDevice(id) {
+    this.device = id;
+    try { localStorage.setItem(DEVICE_STORAGE_KEY, id); } catch { /* Remembering the device is optional. */ }
+  }
+  setTheme(key, value) { this.theme = withThemeOverride(this.theme, key, value); }
+  resetTheme() {
+    this.theme = {};
+    this.resets += 1;
+  }
   async none() {
     this.save('none', this.draft().note);
     await this.updateComplete;
@@ -159,7 +187,7 @@ export class GalleryApp extends LitElement {
 
   render() {
     const { data, saves } = this;
-    const round = this.currentRound(), entry = this.draft(), proposal = selectedProposal(round, entry);
+    const device = deviceById(this.device), round = this.currentRound(), entry = this.draft(), proposal = selectedProposal(round, entry);
     const approved = data?.feedback.approved, locked = this.locked(), error = this.error();
     const approval = approvalText(data);
     return html`
@@ -167,7 +195,18 @@ export class GalleryApp extends LitElement {
       <main>
         <section class="toolbar" aria-label="View controls">
           <label>Round <select id="round" ?disabled=${this.busy} @change=${event => this.changeView('roundId', event)}><button type="button"><selectedcontent></selectedcontent></button>${(data?.rounds || []).map(item => html`<option value=${item.id}>${item.id} / ${item.title}</option>`)}</select></label>
-          <label>Device <select id="device" ?disabled=${this.busy} @change=${event => this.changeView('device', event)}><button type="button"><selectedcontent></selectedcontent></button>${Object.entries(DEVICE_LABELS).map(([value, label]) => html`<option value=${value}>${label}</option>`)}</select></label>
+          <div class="device-switch" role="group" aria-label="Device">
+            ${DEVICES.map(item => html`<button type="button" class="device-button" aria-pressed=${item.id === device.id ? 'true' : 'false'}
+              aria-label=${deviceLabel(item)} title=${`${item.kind} (${item.key})`} @click=${() => this.chooseDevice(item.id)}>${deviceIcon(item.id)}</button>`)}
+            <span class="device-meta" aria-live="polite">${device.name}, ${deviceSize(device)}</span>
+          </div>
+          <div class="preview-theme" role="group" aria-label="Preview theme, not saved">
+            <span class="preview-note">Preview only, not saved</span>
+            <label>Seed color <input id="theme-color" type="color" .value=${this.theme.color ?? DEFAULT_THEME_COLOR} @input=${event => this.setTheme('color', event.target.value)}></label>
+            <label>Variant <select id="theme-variant" @change=${event => this.setTheme('variant', event.target.value)}><button type="button"><selectedcontent></selectedcontent></button><option value="">Proposal's own</option>${THEME_VARIANTS.map(value => html`<option value=${value}>${value}</option>`)}</select></label>
+            <label class="check"><input id="theme-dark" type="checkbox" .checked=${this.theme.scheme === 'dark'} @change=${event => this.setTheme('scheme', event.target.checked ? 'dark' : 'light')}> Dark</label>
+            <button id="theme-reset" type="button" ?disabled=${!Object.keys(this.theme).length} @click=${() => this.resetTheme()}>Reset</button>
+          </div>
         </section>
         <div class="save-bar">
           <p id="status" role="status" aria-live="polite">${statusText({ error, connectionError: this.connectionError, pendingSaves: saves?.pending.size, loaded: Boolean(data) })}</p>
@@ -177,7 +216,7 @@ export class GalleryApp extends LitElement {
         <p id="approval" class="approval" ?hidden=${!approved}>${approval}</p>
         <section id="proposals" class="proposals" aria-label="Design proposals">
           ${data && !round ? html`<p>${WAITING_TEXT}</p>` : ''}
-          ${(round?.proposals || []).map(item => html`<proposal-card .round=${round} .proposal=${item} .device=${this.device}
+          ${(round?.proposals || []).map(item => html`<proposal-card .round=${round} .proposal=${item} .device=${device} .theme=${this.theme} .resets=${this.resets}
             .checked=${proposalKey(round, item) === entry.choice} .locked=${locked}
             @choose=${event => this.save(event.detail, this.draft().note)}></proposal-card>`)}
         </section>

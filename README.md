@@ -15,17 +15,17 @@ Any agent that reads skills can also load `skills/android-design/SKILL.md` direc
 
 ## Requirements
 
-1. Install the [Compose preview CLI](https://github.com/yschimke/compose-ai-tools):
+1. Install Node.js 22+ for the gallery and design exploration. Exploration proposals are HTML reviewed in your agent's browser. The installed skill needs no build or `npm install`: it serves the committed build in `skills/android-design/gallery/public/` and the committed proposal runtime. Python 3 runs the evals and the source scripts.
+
+2. For implementing and reviewing real Compose code, running the evals, and Wear work, install the [Compose preview CLI](https://github.com/yschimke/compose-ai-tools) and the Android SDK:
 
    ```bash
    curl -fsSL https://raw.githubusercontent.com/yschimke/skills/main/scripts/install.sh | bash -s -- --cli-only
    ```
 
-2. Install the [`compose-preview` and `compose-ui-builder` skills](https://github.com/yschimke/skills).
+3. Install the [`compose-preview` and `compose-ui-builder` skills](https://github.com/yschimke/skills).
 
-3. For the local exploration gallery, install Node.js 22+. Node.js runs the gallery and the workspace helper; Python 3 runs the evals and the source scripts. The installed skill needs no build or `npm install`: it serves the committed build in `skills/android-design/gallery/public/`.
-
-4. Check your setup:
+4. Check the Compose setup:
 
    ```bash
    compose-preview doctor
@@ -33,7 +33,7 @@ Any agent that reads skills can also load `skills/android-design/SKILL.md` direc
 
 ### Developing the gallery frontend
 
-The frontend is Vite and Lit source in `skills/android-design/gallery/src/`, built into the committed `skills/android-design/gallery/public/`. `npm install` is for this development only.
+The frontend is Vite and Lit source in `skills/android-design/gallery/src/`, built into the committed `skills/android-design/gallery/public/`. `npm install` is for developing the gallery or the proposal runtime only.
 
 1. Serve an exploration: `node skills/android-design/gallery/cli.mjs serve <exploration> --port 8765`
 2. Run `npm run dev` and open the URL Vite prints. It proxies `/api` and `/images` to port 8765.

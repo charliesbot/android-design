@@ -8,12 +8,16 @@ const PUBLIC = fileURLToPath(new URL('./public/', import.meta.url));
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.png': 'image/png',
-  '.txt': 'text/plain; charset=utf-8', '.json': 'application/json',
+  '.txt': 'text/plain; charset=utf-8', '.json': 'application/json', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp', '.gif': 'image/gif', '.ico': 'image/x-icon', '.woff': 'font/woff',
 };
-// Serve a regular file under public/ only: no traversal, no symlinks, no directories.
+const CSP = "default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+// Proposal pages are shown in the gallery's frames, so only they may be framed, and only by the gallery's own origin.
+const PROPOSAL_CSP = CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'");
+// Serve a regular file under public/ only: no traversal, no symlinks, no directories. A path ending in / serves its index.html.
 function asset(path) {
   let relative;
-  try { relative = decodeURIComponent(path === '/' ? '/index.html' : path); } catch { return null; }
+  try { relative = decodeURIComponent(path.endsWith('/') ? `${path}index.html` : path); } catch { return null; }
   if (relative.includes('\0') || relative.includes('\\')) return null;
   const file = resolve(PUBLIC, `.${relative}`);
   if (!file.startsWith(PUBLIC)) return null;
@@ -28,10 +32,10 @@ function asset(path) {
     return [readFileSync(file), TYPES[extname(file).toLowerCase()] || 'application/octet-stream'];
   } catch { return null; }
 }
-function send(response, status, body, type = 'application/json') {
+function send(response, status, body, type = 'application/json', csp = CSP) {
   response.writeHead(status, {
     'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
-    'Content-Security-Policy': "default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+    'Content-Security-Policy': csp,
     'Referrer-Policy': 'no-referrer',
   });
   response.end(Buffer.isBuffer(body) || typeof body === 'string' ? body : JSON.stringify(body));
@@ -62,8 +66,19 @@ export async function startServer(root, port = 0) {
       const path = new URL(request.url, `http://${authority}`).pathname;
       if (request.method === 'GET') {
         if (path === '/api/exploration') return send(response, 200, store.read());
-        const image = /^\/images\/(\d{3,})\/([a-z][a-z0-9-]{0,39})\/(phone|tablet|desktop|foldable)$/.exec(path);
-        if (image) return send(response, 200, store.image(`${image[1]}/${image[2]}`, image[3]), 'image/png');
+        const proposal = /^\/(?:rounds\/(\d{3,})|draft)\/([a-z][a-z0-9-]{0,39})(\/.*)?$/.exec(path);
+        if (proposal) {
+          const [, roundId, id, rest] = proposal;
+          if (rest === undefined) {
+            response.writeHead(301, { Location: `${path}/`, 'Cache-Control': 'no-store' });
+            return response.end();
+          }
+          let file;
+          try { file = decodeURIComponent(rest.slice(1)); } catch { throw new GalleryError('Not found', 404); }
+          if (file.includes('\0') || file.includes('\\')) throw new GalleryError('Not found', 404);
+          const found = roundId ? store.publishedFile(roundId, id, file) : store.draftFile(id, file);
+          return send(response, 200, found.bytes, TYPES[extname(found.path).toLowerCase()] || 'application/octet-stream', PROPOSAL_CSP);
+        }
         if (!path.startsWith('/api/')) {
           const found = asset(path);
           if (found) return send(response, 200, found[0], found[1]);

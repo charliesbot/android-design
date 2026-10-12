@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.designsandbox.theme.AppTheme
@@ -82,17 +83,20 @@ private fun DetailsCard(modifier: Modifier = Modifier) {
   }
 }
 
+// Seed-tinted previews: surfaces should follow the seed, not the default palette.
+private val PreviewSeed = Color(0xFFB8321F)
+
 // Full layout canvases, not exact system chrome. See the starter README for density provenance.
 @Preview(name = "Pixel 11 (modeled density)", device = "spec:width=411dp,height=923dp,dpi=420")
 @Composable
 private fun ProposalPhonePreview() {
-  AppTheme(darkTheme = false) { ProposalScreen() }
+  AppTheme(seed = PreviewSeed, darkTheme = false) { ProposalScreen() }
 }
 
 @Preview(name = "Pixel Tablet", device = "spec:width=1280dp,height=800dp,dpi=320")
 @Composable
 private fun ProposalTabletPreview() {
-  AppTheme(darkTheme = false) { ProposalScreen() }
+  AppTheme(seed = PreviewSeed, darkTheme = false) { ProposalScreen() }
 }
 
 @Preview(
@@ -101,11 +105,11 @@ private fun ProposalTabletPreview() {
 )
 @Composable
 private fun ProposalDesktopPreview() {
-  AppTheme(darkTheme = false) { ProposalScreen() }
+  AppTheme(seed = PreviewSeed, darkTheme = false) { ProposalScreen() }
 }
 
 @Preview(name = "Z Fold8 (modeled density)", device = "spec:width=704dp,height=933dp,dpi=420")
 @Composable
 private fun ProposalFoldablePreview() {
-  AppTheme(darkTheme = false) { ProposalScreen() }
+  AppTheme(seed = PreviewSeed, darkTheme = false) { ProposalScreen() }
 }
