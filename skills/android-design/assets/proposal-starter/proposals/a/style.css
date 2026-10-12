@@ -3,6 +3,7 @@
 .rail { display: none; }
 .screen {
   flex: 1;
+  min-width: 0; /* lets the column shrink to the phone width instead of overflowing it */
   display: flex;
   flex-direction: column;
   align-items: flex-start;
