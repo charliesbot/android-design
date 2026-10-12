@@ -90,7 +90,6 @@ export const isLocked = ({ busy, approved }) => Boolean(busy || approved);
 export const canRefine = ({ locked, error, entry }) =>
   !(locked || error || !entry.choice || (entry.choice === 'none' && !entry.note.trim()) || requested(entry));
 export const canFinish = ({ locked, error, proposal }) => !(locked || error || !proposal);
-export const canChooseNone = ({ locked, round }) => !(locked || !round);
 
 export function statusText({ error, connectionError, pendingSaves, loaded }) {
   return error?.message || connectionError || (pendingSaves ? 'Saving...' : loaded ? 'Saved' : 'Loading...');
@@ -151,7 +150,3 @@ export function viewedProposal(round, activeKey, entry) {
 export function canvasEntry(round, proposal, entry) {
   return { ...entry, choice: entry.choice === 'none' ? 'none' : proposal ? proposalKey(round, proposal) : null };
 }
-export const rejectionChange = (round, proposal, entry) => ({
-  activeKey: proposal ? proposalKey(round, proposal) : '',
-  choice: entry.choice === 'none' && proposal ? proposalKey(round, proposal) : 'none',
-});

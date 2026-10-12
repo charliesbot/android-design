@@ -3,6 +3,8 @@ import '@m3e/web/button';
 import '@m3e/web/icon-button';
 import '@m3e/web/button-group';
 import '@m3e/web/chips';
+import '@m3e/web/tabs';
+import '@m3e/web/textarea-autosize';
 import '@m3e/web/form-field';
 import '@m3e/web/select';
 import '@m3e/web/option';

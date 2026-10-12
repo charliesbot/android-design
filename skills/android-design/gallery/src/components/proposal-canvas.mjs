@@ -26,7 +26,7 @@ export class ProposalCanvas extends LitElement {
       const toolbar = this.closest('.canvas-content').querySelector('.canvas-toolbar');
       const caption = this.querySelector('.frame-caption');
       const gap = parseFloat(getComputedStyle(this.closest('.canvas-content')).rowGap);
-      const margin = parseFloat(getComputedStyle(caption).marginBottom);
+      const margin = parseFloat(getComputedStyle(caption).marginTop);
       // Reserve the actual controls, wrapping caption, gaps, and frame outline before fitting.
       this.chromeHeight = toolbar.getBoundingClientRect().height + caption.getBoundingClientRect().height + gap + margin + 12;
     });
@@ -85,12 +85,12 @@ export class ProposalCanvas extends LitElement {
     const name = optionName(round, proposal.id);
     const scale = this.scale();
     return html`<article class="canvas-proposal" aria-label=${proposal.name}>
-      <div class="frame-caption"><span>${name}</span><h2>${proposal.name}</h2></div>
       <div class="frame-slot">
         <div class=${`frame-stage ${this.ready ? 'ready' : ''}`} ?hidden=${!scale}>
           <iframe src=${frameURL(round, proposal)} title=${frameTitle(name, device)} @load=${() => this.frameLoaded()}></iframe>
         </div>
       </div>
+      <div class="frame-caption"><span>${name}</span><h2>${proposal.name}</h2></div>
     </article>`;
   }
 }

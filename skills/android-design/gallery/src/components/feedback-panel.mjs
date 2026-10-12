@@ -13,14 +13,10 @@ export class FeedbackPanel extends LitElement {
     locked: { type: Boolean },
     refineEnabled: { type: Boolean },
     finishEnabled: { type: Boolean },
-    noneEnabled: { type: Boolean },
     actionError: {},
   };
   createRenderRoot() { return this; }
-  async focusNote() {
-    await this.updateComplete;
-    this.querySelector('#note')?.focus();
-  }
+  updated() { this.querySelector('m3e-textarea-autosize')?.resizeToFitContent(true); }
   emit(name, detail) { this.dispatchEvent(new CustomEvent(name, { detail, bubbles: true })); }
   render() {
     const { entry } = this;
@@ -29,11 +25,11 @@ export class FeedbackPanel extends LitElement {
       <m3e-form-field id="note-field" variant="outlined"><label slot="label" for="note">${noteLabel(entry)}</label>
         <textarea id="note" rows="3" maxlength="10000" .value=${live(entry.note)} ?disabled=${this.locked}
           @input=${event => this.emit('note-input', event.target.value)}></textarea>
+        <m3e-textarea-autosize for="note" min-rows="3" max-rows="8"></m3e-textarea-autosize>
       </m3e-form-field>
       <div id="workflow-actions" class="actions" ?hidden=${this.approved}>
         <m3e-button variant="tonal" id="refine" type="button" ?disabled=${!this.refineEnabled} @click=${() => this.emit('refine')}>${refineLabel(entry)}</m3e-button>
         <m3e-button variant="filled" id="finish" type="button" ?disabled=${!this.finishEnabled} @click=${() => this.emit('finish')}>Finish</m3e-button>
-        <m3e-button id="none" type="button" aria-pressed=${String(entry.choice === 'none')} ?disabled=${!this.noneEnabled} @click=${() => this.emit('none')}>${entry.choice === 'none' ? 'Use this direction' : 'None of these'}</m3e-button>
       </div>
       <p id="request-status" role="status">${requestStatusText(entry, this.session)}</p>
       <p id="action-error" role="alert">${this.actionError}</p>

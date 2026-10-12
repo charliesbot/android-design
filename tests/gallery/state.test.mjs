@@ -96,16 +96,6 @@ test('new directions retain their feedback target even while a proposal is visib
   assert.equal(state.canvasEntry(round, round.proposals[0], entry).choice, 'none');
   assert.equal(state.canvasEntry(undefined, undefined, state.EMPTY_ENTRY).choice, null);
 });
-test('rejecting directions can be undone without switching to a different proposal', () => {
-  assert.equal(state.rejectionChange(round, round.proposals[0], { choice: 'none' }).choice, '001/a');
-  assert.equal(state.rejectionChange(round, round.proposals[0], { choice: '001/a' }).choice, 'none');
-});
-test('rejecting preserves the viewed proposal even when its saved choice becomes none', () => {
-  const entry = { choice: '001/b', note: '', requests: [] };
-  const change = state.rejectionChange(round, round.proposals[1], entry);
-  assert.equal(state.viewedProposal(round, change.activeKey, { ...entry, choice: change.choice }).id, 'b');
-});
-
 test('shared theme restores all original fields after removing overrides', () => {
   const original = { color: '#123456', variant: 'expressive', scheme: 'dark' };
   const overrides = { color: '#0061a4', variant: 'neutral', scheme: 'light' };

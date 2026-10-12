@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { deviceIcon } from '../../skills/android-design/gallery/src/icons.mjs';
+import { FeedbackPanel } from '../../skills/android-design/gallery/src/components/feedback-panel.mjs';
 import { GalleryApp } from '../../skills/android-design/gallery/src/components/gallery-app.mjs';
 import { ProposalCanvas } from '../../skills/android-design/gallery/src/components/proposal-canvas.mjs';
 
@@ -13,7 +14,7 @@ function markup(value) {
 }
 function render(theme = {}) {
   return markup(GalleryApp.prototype.render.call({
-    data: undefined, saves: undefined, device: 'phone', theme, panelOpen: true,
+    data: undefined, saves: undefined, device: 'phone', theme, panelOpen: true, inspectorTab: 'directions',
     currentRound: () => undefined, feedbackEntry: () => ({ choice: null, note: '', requests: [] }),
     viewed: () => undefined, effectiveTheme: () => ({ color: '#6750a4', variant: 'neutral', scheme: 'light', ...theme }),
     locked: () => false, error: () => undefined,
@@ -126,4 +127,73 @@ test('automatic fit reserves measured device controls and wrapping caption heigh
   assert.equal(ProposalCanvas.prototype.scale.call(context), 0.5);
   context.chromeHeight = 300;
   assert.equal(ProposalCanvas.prototype.scale.call(context), 0.4);
+});
+
+
+test('sidebar exposes a vertical Directions/Theme tab rail and keeps feedback outside both panels', () => {
+  const source = render();
+  assert.match(source, /role="tablist" aria-orientation="vertical"/);
+  assert.match(source, /<m3e-tab id=directions-tab/);
+  assert.match(source, /<m3e-tab id=theme-tab/);
+  assert.match(source, /id="directions-panel" role="tabpanel"/);
+  assert.match(source, /id="theme-panel" role="tabpanel"/);
+});
+test('feedback has supported bounded autosize and no None action', () => {
+  const source = markup(FeedbackPanel.prototype.render.call({ entry: { choice: 'none', note: 'Try warmer colors', requests: [] }, emit() {} }));
+  assert.match(source, /<m3e-textarea-autosize for="note" min-rows="3" max-rows="8"/);
+  assert.match(source, /maxlength="10000"/);
+  assert.doesNotMatch(source, /id="none"|None of these|Use this direction/);
+  assert.equal('noneEnabled' in FeedbackPanel.properties, false);
+  assert.equal('none' in GalleryApp.prototype, false);
+});
+test('proposal caption follows the frame rather than preceding it', () => {
+  const source = markup(ProposalCanvas.prototype.render.call({ round: { id: '001', proposals: [{ id: 'a' }] }, proposal: { id: 'a', name: 'Alternative' }, device: { name: 'Phone' }, scale: () => 1 }));
+  assert.ok(source.indexOf('class="frame-slot"') < source.indexOf('class="frame-caption"'));
+});
+
+
+test('vertical tab navigation supports arrows and Home/End with selected-tab focus', () => {
+  const focus = [], context = { inspectorTab: 'directions', selectInspectorTab(tab) { this.inspectorTab = tab; }, querySelector: selector => ({ focus: () => focus.push(selector) }) };
+  for (const [key, selected] of [['ArrowDown', 'theme'], ['ArrowUp', 'directions'], ['End', 'theme'], ['Home', 'directions']]) {
+    let prevented = false;
+    GalleryApp.prototype.navigateInspectorTabs.call(context, { key, preventDefault: () => { prevented = true; } });
+    assert.equal(context.inspectorTab, selected);
+    assert.equal(prevented, true);
+    assert.equal(focus.at(-1), `#${selected}-tab`);
+  }
+});
+test('legacy rejection can be replaced through the direction selector even with a single proposal', () => {
+  const proposal = { id: 'a', name: 'Alternative' }, round = { id: '001', proposals: [proposal] };
+  const source = markup(GalleryApp.prototype.render.call({
+    data: undefined, saves: undefined, device: 'phone', theme: {}, panelOpen: true, inspectorTab: 'directions',
+    currentRound: () => round, feedbackEntry: () => ({ choice: 'none', note: 'Try warmer', requests: [] }),
+    viewed: () => proposal, effectiveTheme: () => ({ color: '#6750a4', variant: 'neutral', scheme: 'light' }), locked: () => false, error: () => undefined,
+  }));
+  assert.match(source, /id="direction"[^>]*\.value= \?disabled=false/);
+});
+
+test('vertical rail tabs have Material icons and at least a 48px target', () => {
+  const source = render();
+  assert.equal((source.match(/class="rail-tab-content"/g) || []).length, 2);
+  const css = readFileSync(new URL('../../skills/android-design/gallery/src/style.css', import.meta.url), 'utf8');
+  assert.match(css, /\.inspector-rail m3e-tab[^}]*min-height: (?:48|56|64|72)px/);
+});
+
+test('icon-only tab rail sits in the left sidebar before the canvas with accessible names', () => {
+  const source = render();
+  assert.ok(source.indexOf('id="inspector"') < source.indexOf('class="canvas"'));
+  const tabs = source.match(/<m3e-tab [^>]+>/g);
+  assert.equal(tabs.length, 2);
+  tabs.forEach((tab, index) => {
+    const label = index === 0 ? 'Directions' : 'Theme';
+    assert.match(tab, new RegExp(`aria-label=${label}`));
+    assert.match(tab, new RegExp(`title=${label}`));
+  });
+  assert.doesNotMatch(source, /rail-tab-content[^>]*>[^]*?<span>Directions<\/span>/);
+});
+
+test('feedback remains mounted but only visible in Directions, with autosize refreshed on tab switches', () => {
+  const source = readFileSync(new URL('../../skills/android-design/gallery/src/components/gallery-app.mjs', import.meta.url), 'utf8');
+  assert.match(source, /<feedback-panel \?hidden=\$\{this.inspectorTab !== 'directions'\}/);
+  assert.match(source, /changed.has\('inspectorTab'\)/);
 });

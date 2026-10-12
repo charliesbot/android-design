@@ -3,6 +3,7 @@ import { lstatSync, readFileSync } from 'node:fs';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GalleryStore, GalleryError } from './store.mjs';
+import { applyStartupTheme, startupTheme } from './startup-theme.mjs';
 
 const PUBLIC = fileURLToPath(new URL('./public/', import.meta.url));
 const TYPES = {
@@ -81,7 +82,12 @@ export async function startServer(root, port = 0) {
         }
         if (!path.startsWith('/api/')) {
           const found = asset(path);
-          if (found) return send(response, 200, found[0], found[1]);
+          if (found) {
+            const bytes = path === '/' || path === '/index.html'
+              ? applyStartupTheme(found[0].toString('utf8'), startupTheme(store.read(), (round, proposal) => store.publishedFile(round, proposal, 'index.html').bytes.toString('utf8')))
+              : found[0];
+            return send(response, 200, bytes, found[1]);
+          }
         }
       }
       if ((request.method === 'PUT' && path === '/api/feedback') || (request.method === 'POST' && ['/api/approve', '/api/refine'].includes(path))) {

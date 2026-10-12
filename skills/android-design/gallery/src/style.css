@@ -26,7 +26,7 @@ input, textarea { font: inherit; color: inherit; }
 .heading { min-width: 0; flex: 1; }
 .eyebrow { display: block; font-size: .65rem; font-weight: 700; letter-spacing: .14em; margin-bottom: 6px; color: var(--md-sys-color-on-surface-variant); }
 .save-bar { display: flex; align-items: center; gap: 8px; max-width: 28%; flex-wrap: wrap; font-size: .75rem; color: var(--md-sys-color-on-surface-variant); }
-.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; padding: 0 16px 16px; height: calc(100dvh - 96px); }
+.workspace { display: grid; grid-template-columns: 500px minmax(0, 1fr); gap: 12px; padding: 0 16px 16px; height: calc(100dvh - 96px); }
 .workspace.panel-closed { grid-template-columns: minmax(0, 1fr); }
 .canvas { min-width: 0; background: var(--md-sys-color-surface-container-low); border-radius: 28px; display: flex; flex-direction: column; overflow: hidden; }
 .canvas-toolbar { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px; }
@@ -38,14 +38,19 @@ m3e-form-field { --m3e-form-field-container-shape: 16px; max-width: 100%; }
 .canvas-content { display: grid; gap: 24px; width: 100%; min-width: 0; }
 proposal-canvas { display: block; }
 .canvas-proposal { min-width: 0; }
-.frame-caption { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 16px; }
+.frame-caption { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; }
 .frame-caption span { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); border-radius: 12px; padding: 4px 10px; font-size: .75rem; white-space: nowrap; }
 .frame-caption h2 { font-size: 1rem; }
 .frame-slot { display: grid; justify-items: safe center; width: 100%; }
 .frame-stage { overflow: hidden; background: var(--md-sys-color-surface); flex: none; outline: 6px solid var(--md-sys-color-outline-variant); box-shadow: 0 16px 40px color-mix(in srgb, var(--md-sys-color-shadow) 12%, transparent); }
 .frame-stage iframe { display: block; border: 0; transform-origin: 0 0; }
 .frame-stage.ready, .frame-stage.ready iframe { transition: width .25s ease, height .25s ease, transform .25s ease, border-radius .25s ease; }
-.inspector { overflow: auto; min-width: 0; padding: 24px 16px; }
+.inspector { overflow: auto; min-width: 0; padding: 24px 16px; display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 16px; align-content: start; }
+.inspector-rail { display: grid; gap: 8px; align-content: start; }
+.inspector-rail m3e-tab { width: 100%; min-height: 72px; height: 72px; border-radius: 16px; --m3e-tab-padding-start: 8px; --m3e-tab-padding-end: 8px; --m3e-tab-font-size: .75rem; }
+.rail-tab-content { display: grid; justify-items: center; gap: 6px; }
+.inspector-rail m3e-tab[selected] { background: var(--md-sys-color-secondary-container); --m3e-tab-selected-color: var(--md-sys-color-on-secondary-container); }
+.inspector-content { min-width: 0; }
 .supporting { font-size: .8125rem; color: var(--md-sys-color-on-surface-variant); margin-top: 8px; }
 .theme-panel { display: grid; gap: 16px; }
 .theme-panel .supporting { margin-top: -8px; }
@@ -55,9 +60,8 @@ proposal-canvas { display: block; }
 feedback-panel { display: block; }
 .feedback-panel h2 { font-size: 1rem; margin-bottom: 16px; }
 .feedback-panel m3e-form-field { width: 100%; }
-textarea { resize: vertical; min-height: 112px; }
+textarea { width: 100%; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-#none { flex-basis: 100%; }
 #request-status { color: var(--md-sys-color-on-surface-variant); font-size: .8125rem; margin-top: 16px; }
 #action-error, #confirm-error { color: var(--md-sys-color-error); font-size: .875rem; }
 .approval { margin: 0 24px 8px; padding: 12px 16px; border-radius: 16px; background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); }
@@ -78,6 +82,7 @@ textarea { resize: vertical; min-height: 112px; }
   .heading { flex-basis: calc(100% - 64px); }
   .save-bar { flex: 1; }
   .workspace { padding: 0 8px 8px; }
+  .inspector { padding: 16px 12px; grid-template-columns: 72px minmax(0, 1fr); gap: 12px; }
   .canvas-scroll { padding-inline: 16px; }
 }
 @media (prefers-reduced-motion: reduce) { .frame-stage.ready, .frame-stage.ready iframe { transition: none; } }
