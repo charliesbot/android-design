@@ -15,7 +15,7 @@ function render(theme = {}) {
   return markup(GalleryApp.prototype.render.call({
     data: undefined, saves: undefined, device: 'phone', theme, panelOpen: true,
     currentRound: () => undefined, feedbackEntry: () => ({ choice: null, note: '', requests: [] }),
-    viewed: () => undefined, effectiveTheme: () => ({ color: '#6750a4', variant: 'neutral', scheme: 'light' }),
+    viewed: () => undefined, effectiveTheme: () => ({ color: '#6750a4', variant: 'neutral', scheme: 'light', ...theme }),
     locked: () => false, error: () => undefined,
   }));
 }
@@ -46,7 +46,7 @@ test('selecting an active toggle preserves a single selection', () => {
   }
 });
 test('canvas scale always automatically fits the unchanged device viewport', () => {
-  const context = { slotWidth: 500, slotHeight: 652, device: { width: 1000, height: 1000 }, zoom: 2 };
+  const context = { slotWidth: 512, slotHeight: 652, chromeHeight: 152, device: { width: 1000, height: 1000 }, zoom: 2 };
   assert.equal(ProposalCanvas.prototype.scale.call(context), 0.5);
 });
 
@@ -98,4 +98,32 @@ test('nested theme change events never select a seed or change its theme', () =>
   GalleryApp.prototype.chooseToggle.call({}, { target: { tagName: 'M3E-THEME' }, currentTarget: button }, () => choices.push('rose'));
   assert.equal(button.selected, false);
   assert.deepEqual(choices, []);
+});
+
+test('selectors live above theme controls in the sidebar and scheme switch precedes colors', () => {
+  const source = render();
+  assert.ok(source.indexOf('id="inspector"') < source.indexOf('class="canvas-navigation"'));
+  assert.ok(source.indexOf('class="canvas-navigation"') < source.indexOf('class="theme-panel"'));
+  assert.ok(source.indexOf('id="theme-dark"') < source.indexOf('class="seed-colors"'));
+  assert.match(source, /aria-label="Dark theme"/);
+  assert.match(source, /<span id="scheme-label">Light<\/span>/);
+});
+test('palette row content spans the button container instead of its intrinsic label width', () => {
+  const css = readFileSync(new URL('../../skills/android-design/gallery/src/style.css', import.meta.url), 'utf8');
+  assert.match(css, /container-type: inline-size/);
+  assert.match(css, /width: calc\(100cqw -/);
+  assert.match(css, /\.palette-samples[^}]*justify-self: end/);
+});
+
+
+test('the visible scheme label follows dark state while its accessible switch name stays stable', () => {
+  const source = render({ scheme: 'dark' });
+  assert.match(source, /<span id="scheme-label">Dark<\/span>/);
+  assert.match(source, /aria-label="Dark theme" \.checked=true/);
+});
+test('automatic fit reserves measured device controls and wrapping caption height', () => {
+  const context = { slotWidth: 1012, slotHeight: 700, chromeHeight: 200, device: { width: 1000, height: 1000 } };
+  assert.equal(ProposalCanvas.prototype.scale.call(context), 0.5);
+  context.chromeHeight = 300;
+  assert.equal(ProposalCanvas.prototype.scale.call(context), 0.4);
 });

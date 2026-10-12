@@ -10,15 +10,26 @@ export class ProposalCanvas extends LitElement {
     theme: { attribute: false },
     slotWidth: { state: true },
     slotHeight: { state: true },
+    chromeHeight: { state: true },
     ready: { state: true },
   };
   constructor() {
     super();
     this.slotWidth = 0;
     this.slotHeight = 0;
+    this.chromeHeight = 0;
     this.ready = false;
     this.resizeFrame = undefined;
-    this.observer = new ResizeObserver(entries => { this.slotWidth = entries[0].contentRect.width; this.slotHeight = entries[0].contentRect.height; });
+    this.observer = new ResizeObserver(entries => {
+      const box = entries.find(entry => entry.target === this.closest('.canvas-scroll'));
+      if (box) { this.slotWidth = box.contentRect.width; this.slotHeight = box.contentRect.height; }
+      const toolbar = this.closest('.canvas-content').querySelector('.canvas-toolbar');
+      const caption = this.querySelector('.frame-caption');
+      const gap = parseFloat(getComputedStyle(this.closest('.canvas-content')).rowGap);
+      const margin = parseFloat(getComputedStyle(caption).marginBottom);
+      // Reserve the actual controls, wrapping caption, gaps, and frame outline before fitting.
+      this.chromeHeight = toolbar.getBoundingClientRect().height + caption.getBoundingClientRect().height + gap + margin + 12;
+    });
   }
   createRenderRoot() { return this; }
   disconnectedCallback() {
@@ -28,6 +39,8 @@ export class ProposalCanvas extends LitElement {
   }
   firstUpdated() {
     this.observer.observe(this.closest('.canvas-scroll'));
+    this.observer.observe(this.closest('.canvas-content').querySelector('.canvas-toolbar'));
+    this.observer.observe(this.querySelector('.frame-caption'));
     // Enable transitions only after the first layout so frames do not animate in from default sizes.
     this.resizeFrame = requestAnimationFrame(() => { this.resizeFrame = requestAnimationFrame(() => { this.ready = true; }); });
   }
@@ -44,7 +57,7 @@ export class ProposalCanvas extends LitElement {
     frame.style.transform = `scale(${scale})`;
   }
   scale() {
-    return frameScale({ availableWidth: this.slotWidth, maxHeight: Math.max(1, this.slotHeight - 52), device: this.device });
+    return frameScale({ availableWidth: Math.max(0, this.slotWidth - 12), maxHeight: Math.max(1, this.slotHeight - this.chromeHeight), device: this.device });
   }
   updated(changed) {
     this.layout();
