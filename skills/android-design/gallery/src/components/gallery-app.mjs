@@ -4,7 +4,7 @@ import './proposal-canvas.mjs';
 import './feedback-panel.mjs';
 import { deviceIcon } from '../icons.mjs';
 import {
-  viewedProposal, canvasEntry, sharedTheme, SEED_COLORS, DEFAULT_DEVICE, DEVICES, EMPTY_ENTRY, THEME_VARIANTS, WAITING_TEXT, approvalText, deviceById, deviceForKey, deviceLabel, deviceSize,
+  viewedProposal, canvasEntry, sharedTheme, SEED_COLORS, DEFAULT_DEVICE, DEVICES, EMPTY_ENTRY, THEME_VARIANTS, WAITING_TEXT, approvalText, deviceById, deviceForKey, deviceLabel,
   withThemeOverride, rejectionChange, canChooseNone, canFinish, canRefine,
   confirmName, guardUnload, isLocked, mayReplace, nextRoundSelection, proposalKey, sameRounds, sameSession, selectedProposal,
   shouldReload, showReload, showRetry, staleResult, statusText,
@@ -167,9 +167,13 @@ export class GalleryApp extends LitElement {
     try { localStorage.setItem(DEVICE_STORAGE_KEY, id); } catch { /* Remembering the device is optional. */ }
   }
   // Material toggles may deselect themselves; these controls always keep one choice.
-  chooseToggle(event, choose) { event.currentTarget.selected = true; choose(); }
+  chooseToggle(event, choose) {
+    // Nested palette themes also emit bubbling change events during initialization.
+    if (event.target !== event.currentTarget) return;
+    event.currentTarget.selected = true;
+    choose();
+  }
   setTheme(key, value) { this.theme = withThemeOverride(this.theme, key, value); }
-  resetTheme() { this.theme = {}; }
   effectiveTheme() {
     const proposal = this.viewed();
     const key = proposal && proposalKey(this.currentRound(), proposal);
@@ -243,7 +247,7 @@ export class GalleryApp extends LitElement {
               ${DEVICES.map(item => html`<m3e-icon-button variant="tonal" toggle .selected=${item.id === device.id}
                 aria-checked=${String(item.id === device.id)}
                 aria-label=${deviceLabel(item)} title=${`${item.kind} (${item.key})`}
-                @change=${event => this.chooseToggle(event, () => this.chooseDevice(item.id))}>${deviceIcon(item.id)}</m3e-icon-button>`)}
+                @change=${event => this.chooseToggle(event, () => this.chooseDevice(item.id))}>${deviceIcon(item.id, item.id === device.id)}</m3e-icon-button>`)}
             </m3e-button-group>
           </div>
           <div class="canvas-navigation">
@@ -264,38 +268,31 @@ export class GalleryApp extends LitElement {
             ${proposal ? html`<proposal-canvas .round=${round} .proposal=${proposal} .device=${device} .theme=${theme} @proposal-theme=${event => this.receiveTheme(event)}></proposal-canvas>`
               : html`<div class="empty-canvas"><span class="empty-mark" aria-hidden="true">✳</span><h2>Room for a new idea.</h2><p>${data ? WAITING_TEXT : 'Connecting to your exploration.'}</p><p>Ask your agent to explore a screen.<br>Your directions will appear here.</p></div>`}
           </div>
-          <footer class="canvas-footer"><span>${device.name}</span><span>${deviceSize(device)} dp · Live preview</span></footer>
         </section>
         <aside id="inspector" class="inspector" ?hidden=${!this.panelOpen} aria-label="Preview and feedback">
-          <div class="panel-heading"><span class="eyebrow">WORKSPACE</span><h2>Make it yours</h2><p>Explore the details. Shape the next round.</p></div>
           <section class="theme-panel" aria-labelledby="theme-title">
             <h3 id="theme-title">Theme</h3><p class="supporting">One theme for the workspace and app. Saved designs stay unchanged.</p>
             <div class="seed-colors" role="group" aria-label="Seed color">
-              ${SEED_COLORS.map(seed => html`<m3e-button class="seed" variant="tonal"
-                aria-label=${seed.name} aria-pressed=${String(theme.color.toLowerCase() === seed.color)} @click=${() => this.setTheme('color', seed.color)}>
+              ${SEED_COLORS.map(seed => html`<m3e-button class="seed" variant="tonal" toggle .selected=${theme.color.toLowerCase() === seed.color}
+                aria-label=${seed.name} @change=${event => this.chooseToggle(event, () => this.setTheme('color', seed.color))}>
                 <span class="seed-row">
                   <m3e-theme class="palette-preview" color=${seed.color} variant=${theme.variant} scheme=${theme.scheme} aria-hidden="true">
                     <span class="swatch"></span>
                     <span class="palette-samples"><span></span><span></span><span></span><span></span><span></span></span>
                   </m3e-theme>
                   <span class="seed-name">${seed.name}</span>
-                  <span class="seed-check" aria-hidden="true">${theme.color.toLowerCase() === seed.color ? '✓' : ''}</span>
                 </span>
               </m3e-button>`)}
             </div>
             <div class="palette-control"><span id="palette-label">Palette</span>
-              <div class="palette-options">
-                <m3e-button-group id="theme-variant" variant="connected" aria-labelledby="palette-label">
-                  ${['own', ...THEME_VARIANTS].map(value => html`<m3e-button variant="tonal" toggle .selected=${(this.theme.variant ?? 'own') === value}
-                    aria-checked=${String((this.theme.variant ?? 'own') === value)}
-                    @change=${event => this.chooseToggle(event, () => this.setTheme('variant', value))}>${value === 'own' ? "Proposal's own" : value === 'tonal-spot' ? 'Tonal spot' : value[0].toUpperCase() + value.slice(1)}</m3e-button>`)}
-                </m3e-button-group>
-              </div>
+              <m3e-filter-chip-set id="theme-variant" aria-labelledby="palette-label">
+                ${['own', ...THEME_VARIANTS].map(value => html`<m3e-filter-chip value=${value} .selected=${(this.theme.variant ?? 'own') === value}
+                  aria-checked=${String((this.theme.variant ?? 'own') === value)}
+                  @change=${event => this.chooseToggle(event, () => this.setTheme('variant', value))}>${value === 'own' ? "Proposal's own" : value === 'tonal-spot' ? 'Tonal spot' : value[0].toUpperCase() + value.slice(1)}</m3e-filter-chip>`)}
+              </m3e-filter-chip-set>
             </div>
             <div class="switch-row"><span id="dark-label">Dark theme</span><m3e-switch id="theme-dark" aria-labelledby="dark-label" .checked=${theme.scheme === 'dark'} @change=${event => this.setTheme('scheme', event.target.checked ? 'dark' : 'light')}></m3e-switch></div>
-            <m3e-button id="theme-reset" ?disabled=${!Object.keys(this.theme).length} @click=${() => this.resetTheme()}>Reset theme</m3e-button>
           </section>
-          ${proposal ? html`<section class="direction-detail"><span class="eyebrow">CURRENT DIRECTION</span><h3>${proposal.name}</h3><p>${proposal.rationale}</p></section>` : ''}
           ${data ? html`<feedback-panel .round=${round} .proposal=${proposal} .entry=${entry} .session=${data.session} .approved=${Boolean(approved)} .locked=${locked}
             .refineEnabled=${canRefine({ locked, error: Boolean(error), entry })} .finishEnabled=${canFinish({ locked, error: Boolean(error), proposal: entry.choice === 'none' ? undefined : proposal })}
             .noneEnabled=${canChooseNone({ locked, round })} .actionError=${this.actionError}

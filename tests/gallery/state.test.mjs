@@ -55,7 +55,6 @@ test('devices: order, lookup, shortcuts, and exact canvases', () => {
   assert.equal(state.deviceForKey('4').id, 'desktop');
   assert.equal(state.deviceForKey('5'), undefined);
   assert.equal(state.deviceLabel(state.deviceById('foldable')), 'Foldable, Z Fold8');
-  assert.equal(state.deviceSize(state.deviceById('phone')), '411 by 923');
 });
 test('frame scale fits width and height and never enlarges', () => {
   const desktop = state.deviceById('desktop'), phone = state.deviceById('phone');

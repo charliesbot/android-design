@@ -12,7 +12,6 @@ export const DEFAULT_DEVICE = DEVICES[0].id;
 export const deviceById = id => DEVICES.find(device => device.id === id) ?? DEVICES[0];
 export const deviceForKey = key => DEVICES.find(device => device.key === key);
 export const deviceLabel = device => `${device.kind}, ${device.name}`;
-export const deviceSize = device => `${device.width} by ${device.height}`;
 
 // Largest scale at which the whole device canvas fits the box, never enlarging past 1.
 // Zero means the box is not measured yet.
