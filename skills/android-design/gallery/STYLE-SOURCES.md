@@ -1,9 +1,9 @@
 # Gallery design system
 
 The gallery uses the pinned `@m3e/web` Material 3 Expressive components for buttons,
-icon buttons, form fields, selects, switches, and dialogs. The shell uses semantic
-color roles from its own theme, independently of preview-only proposal themes.
-The native color picker and textarea sit within the themed control layout;
+icon buttons, form fields, selects, switches, and dialogs. The shell and active proposal share semantic
+color roles, seed, palette, and light/dark mode. Labeled seed swatches use
+Material buttons. The native textarea sits within a Material form field;
 there is no duplicate custom select, button, or dialog implementation.
 
 Google Sans Flex is shared with the proposal runtime at

@@ -78,7 +78,7 @@ test('theme overrides keep only valid touched fields', () => {
   assert.deepEqual(state.withThemeOverride(overrides, 'variant', 'vibrant').variant, 'vibrant');
   assert.deepEqual(state.withThemeOverride({ variant: 'vibrant' }, 'variant', ''), {});
   assert.equal(state.withThemeOverride({}, 'scheme', 'auto').scheme, undefined);
-  assert.equal(state.themeMessage({ variant: 'rainbow', color: 'nope' }), null);
+  assert.equal(state.themeMessage({ variant: 'invalid', color: 'nope' }), null);
 });
 
 test('canvas resumes the saved direction without mutating feedback or approving', () => {
@@ -105,4 +105,26 @@ test('rejecting preserves the viewed proposal even when its saved choice becomes
   const entry = { choice: '001/b', note: '', requests: [] };
   const change = state.rejectionChange(round, round.proposals[1], entry);
   assert.equal(state.viewedProposal(round, change.activeKey, { ...entry, choice: change.choice }).id, 'b');
+});
+
+test('shared theme restores all original fields after removing overrides', () => {
+  const original = { color: '#123456', variant: 'expressive', scheme: 'dark' };
+  const overrides = { color: '#0061a4', variant: 'neutral', scheme: 'light' };
+  assert.deepEqual(state.sharedTheme(original, overrides), overrides);
+  assert.deepEqual(state.sharedTheme(original, {}), original);
+  assert.equal(state.sharedTheme(original, state.withThemeOverride(overrides, 'variant', 'own')).variant, 'expressive');
+  assert.deepEqual(original, { color: '#123456', variant: 'expressive', scheme: 'dark' });
+});
+test('authored themes normalize missing values and preserve supported library variants', () => {
+  assert.deepEqual(state.authoredTheme({}), { color: '#6750a4', variant: 'neutral', scheme: 'auto' });
+  const original = state.authoredTheme({ color: '#ABCDEF', variant: 'fidelity', scheme: 'auto' });
+  assert.equal(original.color, '#abcdef');
+  assert.deepEqual(state.sharedTheme(original, {}, true), { color: '#abcdef', variant: 'fidelity', scheme: 'dark' });
+  assert.equal(state.sharedTheme(original, {}, false).scheme, 'light');
+  assert.equal(state.themeMessage(state.sharedTheme(original, {})).variant, 'fidelity');
+});
+test('seed choices have stable names and unique valid colors', () => {
+  assert.deepEqual(state.SEED_COLORS.map(item => item.name), ['Purple', 'Blue', 'Green', 'Amber', 'Rose']);
+  assert.equal(new Set(state.SEED_COLORS.map(item => item.color)).size, 5);
+  for (const item of state.SEED_COLORS) assert.match(item.color, /^#[0-9a-f]{6}$/);
 });

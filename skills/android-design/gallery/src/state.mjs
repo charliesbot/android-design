@@ -21,14 +21,22 @@ export function frameScale({ availableWidth, maxHeight, device }) {
   return Math.min(1, availableWidth / device.width, maxHeight / device.height);
 }
 
-// Preview-only theme: only the fields the user touched are sent, so untouched ones keep
-// the proposal's own theme. Nothing here is saved to feedback.
+// Theme overrides are session-only. Resolve them over the authored proposal theme
+// and send the complete result to both the gallery and the proposal.
 export const THEME_VARIANTS = ['tonal-spot', 'neutral', 'vibrant', 'expressive'];
 export const THEME_SCHEMES = ['light', 'dark'];
 export const DEFAULT_THEME_COLOR = '#6750a4';
+const SOURCE_VARIANTS = [...THEME_VARIANTS, 'monochrome', 'fidelity', 'content', 'rainbow', 'fruit-salad'];
+export const SEED_COLORS = [
+  { name: 'Purple', color: '#6750a4' },
+  { name: 'Blue', color: '#0061a4' },
+  { name: 'Green', color: '#386a20' },
+  { name: 'Amber', color: '#8b5000' },
+  { name: 'Rose', color: '#984061' },
+];
 const THEME_VALID = {
   color: value => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value),
-  variant: value => THEME_VARIANTS.includes(value),
+  variant: value => SOURCE_VARIANTS.includes(value),
   scheme: value => THEME_SCHEMES.includes(value),
 };
 export function withThemeOverride(overrides, key, value) {
@@ -40,6 +48,21 @@ export function withThemeOverride(overrides, key, value) {
 export function themeMessage(overrides) {
   const fields = Object.keys(THEME_VALID).filter(key => THEME_VALID[key](overrides?.[key]));
   return fields.length ? { type: 'theme', ...Object.fromEntries(fields.map(key => [key, overrides[key]])) } : null;
+}
+// Missing theme attributes use the web runtime's defaults.
+export function authoredTheme(attributes) {
+  return {
+    color: THEME_VALID.color(attributes.color) ? attributes.color.toLowerCase() : DEFAULT_THEME_COLOR,
+    variant: THEME_VALID.variant(attributes.variant) ? attributes.variant : 'neutral',
+    scheme: [...THEME_SCHEMES, 'auto'].includes(attributes.scheme) ? attributes.scheme : 'auto',
+  };
+}
+export function sharedTheme(original, overrides, systemDark = false) {
+  const result = { ...authoredTheme(original), ...Object.fromEntries(
+    Object.entries(overrides).filter(([key, value]) => THEME_VALID[key]?.(value)),
+  ) };
+  if (result.scheme === 'auto') result.scheme = systemDark ? 'dark' : 'light';
+  return result;
 }
 export const EMPTY_ENTRY = { choice: null, note: '', requests: [] };
 export const WAITING_TEXT = 'Waiting for proposals.';

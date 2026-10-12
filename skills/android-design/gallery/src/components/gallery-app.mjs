@@ -4,7 +4,7 @@ import './proposal-canvas.mjs';
 import './feedback-panel.mjs';
 import { deviceIcon } from '../icons.mjs';
 import {
-  viewedProposal, canvasEntry, DEFAULT_DEVICE, DEFAULT_THEME_COLOR, DEVICES, EMPTY_ENTRY, THEME_VARIANTS, WAITING_TEXT, approvalText, deviceById, deviceForKey, deviceLabel, deviceSize,
+  viewedProposal, canvasEntry, sharedTheme, SEED_COLORS, DEFAULT_DEVICE, DEVICES, EMPTY_ENTRY, THEME_VARIANTS, WAITING_TEXT, approvalText, deviceById, deviceForKey, deviceLabel, deviceSize,
   withThemeOverride, rejectionChange, canChooseNone, canFinish, canRefine,
   confirmName, guardUnload, isLocked, mayReplace, nextRoundSelection, proposalKey, sameRounds, sameSession, selectedProposal,
   shouldReload, showReload, showRetry, staleResult, statusText,
@@ -31,7 +31,8 @@ export class GalleryApp extends LitElement {
     roundId: { state: true },
     device: { state: true },
     theme: { state: true },
-    resets: { state: true },
+    originalTheme: { state: true },
+    systemDark: { state: true },
     confirmLabel: { state: true },
   };
   constructor() {
@@ -49,7 +50,10 @@ export class GalleryApp extends LitElement {
     this.roundId = '';
     this.device = storedDevice();
     this.theme = {};
-    this.resets = 0;
+    this.originalTheme = null;
+    this.systemScheme = matchMedia('(prefers-color-scheme: dark)');
+    this.systemDark = this.systemScheme.matches;
+    this.onSchemeChange = event => { this.systemDark = event.matches; };
     this.confirmLabel = '';
     this.loading = false;
     this.edits = 0;
@@ -69,12 +73,14 @@ export class GalleryApp extends LitElement {
     super.connectedCallback();
     window.addEventListener('beforeunload', this.beforeUnload);
     window.addEventListener('keydown', this.onKeydown);
+    this.systemScheme.addEventListener('change', this.onSchemeChange);
     this.poll();
   }
   disconnectedCallback() {
     super.disconnectedCallback();
     window.removeEventListener('beforeunload', this.beforeUnload);
     window.removeEventListener('keydown', this.onKeydown);
+    this.systemScheme.removeEventListener('change', this.onSchemeChange);
     clearTimeout(this.timer);
     this.stopped = true;
   }
@@ -84,6 +90,10 @@ export class GalleryApp extends LitElement {
     if (round && round.value !== this.roundId) round.value = this.roundId;
     const wanted = this.theme.variant ?? 'own';
     if (variant && variant.value !== wanted) variant.value = wanted;
+    const theme = this.effectiveTheme();
+    const shell = this.closest('m3e-theme');
+    for (const [key, value] of Object.entries(theme)) shell.setAttribute(key, value);
+    document.documentElement.style.colorScheme = theme.scheme;
   }
 
   currentRound() { return this.data?.rounds.find(round => round.id === this.roundId); }
@@ -161,9 +171,16 @@ export class GalleryApp extends LitElement {
     try { localStorage.setItem(DEVICE_STORAGE_KEY, id); } catch { /* Remembering the device is optional. */ }
   }
   setTheme(key, value) { this.theme = withThemeOverride(this.theme, key, value); }
-  resetTheme() {
-    this.theme = {};
-    this.resets += 1;
+  resetTheme() { this.theme = {}; }
+  effectiveTheme() {
+    const proposal = this.viewed();
+    const key = proposal && proposalKey(this.currentRound(), proposal);
+    const original = this.originalTheme && this.originalTheme.key === key ? this.originalTheme.theme : {};
+    return sharedTheme(original, this.theme, this.systemDark);
+  }
+  receiveTheme(event) {
+    const proposal = this.viewed();
+    if (proposal && event.detail.key === proposalKey(this.currentRound(), proposal)) this.originalTheme = event.detail;
   }
   async none() {
     const change = rejectionChange(this.currentRound(), this.viewed(), this.draft());
@@ -208,6 +225,7 @@ export class GalleryApp extends LitElement {
   render() {
     const { data, saves } = this;
     const device = deviceById(this.device), round = this.currentRound(), entry = this.feedbackEntry(), proposal = this.viewed();
+    const theme = this.effectiveTheme();
     const approved = data?.feedback.approved, locked = this.locked(), error = this.error();
     return html`
       <header class="app-header">
@@ -249,7 +267,7 @@ export class GalleryApp extends LitElement {
           </div>
           <p id="approval" class="approval" ?hidden=${!approved}>${approvalText(data)}</p>
           <div class="canvas-scroll">
-            ${proposal ? html`<proposal-canvas .round=${round} .proposal=${proposal} .device=${device} .theme=${this.theme} .resets=${this.resets} .zoom=${this.zoom}></proposal-canvas>`
+            ${proposal ? html`<proposal-canvas .round=${round} .proposal=${proposal} .device=${device} .theme=${theme} @proposal-theme=${event => this.receiveTheme(event)} .zoom=${this.zoom}></proposal-canvas>`
               : html`<div class="empty-canvas"><span class="empty-mark" aria-hidden="true">✳</span><h2>Room for a new idea.</h2><p>${data ? WAITING_TEXT : 'Connecting to your exploration.'}</p><p>Ask your agent to explore a screen.<br>Your directions will appear here.</p></div>`}
           </div>
           <footer class="canvas-footer"><span>${device.name}</span><span>${deviceSize(device)} dp · Live preview</span></footer>
@@ -257,11 +275,16 @@ export class GalleryApp extends LitElement {
         <aside id="inspector" class="inspector" ?hidden=${!this.panelOpen} aria-label="Preview and feedback">
           <div class="panel-heading"><span class="eyebrow">WORKSPACE</span><h2>Make it yours</h2><p>Explore the details. Shape the next round.</p></div>
           <section class="theme-panel" aria-labelledby="theme-title">
-            <h3 id="theme-title">Preview theme</h3><p class="supporting">Preview only. Request changes in your feedback to keep them.</p>
-            <label class="color-row" for="theme-color"><span>Seed color</span><input id="theme-color" type="color" .value=${this.theme.color ?? DEFAULT_THEME_COLOR} @input=${event => this.setTheme('color', event.target.value)}></label>
+            <h3 id="theme-title">Theme</h3><p class="supporting">One theme for the workspace and app. Saved designs stay unchanged.</p>
+            <div class="seed-colors" role="group" aria-label="Seed color">
+              ${SEED_COLORS.map(seed => html`<m3e-button class=${`seed seed-${seed.name.toLowerCase()}`} variant="outlined"
+                aria-label=${seed.name} aria-pressed=${String(theme.color.toLowerCase() === seed.color)} @click=${() => this.setTheme('color', seed.color)}>
+                <span class="swatch" aria-hidden="true">${theme.color.toLowerCase() === seed.color ? '✓' : ''}</span>${seed.name}
+              </m3e-button>`)}
+            </div>
             <m3e-form-field variant="outlined"><label slot="label">Palette</label><m3e-select id="theme-variant" aria-label="Palette" @change=${event => this.setTheme('variant', event.target.value)}><m3e-option value="own">Proposal's own</m3e-option>${THEME_VARIANTS.map(value => html`<m3e-option value=${value}>${value}</m3e-option>`)}</m3e-select></m3e-form-field>
-            <div class="switch-row"><span id="dark-label">Dark preview</span><m3e-switch id="theme-dark" aria-labelledby="dark-label" .checked=${this.theme.scheme === 'dark'} @change=${event => this.setTheme('scheme', event.target.checked ? 'dark' : 'light')}></m3e-switch></div>
-            <m3e-button id="theme-reset" ?disabled=${!Object.keys(this.theme).length} @click=${() => this.resetTheme()}>Reset preview</m3e-button>
+            <div class="switch-row"><span id="dark-label">Dark theme</span><m3e-switch id="theme-dark" aria-labelledby="dark-label" .checked=${theme.scheme === 'dark'} @change=${event => this.setTheme('scheme', event.target.checked ? 'dark' : 'light')}></m3e-switch></div>
+            <m3e-button id="theme-reset" ?disabled=${!Object.keys(this.theme).length} @click=${() => this.resetTheme()}>Reset theme</m3e-button>
           </section>
           ${proposal ? html`<section class="direction-detail"><span class="eyebrow">CURRENT DIRECTION</span><h3>${proposal.name}</h3><p>${proposal.rationale}</p></section>` : ''}
           ${data ? html`<feedback-panel .round=${round} .proposal=${proposal} .entry=${entry} .session=${data.session} .approved=${Boolean(approved)} .locked=${locked}

@@ -1,5 +1,5 @@
 import { LitElement, html } from 'lit';
-import { frameScale, frameTitle, frameURL, optionName, themeMessage } from '../state.mjs';
+import { frameScale, frameTitle, frameURL, optionName, themeMessage, authoredTheme, proposalKey } from '../state.mjs';
 
 // A live device viewport on the canvas. Zoom changes display scale, not layout width.
 export class ProposalCanvas extends LitElement {
@@ -8,7 +8,6 @@ export class ProposalCanvas extends LitElement {
     proposal: { attribute: false },
     device: { attribute: false },
     theme: { attribute: false },
-    resets: { type: Number },
     zoom: { type: Number },
     slotWidth: { state: true },
     slotHeight: { state: true },
@@ -52,15 +51,23 @@ export class ProposalCanvas extends LitElement {
   updated(changed) {
     this.layout();
     if (changed.has('theme')) this.postTheme();
-    if (changed.has('resets') && changed.get('resets') !== undefined) this.reloadFrame();
   }
   frameWindow() { return this.querySelector('iframe')?.contentWindow; }
   postTheme() {
     const message = themeMessage(this.theme);
-    if (message) this.frameWindow()?.postMessage(message, location.origin);
+    if (message && this.loadedDocument === this.querySelector('iframe').contentDocument
+      && this.loadedKey === proposalKey(this.round, this.proposal)) this.frameWindow()?.postMessage(message, location.origin);
   }
-  reloadFrame() {
-    try { this.frameWindow()?.location.reload(); } catch { /* The frame has no document yet; it loads fresh anyway. */ }
+  frameLoaded() {
+    const frame = this.querySelector('iframe');
+    // A previous navigation may finish after the user switches directions.
+    if (frame.contentWindow.location.pathname !== frameURL(this.round, this.proposal)) return;
+    const element = frame.contentDocument.querySelector('m3e-theme');
+    const theme = authoredTheme(Object.fromEntries(['color', 'variant', 'scheme'].map(key => [key, element?.getAttribute(key)])));
+    this.loadedDocument = frame.contentDocument;
+    this.loadedKey = proposalKey(this.round, this.proposal);
+    this.dispatchEvent(new CustomEvent('proposal-theme', { detail: { key: this.loadedKey, theme }, bubbles: true }));
+    // The parent resolves the original theme with its overrides and supplies a new theme.
   }
   render() {
     const { round, proposal, device } = this;
@@ -70,7 +77,7 @@ export class ProposalCanvas extends LitElement {
       <div class="frame-caption"><span>${name}</span><h2>${proposal.name}</h2></div>
       <div class="frame-slot">
         <div class=${`frame-stage ${this.ready ? 'ready' : ''}`} ?hidden=${!scale}>
-          <iframe src=${frameURL(round, proposal)} title=${frameTitle(name, device)} @load=${() => this.postTheme()}></iframe>
+          <iframe src=${frameURL(round, proposal)} title=${frameTitle(name, device)} @load=${() => this.frameLoaded()}></iframe>
         </div>
       </div>
     </article>`;

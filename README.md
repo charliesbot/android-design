@@ -37,6 +37,8 @@ The Material 3 Expressive gallery shows one live direction on a device canvas.
 Switch rounds and directions above the canvas, adjust device size or zoom, and
 open the side panel for theme previews and feedback. Finish requires confirmation
 and never implements the design. Empty explorations show an empty canvas.
+Seed swatches, palette, and Dark theme apply to the website and proposal together.
+Reset theme restores the active proposal's original theme without changing saved designs.
 Google Sans Flex is shared with the proposal runtime, including its local font license.
 
 ### Developing the gallery frontend
