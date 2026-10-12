@@ -1,21 +1,19 @@
 import { LitElement, html } from 'lit';
 import { frameScale, frameTitle, frameURL, optionName, themeMessage, authoredTheme, proposalKey } from '../state.mjs';
 
-// A live device viewport on the canvas. Zoom changes display scale, not layout width.
+// A live device viewport, automatically fit without changing its layout width.
 export class ProposalCanvas extends LitElement {
   static properties = {
     round: { attribute: false },
     proposal: { attribute: false },
     device: { attribute: false },
     theme: { attribute: false },
-    zoom: { type: Number },
     slotWidth: { state: true },
     slotHeight: { state: true },
     ready: { state: true },
   };
   constructor() {
     super();
-    this.zoom = 1;
     this.slotWidth = 0;
     this.slotHeight = 0;
     this.ready = false;
@@ -46,7 +44,7 @@ export class ProposalCanvas extends LitElement {
     frame.style.transform = `scale(${scale})`;
   }
   scale() {
-    return frameScale({ availableWidth: this.slotWidth, maxHeight: Math.max(1, this.slotHeight - 52), device: this.device }) * this.zoom;
+    return frameScale({ availableWidth: this.slotWidth, maxHeight: Math.max(1, this.slotHeight - 52), device: this.device });
   }
   updated(changed) {
     this.layout();
