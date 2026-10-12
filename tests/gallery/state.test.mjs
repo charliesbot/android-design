@@ -8,7 +8,6 @@ test('names options and builds user-visible text', () => {
   const entry = { choice: 'none', note: 'x', requests: [{ choice: 'none', note: 'x' }] };
   assert.equal(state.requestStatusText(entry), 'Request saved. Return to chat to continue.');
   assert.equal(state.refineLabel(entry), 'Request new directions');
-  assert.equal(state.selectionText({ round, entry }), 'Try another direction');
   assert.equal(state.statusText({ pendingSaves: 1 }), 'Saving...');
   assert.equal(state.statusText({ loaded: true }), 'Saved');
 });
@@ -56,7 +55,6 @@ test('devices: order, lookup, shortcuts, and exact canvases', () => {
   assert.equal(state.deviceForKey('4').id, 'desktop');
   assert.equal(state.deviceForKey('5'), undefined);
   assert.equal(state.deviceLabel(state.deviceById('foldable')), 'Foldable, Z Fold8');
-  assert.equal(state.deviceSize(state.deviceById('phone')), '411 by 923');
 });
 test('frame scale fits width and height and never enlarges', () => {
   const desktop = state.deviceById('desktop'), phone = state.deviceById('phone');
@@ -79,5 +77,43 @@ test('theme overrides keep only valid touched fields', () => {
   assert.deepEqual(state.withThemeOverride(overrides, 'variant', 'vibrant').variant, 'vibrant');
   assert.deepEqual(state.withThemeOverride({ variant: 'vibrant' }, 'variant', ''), {});
   assert.equal(state.withThemeOverride({}, 'scheme', 'auto').scheme, undefined);
-  assert.equal(state.themeMessage({ variant: 'rainbow', color: 'nope' }), null);
+  assert.equal(state.themeMessage({ variant: 'invalid', color: 'nope' }), null);
+});
+
+test('canvas resumes the saved direction without mutating feedback or approving', () => {
+  const entry = { choice: '001/b', note: 'Keep the headline', requests: [] };
+  assert.equal(state.viewedProposal(round, '', entry).id, 'b');
+  assert.equal(state.viewedProposal(round, '001/a', entry).id, 'a');
+  assert.equal(state.viewedProposal(round, 'stale/key', state.EMPTY_ENTRY).id, 'a');
+  assert.equal(state.viewedProposal(undefined, '', entry), undefined);
+  const effective = state.canvasEntry(round, round.proposals[0], state.EMPTY_ENTRY);
+  assert.equal(effective.choice, '001/a');
+  assert.equal(state.EMPTY_ENTRY.choice, null);
+  assert.deepEqual(entry, { choice: '001/b', note: 'Keep the headline', requests: [] });
+});
+test('new directions retain their feedback target even while a proposal is visible', () => {
+  const entry = { choice: 'none', note: 'Try warmer colors', requests: [] };
+  assert.equal(state.canvasEntry(round, round.proposals[0], entry).choice, 'none');
+  assert.equal(state.canvasEntry(undefined, undefined, state.EMPTY_ENTRY).choice, null);
+});
+test('shared theme restores all original fields after removing overrides', () => {
+  const original = { color: '#123456', variant: 'expressive', scheme: 'dark' };
+  const overrides = { color: '#0061a4', variant: 'neutral', scheme: 'light' };
+  assert.deepEqual(state.sharedTheme(original, overrides), overrides);
+  assert.deepEqual(state.sharedTheme(original, {}), original);
+  assert.equal(state.sharedTheme(original, state.withThemeOverride(overrides, 'variant', 'own')).variant, 'expressive');
+  assert.deepEqual(original, { color: '#123456', variant: 'expressive', scheme: 'dark' });
+});
+test('authored themes normalize missing values and preserve supported library variants', () => {
+  assert.deepEqual(state.authoredTheme({}), { color: '#6750a4', variant: 'neutral', scheme: 'auto' });
+  const original = state.authoredTheme({ color: '#ABCDEF', variant: 'fidelity', scheme: 'auto' });
+  assert.equal(original.color, '#abcdef');
+  assert.deepEqual(state.sharedTheme(original, {}, true), { color: '#abcdef', variant: 'fidelity', scheme: 'dark' });
+  assert.equal(state.sharedTheme(original, {}, false).scheme, 'light');
+  assert.equal(state.themeMessage(state.sharedTheme(original, {})).variant, 'fidelity');
+});
+test('seed choices have stable names and unique valid colors', () => {
+  assert.deepEqual(state.SEED_COLORS.map(item => item.name), ['Purple', 'Blue', 'Green', 'Amber', 'Rose']);
+  assert.equal(new Set(state.SEED_COLORS.map(item => item.color)).size, 5);
+  for (const item of state.SEED_COLORS) assert.match(item.color, /^#[0-9a-f]{6}$/);
 });
