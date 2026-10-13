@@ -37,12 +37,12 @@ Assume the `compose-preview` CLI and skill are installed, as documented in the r
 | --- | --- | --- | --- |
 | Pixel 11 | 411 x 923 dp | 420 dpi | Modeled density from Pixel 10, with Pixel 11's 1080 x 2424 physical panel. Not a verified factory density. |
 | Pixel Tablet | 1280 x 800 dp | 320 dpi | Android Studio `pixel_tablet` profile, landscape, xhdpi. |
-| Googlebook | 1440 x 900 dp | 320 dpi | Representative 16:10 desktop window at 2x for the common 2880 x 1800 panel, not a factory-default claim. |
-| Z Fold8 non-Ultra | 704 x 933 dp | 420 dpi | Modeled density, portrait main-display orientation, based on the 2448 x 1848 retail specification. |
+| Desktop 1080p | 1920 x 1080 dp | 160 dpi | Representative 1080p desktop display at 1x, chosen so the desktop canvas reaches the extra large window size class (1600dp and up) instead of sharing the tablet's large class. |
+| Z Fold8 non-Ultra | 933 x 704 dp | 420 dpi | Modeled density, landscape main-display orientation, based on the 2448 x 1848 retail specification. Landscape reads as an open foldable and reaches the expanded window size class. |
 
 These are full content-only preview canvases, with no simulated system UI. Do not subtract guessed status-bar or taskbar heights. Insets, folds, input, and motion need separate device validation. Rounding to whole dp can shift output pixels slightly from panel resolution. Use explicit `dp` device specs: the verified Compose Preview CLI 2.33.0 render treated pixel-unit dimensions as the default 400 x 800 dp canvas instead of the requested dimensions.
 
-Device evidence: [Pixel 11 specs](https://store.google.com/product/pixel_11_specs?hl=en-US), [Pixel Tablet specs](https://support.google.com/googlepixeltablet/answer/13555146?hl=en-CA), [Googlebook comparison](https://store.google.com/us/magazine/compare_laptops?hl=en-US), and [Fold8 retail specs](https://www.samsung.com/uk/business/smartphones/galaxy-z/galaxy-z-fold8-lavender-256gb-sm-f971blvbeub/). Samsung's developer skin listing differs from the retail width; these previews use the retail dimensions and do not claim OEM emulator fidelity.
+Device evidence: [Pixel 11 specs](https://store.google.com/product/pixel_11_specs?hl=en-US), [Pixel Tablet specs](https://support.google.com/googlepixeltablet/answer/13555146?hl=en-CA), and [Fold8 retail specs](https://www.samsung.com/uk/business/smartphones/galaxy-z/galaxy-z-fold8-lavender-256gb-sm-f971blvbeub/). Samsung's developer skin listing differs from the retail width; these previews use the retail dimensions and do not claim OEM emulator fidelity.
 
 ## Starter maintenance checks
 

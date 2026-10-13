@@ -33,7 +33,7 @@ The runtime fills the library's confirmed gaps with small shims rather than leav
 
 ### The gallery shows proposals live
 
-Each proposal card holds the proposal at its real device viewport, scaled to fit. One icon switcher (phone, foldable, tablet, desktop) resizes the frames in place with a short eased transition, so the layout visibly reflows and crosses its breakpoint rather than swapping between separate images. The device canvases are unchanged from v1: Pixel 11 at 411 by 923, Galaxy Z Fold8 inner screen at 704 by 933, Pixel Tablet at 1280 by 800, and a Googlebook window at 1440 by 900, in dp, which equal CSS pixels in the frame.
+Each proposal card holds the proposal at its real device viewport, scaled to fit. One icon switcher (phone, foldable, tablet, desktop) resizes the frames in place with a short eased transition, so the layout visibly reflows and crosses its breakpoint rather than swapping between separate images. The device canvases differ from v1 so each lands in its own window size class: the Fold8 inner screen turned to landscape (expanded), and the desktop moved from a 1440 by 900 Googlebook window to 1920 by 1080 (extra large) instead of sharing the tablet's large class. Medium has no device. The canvases are Pixel 11 at 411 by 923, Galaxy Z Fold8 inner screen at 933 by 704, Pixel Tablet at 1280 by 800, and a 1080p desktop display at 1920 by 1080, in dp, which equal CSS pixels in the frame.
 
 Seed color, palette variant, and light or dark are preview-only controls: they re-theme the frames instantly and save nothing. To keep a change, the user writes it in the notes and presses Refine, so feedback stays one explicit, readable request.
 

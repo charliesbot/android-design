@@ -7,9 +7,9 @@ import { parseSource } from './source.js';
 
 const DEVICES = [
   { id: 'phone', name: 'Phone', width: 411, height: 923 },
-  { id: 'tablet', name: 'Tablet', width: 704, height: 933 },
-  { id: 'laptop', name: 'Laptop', width: 1280, height: 800 },
-  { id: 'desktop', name: 'Desktop', width: 1440, height: 900 },
+  { id: 'foldable', name: 'Foldable', width: 933, height: 704 },
+  { id: 'tablet', name: 'Tablet', width: 1280, height: 800 },
+  { id: 'desktop', name: 'Desktop', width: 1920, height: 1080 },
 ];
 // A scaled card fits in this box, so four devices read at a glance. Full size ignores it.
 const FIT = { width: 560, height: 480 };

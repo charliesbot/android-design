@@ -4,10 +4,14 @@
 // Device canvases in CSS px (equal to dp). Order is the switcher order; the key is its shortcut.
 export const DEVICES = [
   { id: 'phone', kind: 'Phone', name: 'Pixel 11', width: 411, height: 923, radius: 28, key: '1' },
-  { id: 'foldable', kind: 'Foldable', name: 'Z Fold8', width: 704, height: 933, radius: 20, key: '2' },
+  { id: 'foldable', kind: 'Foldable', name: 'Z Fold8', width: 933, height: 704, radius: 20, key: '2' },
   { id: 'tablet', kind: 'Tablet', name: 'Pixel Tablet', width: 1280, height: 800, radius: 14, key: '3' },
-  { id: 'desktop', kind: 'Desktop', name: 'Googlebook', width: 1440, height: 900, radius: 10, key: '4' },
+  { id: 'desktop', kind: 'Desktop', name: '1080p display', width: 1920, height: 1080, radius: 8, key: '4' },
 ];
+// Material window size classes by width in dp; each device lands in a different one.
+const SIZE_CLASSES = [[600, 'Compact'], [840, 'Medium'], [1200, 'Expanded'], [1600, 'Large'], [Infinity, 'Extra large']];
+export const sizeClass = width => SIZE_CLASSES.find(([below]) => width < below)[1];
+export const deviceSize = device => `${sizeClass(device.width)} · ${device.width}×${device.height}dp`;
 export const DEFAULT_DEVICE = DEVICES[0].id;
 export const deviceById = id => DEVICES.find(device => device.id === id) ?? DEVICES[0];
 export const deviceForKey = key => DEVICES.find(device => device.key === key);
@@ -91,8 +95,9 @@ export const canRefine = ({ locked, error, entry }) =>
   !(locked || error || !entry.choice || (entry.choice === 'none' && !entry.note.trim()) || requested(entry));
 export const canFinish = ({ locked, error, proposal }) => !(locked || error || !proposal);
 
-export function statusText({ error, connectionError, pendingSaves, loaded }) {
-  return error?.message || connectionError || (pendingSaves ? 'Saving...' : loaded ? 'Saved' : 'Loading...');
+// Saving is silent; the header only speaks up when something needs the user.
+export function statusText({ error, connectionError }) {
+  return error?.message || connectionError || '';
 }
 export const showRetry = ({ error, connectionError }) => Boolean(connectionError || (error && !error.conflict));
 export const showReload = ({ error }) => Boolean(error?.conflict);

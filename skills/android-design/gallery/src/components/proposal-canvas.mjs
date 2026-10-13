@@ -1,5 +1,5 @@
 import { LitElement, html } from 'lit';
-import { frameScale, frameTitle, frameURL, optionName, themeMessage, authoredTheme, proposalKey } from '../state.mjs';
+import { deviceSize, frameScale, frameTitle, frameURL, optionName, themeMessage, authoredTheme, proposalKey } from '../state.mjs';
 
 // A live device viewport, automatically fit without changing its layout width.
 export class ProposalCanvas extends LitElement {
@@ -90,7 +90,7 @@ export class ProposalCanvas extends LitElement {
           <iframe src=${frameURL(round, proposal)} title=${frameTitle(name, device)} @load=${() => this.frameLoaded()}></iframe>
         </div>
       </div>
-      <div class="frame-caption"><span>${name}</span><h2>${proposal.name}</h2></div>
+      <div class="frame-caption"><span>${name}</span><h2>${proposal.name}</h2><span class="frame-size">${deviceSize(device)}</span></div>
     </article>`;
   }
 }

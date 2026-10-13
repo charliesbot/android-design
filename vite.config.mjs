@@ -3,6 +3,14 @@ import { applyStartupTheme, themeFromHTML } from './skills/android-design/galler
 
 // The gallery frontend builds into the skill folder so the installed skill serves it with no npm step.
 const target = 'http://127.0.0.1:8765';
+// The gallery rejects any Origin but its own, so the proxy presents requests as same-origin.
+const proxyToGallery = {
+  target,
+  changeOrigin: true,
+  configure: (proxy) => proxy.on('proxyReq', (request) => {
+    if (request.getHeader('origin')) request.setHeader('origin', target);
+  }),
+};
 export default defineConfig({
   root: 'skills/android-design/gallery/src',
   plugins: [{
@@ -27,11 +35,6 @@ export default defineConfig({
     modulePreload: { polyfill: false },
   },
   server: {
-    proxy: {
-      '/api': { target, changeOrigin: true },
-      '/runtime': { target, changeOrigin: true },
-      '/rounds': { target, changeOrigin: true },
-      '/draft': { target, changeOrigin: true },
-    },
+    proxy: Object.fromEntries(['/api', '/runtime', '/rounds', '/draft'].map((path) => [path, proxyToGallery])),
   },
 });

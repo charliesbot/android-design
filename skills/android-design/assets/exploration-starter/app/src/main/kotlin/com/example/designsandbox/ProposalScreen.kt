@@ -100,15 +100,15 @@ private fun ProposalTabletPreview() {
 }
 
 @Preview(
-  name = "Googlebook (representative window)",
-  device = "spec:width=1440dp,height=900dp,dpi=320",
+  name = "Desktop 1080p (representative display)",
+  device = "spec:width=1920dp,height=1080dp,dpi=160",
 )
 @Composable
 private fun ProposalDesktopPreview() {
   AppTheme(seed = PreviewSeed, darkTheme = false) { ProposalScreen() }
 }
 
-@Preview(name = "Z Fold8 (modeled density)", device = "spec:width=704dp,height=933dp,dpi=420")
+@Preview(name = "Z Fold8 (modeled density)", device = "spec:width=933dp,height=704dp,dpi=420")
 @Composable
 private fun ProposalFoldablePreview() {
   AppTheme(seed = PreviewSeed, darkTheme = false) { ProposalScreen() }

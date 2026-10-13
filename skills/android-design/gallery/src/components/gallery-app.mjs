@@ -2,7 +2,7 @@ import { LitElement, html } from 'lit';
 import { FeedbackSaves } from '../saves.mjs';
 import './proposal-canvas.mjs';
 import './feedback-panel.mjs';
-import { deviceIcon, schemeIcon, inspectorIcon } from '../icons.mjs';
+import { deviceIcon, schemeIcon, inspectorIcon, labIcon } from '../icons.mjs';
 import {
   viewedProposal, canvasEntry, sharedTheme, authoredTheme, SEED_COLORS, DEFAULT_DEVICE, DEVICES, EMPTY_ENTRY, THEME_VARIANTS, WAITING_TEXT, approvalText, deviceById, deviceForKey, deviceLabel,
   withThemeOverride, canFinish, canRefine,
@@ -11,6 +11,13 @@ import {
 } from '../state.mjs';
 
 const DEVICE_STORAGE_KEY = 'android-design.device';
+const INSPECTOR_TABS = ['theme', 'directions'];
+// Every shape in the Material shape library; each page load picks one for the brand mark.
+const BRAND_SHAPES = ['4-leaf-clover', '4-sided-cookie', '6-sided-cookie', '7-sided-cookie', '8-leaf-clover', '9-sided-cookie',
+  '12-sided-cookie', 'arch', 'arrow', 'boom', 'bun', 'burst', 'circle', 'diamond', 'fan', 'flower', 'gem', 'ghost-ish', 'heart',
+  'hexagon', 'oval', 'pentagon', 'pill', 'pixel-circle', 'pixel-triangle', 'puffy', 'puffy-diamond', 'semicircle', 'slanted',
+  'soft-boom', 'soft-burst', 'square', 'sunny', 'triangle', 'very-sunny'];
+const brandShape = BRAND_SHAPES[Math.floor(Math.random() * BRAND_SHAPES.length)];
 function storedDevice() {
   try { return deviceById(localStorage.getItem(DEVICE_STORAGE_KEY)).id; } catch { return DEFAULT_DEVICE; }
 }
@@ -19,7 +26,6 @@ function storedDevice() {
 export class GalleryApp extends LitElement {
   static properties = {
     activeKey: { state: true },
-    panelOpen: { state: true },
     inspectorTab: { state: true },
     data: { state: true },
     saves: { state: true },
@@ -39,8 +45,7 @@ export class GalleryApp extends LitElement {
   constructor() {
     super();
     this.activeKey = '';
-    this.panelOpen = true;
-    this.inspectorTab = 'directions';
+    this.inspectorTab = INSPECTOR_TABS[0];
     this.data = undefined;
     this.saves = undefined;
     this.busy = false;
@@ -62,7 +67,7 @@ export class GalleryApp extends LitElement {
     this.approving = null;
     this.timer = undefined;
     this.onKeydown = event => {
-      if (event.ctrlKey || event.metaKey || event.altKey || event.composedPath().some(node => node.matches?.('input, textarea, m3e-select, m3e-switch, [contenteditable]'))) return;
+      if (event.ctrlKey || event.metaKey || event.altKey || event.composedPath().some(node => node.matches?.('input, textarea, m3e-select, [contenteditable]'))) return;
       const device = deviceForKey(event.key);
       if (device) this.chooseDevice(device.id);
     };
@@ -89,7 +94,7 @@ export class GalleryApp extends LitElement {
     this.stopped = true;
   }
   updated(changed) {
-    if (changed.has('panelOpen') || changed.has('inspectorTab')) this.querySelector('feedback-panel')?.requestUpdate();
+    if (changed.has('inspectorTab')) this.querySelector('feedback-panel')?.requestUpdate();
     // Option children render after the select, so apply the selected values here.
     const round = this.querySelector('#round');
     if (round && round.value !== this.roundId) round.value = this.roundId;
@@ -137,7 +142,7 @@ export class GalleryApp extends LitElement {
       this.roundId = nextRoundSelection({ previousRound: this.roundId, previousLatest: this.data?.rounds.at(-1)?.id, hadData: Boolean(this.data), incomingRounds });
       this.data = incoming;
       this.saves = new FeedbackSaves(incoming.feedback.revision, () => this.requestUpdate());
-      document.title = `${incoming.title} / Design exploration`;
+      document.title = `${incoming.title} / Android Labs`;
       this.actionError = '';
     } catch (error) { this.connectionError = `Cannot load updates: ${error.message}`; }
     finally { this.loading = false; this.requestUpdate(); }
@@ -194,7 +199,7 @@ export class GalleryApp extends LitElement {
   }
   selectInspectorTab(tab) { this.inspectorTab = tab; }
   navigateInspectorTabs(event) {
-    const tabs = ['directions', 'theme'];
+    const tabs = INSPECTOR_TABS;
     let index = tabs.indexOf(this.inspectorTab);
     if (event.key === 'ArrowDown') index = (index + 1) % tabs.length;
     else if (event.key === 'ArrowUp') index = (index + tabs.length - 1) % tabs.length;
@@ -245,24 +250,23 @@ export class GalleryApp extends LitElement {
     const approved = data?.feedback.approved, locked = this.locked(), error = this.error();
     return html`
       <header class="app-header">
-        <div class="brand-mark" aria-hidden="true">✳</div>
-        <div class="heading"><span class="eyebrow">DESIGN EXPLORATION</span><h1 id="title">${data?.title ?? 'Your next direction'}</h1></div>
+        <div class="brand"><m3e-shape class="brand-mark" name=${brandShape} aria-hidden="true"><span class="brand-glyph">${labIcon()}</span></m3e-shape><h1 class="brand-name">Android Labs</h1></div>
         <div class="save-bar">
           <span id="status" role="status" aria-live="polite">${statusText({ error, connectionError: this.connectionError, pendingSaves: saves?.pending.size, loaded: Boolean(data) })}</span>
           <m3e-button id="retry" ?hidden=${!showRetry({ error, connectionError: this.connectionError })} @click=${() => this.retry()}>Retry</m3e-button>
           <m3e-button id="reload" ?hidden=${!showReload({ error })} @click=${() => this.querySelector('#reload-confirm').show()}>Reload saved state</m3e-button>
         </div>
-        <m3e-button variant="tonal" aria-expanded=${String(this.panelOpen)} aria-controls="inspector" @click=${() => { this.panelOpen = !this.panelOpen; }}> ${this.panelOpen ? 'Hide panel' : 'Show panel'}</m3e-button>
       </header>
-      <main class=${`workspace ${this.panelOpen ? '' : 'panel-closed'}`}>
-        <aside id="inspector" class="inspector" ?hidden=${!this.panelOpen} aria-label="Preview and feedback">
+      <main class="workspace">
+        <aside id="inspector" class="inspector" aria-label="Preview and feedback">
           <div class="inspector-rail" role="tablist" aria-orientation="vertical" aria-label="Preview controls" @keydown=${event => this.navigateInspectorTabs(event)}>
-            ${['directions', 'theme'].map(tab => html`<m3e-tab id=${`${tab}-tab`} for=${`${tab}-panel`} aria-label=${tab === 'directions' ? 'Directions' : 'Theme'} title=${tab === 'directions' ? 'Directions' : 'Theme'} .selected=${this.inspectorTab === tab}
+            ${INSPECTOR_TABS.map(tab => html`<m3e-tab id=${`${tab}-tab`} for=${`${tab}-panel`} aria-label=${tab === 'directions' ? 'Directions' : 'Theme'} title=${tab === 'directions' ? 'Directions' : 'Theme'} .selected=${this.inspectorTab === tab}
               aria-selected=${String(this.inspectorTab === tab)} tabindex=${this.inspectorTab === tab ? '0' : '-1'}
               @change=${event => { if (event.target === event.currentTarget) this.selectInspectorTab(tab); }}><span class="rail-tab-content">${inspectorIcon(tab)}</span></m3e-tab>`)}
           </div>
           <div class="inspector-content">
-          <section id="directions-panel" role="tabpanel" aria-labelledby="directions-tab" ?hidden=${this.inspectorTab !== 'directions'}>
+          <section id="directions-panel" role="tabpanel" class="directions-panel" aria-labelledby="directions-tab" ?hidden=${this.inspectorTab !== 'directions'}>
+            <h3 id="directions-title">Directions</h3><p class="supporting">Pick a round and a direction to preview.</p>
           <div class="canvas-navigation">
             <m3e-form-field variant="outlined"><label slot="label">Round</label>
               <m3e-select id="round" aria-label="Round" ?disabled=${this.busy || !round} @change=${event => this.changeView('roundId', event)}>
@@ -279,7 +283,10 @@ export class GalleryApp extends LitElement {
           </section>
           <section id="theme-panel" role="tabpanel" class="theme-panel" aria-labelledby="theme-tab" ?hidden=${this.inspectorTab !== 'theme'}>
             <h3 id="theme-title">Theme</h3><p class="supporting">One theme for the workspace and app. Saved designs stay unchanged.</p>
-            <div class="switch-row"><span class="scheme-name">${schemeIcon(theme.scheme === 'dark')}<span id="scheme-label">${theme.scheme === 'dark' ? 'Dark' : 'Light'}</span></span><m3e-switch id="theme-dark" aria-label="Dark theme" .checked=${theme.scheme === 'dark'} @change=${event => this.setTheme('scheme', event.target.checked ? 'dark' : 'light')}></m3e-switch></div>
+            <m3e-button-group id="theme-scheme" class="scheme-switch" variant="connected" size="medium" aria-label="Color scheme">
+              ${['light', 'dark'].map(scheme => html`<m3e-button variant="tonal" size="medium" toggle .selected=${theme.scheme === scheme} aria-checked=${String(theme.scheme === scheme)}
+                @change=${event => this.chooseToggle(event, () => this.setTheme('scheme', scheme))}><span slot="icon">${schemeIcon(scheme, theme.scheme === scheme)}</span>${scheme === 'dark' ? 'Dark' : 'Light'}</m3e-button>`)}
+            </m3e-button-group>
             <div class="seed-colors" role="group" aria-label="Seed color">
               ${SEED_COLORS.map(seed => html`<m3e-button class="seed" variant="tonal" toggle .selected=${theme.color.toLowerCase() === seed.color}
                 aria-label=${seed.name} @change=${event => this.chooseToggle(event, () => this.setTheme('color', seed.color))}>

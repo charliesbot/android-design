@@ -8,7 +8,7 @@ import '@m3e/web/textarea-autosize';
 import '@m3e/web/form-field';
 import '@m3e/web/select';
 import '@m3e/web/option';
-import '@m3e/web/switch';
 import '@m3e/web/dialog';
+import '@m3e/web/shape';
 import './style.css';
 import './components/gallery-app.mjs';
