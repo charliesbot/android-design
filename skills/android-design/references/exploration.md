@@ -47,7 +47,7 @@ A proposal is `proposals/<id>/index.html` and `style.css` on the runtime. Copy `
 
 ## Review before publishing
 
-Do not judge from code alone. Browser tools cannot emulate exact viewports, so review through the gallery's review page, which frames the draft at all four devices (411x923, 704x933, 1280x800, 1440x900). Start the gallery server and open it:
+Do not judge from code alone. Browser tools cannot emulate exact viewports, so review through the gallery's review page, which frames the draft at all four devices (411x923, 933x704, 1280x800, 1920x1080): compact, expanded, large, and extra large window size classes. Start the gallery server and open it:
 
 ```bash
 node <skill-dir>/gallery/cli.mjs serve <exploration>

@@ -72,7 +72,7 @@ Text is measured where it renders. Slotted text, such as a button label, is attr
 
 ## Review page
 
-`/runtime/review/?src=/draft/<id>/` shows the proposal in four same-origin iframes at exactly 411x923, 704x933, 1280x800, and 1440x900, scaled to fit and labeled. Only `/draft/` and `/rounds/` paths are accepted. Browser tools cannot set exact viewports, so this page is how a review gets them. Each label links to the same device at full size (`&device=phone|tablet|laptop|desktop`) for screenshots.
+`/runtime/review/?src=/draft/<id>/` shows the proposal in four same-origin iframes at exactly 411x923, 933x704, 1280x800, and 1920x1080, scaled to fit and labeled. Only `/draft/` and `/rounds/` paths are accepted. Browser tools cannot set exact viewports, so this page is how a review gets them. Each label links to the same device at full size (`&device=phone|foldable|tablet|desktop`) for screenshots.
 
 `await window.reviewChecks()` waits for every frame to load and its fonts to be ready, then calls each frame's `runtimeChecks()`:
 

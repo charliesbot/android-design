@@ -14,7 +14,7 @@ function markup(value) {
 }
 function render(theme = {}) {
   return markup(GalleryApp.prototype.render.call({
-    data: undefined, saves: undefined, device: 'phone', theme, panelOpen: true, inspectorTab: 'directions',
+    data: undefined, saves: undefined, device: 'phone', theme, inspectorTab: 'directions',
     currentRound: () => undefined, feedbackEntry: () => ({ choice: null, note: '', requests: [] }),
     viewed: () => undefined, effectiveTheme: () => ({ color: '#6750a4', variant: 'neutral', scheme: 'light', ...theme }),
     locked: () => false, error: () => undefined,
@@ -105,9 +105,9 @@ test('selectors live above theme controls in the sidebar and scheme switch prece
   const source = render();
   assert.ok(source.indexOf('id="inspector"') < source.indexOf('class="canvas-navigation"'));
   assert.ok(source.indexOf('class="canvas-navigation"') < source.indexOf('class="theme-panel"'));
-  assert.ok(source.indexOf('id="theme-dark"') < source.indexOf('class="seed-colors"'));
-  assert.match(source, /aria-label="Dark theme"/);
-  assert.match(source, /<span id="scheme-label">Light<\/span>/);
+  assert.ok(source.indexOf('id="theme-scheme"') < source.indexOf('class="seed-colors"'));
+  assert.match(source, /aria-label="Color scheme"/);
+  assert.match(source, /\.selected=true aria-checked=true[^>]*>.*Light<\/m3e-button>/s);
 });
 test('palette row content spans the button container instead of its intrinsic label width', () => {
   const css = readFileSync(new URL('../../skills/android-design/gallery/src/style.css', import.meta.url), 'utf8');
@@ -117,10 +117,10 @@ test('palette row content spans the button container instead of its intrinsic la
 });
 
 
-test('the visible scheme label follows dark state while its accessible switch name stays stable', () => {
+test('the selected scheme button follows dark state', () => {
   const source = render({ scheme: 'dark' });
-  assert.match(source, /<span id="scheme-label">Dark<\/span>/);
-  assert.match(source, /aria-label="Dark theme" \.checked=true/);
+  assert.match(source, /\.selected=false aria-checked=false[^>]*>.*Light<\/m3e-button>/s);
+  assert.match(source, /\.selected=true aria-checked=true[^>]*>(?:(?!m3e-button>).)*Dark<\/m3e-button>/s);
 });
 test('automatic fit reserves measured device controls and wrapping caption height', () => {
   const context = { slotWidth: 1012, slotHeight: 700, chromeHeight: 200, device: { width: 1000, height: 1000 } };
@@ -147,14 +147,14 @@ test('feedback has supported bounded autosize and no None action', () => {
   assert.equal('none' in GalleryApp.prototype, false);
 });
 test('proposal caption follows the frame rather than preceding it', () => {
-  const source = markup(ProposalCanvas.prototype.render.call({ round: { id: '001', proposals: [{ id: 'a' }] }, proposal: { id: 'a', name: 'Alternative' }, device: { name: 'Phone' }, scale: () => 1 }));
+  const source = markup(ProposalCanvas.prototype.render.call({ round: { id: '001', proposals: [{ id: 'a' }] }, proposal: { id: 'a', name: 'Alternative' }, device: { name: 'Phone', width: 411, height: 923 }, scale: () => 1 }));
   assert.ok(source.indexOf('class="frame-slot"') < source.indexOf('class="frame-caption"'));
 });
 
 
 test('vertical tab navigation supports arrows and Home/End with selected-tab focus', () => {
   const focus = [], context = { inspectorTab: 'directions', selectInspectorTab(tab) { this.inspectorTab = tab; }, querySelector: selector => ({ focus: () => focus.push(selector) }) };
-  for (const [key, selected] of [['ArrowDown', 'theme'], ['ArrowUp', 'directions'], ['End', 'theme'], ['Home', 'directions']]) {
+  for (const [key, selected] of [['ArrowDown', 'theme'], ['ArrowUp', 'directions'], ['Home', 'theme'], ['End', 'directions']]) {
     let prevented = false;
     GalleryApp.prototype.navigateInspectorTabs.call(context, { key, preventDefault: () => { prevented = true; } });
     assert.equal(context.inspectorTab, selected);
@@ -165,7 +165,7 @@ test('vertical tab navigation supports arrows and Home/End with selected-tab foc
 test('legacy rejection can be replaced through the direction selector even with a single proposal', () => {
   const proposal = { id: 'a', name: 'Alternative' }, round = { id: '001', proposals: [proposal] };
   const source = markup(GalleryApp.prototype.render.call({
-    data: undefined, saves: undefined, device: 'phone', theme: {}, panelOpen: true, inspectorTab: 'directions',
+    data: undefined, saves: undefined, device: 'phone', theme: {}, inspectorTab: 'directions',
     currentRound: () => round, feedbackEntry: () => ({ choice: 'none', note: 'Try warmer', requests: [] }),
     viewed: () => proposal, effectiveTheme: () => ({ color: '#6750a4', variant: 'neutral', scheme: 'light' }), locked: () => false, error: () => undefined,
   }));
@@ -185,7 +185,7 @@ test('icon-only tab rail sits in the left sidebar before the canvas with accessi
   const tabs = source.match(/<m3e-tab [^>]+>/g);
   assert.equal(tabs.length, 2);
   tabs.forEach((tab, index) => {
-    const label = index === 0 ? 'Directions' : 'Theme';
+    const label = index === 0 ? 'Theme' : 'Directions';
     assert.match(tab, new RegExp(`aria-label=${label}`));
     assert.match(tab, new RegExp(`title=${label}`));
   });

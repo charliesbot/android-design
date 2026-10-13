@@ -8,8 +8,8 @@ test('names options and builds user-visible text', () => {
   const entry = { choice: 'none', note: 'x', requests: [{ choice: 'none', note: 'x' }] };
   assert.equal(state.requestStatusText(entry), 'Request saved. Return to chat to continue.');
   assert.equal(state.refineLabel(entry), 'Request new directions');
-  assert.equal(state.statusText({ pendingSaves: 1 }), 'Saving...');
-  assert.equal(state.statusText({ loaded: true }), 'Saved');
+  assert.equal(state.statusText({ pendingSaves: 1, loaded: true }), '');
+  assert.equal(state.statusText({ connectionError: 'Offline' }), 'Offline');
 });
 test('gates refine and finish', () => {
   const entry = { choice: 'none', note: ' ', requests: [] };
@@ -47,8 +47,11 @@ test('request status text follows the agent session', () => {
 });
 test('devices: order, lookup, shortcuts, and exact canvases', () => {
   assert.deepEqual(state.DEVICES.map(device => [device.id, device.width, device.height, device.key]), [
-    ['phone', 411, 923, '1'], ['foldable', 704, 933, '2'], ['tablet', 1280, 800, '3'], ['desktop', 1440, 900, '4'],
+    ['phone', 411, 923, '1'], ['foldable', 933, 704, '2'], ['tablet', 1280, 800, '3'], ['desktop', 1920, 1080, '4'],
   ]);
+  assert.deepEqual(state.DEVICES.map(device => state.sizeClass(device.width)), ['Compact', 'Expanded', 'Large', 'Extra large']);
+  assert.equal(state.sizeClass(600), 'Medium');
+  assert.equal(state.deviceSize(state.deviceById('tablet')), 'Large · 1280×800dp');
   assert.equal(state.deviceById('tablet').name, 'Pixel Tablet');
   assert.equal(state.deviceById('unknown').id, 'phone');
   assert.equal(state.deviceById(null).id, 'phone');
@@ -58,8 +61,8 @@ test('devices: order, lookup, shortcuts, and exact canvases', () => {
 });
 test('frame scale fits width and height and never enlarges', () => {
   const desktop = state.deviceById('desktop'), phone = state.deviceById('phone');
-  assert.equal(state.frameScale({ availableWidth: 720, maxHeight: 10000, device: desktop }), 0.5);
-  assert.equal(state.frameScale({ availableWidth: 10000, maxHeight: 450, device: desktop }), 0.5);
+  assert.equal(state.frameScale({ availableWidth: 960, maxHeight: 10000, device: desktop }), 0.5);
+  assert.equal(state.frameScale({ availableWidth: 10000, maxHeight: 540, device: desktop }), 0.5);
   assert.equal(state.frameScale({ availableWidth: 10000, maxHeight: 10000, device: phone }), 1);
   assert.equal(state.frameScale({ availableWidth: 0, maxHeight: 500, device: phone }), 0);
   assert.equal(state.frameScale({ availableWidth: 300, maxHeight: NaN, device: phone }), 0);
