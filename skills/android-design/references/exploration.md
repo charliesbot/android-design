@@ -35,7 +35,7 @@ The gallery includes phone, foldable, tablet, and desktop frames. Wear stays out
 A proposal is `proposals/<id>/index.html` and `style.css` on the runtime. Copy `proposals/a` for each extra direction and change the design, not the rules. Details are in `project/README.md` and the runtime contract in `gallery/runtime-src/README.md`. Publishing rejects violations.
 
 - HTML on the runtime only, wrapped in `<m3e-theme color="#RRGGBB" variant="tonal-spot" scheme="light">`. Use only HTML that has a Compose counterpart.
-- Text uses the `.t-*` role classes, or one `.voice-<name>` class declared once. No ad hoc sizes or weights.
+- Text uses the `.t-*` role classes, or one `.voice-<name>` class declared once. No ad hoc sizes or weights. No `font-family`: every text style uses Google Sans Flex from the runtime, so a voice comes from `font-variation-settings`, weight, and width; publishing rejects it.
 - Color uses `--md-sys-color-*` roles. A non-role color (a dish or category color) goes in one `/* static colors */` block of `--static-*` properties.
 - Icons come from the runtime list through `<p-icon>`.
 - Corners come from the corner scale, spacing from the 8dp scale.

@@ -7,3 +7,4 @@
 .wide { width: 600px; height: 24px; background: var(--md-sys-color-surface-container); }
 .row { display: flex; gap: 8px; width: 100%; overflow-x: auto; }
 .card { flex: none; width: 200px; height: 24px; background: var(--md-sys-color-surface-container-high); }
+.ghost { opacity: 0; }

@@ -13,6 +13,7 @@
   },
   "devDependencies": {
     "@material-symbols/svg-400": "^0.48.0",
+    "puppeteer-core": "25.12.0",
     "subset-font": "^2.9.0",
     "vite": "^8.3.4"
   }

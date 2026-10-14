@@ -2,7 +2,7 @@
 
 The judge sees the fixed renders of one case and answers each applicable item PASS or FAIL with a one-sentence reason. Judge only what is visible. When unsure, FAIL and say why.
 
-Phone renders: `light`, `dark`, `font200` (200% text), `wallpaper` (red dynamic-color wallpaper). Wear renders: `large`, `small`, `font`. Widget renders: `light-2x2`, `light-4x2`, `dark-2x2`, `dark-4x2`.
+Every case has six renders of the published HTML proposal. Three are phone size (411x923): `light`, `dark`, and `wallpaper` (the theme color set to red, standing in for a red dynamic-color wallpaper). Three show larger windows in light: `foldable` (933x704, expanded), `tablet` (1280x800, large), and `desktop` (1920x1080, extra large). Items about dark or wallpaper look at that render; the rest look at all of them.
 
 ## General items
 
@@ -12,8 +12,9 @@ Phone renders: `light`, `dark`, `font200` (200% text), `wallpaper` (red dynamic-
 - **R-controls:** Every action looks tappable and reads as its own control. FAIL for text-only buttons floating alone outside a group of actions, or a toolbar whose items merge into one wide pill.
 - **R-font:** The hero title or number is clearly Google Sans Flex with strong axis settings: heavy (bold or black), extremely narrow or wide, or visibly rounded. FAIL for a regular or medium weight at a normal or only slightly condensed width: that reads as a generic sans even when it is Google Sans Flex.
 - **R-platform:** Android conventions, no iOS habits: no disclosure chevrons on list rows, no "Cancel"/"Done" text in the top bar, content drawn edge to edge.
-- **R-text:** No clipped, truncated-without-reason, or overlapping text in any render, including `font200` or `font`. Layouts reflow rather than break.
+- **R-text:** No clipped, truncated-without-reason, or overlapping text in any render shown. Layouts reflow rather than break.
 - **R-dark:** The dark render is fully legible: icons and text are visible against their backgrounds (no black icons on dark surfaces).
+- **R-adaptive:** The layout adapts across the size classes shown: compact phone, expanded foldable, large tablet, and extra large desktop. Moving up a size class reveals more (a second pane, an expanded rail, more detail) rather than only enlarging the phone layout, and navigation moves from a bar to a rail with the margins and panes the layout guidance gives. FAIL when a larger render is a stretched or centered phone layout, or breaks (overflow, clipped or overlapping content, empty void). Source: [window size classes and layout](../sources/m3.material.io/pages/foundations/layout/breakpoints.md), applied through [references/layout.md](../skills/android-design/references/layout.md).
 - **R-idea:** The screen has a visible design idea specific to its content, beyond a standard component-catalog layout.
 
 ## Case items

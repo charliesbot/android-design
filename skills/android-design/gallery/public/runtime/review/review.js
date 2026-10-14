@@ -14,8 +14,6 @@ const DEVICES = [
 // A scaled card fits in this box, so four devices read at a glance. Full size ignores it.
 const FIT = { width: 560, height: 480 };
 
-const settle = win => new Promise(resolve => win.requestAnimationFrame(() => win.requestAnimationFrame(resolve)));
-
 function card(device, src, full) {
   const scale = full ? 1 : Math.min(1, FIT.width / device.width, FIT.height / device.height);
   const figure = document.createElement('figure');
@@ -78,7 +76,7 @@ window.reviewChecks = async () => {
       result = { pass: false, complete: false, error: 'runtimeChecks is missing: the page does not load /runtime/m3e.js' };
     } else {
       await win.document.fonts.ready;
-      await settle(win);
+      await win.runtimeSettle();
       result = win.runtimeChecks();
     }
     devices.push({ id: device.id, viewport: [win.innerWidth, win.innerHeight], result });

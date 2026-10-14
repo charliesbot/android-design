@@ -23,6 +23,7 @@ import '@m3e/web/slider';
 import './p-icon.js';
 import './p-floating-toolbar.js';
 import './theme-bridge.js';
-import { runtimeChecks } from './checks.js';
+import { runtimeChecks, runtimeSettle } from './checks.js';
 
 window.runtimeChecks = runtimeChecks;
+window.runtimeSettle = runtimeSettle;

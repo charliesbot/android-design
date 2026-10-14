@@ -55,7 +55,7 @@ A blind port tested this on 2026-10-10: the approved Compose screen from the fir
 
 ### Why not the alternatives
 
-- **Compose rendered to PNG (v1).** Real code at every round, but each round paid a cold Gradle and Robolectric render and a compile-fix loop against a moving alpha API: about ten minutes to the first round and two per refinement in the recipes test, with soft scaled images and no live switching. It remains the path for evals and for implementing in the app.
+- **Compose rendered to PNG (v1).** Real code at every round, but each round paid a cold Gradle and Robolectric render and a compile-fix loop against a moving alpha API: about ten minutes to the first round and two per refinement in the recipes test, with soft scaled images and no live switching. It remains the path for implementing in the app. The evals moved to HTML proposals as well, because the Compose eval harness was slow enough that it went unrun; Compose fidelity is checked by a manual port instead (see `evals/README.md`).
 - **Compose Multiplatform on the web.** The JetBrains Material 3 artifact has every Expressive API the skill uses, and the MaterialKolor builder site shows live Compose previews in a browser. It costs a Kotlin 2.4 toolchain, a host that sets density, and a Wasm compile per round, which is far more machinery than static pages for the same comparison. See the [Compose Multiplatform research](../research/compose-multiplatform-proposal-fidelity.md).
 - **A sketching tool such as m3e-canvas.** Fast, but it assembles a fixed catalog of parts on one phone frame, which produces the generic look exploration exists to avoid and cannot express type axes, image masks, or content color.
 
