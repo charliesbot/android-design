@@ -284,7 +284,7 @@ Checked 69 URLs. 57 are fully distilled, 12 are partly distilled, and none are s
 ### Actions: buttons
 - [x] /components/buttons/overview → material-3-components.md (Buttons; M3 Expressive changes)
 - [x] /components/buttons/specs → material-3-components.md (Buttons: square and pressed radii, toggle color roles, elevated elevation 1/0)
-- [x] /components/buttons/guidelines → material-3-components.md (Buttons: compact vs large filled-button alignment added)
+- [x] /components/buttons/guidelines → material-3-components.md (Buttons: compact vs large filled-button alignment added; size changes across breakpoints and as parent containers adapt for larger screens; emphasis through size, color, or shape)
 - [x] /components/buttons/accessibility → material-3-components.md (Buttons, Accessibility)
 
 ### Actions: button groups

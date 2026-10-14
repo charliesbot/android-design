@@ -55,6 +55,7 @@ Google's wording; everything else is a close paraphrase of the page.
   - Toggle buttons change from round to square when selected (a square button changes to round).
   - A toggle button uses an outlined icon when unselected and a filled icon when selected, or a heavier weight if no filled icon exists.
   - Adaptive: "constrain button width or place buttons beside other elements" in large windows. Keep the icon and label grouped and centered. Keep the same element order on every screen size.
+  - Size is not fixed per button: "Buttons can be customized to change size and scaling behavior across different breakpoints", and "The size and placement of buttons can change as parent containers, such as cards, adapt for larger screens." Primary actions get "higher visual emphasis through size, color, or shape", so size is one lever of three.
 - **Do / Don't:**
   - DO: "Use buttons for discrete actions"
   - DON'T: "Don't clutter your UI with too many buttons. Consider presenting low-priority actions in overflow menus or as icon buttons."

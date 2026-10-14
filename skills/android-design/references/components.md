@@ -50,6 +50,7 @@ Usage rules from each component's Guidelines tab on m3.material.io (quotes are G
 - Pair by stepping down: filled next to text or outlined; outlined next to text. Place buttons side by side when there's room, not stacked.
 - "Don't clutter your UI with too many buttons. Consider presenting low-priority actions in overflow menus or as icon buttons."
 - Labels 1 to 3 words, sentence case, never wrapped or truncated; the icon leads. Don't stretch buttons into long flat bars on large screens.
+- The container is never narrower than its label. Size can change "across different breakpoints", so when a label does not fit at the planned size, shorten it, give it more room, or step the size down rather than clipping it (in an HTML proposal, only to a size marked `verified` in `compose-mapping.md`); emphasis also comes from color and shape, not size alone.
 - Toggle buttons are for binary selections (Save, Favorite): outlined icon off, filled on, and the shape morphs, so selection shows through more than color.
 
 ### Icon buttons
