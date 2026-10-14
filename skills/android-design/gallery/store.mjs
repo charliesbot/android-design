@@ -117,6 +117,7 @@ function lintCss(file, source) {
     // The theme emits primary, secondary, tertiary, and error *-dim roles that Compose's ColorScheme lacks; a proposal using one could not be ported (see compose-mapping.md).
     const dim = /--md-sys-color-((?:primary|secondary|tertiary|error)-dim)\b/.exec(value);
     if (dim) fail(at, `${dim[1]} has no Compose counterpart. Use another --md-sys-color-* role`);
+    if (property === 'font-family') fail(at, 'font-family is not allowed. Every text style uses Google Sans Flex from the runtime; vary the voice with font-variation-settings, weight, and width');
     if (TYPE_PROPERTIES.has(property)) {
       const rule = [...stack].reverse().find(prelude => !prelude.startsWith('@'));
       if (!rule || !/^\.voice-[\w-]+$/.test(rule)) fail(at, `${property} is only allowed in a single-class .voice-* rule. Use a .t-* type role class instead`);

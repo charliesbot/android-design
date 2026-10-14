@@ -4,13 +4,14 @@ import argparse
 import hashlib
 import re
 import json
-import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from contextlib import contextmanager
 from pathlib import Path
 
 from checks import run as run_checks
@@ -19,106 +20,171 @@ from backends import BACKENDS, execute
 from report import write_report, write_summary
 
 HERE = Path(__file__).resolve().parent
-SKILL_DIR = HERE.parent / "skills" / "android-design"
-DEFAULT_SDK = Path.home() / "Library" / "Android" / "sdk"
-CONTRACTS = {
-    "phone": "Implement the screen as `@Composable fun EvalScreen()` in package `com.example.evalapp` in the :app module, replacing the placeholder in EvalScreen.kt. It must apply the app's own theme. MainActivity already calls it.",
-    "wear": "Implement the screen as `@Composable fun EvalWearScreen()` in package `com.example.evalapp.wear` in the :wear module, replacing the placeholder in EvalWearScreen.kt. It must apply its own Wear theme. MainActivity already calls it.",
-    "widget": "Implement the widget as `class EvalWidget : GlanceAppWidget()` in package `com.example.evalapp` in the :app module, with its receiver registered in the manifest.",
-}
+ROOT = HERE.parent
+SKILL_DIR = ROOT / "skills" / "android-design"
+CLI = SKILL_DIR / "gallery" / "cli.mjs"
+PROPOSAL = "a"
+# The renders evals/render.mjs writes, in its order. test_run.py keeps this in step with render.mjs.
+RENDER_NAMES = ("light", "dark", "wallpaper", "foldable", "tablet", "desktop")
+GIT = ["git", "-c", "user.name=android-design-evals", "-c", "user.email=evals@example.invalid"]
 
 
-def restore_harness(case, project):
-    """Copies the fixed previews, render test, and eval-render.sh over whatever the agent left."""
-    shutil.copytree(HERE / "overlays" / case["surface"], project, dirs_exist_ok=True)
+def run_tool(command, **kwargs):
+    """Runs a short helper command and fails loudly with its output."""
+    done = subprocess.run(command, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=120, **kwargs)
+    if done.returncode:
+        raise RuntimeError(f"{' '.join(map(str, command[:3]))} exited {done.returncode}: {(done.stderr or done.stdout)[-1500:]}")
+    return done.stdout
 
 
-def android_sdk():
-    """The SDK Gradle should use, even when the runner's shell has no ANDROID_HOME."""
-    for name in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
-        if os.environ.get(name):
-            return Path(os.environ[name])
-    return DEFAULT_SDK if DEFAULT_SDK.is_dir() else None
+def case_info(case_dir):
+    return json.loads((case_dir / "case.json").read_text())
+
+
+def proposal_dir(case_dir):
+    return Path(case_info(case_dir)["exploration"]) / "project" / "proposals" / PROPOSAL
 
 
 def prepare(case, case_dir):
+    """A fresh fixture repository with an exploration whose proposal `a` holds the case assets."""
+    case_dir.mkdir(parents=True)
     # Give the agent copies, not repository paths. This is not a security sandbox.
     shutil.copytree(SKILL_DIR, case_dir / "skill")
-    project = case_dir / "project"
-    shutil.copytree(HERE / "template", project)
-    restore_harness(case, project)
-    sdk = android_sdk()
-    if sdk:
-        (project / "local.properties").write_text(f"sdk.dir={sdk}\n")
+    run_tool(["git", "init", "-q"], cwd=case_dir)
+    run_tool([*GIT, "commit", "-q", "--allow-empty", "-m", "Initial commit"], cwd=case_dir)
+    created = run_tool(["node", str(CLI), "create", "--project", str(case_dir), "--title", case["name"]])
+    lines = created.strip().splitlines()
+    exploration = Path(lines[-1].strip()) if lines else None
+    if exploration is None or not (exploration / "project" / "proposals" / PROPOSAL).is_dir():
+        raise RuntimeError(f"cli.mjs create did not report an exploration with proposal {PROPOSAL}: {created!r}")
     for f in case.get("files", []):
-        target = project / f["to"]
+        target = exploration / "project" / "proposals" / PROPOSAL / f["to"]
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(HERE / f["from"], target)
-    return project
+    (case_dir / "case.json").write_text(json.dumps(
+        {"exploration": str(exploration), "proposal": PROPOSAL, "title": case["name"]}, indent=2))
+    return exploration
 
 
-def prompt_for(case, skill_copy):
+def prompt_for(case, case_dir):
     text = (HERE / "agent-prompt.md").read_text()
-    return (text.replace("{{SKILL_DIR}}", str(skill_copy))
-                .replace("{{CONTRACT}}", CONTRACTS[case["surface"]])
+    return (text.replace("{{SKILL_DIR}}", str(case_dir / "skill"))
+                .replace("{{EXPLORATION}}", case_info(case_dir)["exploration"])
                 .replace("{{BRIEF}}", case["prompt"]))
 
 
 def prepare_run(cases, out):
-    """Freeze inputs and prompts without starting any agent or build."""
+    """Freeze inputs and prompts without starting any agent or browser."""
     out = Path(out).resolve()
     out.mkdir(parents=True, exist_ok=False)
     for case in cases:
         directory = out / case['name']
         prepare(case, directory)
-        (directory / 'prompt.md').write_text(prompt_for(case, directory / 'skill'))
+        (directory / 'prompt.md').write_text(prompt_for(case, directory))
     (out / 'rubric.md').write_text((HERE / 'rubric.md').read_text())
     (out / 'manifest.json').write_text(json.dumps({'version': 1, 'cases': cases}, indent=2))
     return out
 
 
 def generate(case_dir, backend, model=None):
-    reply = execute(backend, (case_dir / 'prompt.md').read_text(), case_dir / 'project',
+    reply = execute(backend, (case_dir / 'prompt.md').read_text(), case_dir,
                     role='generator', model=model)
     (case_dir / 'agent.json').write_text(json.dumps(reply, indent=2))
     return reply
 
 
-def render(case, case_dir):
-    """Restore the harness and render; failed builds cannot reuse old PNGs."""
-    project = case_dir / 'project'
-    for path in (project / 'renders', case_dir / 'renders'):
-        if path.is_symlink():
-            raise ValueError(f'Refusing symlink render directory: {path}')
-        if path.exists():
-            shutil.rmtree(path)
-    restore_harness(case, project)
+def free_port():
+    with socket.socket() as sock:
+        sock.bind(('127.0.0.1', 0))
+        return sock.getsockname()[1]
+
+
+def publish(case_dir):
+    """Publishes proposal `a` as a new round, as the runner's step; records publish.json."""
+    info = case_info(case_dir)
+    draft = case_dir / 'draft.json'
+    draft.write_text(json.dumps({'title': info['title'], 'proposals': [
+        {'id': info['proposal'], 'name': info['title'], 'rationale': 'Evaluated proposal.'}]}, indent=2))
+    done = subprocess.run(['node', str(CLI), 'publish', info['exploration'], str(draft)],
+                          capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL)
+    output = done.stdout + done.stderr
+    found = re.search(r'Published round (\d+)', done.stdout)
+    record = {'ok': done.returncode == 0 and found is not None,
+              'round': found.group(1) if found else None, 'output': output}
+    (case_dir / 'publish.json').write_text(json.dumps(record, indent=2))
+    return record
+
+
+@contextmanager
+def gallery_server(exploration, port):
+    """Serves the exploration on a loopback port; always terminates the server."""
+    server = subprocess.Popen(['node', str(CLI), 'serve', str(exploration), '--port', str(port)],
+                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        result = subprocess.run(['./eval-render.sh'], cwd=project, capture_output=True,
-                                text=True, timeout=1800, stdin=subprocess.DEVNULL)
-        log = result.stdout + result.stderr
-        (case_dir / 'render.log').write_text(log)
-        if result.returncode:
-            return [], f'render exited {result.returncode}: {log[-1500:]}'
-    except (OSError, subprocess.TimeoutExpired) as error:
+        deadline = time.time() + 20
+        while True:
+            if server.poll() is not None:
+                raise RuntimeError(f'gallery server exited {server.returncode}')
+            try:
+                with urllib.request.urlopen(f'http://127.0.0.1:{port}/', timeout=2):
+                    break
+            except OSError:
+                if time.time() > deadline:
+                    raise RuntimeError('gallery server did not start within 20 seconds')
+                time.sleep(0.2)
+        yield
+    finally:
+        server.terminate()
+        try:
+            server.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            server.kill()
+            server.wait()
+
+
+def render(case_dir):
+    """Publishes the proposal and renders the published round. Stale renders are removed first.
+
+    Returns (images, error). A rejected publish is not an error here: it leaves no renders and
+    checks.py reports it as C-publish. Only an infrastructure failure (server, Chrome) is an error.
+    """
+    renders = case_dir / 'renders'
+    if renders.is_symlink():
+        raise ValueError(f'Refusing symlink render directory: {renders}')
+    if renders.exists():
+        shutil.rmtree(renders)
+    for stale in ('publish.json', 'render.log'):
+        (case_dir / stale).unlink(missing_ok=True)
+    published = publish(case_dir)
+    if not published['ok']:
+        return [], None
+    port = free_port()
+    url = f"http://127.0.0.1:{port}/rounds/{published['round']}/{PROPOSAL}/"
+    try:
+        with gallery_server(case_info(case_dir)['exploration'], port):
+            done = subprocess.run(['node', str(HERE / 'render.mjs'), '--url', url, '--out', str(renders)],
+                                  cwd=ROOT, capture_output=True, text=True, timeout=900, stdin=subprocess.DEVNULL)
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
         (case_dir / 'render.log').write_text(str(error))
         return [], f'render failed: {error}'
-    if (project / 'renders').exists():
-        shutil.copytree(project / 'renders', case_dir / 'renders')
-    return sorted(str(p.resolve()) for p in (case_dir / 'renders').glob('*.png')), None
+    log = done.stdout + done.stderr
+    (case_dir / 'render.log').write_text(log)
+    if done.returncode:
+        return [], f'render exited {done.returncode}: {log[-1500:]}'
+    return sorted(str(p.resolve()) for p in renders.glob('*.png')), None
 
 
 def build(case, case_dir, backend, model=None):
     """Optional automated generation used by preference rounds as well as scored runs."""
     if case_dir.exists():
         raise FileExistsError(f'Preserving existing case directory: {case_dir}')
-    project = prepare(case, case_dir)
-    (case_dir / 'prompt.md').write_text(prompt_for(case, case_dir / 'skill'))
+    prepare(case, case_dir)
+    (case_dir / 'prompt.md').write_text(prompt_for(case, case_dir))
     reply = generate(case_dir, backend, model)
-    images, error = render(case, case_dir)
+    images, error = render(case_dir)
     if error:
         raise RuntimeError(error)
-    return project, reply, images
+    return case_dir, reply, images
 
 
 def rendered_images(case_dir):
@@ -128,14 +194,10 @@ def rendered_images(case_dir):
 
 
 def artifact_hashes(case_dir):
-    """Bind imported grades to the exact rendered images and implementation inputs."""
+    """Bind imported grades to the exact rendered images and the proposal files."""
     files = rendered_images(case_dir)
-    for p in (case_dir / 'project').rglob('*'):
-        relative = p.relative_to(case_dir / 'project')
-        if any(part in {'build', '.gradle', '.kotlin', '.git', 'renders', 'screenshotTestDebug'} for part in relative.parts):
-            continue
-        if p.is_file() and p.name != 'local.properties':
-            files.append(p)
+    if (case_dir / 'case.json').is_file():
+        files += [p for p in proposal_dir(case_dir).rglob('*') if p.is_file()]
     return {str(p.relative_to(case_dir)): hashlib.sha256(p.read_bytes()).hexdigest()
             for p in sorted(files)}
 
@@ -160,6 +222,10 @@ def import_ballot(case_dir):
     return aggregate([parse(json.dumps(ballot), request['item_ids'])], request['item_ids'])
 
 
+def render_complete(images):
+    return {Path(p).stem for p in images} >= set(RENDER_NAMES)
+
+
 def overall_status(checks, verdict):
     if any(v['pass'] is False for v in checks.values()):
         return 'failed'
@@ -171,17 +237,17 @@ def overall_status(checks, verdict):
 def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1):
     started = time.time()
     directory = out / case['name']
-    images, render_error = render(case, directory)
-    checks = run_checks(directory / 'project', case['surface'])
+    images, render_error = render(directory)
+    checks = run_checks(directory, case['surface'])
     if render_error:
-        checks['C-build'] = {'pass': False, 'detail': render_error}
+        checks['C-review'] = {'pass': False, 'detail': render_error}
     (directory / 'checks.json').write_text(json.dumps(checks, indent=2))
     request = make_request(case, directory, (out / 'rubric.md').read_text())
     (directory / 'judge-request.json').write_text(json.dumps(request, indent=2))
     # An imported ballot must always be explicitly rescored against the latest request.
     verdict = {key: {'pass': None, 'votes': '0/0', 'reason': 'awaiting visual judgment'}
                for key in request['item_ids']}
-    if not checks.get('C-build', {}).get('pass'):
+    if not render_complete(images):
         verdict = {key: {'pass': None, 'votes': '0/0', 'reason': 'render incomplete'} for key in verdict}
     elif judge_backend:
         try:
@@ -266,12 +332,14 @@ def main():
         if not cases or any(not re.fullmatch(r'[a-z0-9-]+', c['name']) for c in cases):
             raise ValueError('Invalid or empty case list')
         if args.command == 'prepare':
-            print(f'Prepared {len(cases)} cases in {out}. Read each <case>/prompt.md; edit only <case>/project.')
+            print(f'Prepared {len(cases)} cases in {out}. Read each <case>/prompt.md; edit only the proposal folder it names.')
+            for case in cases:
+                print(f"  {case['name']}: {proposal_dir(out / case['name'])}")
             return 0
         if args.command == 'score':
             results = json.loads((out / 'results.json').read_text())['cases']
             for result in results:
-                if not result['checks']['C-build']['pass']:
+                if not render_complete(result['renders']):
                     raise ValueError(f"{result['name']}: cannot score an incomplete render")
                 request = json.loads((out / result['name'] / 'judge-request.json').read_text())
                 if request['request_id'] != result['request_id']:

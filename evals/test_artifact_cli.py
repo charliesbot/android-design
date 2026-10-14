@@ -35,7 +35,7 @@ class ArtifactCliTests(unittest.TestCase):
             (directory / 'judge-ballot.json').write_text(json.dumps(ballot))
             (out / 'manifest.json').write_text(json.dumps({'version':1,'cases':[case]}))
             result = {'name':'music','surface':'phone','status':'pending','request_id':request['request_id'],
-                      'checks':{'C-build':{'pass':True}},'judge':{'R-one':{'pass':None}},'renders':['light.png'],
+                      'checks':{'C-publish':{'pass':True}},'judge':{'R-one':{'pass':None}},'renders':[f'{n}.png' for n in run.RENDER_NAMES],
                       'agent':{'cost':None,'message':'fixture'},'minutes':0}
             (out / 'results.json').write_text(json.dumps({'cases':[result]}))
             with patch.object(sys, 'argv', ['run.py','score','--out',str(out),'--judge-label','test fixture','--no-open']), patch('backends.execute') as backend:

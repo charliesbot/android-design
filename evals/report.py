@@ -2,7 +2,7 @@
 import html
 from pathlib import Path
 
-PRIMARY = {"phone": "light", "wear": "large", "widget": "light-4x2"}
+PRIMARY = {"phone": "light"}
 
 
 def score(items):

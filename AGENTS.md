@@ -2,7 +2,7 @@
 
 This is the home of the `android-design` agent skill: Material 3 Expressive design judgment for Jetpack Compose. The repository holds the skill, the research it is distilled from, and the evals that check it.
 
-**Scope status:** phone, tablet, and desktop apps are the validated target. Wear OS and widget guidance exists (references, research, and eval cases) but its results do not yet meet the quality bar, so the skill marks it out of scope and its eval cases are parked. Raising it is future work: improve the references, unpark the cases, and widen the skill's description once their renders pass.
+**Scope status:** phone, tablet, and desktop apps are the validated target. Wear OS and widget guidance exists (references and research) but its results do not yet meet the quality bar, so the skill marks it out of scope. Its eval cases were removed with the Compose eval harness. Raising it is future work: improve the references, build an eval harness that can render Wear and widgets, and widen the skill's description once their renders pass.
 
 It is charliesbot's personal repository. Optimize for the owner's workflow, not broad applicability.
 
@@ -42,7 +42,7 @@ These are settled. Don't flag them in reviews unless the reasoning no longer hol
 
 ## Verification
 
-After changing the skill, run the evals (`evals/README.md`). After changing the rubric, run `evals/calibrate.py` first. After changing `scripts/`, run `python3 -m unittest discover scripts`. After changing the material3 version, run `python3 scripts/material3_inventory.py` and fix `compose-mapping.md` until `python3 -m unittest discover scripts` passes. After changing the gallery or workspace helper, run `npm test` (`node --test tests/gallery/*.test.mjs`). After changing `skills/android-design/gallery/src/`, run `npm run build` and commit `gallery/public/`. After changing `skills/android-design/gallery/runtime-src/`, run `npm run build` and commit `gallery/public/runtime/`.
+After changing the skill, run the evals (`evals/README.md`). After changing the rubric, run `evals/calibrate.py` first. After changing `scripts/`, run `python3 -m unittest discover scripts`. After changing the material3 version, run `python3 scripts/material3_inventory.py` and fix `compose-mapping.md` until `python3 -m unittest discover scripts` passes. After changing the gallery or workspace helper, run `npm test` (`node --test tests/gallery/*.test.mjs`). After changing the runtime checks or `evals/render.mjs`, run `node --test tests/evals/*.test.mjs` (needs Google Chrome). After changing `compose-mapping.md` or the material3 version, run the manual Compose port check in `evals/README.md`. After changing `skills/android-design/gallery/src/`, run `npm run build` and commit `gallery/public/`. After changing `skills/android-design/gallery/runtime-src/`, run `npm run build` and commit `gallery/public/runtime/`.
 
 ## Prose
 

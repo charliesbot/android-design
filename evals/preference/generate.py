@@ -30,18 +30,15 @@ def load_briefs():
     return [c for c in scored if not c.get("parked")] + extra
 
 
-def prune(variant_dir, project):
-    """Keeps the variant's source for later diffing but drops build output and the skill copy."""
+def prune(variant_dir):
+    """Keeps the variant's proposal and exploration for later diffing but drops the skill copy."""
     shutil.rmtree(variant_dir / "skill", ignore_errors=True)
-    shutil.rmtree(project / ".gradle", ignore_errors=True)
-    for build_dir in project.glob("*/build"):
-        shutil.rmtree(build_dir, ignore_errors=True)
 
 
 def run_variant(case, variant_dir, backend, model=None):
     project, agent_info, images = build(case, variant_dir, backend, model)
     checks = run_checks(project, case["surface"])
-    prune(variant_dir, project)
+    prune(variant_dir)
     record = {**agent_info, "checks": checks, "renders": [Path(p).name for p in images]}
     (variant_dir / "variant.json").write_text(json.dumps(record, indent=2))
     print(f"done {variant_dir.parent.name}/{variant_dir.name}: {len(images)} renders", flush=True)

@@ -11898,26 +11898,29 @@ function yy(e) {
 	return null;
 }
 var by = (e) => {
+	for (let t = e; t; t = vy(t)) if (parseFloat(getComputedStyle(t).opacity) === 0) return !0;
+	return !1;
+}, xy = (e) => {
 	for (let t = e; t; t = vy(t)) if (t.getAttribute?.("aria-hidden") === "true") return !0;
 	return !1;
 };
-function xy(e, t) {
-	for (let n of e.querySelectorAll("*")) t(n) !== !1 && n.shadowRoot && xy(n.shadowRoot, t);
-}
 function Sy(e, t) {
+	for (let n of e.querySelectorAll("*")) t(n) !== !1 && n.shadowRoot && Sy(n.shadowRoot, t);
+}
+function Cy(e, t) {
 	let n = (e) => {
 		for (let n of e.childNodes) n.nodeType === Node.TEXT_NODE && n.textContent.trim() && t(n);
 	};
-	e instanceof ShadowRoot && n(e), xy(e, (e) => {
+	e instanceof ShadowRoot && n(e), Sy(e, (e) => {
 		n(e);
 	});
 }
-var Cy = document.createElement("canvas");
-Cy.width = Cy.height = 1;
-var wy = Cy.getContext("2d", { willReadFrequently: !0 });
-function Ty(e) {
-	wy.clearRect(0, 0, 1, 1), wy.fillStyle = "#000", wy.fillStyle = e, wy.fillRect(0, 0, 1, 1);
-	let [t, n, r, i] = wy.getImageData(0, 0, 1, 1).data;
+var wy = document.createElement("canvas");
+wy.width = wy.height = 1;
+var Ty = wy.getContext("2d", { willReadFrequently: !0 });
+function Ey(e) {
+	Ty.clearRect(0, 0, 1, 1), Ty.fillStyle = "#000", Ty.fillStyle = e, Ty.fillRect(0, 0, 1, 1);
+	let [t, n, r, i] = Ty.getImageData(0, 0, 1, 1).data;
 	return {
 		r: t,
 		g: n,
@@ -11925,18 +11928,18 @@ function Ty(e) {
 		a: i / 255
 	};
 }
-function Ey(e) {
+function Dy(e) {
 	for (let t = e; t; t = vy(t)) {
 		let e = getComputedStyle(t);
 		if (parseFloat(e.opacity) < 1) return { reason: "an ancestor has opacity below 1" };
 		if (e.backgroundImage !== "none") return { reason: "background is an image or gradient" };
-		let n = Ty(e.backgroundColor);
+		let n = Ey(e.backgroundColor);
 		if (n.a === 1) return { color: n };
 		if (n.a > 0) return { reason: "background is translucent" };
 	}
 	return { reason: "no opaque background found" };
 }
-function Dy(e, t) {
+function Oy(e, t) {
 	for (let n = yy(t); n; n = yy(vy(n))) {
 		let t = getComputedStyle(n);
 		if (/auto|scroll/.test(t.overflowX + t.overflowY)) return null;
@@ -11947,14 +11950,8 @@ function Dy(e, t) {
 	}
 	return null;
 }
-function Oy() {
-	let e = innerWidth, t = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
-	if (t <= e + 1) return {
-		fails: !1,
-		scrollWidth: t,
-		offenders: []
-	};
-	let n = (e) => {
+function ky() {
+	let e = innerWidth, t = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth), n = (e) => {
 		let t = 0;
 		for (let n = vy(e); n; n = vy(n)) t++;
 		return t;
@@ -11965,28 +11962,41 @@ function Oy() {
 			if (/auto|scroll/.test(t.overflowX) && n.getBoundingClientRect().width <= e + 1) return !0;
 		}
 		return !1;
-	}, i = [];
-	return xy(document, (t) => {
-		let a = getComputedStyle(t);
-		if (a.display === "none" || a.display === "contents" || a.position === "fixed") return;
-		let o = t.getBoundingClientRect().right;
-		o > e + 1 && !r(t) && i.push({
+	}, i = t > e + 1, a = [];
+	return Sy(document, (t) => {
+		let o = getComputedStyle(t);
+		if (o.display === "none" || o.display === "contents") return;
+		let s = o.position === "fixed" || o.position === "sticky";
+		if (!s && !i) return;
+		let { left: c, right: l } = t.getBoundingClientRect();
+		s ? (c < -1 && l > 1 || l > e + 1 && c < e - 1) && _y(t) && !by(t) && !r(t) && a.push({
 			el: gy(t),
-			right: Math.round(o),
+			right: Math.round(l),
+			left: Math.round(c),
+			depth: n(t)
+		}) : l > e + 1 && !r(t) && a.push({
+			el: gy(t),
+			right: Math.round(l),
 			depth: n(t)
 		});
-	}), i.sort((e, t) => t.right - e.right || e.depth - t.depth), {
-		fails: i.length > 0,
+	}), a.sort((e, t) => t.right - e.right || e.depth - t.depth), {
+		fails: a.length > 0,
 		scrollWidth: t,
-		offenders: i.slice(0, 5).map(({ el: e, right: t }) => ({
-			el: e,
-			right: t
-		}))
+		offenders: a.slice(0, 5).map(({ depth: e, ...t }) => t)
 	};
 }
-function ky() {
+async function Ay() {
+	let e = () => new Promise((e) => requestAnimationFrame(() => requestAnimationFrame(e))), t = (e = document) => {
+		if (e.getAnimations().some((e) => e.playState === "running" && Number.isFinite(e.effect?.getComputedTiming().endTime))) return !0;
+		for (let n of e.querySelectorAll("*")) if (n.shadowRoot && t(n.shadowRoot)) return !0;
+		return !1;
+	};
+	await e();
+	for (let n = 0; n < 90 && t(); n++) await e();
+}
+function jy() {
 	let e = [], t = [];
-	xy(document, (e) => {
+	Sy(document, (e) => {
 		if (!e.matches(uy)) return !0;
 		if (_y(e)) {
 			let n = e.getBoundingClientRect(), r = e.shadowRoot?.querySelector(".touch")?.getBoundingClientRect(), i = Math.max(n.width, r?.width ?? 0), a = Math.max(n.height, r?.height ?? 0);
@@ -12023,30 +12033,30 @@ function ky() {
 		let t = e.join("|");
 		return !u.has(t) && (u.add(t), !0);
 	};
-	Sy(document, (t) => {
+	Cy(document, (t) => {
 		let n = vy(t);
 		if (!n || n.closest?.("p-icon, m3e-icon")) return;
 		let r = getComputedStyle(n), i = document.createRange();
 		i.selectNodeContents(t);
 		let a = i.getBoundingClientRect();
-		if (a.width <= 0 || a.height <= 0 || r.visibility !== "visible") return;
+		if (a.width <= 0 || a.height <= 0 || r.visibility !== "visible" || by(n)) return;
 		let o = gy(yy(n) || n);
 		if (!fy(r.fontFamily) && d("font", o) && s.push({
 			el: o,
 			font: r.fontFamily
-		}), by(n)) return;
+		}), xy(n)) return;
 		let u = yy(n), f = /auto|scroll/.test(r.overflowX + r.overflowY);
 		u && !f && getComputedStyle(u).display !== "inline" && (u.scrollWidth > u.clientWidth + 1 || u.scrollHeight > u.clientHeight + 1) && d("overflow", o) && c.push({
 			el: o,
 			scroll: [u.scrollWidth, u.scrollHeight],
 			client: [u.clientWidth, u.clientHeight]
 		});
-		let p = Dy(a, n);
+		let p = Oy(a, n);
 		if (p && p !== u && d("overflow", o, "clip") && c.push({
 			el: o,
 			clippedBy: gy(p)
 		}), !d("contrast", o)) return;
-		let m = Ey(n);
+		let m = Dy(n);
 		if (!m.color) {
 			e.push({
 				check: "contrast",
@@ -12055,14 +12065,14 @@ function ky() {
 			});
 			return;
 		}
-		let h = cy(Ty(r.color), m.color), g = ly(parseFloat(r.fontSize), parseInt(r.fontWeight, 10)), ee = sy(h, m.color);
+		let h = cy(Ey(r.color), m.color), g = ly(parseFloat(r.fontSize), parseInt(r.fontWeight, 10)), ee = sy(h, m.color);
 		ee < g ? l.fails.push({
 			el: o,
 			ratio: Math.round(ee * 100) / 100,
 			need: g
 		}) : l.passed++;
 	});
-	let f = Oy(), p = e.length === 0, m = !f.fails && n.length === 0 && s.length === 0 && c.length === 0 && a.status !== "fail" && o <= 1 && l.fails.length === 0;
+	let f = ky(), p = e.length === 0, m = !f.fails && n.length === 0 && s.length === 0 && c.length === 0 && a.status !== "fail" && o <= 1 && l.fails.length === 0;
 	return JSON.parse(JSON.stringify({
 		pass: m,
 		complete: p,
@@ -12083,7 +12093,5 @@ function ky() {
 		unresolved: e
 	}));
 }
-//#endregion
-//#region skills/android-design/gallery/runtime-src/m3e.js
-window.runtimeChecks = ky;
+window.runtimeChecks = jy, window.runtimeSettle = Ay;
 //#endregion

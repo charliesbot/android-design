@@ -2,6 +2,8 @@
 
 Briefs, rendering, code checks, and rubric judgments are independent of any agent provider. Run the evals after changing the skill, not on a schedule. The current chat, a human, or an optional CLI adapter can supply implementations and judgments.
 
+An eval case is the skill's current output: one HTML proposal built on the gallery runtime (see [exploration workflow checks](exploration.md)). Requirements: Node.js 22+, `npm install` at the repository root (puppeteer-core), and Google Chrome (or set `CHROME_PATH`). No Android SDK, JDK, or Gradle.
+
 ## Use the current chat or another agent
 
 From this directory:
@@ -10,7 +12,11 @@ From this directory:
 python3 run.py prepare --out /tmp/design-eval --cases music
 ```
 
-Read `/tmp/design-eval/music/prompt.md` in the agent session you want to test. Have that agent implement the brief in `music/project/` using the copied skill. The output directory must be new; preparation never overwrites existing work. Omit `--cases` to prepare all four active phone cases. Wear and widget cases remain parked unless explicitly named.
+Preparation makes `music/` a fresh Git repository fixture (one empty commit) with an exploration created by `gallery/cli.mjs create`, the brief's assets copied into its proposal folder `proposals/a/`, and a snapshot of the skill. `music/case.json` records the exploration path, and the command prints the proposal folder.
+
+Read `/tmp/design-eval/music/prompt.md` in the agent session you want to test. Have that agent design the brief as the proposal in `proposals/a/` using the copied skill. It must not publish; the runner does. The output directory must be new; preparation never overwrites existing work. Omit `--cases` to prepare all four cases (music, finance, settings, trek).
+
+The Wear OS and widget cases were removed: they have no HTML harness. They need a new harness before they return.
 
 After implementation, render and check the artifacts without launching an agent:
 
@@ -18,7 +24,11 @@ After implementation, render and check the artifacts without launching an agent:
 python3 run.py evaluate --out /tmp/design-eval --no-open
 ```
 
-This restores the fixed harness, re-renders, runs deterministic checks, and writes a report plus `<case>/judge-request.json`. No provider CLI is required for either command. Rendering requires the Android SDK and JDK; no emulator is needed. The initial dependency resolution requires network access.
+For each case this serves the exploration on a free loopback port (and always stops the server), publishes proposal `a` with `gallery/cli.mjs publish`, renders the published round into six screenshots with `render.mjs`, runs deterministic checks, and writes a report plus `<case>/judge-request.json`. No provider CLI is required for either command. Each evaluate publishes a new round in the case's exploration.
+
+The six renders: `light`, `dark`, `wallpaper` (red theme color standing in for a red dynamic-color wallpaper) at phone size 411x923; `foldable` (933x704), `tablet` (1280x800), and `desktop` (1920x1080) in light.
+
+The deterministic checks are `C-publish` (the publish succeeded, so the lint passed), `C-review` (every render's `runtimeChecks` result passes; an incomplete check counts as a failure, reported as unverified), and `C-palette` (the proposal's `<m3e-theme>` variant is not `expressive` or `vibrant`).
 
 For visual assessment, give each `judge-request.json` to your chosen reviewer. They must inspect every listed screenshot against its included rubric. Prefer a separate session for a blind judgment; the current chat is useful for interactive checks but is not a controlled independent evaluation.
 
@@ -39,7 +49,7 @@ Include every requested rubric ID exactly once, with a JSON boolean and a nonemp
 python3 run.py score --out /tmp/design-eval --judge-label 'reviewer and model or human' --no-open
 ```
 
-Imported judgments are bound to image and project-file hashes. If either changes, evaluate and judge again. A preferred direction or successful build is not a visual pass. Missing judgments are explicitly **pending**, never successful. Exit codes are `0` for all passed, `1` for failures or execution errors, and `2` for incomplete visual assessment.
+Imported judgments are bound to image and proposal-file hashes. If either changes, evaluate and judge again. A preferred direction or successful build is not a visual pass. Missing judgments are explicitly **pending**, never successful. Exit codes are `0` for all passed, `1` for failures or execution errors, and `2` for incomplete visual assessment.
 
 ## Optional unattended automation
 
@@ -75,11 +85,20 @@ Calibration and eval artifacts use the same judging prompt, including the screen
 python3 promote.py /tmp/design-eval
 ```
 
-Agents vary across runs. A failure is a signal; inspect repeated results before attributing it to a skill change. Keep briefs, assets, skill snapshot, rendering configuration, generator, and judge settings fixed for comparisons. Preparation snapshots the skill, case specifications, and rubric. Record the actual model separately when relying on a CLI's configured default.
+Agents vary across runs. A failure is a signal; inspect repeated results before attributing it to a skill change. Keep briefs, assets, skill snapshot, render sizes, generator, and judge settings fixed for comparisons. Preparation snapshots the skill, case specifications, and rubric. Record the actual model separately when relying on a CLI's configured default.
+
+## Compose port check
+
+The evals judge HTML proposals, so they cannot show whether an approved proposal survives the port to Compose. Check that by hand after changing `skills/android-design/references/compose-mapping.md` or the pinned material3 version, not on every skill change.
+
+1. Take one approved proposal from an eval run that passed, with its renders.
+2. Create an Android sandbox with `node skills/android-design/gallery/cli.mjs create --project <scratch repo> --starter android`.
+3. Have an agent that has not seen the proposal's renders port it to Compose using only the proposal source and `compose-mapping.md`, then render it by running `node render.mjs app` in the sandbox's `project/` directory.
+4. Compare the Compose render with the HTML phone render. Differences the HTML determined (layout, hierarchy, color roles, type roles, component choice) are mapping bugs to fix in `compose-mapping.md`. Small style choices the HTML left open are expected.
 
 ## Verification and files
 
-Run `python3 -m unittest discover evals` from the repository root to test adapters, artifact contracts, ballot validation, and preference persistence without model calls. Also run the [exploration workflow checks](exploration.md) for the isolated starter. Those separate rendering/isolation checks from agent routing behavior.
+Run `python3 -m unittest discover evals` from the repository root to test adapters, artifact contracts, ballot validation, and preference persistence without model calls. Also run the [exploration workflow checks](exploration.md) for the isolated starter. Those separate rendering/isolation checks from agent routing behavior. `node --test tests/evals/*.test.mjs` covers `render.mjs`.
 
 | Path | Responsibility |
 | --- | --- |
@@ -87,6 +106,7 @@ Run `python3 -m unittest discover evals` from the repository root to test adapte
 | `run.py`, `backends.py` | Artifact lifecycle and optional CLI launchers |
 | `checks.py`, `judge.py`, `rubric.md` | Deterministic checks and provider-independent rubric judgments |
 | `calibration/`, `baseline/` | Labeled renders and explicitly accepted baselines |
-| `template/`, `overlays/`, `preference/` | Fixed rendering harness and owner preference rounds |
+| `render.mjs` | Headless Chrome renders of a published proposal plus its in-page `runtimeChecks` |
+| `preference/` | Owner preference rounds |
 
-Renders are offscreen: Compose Preview Screenshot Testing for phone/Wear and Robolectric for Glance. They do not verify motion, and widget corner clipping is not drawn. Check device behavior on an emulator when it matters.
+Renders come from headless Chrome against the gallery runtime. They do not verify motion or the Compose port; check device behavior in the ported app when it matters. A proposal's `runtimeChecks` can report `complete: false` when it cannot resolve a check (for example a contrast backdrop); that counts as unverified, not as a pass.

@@ -27,6 +27,8 @@ const cssRejections = [
   ['raw color in a second static colors block', '/* static colors */\n:root { --static-a: #111; }\n/* static colors */\n:root { --static-b: #222; }', /style\.css:4: .*Raw color/],
   ['non-static declaration in the static block', '/* static colors */\n:root { --static-a: #111; color: var(--md-sys-color-primary); }', /style\.css:2: .*--static-\*/],
   ['a dim color role with no Compose counterpart', 'a { color: var(--md-sys-color-primary-dim); }', /style\.css:1: .*primary-dim has no Compose counterpart/],
+  ['font-family in a voice', '.voice-serif { font-family: Georgia, serif; }', /style\.css:1: .*font-family is not allowed/],
+  ['font-family on a plain rule', 'body {\n  font-family: system-ui;\n}', /style\.css:2: .*font-family is not allowed/],
   ['font-size outside a voice', '.title { font-size: 20px; }', /font-size is only allowed/],
   ['font-weight in a compound voice selector', '.voice-a .x { font-weight: 700; }', /font-weight is only allowed/],
   ['line-height in a media query on a non-voice rule', '@media (min-width: 840px) {\n  h1 { line-height: 1.2; }\n}', /style\.css:2: .*line-height/],

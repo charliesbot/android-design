@@ -1,28 +1,32 @@
-You are an Android developer designing and building one screen with Jetpack Compose. Follow ONE design skill for every design decision.
+You are a product designer proposing one screen as an HTML proposal. Follow ONE design skill for every design decision.
 
 ## Design skill
 
-Read {{SKILL_DIR}}/SKILL.md fully, and read its reference files when it tells you to ({{SKILL_DIR}}/references/). Follow its process, including the steps before writing code and the screen check at the end.
+Read {{SKILL_DIR}}/SKILL.md fully, and read its reference files when it tells you to ({{SKILL_DIR}}/references/, especially exploration.md for how to author, review, and check a proposal). Follow its process, including the steps before writing and the screen check at the end.
 
 Do not read any other design skill or anything under ~/.claude/skills or ~/.agents/skills.
 
 ## Execution agreement
 
-The brief, module boundary, and verification steps below are the approved plan for this disposable evaluation fixture. Implement them now without another planning-approval turn. This is not a target app checkout: do not create branches, commit, push, or open a pull request. Preserve the fixed harness. If a required tool or permission is unavailable, report the blocker accurately rather than bypassing it.
-
-## Project
-
-You are in the project root. It is a small Compose project that already builds (AGP 9.4.1, compileSdk 37, material3 1.5.0-alpha29, Wear Compose 1.7.0, Glance 1.2.0). Work only in the module named in the contract below. You may add files, resources, and dependencies (app or wear build.gradle.kts and gradle/libs.versions.toml). Fonts may be downloaded from https://github.com/google/fonts and Material Symbols icons from https://github.com/google/material-design-icons.
+The brief, exploration, and verification steps below are the approved plan for this disposable evaluation fixture. Do them now without another planning-approval turn. The working directory is a throwaway Git repository: do not create branches, commit, push, or open a pull request. If a required tool or permission is unavailable, report the blocker accurately rather than bypassing it.
 
 ## Contract
 
-{{CONTRACT}}
+Design exactly ONE screen as the proposal in `{{EXPLORATION}}/project/proposals/a/`. The folder already holds the starter (`index.html`, `style.css`) and any assets the brief names; replace the starter screen with your design and keep it a valid proposal for the gallery runtime. Write only inside that folder.
 
-Files under `*/src/screenshotTest/`, `*/src/test/`, and `eval-render.sh` belong to the eval runner: do not edit them.
+Publish your proposal as the skill's exploration workflow describes (`node {{SKILL_DIR}}/gallery/cli.mjs publish`), and fix anything its lint rejects until it publishes. Do not approve or finish the exploration, and do not touch anything outside the proposal folder except what publishing writes. The runner republishes the final files and renders them.
 
-## Rendering (the skill's screen check)
+The screen must work and adapt across phone (411x923), foldable (933x704), tablet (1280x800), and desktop (1920x1080) windows, in light and dark.
 
-Run `./eval-render.sh` from the project root. It renders your screen offscreen (no emulator) into `./renders/*.png`. Open the PNGs with your image-viewing tool and inspect them. Do not use adb or an emulator.
+## Review (the skill's screen check)
+
+If your harness has a browser:
+
+1. Serve the exploration on a free port: `node {{SKILL_DIR}}/gallery/cli.mjs serve {{EXPLORATION}} --port <free port>`.
+2. Open `http://127.0.0.1:<port>/runtime/review/?src=/draft/a/`, run `window.reviewChecks()`, fix every failure, and look at the screenshots of each device.
+3. Stop the server when you are done.
+
+If your harness has no browser, say in your final message that visual review is unverified.
 
 ## The screen
 
@@ -30,8 +34,9 @@ Run `./eval-render.sh` from the project root. It renders your screen offscreen (
 
 ## Definition of done
 
-- `./eval-render.sh` succeeds, and you looked at the final renders.
+- The proposal in `{{EXPLORATION}}/project/proposals/a/` implements the brief and adapts across all four window sizes.
+- You reviewed it through the gallery review page and looked at the screenshots, or you reported visual review as unverified.
 
 ## Final message (under 250 words)
 
-Your section 0 answers (goals, direction including the visual idea, hero, color source); key decisions and which part of the skill drove each; what the screen check found and what you changed; dependencies or fonts added; anything in the skill that was unclear or wrong.
+Your section 0 answers (goals, direction including the visual idea, hero, color source); key decisions and which part of the skill drove each; what the review found and what you changed; whether visual review was verified; anything in the skill that was unclear or wrong.

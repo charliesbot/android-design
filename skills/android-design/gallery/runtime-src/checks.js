@@ -50,6 +50,12 @@ function boxOf(el) {
   for (let node = el; node; node = flatParent(node)) if (getComputedStyle(node).display !== 'contents') return node;
   return null;
 }
+// Text the user cannot see: opacity 0 on itself or any flat-tree ancestor (a collapsed rail's labels, a
+// faded-out panel). Such text is skipped, not measured. Fractional opacity is a real, measurable state.
+const fullyTransparent = el => {
+  for (let node = el; node; node = flatParent(node)) if (parseFloat(getComputedStyle(node).opacity) === 0) return true;
+  return false;
+};
 const hiddenFromAssistiveTech = el => {
   for (let node = el; node; node = flatParent(node)) if (node.getAttribute?.('aria-hidden') === 'true') return true;
   return false;
@@ -111,10 +117,11 @@ function clippedBy(textRect, el) {
 
 // A page wider than its viewport is a layout bug: Android has no horizontal page scroll. Returns the widest
 // offenders (widest first, then shallowest, so the cause is named before its children), skipping anything inside a horizontal scroller the author made on purpose.
+// A fixed or sticky element never widens the page, so it is checked on its own: it fails when it is partly
+// visible but crosses the left or right viewport edge. One fully off screen (a closed drawer, a skip link) is hidden on purpose.
 function pageOverflowCheck() {
   const width = innerWidth;
   const scrollWidth = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
-  if (scrollWidth <= width + 1) return { fails: false, scrollWidth, offenders: [] };
   const depth = el => { let n = 0; for (let node = flatParent(el); node; node = flatParent(node)) n++; return n; };
   const inDeliberateScroller = el => {
     for (let node = flatParent(el); node; node = flatParent(node)) {
@@ -124,15 +131,39 @@ function pageOverflowCheck() {
     }
     return false;
   };
+  const wide = scrollWidth > width + 1;
   const offenders = [];
   walk(document, el => {
     const style = getComputedStyle(el);
-    if (style.display === 'none' || style.display === 'contents' || style.position === 'fixed') return;
-    const right = el.getBoundingClientRect().right;
-    if (right > width + 1 && !inDeliberateScroller(el)) offenders.push({ el: describeFlat(el), right: Math.round(right), depth: depth(el) });
+    if (style.display === 'none' || style.display === 'contents') return;
+    const pinned = style.position === 'fixed' || style.position === 'sticky';
+    if (!pinned && !wide) return;
+    const { left, right } = el.getBoundingClientRect();
+    if (pinned) {
+      const spills = (left < -1 && right > 1) || (right > width + 1 && left < width - 1);
+      if (spills && visible(el) && !fullyTransparent(el) && !inDeliberateScroller(el)) offenders.push({ el: describeFlat(el), right: Math.round(right), left: Math.round(left), depth: depth(el) });
+    } else if (right > width + 1 && !inDeliberateScroller(el)) {
+      offenders.push({ el: describeFlat(el), right: Math.round(right), depth: depth(el) });
+    }
   });
   offenders.sort((a, b) => b.right - a.right || a.depth - b.depth);
-  return { fails: offenders.length > 0, scrollWidth, offenders: offenders.slice(0, 5).map(({ el, right }) => ({ el, right })) };
+  return { fails: offenders.length > 0, scrollWidth, offenders: offenders.slice(0, 5).map(({ depth: _depth, ...rest }) => rest) };
+}
+
+// Resolves once the page holds still: two frames, then no finite animation or transition left running
+// (a nav item's label fades in after load, and measuring it mid-fade gives a wrong contrast). Looping
+// animations never finish, so they are not waited for. Gives up after about 3 seconds.
+export async function runtimeSettle() {
+  const frames = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  // document.getAnimations() does not reach into shadow roots, where the components run their transitions.
+  const running = (root = document) => {
+    const live = a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime);
+    if (root.getAnimations().some(live)) return true;
+    for (const el of root.querySelectorAll('*')) if (el.shadowRoot && running(el.shadowRoot)) return true;
+    return false;
+  };
+  await frames();
+  for (let i = 0; i < 90 && running(); i++) await frames();
 }
 
 export function runtimeChecks() {
@@ -185,7 +216,7 @@ export function runtimeChecks() {
     const range = document.createRange();
     range.selectNodeContents(node);
     const rect = range.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0 || style.visibility !== 'visible') return;
+    if (rect.width <= 0 || rect.height <= 0 || style.visibility !== 'visible' || fullyTransparent(el)) return;
     const name = describeFlat(boxOf(el) || el);
     if (!isFlex(style.fontFamily) && once('font', name)) fonts.push({ el: name, font: style.fontFamily });
     if (hiddenFromAssistiveTech(el)) return; // decorative text is exempt from overflow and contrast
