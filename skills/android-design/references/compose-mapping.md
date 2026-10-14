@@ -2,7 +2,7 @@
 
 The lookup an implementing agent uses to port an approved HTML proposal to Compose. Every Compose name here exists in `material3-inventory.txt`, the public names of the pinned material3 artifact, except a few `foundation`, `ui`, and MaterialKolor names that the test in `scripts/test_material3_inventory.py` lists on purpose.
 
-Proposals may only use components marked `verified` in the first table. A component becomes `verified` when its pattern has been ported to Compose, rendered, and compared against the same component on `/runtime/verify/` with matching layout, color, shape, and text; then change its Status here and name the evidence in the commit. The verify page alone never marks a component verified. Exempt from the rule because every page needs them: `m3e-theme`, `p-icon`, and the token tables (type, color, icons, shapes, spacing).
+Proposals may only use components marked `verified` in the first table. A component becomes `verified` when its pattern has been ported to Compose, rendered, and compared against the same component on `/runtime/verify/`, and the two match in layout, color, shape, and text closely enough that the approved design survives the port. Proposals aim to land extremely close to the shipped screen, not pixel-perfect. A small difference between the two libraries is acceptable when it cannot break an approved design (a few dp, a weight or tracking nuance); record it in the row's Notes. A difference that can break a design (Compose noticeably larger, text that would no longer fit) blocks verification. With Google Sans Flex, headline-size text and the large and extra-large buttons render a few dp taller in Compose than in the proposal: the font sets a minimum line height above the type tokens (measured on device). Leave a little vertical room around them. Then change its Status here and name the evidence in the commit. The verify page alone never marks a component verified. Exempt from the rule because every page needs them: `m3e-theme`, `p-icon`, and the token tables (type, color, icons, shapes, spacing).
 
 Compose is written at implementation, in the app, under the app's own conventions. Use the patterns below as the API call to reach for, not as finished code.
 
@@ -12,17 +12,17 @@ The HTML cell is the element and the attribute values that select the pattern. A
 
 | HTML | Compose | Status | Notes |
 | --- | --- | --- | --- |
-| `m3e-button variant="filled" size="extra-large"` | `Button(shapes = ButtonDefaults.shapesFor(ButtonDefaults.ExtraLargeContainerHeight), contentPadding = ButtonDefaults.contentPaddingFor(ButtonDefaults.ExtraLargeContainerHeight), modifier = Modifier.heightIn(min = ButtonDefaults.ExtraLargeContainerHeight))` with label `ButtonDefaults.textStyleFor(ButtonDefaults.ExtraLargeContainerHeight)` | verified | Container and content colors come from the theme roles, not overrides |
+| `m3e-button variant="filled" size="extra-large"` | `Button(shapes = ButtonDefaults.shapesFor(ButtonDefaults.ExtraLargeContainerHeight), contentPadding = ButtonDefaults.contentPaddingFor(ButtonDefaults.ExtraLargeContainerHeight), modifier = Modifier.heightIn(min = ButtonDefaults.ExtraLargeContainerHeight))` with label `ButtonDefaults.textStyleFor(ButtonDefaults.ExtraLargeContainerHeight)` | verified | Container and content colors come from the theme roles, not overrides. With Google Sans Flex, Compose renders 142dp tall against 136 (see the line-height note above); width and color match. |
 | `m3e-button size="extra-small"` | same pattern with height `ButtonDefaults.ExtraSmallContainerHeight` | unverified | |
-| `m3e-button size="small"` | same pattern with height `ButtonDefaults.MinHeight` | unverified | The default size |
-| `m3e-button size="medium"` | same pattern with height `ButtonDefaults.MediumContainerHeight` | unverified | |
-| `m3e-button size="large"` | same pattern with height `ButtonDefaults.LargeContainerHeight` | unverified | |
+| `m3e-button size="small"` | same pattern with height `ButtonDefaults.MinHeight` | verified | The default size. Compose pads 16dp a side (Google's recommended value), `@m3e/web` 20px, so Compose is about 9dp narrower; harmless. |
+| `m3e-button size="medium"` | same pattern with height `ButtonDefaults.MediumContainerHeight` | verified | Compose labels use title medium (weight 500, tracking 0.2), the proposal 400 and 0.5; harmless. |
+| `m3e-button size="large"` | same pattern with height `ButtonDefaults.LargeContainerHeight` | verified | With Google Sans Flex, Compose renders about 99dp tall against 96. |
 | `m3e-button variant="elevated"` | `ElevatedButton` | unverified | Size pattern as above |
-| `m3e-button variant="tonal"` | `FilledTonalButton` | unverified | Size pattern as above |
+| `m3e-button variant="tonal"` | `FilledTonalButton` | verified | Size pattern as above. Verified at small, medium, large, and extra-large, with the same notes as filled. |
 | `m3e-button variant="outlined"` | `OutlinedButton` | unverified | Size pattern as above |
 | `m3e-button variant="text"` | `TextButton` | unverified | Size pattern as above |
 | `m3e-button shape="square"` | `ButtonDefaults.squareShape` as the `shape` of `ButtonDefaults.shapes` | unverified | `rounded` is the default and is what `shapesFor` gives |
-| `m3e-button` with a leading `p-icon` | `Icon(modifier = Modifier.size(ButtonDefaults.IconSize))` then `Spacer(Modifier.width(ButtonDefaults.IconSpacing))` | unverified | Use `ButtonDefaults.iconSizeFor` and `ButtonDefaults.iconSpacingFor` with the button height at other sizes |
+| `m3e-button` with a leading `p-icon` | `Icon(modifier = Modifier.size(ButtonDefaults.IconSize))` then `Spacer(Modifier.width(ButtonDefaults.IconSpacing))` | verified | Use `ButtonDefaults.iconSizeFor` and `ButtonDefaults.iconSpacingFor` with the button height at other sizes. Icon sizes 20, 24, 32, 40 and gaps 8, 8, 12, 16 match at small to extra-large. |
 | `m3e-button toggle variant="filled"` | `ToggleButton(checked, onCheckedChange, shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight))` | unverified | Selected state shows the checked shape |
 | `m3e-button toggle variant="tonal"` | `FilledTonalToggleButton` | unverified | |
 | `m3e-button toggle variant="elevated"` | `ElevatedToggleButton` | unverified | |

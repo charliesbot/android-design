@@ -160,7 +160,7 @@ val AppTypography = base.copy(
 
 Open source on [Google Fonts](https://fonts.google.com/specimen/Google+Sans+Flex) (since November 2025) and the required family for every style in this skill. Axes: `wght` 1 to 1000, `wdth` 25 to 151, `opsz` 6 to 144, `slnt` -10 to 0, `GRAD` 0 to 100, `ROND` 0 to 100.
 
-Bundle the variable TTF in `res/font/` (downloadable Google Fonts don't carry variation settings). Variation settings apply on API 26+. Because optical size should match each style's size, build the font per text style.
+Bundle the variable TTF in `res/font/` (downloadable Google Fonts don't carry variation settings). Variation settings apply on API 26+. Because optical size should match each style's size, build the font per text style. A plain `FontFamily(Font(R.font.google_sans_flex))` draws every weight at 400: each weight needs its own `Font` with `FontVariation.weight`, as below.
 
 Voice starting points (tune them to the screen's direction; they are not presets to copy):
 
