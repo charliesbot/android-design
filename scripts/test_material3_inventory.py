@@ -144,6 +144,7 @@ class MappingTest(unittest.TestCase):
         section = self.text.split("\n## Icons\n")[1].split("\n## ")[0]
         self.assertIn("painterResource(R.drawable.name)", section)
         self.assertIn('android:autoMirrored="true"', section)
+        self.assertIn('android:tint="?attr/colorControlNormal"', section)
 
     def test_all_53_theme_color_roles_are_mapped(self):
         roles = [cells[0] for heading, cells in self.rows if heading == "Color" and cells[0].startswith("`--md-sys-color-")]

@@ -13,7 +13,7 @@ Copy this project with the installed skill's `gallery/cli.mjs create --starter a
 | `darkTheme: Boolean` | `scheme` | Default follows the system. |
 | `dynamic: Boolean` | none | Default `false`. When true on API 31+, uses wallpaper colors instead of the seed. |
 
-The scheme comes from MaterialKolor (`rememberDynamicColorScheme`, spec 2025) with Material 3 Expressive motion and the bundled Google Sans Flex typography. `material-icons-extended` is included so every runtime icon has an `Icons.Rounded.*` counterpart.
+The scheme comes from MaterialKolor (`rememberDynamicColorScheme`, spec 2025) with Material 3 Expressive motion and the bundled Google Sans Flex typography. Icons are Material Symbols vector drawables in `app/src/main/res/drawable/`, drawn with `Icon(painterResource(...))`; see the Icons section of `references/compose-mapping.md` for how to import them.
 ## Entry points
 
 - `app/src/main/kotlin/com/example/designsandbox/ProposalScreen.kt`: phone/tablet proposal with sample state.

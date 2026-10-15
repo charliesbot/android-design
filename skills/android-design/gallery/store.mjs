@@ -184,7 +184,7 @@ function lintHtml(file, source) {
     if (name === 'p-icon') {
       const icon = /\sname\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag[0]);
       const symbol = icon ? icon[1] ?? icon[2] : undefined;
-      if (symbol === undefined) fail(tag.index, '<p-icon> needs a name="..." that is a Material Symbols name from fonts.google.com/icons');
+      if (symbol === undefined) fail(tag.index, '<p-icon> needs a quoted name="..." attribute that is a Material Symbols name from fonts.google.com/icons (name=home without quotes is not accepted)');
       else if (!SYMBOLS.has(symbol)) fail(tag.index, `<p-icon name="${symbol}"> is not a Material Symbols name. Pick one from fonts.google.com/icons, written in snake_case`);
     }
     const attribute = /\sstyle\s*=/i.exec(tag[0]);

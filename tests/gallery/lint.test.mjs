@@ -77,7 +77,7 @@ const htmlRejections = [
   ['style attribute', '<!doctype html>\n<p\n  style="color: var(--md-sys-color-primary)">x</p>', /index\.html:3: .*style=/],
   ['inline style element', '<!doctype html>\n<style>p {}</style>', /index\.html:2: .*<style>/],
   ['an unknown p-icon name', '<!doctype html>\n<p-icon\n  name="not_a_real_symbol"></p-icon>', /index\.html:2: <p-icon name="not_a_real_symbol"> is not a Material Symbols name/],
-  ['a p-icon with no name', '<!doctype html>\n<p-icon filled></p-icon>', /index\.html:2: <p-icon> needs a name/],
+  ['a p-icon with no name', '<!doctype html>\n<p-icon filled></p-icon>', /index\.html:2: <p-icon> needs a quoted name/],
   ['inline script', '<!doctype html>\n\n<script>alert(1)</script>', /index\.html:3: .*<script>/],
 ];
 for (const [name, page, message] of htmlRejections) {

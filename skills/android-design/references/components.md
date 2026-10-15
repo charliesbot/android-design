@@ -227,7 +227,7 @@ Use Material Symbols in one style (outlined, rounded, or sharp) across the app.
 2. Delete only the `android:tint="?attr/colorControlNormal"` attribute from each file's `<vector>` tag, keeping the tag's closing `>`; in Compose, `Icon` applies the color.
 3. Draw with `Icon(painterResource(R.drawable.ic_favorite), contentDescription = "Like", tint = ...)`; leave `tint` at its default (`LocalContentColor`) inside components so the role pair stays correct.
 
-`androidx.compose.material:material-icons-extended` is the older Material Icons set, frozen at 1.7.8 and large; use it only for quick prototypes. Snippets below use `Icons.Rounded.*` for brevity.
+`androidx.compose.material:material-icons-extended` is the older Material Icons set, frozen at 1.7.8 and large; use it only for quick prototypes. Proposal ports always use Material Symbols drawables (see the Icons section of `compose-mapping.md`); the `Icons.Rounded.*` in the snippets below is shorthand only.
 
 ## Snippets
 
