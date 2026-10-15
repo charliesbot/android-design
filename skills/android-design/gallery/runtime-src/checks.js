@@ -157,7 +157,9 @@ function paintsAt(el, x, y) {
   return Boolean(el.shadowRoot?.elementsFromPoint(x, y).some(inner => inner !== el && el.shadowRoot.contains(inner) && paintsAt(inner, x, y)));
 }
 // Can scrolling alone move the text out from under a viewport-pinned coverer? The text scrolls in its nearest
-// scrollable flat-tree ancestor, or in the document when there is none. A coverer inside that scroller moves with it.
+// scrollable flat-tree ancestor, or in the document when there is none. A pinned coverer stays put while that
+// content scrolls under it, even when the coverer sits inside the scroller; text sharing the coverer's pinned
+// ancestor does not scroll under it, and the pinned(el) test rules that out.
 function scrollerOf(el) {
   for (let node = el; node; node = flatParent(node)) {
     if (node === document.documentElement || node === document.body) break;
@@ -170,7 +172,6 @@ function scrollsClear(textRect, el, coverer) {
   const pinned = node => { for (let n = node; n; n = flatParent(n)) if (/fixed|sticky/.test(getComputedStyle(n).position)) return true; return false; };
   if (pinned(el) || !pinned(coverer)) return false;
   const scroller = scrollerOf(el);
-  if (scroller !== document.documentElement && flatContains(scroller, coverer)) return false;
   const remaining = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
   if (remaining <= 0) return false;
   const box = coverer.getBoundingClientRect();

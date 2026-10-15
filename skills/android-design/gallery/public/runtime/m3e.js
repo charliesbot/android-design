@@ -11988,9 +11988,7 @@ function Iy(e, t, n) {
 		return !1;
 	};
 	if (r(t) || !r(n)) return !1;
-	let i = Fy(t);
-	if (i !== document.documentElement && My(i, n)) return !1;
-	let a = i.scrollHeight - i.clientHeight - i.scrollTop;
+	let i = Fy(t), a = i.scrollHeight - i.clientHeight - i.scrollTop;
 	if (a <= 0) return !1;
 	let o = n.getBoundingClientRect(), s = e.top - a;
 	return e.bottom - a <= o.top || s >= o.bottom || e.right <= o.left || e.left >= o.right;
