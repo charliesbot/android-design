@@ -49,7 +49,7 @@ A proposal is `proposals/<id>/index.html` and `style.css` on the runtime, plus o
 - Icons come from the runtime list through `<p-icon>`.
 - Corners come from the corner scale, spacing from the 8dp scale.
 - Components come only from `references/compose-mapping.md` rows marked `verified`. Anything else is built from plain HTML layout with role tokens when it has a plain Compose layout counterpart (`Box`, `Row`, `Column`, `Text`, `Surface`); otherwise leave it out.
-- A large voice sets `line-height` to at least about 1.25 times its `font-size`. Heavy or narrow Google Sans Flex voices clip at 1.2 (measured in eval renders, not a Google rule).
+- A large voice sets `line-height` to at least about 1.2 times its `font-size`, and about 1.25 for heavy or narrow Google Sans Flex voices, which clip at 1.2 (measured in eval renders, not a Google rule).
 - No inline styles or scripts. A proposal is one `index.html` and one `style.css`, and may add its own script files for in-memory interaction only: toggles, an add sheet, a selected tab. Load them with `<script type="module" src="app.js">`, a path inside the proposal folder. Scripts hold state in variables, never in `localStorage` or cookies, and make no network requests. Publishing rejects only an inline `<script>` (one without `src`) and the style rules above; it does not read script files, so the no-storage and no-network rules are yours to keep. The gallery serves proposals under a CSP that allows only same-origin scripts, so a script file published with the round runs there.
 - Mark the primary action `data-primary`.
 - Compact below 840px, expanded from 840px up.
