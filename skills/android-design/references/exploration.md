@@ -32,16 +32,25 @@ The gallery includes phone, foldable, tablet, and desktop frames. Wear stays out
 
 ## Author proposals
 
-A proposal is `proposals/<id>/index.html` and `style.css` on the runtime. Copy `proposals/a` for each extra direction and change the design, not the rules. Details are in `project/README.md` and the runtime contract in `gallery/runtime-src/README.md`. Publishing rejects violations.
+A proposal is `proposals/<id>/index.html` and `style.css` on the runtime, plus optional script files (see below). Copy `proposals/a` for each extra direction and change the design, not the rules. Details are in `project/README.md` and the runtime contract in `gallery/runtime-src/README.md`. Publishing rejects violations.
 
 - HTML on the runtime only, wrapped in `<m3e-theme color="#RRGGBB" variant="tonal-spot" scheme="light">`. Use only HTML that has a Compose counterpart.
 - Text uses the `.t-*` role classes, or one `.voice-<name>` class declared once. No ad hoc sizes or weights. No `font-family`: every text style uses Google Sans Flex from the runtime, so a voice comes from `font-variation-settings`, weight, and width; publishing rejects it.
-- Color uses `--md-sys-color-*` roles. A non-role color (a dish or category color) goes in one `/* static colors */` block of `--static-*` properties.
+- Color uses `--md-sys-color-*` roles. A non-role color (a dish or category color) goes in one `/* static colors */` block of `--static-*` properties. For different light and dark values, use `light-dark()` inside that block: `<m3e-theme>` sets `color-scheme` on the page, so it follows `scheme="light"`, `"dark"`, and `"auto"` (OS), including the gallery's Light/Dark switch. Publishing does not lint values inside the block, so this passes:
+
+  ```css
+  /* static colors */
+  :root {
+    --static-tomato: light-dark(#D84315, #FFAB91);
+  }
+  ```
+
+  Use it as `background: var(--static-tomato)`. There is one block per stylesheet and it holds only `--static-*` declarations, so do not put `[scheme="dark"]` or `prefers-color-scheme` overrides in it.
 - Icons come from the runtime list through `<p-icon>`.
 - Corners come from the corner scale, spacing from the 8dp scale.
 - Components come only from `references/compose-mapping.md` rows marked `verified`. Anything else is built from plain HTML layout with role tokens when it has a plain Compose layout counterpart (`Box`, `Row`, `Column`, `Text`, `Surface`); otherwise leave it out.
-- A large voice sets `line-height` to at least about 1.2 times its `font-size`.
-- No inline styles or scripts. One `index.html` and one `style.css` per proposal.
+- A large voice sets `line-height` to at least about 1.2 times its `font-size`, and about 1.25 for heavy or narrow Google Sans Flex voices, which clip at 1.2 (measured in eval renders, not a Google rule).
+- No inline styles or scripts. A proposal is one `index.html` and one `style.css`, and may add its own script files for in-memory interaction only: toggles, an add sheet, a selected tab. Load them with `<script type="module" src="app.js">`, a path inside the proposal folder. Scripts hold state in variables, never in `localStorage` or cookies, and make no network requests. Publishing rejects only an inline `<script>` (one without `src`) and the style rules above; it does not read script files, so the no-storage and no-network rules are yours to keep. The gallery serves proposals under a CSP that allows only same-origin scripts, so a script file published with the round runs there.
 - Mark the primary action `data-primary`.
 - Compact below 840px, expanded from 840px up.
 
@@ -61,7 +70,7 @@ If the harness has no browser, report visual quality as unverified and do not cl
 
 ## Publish and review
 
-Write a round draft outside `project/`. The proposal folder is implied by the id:
+Write the round draft outside `project/` and outside the proposal folders: the exploration root (`<exploration>/draft.json`) or any other path works. The proposal folder is implied by the id:
 
 ```json
 {
@@ -83,6 +92,8 @@ The round's `proposals` array lists only the proposals in that round. A refineme
 node <skill-dir>/gallery/cli.mjs publish <exploration> <draft.json>
 node <skill-dir>/gallery/cli.mjs serve <exploration>
 ```
+
+`<exploration>` is the folder `create` printed (`design-explorations/<unique-id>`), not its parent `design-explorations/`; the parent fails with an invalid marker error. Every `publish` adds a new round (001, 002, ...) and an existing round can never be overwritten, so publish when a version is worth keeping and iterate on `project/proposals/<id>/` through the draft review page until then.
 
 `publish` lints each folder and snapshots it with file hashes. On a rejected raw color, type declaration, style attribute, or inline script, it names the file and line: fix and retry. A draft with `images` is rejected. Completed rounds are never overwritten. Give the user the printed localhost URL.
 

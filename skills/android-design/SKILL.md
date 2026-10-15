@@ -154,7 +154,7 @@ Their v1-to-v2 lesson: ungrouped settings of similar size and inconsistent color
 - **Contrast inside one line:** two voices in the same phrase can carry meaning, such as a flight's origin light and condensed and its destination heavy, wide, and slanted ("PDX › SFO"). The line reads as past and future without extra UI.
 - **Type as graphic:** oversized words or numbers cropped by the screen edge, or tinted close to their background ("68" behind a weather summary, a trip name behind the traveler). When text becomes art, repeat the information readably elsewhere and hide the decorative copy from accessibility services (`Modifier.clearAndSetSemantics {}`).
 - **Number plus unit:** a huge numeral with its unit in a small label style on the same baseline ("15 min", "0%", "68°"): put both in a `Row` with `Modifier.alignByBaseline()`.
-- Line height about 1.2x on large styles, 1.5x on body. Tabular numbers (`fontFeatureSettings = "tnum"`) for timers and changing values. Sentence case everywhere.
+- Line height about 1.2x on large styles (about 1.25x for heavy or narrow custom voices, measured), 1.5x on body. Tabular numbers (`fontFeatureSettings = "tnum"`) for timers and changing values. Sentence case everywhere.
 
 ## 6. Shape
 

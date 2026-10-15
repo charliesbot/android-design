@@ -37,7 +37,7 @@ Wrap the page in `<m3e-theme color="#RRGGBB" variant="tonal-spot" scheme="light"
 
 One class per Material 3 role: `.t-display-large`, `.t-display-medium`, `.t-display-small`, `.t-headline-large|medium|small`, `.t-title-large|medium|small`, `.t-body-large|medium|small`, `.t-label-large|medium|small` (15), and the same names with an `-em` suffix for the emphasized roles (15). Sizes, line heights, tracking, and weights are generated from `type-scale.json`, extracted from the pinned AndroidX Material 3 artifact, so each class equals its Compose `MaterialTheme.typography` role exactly.
 
-Large voices: Google Sans Flex at heavy weights and large sizes needs a line height of at least about 1.2x the font size (`SKILL.md` section 5: "Line height about 1.2x on large styles"). The checker flags a tighter line box as overflow, because the glyph box then exceeds the box that holds it.
+Large voices: Google Sans Flex at heavy weights and large sizes needs a line height of at least about 1.2x the font size (`SKILL.md` section 5: "Line height about 1.2x on large styles"); heavy or narrow voices need about 1.25x (measured). The checker flags a tighter line box as overflow, because the glyph box then exceeds the box that holds it.
 
 ## Icons
 

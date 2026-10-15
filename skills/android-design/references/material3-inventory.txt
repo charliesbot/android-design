@@ -3041,6 +3041,7 @@ Icons.Rounded.Star
 # androidx.compose.material:material-icons-extended:1.7.8
 Icons.AutoMirrored.Rounded.Chat
 Icons.AutoMirrored.Rounded.Help
+Icons.AutoMirrored.Rounded.QueueMusic
 Icons.AutoMirrored.Rounded.Sort
 Icons.Rounded.Bookmark
 Icons.Rounded.CalendarMonth
@@ -3052,11 +3053,13 @@ Icons.Rounded.GridView
 Icons.Rounded.Help
 Icons.Rounded.Image
 Icons.Rounded.LocalDining
+Icons.Rounded.Lyrics
 Icons.Rounded.Mail
 Icons.Rounded.Map
 Icons.Rounded.MusicNote
 Icons.Rounded.Pause
 Icons.Rounded.PhotoCamera
+Icons.Rounded.QueueMusic
 Icons.Rounded.Repeat
 Icons.Rounded.Restaurant
 Icons.Rounded.Schedule

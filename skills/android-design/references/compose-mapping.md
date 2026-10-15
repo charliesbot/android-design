@@ -2,7 +2,7 @@
 
 The lookup an implementing agent uses to port an approved HTML proposal to Compose. Every Compose name here exists in `material3-inventory.txt`, the public names of the pinned material3 artifact, except a few `foundation`, `ui`, and MaterialKolor names that the test in `scripts/test_material3_inventory.py` lists on purpose.
 
-Proposals may only use components marked `verified` in the first table. A component becomes `verified` when its pattern has been ported to Compose, rendered, and compared against the same component on `/runtime/verify/`, and the two match in layout, color, shape, and text closely enough that the approved design survives the port. Proposals aim to land extremely close to the shipped screen, not pixel-perfect. A small difference between the two libraries is acceptable when it cannot break an approved design (a few dp, a weight or tracking nuance); record it in the row's Notes. A difference that can break a design (Compose noticeably larger, text that would no longer fit) blocks verification. With Google Sans Flex, headline-size text and the large and extra-large buttons render a few dp taller in Compose than in the proposal: the font sets a minimum line height above the type tokens (measured on device). Leave a little vertical room around them. Then change its Status here and name the evidence in the commit. The verify page alone never marks a component verified. Exempt from the rule because every page needs them: `m3e-theme`, `p-icon`, and the token tables (type, color, icons, shapes, spacing).
+Proposals may only use components marked `verified` in the first table. A component becomes `verified` when its pattern has been ported to Compose, rendered, and compared against the same component on `/runtime/verify/`, and the two match in layout, color, shape, and text closely enough that the approved design survives the port. Proposals aim to land extremely close to the shipped screen, not pixel-perfect. A small difference between the two libraries is acceptable when it cannot break an approved design (a few dp, a weight or tracking nuance); record it in the row's Notes. A difference that can break a design (Compose noticeably larger, text that would no longer fit) blocks verification. With Google Sans Flex, headline-size text and the large and extra-large buttons render a few dp taller in Compose than in the proposal: the font sets a minimum line height above the type tokens (measured on device). Display-size text does the same, by more: on a Pixel 10 Pro XL emulator `displayLarge` (64sp token line height) rendered about 71dp tall, the font's natural line height of about 1.25em (a measurement, not a Google rule). Leave vertical room around headline and display text, and do not pack a display line tightly against its neighbors. Then change its Status here and name the evidence in the commit. The verify page alone never marks a component verified. Exempt from the rule because every page needs them: `m3e-theme`, `p-icon`, and the token tables (type, color, icons, shapes, spacing).
 
 Compose is written at implementation, in the app, under the app's own conventions. Use the patterns below as the API call to reach for, not as finished code.
 
@@ -265,7 +265,7 @@ The theme element is the single color source: `rememberDynamicColorScheme(seedCo
 
 ## Icons
 
-Every name in `runtime-src/icons.json`. Icons marked `extended` need the `material-icons-extended` dependency; `core` ones ship with `material-icons-core`. The five directional icons use `Icons.AutoMirrored.Rounded`, which mirrors in right-to-left layouts. Compose's icon set has no unfilled and filled pair: `p-icon` with or without `filled` maps to the same `Icons.Rounded` vector, so the unfilled look needs a Material Symbols vector drawable at implementation.
+Every name in `runtime-src/icons.json`. Icons marked `extended` need the `material-icons-extended` dependency; `core` ones ship with `material-icons-core`. The six directional icons use `Icons.AutoMirrored.Rounded`, which mirrors in right-to-left layouts. Compose's icon set has no unfilled and filled pair: `p-icon` with or without `filled` maps to the same `Icons.Rounded` vector, so the unfilled look needs a Material Symbols vector drawable at implementation.
 
 | HTML `name` | Compose | Artifact |
 | --- | --- | --- |
@@ -319,6 +319,8 @@ Every name in `runtime-src/icons.json`. Icons marked `extended` need the `materi
 | `location_on` | `Icons.Rounded.LocationOn` | core |
 | `explore` | `Icons.Rounded.Explore` | extended |
 | `music_note` | `Icons.Rounded.MusicNote` | extended |
+| `lyrics` | `Icons.Rounded.Lyrics` | extended |
+| `queue_music` | `Icons.AutoMirrored.Rounded.QueueMusic` | extended |
 
 ## Shapes and spacing
 
