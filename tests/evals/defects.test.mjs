@@ -34,6 +34,13 @@ const CASES = {
   'desktop-only': { fails: ['C-review'], detail: /desktop: pageOverflow/, notIn: /tablet: |foldable: / },
   'foldable-only': { fails: ['C-review'], detail: /foldable: pageOverflow/, notIn: /tablet: |desktop: / },
   'fixed-right': { fails: ['C-review'], detail: /light: pageOverflow/ },
+  'midword-break': { fails: ['C-review'], detail: /midWordBreaks/ },
+  'toolbar-overlap': { fails: ['C-review'], detail: /overlap/ },
+  'control-scroll-list': { fails: [] }, // content scrolls clear of the floating toolbar
+  'control-inner-scroller': { fails: [] },
+  'control-scroller-toolbar-inside': { fails: [] }, // a pinned toolbar inside the scroller still lets content scroll clear
+  'control-scroller-sticky-bar': { fails: [] },
+  'toolbar-overlap-static': { fails: ['C-review'], detail: /overlaps/ },
   'fixed-left': { fails: ['C-review'], detail: /light: pageOverflow/ },
 };
 
