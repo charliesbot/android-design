@@ -46,7 +46,7 @@ A proposal is `proposals/<id>/index.html` and `style.css` on the runtime, plus o
   ```
 
   Use it as `background: var(--static-tomato)`. There is one block per stylesheet and it holds only `--static-*` declarations, so do not put `[scheme="dark"]` or `prefers-color-scheme` overrides in it.
-- Icons come from the runtime list through `<p-icon>`.
+- Icons: any Material Symbols Rounded name from fonts.google.com/icons, through `<p-icon name="...">` (add `filled` for the filled glyph). Publishing rejects names that are not Material Symbols.
 - Corners come from the corner scale, spacing from the 8dp scale.
 - Components come only from `references/compose-mapping.md` rows marked `verified`. Anything else is built from plain HTML layout with role tokens when it has a plain Compose layout counterpart (`Box`, `Row`, `Column`, `Text`, `Surface`); otherwise leave it out.
 - A large voice sets `line-height` to at least about 1.2 times its `font-size`, and about 1.25 for heavy or narrow voices (Google Sans Flex, Big Shoulders Display), which clip at 1.2 (measured in eval renders, not a Google rule).

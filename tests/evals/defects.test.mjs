@@ -27,6 +27,7 @@ const CASES = {
   'raw-hex': { fails: ['C-publish', 'C-review'], detail: /Raw color/ },
   'inline-style': { fails: ['C-publish', 'C-review'], detail: /style="" attributes/ },
   'font-size-outside-voice': { fails: ['C-publish', 'C-review'], detail: /font-size is only allowed in a single-class \.voice-\*/ },
+  'icon-unknown': { fails: ['C-publish', 'C-review'], detail: /<p-icon name="homey"> is not a Material Symbols name/ }, // a made-up symbol would render as plain text
   'palette-expressive': { fails: ['C-palette'], detail: /variant expressive/ },
   'tiny-target': { fails: ['C-review'], detail: /light: touchTargets/ },
   'non-flex-font': { fails: ['C-publish', 'C-review'], detail: /font-family is not allowed: "Georgia" is not bundled/ }, // publish lint rejects unbundled families, so the runtime fonts check has no seeded case

@@ -1,0 +1,3 @@
+Material Symbols Rounded variable font (axes FILL, GRAD, opsz, wght), unmodified.
+Source: npm package material-symbols@0.48.0 (github.com/marella/material-symbols, built from github.com/google/material-design-icons), file material-symbols-rounded.woff2.
+License: Apache 2.0, see MaterialSymbolsRounded-LICENSE.txt.

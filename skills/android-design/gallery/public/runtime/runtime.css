@@ -13,6 +13,12 @@
   font-display: block;
 }
 @font-face {
+  font-family: "Material Symbols Rounded"; /* axes: FILL 0-1, GRAD -25-200, opsz 20-48; icon names are ligatures */
+  src: url("fonts/MaterialSymbolsRounded.woff2") format("woff2");
+  font-weight: 100 700;
+  font-display: block;
+}
+@font-face {
   font-family: "Fraunces"; /* axes: opsz 9-144, SOFT 0-100, WONK 0-1 */
   src: url("fonts/Fraunces.woff2") format("woff2");
   font-weight: 100 900;
@@ -112,9 +118,16 @@ m3e-theme {
 .t-label-medium-em { margin: 0; font-size: 12px; line-height: 16px; letter-spacing: 0.5px; font-weight: 700; }
 .t-label-small-em { margin: 0; font-size: 11px; line-height: 16px; letter-spacing: 0.5px; font-weight: 700; }
 
-/* p-icon: one Material Symbols Rounded glyph from icons.svg. Size it with font-size. */
-p-icon { display: inline-flex; flex: none; width: 1em; height: 1em; font-size: 24px; vertical-align: middle; color: inherit; }
-p-icon svg { display: block; width: 100%; height: 100%; }
+/* p-icon: one Material Symbols Rounded glyph, drawn by ligature from the bundled variable font. Size it with font-size.
+   Weight 400 and grade 0; the optical size follows font-size (font-optical-sizing: auto); [filled] sets FILL 1. */
+p-icon { display: inline-flex; flex: none; width: 1em; height: 1em; font-size: 24px; vertical-align: middle; color: inherit; overflow: hidden; }
+p-icon > span {
+  display: block; width: 1em; height: 1em;
+  font-family: "Material Symbols Rounded"; font-weight: 400; font-style: normal; line-height: 1; letter-spacing: normal; text-transform: none;
+  white-space: nowrap; direction: ltr; font-feature-settings: "liga"; -webkit-font-smoothing: antialiased;
+  font-variation-settings: "FILL" 0, "GRAD" 0;
+}
+p-icon[filled] > span { font-variation-settings: "FILL" 1, "GRAD" 0; }
 
 /* p-floating-toolbar: an m3e-toolbar floating at the bottom center, 16px above the bottom inset. */
 p-floating-toolbar {

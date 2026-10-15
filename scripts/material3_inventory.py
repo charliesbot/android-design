@@ -3,8 +3,8 @@
 
 Usage: material3_inventory.py
 
-Reads the material3 version from the exploration starter's libs.versions.toml, finds the matching AAR (and the
-material icons AARs, when present) in the local Gradle cache, and writes:
+Reads the material3 version from the exploration starter's libs.versions.toml, finds the matching AAR in the
+local Gradle cache, and writes:
 
 - skills/android-design/references/material3-inventory.txt: one name per line (`Class`, `Class.member`, or a bare
   top-level function name), no signatures. compose-mapping.md may only use names that appear here.
@@ -24,15 +24,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 LIBS_TOML = ROOT / "skills/android-design/assets/exploration-starter/gradle/libs.versions.toml"
 INVENTORY = ROOT / "skills/android-design/references/material3-inventory.txt"
-ICONS_JSON = ROOT / "skills/android-design/gallery/runtime-src/icons.json"
 TYPE_SCALE = ROOT / "skills/android-design/gallery/runtime-src/type-scale.json"
 GRADLE_FILES = Path.home() / ".gradle/caches/modules-2/files-2.1"
 
 MATERIAL3_ROOT = "androidx/compose/material3/"
 TYPE_SCALE_CLASS = "androidx.compose.material3.tokens.TypeScaleTokens"
 COMPOSER_PARAMS = "androidx.compose.runtime.Composer, int"
-ICON_PACKAGES = {"Icons.Rounded": "androidx/compose/material/icons/rounded/", "Icons.AutoMirrored.Rounded": "androidx/compose/material/icons/automirrored/rounded/"}
-ICON_ARTIFACTS = {"core": "material-icons-core-android", "extended": "material-icons-extended-android"}
 ROLE_ORDER = ["Display", "Headline", "Title", "Body", "Label"]
 SIZE_ORDER = ["Large", "Medium", "Small"]
 NOISE = {"<init>", "<clinit>", "equals", "hashCode", "toString", "values", "valueOf"}
@@ -207,22 +204,6 @@ def material3_entries(classes_dir, class_names):
     return entries
 
 
-def icon_entries(jars):
-    """Returns (found, missing): Icons.Rounded names from icons.json that exist in the icons AARs, per artifact."""
-    wanted = json.loads(ICONS_JSON.read_text())
-    found = {artifact: set() for artifact in jars}
-    seen = set()
-    for artifact, jar in jars.items():
-        names = set(jar.namelist())
-        for name in wanted:
-            camel = "".join(part.capitalize() for part in name.split("_"))
-            for prefix, package in ICON_PACKAGES.items():
-                if f"{package}{camel}Kt.class" in names:
-                    found[artifact].add(f"{prefix}.{camel}")
-                    seen.add(name)
-    return found, [name for name in wanted if name not in seen]
-
-
 def extract_classes_jar(aar, target):
     with zipfile.ZipFile(aar) as archive:
         archive.extract("classes.jar", target)
@@ -288,11 +269,6 @@ def main():
     _, aar = find_aar("androidx.compose.material3", "material3-android", version)
     if not aar:
         sys.exit(f"material3-android {version} is not in {GRADLE_FILES}. Build the exploration starter once so Gradle downloads it.")
-    icon_aars = {}
-    for key, artifact in ICON_ARTIFACTS.items():
-        icon_version, icon_aar = find_aar("androidx.compose.material", artifact)
-        if icon_aar:
-            icon_aars[key] = (icon_version, icon_aar)
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
@@ -304,27 +280,12 @@ def main():
         entries = material3_entries(classes, [n for n in wanted if n != TYPE_SCALE_CLASS])
         scale = extract_type_scale(classes, version)
 
-        icon_jars = {}
-        for key, (_, icon_aar) in icon_aars.items():
-            icon_jars[key] = extract_classes_jar(icon_aar, tmp / f"icons-{key}")
-        found, missing = icon_entries(icon_jars)
-        for icon_jar in icon_jars.values():
-            icon_jar.close()
-
     header = f"# androidx.compose.material3:material3-android:{version}"
     lines = [header, *sorted(entries)]
-    for key, (icon_version, _) in icon_aars.items():
-        lines += [f"# androidx.compose.material:{ICON_ARTIFACTS[key].removesuffix('-android')}:{icon_version}", *sorted(found[key])]
     INVENTORY.write_text("\n".join(lines) + "\n")
     TYPE_SCALE.write_text(json.dumps(scale, indent=1) + "\n")
 
     print(f"{INVENTORY.relative_to(ROOT)}: {len(entries)} material3 names from {aar.name} {version}")
-    for key in icon_aars:
-        print(f"icons ({key}): {len(found[key])} names")
-    if not icon_aars:
-        print(f"No material-icons AAR in {GRADLE_FILES}; could not check any icon in icons.json")
-    elif missing:
-        print("Icons in icons.json not found as Icons.Rounded or Icons.AutoMirrored.Rounded: " + ", ".join(missing))
 
 
 if __name__ == "__main__":

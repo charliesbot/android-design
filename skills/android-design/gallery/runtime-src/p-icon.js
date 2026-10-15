@@ -1,23 +1,17 @@
-// <p-icon name="search" filled label="Search"> draws one glyph from /runtime/icons.svg.
-// Names come from icons.json. Without a label the icon is decorative and hidden from assistive tech.
-const SPRITE = '/runtime/icons.svg';
-const SVG = 'http://www.w3.org/2000/svg';
-
+// <p-icon name="search" filled label="Search"> draws one Material Symbols Rounded glyph by ligature from the bundled variable font.
+// `name` is any symbol in fonts.google.com/icons (the publish lint checks it against runtime/symbols.json). `filled` sets the FILL axis to 1.
+// Without a label the icon is decorative and hidden from assistive tech. The glyph size follows font-size (24px by default).
 class PIcon extends HTMLElement {
-  static observedAttributes = ['name', 'filled', 'label'];
+  static observedAttributes = ['name', 'label'];
 
   connectedCallback() { this.#render(); }
   attributeChangedCallback() { if (this.isConnected) this.#render(); }
 
   #render() {
-    const name = this.getAttribute('name');
     const label = this.getAttribute('label');
-    const svg = document.createElementNS(SVG, 'svg');
-    svg.setAttribute('viewBox', '0 0 960 960');
-    svg.setAttribute('fill', 'currentColor');
-    const use = document.createElementNS(SVG, 'use');
-    if (name) use.setAttribute('href', `${SPRITE}#${name}${this.hasAttribute('filled') ? '-fill' : ''}`);
-    svg.append(use);
+    const glyph = document.createElement('span');
+    glyph.setAttribute('aria-hidden', 'true');
+    glyph.textContent = this.getAttribute('name') ?? '';
     if (label) {
       this.setAttribute('role', 'img');
       this.setAttribute('aria-label', label);
@@ -27,7 +21,7 @@ class PIcon extends HTMLElement {
       this.removeAttribute('aria-label');
       this.setAttribute('aria-hidden', 'true');
     }
-    this.replaceChildren(svg);
+    this.replaceChildren(glyph);
   }
 }
 customElements.define('p-icon', PIcon);

@@ -18,8 +18,9 @@ The gallery CSP is `default-src 'self'`: no inline `<style>`, no `style=""`, no 
 | --- | --- |
 | `runtime/m3e.js` | ES module: registers the `@m3e/web` 2.9.2 elements below, the `p-` pieces, the theme message listener, `window.runtimeChecks`, and `window.runtimeSettle` (resolves once no finite animation or transition is running; call it before `runtimeChecks()`) |
 | `runtime/runtime.css` | Google Sans Flex `@font-face`, page defaults, type role classes, shim styles |
-| `runtime/fonts/` | Latin-subset woff2 with all variable axes and each OFL license: `GoogleSansFlex` (plain text, always), `Fraunces`, `BricolageGrotesque`, `BigShouldersDisplay`, `Doto` (optional brand faces for Display and Headline voices), `GoogleSansCode` (numbers and data). The family list and minimum sizes are in `fonts.json`, read by the publish lint and the fonts check |
-| `runtime/icons.svg` | Material Symbols Rounded sprite (weight 400, unfilled and filled), license in `icons-LICENSE.txt` |
+| `runtime/fonts/` | Latin-subset text woff2 with all variable axes and each OFL license: `GoogleSansFlex` (plain text, always), `Fraunces`, `BricolageGrotesque`, `BigShouldersDisplay`, `Doto` (optional brand faces for Display and Headline voices), `GoogleSansCode` (numbers and data). The family list and minimum sizes are in `fonts.json`, read by the publish lint and the fonts check |
+| `runtime/fonts/MaterialSymbolsRounded.woff2` | The full Material Symbols Rounded variable font (axes FILL, GRAD, opsz, wght), unmodified from the pinned `material-symbols` npm package; provenance in `MaterialSymbolsRounded-SOURCE.txt`, Apache 2.0 license in `MaterialSymbolsRounded-LICENSE.txt` |
+| `runtime/symbols.json` | Every Material Symbols name (from the package's type list). The publish lint rejects a `p-icon` name that is not in it |
 | `runtime/sample/` | A small page that uses only runtime pieces |
 | `runtime/checks-fixture/` | Known-bad and known-good component text (low-contrast and clipped button labels, clipped plain text) that `runtimeChecks()` must flag, plus opacity 0 text it must skip instead of leaving unresolved, and bundled-face text (Fraunces at 40px and Google Sans Code at 12px pass, Doto at 24px must be listed in `fonts.offenders`) |
 | `runtime/review/` | The review page: one proposal in four exact device frames, with `reviewChecks()` |
@@ -43,7 +44,7 @@ Large voices: Google Sans Flex at heavy weights and large sizes needs a line hei
 
 ## Icons
 
-`<p-icon name="search"></p-icon>` draws a 24px `currentColor` glyph; add `filled` for the filled variant, `label="..."` to expose it to assistive tech (otherwise it is `aria-hidden`). Size it with `font-size`. The allowed names are the single list in `icons.json`; they all exist as `Icons.Rounded.*` in Compose. To add one, add it to `icons.json` and rebuild.
+`<p-icon name="search"></p-icon>` draws a 24px `currentColor` Material Symbols Rounded glyph, by ligature from the bundled variable font. `name` is any symbol name from fonts.google.com/icons (`directions_car`, `hiking`, `cloud`); add `filled` for FILL 1, `label="..."` to expose it to assistive tech (otherwise it is `aria-hidden`). Size it with `font-size`; weight is 400, grade 0, and the optical size follows the size. Publishing rejects a name that is not in `symbols.json`, with the file and line. An unknown name would otherwise render its text as a word, so the lint is the guard.
 
 ## Shims
 

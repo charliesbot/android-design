@@ -39,19 +39,8 @@ IDENTIFIER = re.compile(r"(?<![\w.])[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*")
 
 
 def load_inventory():
-    """Returns (all names, {artifact block name: icon names})."""
-    names = set()
-    icon_blocks = {}
-    block = None
-    for line in inventory.INVENTORY.read_text().splitlines():
-        if line.startswith("# androidx.compose.material:material-icons-"):
-            block = line.split("material-icons-")[1].split(":")[0]
-            icon_blocks[block] = set()
-        elif line and not line.startswith("#"):
-            names.add(line)
-            if block:
-                icon_blocks[block].add(line)
-    return names, icon_blocks
+    """Returns every name in the committed inventory."""
+    return {line for line in inventory.INVENTORY.read_text().splitlines() if line and not line.startswith("#")}
 
 
 def mapping_rows():
@@ -90,13 +79,13 @@ def resolves(token, known):
         return True
     if parts[0] == "MaterialTheme" and len(parts) >= 3 and parts[1] in THEME_MEMBERS:
         return "MaterialTheme." + parts[1] in known and f"{THEME_MEMBERS[parts[1]]}.{parts[2]}" in known
-    return len(parts) >= 3 and ".".join(parts[:2]) in known and parts[0] != "Icons"
+    return len(parts) >= 3 and ".".join(parts[:2]) in known
 
 
 class MappingTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.known, cls.icon_blocks = load_inventory()
+        cls.known = load_inventory()
         cls.rows = list(mapping_rows())
         cls.text = MAPPING.read_text()
 
@@ -150,15 +139,11 @@ class MappingTest(unittest.TestCase):
                 data = scale[role[0].upper() + role[1:]]
                 self.assertIn(f"{data['size']:g}sp / {data['lineheight']:g}sp, weight {data['weight']}", cells[2], role)
 
-    def test_every_icon_is_mapped_to_an_icon_that_exists(self):
-        icons = json.loads((RUNTIME_SRC / "icons.json").read_text())
-        rows = {cells[0].strip("`"): cells for heading, cells in self.rows if heading == "Icons"}
-        self.assertEqual(sorted(set(icons) - set(rows)), [])
-        for name, cells in rows.items():
-            icon = cells[1].strip("`")
-            artifact = cells[2]
-            self.assertIn(artifact, self.icon_blocks, name)
-            self.assertIn(icon, self.icon_blocks[artifact], f"{name} is not in material-icons-{artifact}")
+    def test_icons_port_as_symbol_drawables_not_the_legacy_icon_set(self):
+        self.assertNotRegex(self.text, r"Icons\.(Auto)?(Mirrored\.)?Rounded\.[A-Z]")
+        section = self.text.split("\n## Icons\n")[1].split("\n## ")[0]
+        self.assertIn("painterResource(R.drawable.name)", section)
+        self.assertIn('android:autoMirrored="true"', section)
 
     def test_all_53_theme_color_roles_are_mapped(self):
         roles = [cells[0] for heading, cells in self.rows if heading == "Color" and cells[0].startswith("`--md-sys-color-")]
