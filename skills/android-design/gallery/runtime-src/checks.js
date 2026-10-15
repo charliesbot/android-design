@@ -1,3 +1,4 @@
+import bundled from './fonts.json';
 import { neededRatio, over, ratio } from './contrast.js';
 
 // window.runtimeChecks(): the in-page rule checker. Returns one JSON-safe object. `pass` is false when
@@ -13,7 +14,14 @@ const INTERACTIVE = [
 const FAB = 'm3e-fab, m3e-fab-menu, [data-fab]';
 const MIN_TARGET = 48;
 
-const isFlex = family => /google sans flex/i.test(family.split(',')[0]);
+// The first computed family must be a bundled one: Google Sans Flex always, Google Sans Code at any size, a brand face from headline small
+// (24px) up, Doto from display small (36px) up. The publish lint enforces the same sizes on the source; this checks what renders.
+const bundledFont = (family, size) => {
+  const name = family.split(',')[0].trim().replace(/^(["'])(.*)\1$/, '$2').toLowerCase();
+  if (name === bundled.plain.toLowerCase()) return true;
+  const face = bundled.faces.find(item => item.family.toLowerCase() === name);
+  return Boolean(face) && size >= face.minPx;
+};
 const label = el => (el.getAttribute?.('aria-label') || el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 30);
 const describe = el => {
   const text = label(el);
@@ -320,7 +328,7 @@ export function runtimeChecks() {
     const rect = range.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0 || style.visibility !== 'visible' || fullyTransparent(el)) return;
     const name = describeFlat(boxOf(el) || el);
-    if (!isFlex(style.fontFamily) && once('font', name)) fonts.push({ el: name, font: style.fontFamily });
+    if (!bundledFont(style.fontFamily, parseFloat(style.fontSize)) && once('font', name)) fonts.push({ el: name, font: style.fontFamily });
     if (hiddenFromAssistiveTech(el)) return; // decorative text is exempt from overflow and contrast
 
     // Mid-word breaks and overlap. Both read the live layout, so they are measured where the text renders.

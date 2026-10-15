@@ -29,7 +29,9 @@ const CASES = {
   'font-size-outside-voice': { fails: ['C-publish', 'C-review'], detail: /font-size is only allowed in a single-class \.voice-\*/ },
   'palette-expressive': { fails: ['C-palette'], detail: /variant expressive/ },
   'tiny-target': { fails: ['C-review'], detail: /light: touchTargets/ },
-  'non-flex-font': { fails: ['C-publish', 'C-review'], detail: /font-family is not allowed/ }, // publish lint rejects font-family, so the runtime fonts check has no seeded case
+  'non-flex-font': { fails: ['C-publish', 'C-review'], detail: /font-family is not allowed: "Georgia" is not bundled/ }, // publish lint rejects unbundled families, so the runtime fonts check has no seeded case
+  'brand-font-small': { fails: ['C-publish', 'C-review'], detail: /Fraunces is only for headline small/ }, // a brand face below 24px
+  'control-brand-font': { fails: [] }, // a brand face at display size is allowed and renders
   'low-contrast': { fails: ['C-review'], detail: /light: contrast/ },
   'desktop-only': { fails: ['C-review'], detail: /desktop: pageOverflow/, notIn: /tablet: |foldable: / },
   'foldable-only': { fails: ['C-review'], detail: /foldable: pageOverflow/, notIn: /tablet: |desktop: / },

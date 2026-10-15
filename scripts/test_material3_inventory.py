@@ -19,7 +19,7 @@ RUNTIME_BUNDLE = ROOT / "skills/android-design/gallery/public/runtime/m3e.js"
 ALLOWED_ROOTS = {
     # androidx.compose.foundation and androidx.compose.ui, which the inventory does not cover.
     "Modifier", "Arrangement", "Alignment", "WindowInsets", "BoxWithConstraints", "Row", "Column", "Spacer",
-    "RectangleShape", "CircleShape", "ZeroCornerSize", "Color", "TextStyle", "FontFamily", "Font", "FontVariation",
+    "RectangleShape", "CircleShape", "ZeroCornerSize", "Color", "TextStyle", "FontFamily", "Font", "FontVariation", "FontWeight",
     # MaterialKolor, the Kotlin port of Google's color utilities.
     "PaletteStyle", "ColorSpec",
     # The app's generated resource class (R.font.google_sans_flex).
@@ -75,7 +75,8 @@ def unresolved_names(cell, known):
     """Compose identifiers in a cell that are neither in the inventory nor allowed."""
     missing = []
     for span in code_spans(cell):
-        for token in IDENTIFIER.findall(span):
+        # String literals (font axis tags such as "SOFT") are data, not Compose names.
+        for token in IDENTIFIER.findall(re.sub(r'"[^"]*"', '""', span)):
             if not token[0].isupper() or token.split(".")[0] in ALLOWED_ROOTS:
                 continue  # named arguments, locals, and external roots
             if not resolves(token, known):

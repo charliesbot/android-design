@@ -11862,65 +11862,102 @@ window.addEventListener("message", (e) => {
 	let a = document.querySelector("m3e-theme");
 	a && (typeof n == "string" && /^#[0-9a-f]{6}$/i.test(n) && a.setAttribute("color", n), iy.includes(r) && a.setAttribute("variant", r), ay.includes(i) && a.setAttribute("scheme", i));
 });
-//#endregion
-//#region skills/android-design/gallery/runtime-src/contrast.js
-var oy = ({ r: e, g: t, b: n }) => {
+var oy = {
+	plain: "Google Sans Flex",
+	faces: [
+		{
+			family: "Fraunces",
+			use: "brand",
+			minPx: 24
+		},
+		{
+			family: "Bricolage Grotesque",
+			use: "brand",
+			minPx: 24
+		},
+		{
+			family: "Big Shoulders Display",
+			use: "brand",
+			minPx: 24
+		},
+		{
+			family: "Doto",
+			use: "display",
+			minPx: 36
+		},
+		{
+			family: "Google Sans Code",
+			use: "data",
+			minPx: 0
+		}
+	],
+	generics: [
+		"serif",
+		"sans-serif",
+		"monospace"
+	]
+}, sy = ({ r: e, g: t, b: n }) => {
 	let r = (e) => (e /= 255, e <= .03928 ? e / 12.92 : ((e + .055) / 1.055) ** 2.4);
 	return .2126 * r(e) + .7152 * r(t) + .0722 * r(n);
-}, sy = (e, t) => {
-	let [n, r] = [oy(e), oy(t)].sort((e, t) => t - e);
+}, cy = (e, t) => {
+	let [n, r] = [sy(e), sy(t)].sort((e, t) => t - e);
 	return (n + .05) / (r + .05);
-}, cy = (e, t) => e.a < 1 ? {
+}, ly = (e, t) => e.a < 1 ? {
 	r: e.r * e.a + t.r * (1 - e.a),
 	g: e.g * e.a + t.g * (1 - e.a),
 	b: e.b * e.a + t.b * (1 - e.a),
 	a: 1
-} : e, ly = (e, t) => e >= 24 || e >= 18.66 && t >= 700 ? 3 : 4.5, uy = (/* @__PURE__ */ "a[href].button.input.select.textarea.summary.[role=button].[role=link].[role=tab].[role=switch].[role=checkbox].[role=menuitem].[tabindex]:not([tabindex=\"-1\"]).m3e-button.m3e-icon-button.m3e-fab.m3e-fab-menu-trigger.m3e-fab-menu-item.m3e-nav-item.m3e-switch.m3e-slider.m3e-split-button.m3e-card[actionable].m3e-list-item-button.m3e-list-action.m3e-list-option.m3e-chip.m3e-assist-chip.m3e-filter-chip.m3e-input-chip.m3e-suggestion-chip".split(".")).join(","), dy = "m3e-fab, m3e-fab-menu, [data-fab]", fy = (e) => /google sans flex/i.test(e.split(",")[0]), py = (e) => (e.getAttribute?.("aria-label") || e.textContent || "").trim().replace(/\s+/g, " ").slice(0, 30), my = (e) => {
-	let t = py(e);
+} : e, uy = (e, t) => e >= 24 || e >= 18.66 && t >= 700 ? 3 : 4.5, dy = (/* @__PURE__ */ "a[href].button.input.select.textarea.summary.[role=button].[role=link].[role=tab].[role=switch].[role=checkbox].[role=menuitem].[tabindex]:not([tabindex=\"-1\"]).m3e-button.m3e-icon-button.m3e-fab.m3e-fab-menu-trigger.m3e-fab-menu-item.m3e-nav-item.m3e-switch.m3e-slider.m3e-split-button.m3e-card[actionable].m3e-list-item-button.m3e-list-action.m3e-list-option.m3e-chip.m3e-assist-chip.m3e-filter-chip.m3e-input-chip.m3e-suggestion-chip".split(".")).join(","), fy = "m3e-fab, m3e-fab-menu, [data-fab]", py = (e, t) => {
+	let n = e.split(",")[0].trim().replace(/^(["'])(.*)\1$/, "$2").toLowerCase();
+	if (n === oy.plain.toLowerCase()) return !0;
+	let r = oy.faces.find((e) => e.family.toLowerCase() === n);
+	return !!r && t >= r.minPx;
+}, my = (e) => (e.getAttribute?.("aria-label") || e.textContent || "").trim().replace(/\s+/g, " ").slice(0, 30), hy = (e) => {
+	let t = my(e);
 	return e.localName + (e.id ? `#${e.id}` : "") + (t ? ` "${t}"` : "");
-}, hy = (e) => {
-	let t = e.getRootNode().host, n = e.localName + (e.id ? `#${e.id}` : "") + (t && e.classList[0] ? `.${e.classList[0]}` : "");
-	return t ? `${hy(t)} > ${n}` : n;
 }, gy = (e) => {
-	let t = py(e);
-	return hy(e) + (t ? ` "${t}"` : "");
+	let t = e.getRootNode().host, n = e.localName + (e.id ? `#${e.id}` : "") + (t && e.classList[0] ? `.${e.classList[0]}` : "");
+	return t ? `${gy(t)} > ${n}` : n;
 }, _y = (e) => {
+	let t = my(e);
+	return gy(e) + (t ? ` "${t}"` : "");
+}, vy = (e) => {
 	let t = e.getBoundingClientRect();
 	return t.width <= 0 || t.height <= 0 ? !1 : e.checkVisibility ? e.checkVisibility({ visibilityProperty: !0 }) : getComputedStyle(e).visibility !== "hidden";
 };
-function vy(e) {
+function yy(e) {
 	if (e.assignedSlot) return e.assignedSlot;
 	let t = e.parentNode;
 	return t ? t instanceof ShadowRoot ? t.host : t instanceof Element && t.shadowRoot ? null : t instanceof Element ? t : null : null;
 }
-function yy(e) {
-	for (let t = e; t; t = vy(t)) if (getComputedStyle(t).display !== "contents") return t;
+function by(e) {
+	for (let t = e; t; t = yy(t)) if (getComputedStyle(t).display !== "contents") return t;
 	return null;
 }
-var by = (e) => {
-	for (let t = e; t; t = vy(t)) if (parseFloat(getComputedStyle(t).opacity) === 0) return !0;
+var xy = (e) => {
+	for (let t = e; t; t = yy(t)) if (parseFloat(getComputedStyle(t).opacity) === 0) return !0;
 	return !1;
-}, xy = (e) => {
-	for (let t = e; t; t = vy(t)) if (t.getAttribute?.("aria-hidden") === "true") return !0;
+}, Sy = (e) => {
+	for (let t = e; t; t = yy(t)) if (t.getAttribute?.("aria-hidden") === "true") return !0;
 	return !1;
 };
-function Sy(e, t) {
-	for (let n of e.querySelectorAll("*")) t(n) !== !1 && n.shadowRoot && Sy(n.shadowRoot, t);
-}
 function Cy(e, t) {
+	for (let n of e.querySelectorAll("*")) t(n) !== !1 && n.shadowRoot && Cy(n.shadowRoot, t);
+}
+function wy(e, t) {
 	let n = (e) => {
 		for (let n of e.childNodes) n.nodeType === Node.TEXT_NODE && n.textContent.trim() && t(n);
 	};
-	e instanceof ShadowRoot && n(e), Sy(e, (e) => {
+	e instanceof ShadowRoot && n(e), Cy(e, (e) => {
 		n(e);
 	});
 }
-var wy = document.createElement("canvas");
-wy.width = wy.height = 1;
-var Ty = wy.getContext("2d", { willReadFrequently: !0 });
-function Ey(e) {
-	Ty.clearRect(0, 0, 1, 1), Ty.fillStyle = "#000", Ty.fillStyle = e, Ty.fillRect(0, 0, 1, 1);
-	let [t, n, r, i] = Ty.getImageData(0, 0, 1, 1).data;
+var Ty = document.createElement("canvas");
+Ty.width = Ty.height = 1;
+var Ey = Ty.getContext("2d", { willReadFrequently: !0 });
+function Dy(e) {
+	Ey.clearRect(0, 0, 1, 1), Ey.fillStyle = "#000", Ey.fillStyle = e, Ey.fillRect(0, 0, 1, 1);
+	let [t, n, r, i] = Ey.getImageData(0, 0, 1, 1).data;
 	return {
 		r: t,
 		g: n,
@@ -11928,22 +11965,22 @@ function Ey(e) {
 		a: i / 255
 	};
 }
-function Dy(e) {
-	for (let t = e; t; t = vy(t)) {
+function Oy(e) {
+	for (let t = e; t; t = yy(t)) {
 		let e = getComputedStyle(t);
 		if (parseFloat(e.opacity) < 1) return { reason: "an ancestor has opacity below 1" };
 		if (e.backgroundImage !== "none") return { reason: "background is an image or gradient" };
-		let n = Ey(e.backgroundColor);
+		let n = Dy(e.backgroundColor);
 		if (n.a === 1) return { color: n };
 		if (n.a > 0) return { reason: "background is translucent" };
 	}
 	return { reason: "no opaque background found" };
 }
-var Oy = /[^\s\-\u00ad\u200b\u2010-\u2015/]+/g;
-function ky(e, t) {
+var ky = /[^\s\-\u00ad\u200b\u2010-\u2015/]+/g;
+function Ay(e, t) {
 	if (t.hyphens === "auto" || /[　-鿿가-힯฀-๿]/.test(e.textContent)) return [];
 	let n = [], r = document.createRange();
-	for (let t of e.textContent.matchAll(Oy)) {
+	for (let t of e.textContent.matchAll(ky)) {
 		if (t[0].length < 2) continue;
 		r.setStart(e, t.index), r.setEnd(e, t.index + t[0].length);
 		let i = [...r.getClientRects()].filter((e) => e.width > 0 && e.height > 0);
@@ -11953,17 +11990,17 @@ function ky(e, t) {
 	}
 	return n;
 }
-var Ay = .2;
-function jy(e) {
+var jy = .2;
+function My(e) {
 	let t = 1;
-	for (let n = e; n; n = vy(n)) t *= parseFloat(getComputedStyle(n).opacity);
+	for (let n = e; n; n = yy(n)) t *= parseFloat(getComputedStyle(n).opacity);
 	return t;
 }
-function My(e, t) {
-	for (let n = t; n; n = vy(n)) if (n === e) return !0;
+function Ny(e, t) {
+	for (let n = t; n; n = yy(n)) if (n === e) return !0;
 	return !1;
 }
-function Ny(e, t, n) {
+function Py(e, t, n) {
 	let r = document.createRange();
 	for (let i of e.childNodes) if (i.nodeType === Node.TEXT_NODE && i.textContent.trim()) {
 		r.selectNodeContents(i);
@@ -11971,29 +12008,29 @@ function Ny(e, t, n) {
 	}
 	return !1;
 }
-function Py(e, t, n) {
+function Fy(e, t, n) {
 	let r = getComputedStyle(e);
-	return r.visibility !== "visible" || jy(e) < .9 ? !1 : /^(img|svg|canvas|video|picture)$/i.test(e.localName) || r.backgroundImage.includes("url(") || Ey(r.backgroundColor).a >= .9 || Ny(e, t, n) ? !0 : !!e.shadowRoot?.elementsFromPoint(t, n).some((r) => r !== e && e.shadowRoot.contains(r) && Py(r, t, n));
+	return r.visibility !== "visible" || My(e) < .9 ? !1 : /^(img|svg|canvas|video|picture)$/i.test(e.localName) || r.backgroundImage.includes("url(") || Dy(r.backgroundColor).a >= .9 || Py(e, t, n) ? !0 : !!e.shadowRoot?.elementsFromPoint(t, n).some((r) => r !== e && e.shadowRoot.contains(r) && Fy(r, t, n));
 }
-function Fy(e) {
-	for (let t = e; t && t !== document.documentElement && t !== document.body; t = vy(t)) {
+function Iy(e) {
+	for (let t = e; t && t !== document.documentElement && t !== document.body; t = yy(t)) {
 		let e = getComputedStyle(t);
 		if (/auto|scroll/.test(e.overflowY) && t.scrollHeight > t.clientHeight + 1) return t;
 	}
 	return document.documentElement;
 }
-function Iy(e, t, n) {
+function Ly(e, t, n) {
 	let r = (e) => {
-		for (let t = e; t; t = vy(t)) if (/fixed|sticky/.test(getComputedStyle(t).position)) return !0;
+		for (let t = e; t; t = yy(t)) if (/fixed|sticky/.test(getComputedStyle(t).position)) return !0;
 		return !1;
 	};
 	if (r(t) || !r(n)) return !1;
-	let i = Fy(t), a = i.scrollHeight - i.clientHeight - i.scrollTop;
+	let i = Iy(t), a = i.scrollHeight - i.clientHeight - i.scrollTop;
 	if (a <= 0) return !1;
 	let o = n.getBoundingClientRect(), s = e.top - a;
 	return e.bottom - a <= o.top || s >= o.bottom || e.right <= o.left || e.left >= o.right;
 }
-function Ly(e, t) {
+function Ry(e, t) {
 	let n = document.createRange();
 	n.selectNodeContents(e);
 	let r = [...n.getClientRects()].filter((e) => e.width > 0 && e.height > 0), i = Math.max(1, Math.ceil(r.length / 8)), a = 0, o = 0, s = null;
@@ -12006,19 +12043,19 @@ function Ly(e, t) {
 	]) {
 		let r = e.left + e.width * n, i = e.top + e.height / 2;
 		if (r < 0 || i < 0 || r >= innerWidth || i >= innerHeight) continue;
-		let c = document.elementsFromPoint(r, i), l = c.findIndex((e) => My(e, t));
+		let c = document.elementsFromPoint(r, i), l = c.findIndex((e) => Ny(e, t));
 		if (l < 0) continue;
 		a++;
-		let u = c.slice(0, l).find((n) => !My(t, n) && !by(n) && Py(n, r, i) && !Iy(e, t, n));
+		let u = c.slice(0, l).find((n) => !Ny(t, n) && !xy(n) && Fy(n, r, i) && !Ly(e, t, n));
 		u && (o++, s ??= u);
 	}
-	return a > 0 && o / a >= Ay ? {
+	return a > 0 && o / a >= jy ? {
 		by: s,
 		share: Math.round(o / a * 100)
 	} : null;
 }
-function Ry(e, t) {
-	for (let n = yy(t); n; n = yy(vy(n))) {
+function zy(e, t) {
+	for (let n = by(t); n; n = by(yy(n))) {
 		let t = getComputedStyle(n);
 		if (/auto|scroll/.test(t.overflowX + t.overflowY)) return null;
 		if (/hidden|clip/.test(t.overflowX + t.overflowY) && n !== document.documentElement) {
@@ -12028,32 +12065,32 @@ function Ry(e, t) {
 	}
 	return null;
 }
-function zy() {
+function By() {
 	let e = innerWidth, t = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth), n = (e) => {
 		let t = 0;
-		for (let n = vy(e); n; n = vy(n)) t++;
+		for (let n = yy(e); n; n = yy(n)) t++;
 		return t;
 	}, r = (t) => {
-		for (let n = vy(t); n; n = vy(n)) {
+		for (let n = yy(t); n; n = yy(n)) {
 			if (n === document.documentElement || n === document.body) return !1;
 			let t = getComputedStyle(n);
 			if (/auto|scroll/.test(t.overflowX) && n.getBoundingClientRect().width <= e + 1) return !0;
 		}
 		return !1;
 	}, i = t > e + 1, a = [];
-	return Sy(document, (t) => {
+	return Cy(document, (t) => {
 		let o = getComputedStyle(t);
 		if (o.display === "none" || o.display === "contents") return;
 		let s = o.position === "fixed" || o.position === "sticky";
 		if (!s && !i) return;
 		let { left: c, right: l } = t.getBoundingClientRect();
-		s ? (c < -1 && l > 1 || l > e + 1 && c < e - 1) && _y(t) && !by(t) && !r(t) && a.push({
-			el: gy(t),
+		s ? (c < -1 && l > 1 || l > e + 1 && c < e - 1) && vy(t) && !xy(t) && !r(t) && a.push({
+			el: _y(t),
 			right: Math.round(l),
 			left: Math.round(c),
 			depth: n(t)
 		}) : l > e + 1 && !r(t) && a.push({
-			el: gy(t),
+			el: _y(t),
 			right: Math.round(l),
 			depth: n(t)
 		});
@@ -12063,7 +12100,7 @@ function zy() {
 		offenders: a.slice(0, 5).map(({ depth: e, ...t }) => t)
 	};
 }
-async function By() {
+async function Vy() {
 	let e = () => new Promise((e) => requestAnimationFrame(() => requestAnimationFrame(e))), t = (e = document) => {
 		if (e.getAnimations().some((e) => e.playState === "running" && Number.isFinite(e.effect?.getComputedTiming().endTime))) return !0;
 		for (let n of e.querySelectorAll("*")) if (n.shadowRoot && t(n.shadowRoot)) return !0;
@@ -12072,14 +12109,14 @@ async function By() {
 	await e();
 	for (let n = 0; n < 90 && t(); n++) await e();
 }
-function Vy() {
+function Hy() {
 	let e = [], t = [];
-	Sy(document, (e) => {
-		if (!e.matches(uy) || e.localName === "m3e-slider-thumb") return !0;
-		if (_y(e)) {
+	Cy(document, (e) => {
+		if (!e.matches(dy) || e.localName === "m3e-slider-thumb") return !0;
+		if (vy(e)) {
 			let n = e.getBoundingClientRect(), r = e.shadowRoot?.querySelector(".touch")?.getBoundingClientRect(), i = Math.max(n.width, r?.width ?? 0), a = Math.max(n.height, r?.height ?? 0);
 			t.push({
-				el: my(e),
+				el: hy(e),
 				node: e,
 				w: Math.round(i * 10) / 10,
 				h: Math.round(a * 10) / 10,
@@ -12104,33 +12141,33 @@ function Vy() {
 		check: "primary",
 		reason: "no visible element has data-primary"
 	})) : i.length > 1 ? (a.status = "fail", a.reason = "more than one visible element has data-primary") : (a.status = i[0].area >= r.area - .5 ? "pass" : "fail", a.status === "fail" && (a.reason = `${i[0].el} is smaller than ${r.el}`));
-	let o = [...document.querySelectorAll(dy)].filter((e) => !e.parentElement?.closest("m3e-fab-menu") && _y(e)).length, s = [], c = [], l = [], u = [], d = {
+	let o = [...document.querySelectorAll(fy)].filter((e) => !e.parentElement?.closest("m3e-fab-menu") && vy(e)).length, s = [], c = [], l = [], u = [], d = {
 		fails: [],
 		passed: 0
 	}, f = /* @__PURE__ */ new Set(), p = (...e) => {
 		let t = e.join("|");
 		return !f.has(t) && (f.add(t), !0);
 	};
-	Cy(document, (t) => {
-		let n = vy(t);
+	wy(document, (t) => {
+		let n = yy(t);
 		if (!n || n.closest?.("p-icon, m3e-icon")) return;
 		let r = getComputedStyle(n), i = document.createRange();
 		i.selectNodeContents(t);
 		let a = i.getBoundingClientRect();
-		if (a.width <= 0 || a.height <= 0 || r.visibility !== "visible" || by(n)) return;
-		let o = gy(yy(n) || n);
-		if (!fy(r.fontFamily) && p("font", o) && s.push({
+		if (a.width <= 0 || a.height <= 0 || r.visibility !== "visible" || xy(n)) return;
+		let o = _y(by(n) || n);
+		if (!py(r.fontFamily, parseFloat(r.fontSize)) && p("font", o) && s.push({
 			el: o,
 			font: r.fontFamily
-		}), xy(n)) return;
-		let f = ky(t, r);
+		}), Sy(n)) return;
+		let f = Ay(t, r);
 		f.length && p("midword", o) && l.push({
 			el: o,
 			words: f.slice(0, 3)
 		});
 		let m = null;
 		try {
-			m = Ly(t, n);
+			m = Ry(t, n);
 		} catch (t) {
 			p("overlap-error", o) && e.push({
 				check: "overlaps",
@@ -12140,21 +12177,21 @@ function Vy() {
 		}
 		m && p("overlap", o) && u.push({
 			el: o,
-			coveredBy: gy(m.by),
+			coveredBy: _y(m.by),
 			share: m.share
 		});
-		let h = yy(n), ee = /auto|scroll/.test(r.overflowX + r.overflowY);
+		let h = by(n), ee = /auto|scroll/.test(r.overflowX + r.overflowY);
 		h && !ee && getComputedStyle(h).display !== "inline" && (h.scrollWidth > h.clientWidth + 1 || h.scrollHeight > h.clientHeight + 1) && p("overflow", o) && c.push({
 			el: o,
 			scroll: [h.scrollWidth, h.scrollHeight],
 			client: [h.clientWidth, h.clientHeight]
 		});
-		let te = Ry(a, n);
+		let te = zy(a, n);
 		if (te && te !== h && p("overflow", o, "clip") && c.push({
 			el: o,
-			clippedBy: gy(te)
+			clippedBy: _y(te)
 		}), !p("contrast", o)) return;
-		let g = Dy(n);
+		let g = Oy(n);
 		if (!g.color) {
 			e.push({
 				check: "contrast",
@@ -12163,14 +12200,14 @@ function Vy() {
 			});
 			return;
 		}
-		let _ = cy(Ey(r.color), g.color), ne = ly(parseFloat(r.fontSize), parseInt(r.fontWeight, 10)), v = sy(_, g.color);
+		let _ = ly(Dy(r.color), g.color), ne = uy(parseFloat(r.fontSize), parseInt(r.fontWeight, 10)), v = cy(_, g.color);
 		v < ne ? d.fails.push({
 			el: o,
 			ratio: Math.round(v * 100) / 100,
 			need: ne
 		}) : d.passed++;
 	});
-	let m = zy(), h = e.length === 0, ee = !m.fails && n.length === 0 && s.length === 0 && c.length === 0 && l.length === 0 && u.length === 0 && a.status !== "fail" && o <= 1 && d.fails.length === 0;
+	let m = By(), h = e.length === 0, ee = !m.fails && n.length === 0 && s.length === 0 && c.length === 0 && l.length === 0 && u.length === 0 && a.status !== "fail" && o <= 1 && d.fails.length === 0;
 	return JSON.parse(JSON.stringify({
 		pass: ee,
 		complete: h,
@@ -12193,5 +12230,5 @@ function Vy() {
 		unresolved: e
 	}));
 }
-window.runtimeChecks = Vy, window.runtimeSettle = By;
+window.runtimeChecks = Hy, window.runtimeSettle = Vy;
 //#endregion
