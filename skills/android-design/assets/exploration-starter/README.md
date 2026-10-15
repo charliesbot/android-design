@@ -66,4 +66,16 @@ Generated once using `android create empty-activity` and `android-dev`'s `bootst
 
 Keep this starter's dependencies explicitly pinned. When updating it, build both shells, render both screenshot entry points, inspect the PNGs, and run Spotless in a disposable copy. Keep build outputs, local SDK paths, caches, and exploration results out of the installed template.
 
-Unmodified fonts come from the official [Google Fonts repository](https://github.com/google/fonts): `ofl/googlesansflex` and `ofl/robotoflex`. Their redistribution licenses are in `licenses/`.
+Unmodified fonts come from the official [Google Fonts repository](https://github.com/google/fonts) (`main` branch). Their redistribution licenses are in `licenses/`. Google Sans Flex is the default typography; the other faces are a curated set an exploration may use for a direction (brand faces on Display and Headline only, Doto at Display sizes only, Google Sans Code for numbers and data), and are not referenced by the starter's `Typography`.
+
+| File in `res/font/` | Source (`https://raw.githubusercontent.com/google/fonts/main/ofl/...`) | License in `licenses/` |
+| --- | --- | --- |
+| `google_sans_flex.ttf` | `googlesansflex/` (variable TTF) | `google-sans-flex-OFL.txt` |
+| `roboto_flex.ttf` | `robotoflex/` (variable TTF, Wear) | `roboto-flex-OFL.txt` |
+| `fraunces.ttf` | `fraunces/Fraunces[SOFT,WONK,opsz,wght].ttf` | `fraunces-OFL.txt` (`fraunces/OFL.txt`) |
+| `bricolage_grotesque.ttf` | `bricolagegrotesque/BricolageGrotesque[opsz,wdth,wght].ttf` | `bricolage-grotesque-OFL.txt` (`bricolagegrotesque/OFL.txt`) |
+| `big_shoulders_display.ttf` | `bigshouldersdisplay/BigShouldersDisplay[wght].ttf` | `big-shoulders-display-OFL.txt` (`bigshouldersdisplay/OFL.txt`) |
+| `doto.ttf` | `doto/Doto[ROND,wght].ttf` | `doto-OFL.txt` (`doto/OFL.txt`) |
+| `google_sans_code.ttf` | `googlesanscode/GoogleSansCode[wght].ttf` | `google-sans-code-OFL.txt` (`googlesanscode/OFL.txt`) |
+
+The gallery runtime builds its Latin-subset woff2 files from these TTFs (`gallery/runtime-src/assets.mjs`).

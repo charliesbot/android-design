@@ -9,7 +9,9 @@ there is no duplicate custom select, button, or dialog implementation.
 Google Sans Flex is shared with the proposal runtime at
 `public/runtime/fonts/GoogleSansFlex.woff2`. It is a Latin subset preserving all
 variable axes, generated from the Android starter's font by the runtime build.
-License: `public/runtime/fonts/OFL.txt`. Other characters use the system fallback.
+License: `public/runtime/fonts/OFL.txt`. Other characters use the system fallback. The runtime also bundles the
+brand and data faces (Fraunces, Bricolage Grotesque, Big Shoulders Display, Doto, Google Sans Code) the same way, each
+with its own `<Name>-OFL.txt` beside it; the gallery shell itself uses only Google Sans Flex.
 
 Device icons in `src/icons.mjs` and the proposal runtime sprite use Material Symbols
 Rounded, weight 400. The runtime sprite is generated from `@material-symbols/svg-400`.

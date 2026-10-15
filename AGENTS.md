@@ -34,7 +34,7 @@ Fetch monthly and after major Material or Android announcements. Quarterly, look
 
 These are settled. Don't flag them in reviews unless the reasoning no longer holds.
 
-- **Google Sans Flex on every phone, tablet, and desktop text style** is the owner's standard, not Google's; the skill says so, and the eval rubric enforces it on purpose.
+- **Google Sans Flex for plain text; a curated brand set for display and headline** is the owner's standard, not Google's; the skill says so, and the eval rubric enforces it on purpose. Plain text (Title, Body, Label) is always Google Sans Flex. One optional bundled brand face (Fraunces, Bricolage Grotesque, Big Shoulders Display, or Doto at display sizes only) may take Display and Headline, following Material's brand/plain typeface split, and Google Sans Code serves numbers and data. Every face is bundled so explorations never fetch fonts.
 - **Rules come from Google's docs, not apps.** Shipped apps, including Google's own, are examples of one implementation. A pattern seen in an app becomes a rule only when a Google source states it.
 - **Git is the source inventory.** `sources/` files carry no dates or hashes so unchanged pages diff clean; commit history records when each page changed.
 - **The coverage check proves agreement, not freshness.** A pass means the ledger and `sources/` match. Only running `fetch.py` shows whether Google changed anything.

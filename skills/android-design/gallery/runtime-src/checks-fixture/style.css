@@ -8,3 +8,7 @@
 .row { display: flex; gap: 8px; width: 100%; overflow-x: auto; }
 .card { flex: none; width: 200px; height: 24px; background: var(--md-sys-color-surface-container-high); }
 .ghost { opacity: 0; }
+/* Bundled faces: the first two are allowed where they are used, the third is below the face's minimum size and must be listed in fonts.offenders. */
+.voice-brand-ok { margin: 0; font-family: Fraunces, serif; font-size: 40px; line-height: 48px; }
+.voice-code-ok { margin: 0; font-family: "Google Sans Code", monospace; font-size: 12px; line-height: 16px; }
+.voice-doto-small { margin: 0; font-family: Doto, sans-serif; font-size: 24px; line-height: 32px; }

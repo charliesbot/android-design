@@ -79,6 +79,10 @@ const NAMED_COLORS = ('aliceblue antiquewhite aqua aquamarine azure beige bisque
 const COLOR_WORD = new RegExp(`(?<![\\w-])(?:${NAMED_COLORS.join('|')})(?![\\w-])`, 'i');
 const COLOR_FUNCTION = /(?<![\w-])(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i;
 const HEX_COLOR = /#[0-9a-f]{3,8}(?![\w-])/i;
+// The bundled typefaces (runtime-src/fonts.json, the same list the runtime fonts check reads). A brand face is for headline small (24px) and up,
+// Doto for display small (36px) and up, Google Sans Code for numbers and data at any size, Google Sans Flex everywhere.
+const FONTS = JSON.parse(readFileSync(new URL('./runtime-src/fonts.json', import.meta.url), 'utf8'));
+const BUNDLED = [FONTS.plain, ...FONTS.faces.map(face => face.family)];
 const TYPE_PROPERTIES = new Set(['font', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'font-variation-settings']);
 const blank = text => text.replace(/[^\n]/g, ' ');
 const lineAt = (text, index) => text.slice(0, index).split('\n').length;
@@ -98,7 +102,13 @@ function lintCss(file, source) {
     if (open >= 0 && close >= 0) { staticStart = open; staticEnd = close; }
   }
   const stack = [];
+  const voices = new Map(); // selector -> { family, min, at, sizes } across every rule that styles that voice
+  const frames = []; // one per open block: the family and font-size declared directly in it
   let start = 0;
+  const voice = selector => {
+    if (!voices.has(selector)) voices.set(selector, { min: 0, sizes: [] });
+    return voices.get(selector);
+  };
   const declaration = (end) => {
     const raw = text.slice(start, end);
     const colon = raw.indexOf(':');
@@ -117,17 +127,47 @@ function lintCss(file, source) {
     // The theme emits primary, secondary, tertiary, and error *-dim roles that Compose's ColorScheme lacks; a proposal using one could not be ported (see compose-mapping.md).
     const dim = /--md-sys-color-((?:primary|secondary|tertiary|error)-dim)\b/.exec(value);
     if (dim) fail(at, `${dim[1]} has no Compose counterpart. Use another --md-sys-color-* role`);
-    if (property === 'font-family') fail(at, 'font-family is not allowed. Every text style uses Google Sans Flex from the runtime; vary the voice with font-variation-settings, weight, and width');
-    if (TYPE_PROPERTIES.has(property)) {
-      const rule = [...stack].reverse().find(prelude => !prelude.startsWith('@'));
-      if (!rule || !/^\.voice-[\w-]+$/.test(rule)) fail(at, `${property} is only allowed in a single-class .voice-* rule. Use a .t-* type role class instead`);
+    const rule = [...stack].reverse().find(prelude => !prelude.startsWith('@'));
+    const isVoice = rule && /^\.voice-[\w-]+$/.test(rule);
+    if (property === 'font-family') {
+      if (!isVoice) fail(at, 'font-family is not allowed outside a single-class .voice-* rule. Plain text uses Google Sans Flex from the runtime');
+      const names = raw.slice(colon + 1).split(',').map(name => name.trim().replace(/^(["'])(.*)\1$/, '$2'));
+      const named = names.filter(name => !FONTS.generics.includes(name.toLowerCase()));
+      const unknown = named.find(name => !BUNDLED.includes(name));
+      if (unknown !== undefined) fail(at, `font-family is not allowed: "${unknown}" is not bundled. Use ${BUNDLED.join(', ')}, optionally followed by ${FONTS.generics.join(', ')} as a fallback`);
+      if (named.length !== 1) fail(at, `font-family is not allowed: a voice names exactly one bundled family (got ${named.length}). Use ${BUNDLED.join(', ')}`);
+      const face = FONTS.faces.find(item => item.family === named[0]);
+      if (face?.minPx) {
+        const info = voice(rule);
+        info.min = face.minPx; info.family = face.family; info.use = face.use; info.at = at;
+        frames.at(-1).needsSize = info;
+      }
     }
+    if (property === 'font-size' && isVoice) {
+      const px = /^\s*(\d+(?:\.\d+)?)px\s*$/.exec(value);
+      voice(rule).sizes.push({ px: px ? Number(px[1]) : null, at });
+      frames.at(-1).sized = true;
+    }
+    if (TYPE_PROPERTIES.has(property) && !isVoice) fail(at, `${property} is only allowed in a single-class .voice-* rule. Use a .t-* type role class instead`);
+    if (property === 'font' && isVoice) fail(at, 'The font shorthand is not allowed. Set font-size, font-weight, line-height, and font-variation-settings separately');
   };
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
-    if (char === '{') { stack.push(text.slice(start, i).trim().replace(/\s+/g, ' ')); start = i + 1; }
+    if (char === '{') { stack.push(text.slice(start, i).trim().replace(/\s+/g, ' ')); frames.push({}); start = i + 1; }
     else if (char === ';') { declaration(i); start = i + 1; }
-    else if (char === '}') { declaration(i); stack.pop(); start = i + 1; }
+    else if (char === '}') {
+      declaration(i);
+      const frame = frames.pop();
+      if (frame?.needsSize && !frame.sized) fail(frame.needsSize.at, `${frame.needsSize.family} needs a font-size of at least ${frame.needsSize.min}px in the same rule (${frame.needsSize.use === 'display' ? 'display small and up' : 'headline small and up'})`);
+      stack.pop(); start = i + 1;
+    }
+  }
+  for (const info of voices.values()) {
+    if (!info.min) continue;
+    for (const { px, at } of info.sizes) {
+      if (px === null) fail(at, `${info.family} voices need a font-size in px so the minimum can be checked`);
+      if (px < info.min) fail(at, `${info.family} is only for ${info.use === 'display' ? 'display small (36px)' : 'headline small (24px)'} and up. This voice sets font-size ${px}px; the minimum is ${info.min}px. Use Google Sans Flex for smaller text`);
+    }
   }
 }
 

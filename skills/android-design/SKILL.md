@@ -68,7 +68,7 @@ fun AppTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> U
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
         motionScheme = MotionScheme.expressive(),
-        typography = AppTypography, // Google Sans Flex voices, see section 5
+        typography = AppTypography, // Google Sans Flex voices plus an optional brand face, see section 5
         content = content,
     )
 }
@@ -143,12 +143,19 @@ Their v1-to-v2 lesson: ungrouped settings of similar size and inconsistent color
 
 - Use the role scale: **Display** for short important text and numerals, **Headline** for short high-emphasis text on phones, **Title** for secondary regions, **Body** for reading, **Label** inside components. Most screens need about five styles; pick sizes with clear contrast between them, not near-duplicates.
 - **Emphasized styles** (`MaterialTheme.typography.displayLargeEmphasized` through `labelSmallEmphasized`) are heavier variants. Components don't use them by default; apply them to the primary button label, selected items, unread items, key numbers, and headlines. "Give extra impact to a headline, or subtly strengthen text of the same size."
-- **Use Google Sans Flex for every style** in phone, tablet, and desktop apps (this skill's standard, not a Google requirement; Wear uses Roboto Flex). It is open source on Google Fonts since November 2025, most of the shipped Expressive apps sampled for this skill use it, and its shapes echo the Material shape library. Six variable axes: weight (1 to 1000), width (25 to 151), optical size (6 to 144), slant (0 to -10), grade (0 to 100), and roundness (`ROND`, 0 to 100). Bundle the variable font and set axes per style ([references/theming.md](references/theming.md#google-sans-flex)).
+- **Google Sans Flex for plain text and by default** in phone, tablet, and desktop apps (this skill's standard, not a Google requirement; Wear uses Roboto Flex). It is open source on Google Fonts since November 2025, most of the shipped Expressive apps sampled for this skill use it, and its shapes echo the Material shape library. Six variable axes: weight (1 to 1000), width (25 to 151), optical size (6 to 144), slant (0 to -10), grade (0 to 100), and roundness (`ROND`, 0 to 100). Bundle the variable font and set axes per style ([references/theming.md](references/theming.md#google-sans-flex)).
+- **Optionally one brand face for Display and Headline.** Material's type scale has a brand typeface "used for larger type styles, like Headline and Display, to focus on expression" and a plain one "used for smaller type styles, like Body and Label, to focus on readability", and says "Consider replacing Roboto with different typefaces to boost brand expression in your product." Explorations pick at most one face from this bundled set (all OFL, no fetching), used only on Display and Headline voices (24px and up) while Title, Body, and Label stay Google Sans Flex. By direction:
+  - **Fraunces** (`opsz`, `SOFT`, `WONK`, `wght`): warm, editorial soft serif for food, reading, journaling, and heritage.
+  - **Bricolage Grotesque** (`opsz`, `wdth`, `wght`): quirky, characterful grotesque for playful, indie, and creative tools.
+  - **Big Shoulders Display** (`wght`): tall, condensed poster type for sport, fitness, transit, and loud energy.
+  - **Doto** (`ROND`, `wght`): dot-matrix type for retro-tech, timers, and music; Display sizes only (36px and up).
+- **Google Sans Code for numbers and data** (timers, tabular values, codes, metadata), at any size, in any proposal; it is a mono face that pairs with any of the above.
+- Brand faces change character, not size: keep the scale's sizes and adjust line height and tracking ("Avoid changing the type size; this can affect how components render and reflow").
 - **Expressive voices on large styles, the text voice on small:** give Display and Headline the voice that serves the direction; keep Body and Label on default axes so they stay highly readable. Be careful at Title.
-- **The hero title or number must read as Google Sans Flex** (default): its character comes through strong axis settings (heavy weight, very narrow or very wide width, or high roundness). A medium weight at a middle width looks like any sans; keep the calm voices for secondary text.
+- **The hero title or number needs a real voice.** With Google Sans Flex (default) the character comes through strong axis settings (heavy weight, very narrow or very wide width, or high roundness); a medium weight at a middle width looks like any sans. With a bundled brand face, use it at Display or Headline size on purpose (its own axes, weight, tracking), not as a regular-weight swap. Keep the calm voices for secondary text.
 - **Axes carry feeling and meaning.** Google describes weight as ranging from "calm as a whisper" to "loud and rugged" and roundness as "personal, playful." In their research with 3,000+ readers, taller, more elegant (narrower) styles read as more premium and engaging. Axes also carry state: heavy in a filled container for the selected item, light for the rest, at the same size so nothing reflows. Grade adds emphasis without changing width.
 - **Always match optical size to the text size.** It reshapes letters to stay legible at every size; one setting across Display and Label hurts both. Set `opsz` per style (see the theming reference).
-- **Pick voices, not random axis values.** Define each voice once as a style and reuse it; two or three per app, each with one job. Starting points for Google Sans Flex voices are in [references/theming.md](references/theming.md#google-sans-flex); tune them to the direction rather than copying the nearest preset.
+- **Pick voices, not random axis values.** Define each voice once as a style and reuse it; two or three per app, each with one job. Starting points for Google Sans Flex voices and the brand faces are in [references/theming.md](references/theming.md#google-sans-flex); tune them to the direction rather than copying the nearest preset.
 
 - **Other voices:** Google Sans Code (or Roboto Mono) for code, metadata, and timecodes; Google Sans Mono only at medium and large editorial sizes, never for code. Roboto Serif for long reading.
 - **Editorial treatments** let type dominate a hero moment: a huge number, an album title over a photo, text that widens as a slider rises. Keep them consistent, match the emotion (narrow and light for calm, bold and wide for energy), and never use them for labels.
@@ -305,7 +312,7 @@ When the render contradicts the direction or the hierarchy, fix the largest mism
 
 Code checks, separately:
 
-- [ ] Theme and type for the surface: phone, tablet, and desktop use `MaterialExpressiveTheme` with the color source from section 4 and Google Sans Flex on every text style; Wear and widgets follow their references.
+- [ ] Theme and type for the surface: phone, tablet, and desktop use `MaterialExpressiveTheme` with the color source from section 4 and Google Sans Flex for plain text (plus at most one bundled brand face on Display and Headline); Wear and widgets follow their references.
 - [ ] Components from the right column of section 9's table (Wear and widgets: the components their references name).
 - [ ] Text and icons use their intended role pairs: no `copy(alpha = ...)`, no hard-coded hex colors.
 - [ ] Custom animations use `MaterialTheme.motionScheme`, not `tween()`.

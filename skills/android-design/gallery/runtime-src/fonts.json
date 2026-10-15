@@ -1,0 +1,11 @@
+{
+  "plain": "Google Sans Flex",
+  "faces": [
+    { "family": "Fraunces", "use": "brand", "minPx": 24 },
+    { "family": "Bricolage Grotesque", "use": "brand", "minPx": 24 },
+    { "family": "Big Shoulders Display", "use": "brand", "minPx": 24 },
+    { "family": "Doto", "use": "display", "minPx": 36 },
+    { "family": "Google Sans Code", "use": "data", "minPx": 0 }
+  ],
+  "generics": ["serif", "sans-serif", "monospace"]
+}

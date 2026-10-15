@@ -6,8 +6,17 @@ const here = new URL('./', import.meta.url);
 const repo = new URL('../../../../', here);
 const read = (url, encoding) => readFileSync(fileURLToPath(url), encoding);
 
-const FONT = new URL('skills/android-design/assets/exploration-starter/core/designsystem/common/src/main/res/font/google_sans_flex.ttf', repo);
-const FONT_LICENSE = new URL('skills/android-design/assets/exploration-starter/licenses/google-sans-flex-OFL.txt', repo);
+const STARTER = new URL('skills/android-design/assets/exploration-starter/', repo);
+// The bundled typefaces. The sources are the Compose starter's TTFs and licenses, so the web runtime and the Compose port ship the same fonts.
+// Google Sans Flex keeps the unqualified OFL.txt name; every other family has <Name>-OFL.txt.
+const FONTS = [
+  { name: 'GoogleSansFlex', file: 'google_sans_flex', license: 'google-sans-flex', licenseOut: 'OFL.txt' },
+  { name: 'Fraunces', file: 'fraunces', license: 'fraunces' },
+  { name: 'BricolageGrotesque', file: 'bricolage_grotesque', license: 'bricolage-grotesque' },
+  { name: 'BigShouldersDisplay', file: 'big_shoulders_display', license: 'big-shoulders-display' },
+  { name: 'Doto', file: 'doto', license: 'doto' },
+  { name: 'GoogleSansCode', file: 'google_sans_code', license: 'google-sans-code' },
+];
 const SYMBOLS = new URL('node_modules/@material-symbols/svg-400/', repo);
 
 // Basic Latin, Latin-1 Supplement, and the punctuation and symbols that appear in UI copy.
@@ -34,9 +43,11 @@ export function runtimeAssets() {
     name: 'proposal-runtime-assets',
     async generateBundle() {
       const emit = (fileName, source) => this.emitFile({ type: 'asset', fileName, source });
-      const font = await subsetFont(read(FONT), LATIN, { targetFormat: 'woff2' });
-      emit('fonts/GoogleSansFlex.woff2', font);
-      emit('fonts/OFL.txt', read(FONT_LICENSE));
+      for (const { name, file, license, licenseOut } of FONTS) {
+        const ttf = read(new URL(`core/designsystem/common/src/main/res/font/${file}.ttf`, STARTER));
+        emit(`fonts/${name}.woff2`, await subsetFont(ttf, LATIN, { targetFormat: 'woff2' }));
+        emit(`fonts/${licenseOut ?? `${name}-OFL.txt`}`, read(new URL(`licenses/${license}-OFL.txt`, STARTER)));
+      }
       emit('icons.svg', await sprite());
       emit('icons-LICENSE.txt', read(new URL('LICENSE', SYMBOLS)));
       emit('runtime.css', read(new URL('runtime.css', here)));

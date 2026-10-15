@@ -18,10 +18,10 @@ The gallery CSP is `default-src 'self'`: no inline `<style>`, no `style=""`, no 
 | --- | --- |
 | `runtime/m3e.js` | ES module: registers the `@m3e/web` 2.9.2 elements below, the `p-` pieces, the theme message listener, `window.runtimeChecks`, and `window.runtimeSettle` (resolves once no finite animation or transition is running; call it before `runtimeChecks()`) |
 | `runtime/runtime.css` | Google Sans Flex `@font-face`, page defaults, type role classes, shim styles |
-| `runtime/fonts/` | `GoogleSansFlex.woff2` (Latin subset, all variable axes) and its OFL license |
+| `runtime/fonts/` | Latin-subset woff2 with all variable axes and each OFL license: `GoogleSansFlex` (plain text, always), `Fraunces`, `BricolageGrotesque`, `BigShouldersDisplay`, `Doto` (optional brand faces for Display and Headline voices), `GoogleSansCode` (numbers and data). The family list and minimum sizes are in `fonts.json`, read by the publish lint and the fonts check |
 | `runtime/icons.svg` | Material Symbols Rounded sprite (weight 400, unfilled and filled), license in `icons-LICENSE.txt` |
 | `runtime/sample/` | A small page that uses only runtime pieces |
-| `runtime/checks-fixture/` | Known-bad and known-good component text (low-contrast and clipped button labels, clipped plain text) that `runtimeChecks()` must flag, plus opacity 0 text it must skip instead of leaving unresolved |
+| `runtime/checks-fixture/` | Known-bad and known-good component text (low-contrast and clipped button labels, clipped plain text) that `runtimeChecks()` must flag, plus opacity 0 text it must skip instead of leaving unresolved, and bundled-face text (Fraunces at 40px and Google Sans Code at 12px pass, Doto at 24px must be listed in `fonts.offenders`) |
 | `runtime/review/` | The review page: one proposal in four exact device frames, with `reviewChecks()` |
 | `runtime/verify/` | One section per component in `references/compose-mapping.md`, with its variants, for comparing against Compose; it marks nothing verified |
 
@@ -36,6 +36,8 @@ Wrap the page in `<m3e-theme color="#RRGGBB" variant="tonal-spot" scheme="light"
 ## Type roles
 
 One class per Material 3 role: `.t-display-large`, `.t-display-medium`, `.t-display-small`, `.t-headline-large|medium|small`, `.t-title-large|medium|small`, `.t-body-large|medium|small`, `.t-label-large|medium|small` (15), and the same names with an `-em` suffix for the emphasized roles (15). Sizes, line heights, tracking, and weights are generated from `type-scale.json`, extracted from the pinned AndroidX Material 3 artifact, so each class equals its Compose `MaterialTheme.typography` role exactly.
+
+Fonts: every element is Google Sans Flex. A `.voice-*` rule may set `font-family` to one bundled face (`Fraunces`, `"Bricolage Grotesque"`, `"Big Shoulders Display"` at `font-size` 24px and up in that rule; `Doto` at 36px and up; `"Google Sans Code"` at any size), optionally followed by `serif`, `sans-serif`, or `monospace`. Publishing rejects any other family, a `font` shorthand, and a brand face below its minimum, with the file and line. The fonts check lists rendered text whose first family is not bundled or is a brand face below its minimum size.
 
 Large voices: Google Sans Flex at heavy weights and large sizes needs a line height of at least about 1.2x the font size (`SKILL.md` section 5: "Line height about 1.2x on large styles"); heavy or narrow voices need about 1.25x (measured). The checker flags a tighter line box as overflow, because the glyph box then exceeds the box that holds it.
 

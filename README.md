@@ -39,7 +39,7 @@ open the side panel for theme previews and feedback. Finish requires confirmatio
 and never implements the design. Empty explorations show an empty canvas.
 Seed swatches, palette, and Dark theme apply to the website and proposal together.
 Reset theme restores the active proposal's original theme without changing saved designs.
-Google Sans Flex is shared with the proposal runtime, including its local font license.
+Google Sans Flex is shared with the proposal runtime, including its local font license. The runtime also bundles the optional brand and data faces (Fraunces, Bricolage Grotesque, Big Shoulders Display, Doto, Google Sans Code).
 
 ### Developing the gallery frontend
 
