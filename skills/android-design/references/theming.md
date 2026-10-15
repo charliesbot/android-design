@@ -224,7 +224,7 @@ fun numeralStyle(selected: Boolean) =
 
 ### Brand faces (Display and Headline only)
 
-Optional: one face from the set below on Display and Headline styles, with everything else on Google Sans Flex. All are OFL and bundled in the exploration starter's `res/font/` as variable TTFs, so an exploration never fetches fonts. Material calls this the brand typeface (larger styles, "to focus on expression") against the plain typeface (smaller styles, "to focus on readability"); do not use a brand face on Body or Label. Build each style the same way as `flex` above: one `Font` per weight with `FontVariation.Settings`, and keep the scale's sizes (change line height and tracking).
+Optional: one face from the set below on Display and Headline styles, with everything else on Google Sans Flex. The face set, one face per proposal, Doto's display-only limit, and keeping Title on Google Sans Flex are this skill's choices, not Google's. All are OFL and bundled in the exploration starter's `res/font/` as variable TTFs, so an exploration never fetches fonts. Material calls this the brand typeface (larger styles, "to focus on expression") against the plain typeface (smaller styles, "to focus on readability"); do not use a brand face on Body or Label. Build each style the same way as `flex` above: one `Font` per weight with `FontVariation.Settings`, and keep the scale's sizes (change line height and tracking).
 
 | Face | File | Axes | Use for | Starting point |
 | --- | --- | --- | --- | --- |
