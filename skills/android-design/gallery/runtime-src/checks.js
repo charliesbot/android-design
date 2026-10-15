@@ -103,9 +103,9 @@ function backdrop(el) {
 
 // Mid-word breaks: a word split across two lines with no hyphen, which `overflow-wrap: anywhere`, `word-break`
 // or a too-narrow box produces ("Golde / n Hour"). Words are measured in segments split at spaces, hyphens,
-// soft hyphens, and slashes, where a break is legitimate. Text with `hyphens: auto` shows a hyphen at the
+// soft hyphens, zero-width spaces, and slashes, where a break is legitimate. Text with `hyphens: auto` shows a hyphen at the
 // break, and CJK runs have no spaces to break at, so both are skipped.
-const BREAKABLE = /[^\s\-­‐-―/]+/g;
+const BREAKABLE = /[^\s\-\u00ad\u200b\u2010-\u2015/]+/g;
 function midWordBreaks(node, style) {
   if (style.hyphens === 'auto' || /[　-鿿가-힯฀-๿]/.test(node.textContent)) return [];
   const found = [];
@@ -154,14 +154,24 @@ function paintsAt(el, x, y) {
   if (style.visibility !== 'visible' || opacityChain(el) < 0.9) return false;
   if (/^(img|svg|canvas|video|picture)$/i.test(el.localName) || style.backgroundImage.includes('url(')) return true;
   if (rgba(style.backgroundColor).a >= 0.9 || ownsTextAt(el, x, y)) return true;
-  return Boolean(el.shadowRoot?.elementsFromPoint(x, y).some(inner => inner !== el && paintsAt(inner, x, y)));
+  return Boolean(el.shadowRoot?.elementsFromPoint(x, y).some(inner => inner !== el && el.shadowRoot.contains(inner) && paintsAt(inner, x, y)));
 }
-// Can scrolling alone move the text out from under a viewport-pinned coverer? Only the document scrolls here.
+// Can scrolling alone move the text out from under a viewport-pinned coverer? The text scrolls in its nearest
+// scrollable flat-tree ancestor, or in the document when there is none. A coverer inside that scroller moves with it.
+function scrollerOf(el) {
+  for (let node = el; node; node = flatParent(node)) {
+    if (node === document.documentElement || node === document.body) break;
+    const style = getComputedStyle(node);
+    if (/auto|scroll/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 1) return node;
+  }
+  return document.documentElement;
+}
 function scrollsClear(textRect, el, coverer) {
   const pinned = node => { for (let n = node; n; n = flatParent(n)) if (/fixed|sticky/.test(getComputedStyle(n).position)) return true; return false; };
   if (pinned(el) || !pinned(coverer)) return false;
-  const root = document.documentElement;
-  const remaining = root.scrollHeight - root.clientHeight - root.scrollTop;
+  const scroller = scrollerOf(el);
+  if (scroller !== document.documentElement && flatContains(scroller, coverer)) return false;
+  const remaining = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
   if (remaining <= 0) return false;
   const box = coverer.getBoundingClientRect();
   const top = textRect.top - remaining, bottom = textRect.bottom - remaining;
@@ -313,7 +323,8 @@ export function runtimeChecks() {
     // Mid-word breaks and overlap. Both read the live layout, so they are measured where the text renders.
     const broken = midWordBreaks(node, style);
     if (broken.length && once('midword', name)) midWord.push({ el: name, words: broken.slice(0, 3) });
-    const covered = coveredText(node, el);
+    let covered = null;
+    try { covered = coveredText(node, el); } catch (error) { if (once('overlap-error', name)) unresolved.push({ check: 'overlaps', el: name, reason: String(error) }); }
     if (covered && once('overlap', name)) overlaps.push({ el: name, coveredBy: describeFlat(covered.by), share: covered.share });
 
     // Overflow: the box holding the text overflows itself, or an ancestor that clips cuts the text off.

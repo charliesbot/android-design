@@ -11939,7 +11939,7 @@ function Dy(e) {
 	}
 	return { reason: "no opaque background found" };
 }
-var Oy = /[^\s\-­‐-―/]+/g;
+var Oy = /[^\s\-\u00ad\u200b\u2010-\u2015/]+/g;
 function ky(e, t) {
 	if (t.hyphens === "auto" || /[　-鿿가-힯฀-๿]/.test(e.textContent)) return [];
 	let n = [], r = document.createRange();
@@ -11973,20 +11973,29 @@ function Ny(e, t, n) {
 }
 function Py(e, t, n) {
 	let r = getComputedStyle(e);
-	return r.visibility !== "visible" || jy(e) < .9 ? !1 : /^(img|svg|canvas|video|picture)$/i.test(e.localName) || r.backgroundImage.includes("url(") || Ey(r.backgroundColor).a >= .9 || Ny(e, t, n) ? !0 : !!e.shadowRoot?.elementsFromPoint(t, n).some((r) => r !== e && Py(r, t, n));
+	return r.visibility !== "visible" || jy(e) < .9 ? !1 : /^(img|svg|canvas|video|picture)$/i.test(e.localName) || r.backgroundImage.includes("url(") || Ey(r.backgroundColor).a >= .9 || Ny(e, t, n) ? !0 : !!e.shadowRoot?.elementsFromPoint(t, n).some((r) => r !== e && e.shadowRoot.contains(r) && Py(r, t, n));
 }
-function Fy(e, t, n) {
+function Fy(e) {
+	for (let t = e; t && t !== document.documentElement && t !== document.body; t = vy(t)) {
+		let e = getComputedStyle(t);
+		if (/auto|scroll/.test(e.overflowY) && t.scrollHeight > t.clientHeight + 1) return t;
+	}
+	return document.documentElement;
+}
+function Iy(e, t, n) {
 	let r = (e) => {
 		for (let t = e; t; t = vy(t)) if (/fixed|sticky/.test(getComputedStyle(t).position)) return !0;
 		return !1;
 	};
 	if (r(t) || !r(n)) return !1;
-	let i = document.documentElement, a = i.scrollHeight - i.clientHeight - i.scrollTop;
+	let i = Fy(t);
+	if (i !== document.documentElement && My(i, n)) return !1;
+	let a = i.scrollHeight - i.clientHeight - i.scrollTop;
 	if (a <= 0) return !1;
 	let o = n.getBoundingClientRect(), s = e.top - a;
 	return e.bottom - a <= o.top || s >= o.bottom || e.right <= o.left || e.left >= o.right;
 }
-function Iy(e, t) {
+function Ly(e, t) {
 	let n = document.createRange();
 	n.selectNodeContents(e);
 	let r = [...n.getClientRects()].filter((e) => e.width > 0 && e.height > 0), i = Math.max(1, Math.ceil(r.length / 8)), a = 0, o = 0, s = null;
@@ -12002,7 +12011,7 @@ function Iy(e, t) {
 		let c = document.elementsFromPoint(r, i), l = c.findIndex((e) => My(e, t));
 		if (l < 0) continue;
 		a++;
-		let u = c.slice(0, l).find((n) => !My(t, n) && !by(n) && Py(n, r, i) && !Fy(e, t, n));
+		let u = c.slice(0, l).find((n) => !My(t, n) && !by(n) && Py(n, r, i) && !Iy(e, t, n));
 		u && (o++, s ??= u);
 	}
 	return a > 0 && o / a >= Ay ? {
@@ -12010,7 +12019,7 @@ function Iy(e, t) {
 		share: Math.round(o / a * 100)
 	} : null;
 }
-function Ly(e, t) {
+function Ry(e, t) {
 	for (let n = yy(t); n; n = yy(vy(n))) {
 		let t = getComputedStyle(n);
 		if (/auto|scroll/.test(t.overflowX + t.overflowY)) return null;
@@ -12021,7 +12030,7 @@ function Ly(e, t) {
 	}
 	return null;
 }
-function Ry() {
+function zy() {
 	let e = innerWidth, t = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth), n = (e) => {
 		let t = 0;
 		for (let n = vy(e); n; n = vy(n)) t++;
@@ -12056,7 +12065,7 @@ function Ry() {
 		offenders: a.slice(0, 5).map(({ depth: e, ...t }) => t)
 	};
 }
-async function zy() {
+async function By() {
 	let e = () => new Promise((e) => requestAnimationFrame(() => requestAnimationFrame(e))), t = (e = document) => {
 		if (e.getAnimations().some((e) => e.playState === "running" && Number.isFinite(e.effect?.getComputedTiming().endTime))) return !0;
 		for (let n of e.querySelectorAll("*")) if (n.shadowRoot && t(n.shadowRoot)) return !0;
@@ -12065,7 +12074,7 @@ async function zy() {
 	await e();
 	for (let n = 0; n < 90 && t(); n++) await e();
 }
-function By() {
+function Vy() {
 	let e = [], t = [];
 	Sy(document, (e) => {
 		if (!e.matches(uy)) return !0;
@@ -12121,7 +12130,16 @@ function By() {
 			el: o,
 			words: f.slice(0, 3)
 		});
-		let m = Iy(t, n);
+		let m = null;
+		try {
+			m = Ly(t, n);
+		} catch (t) {
+			p("overlap-error", o) && e.push({
+				check: "overlaps",
+				el: o,
+				reason: String(t)
+			});
+		}
 		m && p("overlap", o) && u.push({
 			el: o,
 			coveredBy: gy(m.by),
@@ -12133,7 +12151,7 @@ function By() {
 			scroll: [h.scrollWidth, h.scrollHeight],
 			client: [h.clientWidth, h.clientHeight]
 		});
-		let te = Ly(a, n);
+		let te = Ry(a, n);
 		if (te && te !== h && p("overflow", o, "clip") && c.push({
 			el: o,
 			clippedBy: gy(te)
@@ -12154,7 +12172,7 @@ function By() {
 			need: ne
 		}) : d.passed++;
 	});
-	let m = Ry(), h = e.length === 0, ee = !m.fails && n.length === 0 && s.length === 0 && c.length === 0 && l.length === 0 && u.length === 0 && a.status !== "fail" && o <= 1 && d.fails.length === 0;
+	let m = zy(), h = e.length === 0, ee = !m.fails && n.length === 0 && s.length === 0 && c.length === 0 && l.length === 0 && u.length === 0 && a.status !== "fail" && o <= 1 && d.fails.length === 0;
 	return JSON.parse(JSON.stringify({
 		pass: ee,
 		complete: h,
@@ -12177,5 +12195,5 @@ function By() {
 		unresolved: e
 	}));
 }
-window.runtimeChecks = By, window.runtimeSettle = zy;
+window.runtimeChecks = Vy, window.runtimeSettle = By;
 //#endregion

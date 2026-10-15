@@ -36,6 +36,9 @@ const CASES = {
   'fixed-right': { fails: ['C-review'], detail: /light: pageOverflow/ },
   'midword-break': { fails: ['C-review'], detail: /midWordBreaks/ },
   'toolbar-overlap': { fails: ['C-review'], detail: /overlap/ },
+  'control-scroll-list': { fails: [] }, // content scrolls clear of the floating toolbar
+  'control-inner-scroller': { fails: [] },
+  'toolbar-overlap-static': { fails: ['C-review'], detail: /overlaps/ },
   'fixed-left': { fails: ['C-review'], detail: /light: pageOverflow/ },
 };
 
