@@ -23,7 +23,7 @@ The screen must work and adapt across phone (411x923), foldable (933x704), table
 If your harness has a browser:
 
 1. Serve the exploration on a free port: `node {{SKILL_DIR}}/gallery/cli.mjs serve {{EXPLORATION}} --port <free port>`.
-2. Open your own new browser tab for `http://127.0.0.1:<port>/runtime/review/?src=/draft/a/` (other agents may share the browser, so never reuse or navigate an existing tab) and keep it in front while you run the checks, because a backgrounded tab can stall `reviewChecks()`. Run `window.reviewChecks()`, fix every failure, and look at the screenshots of each device.
+2. Open your own new browser tab for `http://127.0.0.1:<port>/runtime/review/?src=/draft/a/` (other agents may share the browser, so never reuse or navigate an existing tab) and keep it in front while you run the checks, because a backgrounded tab can stall `reviewChecks()`. Run `window.reviewChecks()`, fix every failure, and look at the screenshot of every device frame (phone, foldable, tablet, desktop), not just the phone. Check that each larger frame reveals what your section 0 adaptation answer promised, rather than rearranging the phone content.
 3. Stop the server when you are done.
 
 If your harness has no browser, say in your final message that visual review is unverified.
@@ -39,4 +39,4 @@ If your harness has no browser, say in your final message that visual review is 
 
 ## Final message (under 250 words)
 
-Your section 0 answers (goals, direction including the visual idea, hero, color source); key decisions and which part of the skill drove each; what the review found and what you changed; whether visual review was verified; anything in the skill that was unclear or wrong.
+Your section 0 answers (goals, direction including the visual idea, hero, color source, adaptation); key decisions and which part of the skill drove each; what the review found and what you changed; whether visual review was verified; anything in the skill that was unclear or wrong.

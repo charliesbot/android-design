@@ -131,6 +131,7 @@ behavior Material leaves out. The most useful additions for a design skill:
   for primary; tabs or a bottom toolbar for secondary. Don't stretch a bottom
   nav bar on large screens; switch to a rail. A rail can be more ergonomic even
   on a compact cover screen.
+- **Control-based layouts reflow and reveal.** Adapt-layout: "For control based layouts, like media players, allow the controls to reflow and content to reveal." On a cover screen, "use an anchor element, like a large play button, to adapt the content around and the hero art becomes the background on the cover screen." Reflow and reveal come as a pair here: the controls move, and the extra space shows content the compact layout hid.
 - **Actions:** one FAB for the most important action; secondary actions in the
   top bar or next to their content; rare actions in an overflow menu.
 - **Landscape and postures:** landscape phones are medium width with compact
