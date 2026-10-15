@@ -49,14 +49,17 @@ class ArtifactCliTests(unittest.TestCase):
             with patch.object(sys, 'argv', ['calibrate.py', 'prepare', '--out', str(out)]):
                 self.assertEqual(calibrate.main(), 0)
             labels = json.loads((out / 'labels.json').read_text())
-            self.assertEqual(len(labels), 7)
+            self.assertEqual(len(labels), 10)
             jpeg_directory = None
             for index, label in enumerate(labels):
                 directory = out / str(index)
                 request = json.loads((directory / 'judge-request.json').read_text())
-                image = directory / 'renders' / Path(label['image']).name
-                self.assertEqual(request['images'], [str(image.resolve())])
-                self.assertIn(str(image.relative_to(directory)), request['artifacts'])
+                names = calibrate.label_images(label)
+                images = sorted(directory / 'renders' / Path(name).name for name in names)
+                self.assertEqual(request['images'], [str(i.resolve()) for i in images])
+                for image in images:
+                    self.assertIn(str(image.relative_to(directory)), request['artifacts'])
+                image = images[0]
                 ballot = {'request_id': request['request_id'], 'items': [
                     {'id': item, 'pass': True, 'reason': 'Fixture verdict'}
                     for item in request['item_ids']]}

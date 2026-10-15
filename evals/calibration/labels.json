@@ -1,5 +1,5 @@
 {
-  "note": "Known verdicts for past renders and reference screenshots. calibrate.py must reproduce every label before the judge is trusted. music-content-color.png is the owner's supplied music-app collage: its now-playing screen pairs a full-screen burgundy palette with visible pink album art. It tests visual coherence, not proof of token usage or color extraction.",
+  "note": "Known verdicts for past renders and reference screenshots. calibrate.py must reproduce every label before the judge is trusted. music-content-color.png is the owner's supplied music-app collage: its now-playing screen pairs a full-screen burgundy palette with visible pink album art. It tests visual coherence, not proof of token usage or color extraction. The adaptive-* labels list four frames each (light phone, foldable, tablet, desktop) because R-adaptive compares size classes: the music set only rearranges the phone layout (fail); the settings and trek sets reveal a second pane or more content (pass).",
   "images": [
     {"image": "music-content-color.png", "case": "music", "expect": {"R-surfaces": true}},
     {"image": "finance-v3-neon.jpg", "case": "finance", "expect": {"R-surfaces": false}},
@@ -7,6 +7,9 @@
     {"image": "finance-v5.jpg", "case": "finance", "expect": {"R-surfaces": true, "R-finance-categories": true, "R-font": true, "R-hierarchy": true}},
     {"image": "music-v5-loose-text-buttons.jpg", "case": "music", "expect": {"R-controls": false, "R-font": false}},
     {"image": "music-v6-merged-toolbar.jpg", "case": "music", "expect": {"R-controls": false}},
-    {"image": "music-v8.jpg", "case": "music", "expect": {"R-controls": true, "R-font": true, "R-surfaces": true, "R-hierarchy": true, "R-music-actions": true}}
+    {"image": "music-v8.jpg", "case": "music", "expect": {"R-controls": true, "R-font": true, "R-surfaces": true, "R-hierarchy": true, "R-music-actions": true}},
+    {"images": ["adaptive-music-light.jpg", "adaptive-music-foldable.jpg", "adaptive-music-tablet.jpg", "adaptive-music-desktop.jpg"], "case": "music", "expect": {"R-adaptive": false}},
+    {"images": ["adaptive-settings-light.jpg", "adaptive-settings-foldable.jpg", "adaptive-settings-tablet.jpg", "adaptive-settings-desktop.jpg"], "case": "settings", "expect": {"R-adaptive": true}},
+    {"images": ["adaptive-trek-light.jpg", "adaptive-trek-foldable.jpg", "adaptive-trek-tablet.jpg", "adaptive-trek-desktop.jpg"], "case": "trek", "expect": {"R-adaptive": true}}
   ]
 }

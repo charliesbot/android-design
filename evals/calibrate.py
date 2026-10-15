@@ -12,6 +12,11 @@ from run import make_request, import_ballot
 HERE = Path(__file__).resolve().parent
 
 
+def label_images(label):
+    """A label names one image, or several when a rule needs more than one frame."""
+    return label.get('images') or [label['image']]
+
+
 def report(labels, verdicts):
     misses = 0
     for label, verdict in zip(labels, verdicts):
@@ -19,7 +24,7 @@ def report(labels, verdicts):
             got = verdict[item]
             ok = got['pass'] == expected
             misses += not ok
-            print(f"{'ok  ' if ok else 'MISS'} {label['image']:40} {item:22} expected {expected}, got {got['pass']} ({got['votes']}): {got['reason'][:90]}")
+            print(f"{'ok  ' if ok else 'MISS'} {label_images(label)[0]:40} {item:22} expected {expected}, got {got['pass']} ({got['votes']}): {got['reason'][:90]}")
     print(f"\n{'calibrated' if not misses else f'{misses} miss(es)'}")
     return 1 if misses else 0
 
@@ -38,7 +43,7 @@ def main():
         labels = json.loads((HERE / 'calibration/labels.json').read_text())['images']
         if args.command == 'run':
             validate_runs(args.runs)
-            verdicts = [judge(label['case'], [str(HERE / 'calibration' / label['image'])],
+            verdicts = [judge(label['case'], [str(HERE / 'calibration' / name) for name in label_images(label)],
                               list(label['expect']), args.runs, backend=args.judge, model=args.model)
                         for label in labels]
             return report(labels, verdicts)
@@ -49,7 +54,8 @@ def main():
             for index, label in enumerate(labels):
                 directory = out / str(index)
                 (directory / 'renders').mkdir(parents=True)
-                shutil.copy2(HERE / 'calibration' / label['image'], directory / 'renders' / Path(label['image']).name)
+                for name in label_images(label):
+                    shutil.copy2(HERE / 'calibration' / name, directory / 'renders' / Path(name).name)
                 case = dict(cases[label['case']])
                 case['assertions'] = [a for a in case['assertions'] if a['id'] in label['expect']]
                 request = make_request(case, directory, (HERE / 'rubric.md').read_text())

@@ -699,7 +699,7 @@ Result: 48 routes checked. 25 are fully distilled, 17 are partly distilled, 6 ar
 - [x] /design/ui/mobile/guides/styles/themes → android-ui-design-guides.md (Color and theming)
 
 ### Mobile: layout and content
-- [x] /design/ui/mobile/guides/layout-and-content/adapt-layout → android-ui-design-guides.md (Layout)
+- [x] /design/ui/mobile/guides/layout-and-content/adapt-layout → android-ui-design-guides.md (Layout: control-based layouts reflow and reveal; anchor element)
 - [x] /design/ui/mobile/guides/layout-and-content/app-anatomy → android-ui-design-guides.md (System bars and edge-to-edge)
 - [-] /design/ui/mobile/guides/layout-and-content/canonical-layouts; dead link (HTTP 404), not scraped
 - [x] /design/ui/mobile/guides/layout-and-content/common-layouts → android-ui-design-guides.md (Layout > Windows, orientation, and continuity: supporting sheets, WebView)

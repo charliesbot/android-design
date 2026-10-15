@@ -14,7 +14,7 @@ Design for window size, not devices; orientation, folding, split screen, and fre
 | Large | 1200 to 1599dp | 2 recommended | Rail, collapsed or expanded | 24dp, 24dp spacer |
 | Extra large | 1600dp+ | 2 (3 with a side sheet) | Expanded rail | 24dp, 24dp spacer |
 
-Moving up a breakpoint, ask five questions:
+Moving up a breakpoint, ask five questions. For control-based layouts like media players, "allow the controls to reflow and content to reveal" (adapt-layout).
 
 1. **Reveal:** what hidden UI can appear (expanded rail, second pane, more list detail)? "Additional space doesn't just mean making the same thing bigger."
 2. **Divide:** one pane or two?

@@ -48,6 +48,7 @@ Answer these in your reply before any code, a sentence or two each. Skipping thi
 4. **Choose the color source.** Dynamic (wallpaper), brand (a generated scheme), or content-based (from an image on screen). See section 4.
 5. **Spend emphasis by rank.** The primary goal gets the most, usually size first. Secondary goals get fewer tactics; tertiary ones get containment and type (Google). Content can dominate the screen when it is the product, as long as the primary action stays unmistakable.
 6. **Pick components from section 9's table**, not from memory of older Material.
+7. **Answer the adaptation question.** For each size class you will render (compact; medium or expanded; large or extra large), name what the extra space reveals: a second pane, an expanded rail, more detail. Use the five questions in [references/layout.md](references/layout.md), starting with "What should be revealed?". Navigation stays consistent: if a larger layout has a rail, compact has a navigation bar for the same destinations. For a control-based screen like a media player, the controls reflow and content is revealed. A larger layout that is only the phone content spread wider has not answered it: "Additional space doesn't just mean making the same thing bigger." (Google)
 
 Then compose the screen (section 8), build it, and run the [screen check](#screen-check) on the rendered result.
 
@@ -203,7 +204,7 @@ val tint by animateColorAsState(if (selected) colors.primary else colors.surface
 - Use an 8dp scale (4, 8, 12, 16, 24, 32, 48). Put padding and gaps on parents, not margins on children. Compact screens use 16dp side margins; medium and up 24dp.
 - **Group with gaps and containers instead of dividers.** Expressive lists, menus, and search results separate groups with gaps between filled items; dividers are for uncontained lists only.
 - Keep reading text at 40 to 60 characters per line.
-- **Adapt by breakpoint:** compact (under 600dp) one pane with a navigation bar; medium (600 to 839dp) one pane (two only for low-density content); expanded and up two panes with a navigation rail. Moving up a breakpoint, *reveal* more, don't just enlarge. Details: [references/layout.md](references/layout.md).
+- **Adapt by breakpoint:** compact (under 600dp) one pane with a navigation bar; medium (600 to 839dp) one pane (two only for low-density content); expanded and up two panes with a navigation rail. Moving up a breakpoint, *reveal* more: "Additional space doesn't just mean making the same thing bigger." Build what your section 0 adaptation answer says each size class reveals. Details: [references/layout.md](references/layout.md).
 
 ### Composing the screen
 
