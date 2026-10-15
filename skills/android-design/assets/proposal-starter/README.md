@@ -15,13 +15,13 @@ Publishing fails on a violation and names the file and line. Each rule keeps a p
 - Color uses only `var(--md-sys-color-*)` role variables. A color that is not a role (a dish or category color) is declared once, in a single block that starts with the comment `/* static colors */` and declares only `--static-*` custom properties. Raw hex, `rgb(`, `hsl(`, and named colors are rejected everywhere else; `transparent`, `currentColor`, and `inherit` are fine. The `primary-dim`, `secondary-dim`, `tertiary-dim`, and `error-dim` roles are rejected because Compose has no matching role.
 - Icons come only from `gallery/runtime-src/icons.json`, through `<p-icon name="...">`.
 - Corners come from the Material corner scale (or `m3e-shape`), spacing from the 8dp scale (4dp for tight pairs).
-- No `style=""` attributes, inline `<style>`, or inline `<script>`: the CSP forbids them and the linter rejects them. Put styles in a `.css` file and scripts behind `src`.
+- No `style=""` attributes, inline `<style>`, or inline `<script>`: the CSP forbids them and the linter rejects them. Put styles in a `.css` file and scripts behind `src`. A proposal may add its own script files for in-memory interaction only (no network, no storage); the lint checks that scripts have `src`, not what they do.
 
-Static color block example:
+Static color block example (`light-dark()` gives a light and a dark value; `<m3e-theme>` sets `color-scheme` from its `scheme`):
 
 ```css
 /* static colors */
 :root {
-  --static-tomato: #D84315;
+  --static-tomato: light-dark(#D84315, #FFAB91);
 }
 ```

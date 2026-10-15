@@ -48,5 +48,7 @@
   "visibility",
   "location_on",
   "explore",
-  "music_note"
+  "music_note",
+  "lyrics",
+  "queue_music"
 ]
