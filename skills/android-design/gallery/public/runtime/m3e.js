@@ -12075,7 +12075,7 @@ async function By() {
 function Vy() {
 	let e = [], t = [];
 	Sy(document, (e) => {
-		if (!e.matches(uy)) return !0;
+		if (!e.matches(uy) || e.localName === "m3e-slider-thumb") return !0;
 		if (_y(e)) {
 			let n = e.getBoundingClientRect(), r = e.shadowRoot?.querySelector(".touch")?.getBoundingClientRect(), i = Math.max(n.width, r?.width ?? 0), a = Math.max(n.height, r?.height ?? 0);
 			t.push({
