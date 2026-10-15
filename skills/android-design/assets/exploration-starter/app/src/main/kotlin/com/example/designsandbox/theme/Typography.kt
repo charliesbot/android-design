@@ -3,9 +3,22 @@ package com.example.designsandbox.theme
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.text.font.FontWeight
 import com.example.designsandbox.designsystem.common.R
 
-private val googleSansFlex = FontFamily(Font(R.font.google_sans_flex))
+// google_sans_flex.ttf is variable: without one wght instance per weight, Compose draws
+// every weight at 400.
+private val googleSansFlex =
+  FontFamily(
+    listOf(400, 500, 600, 700).map { weight ->
+      Font(
+        R.font.google_sans_flex,
+        weight = FontWeight(weight),
+        variationSettings = FontVariation.Settings(FontVariation.weight(weight)),
+      )
+    }
+  )
 private val baseline = Typography()
 val AppTypography =
   Typography(
