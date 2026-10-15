@@ -42,6 +42,8 @@ const CASES = {
   'control-scroller-sticky-bar': { fails: [] },
   'toolbar-overlap-static': { fails: ['C-review'], detail: /overlaps/ },
   'fixed-left': { fails: ['C-review'], detail: /light: pageOverflow/ },
+  'control-slider': { fails: [] }, // Compose's whole 48dp Slider is the touch target; the thumb has none
+  'slider-short': { fails: ['C-review'], detail: /light: touchTargets/ },
 };
 
 function freePort() {

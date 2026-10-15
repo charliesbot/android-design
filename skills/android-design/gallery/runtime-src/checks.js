@@ -275,6 +275,8 @@ export function runtimeChecks() {
   const interactive = [];
   walk(document, el => {
     if (!el.matches(INTERACTIVE)) return true;
+    // Compose's whole Slider is the touch target; its thumb has none, so the m3e-slider host is measured instead.
+    if (el.localName === 'm3e-slider-thumb') return true;
     if (visible(el)) {
       const host = el.getBoundingClientRect();
       const touch = el.shadowRoot?.querySelector('.touch')?.getBoundingClientRect();
