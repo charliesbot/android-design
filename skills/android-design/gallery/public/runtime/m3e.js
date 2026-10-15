@@ -48,7 +48,7 @@ var r = globalThis, i = r.ShadowRoot && (r.ShadyCSS === void 0 || r.ShadyCSS.nat
 	let t = "";
 	for (let n of e.cssRules) t += n.cssText;
 	return c(t);
-})(e) : e, { is: f, defineProperty: p, getOwnPropertyDescriptor: m, getOwnPropertyNames: h, getOwnPropertySymbols: g, getPrototypeOf: ee } = Object, te = globalThis, _ = te.trustedTypes, ne = _ ? _.emptyScript : "", v = te.reactiveElementPolyfillSupport, re = (e, t) => e, ie = {
+})(e) : e, { is: f, defineProperty: p, getOwnPropertyDescriptor: m, getOwnPropertyNames: h, getOwnPropertySymbols: ee, getPrototypeOf: te } = Object, g = globalThis, _ = g.trustedTypes, ne = _ ? _.emptyScript : "", v = g.reactiveElementPolyfillSupport, re = (e, t) => e, ie = {
 	toAttribute(e, t) {
 		switch (t) {
 			case Boolean:
@@ -85,7 +85,7 @@ var r = globalThis, i = r.ShadowRoot && (r.ShadyCSS === void 0 || r.ShadyCSS.nat
 	useDefault: !1,
 	hasChanged: ae
 };
-Symbol.metadata ??= Symbol("metadata"), te.litPropertyMetadata ??= /* @__PURE__ */ new WeakMap();
+Symbol.metadata ??= Symbol("metadata"), g.litPropertyMetadata ??= /* @__PURE__ */ new WeakMap();
 var se = class extends HTMLElement {
 	static addInitializer(e) {
 		this._$Ei(), (this.l ??= []).push(e);
@@ -123,13 +123,13 @@ var se = class extends HTMLElement {
 	}
 	static _$Ei() {
 		if (this.hasOwnProperty(re("elementProperties"))) return;
-		let e = ee(this);
+		let e = te(this);
 		e.finalize(), e.l !== void 0 && (this.l = [...e.l]), this.elementProperties = new Map(e.elementProperties);
 	}
 	static finalize() {
 		if (this.hasOwnProperty(re("finalized"))) return;
 		if (this.finalized = !0, this._$Ei(), this.hasOwnProperty(re("properties"))) {
-			let e = this.properties, t = [...h(e), ...g(e)];
+			let e = this.properties, t = [...h(e), ...ee(e)];
 			for (let n of t) this.createProperty(n, e[n]);
 		}
 		let e = this[Symbol.metadata];
@@ -270,7 +270,7 @@ var se = class extends HTMLElement {
 	updated(e) {}
 	firstUpdated(e) {}
 };
-se.elementStyles = [], se.shadowRootOptions = { mode: "open" }, se[re("elementProperties")] = /* @__PURE__ */ new Map(), se[re("finalized")] = /* @__PURE__ */ new Map(), v?.({ ReactiveElement: se }), (te.reactiveElementVersions ??= []).push("2.1.2");
+se.elementStyles = [], se.shadowRootOptions = { mode: "open" }, se[re("elementProperties")] = /* @__PURE__ */ new Map(), se[re("finalized")] = /* @__PURE__ */ new Map(), v?.({ ReactiveElement: se }), (g.reactiveElementVersions ??= []).push("2.1.2");
 //#endregion
 //#region node_modules/lit-html/lit-html.js
 var ce = globalThis, le = (e) => e, ue = ce.trustedTypes, de = ue ? ue.createPolicy("lit-html", { createHTML: (e) => e }) : void 0, fe = "$lit$", pe = `lit$${Math.random().toFixed(9).slice(2)}$`, me = "?" + pe, he = `<${me}>`, ge = document, _e = () => ge.createComment(""), ve = (e) => e === null || typeof e != "object" && typeof e != "function", ye = Array.isArray, be = (e) => ye(e) || typeof e?.[Symbol.iterator] == "function", xe = "[ 	\n\f\r]", Se = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, Ce = /-->/g, we = />/g, Te = RegExp(`>|${xe}(?:([^\\s"'>=/]+)(${xe}*=${xe}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`, "g"), Ee = /'/g, De = /"/g, Oe = /^(?:script|style|textarea|title)$/i, ke = (e) => (t, ...n) => ({
@@ -3101,16 +3101,16 @@ var Vo = class e {
 			100 / s * f + 1 - f,
 			100 / c * f + 1 - f,
 			100 / l * f + 1 - f
-		], h = 1 / (5 * n + 1), g = h * h * h * h, ee = 1 - g, te = g * n + .1 * ee * ee * Math.cbrt(5 * n), _ = Po(r) / t[1], ne = 1.48 + Math.sqrt(_), v = .725 / _ ** .2, re = v, ie = [
-			(te * m[0] * s / 100) ** .42,
-			(te * m[1] * c / 100) ** .42,
-			(te * m[2] * l / 100) ** .42
+		], h = 1 / (5 * n + 1), ee = h * h * h * h, te = 1 - ee, g = ee * n + .1 * te * te * Math.cbrt(5 * n), _ = Po(r) / t[1], ne = 1.48 + Math.sqrt(_), v = .725 / _ ** .2, re = v, ie = [
+			(g * m[0] * s / 100) ** .42,
+			(g * m[1] * c / 100) ** .42,
+			(g * m[2] * l / 100) ** .42
 		], ae = [
 			400 * ie[0] / (ie[0] + 27.13),
 			400 * ie[1] / (ie[1] + 27.13),
 			400 * ie[2] / (ie[2] + 27.13)
 		], oe = (2 * ae[0] + ae[1] + .05 * ae[2]) * v;
-		return new e(_, oe, v, re, d, p, m, te, te ** .25, ne);
+		return new e(_, oe, v, re, d, p, m, g, g ** .25, ne);
 	}
 	constructor(e, t, n, r, i, a, o, s, c, l) {
 		this.n = e, this.aw = t, this.nbb = n, this.ncb = r, this.c = i, this.nc = a, this.rgbD = o, this.fl = s, this.fLRoot = c, this.z = l;
@@ -3129,7 +3129,7 @@ var Ho = class e {
 		return e.fromIntInViewingConditions(t, Vo.DEFAULT);
 	}
 	static fromIntInViewingConditions(t, n) {
-		let r = (t & 16711680) >> 16, i = (t & 65280) >> 8, a = t & 255, o = Io(r), s = Io(i), c = Io(a), l = .41233895 * o + .35762064 * s + .18051042 * c, u = .2126 * o + .7152 * s + .0722 * c, d = .01932141 * o + .11916382 * s + .95034478 * c, f = .401288 * l + .650173 * u - .051461 * d, p = -.250268 * l + 1.204414 * u + .045854 * d, m = -.002079 * l + .048952 * u + .953127 * d, h = n.rgbD[0] * f, g = n.rgbD[1] * p, ee = n.rgbD[2] * m, te = (n.fl * Math.abs(h) / 100) ** .42, _ = (n.fl * Math.abs(g) / 100) ** .42, ne = (n.fl * Math.abs(ee) / 100) ** .42, v = fo(h) * 400 * te / (te + 27.13), re = fo(g) * 400 * _ / (_ + 27.13), ie = fo(ee) * 400 * ne / (ne + 27.13), ae = (11 * v + -12 * re + ie) / 11, oe = (v + re - 2 * ie) / 9, se = (20 * v + 20 * re + 21 * ie) / 20, ce = (40 * v + 20 * re + ie) / 20, le = _o(Math.atan2(oe, ae) * 180 / Math.PI), ue = le * Math.PI / 180, de = 100 * (ce * n.nbb / n.aw) ** +(n.c * n.z), fe = 4 / n.c * Math.sqrt(de / 100) * (n.aw + 4) * n.fLRoot, pe = le < 20.14 ? le + 360 : le, me = (5e4 / 13 * (.25 * (Math.cos(pe * Math.PI / 180 + 2) + 3.8)) * n.nc * n.ncb * Math.sqrt(ae * ae + oe * oe) / (se + .305)) ** .9 * (1.64 - .29 ** n.n) ** .73, he = me * Math.sqrt(de / 100), ge = he * n.fLRoot, _e = 50 * Math.sqrt(me * n.c / (n.aw + 4)), ve = (1 + 100 * .007) * de / (1 + .007 * de), ye = 1 / .0228 * Math.log(1 + .0228 * ge), be = ye * Math.cos(ue), xe = ye * Math.sin(ue);
+		let r = (t & 16711680) >> 16, i = (t & 65280) >> 8, a = t & 255, o = Io(r), s = Io(i), c = Io(a), l = .41233895 * o + .35762064 * s + .18051042 * c, u = .2126 * o + .7152 * s + .0722 * c, d = .01932141 * o + .11916382 * s + .95034478 * c, f = .401288 * l + .650173 * u - .051461 * d, p = -.250268 * l + 1.204414 * u + .045854 * d, m = -.002079 * l + .048952 * u + .953127 * d, h = n.rgbD[0] * f, ee = n.rgbD[1] * p, te = n.rgbD[2] * m, g = (n.fl * Math.abs(h) / 100) ** .42, _ = (n.fl * Math.abs(ee) / 100) ** .42, ne = (n.fl * Math.abs(te) / 100) ** .42, v = fo(h) * 400 * g / (g + 27.13), re = fo(ee) * 400 * _ / (_ + 27.13), ie = fo(te) * 400 * ne / (ne + 27.13), ae = (11 * v + -12 * re + ie) / 11, oe = (v + re - 2 * ie) / 9, se = (20 * v + 20 * re + 21 * ie) / 20, ce = (40 * v + 20 * re + ie) / 20, le = _o(Math.atan2(oe, ae) * 180 / Math.PI), ue = le * Math.PI / 180, de = 100 * (ce * n.nbb / n.aw) ** +(n.c * n.z), fe = 4 / n.c * Math.sqrt(de / 100) * (n.aw + 4) * n.fLRoot, pe = le < 20.14 ? le + 360 : le, me = (5e4 / 13 * (.25 * (Math.cos(pe * Math.PI / 180 + 2) + 3.8)) * n.nc * n.ncb * Math.sqrt(ae * ae + oe * oe) / (se + .305)) ** .9 * (1.64 - .29 ** n.n) ** .73, he = me * Math.sqrt(de / 100), ge = he * n.fLRoot, _e = 50 * Math.sqrt(me * n.c / (n.aw + 4)), ve = (1 + 100 * .007) * de / (1 + .007 * de), ye = 1 / .0228 * Math.log(1 + .0228 * ge), be = ye * Math.cos(ue), xe = ye * Math.sin(ue);
 		return new e(le, he, de, fe, ge, _e, ve, be, xe);
 	}
 	static fromJch(t, n, r) {
@@ -3152,15 +3152,15 @@ var Ho = class e {
 		return this.viewed(Vo.DEFAULT);
 	}
 	viewed(e) {
-		let t = ((this.chroma === 0 || this.j === 0 ? 0 : this.chroma / Math.sqrt(this.j / 100)) / (1.64 - .29 ** e.n) ** .73) ** (1 / .9), n = this.hue * Math.PI / 180, r = .25 * (Math.cos(n + 2) + 3.8), i = e.aw * (this.j / 100) ** (1 / e.c / e.z), a = 5e4 / 13 * r * e.nc * e.ncb, o = i / e.nbb, s = Math.sin(n), c = Math.cos(n), l = 23 * (o + .305) * t / (23 * a + 11 * t * c + 108 * t * s), u = l * c, d = l * s, f = (460 * o + 451 * u + 288 * d) / 1403, p = (460 * o - 891 * u - 261 * d) / 1403, m = (460 * o - 220 * u - 6300 * d) / 1403, h = Math.max(0, 27.13 * Math.abs(f) / (400 - Math.abs(f))), g = fo(f) * (100 / e.fl) * h ** (1 / .42), ee = Math.max(0, 27.13 * Math.abs(p) / (400 - Math.abs(p))), te = fo(p) * (100 / e.fl) * ee ** (1 / .42), _ = Math.max(0, 27.13 * Math.abs(m) / (400 - Math.abs(m))), ne = fo(m) * (100 / e.fl) * _ ** (1 / .42), v = g / e.rgbD[0], re = te / e.rgbD[1], ie = ne / e.rgbD[2];
+		let t = ((this.chroma === 0 || this.j === 0 ? 0 : this.chroma / Math.sqrt(this.j / 100)) / (1.64 - .29 ** e.n) ** .73) ** (1 / .9), n = this.hue * Math.PI / 180, r = .25 * (Math.cos(n + 2) + 3.8), i = e.aw * (this.j / 100) ** (1 / e.c / e.z), a = 5e4 / 13 * r * e.nc * e.ncb, o = i / e.nbb, s = Math.sin(n), c = Math.cos(n), l = 23 * (o + .305) * t / (23 * a + 11 * t * c + 108 * t * s), u = l * c, d = l * s, f = (460 * o + 451 * u + 288 * d) / 1403, p = (460 * o - 891 * u - 261 * d) / 1403, m = (460 * o - 220 * u - 6300 * d) / 1403, h = Math.max(0, 27.13 * Math.abs(f) / (400 - Math.abs(f))), ee = fo(f) * (100 / e.fl) * h ** (1 / .42), te = Math.max(0, 27.13 * Math.abs(p) / (400 - Math.abs(p))), g = fo(p) * (100 / e.fl) * te ** (1 / .42), _ = Math.max(0, 27.13 * Math.abs(m) / (400 - Math.abs(m))), ne = fo(m) * (100 / e.fl) * _ ** (1 / .42), v = ee / e.rgbD[0], re = g / e.rgbD[1], ie = ne / e.rgbD[2];
 		return ko(1.86206786 * v - 1.01125463 * re + .14918677 * ie, .38752654 * v + .62144744 * re - .00897398 * ie, -.0158415 * v - .03412294 * re + 1.04996444 * ie);
 	}
 	static fromXyzInViewingConditions(t, n, r, i) {
-		let a = .401288 * t + .650173 * n - .051461 * r, o = -.250268 * t + 1.204414 * n + .045854 * r, s = -.002079 * t + .048952 * n + .953127 * r, c = i.rgbD[0] * a, l = i.rgbD[1] * o, u = i.rgbD[2] * s, d = (i.fl * Math.abs(c) / 100) ** .42, f = (i.fl * Math.abs(l) / 100) ** .42, p = (i.fl * Math.abs(u) / 100) ** .42, m = fo(c) * 400 * d / (d + 27.13), h = fo(l) * 400 * f / (f + 27.13), g = fo(u) * 400 * p / (p + 27.13), ee = (11 * m + -12 * h + g) / 11, te = (m + h - 2 * g) / 9, _ = (20 * m + 20 * h + 21 * g) / 20, ne = (40 * m + 20 * h + g) / 20, v = Math.atan2(te, ee) * 180 / Math.PI, re = v < 0 ? v + 360 : v >= 360 ? v - 360 : v, ie = re * Math.PI / 180, ae = 100 * (ne * i.nbb / i.aw) ** +(i.c * i.z), oe = 4 / i.c * Math.sqrt(ae / 100) * (i.aw + 4) * i.fLRoot, se = re < 20.14 ? re + 360 : re, ce = (5e4 / 13 * (1 / 4 * (Math.cos(se * Math.PI / 180 + 2) + 3.8)) * i.nc * i.ncb * Math.sqrt(ee * ee + te * te) / (_ + .305)) ** .9 * (1.64 - .29 ** i.n) ** .73, le = ce * Math.sqrt(ae / 100), ue = le * i.fLRoot, de = 50 * Math.sqrt(ce * i.c / (i.aw + 4)), fe = (1 + 100 * .007) * ae / (1 + .007 * ae), pe = Math.log(1 + .0228 * ue) / .0228, me = pe * Math.cos(ie), he = pe * Math.sin(ie);
+		let a = .401288 * t + .650173 * n - .051461 * r, o = -.250268 * t + 1.204414 * n + .045854 * r, s = -.002079 * t + .048952 * n + .953127 * r, c = i.rgbD[0] * a, l = i.rgbD[1] * o, u = i.rgbD[2] * s, d = (i.fl * Math.abs(c) / 100) ** .42, f = (i.fl * Math.abs(l) / 100) ** .42, p = (i.fl * Math.abs(u) / 100) ** .42, m = fo(c) * 400 * d / (d + 27.13), h = fo(l) * 400 * f / (f + 27.13), ee = fo(u) * 400 * p / (p + 27.13), te = (11 * m + -12 * h + ee) / 11, g = (m + h - 2 * ee) / 9, _ = (20 * m + 20 * h + 21 * ee) / 20, ne = (40 * m + 20 * h + ee) / 20, v = Math.atan2(g, te) * 180 / Math.PI, re = v < 0 ? v + 360 : v >= 360 ? v - 360 : v, ie = re * Math.PI / 180, ae = 100 * (ne * i.nbb / i.aw) ** +(i.c * i.z), oe = 4 / i.c * Math.sqrt(ae / 100) * (i.aw + 4) * i.fLRoot, se = re < 20.14 ? re + 360 : re, ce = (5e4 / 13 * (1 / 4 * (Math.cos(se * Math.PI / 180 + 2) + 3.8)) * i.nc * i.ncb * Math.sqrt(te * te + g * g) / (_ + .305)) ** .9 * (1.64 - .29 ** i.n) ** .73, le = ce * Math.sqrt(ae / 100), ue = le * i.fLRoot, de = 50 * Math.sqrt(ce * i.c / (i.aw + 4)), fe = (1 + 100 * .007) * ae / (1 + .007 * ae), pe = Math.log(1 + .0228 * ue) / .0228, me = pe * Math.cos(ie), he = pe * Math.sin(ie);
 		return new e(re, le, ae, oe, ue, de, fe, me, he);
 	}
 	xyzInViewingConditions(e) {
-		let t = ((this.chroma === 0 || this.j === 0 ? 0 : this.chroma / Math.sqrt(this.j / 100)) / (1.64 - .29 ** e.n) ** .73) ** (1 / .9), n = this.hue * Math.PI / 180, r = .25 * (Math.cos(n + 2) + 3.8), i = e.aw * (this.j / 100) ** (1 / e.c / e.z), a = 5e4 / 13 * r * e.nc * e.ncb, o = i / e.nbb, s = Math.sin(n), c = Math.cos(n), l = 23 * (o + .305) * t / (23 * a + 11 * t * c + 108 * t * s), u = l * c, d = l * s, f = (460 * o + 451 * u + 288 * d) / 1403, p = (460 * o - 891 * u - 261 * d) / 1403, m = (460 * o - 220 * u - 6300 * d) / 1403, h = Math.max(0, 27.13 * Math.abs(f) / (400 - Math.abs(f))), g = fo(f) * (100 / e.fl) * h ** (1 / .42), ee = Math.max(0, 27.13 * Math.abs(p) / (400 - Math.abs(p))), te = fo(p) * (100 / e.fl) * ee ** (1 / .42), _ = Math.max(0, 27.13 * Math.abs(m) / (400 - Math.abs(m))), ne = fo(m) * (100 / e.fl) * _ ** (1 / .42), v = g / e.rgbD[0], re = te / e.rgbD[1], ie = ne / e.rgbD[2];
+		let t = ((this.chroma === 0 || this.j === 0 ? 0 : this.chroma / Math.sqrt(this.j / 100)) / (1.64 - .29 ** e.n) ** .73) ** (1 / .9), n = this.hue * Math.PI / 180, r = .25 * (Math.cos(n + 2) + 3.8), i = e.aw * (this.j / 100) ** (1 / e.c / e.z), a = 5e4 / 13 * r * e.nc * e.ncb, o = i / e.nbb, s = Math.sin(n), c = Math.cos(n), l = 23 * (o + .305) * t / (23 * a + 11 * t * c + 108 * t * s), u = l * c, d = l * s, f = (460 * o + 451 * u + 288 * d) / 1403, p = (460 * o - 891 * u - 261 * d) / 1403, m = (460 * o - 220 * u - 6300 * d) / 1403, h = Math.max(0, 27.13 * Math.abs(f) / (400 - Math.abs(f))), ee = fo(f) * (100 / e.fl) * h ** (1 / .42), te = Math.max(0, 27.13 * Math.abs(p) / (400 - Math.abs(p))), g = fo(p) * (100 / e.fl) * te ** (1 / .42), _ = Math.max(0, 27.13 * Math.abs(m) / (400 - Math.abs(m))), ne = fo(m) * (100 / e.fl) * _ ** (1 / .42), v = ee / e.rgbD[0], re = g / e.rgbD[1], ie = ne / e.rgbD[2];
 		return [
 			1.86206786 * v - 1.01125463 * re + .14918677 * ie,
 			.38752654 * v + .62144744 * re - .00897398 * ie,
@@ -3288,10 +3288,10 @@ var Ho = class e {
 	static findResultByJ(t, n, r) {
 		let i = Math.sqrt(r) * 11, a = Vo.DEFAULT, o = 1 / (1.64 - .29 ** a.n) ** .73, s = .25 * (Math.cos(t + 2) + 3.8) * (5e4 / 13) * a.nc * a.ncb, c = Math.sin(t), l = Math.cos(t);
 		for (let t = 0; t < 5; t++) {
-			let u = i / 100, d = ((n === 0 || i === 0 ? 0 : n / Math.sqrt(u)) * o) ** (1 / .9), f = a.aw * u ** (1 / a.c / a.z) / a.nbb, p = 23 * (f + .305) * d / (23 * s + 11 * d * l + 108 * d * c), m = p * l, h = p * c, g = (460 * f + 451 * m + 288 * h) / 1403, ee = (460 * f - 891 * m - 261 * h) / 1403, te = (460 * f - 220 * m - 6300 * h) / 1403, _ = bo([
-				e.inverseChromaticAdaptation(g),
+			let u = i / 100, d = ((n === 0 || i === 0 ? 0 : n / Math.sqrt(u)) * o) ** (1 / .9), f = a.aw * u ** (1 / a.c / a.z) / a.nbb, p = 23 * (f + .305) * d / (23 * s + 11 * d * l + 108 * d * c), m = p * l, h = p * c, ee = (460 * f + 451 * m + 288 * h) / 1403, te = (460 * f - 891 * m - 261 * h) / 1403, g = (460 * f - 220 * m - 6300 * h) / 1403, _ = bo([
 				e.inverseChromaticAdaptation(ee),
-				e.inverseChromaticAdaptation(te)
+				e.inverseChromaticAdaptation(te),
+				e.inverseChromaticAdaptation(g)
 			], e.LINRGB_FROM_SCALED_DISCOUNT);
 			if (_[0] < 0 || _[1] < 0 || _[2] < 0) return 0;
 			let ne = e.Y_FROM_LINRGB[0], v = e.Y_FROM_LINRGB[1], re = e.Y_FROM_LINRGB[2], ie = ne * _[0] + v * _[1] + re * _[2];
@@ -8777,25 +8777,25 @@ async function Nd(e, t) {
 		boundary: c,
 		rootBoundary: l,
 		strategy: s
-	})), g = u === "floating" ? {
+	})), ee = u === "floating" ? {
 		x: n,
 		y: r,
 		width: a.floating.width,
 		height: a.floating.height
-	} : a.reference, ee = await (i.getOffsetParent == null ? void 0 : i.getOffsetParent(o.floating)), te = await (i.isElement == null ? void 0 : i.isElement(ee)) && await (i.getScale == null ? void 0 : i.getScale(ee)) || {
+	} : a.reference, te = await (i.getOffsetParent == null ? void 0 : i.getOffsetParent(o.floating)), g = await (i.isElement == null ? void 0 : i.isElement(te)) && await (i.getScale == null ? void 0 : i.getScale(te)) || {
 		x: 1,
 		y: 1
 	}, _ = jd(i.convertOffsetParentRelativeRectToViewportRelativeRect ? await i.convertOffsetParentRelativeRectToViewportRelativeRect({
 		elements: o,
-		rect: g,
-		offsetParent: ee,
+		rect: ee,
+		offsetParent: te,
 		strategy: s
-	}) : g);
+	}) : ee);
 	return {
-		top: (h.top - _.top + p.top) / te.y,
-		bottom: (_.bottom - h.bottom + p.bottom) / te.y,
-		left: (h.left - _.left + p.left) / te.x,
-		right: (_.right - h.right + p.right) / te.x
+		top: (h.top - _.top + p.top) / g.y,
+		bottom: (_.bottom - h.bottom + p.bottom) / g.y,
+		left: (h.left - _.left + p.left) / g.x,
+		right: (_.right - h.right + p.right) / g.x
 	};
 }
 var Pd = 50, Fd = async (e, t, n) => {
@@ -8810,7 +8810,7 @@ var Pd = 50, Fd = async (e, t, n) => {
 	for (let n = 0; n < a.length; n++) {
 		let h = a[n];
 		if (!h) continue;
-		let { name: g, fn: ee } = h, { x: te, y: _, data: ne, reset: v } = await ee({
+		let { name: ee, fn: te } = h, { x: g, y: _, data: ne, reset: v } = await te({
 			x: u,
 			y: d,
 			initialPlacement: r,
@@ -8824,8 +8824,8 @@ var Pd = 50, Fd = async (e, t, n) => {
 				floating: t
 			}
 		});
-		u = te ?? u, d = _ ?? d, m[g] = {
-			...m[g],
+		u = g ?? u, d = _ ?? d, m[ee] = {
+			...m[ee],
 			...ne
 		}, v && p < Pd && (p++, typeof v == "object" && (v.placement && (f = v.placement), v.rects && (l = v.rects === !0 ? await o.getElementRects({
 			reference: e,
@@ -8848,10 +8848,10 @@ var Pd = 50, Fd = async (e, t, n) => {
 			var n;
 			let { placement: r, middlewareData: i, rects: a, initialPlacement: o, platform: s, elements: c } = t, { mainAxis: l = !0, crossAxis: u = !0, fallbackPlacements: d, fallbackStrategy: f = "bestFit", fallbackAxisSideDirection: p = "none", flipAlignment: m = !0, ...h } = fd(e, t);
 			if ((n = i.arrow) != null && n.alignmentOffset) return {};
-			let g = pd(r), ee = _d(o), te = pd(o) === o, _ = await (s.isRTL == null ? void 0 : s.isRTL(c.floating)), ne = d || (te || !m ? [Od(o)] : bd(o)), v = p !== "none";
+			let ee = pd(r), te = _d(o), g = pd(o) === o, _ = await (s.isRTL == null ? void 0 : s.isRTL(c.floating)), ne = d || (g || !m ? [Od(o)] : bd(o)), v = p !== "none";
 			!d && v && ne.push(...Dd(o, m, p, _));
 			let re = [o, ...ne], ie = await s.detectOverflow(t, h), ae = [], oe = i.flip?.overflows || [];
-			if (l && ae.push(ie[g]), u) {
+			if (l && ae.push(ie[ee]), u) {
 				let e = yd(r, a, _);
 				ae.push(ie[e[0]], ie[e[1]]);
 			}
@@ -8860,7 +8860,7 @@ var Pd = 50, Fd = async (e, t, n) => {
 				overflows: ae
 			}], !ae.every((e) => e <= 0)) {
 				let e = (i.flip?.index || 0) + 1, t = re[e];
-				if (t && (u !== "alignment" || ee === _d(t) || oe.every((e) => _d(e.placement) !== ee || e.overflows[0] > 0))) return {
+				if (t && (u !== "alignment" || te === _d(t) || oe.every((e) => _d(e.placement) !== te || e.overflows[0] > 0))) return {
 					data: {
 						index: e,
 						overflows: oe
@@ -8873,7 +8873,7 @@ var Pd = 50, Fd = async (e, t, n) => {
 						let e = oe.filter((e) => {
 							if (v) {
 								let t = _d(e.placement);
-								return t === ee || t === "y";
+								return t === te || t === "y";
 							}
 							return !0;
 						}).map((e) => [e.placement, e.overflows.filter((e) => e > 0).reduce((e, t) => e + t, 0)]).sort((e, t) => e[1] - t[1])[0]?.[0];
@@ -9008,16 +9008,16 @@ var Hd = function(e) {
 				let e = f === "y" ? "top" : "left", t = f === "y" ? "bottom" : "right", n = h + d[e], r = h - d[t];
 				h = dd(n, h, r);
 			}
-			let g = c.fn({
+			let ee = c.fn({
 				...t,
 				[p]: m,
 				[f]: h
 			});
 			return {
-				...g,
+				...ee,
 				data: {
-					x: g.x - n,
-					y: g.y - r,
+					x: ee.x - n,
+					y: ee.y - r,
 					enabled: {
 						[p]: o,
 						[f]: s
@@ -9033,7 +9033,7 @@ var Hd = function(e) {
 			let { x: n, y: r, placement: i, rects: a, middlewareData: o } = t, { offset: s = 0, mainAxis: c = !0, crossAxis: l = !0 } = fd(e, t), u = {
 				x: n,
 				y: r
-			}, d = _d(i), f = hd(d), p = u[f], m = u[d], h = fd(s, t), g = typeof h == "number" ? {
+			}, d = _d(i), f = hd(d), p = u[f], m = u[d], h = fd(s, t), ee = typeof h == "number" ? {
 				mainAxis: h,
 				crossAxis: 0
 			} : {
@@ -9042,11 +9042,11 @@ var Hd = function(e) {
 				...h
 			};
 			if (c) {
-				let e = f === "y" ? "height" : "width", t = a.reference[f] - a.floating[e] + g.mainAxis, n = a.reference[f] + a.reference[e] - g.mainAxis;
+				let e = f === "y" ? "height" : "width", t = a.reference[f] - a.floating[e] + ee.mainAxis, n = a.reference[f] + a.reference[e] - ee.mainAxis;
 				p < t ? p = t : p > n && (p = n);
 			}
 			if (l) {
-				let e = f === "y" ? "width" : "height", t = Bd.has(pd(i)), n = a.reference[d] - a.floating[e] + (t && o.offset?.[d] || 0) + (t ? 0 : g.crossAxis), r = a.reference[d] + a.reference[e] + (t ? 0 : o.offset?.[d] || 0) - (t ? g.crossAxis : 0);
+				let e = f === "y" ? "width" : "height", t = Bd.has(pd(i)), n = a.reference[d] - a.floating[e] + (t && o.offset?.[d] || 0) + (t ? 0 : ee.crossAxis), r = a.reference[d] + a.reference[e] + (t ? 0 : o.offset?.[d] || 0) - (t ? ee.crossAxis : 0);
 				m < n ? m = n : m > r && (m = r);
 			}
 			return {
@@ -9409,8 +9409,8 @@ function Gf(e, t) {
 		s === void 0 && (s = !1), c === void 0 && (c = 1), a();
 		let l = e.getBoundingClientRect(), { left: u, top: d, width: f, height: p } = l;
 		if (s || t(), !f || !p) return;
-		let m = cd(d), h = cd(i.clientWidth - (u + f)), g = cd(i.clientHeight - (d + p)), ee = cd(u), te = {
-			rootMargin: -m + "px " + -h + "px " + -g + "px " + -ee + "px",
+		let m = cd(d), h = cd(i.clientWidth - (u + f)), ee = cd(i.clientHeight - (d + p)), te = cd(u), g = {
+			rootMargin: -m + "px " + -h + "px " + -ee + "px " + -te + "px",
 			threshold: od(0, ad(1, c)) || 1
 		}, _ = !0;
 		function ne(t) {
@@ -9425,11 +9425,11 @@ function Gf(e, t) {
 		}
 		try {
 			n = new IntersectionObserver(ne, {
-				...te,
+				...g,
 				root: i.ownerDocument
 			});
 		} catch {
-			n = new IntersectionObserver(ne, te);
+			n = new IntersectionObserver(ne, g);
 		}
 		n.observe(e);
 	}
@@ -9450,10 +9450,10 @@ function Kf(e, t, n, r) {
 		})), n();
 	}), l && !c && p.observe(l), t && p.observe(t));
 	let m, h = c ? Cf(e) : null;
-	c && g();
-	function g() {
+	c && ee();
+	function ee() {
 		let t = Cf(e);
-		h && !Wf(h, t) && n(), h = t, m = requestAnimationFrame(g);
+		h && !Wf(h, t) && n(), h = t, m = requestAnimationFrame(ee);
 	}
 	return n(), () => {
 		var e;
@@ -11939,7 +11939,78 @@ function Dy(e) {
 	}
 	return { reason: "no opaque background found" };
 }
-function Oy(e, t) {
+var Oy = /[^\s\-­‐-―/]+/g;
+function ky(e, t) {
+	if (t.hyphens === "auto" || /[　-鿿가-힯฀-๿]/.test(e.textContent)) return [];
+	let n = [], r = document.createRange();
+	for (let t of e.textContent.matchAll(Oy)) {
+		if (t[0].length < 2) continue;
+		r.setStart(e, t.index), r.setEnd(e, t.index + t[0].length);
+		let i = [...r.getClientRects()].filter((e) => e.width > 0 && e.height > 0);
+		if (i.length < 2) continue;
+		let a = i.map((e) => e.top);
+		Math.max(...a) - Math.min(...a) > Math.min(...i.map((e) => e.height)) / 2 && n.push(t[0]);
+	}
+	return n;
+}
+var Ay = .2;
+function jy(e) {
+	let t = 1;
+	for (let n = e; n; n = vy(n)) t *= parseFloat(getComputedStyle(n).opacity);
+	return t;
+}
+function My(e, t) {
+	for (let n = t; n; n = vy(n)) if (n === e) return !0;
+	return !1;
+}
+function Ny(e, t, n) {
+	let r = document.createRange();
+	for (let i of e.childNodes) if (i.nodeType === Node.TEXT_NODE && i.textContent.trim()) {
+		r.selectNodeContents(i);
+		for (let e of r.getClientRects()) if (t >= e.left && t <= e.right && n >= e.top && n <= e.bottom) return !0;
+	}
+	return !1;
+}
+function Py(e, t, n) {
+	let r = getComputedStyle(e);
+	return r.visibility !== "visible" || jy(e) < .9 ? !1 : /^(img|svg|canvas|video|picture)$/i.test(e.localName) || r.backgroundImage.includes("url(") || Ey(r.backgroundColor).a >= .9 || Ny(e, t, n) ? !0 : !!e.shadowRoot?.elementsFromPoint(t, n).some((r) => r !== e && Py(r, t, n));
+}
+function Fy(e, t, n) {
+	let r = (e) => {
+		for (let t = e; t; t = vy(t)) if (/fixed|sticky/.test(getComputedStyle(t).position)) return !0;
+		return !1;
+	};
+	if (r(t) || !r(n)) return !1;
+	let i = document.documentElement, a = i.scrollHeight - i.clientHeight - i.scrollTop;
+	if (a <= 0) return !1;
+	let o = n.getBoundingClientRect(), s = e.top - a;
+	return e.bottom - a <= o.top || s >= o.bottom || e.right <= o.left || e.left >= o.right;
+}
+function Iy(e, t) {
+	let n = document.createRange();
+	n.selectNodeContents(e);
+	let r = [...n.getClientRects()].filter((e) => e.width > 0 && e.height > 0), i = Math.max(1, Math.ceil(r.length / 8)), a = 0, o = 0, s = null;
+	for (let e of r.filter((e, t) => t % i === 0)) for (let n of [
+		.1,
+		.3,
+		.5,
+		.7,
+		.9
+	]) {
+		let r = e.left + e.width * n, i = e.top + e.height / 2;
+		if (r < 0 || i < 0 || r >= innerWidth || i >= innerHeight) continue;
+		let c = document.elementsFromPoint(r, i), l = c.findIndex((e) => My(e, t));
+		if (l < 0) continue;
+		a++;
+		let u = c.slice(0, l).find((n) => !My(t, n) && !by(n) && Py(n, r, i) && !Fy(e, t, n));
+		u && (o++, s ??= u);
+	}
+	return a > 0 && o / a >= Ay ? {
+		by: s,
+		share: Math.round(o / a * 100)
+	} : null;
+}
+function Ly(e, t) {
 	for (let n = yy(t); n; n = yy(vy(n))) {
 		let t = getComputedStyle(n);
 		if (/auto|scroll/.test(t.overflowX + t.overflowY)) return null;
@@ -11950,7 +12021,7 @@ function Oy(e, t) {
 	}
 	return null;
 }
-function ky() {
+function Ry() {
 	let e = innerWidth, t = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth), n = (e) => {
 		let t = 0;
 		for (let n = vy(e); n; n = vy(n)) t++;
@@ -11985,7 +12056,7 @@ function ky() {
 		offenders: a.slice(0, 5).map(({ depth: e, ...t }) => t)
 	};
 }
-async function Ay() {
+async function zy() {
 	let e = () => new Promise((e) => requestAnimationFrame(() => requestAnimationFrame(e))), t = (e = document) => {
 		if (e.getAnimations().some((e) => e.playState === "running" && Number.isFinite(e.effect?.getComputedTiming().endTime))) return !0;
 		for (let n of e.querySelectorAll("*")) if (n.shadowRoot && t(n.shadowRoot)) return !0;
@@ -11994,7 +12065,7 @@ async function Ay() {
 	await e();
 	for (let n = 0; n < 90 && t(); n++) await e();
 }
-function jy() {
+function By() {
 	let e = [], t = [];
 	Sy(document, (e) => {
 		if (!e.matches(uy)) return !0;
@@ -12026,12 +12097,12 @@ function jy() {
 		check: "primary",
 		reason: "no visible element has data-primary"
 	})) : i.length > 1 ? (a.status = "fail", a.reason = "more than one visible element has data-primary") : (a.status = i[0].area >= r.area - .5 ? "pass" : "fail", a.status === "fail" && (a.reason = `${i[0].el} is smaller than ${r.el}`));
-	let o = [...document.querySelectorAll(dy)].filter((e) => !e.parentElement?.closest("m3e-fab-menu") && _y(e)).length, s = [], c = [], l = {
+	let o = [...document.querySelectorAll(dy)].filter((e) => !e.parentElement?.closest("m3e-fab-menu") && _y(e)).length, s = [], c = [], l = [], u = [], d = {
 		fails: [],
 		passed: 0
-	}, u = /* @__PURE__ */ new Set(), d = (...e) => {
+	}, f = /* @__PURE__ */ new Set(), p = (...e) => {
 		let t = e.join("|");
-		return !u.has(t) && (u.add(t), !0);
+		return !f.has(t) && (f.add(t), !0);
 	};
 	Cy(document, (t) => {
 		let n = vy(t);
@@ -12041,41 +12112,52 @@ function jy() {
 		let a = i.getBoundingClientRect();
 		if (a.width <= 0 || a.height <= 0 || r.visibility !== "visible" || by(n)) return;
 		let o = gy(yy(n) || n);
-		if (!fy(r.fontFamily) && d("font", o) && s.push({
+		if (!fy(r.fontFamily) && p("font", o) && s.push({
 			el: o,
 			font: r.fontFamily
 		}), xy(n)) return;
-		let u = yy(n), f = /auto|scroll/.test(r.overflowX + r.overflowY);
-		u && !f && getComputedStyle(u).display !== "inline" && (u.scrollWidth > u.clientWidth + 1 || u.scrollHeight > u.clientHeight + 1) && d("overflow", o) && c.push({
+		let f = ky(t, r);
+		f.length && p("midword", o) && l.push({
 			el: o,
-			scroll: [u.scrollWidth, u.scrollHeight],
-			client: [u.clientWidth, u.clientHeight]
+			words: f.slice(0, 3)
 		});
-		let p = Oy(a, n);
-		if (p && p !== u && d("overflow", o, "clip") && c.push({
+		let m = Iy(t, n);
+		m && p("overlap", o) && u.push({
 			el: o,
-			clippedBy: gy(p)
-		}), !d("contrast", o)) return;
-		let m = Dy(n);
-		if (!m.color) {
+			coveredBy: gy(m.by),
+			share: m.share
+		});
+		let h = yy(n), ee = /auto|scroll/.test(r.overflowX + r.overflowY);
+		h && !ee && getComputedStyle(h).display !== "inline" && (h.scrollWidth > h.clientWidth + 1 || h.scrollHeight > h.clientHeight + 1) && p("overflow", o) && c.push({
+			el: o,
+			scroll: [h.scrollWidth, h.scrollHeight],
+			client: [h.clientWidth, h.clientHeight]
+		});
+		let te = Ly(a, n);
+		if (te && te !== h && p("overflow", o, "clip") && c.push({
+			el: o,
+			clippedBy: gy(te)
+		}), !p("contrast", o)) return;
+		let g = Dy(n);
+		if (!g.color) {
 			e.push({
 				check: "contrast",
 				el: o,
-				reason: m.reason
+				reason: g.reason
 			});
 			return;
 		}
-		let h = cy(Ey(r.color), m.color), g = ly(parseFloat(r.fontSize), parseInt(r.fontWeight, 10)), ee = sy(h, m.color);
-		ee < g ? l.fails.push({
+		let _ = cy(Ey(r.color), g.color), ne = ly(parseFloat(r.fontSize), parseInt(r.fontWeight, 10)), v = sy(_, g.color);
+		v < ne ? d.fails.push({
 			el: o,
-			ratio: Math.round(ee * 100) / 100,
-			need: g
-		}) : l.passed++;
+			ratio: Math.round(v * 100) / 100,
+			need: ne
+		}) : d.passed++;
 	});
-	let f = ky(), p = e.length === 0, m = !f.fails && n.length === 0 && s.length === 0 && c.length === 0 && a.status !== "fail" && o <= 1 && l.fails.length === 0;
+	let m = Ry(), h = e.length === 0, ee = !m.fails && n.length === 0 && s.length === 0 && c.length === 0 && l.length === 0 && u.length === 0 && a.status !== "fail" && o <= 1 && d.fails.length === 0;
 	return JSON.parse(JSON.stringify({
-		pass: m,
-		complete: p,
+		pass: ee,
+		complete: h,
 		viewport: [innerWidth, innerHeight],
 		touchTargets: {
 			checked: t.length,
@@ -12083,15 +12165,17 @@ function jy() {
 		},
 		fonts: { offenders: s },
 		overflow: c,
-		pageOverflow: f,
+		midWordBreaks: l,
+		overlaps: u,
+		pageOverflow: m,
 		primary: a,
 		fabs: {
 			count: o,
 			ok: o <= 1
 		},
-		contrast: l,
+		contrast: d,
 		unresolved: e
 	}));
 }
-window.runtimeChecks = jy, window.runtimeSettle = Ay;
+window.runtimeChecks = By, window.runtimeSettle = zy;
 //#endregion

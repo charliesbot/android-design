@@ -100,6 +100,95 @@ function backdrop(el) {
   return { reason: 'no opaque background found' };
 }
 
+
+// Mid-word breaks: a word split across two lines with no hyphen, which `overflow-wrap: anywhere`, `word-break`
+// or a too-narrow box produces ("Golde / n Hour"). Words are measured in segments split at spaces, hyphens,
+// soft hyphens, and slashes, where a break is legitimate. Text with `hyphens: auto` shows a hyphen at the
+// break, and CJK runs have no spaces to break at, so both are skipped.
+const BREAKABLE = /[^\s\-­‐-―/]+/g;
+function midWordBreaks(node, style) {
+  if (style.hyphens === 'auto' || /[　-鿿가-힯฀-๿]/.test(node.textContent)) return [];
+  const found = [];
+  const range = document.createRange();
+  for (const match of node.textContent.matchAll(BREAKABLE)) {
+    if (match[0].length < 2) continue;
+    range.setStart(node, match.index);
+    range.setEnd(node, match.index + match[0].length);
+    const rects = [...range.getClientRects()].filter(r => r.width > 0 && r.height > 0);
+    if (rects.length < 2) continue;
+    const tops = rects.map(r => r.top);
+    if (Math.max(...tops) - Math.min(...tops) > Math.min(...rects.map(r => r.height)) / 2) found.push(match[0]);
+  }
+  return found;
+}
+
+// Overlap: text another element paints over. The text is sampled on a grid across each line; at every
+// sample, document.elementsFromPoint lists what is hit top first, and anything above the text's own box
+// (ancestors and descendants of the text's element excluded) that really paints there counts as covering it.
+// elementsFromPoint already leaves out pointer-events: none elements. A coverer paints when it is nearly
+// opaque (a background of alpha 0.9 or more after its opacity, a url() background image, a replaced element
+// or svg, or its own text at that point, or a component whose shadow root paints there). Translucent
+// scrims and gradients leave the text legible, so they are not coverers. A fixed or sticky coverer over
+// content that can be scrolled clear of it is normal stacking, not a defect, and is skipped.
+const COVER_MIN_SHARE = 0.2;
+function opacityChain(el) {
+  let value = 1;
+  for (let node = el; node; node = flatParent(node)) value *= parseFloat(getComputedStyle(node).opacity);
+  return value;
+}
+function flatContains(ancestor, el) {
+  for (let node = el; node; node = flatParent(node)) if (node === ancestor) return true;
+  return false;
+}
+function ownsTextAt(el, x, y) {
+  const range = document.createRange();
+  for (const node of el.childNodes) {
+    if (node.nodeType !== Node.TEXT_NODE || !node.textContent.trim()) continue;
+    range.selectNodeContents(node);
+    for (const r of range.getClientRects()) if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return true;
+  }
+  return false;
+}
+function paintsAt(el, x, y) {
+  const style = getComputedStyle(el);
+  if (style.visibility !== 'visible' || opacityChain(el) < 0.9) return false;
+  if (/^(img|svg|canvas|video|picture)$/i.test(el.localName) || style.backgroundImage.includes('url(')) return true;
+  if (rgba(style.backgroundColor).a >= 0.9 || ownsTextAt(el, x, y)) return true;
+  return Boolean(el.shadowRoot?.elementsFromPoint(x, y).some(inner => inner !== el && paintsAt(inner, x, y)));
+}
+// Can scrolling alone move the text out from under a viewport-pinned coverer? Only the document scrolls here.
+function scrollsClear(textRect, el, coverer) {
+  const pinned = node => { for (let n = node; n; n = flatParent(n)) if (/fixed|sticky/.test(getComputedStyle(n).position)) return true; return false; };
+  if (pinned(el) || !pinned(coverer)) return false;
+  const root = document.documentElement;
+  const remaining = root.scrollHeight - root.clientHeight - root.scrollTop;
+  if (remaining <= 0) return false;
+  const box = coverer.getBoundingClientRect();
+  const top = textRect.top - remaining, bottom = textRect.bottom - remaining;
+  return bottom <= box.top || top >= box.bottom || textRect.right <= box.left || textRect.left >= box.right;
+}
+function coveredText(node, el) {
+  const range = document.createRange();
+  range.selectNodeContents(node);
+  const lines = [...range.getClientRects()].filter(r => r.width > 0 && r.height > 0);
+  const step = Math.max(1, Math.ceil(lines.length / 8));
+  let samples = 0, covered = 0, top = null;
+  for (const line of lines.filter((_, i) => i % step === 0)) {
+    for (const f of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+      const x = line.left + line.width * f, y = line.top + line.height / 2;
+      if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue;
+      const hits = document.elementsFromPoint(x, y);
+      const own = hits.findIndex(hit => flatContains(hit, el));
+      if (own < 0) continue; // the text itself is not hit-testable here (pointer-events: none), so it is unknown
+      samples++;
+      const cover = hits.slice(0, own).find(hit => !flatContains(el, hit) && !fullyTransparent(hit) && paintsAt(hit, x, y)
+        && !scrollsClear(line, el, hit));
+      if (cover) { covered++; top ??= cover; }
+    }
+  }
+  return samples > 0 && covered / samples >= COVER_MIN_SHARE ? { by: top, share: Math.round((covered / samples) * 100) } : null;
+}
+
 // Is any part of the text drawn outside an ancestor that clips? Returns that ancestor, or null.
 // A scroll container ends the climb: its content is reachable.
 function clippedBy(textRect, el) {
@@ -206,7 +295,7 @@ export function runtimeChecks() {
   // Text: every text node, in light and shadow DOM, measured where it renders (through its slot, in the
   // flat tree): color, font, and clipping come from the rendering element, the fill from the first opaque
   // background up the flat tree, including the shadow parts that paint a component's container.
-  const fonts = [], overflow = [], contrast = { fails: [], passed: 0 };
+  const fonts = [], overflow = [], midWord = [], overlaps = [], contrast = { fails: [], passed: 0 };
   const seen = new Set();
   const once = (...keys) => { const key = keys.join('|'); if (seen.has(key)) return false; seen.add(key); return true; };
   walkText(document, node => {
@@ -220,6 +309,12 @@ export function runtimeChecks() {
     const name = describeFlat(boxOf(el) || el);
     if (!isFlex(style.fontFamily) && once('font', name)) fonts.push({ el: name, font: style.fontFamily });
     if (hiddenFromAssistiveTech(el)) return; // decorative text is exempt from overflow and contrast
+
+    // Mid-word breaks and overlap. Both read the live layout, so they are measured where the text renders.
+    const broken = midWordBreaks(node, style);
+    if (broken.length && once('midword', name)) midWord.push({ el: name, words: broken.slice(0, 3) });
+    const covered = coveredText(node, el);
+    if (covered && once('overlap', name)) overlaps.push({ el: name, coveredBy: describeFlat(covered.by), share: covered.share });
 
     // Overflow: the box holding the text overflows itself, or an ancestor that clips cuts the text off.
     const box = boxOf(el);
@@ -244,7 +339,7 @@ export function runtimeChecks() {
   const pageOverflow = pageOverflowCheck();
 
   const complete = unresolved.length === 0;
-  const pass = !pageOverflow.fails && under48.length === 0 && fonts.length === 0 && overflow.length === 0 && primary.status !== 'fail' && fabs <= 1 && contrast.fails.length === 0;
+  const pass = !pageOverflow.fails && under48.length === 0 && fonts.length === 0 && overflow.length === 0 && midWord.length === 0 && overlaps.length === 0 && primary.status !== 'fail' && fabs <= 1 && contrast.fails.length === 0;
   return JSON.parse(JSON.stringify({
     pass,
     complete,
@@ -252,6 +347,8 @@ export function runtimeChecks() {
     touchTargets: { checked: interactive.length, under48 },
     fonts: { offenders: fonts },
     overflow,
+    midWordBreaks: midWord,
+    overlaps,
     pageOverflow,
     primary,
     fabs: { count: fabs, ok: fabs <= 1 },

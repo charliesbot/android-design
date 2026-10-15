@@ -20,6 +20,8 @@ FAILING = {
     "touchTargets": lambda v: v.get("under48"),
     "fonts": lambda v: v.get("offenders"),
     "overflow": lambda v: v,
+    "midWordBreaks": lambda v: v,
+    "overlaps": lambda v: v,
     "primary": lambda v: v.get("status") == "fail",
     "fabs": lambda v: v.get("ok") is False,
     "contrast": lambda v: v.get("fails"),

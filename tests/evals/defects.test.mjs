@@ -34,6 +34,8 @@ const CASES = {
   'desktop-only': { fails: ['C-review'], detail: /desktop: pageOverflow/, notIn: /tablet: |foldable: / },
   'foldable-only': { fails: ['C-review'], detail: /foldable: pageOverflow/, notIn: /tablet: |desktop: / },
   'fixed-right': { fails: ['C-review'], detail: /light: pageOverflow/ },
+  'midword-break': { fails: ['C-review'], detail: /midWordBreaks/ },
+  'toolbar-overlap': { fails: ['C-review'], detail: /overlap/ },
   'fixed-left': { fails: ['C-review'], detail: /light: pageOverflow/ },
 };
 

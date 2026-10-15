@@ -23,7 +23,7 @@ The screen must work and adapt across phone (411x923), foldable (933x704), table
 If your harness has a browser:
 
 1. Serve the exploration on a free port: `node {{SKILL_DIR}}/gallery/cli.mjs serve {{EXPLORATION}} --port <free port>`.
-2. Open `http://127.0.0.1:<port>/runtime/review/?src=/draft/a/`, run `window.reviewChecks()`, fix every failure, and look at the screenshots of each device.
+2. Open your own new browser tab for `http://127.0.0.1:<port>/runtime/review/?src=/draft/a/` (other agents may share the browser, so never reuse or navigate an existing tab) and keep it in front while you run the checks, because a backgrounded tab can stall `reviewChecks()`. Run `window.reviewChecks()`, fix every failure, and look at the screenshots of each device.
 3. Stop the server when you are done.
 
 If your harness has no browser, say in your final message that visual review is unverified.
