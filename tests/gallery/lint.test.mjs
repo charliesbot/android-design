@@ -76,6 +76,8 @@ test('lint allows voices, role variables, and neutral color keywords', t => {
 const htmlRejections = [
   ['style attribute', '<!doctype html>\n<p\n  style="color: var(--md-sys-color-primary)">x</p>', /index\.html:3: .*style=/],
   ['inline style element', '<!doctype html>\n<style>p {}</style>', /index\.html:2: .*<style>/],
+  ['an unknown p-icon name', '<!doctype html>\n<p-icon\n  name="not_a_real_symbol"></p-icon>', /index\.html:2: <p-icon name="not_a_real_symbol"> is not a Material Symbols name/],
+  ['a p-icon with no name', '<!doctype html>\n<p-icon filled></p-icon>', /index\.html:2: <p-icon> needs a quoted name/],
   ['inline script', '<!doctype html>\n\n<script>alert(1)</script>', /index\.html:3: .*<script>/],
 ];
 for (const [name, page, message] of htmlRejections) {
@@ -86,6 +88,10 @@ for (const [name, page, message] of htmlRejections) {
 
 test('lint allows script with src and ignores commented markup', t => {
   publish(t, { page: `${PAGE}<!-- <p style="x"> --><script type="module" src="/runtime/m3e.js"></script>` })();
+});
+
+test('lint allows any Material Symbols name on p-icon, filled or not', t => {
+  publish(t, { page: `${PAGE}<p-icon name="directions_car"></p-icon><p-icon name='hiking' filled label="Hike"></p-icon><p-icon name="cloud"></p-icon><p-icon name="3d_rotation"></p-icon>` })();
 });
 
 test('lint allows the bundled families in voices at their minimum sizes', t => {

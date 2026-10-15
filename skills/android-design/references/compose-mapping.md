@@ -99,7 +99,7 @@ The HTML cell is the element and the attribute values that select the pattern. A
 | `m3e-circular-progress-indicator variant="wavy"` | `CircularWavyProgressIndicator` | unverified | |
 | `m3e-linear-progress-indicator variant="flat"` | `LinearProgressIndicator` | unverified | |
 | `m3e-linear-progress-indicator variant="wavy"` | `LinearWavyProgressIndicator` | unverified | |
-| `m3e-switch` | `Switch` | verified | `icons` is the `thumbContent` slot: `Icon(Icons.Rounded.Check, null, Modifier.size(SwitchDefaults.IconSize))` when on, `Icons.Rounded.Close` when off. Track, thumb sizes, and colors match, off and on, with and without icons. Compose reserves a 48dp-tall touch box around the 32dp switch; leave that room. The on-state icon is slightly darker in Compose; harmless. |
+| `m3e-switch` | `Switch` | verified | `icons` is the `thumbContent` slot: `Icon(painterResource(R.drawable.check), null, Modifier.size(SwitchDefaults.IconSize))` when on, `R.drawable.close` when off (see Icons). Track, thumb sizes, and colors match, off and on, with and without icons. Compose reserves a 48dp-tall touch box around the 32dp switch; leave that room. The on-state icon is slightly darker in Compose; harmless. |
 | `m3e-slider` | `Slider(value, onValueChange)` | verified | Track and thumb through `SliderDefaults.Track` and `SliderDefaults.Thumb`. Verified continuous at a mid value: 16dp track, 4x44dp handle, 6dp gaps, colors match, and the `SliderState` overload renders the same. Compose's track is 2dp shorter at each end, its end dot is the primary color (proposal: on-secondary-container), inner track corners are 2dp, and the layout box is 48dp against 44; harmless. In a proposal, give the slider `min-height: 48px` to match Compose's 48dp slider, whose whole box is the touch target. Do not resize the thumb: @m3e/web derives the handle gaps from it. |
 | `m3e-slider` with two `m3e-slider-thumb` | `RangeSlider` | verified | Same notes as the single slider. Compose places each handle up to 4dp nearer the track ends; harmless. |
 | `m3e-slider-thumb` | see `m3e-slider` | verified | Covered by the slider rows. |
@@ -107,7 +107,7 @@ The HTML cell is the element and the attribute values that select the pattern. A
 | `p-floating-toolbar` | see the shims table | verified | The `m3e-toolbar` wrapper inside it is part of this row. The toggle buttons inside are the blind port's `HorizontalFloatingToolbar` with `ToggleButton` |
 | `m3e-button toggle` inside `p-floating-toolbar` | `ToggleButton(checked, onCheckedChange, colors = ToggleButtonDefaults.colors(containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.onSurfaceVariant, checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer, checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer))` | verified | Selected is tonal, others text; 48dp minimum height with `Modifier.heightIn(min = 48.dp)`; icon at `ToggleButtonDefaults.IconSize` |
 | `m3e-theme color variant scheme` | `MaterialExpressiveTheme(colorScheme = rememberDynamicColorScheme(seedColor, isDark, style = PaletteStyle.TonalSpot, specVersion = ColorSpec.SpecVersion.SPEC_2025), motionScheme = MotionScheme.expressive())` | unverified | Required by the page contract. See the color table for `variant` and `scheme` |
-| `p-icon` | `Icon(Icons.Rounded.Home, contentDescription = ...)` | unverified | `label` is the `contentDescription`; without it pass `null`. See the icons table |
+| `p-icon` | `Icon(painterResource(R.drawable.home), contentDescription = ...)` | unverified | `label` is the `contentDescription`; without it pass `null`. See Icons |
 
 ### Shape names for `m3e-shape`
 
@@ -266,62 +266,9 @@ The theme element is the single color source: `rememberDynamicColorScheme(seedCo
 
 ## Icons
 
-Every name in `runtime-src/icons.json`. Icons marked `extended` need the `material-icons-extended` dependency; `core` ones ship with `material-icons-core`. The six directional icons use `Icons.AutoMirrored.Rounded`, which mirrors in right-to-left layouts. Compose's icon set has no unfilled and filled pair: `p-icon` with or without `filled` maps to the same `Icons.Rounded` vector, so the unfilled look needs a Material Symbols vector drawable at implementation.
+Both sides use Material Symbols, so no per-icon table exists. Every `p-icon name="x"` ports as the same Material Symbol: Rounded style, weight 400, grade 0, with Fill 1 when the element has `filled` and Fill 0 otherwise (so a toggle's off and on states are two drawables). Download it from [fonts.google.com/icons](https://fonts.google.com/icons) in the Android format (or add the SVG with Android Studio's Vector Asset) and import it as a vector drawable named after the symbol. Delete the `android:tint="?attr/colorControlNormal"` attribute from the downloaded `<vector>` tag (keep the tag's closing `>`): the starter has no AppCompat or MDC, so the attribute fails resource linking, and `Icon` applies the color. Draw it with `Icon(painterResource(R.drawable.name), contentDescription = label)`; the `label` attribute is the `contentDescription`, and without it pass `null`. Leave `tint` at its default. The legacy `Icons.Rounded` set from `material-icons-extended` is frozen and lacks the Fill axis: do not use it.
 
-| HTML `name` | Compose | Artifact |
-| --- | --- | --- |
-| `home` | `Icons.Rounded.Home` | core |
-| `search` | `Icons.Rounded.Search` | core |
-| `favorite` | `Icons.Rounded.Favorite` | core |
-| `settings` | `Icons.Rounded.Settings` | core |
-| `add` | `Icons.Rounded.Add` | core |
-| `close` | `Icons.Rounded.Close` | core |
-| `arrow_back` | `Icons.AutoMirrored.Rounded.ArrowBack` | core |
-| `more_vert` | `Icons.Rounded.MoreVert` | core |
-| `menu` | `Icons.Rounded.Menu` | core |
-| `edit` | `Icons.Rounded.Edit` | core |
-| `delete` | `Icons.Rounded.Delete` | core |
-| `share` | `Icons.Rounded.Share` | core |
-| `check` | `Icons.Rounded.Check` | core |
-| `calendar_month` | `Icons.Rounded.CalendarMonth` | extended |
-| `schedule` | `Icons.Rounded.Schedule` | extended |
-| `person` | `Icons.Rounded.Person` | core |
-| `notifications` | `Icons.Rounded.Notifications` | core |
-| `star` | `Icons.Rounded.Star` | core |
-| `bookmark` | `Icons.Rounded.Bookmark` | extended |
-| `play_arrow` | `Icons.Rounded.PlayArrow` | core |
-| `pause` | `Icons.Rounded.Pause` | extended |
-| `skip_next` | `Icons.Rounded.SkipNext` | extended |
-| `skip_previous` | `Icons.Rounded.SkipPrevious` | extended |
-| `shuffle` | `Icons.Rounded.Shuffle` | extended |
-| `repeat` | `Icons.Rounded.Repeat` | extended |
-| `filter_list` | `Icons.Rounded.FilterList` | extended |
-| `sort` | `Icons.AutoMirrored.Rounded.Sort` | extended |
-| `info` | `Icons.Rounded.Info` | core |
-| `help` | `Icons.AutoMirrored.Rounded.Help` | extended |
-| `map` | `Icons.Rounded.Map` | extended |
-| `photo_camera` | `Icons.Rounded.PhotoCamera` | extended |
-| `image` | `Icons.Rounded.Image` | extended |
-| `chat` | `Icons.AutoMirrored.Rounded.Chat` | extended |
-| `mail` | `Icons.Rounded.Mail` | extended |
-| `call` | `Icons.Rounded.Call` | core |
-| `shopping_cart` | `Icons.Rounded.ShoppingCart` | core |
-| `restaurant` | `Icons.Rounded.Restaurant` | extended |
-| `local_dining` | `Icons.Rounded.LocalDining` | extended |
-| `timer` | `Icons.Rounded.Timer` | extended |
-| `list` | `Icons.AutoMirrored.Rounded.List` | core |
-| `grid_view` | `Icons.Rounded.GridView` | extended |
-| `tune` | `Icons.Rounded.Tune` | extended |
-| `refresh` | `Icons.Rounded.Refresh` | core |
-| `download` | `Icons.Rounded.Download` | extended |
-| `upload` | `Icons.Rounded.Upload` | extended |
-| `lock` | `Icons.Rounded.Lock` | core |
-| `visibility` | `Icons.Rounded.Visibility` | extended |
-| `location_on` | `Icons.Rounded.LocationOn` | core |
-| `explore` | `Icons.Rounded.Explore` | extended |
-| `music_note` | `Icons.Rounded.MusicNote` | extended |
-| `lyrics` | `Icons.Rounded.Lyrics` | extended |
-| `queue_music` | `Icons.AutoMirrored.Rounded.QueueMusic` | extended |
+Directional icons (`arrow_back`, `arrow_forward`, `sort`, `help`, `chat`, `list`, `queue_music`, and any other glyph whose meaning has a direction) must mirror in right-to-left layouts: set `android:autoMirrored="true"` on the drawable's `<vector>` tag.
 
 ## Shapes and spacing
 

@@ -13,9 +13,10 @@ License: `public/runtime/fonts/OFL.txt`. Other characters use the system fallbac
 brand and data faces (Fraunces, Bricolage Grotesque, Big Shoulders Display, Doto, Google Sans Code) the same way, each
 with its own `<Name>-OFL.txt` beside it; the gallery shell itself uses only Google Sans Flex.
 
-Device icons in `src/icons.mjs` and the proposal runtime sprite use Material Symbols
-Rounded, weight 400. The runtime sprite is generated from `@material-symbols/svg-400`.
-License: Apache 2.0, `public/runtime/icons-LICENSE.txt`.
+Device icons in `src/icons.mjs` use Material Symbols Rounded, weight 400, copied from `@material-symbols/svg-400`.
+The proposal runtime bundles the Material Symbols Rounded variable font (`material-symbols` npm package, pinned) as
+`public/runtime/fonts/MaterialSymbolsRounded.woff2`, with provenance and the Apache 2.0 license beside it
+(`MaterialSymbolsRounded-SOURCE.txt`, `MaterialSymbolsRounded-LICENSE.txt`).
 
 The canvas-first composition is specific to reviewing proposals, not editing UI.
 M3E Canvas informed the workspace direction, not its exact layout or controls:

@@ -83,6 +83,9 @@ const HEX_COLOR = /#[0-9a-f]{3,8}(?![\w-])/i;
 // Doto for display small (36px) and up, Google Sans Code for numbers and data at any size, Google Sans Flex everywhere.
 const FONTS = JSON.parse(readFileSync(new URL('./runtime-src/fonts.json', import.meta.url), 'utf8'));
 const BUNDLED = [FONTS.plain, ...FONTS.faces.map(face => face.family)];
+// Every Material Symbols name (public/runtime/symbols.json, emitted by the runtime build from the pinned `material-symbols` package).
+// <p-icon name> draws the name as a font ligature, so an unknown name would render as plain text; publishing rejects it instead.
+const SYMBOLS = new Set(JSON.parse(readFileSync(new URL('./public/runtime/symbols.json', import.meta.url), 'utf8')));
 const TYPE_PROPERTIES = new Set(['font', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'font-variation-settings']);
 const blank = text => text.replace(/[^\n]/g, ' ');
 const lineAt = (text, index) => text.slice(0, index).split('\n').length;
@@ -178,6 +181,12 @@ function lintHtml(file, source) {
     const name = tag[1].toLowerCase();
     if (name === 'style') fail(tag.index, 'Inline <style> is not allowed. Put styles in a .css file');
     if (name === 'script' && !/\ssrc\s*=/i.test(tag[0])) fail(tag.index, 'Inline <script> is not allowed. Use <script src="...">');
+    if (name === 'p-icon') {
+      const icon = /\sname\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag[0]);
+      const symbol = icon ? icon[1] ?? icon[2] : undefined;
+      if (symbol === undefined) fail(tag.index, '<p-icon> needs a quoted name="..." attribute that is a Material Symbols name from fonts.google.com/icons (name=home without quotes is not accepted)');
+      else if (!SYMBOLS.has(symbol)) fail(tag.index, `<p-icon name="${symbol}"> is not a Material Symbols name. Pick one from fonts.google.com/icons, written in snake_case`);
+    }
     const attribute = /\sstyle\s*=/i.exec(tag[0]);
     if (attribute) fail(tag.index + attribute.index, 'style="" attributes are not allowed. Put styles in a .css file');
   }
