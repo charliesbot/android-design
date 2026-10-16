@@ -15,8 +15,8 @@
       ],
       "assertions": [
         {
-          "id": "C-publish",
-          "text": "The runner's `cli.mjs publish` of the draft succeeded (its lint rejects raw colors, inline style or script, and misplaced type declarations)",
+          "id": "C-lint",
+          "text": "The lint run by `cli.mjs render` passed (it rejects raw colors, inline style or script, and misplaced type declarations)",
           "type": "code"
         },
         {
@@ -95,8 +95,8 @@
       "files": [],
       "assertions": [
         {
-          "id": "C-publish",
-          "text": "The runner's `cli.mjs publish` of the draft succeeded (its lint rejects raw colors, inline style or script, and misplaced type declarations)",
+          "id": "C-lint",
+          "text": "The lint run by `cli.mjs render` passed (it rejects raw colors, inline style or script, and misplaced type declarations)",
           "type": "code"
         },
         {
@@ -175,8 +175,8 @@
       "files": [],
       "assertions": [
         {
-          "id": "C-publish",
-          "text": "The runner's `cli.mjs publish` of the draft succeeded (its lint rejects raw colors, inline style or script, and misplaced type declarations)",
+          "id": "C-lint",
+          "text": "The lint run by `cli.mjs render` passed (it rejects raw colors, inline style or script, and misplaced type declarations)",
           "type": "code"
         },
         {
@@ -260,8 +260,8 @@
       ],
       "assertions": [
         {
-          "id": "C-publish",
-          "text": "The runner's `cli.mjs publish` of the draft succeeded (its lint rejects raw colors, inline style or script, and misplaced type declarations)",
+          "id": "C-lint",
+          "text": "The lint run by `cli.mjs render` passed (it rejects raw colors, inline style or script, and misplaced type declarations)",
           "type": "code"
         },
         {

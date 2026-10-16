@@ -1,8 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
+import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { initializeExploration } from './store.mjs';
 
 export const PREFIX = 'android-design-explore-';
 export const MARKER = '.android-design-exploration.json';
@@ -56,7 +55,8 @@ export function create({ starter = 'html', template, root, title = 'Design explo
   const destination = mkdtempSync(join(base, PREFIX));
   try {
     cpSync(template, join(destination, 'project'), { recursive: true, filter: source => !SKIP.has(basename(source)) });
-    initializeExploration(destination, title);
+    writeFileSync(join(destination, MARKER), `${JSON.stringify({ version: 1, path: destination })}\n`);
+    writeFileSync(join(destination, 'exploration.json'), `${JSON.stringify({ version: 1, title })}\n`);
   } catch (error) {
     rmSync(destination, { recursive: true, force: true });
     throw error;

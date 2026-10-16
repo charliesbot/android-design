@@ -2,15 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { GalleryStore } from '../../skills/android-design/gallery/store.mjs';
-import { fixture, writeProposal, PAGE, STYLE } from './fixture.mjs';
+import { lintAll } from '../../skills/android-design/gallery/render.mjs';
+import { workspace, writeProposal, PAGE } from './fixture.mjs';
 
 const starter = name => readFileSync(fileURLToPath(new URL(`../../skills/android-design/assets/proposal-starter/proposals/a/${name}`, import.meta.url)), 'utf8');
 
+// Returns a function that throws the lint errors of proposal `a`, as `render` would report them.
 function publish(t, files) {
-  const { root, draft } = fixture(t);
+  const root = workspace(t);
   writeProposal(root, 'a', files);
-  return () => new GalleryStore(root).publish(draft);
+  return () => {
+    const errors = lintAll(`${root}/project/proposals`, ['a']);
+    if (errors.length) throw new Error(errors.join('\n'));
+  };
 }
 
 test('the shipped starter and the fixture pass the lint', t => {
@@ -106,12 +110,4 @@ test('lint allows the bundled families in voices at their minimum sizes', t => {
     '/* .voice-bad { font-family: Georgia; } */',
   ].join('\n');
   publish(t, { style })();
-});
-
-test('a lint failure publishes nothing', t => {
-  const { root, draft } = fixture(t);
-  writeProposal(root, 'a', { style: `${STYLE}p { color: #000; }` });
-  const store = new GalleryStore(root);
-  assert.throws(() => store.publish(draft), /Raw color/);
-  assert.equal(store.read().rounds.length, 0);
 });

@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { luminance, neededRatio, over, ratio } from '../../skills/android-design/gallery/runtime-src/contrast.js';
-import { parseSource } from '../../skills/android-design/gallery/runtime-src/review/source.js';
 
 const rgb = (r, g, b, a = 1) => ({ r, g, b, a });
 const round = v => Math.round(v * 100) / 100;
@@ -31,14 +30,4 @@ test('large text needs 3:1, other text 4.5:1', () => {
   assert.equal(neededRatio(24, 400), 3);
   assert.equal(neededRatio(18.66, 700), 3);
   assert.equal(neededRatio(18.66, 500), 4.5);
-});
-
-test('the review page frames only same-origin /draft/ and /rounds/ paths', () => {
-  const origin = 'http://127.0.0.1:8767';
-  assert.equal(parseSource('/draft/a/', origin), '/draft/a/');
-  assert.equal(parseSource('/rounds/001/a/', origin), '/rounds/001/a/');
-  assert.equal(parseSource('/draft/a/?x=1', origin), '/draft/a/?x=1');
-  for (const bad of [null, '', 'draft/a/', '/api/exploration', '/runtime/sample/', '//evil.example/draft/a/', 'http://evil.example/draft/a/', '/\\evil.example/draft/', 'javascript:alert(1)', '/draftx/a/']) {
-    assert.equal(parseSource(bad, origin), null, String(bad));
-  }
 });

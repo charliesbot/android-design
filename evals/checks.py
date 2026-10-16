@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Deterministic checks for one eval case. Usage: checks.py <case_dir> [phone]
 
-Reads the files the runner leaves in the case directory: publish.json (the result of `cli.mjs publish`),
-renders/review.json (the in-page runtimeChecks of every render), and the proposal's index.html (named by
+Reads the files the runner leaves in the case directory: lint.json (the lint result of `cli.mjs render`),
+renders/checks.json (the in-page runtimeChecks of every render), and the proposal's index.html (named by
 case.json). Prints JSON: {"C-id": {"pass": bool, "detail": str}}.
 """
 import json
@@ -47,13 +47,13 @@ def proposal_dir(case_dir: Path):
     return Path(exploration) / "project" / "proposals" / case.get("proposal", "a")
 
 
-def check_publish(case_dir: Path):
-    publish = read_json(case_dir / "publish.json")
-    if publish is None:
-        return result(False, "publish did not run")
-    if publish.get("ok"):
+def check_lint(case_dir: Path):
+    lint = read_json(case_dir / "lint.json")
+    if lint is None:
+        return result(False, "lint did not run")
+    if lint.get("ok"):
         return result(True)
-    return result(False, str(publish.get("output", "publish failed")).strip()[-400:])
+    return result(False, str(lint.get("output", "lint failed")).strip()[-400:])
 
 
 def failing_keys(outcome):
@@ -61,11 +61,11 @@ def failing_keys(outcome):
 
 
 def check_review(case_dir: Path):
-    review = read_json(case_dir / "renders" / "review.json")
+    review = read_json(case_dir / "renders" / "checks.json")
     if not review or not isinstance(review.get("renders"), list) or not review["renders"]:
         log = case_dir / "render.log"
         why = f": {log.read_text()[-300:].strip()}" if log.is_file() else ""
-        return result(False, f"no renders/review.json: the proposal was not rendered{why}")
+        return result(False, f"no renders/checks.json: the proposal was not rendered{why}")
     failed, unverified = [], []
     for render in review["renders"]:
         outcome = render.get("result") or {}
@@ -97,7 +97,7 @@ def check_palette(case_dir: Path):
 def run(case_dir: Path, surface: str = "phone"):
     case_dir = Path(case_dir)
     return {
-        "C-publish": check_publish(case_dir),
+        "C-lint": check_lint(case_dir),
         "C-review": check_review(case_dir),
         "C-palette": check_palette(case_dir),
     }

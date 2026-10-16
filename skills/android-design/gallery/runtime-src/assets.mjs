@@ -26,7 +26,7 @@ const RANGES = [[0x20, 0x7e], [0xa0, 0xff], [0x2010, 0x2027], [0x2030, 0x203a], 
 const LATIN = RANGES.flatMap(([from, to]) => Array.from({ length: to - from + 1 }, (_, i) => String.fromCodePoint(from + i))).join('');
 
 // Folders copied unchanged to public/runtime/<name>/.
-const PAGES = ['sample', 'verify', 'checks-fixture', 'review'];
+const PAGES = ['sample', 'verify', 'checks-fixture'];
 
 function symbolNames() {
   const names = [...read(new URL('index.d.ts', SYMBOLS), 'utf8').matchAll(/^\s*"([a-z0-9_]+)",?$/gm)].map(match => match[1]);

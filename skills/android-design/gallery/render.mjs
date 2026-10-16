@@ -1,0 +1,235 @@
+// `render`: lint each proposal, then render it headlessly in the system Chrome and write the images, the rule-check
+// results, a contact sheet, and a self-contained view.html per proposal. No server and no content port: Chrome is
+// driven over a pipe (cdp.mjs) and its requests for https://proposal.invalid/ are answered from disk.
+import { mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, extname, join, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Browser } from './cdp.mjs';
+import { LintError, lintProposal, proposalFiles } from './lint.mjs';
+import { dataUri, inlineHtml, viewerHtml } from './view.mjs';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+export const RUNTIME_DIR = join(HERE, 'public/runtime');
+export const ORIGIN = 'https://proposal.invalid';
+const PROPOSAL_ID = /^[a-z][a-z0-9-]{0,39}$/;
+const PHONE = [411, 923];
+
+// One row per render. `color` stands in for a red dynamic-color wallpaper.
+export const RENDERS = [
+  { name: 'light', viewport: PHONE, scheme: 'light' },
+  { name: 'dark', viewport: PHONE, scheme: 'dark' },
+  { name: 'wallpaper', viewport: PHONE, scheme: 'light', color: '#b3261e' },
+  { name: 'foldable', viewport: [933, 704], scheme: 'light' },
+  { name: 'tablet', viewport: [1280, 800], scheme: 'light' },
+  { name: 'desktop', viewport: [1920, 1080], scheme: 'light' },
+];
+// The contact sheet shows one row per proposal and these columns.
+export const SHEET_COLUMNS = ['light', 'foldable', 'tablet', 'desktop'];
+
+const TYPES = {
+  '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
+  '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+  '.webp': 'image/webp', '.avif': 'image/avif', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.txt': 'text/plain; charset=utf-8',
+};
+
+export function summarize(url, renders) {
+  return {
+    url,
+    renders,
+    pass: renders.every(r => r.result.pass === true),
+    complete: renders.every(r => r.result.complete === true),
+  };
+}
+
+// URL -> { type, body } | null. /runtime/* comes from the built runtime, /draft/<id>/* from that proposal's folder.
+export function makeRoute({ runtimeDir = RUNTIME_DIR, proposalsDir }) {
+  return url => {
+    if (url.origin !== ORIGIN) return null;
+    const path = decodeURIComponent(url.pathname);
+    let base, rest;
+    if (path.startsWith('/runtime/')) [base, rest] = [runtimeDir, path.slice('/runtime/'.length)];
+    else {
+      const match = /^\/draft\/([a-z][a-z0-9-]*)\/(.*)$/.exec(path);
+      if (!match) return null;
+      [base, rest] = [join(proposalsDir, match[1]), match[2]];
+    }
+    if (!rest || rest.endsWith('/')) rest += 'index.html';
+    const file = resolve(base, rest);
+    if (!file.startsWith(base + sep)) return null;
+    try {
+      if (!statSync(file).isFile()) return null;
+      return { type: TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream', body: readFileSync(file) };
+    } catch { return null; }
+  };
+}
+
+// Runs in the page: apply the theme, wait for fonts, two frames, a stable primary color, and no running transitions, then run the checks.
+async function prepare({ scheme, color }) {
+  const theme = document.querySelector('m3e-theme');
+  if (theme) {
+    theme.setAttribute('scheme', scheme);
+    if (color) theme.setAttribute('color', color);
+  }
+  const frames = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const primary = () => getComputedStyle(document.documentElement).getPropertyValue('--md-sys-color-primary');
+  await document.fonts.ready;
+  await frames();
+  // The theme recomputes its tokens asynchronously: wait until the value holds for three frames (max ~2s).
+  let last = primary();
+  let stable = 0;
+  for (let i = 0; i < 120 && stable < 3; i++) {
+    await frames();
+    const now = primary();
+    stable = now === last ? stable + 1 : 0;
+    last = now;
+  }
+  if (typeof window.runtimeChecks !== 'function') {
+    return { pass: false, complete: false, error: 'runtimeChecks is missing: the page does not load /runtime/m3e.js' };
+  }
+  await window.runtimeSettle();
+  return window.runtimeChecks();
+}
+
+// Renders `url` once per RENDERS row on an open page. `onShot(name, png)` receives each screenshot.
+export async function renderViews(page, url, onShot = () => {}) {
+  const renders = [];
+  for (const spec of RENDERS) {
+    await page.setViewport(...spec.viewport);
+    await page.goto(url);
+    const result = await page.evaluate(prepare, spec);
+    onShot(spec.name, await page.screenshot());
+    renders.push({ name: spec.name, viewport: spec.viewport, result });
+  }
+  return renders;
+}
+
+// One line per failing render: which check keys failed, or the page error.
+export function failures(renders) {
+  const bad = result => Object.entries(result).filter(([key, value]) => !['pass', 'complete', 'unresolved'].includes(key)
+    && (Array.isArray(value) ? value.length : value && typeof value === 'object' ? value.fails || value.under48?.length || value.offenders?.length || value.status === 'fail' || value.ok === false : false)).map(([key]) => key);
+  return renders.filter(r => r.result.pass !== true || r.result.complete !== true).map(r => {
+    const keys = bad(r.result);
+    return `${r.name}: ${r.result.error ?? (keys.length ? keys.join(', ') : r.result.pass === true ? 'checks incomplete' : 'failed')}`;
+  });
+}
+
+const escape = text => String(text).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
+
+// Pure: rows are { id, pass, images: { <render name>: data URI } }.
+export function contactSheetHtml(title, rows) {
+  const sections = rows.map(row => `<section><h2>${escape(row.id)} <small class="${row.pass ? 'ok' : 'bad'}">${row.pass ? 'pass' : 'fail'}</small></h2>
+<div>${SHEET_COLUMNS.map(name => `<figure><img src="${row.images[name]}"><figcaption>${name}</figcaption></figure>`).join('')}</div></section>`).join('\n');
+  return `<!doctype html><meta charset="utf-8"><title>${escape(title)}</title>
+<style>
+  body { margin: 0; padding: 24px; font: 14px system-ui, sans-serif; background: #eee; color: #222; width: max-content; }
+  h1 { margin: 0 0 16px; font-size: 20px; }
+  h2 { margin: 16px 0 8px; font-size: 18px; }
+  small { font-size: 13px; padding: 2px 8px; border-radius: 10px; color: #fff; }
+  .ok { background: #2e7d32; } .bad { background: #c62828; }
+  section > div { display: flex; gap: 16px; align-items: flex-start; }
+  figure { margin: 0; }
+  img { height: 400px; display: block; border: 1px solid #bbb; background: #fff; }
+  figcaption { margin-top: 4px; color: #666; }
+</style>
+<h1>${escape(title)}</h1>
+${sections}`;
+}
+
+async function writeContactSheet(browser, file, title, rows) {
+  const page = await browser.newPage();
+  try {
+    const html = contactSheetHtml(title, rows);
+    await page.serve(url => (url.href === `${ORIGIN}/contact-sheet.html` ? { type: 'text/html; charset=utf-8', body: Buffer.from(html) } : null));
+    await page.setViewport(1200, 800);
+    await page.goto(`${ORIGIN}/contact-sheet.html`);
+    const size = await page.evaluate(async () => {
+      await Promise.all([...document.images].map(image => image.decode()));
+      return [document.documentElement.scrollWidth, document.documentElement.scrollHeight];
+    });
+    await page.setViewport(...size);
+    writeFileSync(file, await page.screenshot());
+  } finally {
+    await page.close();
+  }
+}
+
+function folderIds(proposalsDir) {
+  return readdirSync(proposalsDir, { withFileTypes: true }).filter(e => e.isDirectory() && !e.name.startsWith('.')).map(e => e.name).sort();
+}
+
+// Lints every proposal and returns the errors as "file:line: message" lines; nothing is rendered when there are any.
+export function lintAll(proposalsDir, ids) {
+  const errors = [];
+  for (const id of ids) {
+    try {
+      const files = proposalFiles(join(proposalsDir, id));
+      if (!files.some(file => file.path === 'index.html')) throw new LintError(`proposals/${id}/index.html: missing`);
+      lintProposal(id, files);
+    } catch (error) {
+      if (!(error instanceof LintError)) throw error;
+      errors.push(error.message);
+    }
+  }
+  return errors;
+}
+
+export function viewHtml(exploration, id, route) {
+  const pageUrl = new URL(`${ORIGIN}/draft/${id}/`);
+  const doc = inlineHtml(route(new URL('index.html', pageUrl)).body.toString('utf8'), pageUrl, route);
+  let title = 'Design exploration';
+  try { title = JSON.parse(readFileSync(join(exploration, 'exploration.json'), 'utf8')).title ?? title; } catch { /* the title is optional */ }
+  return viewerHtml({ title: `${id} - ${title}`, doc });
+}
+
+// Returns { renders: <dir>, sheet, proposals: [{ id, dir, summary, problems }] }. Throws a LintError listing every lint failure first.
+export async function renderExploration(exploration, requested = []) {
+  exploration = realpathSync(resolve(exploration));
+  const proposalsDir = join(exploration, 'project/proposals');
+  let available;
+  try { available = folderIds(proposalsDir); } catch { throw new Error(`Not an HTML exploration (no project/proposals/): ${exploration}`); }
+  const ids = requested.length ? requested : available;
+  if (!ids.length) throw new Error(`No proposals in ${proposalsDir}`);
+  for (const id of ids) if (!PROPOSAL_ID.test(id) || !available.includes(id)) throw new Error(`Unknown proposal "${id}". Available: ${available.join(', ') || 'none'}`);
+  const errors = lintAll(proposalsDir, ids);
+  if (errors.length) throw new LintError(errors.join('\n'));
+
+  const route = makeRoute({ proposalsDir });
+  const out = join(exploration, 'renders');
+  const missing = new Set();
+  const browser = await Browser.launch();
+  try {
+    const page = await browser.newPage();
+    await page.serve(route, url => { if (!url.endsWith('/favicon.ico')) missing.add(url); });
+    const proposals = [];
+    for (const id of ids) {
+      const dir = join(out, id);
+      rmSync(dir, { recursive: true, force: true });
+      mkdirSync(dir, { recursive: true });
+      const images = {};
+      const url = `${ORIGIN}/draft/${id}/`;
+      missing.clear();
+      const renders = await renderViews(page, url, (name, png) => { writeFileSync(join(dir, `${name}.png`), png); images[name] = dataUri('image/png', png); });
+      const summary = summarize(url, renders);
+      writeFileSync(join(dir, 'checks.json'), `${JSON.stringify(summary, null, 2)}\n`);
+      writeFileSync(join(dir, 'view.html'), viewHtml(exploration, id, route));
+      proposals.push({ id, dir, summary, images, problems: failures(renders), missing: [...missing] });
+    }
+    await page.close();
+    const sheet = join(out, 'contact-sheet.png');
+    await writeContactSheet(browser, sheet, 'Contact sheet', proposals.map(p => ({ id: p.id, pass: p.summary.pass && p.summary.complete, images: p.images })));
+    return { renders: out, sheet, proposals: proposals.map(({ images: _images, ...rest }) => rest) };
+  } finally {
+    await browser.close();
+  }
+}
+
+// The text `cli.mjs render` prints.
+export function report(result) {
+  const lines = [`Contact sheet: ${result.sheet}`];
+  for (const { id, dir, summary, problems, missing } of result.proposals) {
+    lines.push(`${id}: ${summary.pass && summary.complete ? 'pass' : `FAIL (${problems.join('; ')})`}`);
+    lines.push(`  ${dir}/{${RENDERS.map(r => r.name).join(',')}}.png, checks.json, view.html`);
+    if (missing.length) lines.push(`  not found: ${missing.join(', ')}`);
+  }
+  return lines.join('\n');
+}

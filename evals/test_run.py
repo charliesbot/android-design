@@ -55,11 +55,11 @@ class PrepareTest(unittest.TestCase):
             self.assertNotRegex(case['prompt'], r'R\.drawable|Compose|Kotlin|EvalScreen')
             self.assertIn('1920x1080', case['prompt'])
             codes = [a['id'] for a in case['assertions'] if a['type'] == 'code']
-            self.assertEqual(codes, ['C-publish', 'C-review', 'C-palette'])
+            self.assertEqual(codes, ['C-lint', 'C-review', 'C-palette'])
             self.assertIn('R-adaptive', [a['id'] for a in case['assertions']])
 
-    def test_render_names_match_render_mjs(self):
-        source = (run.HERE / 'render.mjs').read_text()
+    def test_render_names_match_the_skill_render(self):
+        source = (run.SKILL_DIR / 'gallery/render.mjs').read_text()
         names = re.findall(r"\{ name: '(\w+)', viewport", source)
         self.assertEqual(tuple(names), run.RENDER_NAMES)
 
@@ -75,63 +75,58 @@ class ArtifactPipelineTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 run.prepare_run([case], out)
 
-    def test_rejected_publish_leaves_no_renders_and_clears_stale_ones(self):
+    def test_lint_failure_leaves_no_renders_and_clears_stale_ones(self):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             fake_case(directory)
             (directory / 'renders').mkdir()
             (directory / 'renders/light.png').write_bytes(b'old')
-            failed = subprocess.CompletedProcess([], 1, '', 'index.html:3 raw color')
-            with mock.patch.object(run.subprocess, 'run', return_value=failed), \
-                    mock.patch.object(run, 'gallery_server') as server:
+            failed = subprocess.CompletedProcess([], 2, '', 'proposals/a/style.css:3: Raw color')
+            with mock.patch.object(run.subprocess, 'run', return_value=failed):
                 images, error = run.render(directory)
-            server.assert_not_called()
             self.assertEqual(images, [])
             self.assertIsNone(error)
             self.assertFalse((directory / 'renders/light.png').exists())
-            record = json.loads((directory / 'publish.json').read_text())
+            record = json.loads((directory / 'lint.json').read_text())
             self.assertFalse(record['ok'])
-            self.assertIn('raw color', record['output'])
+            self.assertIn('Raw color', record['output'])
 
-    def test_render_publishes_then_renders_the_published_round_and_stops_the_server(self):
+    def test_chrome_failure_is_an_infrastructure_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             fake_case(directory)
+            crashed = subprocess.CompletedProcess([], 1, '', 'Chrome not found')
+            with mock.patch.object(run.subprocess, 'run', return_value=crashed):
+                images, error = run.render(directory)
+            self.assertEqual(images, [])
+            self.assertIn('Chrome not found', error)
+
+    def test_render_calls_the_skill_render_and_copies_its_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            fake_case(directory)
+            exploration = Path(run.case_info(directory)['exploration'])
             calls = []
 
             def fake_run(command, **kwargs):
                 calls.append(command)
-                if 'publish' in command:
-                    return subprocess.CompletedProcess(command, 0, 'Published round 002: 1 proposals.', '')
-                out = Path(command[command.index('--out') + 1])
+                out = exploration / 'renders' / 'a'
                 out.mkdir(parents=True)
                 for name in run.RENDER_NAMES:
                     (out / f'{name}.png').write_bytes(b'png')
-                return subprocess.CompletedProcess(command, 0, 'rendered', '')
+                (out / 'checks.json').write_text('{"renders": []}')
+                (out / 'view.html').write_text('big')
+                return subprocess.CompletedProcess(command, 0, 'a: pass', '')
 
-            started = []
-            from contextlib import contextmanager
-
-            @contextmanager
-            def fake_server(exploration, port):
-                started.append(port)
-                try:
-                    yield
-                finally:
-                    started.append('stopped')
-
-            with mock.patch.object(run.subprocess, 'run', side_effect=fake_run), \
-                    mock.patch.object(run, 'gallery_server', fake_server):
+            with mock.patch.object(run.subprocess, 'run', side_effect=fake_run):
                 images, error = run.render(directory)
             self.assertIsNone(error)
+            self.assertEqual(calls[0][2:], ['render', str(exploration), 'a'])
             self.assertEqual(len(images), 6)
             self.assertTrue(run.render_complete(images))
-            render_command = calls[-1]
-            url = render_command[render_command.index('--url') + 1]
-            self.assertRegex(url, r'^http://127\.0\.0\.1:\d+/rounds/002/a/$')
-            self.assertEqual(started[-1], 'stopped')
-            draft = json.loads((directory / 'draft.json').read_text())
-            self.assertEqual([p['id'] for p in draft['proposals']], ['a'])
+            self.assertTrue((directory / 'renders/checks.json').is_file())
+            self.assertFalse((directory / 'renders/view.html').exists())
+            self.assertTrue(json.loads((directory / 'lint.json').read_text())['ok'])
 
     def test_missing_judge_is_pending_not_passed(self):
         case = {'name': 'music', 'surface': 'phone', 'assertions': [{'type': 'rubric', 'id': 'R-one'}]}
@@ -146,7 +141,7 @@ class ArtifactPipelineTests(unittest.TestCase):
                 image = directory / 'renders' / f'{name}.png'
                 image.write_bytes(b'png')
                 images.append(str(image))
-            ok = {'C-publish': {'pass': True}}
+            ok = {'C-lint': {'pass': True}}
             with mock.patch.object(run, 'render', return_value=(images, None)), \
                     mock.patch.object(run, 'run_checks', return_value=ok), mock.patch.object(run, 'judge') as grade:
                 result = run.evaluate_case(case, out)
@@ -163,7 +158,7 @@ class ArtifactPipelineTests(unittest.TestCase):
             fake_case(directory)
             (out / 'rubric.md').write_text('Rubric')
             (directory / 'renders').mkdir()
-            bad = {'C-publish': {'pass': False, 'detail': 'lint'}}
+            bad = {'C-lint': {'pass': False, 'detail': 'lint'}}
             with mock.patch.object(run, 'render', return_value=([], None)), mock.patch.object(run, 'run_checks', return_value=bad):
                 result = run.evaluate_case(case, out)
             self.assertEqual(result['status'], 'failed')
@@ -177,13 +172,13 @@ class ArtifactPipelineTests(unittest.TestCase):
             (directory / 'renders').mkdir()
             for name in run.RENDER_NAMES:
                 (directory / 'renders' / f'{name}.png').write_bytes(b'png')
-            (directory / 'renders/review.json').write_text('{}')
+            (directory / 'renders/checks.json').write_text('{}')
             request = run.make_request(case, directory, (run.HERE / 'rubric.md').read_text())
             self.assertEqual([Path(p).stem for p in request['images']], sorted(run.RENDER_NAMES))
             for name in run.RENDER_NAMES:
                 self.assertIn(f'- {name}: ', request['prompt'])
             self.assertIn('R-adaptive', request['item_ids'])
-            self.assertNotIn('C-publish', request['item_ids'])
+            self.assertNotIn('C-lint', request['item_ids'])
             self.assertIn('desktop', request['prompt'])
             hashed = set(request['artifacts'])
             self.assertTrue(any(k.endswith('proposals/a/index.html') for k in hashed))
