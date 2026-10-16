@@ -2,15 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { GalleryStore } from '../../skills/android-design/gallery/store.mjs';
-import { fixture, writeProposal, PAGE, STYLE } from './fixture.mjs';
+import { lintAll } from '../../skills/android-design/gallery/render.mjs';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { workspace, writeProposal, PAGE } from './fixture.mjs';
 
 const starter = name => readFileSync(fileURLToPath(new URL(`../../skills/android-design/assets/proposal-starter/proposals/a/${name}`, import.meta.url)), 'utf8');
 
+// Returns a function that throws the lint errors of proposal `a`, as `render` would report them.
 function publish(t, files) {
-  const { root, draft } = fixture(t);
+  const root = workspace(t);
   writeProposal(root, 'a', files);
-  return () => new GalleryStore(root).publish(draft);
+  return () => {
+    const errors = lintAll(`${root}/project/proposals`, ['a']);
+    if (errors.length) throw new Error(errors.join('\n'));
+  };
 }
 
 test('the shipped starter and the fixture pass the lint', t => {
@@ -108,10 +114,31 @@ test('lint allows the bundled families in voices at their minimum sizes', t => {
   publish(t, { style })();
 });
 
-test('a lint failure publishes nothing', t => {
-  const { root, draft } = fixture(t);
-  writeProposal(root, 'a', { style: `${STYLE}p { color: #000; }` });
-  const store = new GalleryStore(root);
-  assert.throws(() => store.publish(draft), /Raw color/);
-  assert.equal(store.read().rounds.length, 0);
+const scriptRejections = [
+  ['a relative import', "import { x } from './data.js';\n", /app\.js:1: Relative import "\.\/data\.js"/],
+  ['a parent import', "const a = 1;\nimport '../util.mjs';\n", /app\.js:2: Relative import/],
+  ['a root-relative import', "import x from \"/shared/x.js\";", /Relative import "\/shared\/x\.js"/],
+  ['a re-export', "export * from './data.js';", /Relative import/],
+  ['a multi-line import', "import {\n  a,\n  b,\n} from './data.js';", /app\.js:1: Relative import/],
+  ['a dynamic import', "const m = await import('./lazy.js');", /app\.js:1: Dynamic import\(\)/],
+  ['import.meta', "const u = new URL('a.png', import.meta.url);", /app\.js:1: import\.meta/],
+];
+for (const [name, script, message] of scriptRejections) {
+  test(`lint rejects ${name} in a proposal script`, t => {
+    const root = workspace(t);
+    writeProposal(root, 'a');
+    writeFileSync(join(root, 'project/proposals/a/app.js'), script);
+    assert.throws(() => { const e = lintAll(`${root}/project/proposals`, ['a']); if (e.length) throw new Error(e.join('\n')); }, message);
+  });
+}
+
+test('lint allows a self-contained script and ignores commented imports', t => {
+  const root = workspace(t);
+  writeProposal(root, 'a');
+  writeFileSync(join(root, 'project/proposals/a/app.js'), "// import './x.js';\n/* import('./y.js') */\nconst important = 'import from ./z';\ndocument.title = important;\n");
+  assert.deepEqual(lintAll(`${root}/project/proposals`, ['a']), []);
+});
+
+test('lint rejects a CSS @import', t => {
+  assert.throws(publish(t, { style: '\n@import url("other.css");\nbody { color: var(--md-sys-color-on-surface); }' }), /style\.css:2: @import is not allowed/);
 });

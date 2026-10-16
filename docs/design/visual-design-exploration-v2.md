@@ -4,17 +4,17 @@
 
 ## TL;DR
 
-Design exploration proposals become live HTML built with the Material 3 Expressive web components in `@m3e/web` and themed by Google's own color utilities, instead of Compose code rendered to PNG. The gallery shows each proposal live in one device frame that resizes in place, the agent reviews it through its harness's browser, and Compose is written once, at implementation time, from the approved design and a verified mapping to Compose components. The workflow around proposals (the review surface outside chat, rounds, Refine, project-local storage, approval without implementation) carries over from [v1](../archive/visual-design-exploration.md) unchanged. The point is speed: first results in minutes rather than ten, sharp previews, and instant device and theme switching, without giving up proposals that map one-to-one onto real Compose components.
+Design exploration proposals become live HTML built with the Material 3 Expressive web components in `@m3e/web` and themed by Google's own color utilities, instead of Compose code rendered to PNG. The agent renders each proposal headlessly with `cli.mjs render`, fixes the rule checks, looks at the screenshots, and shows the user a contact sheet in chat; the user answers in chat. Each proposal also gets a self-contained `view.html` the user can double-click to try theme colors and device sizes with no server. Compose is written once, at implementation time, from the approved design and a verified mapping to Compose components. The point is speed: first results in minutes rather than ten, sharp previews, and instant device and theme switching, without giving up proposals that map one-to-one onto real Compose components. The v1 gallery, rounds, and Refine are gone; see the history line at the end.
 
 ## Design
 
 ### What stays from v1
 
-Requests for multiple designs or for exploration open a local gallery that becomes the visual review surface; ordinary implementation requests do not. The prompt sets the scope: a feature exploration preserves the app's visual language, a redesign can go further, and alternatives differ in design approach rather than color. Image-generated UI mockups are not proposals.
+Requests for multiple designs or for exploration start an exploration; ordinary implementation requests do not. The prompt sets the scope: a feature exploration preserves the app's visual language, a redesign can go further, and alternatives differ in design approach rather than color. Image-generated UI mockups are not proposals.
 
-The user selects one option per round and writes shared notes; **Refine** saves an explicit request, **None of these** asks for new directions, and the agent produces one refinement by default. Earlier rounds, notes, and requests are preserved, and new rounds appear without replacing unsaved edits or the round being inspected. An explicitly started [watch session](agent-refine-loop.md) can answer requests without the user returning to chat.
+Iteration happens in chat. The agent shows the contact sheet and the `view.html` paths, the user replies ("keep a, make b warmer"), and the agent edits and renders again; to keep a version it copies the folder before editing. Approval is the user saying so in chat.
 
-Each exploration lives under `design-explorations/` in the requesting app's repository, Git-ignored by default, with representative data and no credentials or personal data. **Finish with [name]** marks one exact proposal revision final and makes the exploration read-only. Approval does not implement the design or change the app; a later explicit implementation request follows the app's own workflow, and adapts the design to the app's existing library versions rather than the reverse.
+Each exploration lives under `design-explorations/` in the requesting app's repository, Git-ignored by default, with representative data and no credentials or personal data. Approval does not implement the design or change the app; a later explicit implementation request follows the app's own workflow, and adapts the design to the app's existing library versions rather than the reverse.
 
 ### A proposal is HTML on a Material 3 Expressive runtime
 
@@ -31,25 +31,25 @@ Styling is strict, so the port is a lookup rather than a translation. Text uses 
 
 The runtime fills the library's confirmed gaps with small shims rather than leaving each proposal to improvise: a floating toolbar wrapper, the emphasized type role classes, and inset variables that stand in for system bars. The mapping table covers shims like any other component. A library component that is listed but not yet checked, such as the large flexible app bar's collapse or press shape morph, is allowed in proposals only after a test page shows it behaves like its Compose counterpart.
 
-### The gallery shows proposals live
+### `render` and `view.html` show proposals
 
-Each proposal card holds the proposal at its real device viewport, scaled to fit. One icon switcher (phone, foldable, tablet, desktop) resizes the frames in place with a short eased transition, so the layout visibly reflows and crosses its breakpoint rather than swapping between separate images. The device canvases differ from v1 so each lands in its own window size class: the Fold8 inner screen turned to landscape (expanded), and the desktop moved from a 1440 by 900 Googlebook window to 1920 by 1080 (extra large) instead of sharing the tablet's large class. Medium has no device. The canvases are Pixel 11 at 411 by 923, Galaxy Z Fold8 inner screen at 933 by 704, Pixel Tablet at 1280 by 800, and a 1080p desktop display at 1920 by 1080, in dp, which equal CSS pixels in the frame.
+`render` loads each proposal at its real device viewport: Pixel 11 at 411 by 923, Galaxy Z Fold8 inner screen at 933 by 704, Pixel Tablet at 1280 by 800, and a 1080p desktop at 1920 by 1080, in dp, which equal CSS pixels. Each lands in its own window size class (the Fold8 inner screen turned to landscape is expanded, the desktop is extra large); medium has no device. It also renders phone dark and a red wallpaper-seed view. The contact sheet shows one row per proposal across phone, foldable, tablet, and desktop.
 
-Seed color, palette variant, and light or dark are preview-only controls: they re-theme the frames instantly and save nothing. To keep a change, the user writes it in the notes and presses Refine, so feedback stays one explicit, readable request.
+`view.html` is one file with the runtime, fonts, and the proposal inlined, opened from `file://`. Its Phone, Foldable, Tablet, and Desktop buttons resize the frame, and its light or dark, seed color, and palette variant controls re-theme it instantly and save nothing. To keep a change, the user says so in chat.
 
-The gallery shows only HTML proposals. Explorations recorded as PNG rounds stay on disk and readable through `status`, but are not displayed.
+Only HTML proposals are rendered. Explorations recorded as PNG rounds stay on disk but are not displayed.
 
-### The agent reviews through its harness's browser
+### The agent checks every render
 
-Before publishing, the agent opens each proposal in the browser its harness provides, runs the in-page rule checker, and looks at one screenshot per device. The checker covers what the rules make measurable: touch targets of at least 48dp, Google Sans Flex on every text node, text that clips or overflows, contrast of each text and background pair, the largest interactive element being the primary action, and at most one FAB. Checks it cannot resolve are reported as unresolved, never as passing.
+Before showing anything, the agent runs `render`, which lints the proposal and runs the in-page rule checker on every view, then looks at the screenshots. The checker covers what the rules make measurable: touch targets of at least 48dp, Google Sans Flex on every text node, text that clips or overflows, contrast of each text and background pair, the largest interactive element being the primary action, and at most one FAB. Checks it cannot resolve are reported as unresolved, never as passing.
 
 The screenshot stays because the rules cannot see everything. A music screen in this project's evals passed every code check and still failed the distinctive-design criterion, and in the first recipes exploration a button used `primary` exactly as the rules prescribe and still competed with the hero's color. Hierarchy, character, and color balance are judged by looking.
 
-When a harness has no browser, the agent reports visual quality as unverified instead of publishing on code alone, the same rule that applied when the Compose renderer was unavailable.
+When an agent cannot view images, it reports visual quality as unverified instead of showing the proposal on code checks alone.
 
 ### Compose is written at implementation, from a verified mapping
 
-The skill's job ends at an approved design: the exploration hands the parent agent the approved proposal's source, its screenshots, and a mapping table from every `m3e-*` element and pattern the runtime allows to its Compose API, with each Compose name verified against the pinned Material 3 artifact. The parent agent writes the Compose in the app under the app's own approval and branch workflow, renders it, and compares it with the approved screenshots.
+The skill's job ends at an approved design: the exploration hands the parent agent the approved proposal's source, its renders, and a mapping table from every `m3e-*` element and pattern the runtime allows to its Compose API, with each Compose name verified against the pinned Material 3 artifact. The parent agent writes the Compose in the app under the app's own approval and branch workflow, renders it, and compares it with the approved renders.
 
 A blind port tested this on 2026-10-10: the approved Compose screen from the first recipes exploration was rebuilt in HTML, then ported back to Compose by an agent that could not see the original. The port compiled in under two minutes and rendered nearly identical to the original, with seed-tinted surfaces the original lacked. Its differences were small style choices the HTML did not determine (a headline weight, a selected-pill color, card padding); strict role-based styling removes them. The one wrong API name was the same mistake every Compose round had made, and the verified table removes it.
 
@@ -73,9 +73,13 @@ Phone, tablet, desktop, and foldable layouts are in scope. Wear OS stays outside
 ## Links
 
 - [Visual design exploration v1](../archive/visual-design-exploration.md): the Compose PNG design this replaces, including the original reasoning for the workflow kept here.
-- [Agent-driven Refine loop](agent-refine-loop.md): the watch session that answers Refine without returning to chat.
+- [Agent-driven Refine loop](../archive/agent-refine-loop.md): the archived watch session that answered Refine without returning to chat.
 - [Compose Multiplatform proposal fidelity](../research/compose-multiplatform-proposal-fidelity.md): the verified alternative renderer.
 - [Android design skill](../../skills/android-design/SKILL.md): the design rules proposals follow.
 - [`@m3e/web`](https://github.com/matraic/m3e): the Material 3 Expressive web components.
 - [`material-color-utilities`](https://github.com/material-foundation/material-color-utilities): Google's color generator, including the 2025 spec.
 - [MaterialKolor](https://github.com/jordond/MaterialKolor): the Kotlin port used on the Compose side.
+
+## History
+
+2026-10-15: the gallery, its server, the feedback store, rounds, publish, and the watch session were replaced by `cli.mjs render`, a self-contained `view.html` per proposal, and iteration in chat. `render` lints, renders headlessly with no port, and writes per-proposal screenshots, `checks.json`, `view.html`, and a contact sheet. The agent fixes the checks, looks at the screenshots, and shows the user the contact sheet; the user replies in chat, and approval is the user saying so. Descriptions above of the gallery, rounds, Refine, Finish, and `status` or `wait` are history. The proposal format, runtime, rule checker, and Compose port flow are unchanged. See [references/exploration.md](../../skills/android-design/references/exploration.md).

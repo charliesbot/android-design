@@ -12,21 +12,19 @@ The brief, exploration, and verification steps below are the approved plan for t
 
 ## Contract
 
-Design exactly ONE screen as the proposal in `{{EXPLORATION}}/project/proposals/a/`. The folder already holds the starter (`index.html`, `style.css`) and any assets the brief names; replace the starter screen with your design and keep it a valid proposal for the gallery runtime. Write only inside that folder.
+Design exactly ONE screen as the proposal in `{{EXPLORATION}}/project/proposals/a/`. The folder already holds the starter (`index.html`, `style.css`) and any assets the brief names; replace the starter screen with your design and keep it a valid proposal for the proposal runtime. Write only inside that folder.
 
-Publish your proposal as the skill's exploration workflow describes (`node {{SKILL_DIR}}/gallery/cli.mjs publish`), and fix anything its lint rejects until it publishes. Do not approve or finish the exploration, and do not touch anything outside the proposal folder except what publishing writes. The runner republishes the final files and renders them.
+Render your proposal as the skill's exploration workflow describes (`node {{SKILL_DIR}}/gallery/cli.mjs render {{EXPLORATION}} a`), and fix anything its lint rejects until it renders. Do not touch anything outside the proposal folder except what `render` writes under `{{EXPLORATION}}/renders/`. The runner renders the final files again and checks them.
 
 The screen must work and adapt across phone (411x923), foldable (933x704), tablet (1280x800), and desktop (1920x1080) windows, in light and dark.
 
 ## Review (the skill's screen check)
 
-If your harness has a browser:
+1. Run `node {{SKILL_DIR}}/gallery/cli.mjs render {{EXPLORATION}} a`. It needs no browser tool and no port.
+2. Fix every failure in `{{EXPLORATION}}/renders/a/checks.json` (treat `complete: false` as unverified), then rerun `render`.
+3. Look at every PNG in `{{EXPLORATION}}/renders/a/` (phone light, dark, wallpaper, foldable, tablet, desktop), not just the phone. Check that each larger view reveals what your section 0 adaptation answer promised, rather than rearranging the phone content.
 
-1. Serve the exploration on a free port: `node {{SKILL_DIR}}/gallery/cli.mjs serve {{EXPLORATION}} --port <free port>`.
-2. Open your own new browser tab for `http://127.0.0.1:<port>/runtime/review/?src=/draft/a/` (other agents may share the browser, so never reuse or navigate an existing tab) and keep it in front while you run the checks, because a backgrounded tab can stall `reviewChecks()`. Run `window.reviewChecks()`, fix every failure, and look at the screenshot of every device frame (phone, foldable, tablet, desktop), not just the phone. Check that each larger frame reveals what your section 0 adaptation answer promised, rather than rearranging the phone content.
-3. Stop the server when you are done.
-
-If your harness has no browser, say in your final message that visual review is unverified.
+If your harness cannot view images, say in your final message that visual review is unverified.
 
 ## The screen
 
@@ -35,7 +33,7 @@ If your harness has no browser, say in your final message that visual review is 
 ## Definition of done
 
 - The proposal in `{{EXPLORATION}}/project/proposals/a/` implements the brief and adapts across all four window sizes.
-- You reviewed it through the gallery review page and looked at the screenshots, or you reported visual review as unverified.
+- You rendered it, fixed every failure in `checks.json`, and looked at every screenshot, or you reported visual review as unverified.
 
 ## Final message (under 250 words)
 

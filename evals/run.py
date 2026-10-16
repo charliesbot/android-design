@@ -5,13 +5,10 @@ import hashlib
 import re
 import json
 import shutil
-import socket
 import subprocess
 import sys
 import time
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
 from pathlib import Path
 
 from checks import run as run_checks
@@ -24,7 +21,7 @@ ROOT = HERE.parent
 SKILL_DIR = ROOT / "skills" / "android-design"
 CLI = SKILL_DIR / "gallery" / "cli.mjs"
 PROPOSAL = "a"
-# The renders evals/render.mjs writes, in its order. test_run.py keeps this in step with render.mjs.
+# The views `cli.mjs render` writes, in its order. test_run.py keeps this in step with gallery/render.mjs.
 RENDER_NAMES = ("light", "dark", "wallpaper", "foldable", "tablet", "desktop")
 GIT = ["git", "-c", "user.name=android-design-evals", "-c", "user.email=evals@example.invalid"]
 
@@ -93,84 +90,39 @@ def generate(case_dir, backend, model=None):
     return reply
 
 
-def free_port():
-    with socket.socket() as sock:
-        sock.bind(('127.0.0.1', 0))
-        return sock.getsockname()[1]
-
-
-def publish(case_dir):
-    """Publishes proposal `a` as a new round, as the runner's step; records publish.json."""
-    info = case_info(case_dir)
-    draft = case_dir / 'draft.json'
-    draft.write_text(json.dumps({'title': info['title'], 'proposals': [
-        {'id': info['proposal'], 'name': info['title'], 'rationale': 'Evaluated proposal.'}]}, indent=2))
-    done = subprocess.run(['node', str(CLI), 'publish', info['exploration'], str(draft)],
-                          capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL)
-    output = done.stdout + done.stderr
-    found = re.search(r'Published round (\d+)', done.stdout)
-    record = {'ok': done.returncode == 0 and found is not None,
-              'round': found.group(1) if found else None, 'output': output}
-    (case_dir / 'publish.json').write_text(json.dumps(record, indent=2))
-    return record
-
-
-@contextmanager
-def gallery_server(exploration, port):
-    """Serves the exploration on a loopback port; always terminates the server."""
-    server = subprocess.Popen(['node', str(CLI), 'serve', str(exploration), '--port', str(port)],
-                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    try:
-        deadline = time.time() + 20
-        while True:
-            if server.poll() is not None:
-                raise RuntimeError(f'gallery server exited {server.returncode}')
-            try:
-                with urllib.request.urlopen(f'http://127.0.0.1:{port}/', timeout=2):
-                    break
-            except OSError:
-                if time.time() > deadline:
-                    raise RuntimeError('gallery server did not start within 20 seconds')
-                time.sleep(0.2)
-        yield
-    finally:
-        server.terminate()
-        try:
-            server.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            server.kill()
-            server.wait()
-
-
 def render(case_dir):
-    """Publishes the proposal and renders the published round. Stale renders are removed first.
+    """Renders proposal `a` with the skill's `cli.mjs render` and copies the result into <case>/renders/.
 
-    Returns (images, error). A rejected publish is not an error here: it leaves no renders and
-    checks.py reports it as C-publish. Only an infrastructure failure (server, Chrome) is an error.
+    Stale renders are removed first. Returns (images, error). Lint errors (exit 2) are not an error here: they
+    leave no renders and checks.py reports them as C-lint from lint.json. Only an infrastructure failure
+    (Chrome, timeout) is an error.
     """
     renders = case_dir / 'renders'
     if renders.is_symlink():
         raise ValueError(f'Refusing symlink render directory: {renders}')
     if renders.exists():
         shutil.rmtree(renders)
-    for stale in ('publish.json', 'render.log'):
+    for stale in ('lint.json', 'render.log'):
         (case_dir / stale).unlink(missing_ok=True)
-    published = publish(case_dir)
-    if not published['ok']:
-        return [], None
-    port = free_port()
-    url = f"http://127.0.0.1:{port}/rounds/{published['round']}/{PROPOSAL}/"
+    exploration = Path(case_info(case_dir)['exploration'])
     try:
-        with gallery_server(case_info(case_dir)['exploration'], port):
-            done = subprocess.run(['node', str(HERE / 'render.mjs'), '--url', url, '--out', str(renders)],
-                                  cwd=ROOT, capture_output=True, text=True, timeout=900, stdin=subprocess.DEVNULL)
-    except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
+        done = subprocess.run(['node', str(CLI), 'render', str(exploration), PROPOSAL],
+                              cwd=ROOT, capture_output=True, text=True, timeout=900, stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.TimeoutExpired) as error:
         (case_dir / 'render.log').write_text(str(error))
         return [], f'render failed: {error}'
     log = done.stdout + done.stderr
     (case_dir / 'render.log').write_text(log)
+    if done.returncode == 2:
+        (case_dir / 'lint.json').write_text(json.dumps({'ok': False, 'output': log}, indent=2))
+        return [], None
     if done.returncode:
         return [], f'render exited {done.returncode}: {log[-1500:]}'
+    (case_dir / 'lint.json').write_text(json.dumps({'ok': True}, indent=2))
+    source = exploration / 'renders' / PROPOSAL
+    renders.mkdir()
+    for name in [f'{n}.png' for n in RENDER_NAMES] + ['checks.json']:
+        shutil.copy(source / name, renders / name)
     return sorted(str(p.resolve()) for p in renders.glob('*.png')), None
 
 

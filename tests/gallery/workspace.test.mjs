@@ -6,7 +6,6 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { create, cleanup, MARKER, TEMPLATE } from '../../skills/android-design/gallery/workspace.mjs';
-import { GalleryStore } from '../../skills/android-design/gallery/store.mjs';
 
 const git = (root, ...args) => spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' });
 
@@ -43,13 +42,10 @@ test('generated artifacts are not copied', t => {
   }
 });
 
-test('created exploration is readable by the gallery store', t => {
+test('created exploration records its title and validates it', t => {
   const { root, template } = repo(t);
   const result = create({ template, root, title: 'Reading' });
-  const data = new GalleryStore(result).read();
-  assert.equal(data.title, 'Reading');
-  assert.deepEqual(data.rounds, []);
-  assert.equal(data.feedback.revision, 0);
+  assert.equal(JSON.parse(readFileSync(join(result, 'exploration.json'), 'utf8')).title, 'Reading');
   assert.throws(() => create({ template, root, title: '   ' }), /Title/);
   assert.throws(() => create({ template, root, title: 'x'.repeat(201) }), /Title/);
 });
@@ -94,13 +90,12 @@ test('cleanup does not follow internal symlinks', t => {
   assert.equal(existsSync(join(template, 'proposals/a/index.html')), true);
 });
 
-test('local git exclusion and initial gallery files', t => {
+test('local git exclusion and the exploration marker', t => {
   const { root, template } = repo(t);
   const result = create({ template, root });
   create({ template, root });
   assert.equal(dirname(result), join(root, 'design-explorations'));
   assert.equal(lstatSync(join(result, 'exploration.json')).isFile(), true);
-  assert.equal(lstatSync(join(result, 'feedback.json')).isFile(), true);
   assert.equal(git(root, 'check-ignore', result).status, 0);
   assert.equal(existsSync(join(root, '.gitignore')), false);
   const exclude = readFileSync(join(root, '.git/info/exclude'), 'utf8');
@@ -226,7 +221,6 @@ test('create --starter android copies the Compose project with the same skip lis
   for (const name of ['build', '.gradle', '.git', 'renders', 'local.properties']) {
     assert.equal(existsSync(join(result, 'project', name)), false, name);
   }
-  assert.equal(new GalleryStore(result).read().rounds.length, 0);
 });
 
 test('create rejects an unknown starter', t => {

@@ -11,14 +11,8 @@ export function writeProposal(root, id, { page = PAGE, style = STYLE } = {}) {
   writeFileSync(join(root, 'project/proposals', id, 'style.css'), style);
 }
 
-export function fixture(t) {
+export function workspace(t) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'gallery-test-')));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  writeFileSync(join(root, '.android-design-exploration.json'), JSON.stringify({ version: 1, path: root }));
-  writeFileSync(join(root, 'exploration.json'), JSON.stringify({ version: 1, title: 'Reading', rounds: [] }));
-  writeFileSync(join(root, 'feedback.json'), JSON.stringify({ revision: 0, rounds: {}, approved: null }));
-  writeProposal(root, 'a');
-  const proposal = { id: 'a', name: 'Editorial', rationale: 'Prioritizes reading.' };
-  const draft = { title: 'First directions', proposals: [proposal] };
-  return { root, draft };
+  return root;
 }
