@@ -24,7 +24,10 @@ export function chromeExecutable({ env = process.env, exists = existsSync } = {}
 const TIMEOUT = 30000;
 
 export class Browser {
-  #child; #profile; #next = 1; #pending = new Map(); #listeners = []; #buffer = '';
+  #child; #profile; #exited = false; #next = 1; #pending = new Map(); #listeners = []; #buffer = '';
+
+  get pid() { return this.#child.pid; }
+  get profile() { return this.#profile; }
 
   static async launch(executable = chromeExecutable()) {
     const browser = new Browser();
@@ -35,7 +38,7 @@ export class Browser {
     const child = spawn(executable, flags, { stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] });
     browser.#child = child;
     child.on('error', error => browser.#fail(error));
-    child.on('exit', () => browser.#fail(new Error('Chrome exited')));
+    child.on('exit', () => { browser.#exited = true; browser.#fail(new Error('Chrome exited')); });
     child.stdio[4].on('data', chunk => browser.#read(chunk));
     child.stdio[3].on('error', () => {});
     return browser;
@@ -62,6 +65,7 @@ export class Browser {
 
   send(method, params = {}, sessionId) {
     const id = this.#next++;
+    if (this.#exited) return Promise.reject(new Error('Chrome exited'));
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { this.#pending.delete(id); reject(new Error(`${method} timed out`)); }, TIMEOUT);
       this.#pending.set(id, { method, resolve: value => { clearTimeout(timer); resolve(value); }, reject: error => { clearTimeout(timer); reject(error); } });
@@ -86,7 +90,7 @@ export class Browser {
 
   async close() {
     const child = this.#child;
-    if (child.exitCode === null) {
+    if (!this.#exited) {
       const exited = new Promise(resolve => child.once('exit', resolve));
       this.send('Browser.close').catch(() => {});
       const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
@@ -131,13 +135,20 @@ export class Page {
   }
 
   async goto(url) {
+    let stop, timer;
     const loaded = new Promise((resolve, reject) => {
-      const stop = this.browser.on(this.sessionId, 'Page.loadEventFired', () => { stop(); clearTimeout(timer); resolve(); });
-      const timer = setTimeout(() => { stop(); reject(new Error(`Loading ${url} timed out`)); }, TIMEOUT);
+      stop = this.browser.on(this.sessionId, 'Page.loadEventFired', resolve);
+      timer = setTimeout(() => reject(new Error(`Loading ${url} timed out`)), TIMEOUT);
     });
-    const { errorText } = await this.send('Page.navigate', { url });
-    if (errorText) throw new Error(`Cannot load ${url}: ${errorText}`);
-    await loaded;
+    try {
+      const { errorText } = await this.send('Page.navigate', { url });
+      if (errorText) throw new Error(`Cannot load ${url}: ${errorText}`);
+      await loaded;
+    } finally {
+      stop();
+      clearTimeout(timer);
+      loaded.catch(() => {});
+    }
   }
 
   // Runs `fn(arg)` in the page (awaiting a returned promise) and returns its JSON value.

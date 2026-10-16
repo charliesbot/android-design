@@ -53,7 +53,7 @@ Large voices: Google Sans Flex at heavy weights and large sizes needs a line hei
 
 ## Theme messages
 
-`view.html`'s theme controls, and `render` for the wallpaper view, post `{type: "theme", color, variant, scheme}` to the proposal frame. `m3e.js` applies valid values to the page's `m3e-theme` and ignores messages from other origins.
+`view.html`'s theme controls post `{type: "theme", color, variant, scheme}` to the proposal frame. `m3e.js` applies valid values to the page's `m3e-theme` and ignores messages from other origins. `render` does not use messages: it sets the `scheme` and `color` attributes on `m3e-theme` directly in the page.
 
 ## Rule checker
 
@@ -77,7 +77,7 @@ Text is measured where it renders. Slotted text, such as a button label, is attr
 `cli.mjs render` loads each proposal at exactly 411x923, 933x704, 1280x800, and 1920x1080, awaits `runtimeSettle()`, and stores `runtimeChecks()` for every view in `renders/<id>/checks.json`:
 
 ```
-{ url, renders: [{ name, result }], pass, complete }
+{ url, renders: [{ name, viewport: [width, height], result }], pass, complete }
 ```
 
 `pass` and `complete` fold every view's `result`. `complete: false` means not verified.

@@ -37,6 +37,8 @@ function lintCss(file, source) {
     }
     if (open >= 0 && close >= 0) { staticStart = open; staticEnd = close; }
   }
+  const imported = /@import\b/.exec(text);
+  if (imported) fail(imported.index, '@import is not allowed: view.html inlines each file, so a CSS file cannot load another. Put the rules in one .css file or link each file from index.html');
   const stack = [];
   const voices = new Map(); // selector -> { family, min, at, sizes } across every rule that styles that voice
   const frames = []; // one per open block: the family and font-size declared directly in it
@@ -107,6 +109,19 @@ function lintCss(file, source) {
   }
 }
 
+// view.html inlines each script into one document, so a script must be self-contained: no module imports, no URLs built from its own location.
+function lintJs(file, source) {
+  const text = source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, blank);
+  const fail = (index, message) => { throw new LintError(`${file}:${lineAt(text, index)}: ${message}`); };
+  const dynamic = /(?<![\w$.])import\s*\(/.exec(text);
+  if (dynamic) fail(dynamic.index, 'Dynamic import() is not allowed: a proposal script must be self-contained (view.html inlines it). Put the code in this file or load it with another <script src> in index.html');
+  const meta = /import\.meta\b/.exec(text);
+  if (meta) fail(meta.index, 'import.meta is not allowed: the script is inlined, so it has no file location. Use a data: URI or put assets in the HTML or CSS');
+  for (const match of text.matchAll(/(?<![\w$.])(?:import|export)\b[^;'"`]*?(?:\bfrom\s*)?(["'])(\.{0,2}\/[^"']*|\.[^"']*)\1/g)) {
+    fail(match.index, `Relative import "${match[2]}" is not allowed: a proposal script must be self-contained (view.html inlines it). Put the code in this file or load it with another <script src> in index.html`);
+  }
+}
+
 function lintHtml(file, source) {
   const text = source.replace(/<!--[\s\S]*?-->/g, blank);
   const fail = (index, message) => { throw new LintError(`${file}:${lineAt(text, index)}: ${message}`); };
@@ -130,6 +145,7 @@ export function lintProposal(id, files) {
     const label = `proposals/${id}/${file.path}`;
     if (/\.css$/i.test(file.path)) lintCss(label, file.bytes.toString('utf8'));
     else if (/\.html?$/i.test(file.path)) lintHtml(label, file.bytes.toString('utf8'));
+    else if (/\.m?js$/i.test(file.path)) lintJs(label, file.bytes.toString('utf8'));
   }
 }
 
