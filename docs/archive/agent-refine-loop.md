@@ -1,5 +1,7 @@
 # Agent-driven Refine loop
 
+> **Archived:** Superseded by chat iteration on 2026-10-15. The gallery, server, `wait` loop, and feedback store this document describes were removed.
+
 **Date:** 2026-10-10
 
 ## TL;DR

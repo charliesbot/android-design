@@ -15,7 +15,7 @@ Any agent that reads skills can also load `skills/android-design/SKILL.md` direc
 
 ## Requirements
 
-1. Install Node.js 22+ for the gallery and design exploration. Exploration proposals are HTML reviewed in your agent's browser. The installed skill needs no build or `npm install`: it serves the committed build in `skills/android-design/gallery/public/` and the committed proposal runtime. Python 3 runs the evals and the source scripts.
+1. Install Node.js 22+ and Google Chrome for design exploration. Proposals are HTML rendered headlessly by `cli.mjs render`, so no browser tool or server is needed. The installed skill needs no build or `npm install`: it uses the committed proposal runtime in `skills/android-design/gallery/public/runtime/`. Python 3 runs the evals and the source scripts.
 
 2. For implementing and reviewing real Compose code, running the evals, and Wear work, install the [Compose preview CLI](https://github.com/yschimke/compose-ai-tools) and the Android SDK:
 
@@ -31,23 +31,18 @@ Any agent that reads skills can also load `skills/android-design/SKILL.md` direc
    compose-preview doctor
    ```
 
-### Gallery workspace
+### Render and view
 
-The Material 3 Expressive gallery shows one live direction on a device canvas.
-Switch rounds and directions above the canvas, adjust device size or zoom, and
-open the side panel for theme previews and feedback. Finish requires confirmation
-and never implements the design. Empty explorations show an empty canvas.
-Seed swatches, palette, and Dark theme apply to the website and proposal together.
-Reset theme restores the active proposal's original theme without changing saved designs.
+`node skills/android-design/gallery/cli.mjs render <exploration>` lints each proposal, renders it headlessly in Chrome (no port), and writes `renders/<id>/` screenshots for phone, foldable, tablet, and desktop, a `checks.json`, and a self-contained `view.html`, plus `renders/contact-sheet.png`. Double-click `view.html` to switch devices, light and dark, seed colors, and palette. Iteration happens in chat: the agent shows the contact sheet, you reply, it edits and renders again.
+
 Google Sans Flex is shared with the proposal runtime, including its local font license. The runtime also bundles the optional brand and data faces (Fraunces, Bricolage Grotesque, Big Shoulders Display, Doto, Google Sans Code).
 
-### Developing the gallery frontend
+### Developing the proposal runtime
 
-The frontend is Vite and Lit source in `skills/android-design/gallery/src/`, built into the committed `skills/android-design/gallery/public/`. `npm install` is for developing the gallery or the proposal runtime only.
+The runtime source is in `skills/android-design/gallery/runtime-src/`, built into the committed `skills/android-design/gallery/public/runtime/`. `npm install` is for developing the runtime and running the tests only.
 
-1. Serve an exploration: `node skills/android-design/gallery/cli.mjs serve <exploration> --port 8765`
-2. Run `npm run dev` and open the URL Vite prints. It proxies the API, proposal pages, and shared runtime to port 8765.
-3. Before committing, run `npm run build` and `npm test`.
+1. Edit the runtime source.
+2. Run `npm run build` to rebuild the runtime, then `npm test`.
 
 ## What is here
 

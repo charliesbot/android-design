@@ -17,7 +17,7 @@ const HEX_COLOR = /#[0-9a-f]{3,8}(?![\w-])/i;
 const FONTS = JSON.parse(readFileSync(new URL('./runtime-src/fonts.json', import.meta.url), 'utf8'));
 const BUNDLED = [FONTS.plain, ...FONTS.faces.map(face => face.family)];
 // Every Material Symbols name (public/runtime/symbols.json, emitted by the runtime build from the pinned `material-symbols` package).
-// <p-icon name> draws the name as a font ligature, so an unknown name would render as plain text; publishing rejects it instead.
+// <p-icon name> draws the name as a font ligature, so an unknown name would render as plain text; the lint rejects it instead.
 const SYMBOLS = new Set(JSON.parse(readFileSync(new URL('./public/runtime/symbols.json', import.meta.url), 'utf8')));
 const TYPE_PROPERTIES = new Set(['font', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'font-variation-settings']);
 const blank = text => text.replace(/[^\n]/g, ' ');

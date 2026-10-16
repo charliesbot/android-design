@@ -4,7 +4,7 @@ Each proposal is a folder `project/proposals/<id>/` with an `index.html` and the
 
 Page contract: load `/runtime/runtime.css`, your `style.css`, and `/runtime/m3e.js` (module); wrap the page in `<m3e-theme color="#RRGGBB" variant="tonal-spot" scheme="light">`; lay out compact below 840px and expanded (nav rail instead of the floating toolbar) from 840px up; mark the primary action with `data-primary`. The runtime's pieces, components, and `window.runtimeChecks()` are documented in `gallery/runtime-src/README.md`.
 
-Review a draft before publishing at `/draft/<id>/` on the running gallery server.
+Check a draft with `node <skill-dir>/gallery/cli.mjs render <exploration>`; it needs no server.
 
 ## Styling rules
 

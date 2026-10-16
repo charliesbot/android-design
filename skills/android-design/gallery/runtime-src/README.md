@@ -1,6 +1,6 @@
 # Proposal runtime
 
-Every exploration proposal is an `index.html` and a `style.css` that load this runtime. It is built from this folder into `../public/runtime/` and committed, so the installed skill never runs npm. The gallery serves it at `/runtime/`.
+Every exploration proposal is an `index.html` and a `style.css` that load this runtime. It is built from this folder into `../public/runtime/` and committed, so the installed skill never runs npm. `cli.mjs render` serves it to headless Chrome at `/runtime/`, and `view.html` inlines it.
 
 A proposal page starts like this:
 
@@ -10,7 +10,7 @@ A proposal page starts like this:
 <script type="module" src="/runtime/m3e.js"></script>
 ```
 
-The gallery CSP is `default-src 'self'`: no inline `<style>`, no `style=""`, no inline scripts, no data URIs. Proposals keep styles in `style.css`. See `sample/` for a working page.
+Proposals have no inline `<style>`, no `style=""`, and no inline scripts (the lint enforces this); they keep styles in `style.css`. `view.html` inlines the runtime, fonts, and proposal files as data URIs, so a proposal may reference its own files by relative path. See `sample/` for a working page.
 
 ## What it contains
 
@@ -18,12 +18,11 @@ The gallery CSP is `default-src 'self'`: no inline `<style>`, no `style=""`, no 
 | --- | --- |
 | `runtime/m3e.js` | ES module: registers the `@m3e/web` 2.9.2 elements below, the `p-` pieces, the theme message listener, `window.runtimeChecks`, and `window.runtimeSettle` (resolves once no finite animation or transition is running; call it before `runtimeChecks()`) |
 | `runtime/runtime.css` | Google Sans Flex `@font-face`, page defaults, type role classes, shim styles |
-| `runtime/fonts/` | Latin-subset text woff2 with all variable axes and each OFL license: `GoogleSansFlex` (plain text, always), `Fraunces`, `BricolageGrotesque`, `BigShouldersDisplay`, `Doto` (optional brand faces for Display and Headline voices), `GoogleSansCode` (numbers and data). The family list and minimum sizes are in `fonts.json`, read by the publish lint and the fonts check |
+| `runtime/fonts/` | Latin-subset text woff2 with all variable axes and each OFL license: `GoogleSansFlex` (plain text, always), `Fraunces`, `BricolageGrotesque`, `BigShouldersDisplay`, `Doto` (optional brand faces for Display and Headline voices), `GoogleSansCode` (numbers and data). The family list and minimum sizes are in `fonts.json`, read by the lint and the fonts check |
 | `runtime/fonts/MaterialSymbolsRounded.woff2` | The full Material Symbols Rounded variable font (axes FILL, GRAD, opsz, wght), unmodified from the pinned `material-symbols` npm package; provenance in `MaterialSymbolsRounded-SOURCE.txt`, Apache 2.0 license in `MaterialSymbolsRounded-LICENSE.txt` |
-| `runtime/symbols.json` | Every Material Symbols name (from the package's type list). The publish lint rejects a `p-icon` name that is not in it |
+| `runtime/symbols.json` | Every Material Symbols name (from the package's type list). The lint rejects a `p-icon` name that is not in it |
 | `runtime/sample/` | A small page that uses only runtime pieces |
 | `runtime/checks-fixture/` | Known-bad and known-good component text (low-contrast and clipped button labels, clipped plain text) that `runtimeChecks()` must flag, plus opacity 0 text it must skip instead of leaving unresolved, and bundled-face text (Fraunces at 40px and Google Sans Code at 12px pass, Doto at 24px must be listed in `fonts.offenders`) |
-| `runtime/review/` | The review page: one proposal in four exact device frames, with `reviewChecks()` |
 | `runtime/verify/` | One section per component in `references/compose-mapping.md`, with its variants, for comparing against Compose; it marks nothing verified |
 
 ## Registered elements
@@ -54,7 +53,7 @@ Large voices: Google Sans Flex at heavy weights and large sizes needs a line hei
 
 ## Theme messages
 
-The gallery's preview-only theme controls post `{type: "theme", color, variant, scheme}` to the proposal frame. `m3e.js` applies valid values to the page's `m3e-theme` and ignores messages from other origins.
+`view.html`'s theme controls, and `render` for the wallpaper view, post `{type: "theme", color, variant, scheme}` to the proposal frame. `m3e.js` applies valid values to the page's `m3e-theme` and ignores messages from other origins.
 
 ## Rule checker
 
@@ -73,17 +72,15 @@ Text is measured where it renders. Slotted text, such as a button label, is attr
 
 `m3e-icon-button` draws a 40px visual. `runtime.css` gives it the 48px minimum box Compose `IconButton` has, so a proposal needs no per-page CSS for the touch target.
 
-## Review page
+## Render output
 
-`/runtime/review/?src=/draft/<id>/` shows the proposal in four same-origin iframes at exactly 411x923, 933x704, 1280x800, and 1920x1080, scaled to fit and labeled. Only `/draft/` and `/rounds/` paths are accepted. Browser tools cannot set exact viewports, so this page is how a review gets them. Each label links to the same device at full size (`&device=phone|foldable|tablet|desktop`) for screenshots.
-
-`await window.reviewChecks()` waits for every frame to load and its fonts to be ready, then runs `runtimeSettle()` and calls each frame's `runtimeChecks()`:
+`cli.mjs render` loads each proposal at exactly 411x923, 933x704, 1280x800, and 1920x1080, awaits `runtimeSettle()`, and stores `runtimeChecks()` for every view in `renders/<id>/checks.json`:
 
 ```
-{ src, devices: [{ id, viewport: [innerWidth, innerHeight], result }], pass, complete }
+{ url, renders: [{ name, result }], pass, complete }
 ```
 
-`pass` and `complete` fold every device's `result`. `complete: false` means not verified. The page uses no inline script or style, so it runs under the gallery CSP.
+`pass` and `complete` fold every view's `result`. `complete: false` means not verified.
 
 ## Rebuild
 
@@ -91,4 +88,4 @@ Text is measured where it renders. Slotted text, such as a button label, is attr
 npm run build
 ```
 
-builds the gallery, then this runtime (`vite.runtime.config.mjs`, `assets.mjs`). Output is deterministic. After changing anything here, commit `../public/runtime/` with the source.
+builds this runtime (`vite.runtime.config.mjs`, `assets.mjs`). Output is deterministic. After changing anything here, commit `../public/runtime/` with the source.

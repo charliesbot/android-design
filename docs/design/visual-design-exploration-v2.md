@@ -12,7 +12,7 @@ Design exploration proposals become live HTML built with the Material 3 Expressi
 
 Requests for multiple designs or for exploration open a local gallery that becomes the visual review surface; ordinary implementation requests do not. The prompt sets the scope: a feature exploration preserves the app's visual language, a redesign can go further, and alternatives differ in design approach rather than color. Image-generated UI mockups are not proposals.
 
-The user selects one option per round and writes shared notes; **Refine** saves an explicit request, **None of these** asks for new directions, and the agent produces one refinement by default. Earlier rounds, notes, and requests are preserved, and new rounds appear without replacing unsaved edits or the round being inspected. An explicitly started [watch session](agent-refine-loop.md) can answer requests without the user returning to chat.
+The user selects one option per round and writes shared notes; **Refine** saves an explicit request, **None of these** asks for new directions, and the agent produces one refinement by default. Earlier rounds, notes, and requests are preserved, and new rounds appear without replacing unsaved edits or the round being inspected. An explicitly started [watch session](../archive/agent-refine-loop.md) can answer requests without the user returning to chat.
 
 Each exploration lives under `design-explorations/` in the requesting app's repository, Git-ignored by default, with representative data and no credentials or personal data. **Finish with [name]** marks one exact proposal revision final and makes the exploration read-only. Approval does not implement the design or change the app; a later explicit implementation request follows the app's own workflow, and adapts the design to the app's existing library versions rather than the reverse.
 
@@ -73,9 +73,13 @@ Phone, tablet, desktop, and foldable layouts are in scope. Wear OS stays outside
 ## Links
 
 - [Visual design exploration v1](../archive/visual-design-exploration.md): the Compose PNG design this replaces, including the original reasoning for the workflow kept here.
-- [Agent-driven Refine loop](agent-refine-loop.md): the watch session that answers Refine without returning to chat.
+- [Agent-driven Refine loop](../archive/agent-refine-loop.md): the archived watch session that answered Refine without returning to chat.
 - [Compose Multiplatform proposal fidelity](../research/compose-multiplatform-proposal-fidelity.md): the verified alternative renderer.
 - [Android design skill](../../skills/android-design/SKILL.md): the design rules proposals follow.
 - [`@m3e/web`](https://github.com/matraic/m3e): the Material 3 Expressive web components.
 - [`material-color-utilities`](https://github.com/material-foundation/material-color-utilities): Google's color generator, including the 2025 spec.
 - [MaterialKolor](https://github.com/jordond/MaterialKolor): the Kotlin port used on the Compose side.
+
+## Update 2026-10-15
+
+The gallery, its server, the feedback store, rounds, publish, and the watch session were replaced by `cli.mjs render`, a self-contained `view.html` per proposal, and iteration in chat. `render` lints, renders headlessly with no port, and writes per-proposal screenshots, `checks.json`, `view.html`, and a contact sheet. The agent fixes the checks, looks at the screenshots, and shows the user the contact sheet; the user replies in chat, and approval is the user saying so. Descriptions above of the gallery, rounds, Refine, Finish, and `status` or `wait` are history. The proposal format, runtime, rule checker, and Compose port flow are unchanged. See [references/exploration.md](../../skills/android-design/references/exploration.md).

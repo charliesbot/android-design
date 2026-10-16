@@ -2,7 +2,7 @@
 
 The judge sees the fixed renders of one case and answers each applicable item PASS or FAIL with a one-sentence reason. Judge only what is visible. When unsure, FAIL and say why.
 
-Every case has six renders of the published HTML proposal. Three are phone size (411x923): `light`, `dark`, and `wallpaper` (the theme color set to red, standing in for a red dynamic-color wallpaper). Three show larger windows in light: `foldable` (933x704, expanded), `tablet` (1280x800, large), and `desktop` (1920x1080, extra large). Items about dark or wallpaper look at that render; the rest look at all of them.
+Every case has six renders of the HTML proposal. Three are phone size (411x923): `light`, `dark`, and `wallpaper` (the theme color set to red, standing in for a red dynamic-color wallpaper). Three show larger windows in light: `foldable` (933x704, expanded), `tablet` (1280x800, large), and `desktop` (1920x1080, extra large). Items about dark or wallpaper look at that render; the rest look at all of them.
 
 ## General items
 
