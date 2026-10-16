@@ -114,13 +114,15 @@ export class Page {
   // only data:, blob:, and about: URLs pass through.
   async serve(route, onMissing = () => {}) {
     await this.send('Fetch.enable', { patterns: [{ urlPattern: '*' }] });
+    // A request can still be paused when its page closes, so a late reply may find no session; nothing waits on it.
+    const reply = (method, params) => this.send(method, params).catch(() => {});
     this.browser.on(this.sessionId, 'Fetch.requestPaused', async ({ requestId, request }) => {
       const url = new URL(request.url);
-      if (['data:', 'blob:', 'about:'].includes(url.protocol)) return this.send('Fetch.continueRequest', { requestId });
+      if (['data:', 'blob:', 'about:'].includes(url.protocol)) return reply('Fetch.continueRequest', { requestId });
       const found = route(url);
       if (!found) onMissing(request.url);
       const response = found ?? { type: 'text/plain', body: Buffer.from('Not found'), status: 404 };
-      return this.send('Fetch.fulfillRequest', {
+      return reply('Fetch.fulfillRequest', {
         requestId, responseCode: response.status ?? 200,
         responseHeaders: [{ name: 'Content-Type', value: response.type }, { name: 'Cache-Control', value: 'no-store' }],
         body: Buffer.from(response.body).toString('base64'),
