@@ -1,5 +1,5 @@
 {
-  "note": "Known verdicts for past renders and reference screenshots. calibrate.py must reproduce every label before the judge is trusted. music-content-color.png is the owner's supplied music-app collage: its now-playing screen pairs a full-screen burgundy palette with visible pink album art. It tests visual coherence, not proof of token usage or color extraction. The adaptive-* labels list four frames each (light phone, foldable, tablet, desktop) because R-adaptive compares size classes: the music set only rearranges the phone layout (fail); the settings and trek sets reveal a second pane or more content (pass).",
+  "note": "Known verdicts for past renders and reference screenshots. calibrate.py must reproduce every label before the judge is trusted. music-content-color.png is the owner's supplied music-app collage: its now-playing screen pairs a full-screen burgundy palette with visible pink album art. It tests visual coherence, not proof of token usage or color extraction. The adaptive-* labels list four frames each (light phone, foldable, tablet, desktop) because R-adaptive compares size classes: the music set only rearranges the phone layout (fail); the settings and trek sets reveal a second pane or more content (pass). The text-* labels test R-text: the trek and finance phone renders have scrolling content partly under a floating toolbar or FAB (pass, Google allows it); the music collision render draws a subtitle over the title (fail).",
   "images": [
     {"image": "music-content-color.png", "case": "music", "expect": {"R-surfaces": true}},
     {"image": "finance-v3-neon.jpg", "case": "finance", "expect": {"R-surfaces": false}},
@@ -10,6 +10,9 @@
     {"image": "music-v8.jpg", "case": "music", "expect": {"R-controls": true, "R-font": true, "R-surfaces": true, "R-hierarchy": true, "R-music-actions": true}},
     {"images": ["adaptive-music-light.jpg", "adaptive-music-foldable.jpg", "adaptive-music-tablet.jpg", "adaptive-music-desktop.jpg"], "case": "music", "expect": {"R-adaptive": false}},
     {"images": ["adaptive-settings-light.jpg", "adaptive-settings-foldable.jpg", "adaptive-settings-tablet.jpg", "adaptive-settings-desktop.jpg"], "case": "settings", "expect": {"R-adaptive": true}},
-    {"images": ["adaptive-trek-light.jpg", "adaptive-trek-foldable.jpg", "adaptive-trek-tablet.jpg", "adaptive-trek-desktop.jpg"], "case": "trek", "expect": {"R-adaptive": true}}
+    {"images": ["adaptive-trek-light.jpg", "adaptive-trek-foldable.jpg", "adaptive-trek-tablet.jpg", "adaptive-trek-desktop.jpg"], "case": "trek", "expect": {"R-adaptive": true}},
+    {"image": "text-trek-under-toolbar.jpg", "case": "trek", "expect": {"R-text": true}},
+    {"image": "text-finance-under-fab.jpg", "case": "finance", "expect": {"R-text": true}},
+    {"image": "text-music-collision.jpg", "case": "music", "expect": {"R-text": false}}
   ]
 }
