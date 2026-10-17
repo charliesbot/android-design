@@ -20,6 +20,9 @@ import '@m3e/web/shape';
 import '@m3e/web/switch';
 import '@m3e/web/slider';
 import '@m3e/web/form-field';
+import '@m3e/web/bottom-sheet';
+import '@m3e/web/dialog';
+import '@m3e/web/menu';
 
 import './p-icon.js';
 import './p-floating-toolbar.js';

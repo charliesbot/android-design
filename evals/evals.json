@@ -30,6 +30,11 @@
           "type": "code"
         },
         {
+          "id": "C-states",
+          "text": "index.html declares at least three p-states (lyrics, queue, credits open over the player) and each has <state>-light.png and <state>-tablet.png renders",
+          "type": "code"
+        },
+        {
           "id": "R-hierarchy",
           "text": "See rubric.md",
           "type": "rubric"

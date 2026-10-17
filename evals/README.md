@@ -24,11 +24,13 @@ After implementation, render and check the artifacts without launching an agent:
 python3 run.py evaluate --out /tmp/design-eval --no-open
 ```
 
-For each case this runs `gallery/cli.mjs render` on proposal `a` (headless, no server), copies its six screenshots and `checks.json`, runs deterministic checks, and writes a report plus `<case>/judge-request.json`. No provider CLI is required for either command.
+For each case this runs `gallery/cli.mjs render` on proposal `a` (headless, no server), copies its screenshots (the six renders below, plus the state renders) and `checks.json`, runs deterministic checks, and writes a report plus `<case>/judge-request.json`. No provider CLI is required for either command.
 
 The six renders: `light`, `dark`, `wallpaper` (red theme color standing in for a red dynamic-color wallpaper) at phone size 411x923; `foldable` (933x704), `tablet` (1280x800), and `desktop` (1920x1080) in light.
 
-The deterministic checks are `C-lint` (the render succeeded, so the lint passed), `C-review` (every render's `runtimeChecks` result passes; an incomplete check counts as a failure, reported as unverified), and `C-palette` (the proposal's `<m3e-theme>` variant is not `expressive` or `vibrant`).
+A proposal that declares open states (`<meta name="p-states" content="queue lyrics">` plus a script that defines `window.proposalState`) adds `<state>-light` (phone) and `<state>-tablet`, both in light, for each state. They are copied with the rest, listed in `judge-request.json` and its image hashes, checked by `C-review` like any render (a failure reads `queue-light: contrast`), and judged by the rubric on the overlay's own surface. The music brief opens lyrics, the queue, and credits over the player, so those are states.
+
+The deterministic checks are `C-lint` (the render succeeded, so the lint passed), `C-review` (every render's `runtimeChecks` result passes; an incomplete check counts as a failure, reported as unverified), and `C-palette` (the proposal's `<m3e-theme>` variant is not `expressive` or `vibrant`). The music case adds `C-states`: `index.html` declares at least three `p-states` (its lyrics, queue, and credits open over the player) and the case renders hold `<state>-light.png` and `<state>-tablet.png` for each.
 
 For visual assessment, give each `judge-request.json` to your chosen reviewer. They must inspect every listed screenshot against its included rubric. Prefer a separate session for a blind judgment; the current chat is useful for interactive checks but is not a controlled independent evaluation.
 

@@ -4,12 +4,13 @@
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { Browser, chromeExecutable } from '../../skills/android-design-explore/gallery/cdp.mjs';
+import { proposalStates } from '../../skills/android-design-explore/gallery/lint.mjs';
 import { ORIGIN, lintAll, makeRoute, renderViews, summarize } from '../../skills/android-design-explore/gallery/render.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -61,6 +62,14 @@ const CASES = {
   'button-label-ellipsis': { fails: ['C-review'], detail: /light: overflow/ }, // button labels never truncate
   'primary-drawer-container': { fails: ['C-review'], detail: /light: primary/ }, // the drawer container's main content is not nav chrome
   'slider-short': { fails: ['C-review'], detail: /light: touchTargets/ },
+  // Open states (p-states + window.proposalState): content behind an open modal is exempt, the modal's own surface is checked.
+  'control-sheet-open': { fails: [] }, // a modal bottom sheet over the starter covers its text and floating toolbar
+  'control-dialog-open': { fails: [] }, // a dialog covers the starter text
+  'control-menu-open': { fails: [] }, // a menu opened over the primary button covers it, and covers no text it should not
+  'sheet-low-contrast': { fails: ['C-review'], detail: /^queue-light: contrast/ }, // the sheet's own title matches its container; the closed sheet in the default views is not measured
+  'sheet-text-overflow': { fails: ['C-review'], detail: /^queue-light: overflow/ }, // the sheet's own text is cut off with no ellipsis
+  'modal-open-by-default': { fails: ['C-review'], detail: /^light: a modal is open in the default state/ }, // an open dialog on load would exempt the page and skip the two-primary failure
+  'dialog-low-contrast': { fails: ['C-review'], detail: /credits-light: contrast/ }, // measured against the dialog's container, not the page behind it
 };
 
 if (!chrome) {
@@ -98,7 +107,8 @@ if (!chrome) {
       writeFileSync(join(caseDir, 'lint.json'), JSON.stringify({ ok: errors.length === 0, output: errors.join('\n') }));
       if (!errors.length) {
         const url = `${ORIGIN}/draft/a/`;
-        writeFileSync(join(caseDir, 'renders/checks.json'), JSON.stringify(summarize(url, await renderViews(page, url))));
+        const states = proposalStates(readFileSync(join(proposal, 'index.html'), 'utf8'));
+        writeFileSync(join(caseDir, 'renders/checks.json'), JSON.stringify(summarize(url, await renderViews(page, url, undefined, states))));
       }
       const checked = spawnSync('python3', [CHECKS, caseDir], { encoding: 'utf8' });
       assert.equal(checked.status, 0, checked.stderr);

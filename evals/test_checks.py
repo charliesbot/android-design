@@ -57,6 +57,20 @@ class ChecksTests(unittest.TestCase):
         self.assertIn('tablet', out['C-review']['detail'])
         self.assertIn('pageOverflow', out['C-review']['detail'])
 
+    def test_review_names_the_state_view_that_failed(self):
+        bad = render('queue-light')
+        bad['result'] = {'pass': False, 'complete': True, 'contrast': {'fails': [{'el': 'div', 'ratio': 1, 'need': 4.5}], 'passed': 3}}
+        out = self.run_checks(lint={'ok': True}, renders=[render('light'), render('queue-tablet'), bad], index=GOOD)
+        self.assertFalse(out['C-review']['pass'])
+        self.assertEqual(out['C-review']['detail'], 'queue-light: contrast')
+
+    def test_review_fails_when_a_declared_state_could_not_open(self):
+        bad = render('queue-light')
+        bad['result'] = {'pass': False, 'complete': False, 'error': 'proposalState is missing: index.html declares the state "queue"'}
+        out = self.run_checks(lint={'ok': True}, renders=[render('light'), bad], index=GOOD)
+        self.assertFalse(out['C-review']['pass'])
+        self.assertIn('queue-light: proposalState is missing', out['C-review']['detail'])
+
     def test_incomplete_review_is_unverified_not_passed(self):
         out = self.run_checks(lint={'ok': True}, renders=[render('light'), render('dark', complete=False)], index=GOOD)
         self.assertFalse(out['C-review']['pass'])
@@ -80,6 +94,44 @@ class ChecksTests(unittest.TestCase):
 
     def test_palette_fails_without_a_proposal(self):
         self.assertFalse(self.run_checks()['C-palette']['pass'])
+
+
+
+class StatesCheckTests(unittest.TestCase):
+    PAGE = '<meta name="p-states" content="{}">' + GOOD
+
+    def run_states(self, index, shots=()):
+        with tempfile.TemporaryDirectory() as tmp:
+            case = CaseDir(tmp, lint={'ok': True}, renders=[render('light')], index=index)
+            for name in shots:
+                (case.path / 'renders' / f'{name}.png').write_bytes(b'png')
+            return checks.run(case.path, 'phone', ['C-states'])['C-states']
+
+    def shots(self, *names):
+        return [f'{n}-{v}' for n in names for v in ('light', 'tablet')]
+
+    def test_not_run_unless_the_case_asks_for_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertNotIn('C-states', checks.run(CaseDir(tmp, lint={'ok': True}, index=GOOD).path))
+
+    def test_passes_with_three_states_and_their_renders(self):
+        out = self.run_states(self.PAGE.format('lyrics queue credits'), self.shots('lyrics', 'queue', 'credits'))
+        self.assertTrue(out['pass'], out)
+
+    def test_fails_without_p_states(self):
+        out = self.run_states(GOOD)
+        self.assertFalse(out['pass'])
+        self.assertIn('p-states', out['detail'])
+
+    def test_fails_with_fewer_than_three_states(self):
+        out = self.run_states(self.PAGE.format('lyrics queue'), self.shots('lyrics', 'queue'))
+        self.assertFalse(out['pass'])
+        self.assertIn('at least three', out['detail'])
+
+    def test_fails_when_a_state_render_is_missing(self):
+        out = self.run_states(self.PAGE.format('lyrics queue credits'), self.shots('lyrics', 'queue') + ['credits-light'])
+        self.assertFalse(out['pass'])
+        self.assertIn('credits-tablet.png', out['detail'])
 
 
 if __name__ == '__main__':

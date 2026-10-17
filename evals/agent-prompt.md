@@ -23,7 +23,7 @@ The screen must work and adapt across phone (411x923), foldable (933x704), table
 
 1. Run `node {{EXPLORE_DIR}}/gallery/cli.mjs render {{EXPLORATION}} a`. It needs no browser tool and no port.
 2. Fix every failure in `{{EXPLORATION}}/renders/a/checks.json` (treat `complete: false` as unverified), then rerun `render`.
-3. Look at every PNG in `{{EXPLORATION}}/renders/a/` (phone light, dark, wallpaper, foldable, tablet, desktop), not just the phone. Check that each larger view reveals what your section 0 adaptation answer promised, rather than rearranging the phone content.
+3. Look at every PNG in `{{EXPLORATION}}/renders/a/` (phone light, dark, wallpaper, foldable, tablet, desktop, and the `<state>-light` and `<state>-tablet` renders of each state you declared), not just the phone. Check that each larger view reveals what your section 0 adaptation answer promised, rather than rearranging the phone content.
 
 If your harness cannot view images, say in your final message that visual review is unverified.
 

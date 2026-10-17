@@ -57,7 +57,7 @@ class PrepareTest(unittest.TestCase):
             self.assertNotRegex(case['prompt'], r'R\.drawable|Compose|Kotlin|EvalScreen')
             self.assertIn('1920x1080', case['prompt'])
             codes = [a['id'] for a in case['assertions'] if a['type'] == 'code']
-            self.assertEqual(codes, ['C-lint', 'C-review', 'C-palette'])
+            self.assertEqual(codes, ['C-lint', 'C-review', 'C-palette'] + (['C-states'] if case['name'] == 'music' else []))
             self.assertIn('R-adaptive', [a['id'] for a in case['assertions']])
 
     def test_render_names_match_the_skill_render(self):
@@ -129,6 +129,44 @@ class ArtifactPipelineTests(unittest.TestCase):
             self.assertTrue((directory / 'renders/checks.json').is_file())
             self.assertFalse((directory / 'renders/view.html').exists())
             self.assertTrue(json.loads((directory / 'lint.json').read_text())['ok'])
+
+    def test_render_copies_the_state_renders_of_a_proposal_that_declares_states(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            fake_case(directory)
+            exploration = Path(run.case_info(directory)['exploration'])
+
+            def fake_run(command, **kwargs):
+                out = exploration / 'renders' / 'a'
+                out.mkdir(parents=True)
+                for name in (*run.RENDER_NAMES, 'queue-light', 'queue-tablet'):
+                    (out / f'{name}.png').write_bytes(b'png')
+                (out / 'checks.json').write_text('{"renders": []}')
+                (out / 'view.html').write_text('big')
+                return subprocess.CompletedProcess(command, 0, 'a: pass', '')
+
+            with mock.patch.object(run.subprocess, 'run', side_effect=fake_run):
+                images, error = run.render(directory)
+            self.assertIsNone(error)
+            self.assertEqual(sorted(Path(p).stem for p in images), sorted([*run.RENDER_NAMES, 'queue-light', 'queue-tablet']))
+            self.assertTrue(run.render_complete(images))
+            self.assertTrue((directory / 'renders/queue-tablet.png').is_file())
+            self.assertFalse((directory / 'renders/view.html').exists())
+
+    def test_judge_request_lists_state_renders_and_says_how_to_judge_them(self):
+        case = next(iter(run.select_cases('music')))
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            fake_case(directory)
+            (directory / 'renders').mkdir()
+            for name in (*run.RENDER_NAMES, 'queue-light', 'queue-tablet'):
+                (directory / 'renders' / f'{name}.png').write_bytes(b'png')
+            request = run.make_request(case, directory, (run.HERE / 'rubric.md').read_text())
+            self.assertIn('queue-light', [Path(p).stem for p in request['images']])
+            self.assertIn('- queue-tablet: ', request['prompt'])
+            self.assertIn('State renders', request['prompt'])
+            self.assertIn('on its own surface', request['prompt'])
+            self.assertTrue(any(k.endswith('renders/queue-light.png') for k in request['artifacts']))
 
     def test_missing_judge_is_pending_not_passed(self):
         case = {'name': 'music', 'surface': 'phone', 'assertions': [{'type': 'rubric', 'id': 'R-one'}]}

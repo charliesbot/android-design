@@ -20,6 +20,7 @@ ALLOWED_ROOTS = {
     # androidx.compose.foundation and androidx.compose.ui, which the inventory does not cover.
     "Modifier", "Arrangement", "Alignment", "WindowInsets", "BoxWithConstraints", "Box", "Row", "Column", "Spacer", "BorderStroke",
     "RectangleShape", "CircleShape", "ZeroCornerSize", "Color", "TextStyle", "FontFamily", "Font", "FontVariation", "FontWeight",
+    "DialogProperties",
     # MaterialKolor, the Kotlin port of Google's color utilities.
     "PaletteStyle", "ColorSpec",
     # The app's generated resource class (R.font.google_sans_flex).
@@ -31,6 +32,8 @@ INTERNAL_ELEMENTS = {
     "m3e-collapsible", "m3e-elevation", "m3e-floating-panel", "m3e-focus-ring", "m3e-focus-trap", "m3e-list-item-button",
     "m3e-pseudo-checkbox", "m3e-pseudo-radio", "m3e-ripple", "m3e-scroll-container", "m3e-selection-indicator",
     "m3e-slide", "m3e-state-layer", "m3e-text-highlight", "m3e-text-overflow", "m3e-theme-icon",
+    # The bottom sheet's drag handle gestures.
+    "m3e-pan-gesture", "m3e-swipe-gesture", "m3e-tap-gesture",
 }
 
 # Theme containers whose members live in another inventory class.
