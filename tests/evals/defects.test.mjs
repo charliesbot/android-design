@@ -46,6 +46,19 @@ const CASES = {
   'toolbar-overlap-static': { fails: ['C-review'], detail: /overlaps/ },
   'fixed-left': { fails: ['C-review'], detail: /light: pageOverflow/ },
   'control-slider': { fails: [] }, // Compose's whole 48dp Slider is the touch target; the thumb has none
+  'control-scroller-under-pinned-bars': { fails: [] }, // padded list scrolls under opaque pinned bars inside a fixed app shell; rows under the bottom bar scroll clear
+  'scroller-end-under-bar': { fails: ['C-review'], detail: /tablet: overlaps/ }, // last row under the bottom bar can never scroll clear (no bottom padding)
+  'control-scroller-end-padded': { fails: [] }, // bottom padding at least the bar height lets every row scroll clear
+  'scroller-row0-under-top-bar': { fails: ['C-review'], detail: /light: overlaps/ }, // row 0 under the top bar at scroll 0 can never scroll clear
+  'control-truncate-ellipsis': { fails: [] }, // single-line ellipsis and a 2-line clamp are intentional truncation
+  'text-clipped-no-ellipsis': { fails: ['C-review'], detail: /light: overflow/ },
+  'control-primary-with-slider': { fails: [] }, // a full-width slider is a track, not a competing action
+  'control-primary-with-nav-rail': { fails: [] }, // navigation chrome is not compared with the primary
+  'primary-outsized': { fails: ['C-review'], detail: /light: primary/ },
+  'ellipsis-vertical-clip': { fails: ['C-review'], detail: /light: overflow/ }, // ellipsis does not excuse a vertical clip
+  'ellipsis-glyph-clip': { fails: ['C-review'], detail: /light: overflow/ }, // nowrap ellipsis with line-height 0.6 clips the glyphs vertically
+  'button-label-ellipsis': { fails: ['C-review'], detail: /light: overflow/ }, // button labels never truncate
+  'primary-drawer-container': { fails: ['C-review'], detail: /light: primary/ }, // the drawer container's main content is not nav chrome
   'slider-short': { fails: ['C-review'], detail: /light: touchTargets/ },
 };
 

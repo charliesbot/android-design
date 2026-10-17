@@ -137,7 +137,7 @@ function midWordBreaks(node, style) {
 // opaque (a background of alpha 0.9 or more after its opacity, a url() background image, a replaced element
 // or svg, or its own text at that point, or a component whose shadow root paints there). Translucent
 // scrims and gradients leave the text legible, so they are not coverers. A fixed or sticky coverer over
-// content that can be scrolled clear of it is normal stacking, not a defect, and is skipped.
+// content that scrolls under it is occlusion, normal stacking and not a defect, and is skipped.
 const COVER_MIN_SHARE = 0.2;
 function opacityChain(el) {
   let value = 1;
@@ -164,27 +164,44 @@ function paintsAt(el, x, y) {
   if (rgba(style.backgroundColor).a >= 0.9 || ownsTextAt(el, x, y)) return true;
   return Boolean(el.shadowRoot?.elementsFromPoint(x, y).some(inner => inner !== el && el.shadowRoot.contains(inner) && paintsAt(inner, x, y)));
 }
-// Can scrolling alone move the text out from under a viewport-pinned coverer? The text scrolls in its nearest
-// scrollable flat-tree ancestor, or in the document when there is none. A pinned coverer stays put while that
-// content scrolls under it, even when the coverer sits inside the scroller; text sharing the coverer's pinned
-// ancestor does not scroll under it, and the pinned(el) test rules that out.
+// Occlusion: text that scrolls under an opaque viewport-pinned surface (a top app bar, a bottom nav bar, a FAB)
+// is normal scrolling UI, not an overlap, provided scrolling can move it fully clear. The text scrolls in its nearest scrollable flat-tree ancestor, or in
+// the document when there is none. A pinned ancestor above that scroller (an app shell that is position: fixed)
+// does not pin the text; one between the text and the scroller (a sticky header, fixed text) does. The coverer
+// is pinned against the scroller when it sits outside the scroller's content or is fixed or sticky inside it.
+// A coverer as tall as the scroller's viewport cannot be scrolled clear of, so it still counts.
+const isPinned = node => /fixed|sticky/.test(getComputedStyle(node).position);
 function scrollerOf(el) {
   for (let node = el; node; node = flatParent(node)) {
     if (node === document.documentElement || node === document.body) break;
+    if (isPinned(node)) return null;
     const style = getComputedStyle(node);
     if (/auto|scroll/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 1) return node;
   }
-  return document.documentElement;
+  return document.documentElement.scrollHeight > innerHeight + 1 ? document.documentElement : null;
 }
-function scrollsClear(textRect, el, coverer) {
-  const pinned = node => { for (let n = node; n; n = flatParent(n)) if (/fixed|sticky/.test(getComputedStyle(n).position)) return true; return false; };
-  if (pinned(el) || !pinned(coverer)) return false;
+function pinnedAgainst(scroller, coverer) {
+  for (let node = coverer; node; node = flatParent(node)) {
+    if (node === scroller) return false;
+    if (isPinned(node)) return true;
+  }
+  return scroller !== document.documentElement;
+}
+// Can scrolling within the scroller's real range move the text fully clear of the coverer? Scrolling down
+// moves content up (clears a coverer in the lower half of the scroller, such as a bottom bar) by at most the scroll left;
+// scrolling back up moves it down (clears a coverer in the upper half, such as a top bar) by at most scrollTop.
+// Text that can never scroll clear is a layout bug (missing content padding), so it still counts as covered.
+function occludes(el, coverer, textRect) {
   const scroller = scrollerOf(el);
-  const remaining = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
-  if (remaining <= 0) return false;
+  if (!scroller || !pinnedAgainst(scroller, coverer)) return false;
+  const root = scroller === document.documentElement;
+  const view = root ? innerHeight : scroller.clientHeight;
   const box = coverer.getBoundingClientRect();
-  const top = textRect.top - remaining, bottom = textRect.bottom - remaining;
-  return bottom <= box.top || top >= box.bottom || textRect.right <= box.left || textRect.left >= box.right;
+  if (box.height >= view - 1) return false;
+  const up = scroller.scrollHeight - view - scroller.scrollTop, down = scroller.scrollTop;
+  const frame = root ? { top: 0 } : scroller.getBoundingClientRect();
+  if ((box.top + box.bottom) / 2 >= frame.top + view / 2) return up > 0 && textRect.bottom - up <= box.top;
+  return down > 0 && textRect.top + down >= box.bottom;
 }
 function coveredText(node, el) {
   const range = document.createRange();
@@ -201,13 +218,29 @@ function coveredText(node, el) {
       if (own < 0) continue; // the text itself is not hit-testable here (pointer-events: none), so it is unknown
       samples++;
       const cover = hits.slice(0, own).find(hit => !flatContains(el, hit) && !fullyTransparent(hit) && paintsAt(hit, x, y)
-        && !scrollsClear(line, el, hit));
+        && !occludes(el, hit, line));
       if (cover) { covered++; top ??= cover; }
     }
   }
   return samples > 0 && covered / samples >= COVER_MIN_SHARE ? { by: top, share: Math.round((covered / samples) * 100) } : null;
 }
 
+// Intentional truncation, like Compose's Text(maxLines, overflow = Ellipsis), per axis: text-overflow: ellipsis
+// truncates only inline (horizontal) overflow, a line clamp only block (vertical) overflow, and each only on a
+// box that clips that axis. The other axis is still checked, so an ellipsis does not excuse glyphs cut off
+// vertically. Button labels never truncate (Google: "Don't truncate or wrap label text"), so nothing inside
+// a control is exempt.
+const CONTROL = 'button, [role=button], m3e-button, m3e-icon-button, m3e-fab, m3e-fab-menu-trigger, m3e-split-button, m3e-chip, m3e-assist-chip, m3e-filter-chip, m3e-input-chip, m3e-suggestion-chip, m3e-button-group';
+function truncation(el) {
+  const none = { x: false, y: false };
+  for (let node = el; node; node = flatParent(node)) if (node.matches?.(CONTROL)) return none;
+  const style = getComputedStyle(el);
+  const clamp = style.getPropertyValue('-webkit-line-clamp') || style.getPropertyValue('line-clamp');
+  return {
+    x: /hidden|clip/.test(style.overflowX) && style.textOverflow.includes('ellipsis'),
+    y: /hidden|clip/.test(style.overflowY) && clamp !== '' && clamp !== 'none',
+  };
+}
 // Is any part of the text drawn outside an ancestor that clips? Returns that ancestor, or null.
 // A scroll container ends the climb: its content is reachable.
 function clippedBy(textRect, el) {
@@ -215,9 +248,10 @@ function clippedBy(textRect, el) {
     const style = getComputedStyle(node);
     if (/auto|scroll/.test(style.overflowX + style.overflowY)) return null;
     if (/hidden|clip/.test(style.overflowX + style.overflowY) && node !== document.documentElement) {
+      const cut = truncation(node);
       const box = node.getBoundingClientRect();
       const [left, top] = [box.left + node.clientLeft, box.top + node.clientTop];
-      if (textRect.left < left - 1 || textRect.top < top - 1 || textRect.right > left + node.clientWidth + 1 || textRect.bottom > top + node.clientHeight + 1) return node;
+      if ((!cut.x && (textRect.left < left - 1 || textRect.right > left + node.clientWidth + 1)) || textRect.top < top - 1 || (!cut.y && textRect.bottom > top + node.clientHeight + 1)) return node;
     }
   }
   return null;
@@ -295,7 +329,11 @@ export function runtimeChecks() {
     return false;
   });
   const under48 = interactive.filter(i => i.w < MIN_TARGET - 0.05 || i.h < MIN_TARGET - 0.05).map(({ el, w, h }) => ({ el, w, h }));
-  const largest = interactive.reduce((best, i) => (!best || i.area > best.area ? i : best), null);
+  // Navigation chrome and slider or progress tracks span the screen by design; they are not competing actions.
+  const NAV = 'm3e-nav-bar, m3e-nav-rail, m3e-nav-menu, m3e-nav-item, m3e-drawer-container > [slot=start], m3e-drawer-container > [slot=end], nav, [role=navigation]';
+  const TRACK = 'm3e-slider, input[type=range], [role=slider], [role=progressbar]';
+  const exempt = el => { for (let node = el; node; node = flatParent(node)) if (node.matches?.(NAV) || node.matches?.(TRACK)) return true; return false; };
+  const largest = interactive.filter(i => !exempt(i.node)).reduce((best, i) => (!best || i.area > best.area ? i : best), null);
 
   // The page marks its primary action with data-primary; it must be the largest interactive element.
   const marked = interactive.filter(i => i.node.hasAttribute('data-primary'));
@@ -307,7 +345,7 @@ export function runtimeChecks() {
     primary.status = 'fail';
     primary.reason = 'more than one visible element has data-primary';
   } else {
-    primary.status = marked[0].area >= largest.area - 0.5 ? 'pass' : 'fail';
+    primary.status = !largest || marked[0].area >= largest.area - 0.5 ? 'pass' : 'fail';
     if (primary.status === 'fail') primary.reason = `${marked[0].el} is smaller than ${largest.el}`;
   }
 
@@ -341,7 +379,7 @@ export function runtimeChecks() {
     // Overflow: the box holding the text overflows itself, or an ancestor that clips cuts the text off.
     const box = boxOf(el);
     const scrolls = /auto|scroll/.test(style.overflowX + style.overflowY);
-    if (box && !scrolls && getComputedStyle(box).display !== 'inline' && (box.scrollWidth > box.clientWidth + 1 || box.scrollHeight > box.clientHeight + 1)
+    if (box && !scrolls && getComputedStyle(box).display !== 'inline' && ((!truncation(box).x && box.scrollWidth > box.clientWidth + 1) || (!truncation(box).y && box.scrollHeight > box.clientHeight + 1))
         && once('overflow', name)) {
       overflow.push({ el: name, scroll: [box.scrollWidth, box.scrollHeight], client: [box.clientWidth, box.clientHeight] });
     }
