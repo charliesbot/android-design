@@ -56,7 +56,14 @@ const CASES = {
   'control-text-field': { fails: [] }, // an empty and a short-valued text field are a 56dp touch target and do not overflow or truncate
   'control-primary-with-slider': { fails: [] }, // a full-width slider is a track, not a competing action
   'control-primary-with-nav-rail': { fails: [] }, // navigation chrome is not compared with the primary
-  'primary-outsized': { fails: ['C-review'], detail: /light: primary/ },
+  'primary-outsized': { fails: ['C-review'], detail: /light: primary/ }, // a regular button larger than the primary action fails
+  'primary-outsized-native-button': { fails: ['C-review'], detail: /light: primary/ }, // a native button that is not a row is an action
+  'control-primary-with-content': { fails: [] }, // tappable list rows and a card larger than the primary are content, not competing actions
+  'control-primary-equal-buttons': { fails: [] }, // peers of one size: the primary ties with them and leads through fill
+  'control-primary-default-with-toolbar': { fails: [] }, // the starter's labeled toggle toolbar is navigation, not competing actions, for a default-size primary
+  'control-primary-small-peers': { fails: [] }, // same size step, wider label: height decides, not area
+  'control-primary-with-icon-buttons': { fails: [] }, // a standard icon button is a 48px box around a 40px visual
+  'primary-outsized-fab': { fails: ['C-review'], detail: /light: primary/ }, // a FAB is taller than a small primary button
   'ellipsis-vertical-clip': { fails: ['C-review'], detail: /light: overflow/ }, // ellipsis does not excuse a vertical clip
   'ellipsis-glyph-clip': { fails: ['C-review'], detail: /light: overflow/ }, // nowrap ellipsis with line-height 0.6 clips the glyphs vertically
   'button-label-ellipsis': { fails: ['C-review'], detail: /light: overflow/ }, // button labels never truncate

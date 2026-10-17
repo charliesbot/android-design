@@ -348,20 +348,29 @@ export function runtimeChecks() {
       const touch = (el.shadowRoot?.querySelector('.touch') ?? el.querySelector(':scope > .handle-touch'))?.getBoundingClientRect();
       const width = Math.max(host.width, touch?.width ?? 0);
       const height = Math.max(host.height, touch?.height ?? 0);
-      interactive.push({ el: describe(el), node: el, behind: behindModal(el), w: Math.round(width * 10) / 10, h: Math.round(height * 10) / 10, area: width * height });
+      // The visual container is what the eye compares: the component's .base, else the host. A standard icon button is a 48px box around a 40px visual.
+      const visual = (el.shadowRoot?.querySelector('.base') ?? el).getBoundingClientRect();
+      interactive.push({ el: describe(el), node: el, behind: behindModal(el), w: Math.round(width * 10) / 10, h: Math.round(height * 10) / 10, vw: Math.round(visual.width * 10) / 10, vh: Math.round(visual.height * 10) / 10 });
     }
     return false;
   });
   const under48 = interactive.filter(i => !i.behind && (i.w < MIN_TARGET - 0.05 || i.h < MIN_TARGET - 0.05)).map(({ el, w, h }) => ({ el, w, h }));
-  // Navigation chrome, slider or progress tracks, and text fields span the screen by design; they are not competing actions.
-  const NAV = 'm3e-nav-bar, m3e-nav-rail, m3e-nav-menu, m3e-nav-item, m3e-drawer-container > [slot=start], m3e-drawer-container > [slot=end], nav, [role=navigation]';
+  // Navigation chrome (a labeled single-select toggle in the floating toolbar is the compact navigation), slider or progress tracks, and text fields span the screen by design; they are not competing actions.
+  const NAV = 'm3e-nav-bar, m3e-nav-rail, m3e-nav-menu, m3e-nav-item, m3e-drawer-container > [slot=start], m3e-drawer-container > [slot=end], nav, [role=navigation], p-floating-toolbar m3e-button[toggle]';
   const TRACK = 'm3e-slider, input[type=range], [role=slider], [role=progressbar], m3e-form-field';
   const exempt = el => { for (let node = el; node; node = flatParent(node)) if (node.matches?.(NAV) || node.matches?.(TRACK)) return true; return false; };
-  const largest = interactive.filter(i => !exempt(i.node)).reduce((best, i) => (!best || i.area > best.area ? i : best), null);
+  // The primary leads the other actions, not the content: a tappable list row, card, or tile is content and may be bigger.
+  // An action is a button-like component (button, icon button, FAB, split button, chip), or a native button or
+  // [role=button] that is not part of a row (inside m3e-list-item, m3e-card, or li, or with a link, listitem, row, or option role).
+  const ACTION = 'm3e-button, m3e-icon-button, m3e-fab, m3e-fab-menu-trigger, m3e-split-button, m3e-chip, m3e-assist-chip, m3e-filter-chip, m3e-input-chip, m3e-suggestion-chip';
+  const isAction = el => el.matches(ACTION)
+    || (el.matches('button, [role=button]') && !el.closest('m3e-list-item, m3e-card, li') && !/^(link|listitem|row|option)$/.test(el.getAttribute('role') ?? ''));
+  const largest = interactive.filter(i => !exempt(i.node) && isAction(i.node)).reduce((best, i) => (!best || i.vh > best.vh ? i : best), null);
 
-  // The page marks its primary action with data-primary; it must be the largest interactive element.
+  // The page marks its primary action with data-primary; its visual height (the button size step) must be at least every other action's.
+  // Height, not area: width follows the label, so same-size peers with different labels tie.
   const marked = interactive.filter(i => i.node.hasAttribute('data-primary'));
-  const primary = { marked: marked.length, largest: largest && { el: largest.el, w: largest.w, h: largest.h } };
+  const primary = { marked: marked.length, largest: largest && { el: largest.el, w: largest.vw, h: largest.vh } };
   if (modals.length) {
     // The primary action sits behind the scrim of an open modal: the default views check it.
     primary.status = 'skipped';
@@ -373,8 +382,8 @@ export function runtimeChecks() {
     primary.status = 'fail';
     primary.reason = 'more than one visible element has data-primary';
   } else {
-    primary.status = !largest || marked[0].area >= largest.area - 0.5 ? 'pass' : 'fail';
-    if (primary.status === 'fail') primary.reason = `${marked[0].el} is smaller than ${largest.el}`;
+    primary.status = !largest || marked[0].vh >= largest.vh - 1 ? 'pass' : 'fail';
+    if (primary.status === 'fail') primary.reason = `${marked[0].el} (${marked[0].vh}px tall) is shorter than ${largest.el} (${largest.vh}px tall)`;
   }
 
   const fabs = [...document.querySelectorAll(FAB)].filter(el => !el.parentElement?.closest('m3e-fab-menu') && visible(el)).length;
