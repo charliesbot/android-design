@@ -5,7 +5,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { create, cleanup, MARKER, TEMPLATE } from '../../skills/android-design/gallery/workspace.mjs';
+import { create, cleanup, MARKER, TEMPLATE } from '../../skills/android-design-explore/gallery/workspace.mjs';
 
 const git = (root, ...args) => spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' });
 
@@ -150,7 +150,7 @@ test('create copies the starter without the Android project', t => {
   assert.equal(existsSync(join(result, 'project/app')), false);
 });
 
-const MAPPING = readFileSync(fileURLToPath(new URL('../../skills/android-design/references/compose-mapping.md', import.meta.url)), 'utf8');
+const MAPPING = readFileSync(fileURLToPath(new URL('../../skills/android-design-explore/references/compose-mapping.md', import.meta.url)), 'utf8');
 const VARIANT_ATTRIBUTES = new Set(['variant', 'size', 'mode', 'shape', 'orientation', 'width', 'toggle', 'extended', 'vertical', 'multi', 'actionable']);
 // m3e-toolbar is only the wrapper inside p-floating-toolbar, which the verified p-floating-toolbar row covers.
 const COVERED_BY_PARENT = new Map([['m3e-toolbar', 'p-floating-toolbar']]);
@@ -231,7 +231,7 @@ test('create rejects an unknown starter', t => {
 
 test('the CLI selects the starter and validates the value', t => {
   const { root } = repo(t);
-  const cli = fileURLToPath(new URL('../../skills/android-design/gallery/cli.mjs', import.meta.url));
+  const cli = fileURLToPath(new URL('../../skills/android-design-explore/gallery/cli.mjs', import.meta.url));
   const run = (...args) => spawnSync('node', [cli, 'create', '--project', root, ...args], { encoding: 'utf8' });
   const html = run();
   assert.equal(html.status, 0, html.stderr);

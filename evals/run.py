@@ -19,7 +19,10 @@ from report import write_report, write_summary
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 SKILL_DIR = ROOT / "skills" / "android-design"
-CLI = SKILL_DIR / "gallery" / "cli.mjs"
+EXPLORE_DIR = ROOT / "skills" / "android-design-explore"
+# Where prepare() copies both skills inside a case directory.
+CASE_SKILLS = "skills"
+CLI = EXPLORE_DIR / "gallery" / "cli.mjs"
 PROPOSAL = "a"
 # The views `cli.mjs render` writes, in its order. test_run.py keeps this in step with gallery/render.mjs.
 RENDER_NAMES = ("light", "dark", "wallpaper", "foldable", "tablet", "desktop")
@@ -46,7 +49,8 @@ def prepare(case, case_dir):
     """A fresh fixture repository with an exploration whose proposal `a` holds the case assets."""
     case_dir.mkdir(parents=True)
     # Give the agent copies, not repository paths. This is not a security sandbox.
-    shutil.copytree(SKILL_DIR, case_dir / "skill")
+    for skill in (SKILL_DIR, EXPLORE_DIR):
+        shutil.copytree(skill, case_dir / CASE_SKILLS / skill.name)
     run_tool(["git", "init", "-q"], cwd=case_dir)
     run_tool([*GIT, "commit", "-q", "--allow-empty", "-m", "Initial commit"], cwd=case_dir)
     created = run_tool(["node", str(CLI), "create", "--project", str(case_dir), "--title", case["name"]])
@@ -65,7 +69,8 @@ def prepare(case, case_dir):
 
 def prompt_for(case, case_dir):
     text = (HERE / "agent-prompt.md").read_text()
-    return (text.replace("{{SKILL_DIR}}", str(case_dir / "skill"))
+    return (text.replace("{{SKILL_DIR}}", str(case_dir / CASE_SKILLS / SKILL_DIR.name))
+                .replace("{{EXPLORE_DIR}}", str(case_dir / CASE_SKILLS / EXPLORE_DIR.name))
                 .replace("{{EXPLORATION}}", case_info(case_dir)["exploration"])
                 .replace("{{BRIEF}}", case["prompt"]))
 

@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromeExecutable } from '../../skills/android-design/gallery/cdp.mjs';
-import { ORIGIN, RENDERS, SHEET_COLUMNS, contactSheetHtml, failures, makeRoute, summarize } from '../../skills/android-design/gallery/render.mjs';
-import { dataUri, inlineCss, inlineHtml, viewerHtml } from '../../skills/android-design/gallery/view.mjs';
+import { chromeExecutable } from '../../skills/android-design-explore/gallery/cdp.mjs';
+import { ORIGIN, RENDERS, SHEET_COLUMNS, contactSheetHtml, failures, makeRoute, summarize } from '../../skills/android-design-explore/gallery/render.mjs';
+import { dataUri, inlineCss, inlineHtml, viewerHtml } from '../../skills/android-design-explore/gallery/view.mjs';
 import { workspace } from './fixture.mjs';
 
 const files = {

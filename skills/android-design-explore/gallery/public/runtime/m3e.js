@@ -11792,7 +11792,7 @@ Cv = /* @__PURE__ */ new WeakMap(), wv = /* @__PURE__ */ new WeakMap(), Tv = /* 
 	reflect: !0
 })], $v.prototype, "discrete", void 0), e([C({ type: Number })], $v.prototype, "min", void 0), e([C({ type: Number })], $v.prototype, "max", void 0), e([C({ type: Number })], $v.prototype, "step", void 0), e([C({ type: Boolean })], $v.prototype, "labelled", void 0), e([C({ attribute: !1 })], $v.prototype, "displayWith", void 0), $v = e([T("m3e-slider")], $v);
 //#endregion
-//#region skills/android-design/gallery/runtime-src/p-icon.js
+//#region skills/android-design-explore/gallery/runtime-src/p-icon.js
 var ey = class extends HTMLElement {
 	static observedAttributes = ["name", "label"];
 	connectedCallback() {
@@ -11808,7 +11808,7 @@ var ey = class extends HTMLElement {
 };
 customElements.define("p-icon", ey);
 //#endregion
-//#region skills/android-design/gallery/runtime-src/p-floating-toolbar.js
+//#region skills/android-design-explore/gallery/runtime-src/p-floating-toolbar.js
 var ty = class extends HTMLElement {
 	connectedCallback() {
 		let e = this.querySelector("m3e-toolbar");
@@ -11833,7 +11833,7 @@ var ty = class extends HTMLElement {
 };
 customElements.define("p-floating-toolbar", ty);
 //#endregion
-//#region skills/android-design/gallery/runtime-src/theme-bridge.js
+//#region skills/android-design-explore/gallery/runtime-src/theme-bridge.js
 var ny = [
 	"monochrome",
 	"neutral",

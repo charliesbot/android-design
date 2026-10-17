@@ -6,7 +6,7 @@ const here = new URL('./', import.meta.url);
 const repo = new URL('../../../../', here);
 const read = (url, encoding) => readFileSync(fileURLToPath(url), encoding);
 
-const STARTER = new URL('skills/android-design/assets/exploration-starter/', repo);
+const STARTER = new URL('skills/android-design-explore/assets/exploration-starter/', repo);
 // The bundled typefaces. The sources are the Compose starter's TTFs and licenses, so the web runtime and the Compose port ship the same fonts.
 // Google Sans Flex keeps the unqualified OFL.txt name; every other family has <Name>-OFL.txt.
 const FONTS = [

@@ -9,14 +9,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { Browser, chromeExecutable } from '../../skills/android-design/gallery/cdp.mjs';
-import { ORIGIN, lintAll, makeRoute, renderViews, summarize } from '../../skills/android-design/gallery/render.mjs';
+import { Browser, chromeExecutable } from '../../skills/android-design-explore/gallery/cdp.mjs';
+import { ORIGIN, lintAll, makeRoute, renderViews, summarize } from '../../skills/android-design-explore/gallery/render.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const CLI = join(ROOT, 'skills/android-design/gallery/cli.mjs');
+const CLI = join(ROOT, 'skills/android-design-explore/gallery/cli.mjs');
 const CHECKS = join(ROOT, 'evals/checks.py');
 const DEFECTS = join(ROOT, 'tests/evals/defects');
-const STARTER = join(ROOT, 'skills/android-design/assets/proposal-starter/proposals/a');
+const STARTER = join(ROOT, 'skills/android-design-explore/assets/proposal-starter/proposals/a');
 let chrome;
 try { chrome = chromeExecutable(); } catch { chrome = null; }
 

@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { lintAll } from '../../skills/android-design/gallery/render.mjs';
+import { lintAll } from '../../skills/android-design-explore/gallery/render.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { workspace, writeProposal, PAGE } from './fixture.mjs';
 
-const starter = name => readFileSync(fileURLToPath(new URL(`../../skills/android-design/assets/proposal-starter/proposals/a/${name}`, import.meta.url)), 'utf8');
+const starter = name => readFileSync(fileURLToPath(new URL(`../../skills/android-design-explore/assets/proposal-starter/proposals/a/${name}`, import.meta.url)), 'utf8');
 
 // Returns a function that throws the lint errors of proposal `a`, as `render` would report them.
 function publish(t, files) {

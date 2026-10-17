@@ -39,7 +39,7 @@ One class per Material 3 role: `.t-display-large`, `.t-display-medium`, `.t-disp
 
 Fonts: every element is Google Sans Flex. A `.voice-*` rule may set `font-family` to one bundled face (`Fraunces`, `"Bricolage Grotesque"`, `"Big Shoulders Display"` at `font-size` 24px and up in that rule; `Doto` at 36px and up; `"Google Sans Code"` at any size), optionally followed by `serif`, `sans-serif`, or `monospace`. Publishing rejects any other family, a `font` shorthand, and a brand face below its minimum, with the file and line. The fonts check lists rendered text whose first family is not bundled or is a brand face below its minimum size.
 
-Large voices: Google Sans Flex at heavy weights and large sizes needs a line height of at least about 1.2x the font size (`SKILL.md` section 5: "Line height about 1.2x on large styles"); heavy or narrow voices need about 1.25x (measured). The checker flags a tighter line box as overflow, because the glyph box then exceeds the box that holds it.
+Large voices: Google Sans Flex at heavy weights and large sizes needs a line height of at least about 1.2x the font size (the `android-design` skill's `SKILL.md` section 5: "Line height about 1.2x on large styles"); heavy or narrow voices need about 1.25x (measured). The checker flags a tighter line box as overflow, because the glyph box then exceeds the box that holds it.
 
 ## Icons
 

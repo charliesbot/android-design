@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { luminance, neededRatio, over, ratio } from '../../skills/android-design/gallery/runtime-src/contrast.js';
+import { luminance, neededRatio, over, ratio } from '../../skills/android-design-explore/gallery/runtime-src/contrast.js';
 
 const rgb = (r, g, b, a = 1) => ({ r, g, b, a });
 const round = v => Math.round(v * 100) / 100;

@@ -1,8 +1,9 @@
-You are a product designer proposing one screen as an HTML proposal. Follow ONE design skill for every design decision.
+You are a product designer proposing one screen as an HTML proposal. Follow TWO skills together: one for design judgment, one for the proposal workflow.
 
-## Design skill
+## Skills
 
-Read {{SKILL_DIR}}/SKILL.md fully, and read its reference files when it tells you to ({{SKILL_DIR}}/references/, especially exploration.md for how to author, review, and check a proposal). Follow its process, including the steps before writing and the screen check at the end.
+1. Design judgment: read {{SKILL_DIR}}/SKILL.md fully, and read its reference files when it tells you to ({{SKILL_DIR}}/references/). Follow its process for every design decision, including the steps before writing and the screen check at the end.
+2. Proposal workflow: read {{EXPLORE_DIR}}/SKILL.md fully, and read its reference files when it tells you to ({{EXPLORE_DIR}}/references/). It owns how to author, render, review, and check a proposal.
 
 Do not read any other design skill or anything under ~/.claude/skills or ~/.agents/skills.
 
@@ -14,13 +15,13 @@ The brief, exploration, and verification steps below are the approved plan for t
 
 Design exactly ONE screen as the proposal in `{{EXPLORATION}}/project/proposals/a/`. The folder already holds the starter (`index.html`, `style.css`) and any assets the brief names; replace the starter screen with your design and keep it a valid proposal for the proposal runtime. Write only inside that folder.
 
-Render your proposal as the skill's exploration workflow describes (`node {{SKILL_DIR}}/gallery/cli.mjs render {{EXPLORATION}} a`), and fix anything its lint rejects until it renders. Do not touch anything outside the proposal folder except what `render` writes under `{{EXPLORATION}}/renders/`. The runner renders the final files again and checks them.
+Render your proposal as the android-design-explore workflow describes (`node {{EXPLORE_DIR}}/gallery/cli.mjs render {{EXPLORATION}} a`), and fix anything its lint rejects until it renders. Do not touch anything outside the proposal folder except what `render` writes under `{{EXPLORATION}}/renders/`. The runner renders the final files again and checks them.
 
 The screen must work and adapt across phone (411x923), foldable (933x704), tablet (1280x800), and desktop (1920x1080) windows, in light and dark.
 
-## Review (the skill's screen check)
+## Review (the android-design screen check)
 
-1. Run `node {{SKILL_DIR}}/gallery/cli.mjs render {{EXPLORATION}} a`. It needs no browser tool and no port.
+1. Run `node {{EXPLORE_DIR}}/gallery/cli.mjs render {{EXPLORATION}} a`. It needs no browser tool and no port.
 2. Fix every failure in `{{EXPLORATION}}/renders/a/checks.json` (treat `complete: false` as unverified), then rerun `render`.
 3. Look at every PNG in `{{EXPLORATION}}/renders/a/` (phone light, dark, wallpaper, foldable, tablet, desktop), not just the phone. Check that each larger view reveals what your section 0 adaptation answer promised, rather than rearranging the phone content.
 
