@@ -92,3 +92,5 @@ section { margin-top: 48px; scroll-margin-top: 16px; }
 .corner-extra-large-increased { border-radius: 32px; }
 .corner-extra-extra-large { border-radius: 48px; }
 .corner-full { border-radius: 9999px; }
+
+.demo m3e-form-field { --m3e-form-field-width: 280px; }

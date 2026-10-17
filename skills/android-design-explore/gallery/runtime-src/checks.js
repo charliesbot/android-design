@@ -320,7 +320,8 @@ export function runtimeChecks() {
     // Compose's whole Slider is the touch target; its thumb has none, so the m3e-slider host is measured instead.
     if (el.localName === 'm3e-slider-thumb') return true;
     if (visible(el)) {
-      const host = el.getBoundingClientRect();
+      // A native input or textarea inside m3e-form-field is the text field's input, not the field: Compose's whole TextField (56dp) is the target, so the form field is measured.
+      const host = (el.closest('m3e-form-field') ?? el).getBoundingClientRect();
       const touch = el.shadowRoot?.querySelector('.touch')?.getBoundingClientRect();
       const width = Math.max(host.width, touch?.width ?? 0);
       const height = Math.max(host.height, touch?.height ?? 0);
@@ -329,9 +330,9 @@ export function runtimeChecks() {
     return false;
   });
   const under48 = interactive.filter(i => i.w < MIN_TARGET - 0.05 || i.h < MIN_TARGET - 0.05).map(({ el, w, h }) => ({ el, w, h }));
-  // Navigation chrome and slider or progress tracks span the screen by design; they are not competing actions.
+  // Navigation chrome, slider or progress tracks, and text fields span the screen by design; they are not competing actions.
   const NAV = 'm3e-nav-bar, m3e-nav-rail, m3e-nav-menu, m3e-nav-item, m3e-drawer-container > [slot=start], m3e-drawer-container > [slot=end], nav, [role=navigation]';
-  const TRACK = 'm3e-slider, input[type=range], [role=slider], [role=progressbar]';
+  const TRACK = 'm3e-slider, input[type=range], [role=slider], [role=progressbar], m3e-form-field';
   const exempt = el => { for (let node = el; node; node = flatParent(node)) if (node.matches?.(NAV) || node.matches?.(TRACK)) return true; return false; };
   const largest = interactive.filter(i => !exempt(i.node)).reduce((best, i) => (!best || i.area > best.area ? i : best), null);
 

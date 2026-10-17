@@ -52,6 +52,7 @@ const CASES = {
   'scroller-row0-under-top-bar': { fails: ['C-review'], detail: /light: overlaps/ }, // row 0 under the top bar at scroll 0 can never scroll clear
   'control-truncate-ellipsis': { fails: [] }, // single-line ellipsis and a 2-line clamp are intentional truncation
   'text-clipped-no-ellipsis': { fails: ['C-review'], detail: /light: overflow/ },
+  'control-text-field': { fails: [] }, // an empty and a short-valued text field are a 56dp touch target and do not overflow or truncate
   'control-primary-with-slider': { fails: [] }, // a full-width slider is a track, not a competing action
   'control-primary-with-nav-rail': { fails: [] }, // navigation chrome is not compared with the primary
   'primary-outsized': { fails: ['C-review'], detail: /light: primary/ },
