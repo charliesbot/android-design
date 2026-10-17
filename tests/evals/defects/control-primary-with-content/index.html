@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Proposal A</title>
+  <link rel="stylesheet" href="/runtime/runtime.css">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="/runtime/m3e.js"></script>
+</head>
+<body>
+  <m3e-theme color="#6750A4" variant="tonal-spot" scheme="light">
+    <main class="screen">
+      <h1 class="t-headline-large-em">Tasks</h1>
+      <m3e-button variant="filled" class="primary" data-primary><p-icon slot="icon" name="add"></p-icon>Add</m3e-button>
+      <m3e-action-list class="rows">
+        <m3e-list-action>Water the plants</m3e-list-action>
+        <m3e-list-action>Book the dentist</m3e-list-action>
+        <m3e-list-action>Plan the weekend</m3e-list-action>
+      </m3e-action-list>
+      <m3e-card variant="filled" actionable class="summary">
+        <p class="t-body-large">Three tasks left today</p>
+      </m3e-card>
+    </main>
+  </m3e-theme>
+</body>
+</html>
