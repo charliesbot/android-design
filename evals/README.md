@@ -12,9 +12,9 @@ From this directory:
 python3 run.py prepare --out /tmp/design-eval --cases music
 ```
 
-Preparation makes `music/` a fresh Git repository fixture (one empty commit) with an exploration created by `gallery/cli.mjs create`, the brief's assets copied into its proposal folder `proposals/a/`, and a snapshot of the skill. `music/case.json` records the exploration path, and the command prints the proposal folder.
+Preparation makes `music/` a fresh Git repository fixture (one empty commit) with an exploration created by `gallery/cli.mjs create`, the brief's assets copied into its proposal folder `proposals/a/`, and a snapshot of both skills (`skills/android-design` and `skills/android-design-explore`). `music/case.json` records the exploration path, and the command prints the proposal folder.
 
-Read `/tmp/design-eval/music/prompt.md` in the agent session you want to test. Have that agent design the brief as the proposal in `proposals/a/` using the copied skill. It renders with `cli.mjs render` to check its work; the runner renders again. The output directory must be new; preparation never overwrites existing work. Omit `--cases` to prepare all four cases (music, finance, settings, trek).
+Read `/tmp/design-eval/music/prompt.md` in the agent session you want to test. Have that agent design the brief as the proposal in `proposals/a/` using the copied skills. It renders with `cli.mjs render` to check its work; the runner renders again. The output directory must be new; preparation never overwrites existing work. Omit `--cases` to prepare all four cases (music, finance, settings, trek).
 
 The Wear OS and widget cases were removed: they have no HTML harness. They need a new harness before they return.
 
@@ -85,14 +85,14 @@ Calibration and eval artifacts use the same judging prompt, including the screen
 python3 promote.py /tmp/design-eval
 ```
 
-Agents vary across runs. A failure is a signal; inspect repeated results before attributing it to a skill change. Keep briefs, assets, skill snapshot, render sizes, generator, and judge settings fixed for comparisons. Preparation snapshots the skill, case specifications, and rubric. Record the actual model separately when relying on a CLI's configured default.
+Agents vary across runs. A failure is a signal; inspect repeated results before attributing it to a skill change. Keep briefs, assets, skill snapshot, render sizes, generator, and judge settings fixed for comparisons. Preparation snapshots both skills, case specifications, and rubric. Record the actual model separately when relying on a CLI's configured default.
 
 ## Compose port check
 
-The evals judge HTML proposals, so they cannot show whether an approved proposal survives the port to Compose. Check that by hand after changing `skills/android-design/references/compose-mapping.md` or the pinned material3 version, not on every skill change.
+The evals judge HTML proposals, so they cannot show whether an approved proposal survives the port to Compose. Check that by hand after changing `skills/android-design-explore/references/compose-mapping.md` or the pinned material3 version, not on every skill change.
 
 1. Take one approved proposal from an eval run that passed, with its renders.
-2. Create an Android sandbox with `node skills/android-design/gallery/cli.mjs create --project <scratch repo> --starter android`.
+2. Create an Android sandbox with `node skills/android-design-explore/gallery/cli.mjs create --project <scratch repo> --starter android`.
 3. Have an agent that has not seen the proposal's renders port it to Compose using only the proposal source and `compose-mapping.md`, then render it by running `node render.mjs app` in the sandbox's `project/` directory.
 4. Compare the Compose render with the HTML phone render. Differences the HTML determined (layout, hierarchy, color roles, type roles, component choice) are mapping bugs to fix in `compose-mapping.md`. Small style choices the HTML left open are expected.
 
@@ -106,7 +106,7 @@ Run `python3 -m unittest discover evals` from the repository root to test adapte
 | `run.py`, `backends.py` | Artifact lifecycle and optional CLI launchers |
 | `checks.py`, `judge.py`, `rubric.md` | Deterministic checks and provider-independent rubric judgments |
 | `calibration/`, `baseline/` | Labeled renders and explicitly accepted baselines |
-| `skills/android-design/gallery/render.mjs` | Headless Chrome renders of a proposal plus its in-page `runtimeChecks` (what `cli.mjs render` runs) |
+| `skills/android-design-explore/gallery/render.mjs` | Headless Chrome renders of a proposal plus its in-page `runtimeChecks` (what `cli.mjs render` runs) |
 | `preference/` | Owner preference rounds |
 
 Renders come from headless Chrome against the proposal runtime. They do not verify motion or the Compose port; check device behavior in the ported app when it matters. A proposal's `runtimeChecks` can report `complete: false` when it cannot resolve a check (for example a contrast backdrop); that counts as unverified, not as a pass.

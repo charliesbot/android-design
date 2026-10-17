@@ -11,11 +11,11 @@ With [Chai](https://github.com/charliesbot/chai), add this repo's `skills` folde
 local = ['~/projects/android-design/skills']
 ```
 
-Any agent that reads skills can also load `skills/android-design/SKILL.md` directly.
+Chai syncs the whole `skills/` folder, which installs two skills: `android-design` (design judgment for building, refining, and reviewing real Compose) and `android-design-explore` (HTML proposals before implementation, built on `android-design`). Any agent that reads skills can also load `skills/android-design/SKILL.md` and `skills/android-design-explore/SKILL.md` directly.
 
 ## Requirements
 
-1. Install Node.js 22+ and Google Chrome for design exploration. Proposals are HTML rendered headlessly by `cli.mjs render`, so no browser tool or server is needed. The installed skill needs no build or `npm install`: it uses the committed proposal runtime in `skills/android-design/gallery/public/runtime/`. Python 3 runs the evals and the source scripts.
+1. Install Node.js 22+ and Google Chrome for design exploration. Proposals are HTML rendered headlessly by `cli.mjs render`, so no browser tool or server is needed. The installed skill needs no build or `npm install`: it uses the committed proposal runtime in `skills/android-design-explore/gallery/public/runtime/`. Python 3 runs the evals and the source scripts.
 
 2. For implementing and reviewing real Compose code, running the evals, and Wear work, install the [Compose preview CLI](https://github.com/yschimke/compose-ai-tools) and the Android SDK:
 
@@ -33,13 +33,13 @@ Any agent that reads skills can also load `skills/android-design/SKILL.md` direc
 
 ### Render and view
 
-`node skills/android-design/gallery/cli.mjs render <exploration>` lints each proposal, renders it headlessly in Chrome (no port), and writes `renders/<id>/` screenshots for phone, foldable, tablet, and desktop, a `checks.json`, and a self-contained `view.html`, plus `renders/contact-sheet.png`. Double-click `view.html` to switch devices, light and dark, seed colors, and palette. Iteration happens in chat: the agent shows the contact sheet, you reply, it edits and renders again.
+`node skills/android-design-explore/gallery/cli.mjs render <exploration>` lints each proposal, renders it headlessly in Chrome (no port), and writes `renders/<id>/` screenshots for phone, foldable, tablet, and desktop, a `checks.json`, and a self-contained `view.html`, plus `renders/contact-sheet.png`. Double-click `view.html` to switch devices, light and dark, seed colors, and palette. Iteration happens in chat: the agent shows the contact sheet, you reply, it edits and renders again.
 
 Google Sans Flex is shared with the proposal runtime, including its local font license. The runtime also bundles the optional brand and data faces (Fraunces, Bricolage Grotesque, Big Shoulders Display, Doto, Google Sans Code).
 
 ### Developing the proposal runtime
 
-The runtime source is in `skills/android-design/gallery/runtime-src/`, built into the committed `skills/android-design/gallery/public/runtime/`. `npm install` is for developing the runtime and running the tests only.
+The runtime source is in `skills/android-design-explore/gallery/runtime-src/`, built into the committed `skills/android-design-explore/gallery/public/runtime/`. `npm install` is for developing the runtime and running the tests only.
 
 1. Edit the runtime source.
 2. Run `npm run build` to rebuild the runtime, then `npm test`.
@@ -48,7 +48,8 @@ The runtime source is in `skills/android-design/gallery/runtime-src/`, built int
 
 | Path | Job |
 | --- | --- |
-| `skills/android-design/` | The skill itself |
+| `skills/android-design/` | The design judgment skill |
+| `skills/android-design-explore/` | The exploration skill: HTML proposals, render and view tooling, and the Compose porting table |
 | `docs/research/` | Distilled research from m3.material.io, developer.android.com/design/ui, and official videos and articles |
 | `docs/research/source-coverage.md` | Every official source page and whether its guidance reached the research |
 | `evals/` | Headless agents build four phone briefs (plus parked Wear and widget briefs), and the renders are checked against the skill's rules |

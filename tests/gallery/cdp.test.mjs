@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { existsSync } from 'node:fs';
-import { Browser, Page, chromeExecutable } from '../../skills/android-design/gallery/cdp.mjs';
+import { Browser, Page, chromeExecutable } from '../../skills/android-design-explore/gallery/cdp.mjs';
 
 // A request can still be paused when its page closes; the late reply then fails with
 // "Session with given id not found". That must not surface as an unhandled rejection.

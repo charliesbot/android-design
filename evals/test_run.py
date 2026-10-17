@@ -30,21 +30,23 @@ class PrepareTest(unittest.TestCase):
             log = subprocess.run(['git', 'log', '--oneline'], cwd=directory, capture_output=True, text=True)
             self.assertEqual(log.returncode, 0)
             self.assertEqual(len(log.stdout.strip().splitlines()), 1)
-            self.assertTrue((directory / 'skill/SKILL.md').is_file())
+            self.assertTrue((directory / 'skills/android-design/SKILL.md').is_file())
+            self.assertTrue((directory / 'skills/android-design-explore/SKILL.md').is_file())
             self.assertTrue((exploration / 'project/proposals/a/index.html').is_file())
             self.assertTrue((exploration / 'project/proposals/a/assets/album_art.jpg').is_file())
             info = json.loads((directory / 'case.json').read_text())
             self.assertEqual(info['exploration'], str(exploration))
             self.assertEqual(run.proposal_dir(directory), exploration / 'project/proposals/a')
 
-    def test_prompt_names_the_exploration_and_the_skill_copy(self):
+    def test_prompt_names_the_exploration_and_both_skill_copies(self):
         case = next(iter(run.select_cases('music')))
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp) / 'music'
             exploration = run.prepare(case, directory)
             text = run.prompt_for(case, directory)
             self.assertIn(str(exploration), text)
-            self.assertIn(str(directory / 'skill'), text)
+            self.assertIn(str(directory / 'skills/android-design'), text)
+            self.assertIn(str(directory / 'skills/android-design-explore'), text)
             self.assertIn(case['prompt'], text)
             self.assertNotIn('{{', text)
 
@@ -59,7 +61,7 @@ class PrepareTest(unittest.TestCase):
             self.assertIn('R-adaptive', [a['id'] for a in case['assertions']])
 
     def test_render_names_match_the_skill_render(self):
-        source = (run.SKILL_DIR / 'gallery/render.mjs').read_text()
+        source = (run.EXPLORE_DIR / 'gallery/render.mjs').read_text()
         names = re.findall(r"\{ name: '(\w+)', viewport", source)
         self.assertEqual(tuple(names), run.RENDER_NAMES)
 

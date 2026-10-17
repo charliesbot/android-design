@@ -3,7 +3,7 @@ name: android-design
 description: >
   Material 3 Expressive design judgment for Android apps in Jetpack Compose, distilled from Google's
   guidelines, UX research, and I/O talks. Use when designing, building, or reviewing Android phone, tablet,
-  or desktop screens; exploring app ideas or redesign alternatives without editing the app; choosing components;
+  or desktop screens; choosing components;
   setting up a theme (color, type, shape, motion); or when a Compose UI looks generic and needs hierarchy,
   emphasis, or polish.
 ---
@@ -30,13 +30,13 @@ Three causes, each fixable:
 
 ## Visual tooling
 
-Exploration needs only Node.js 22+ and Google Chrome (the `render` command drives it headlessly; the harness needs no browser). Implementing or reviewing real Compose code needs the `compose-preview` CLI and the `compose-preview` and `compose-ui-builder` skills: read and follow `compose-preview`, which owns tool selection, rendering, and troubleshooting. For a UI Builder design authoring request, follow `compose-ui-builder`. This skill owns design decisions and the screen check. If a dependency is unavailable, report it and refer the user to this repository's README setup section rather than installing tools or substituting another renderer.
+Implementing or reviewing real Compose code needs the `compose-preview` CLI and the `compose-preview` and `compose-ui-builder` skills: read and follow `compose-preview`, which owns tool selection, rendering, and troubleshooting. For a UI Builder design authoring request, follow `compose-ui-builder`. This skill owns design decisions and the screen check. If a dependency is unavailable, report it and refer the user to this repository's README setup section rather than installing tools or substituting another renderer.
 
 ## Exploration or implementation
 
-For brainstorming, redesign ideas, or visual alternatives before implementation, read [references/exploration.md](references/exploration.md) first. Proposals are HTML on the bundled Material 3 Expressive runtime, rendered headlessly to screenshots, a contact sheet, and a self-contained `view.html` per proposal, then iterated with the user in chat; production app code and dependencies stay unchanged. Use image generation only for assets, not as a substitute for a proposal. Implementation ports the approved proposal into the app with [references/compose-mapping.md](references/compose-mapping.md). The Android starter's experimental Wear shell is for explicitly requested explorations, without widening this skill's validated scope.
+For brainstorming, idea exploration, or visual alternatives before implementation, use the `android-design-explore` skill; it builds on this one. Porting an approved proposal to Compose also follows that skill's mapping table.
 
-For implementation or review requests, work in the actual project under its own approval and branch rules. Both paths use the design decisions and screen check below.
+For implementation or review requests, work in the actual project under its own approval and branch rules, using the design decisions and screen check below.
 
 ## 0. Before writing UI
 
@@ -82,7 +82,7 @@ fun AppTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> U
 
 Google's research justifies Expressive through usability, not decoration: participants found key UI elements **up to 4x faster** on expressive screens, and the age gap in finding them nearly disappeared. Emphasis is how people find the primary action.
 
-- **Size is the loudest lever.** "The most important action or the main call to action should be the largest element" (the largest interactive element; a summary card can be physically bigger). Larger key actions measurably reduce errors and improve satisfaction. One focal point per screen: when everything is large, nothing is. The label sets the floor: Google says "Don't truncate or wrap label text" and a container "shouldn't be narrower than its label text." When the label does not fit on one line at extra-large in its container (a phone-width card, a pane), shorten it to 1 to 3 words, give the button more room, or step down to a smaller size (Google: size can change "across different breakpoints", and emphasis comes "through size, color, or shape"). In an HTML proposal, step down only to a size marked `verified` in `references/compose-mapping.md`. The primary action keeps its lead through fill and placement, and stays larger than the secondary buttons.
+- **Size is the loudest lever.** "The most important action or the main call to action should be the largest element" (the largest interactive element; a summary card can be physically bigger). Larger key actions measurably reduce errors and improve satisfaction. One focal point per screen: when everything is large, nothing is. The label sets the floor: Google says "Don't truncate or wrap label text" and a container "shouldn't be narrower than its label text." When the label does not fit on one line at extra-large in its container (a phone-width card, a pane), shorten it to 1 to 3 words, give the button more room, or step down to a smaller size (Google: size can change "across different breakpoints", and emphasis comes "through size, color, or shape"). The primary action keeps its lead through fill and placement, and stays larger than the secondary buttons.
 - **Placement:** put the key action where the hands and eyes already are. Google's email study: moving Send from a small top-bar icon to a larger button just above the keyboard, in `secondary`, made people find it 4x faster; Aura's home screen puts its extra-large start button low, last in the vertical flow. Choose the size and position from the interaction and the space the content needs (default): an XL button suits a control-led hero, not every important action.
 - **The primary action gets the strongest fill** (Google: primary roles go to crucial calls to action; filled buttons sparingly). Secondary actions are tonal or standard; toggles like favorite show state with a filled icon or a tonal container, not a second loud fill competing with the main control.
 - **Contrast between roles, not one role everywhere:** `primary` for the main action, `secondary` or `secondaryContainer` for supporting controls, `tertiary` for status or accents. Using `primary` and `primaryContainer` for everything flattens the screen.
@@ -342,4 +342,3 @@ Code checks, separately:
 - [references/layout.md](references/layout.md): read when a screen must adapt to tablets, foldables, landscape, or desktop windows, or support mouse and keyboard.
 - [references/widgets.md](references/widgets.md): read before designing or reviewing a home screen widget (not yet in scope, see Surfaces).
 - [references/wear-os.md](references/wear-os.md): read before designing any Wear OS screen or tile (not yet in scope, see Surfaces).
-- [references/compose-mapping.md](references/compose-mapping.md): read when porting an approved HTML proposal to Compose; maps each runtime element and token to its verified Compose API.

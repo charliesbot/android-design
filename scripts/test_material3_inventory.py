@@ -10,9 +10,9 @@ from pathlib import Path
 import material3_inventory as inventory
 
 ROOT = Path(__file__).resolve().parent.parent
-MAPPING = ROOT / "skills/android-design/references/compose-mapping.md"
-RUNTIME_SRC = ROOT / "skills/android-design/gallery/runtime-src"
-RUNTIME_BUNDLE = ROOT / "skills/android-design/gallery/public/runtime/m3e.js"
+MAPPING = ROOT / "skills/android-design-explore/references/compose-mapping.md"
+RUNTIME_SRC = ROOT / "skills/android-design-explore/gallery/runtime-src"
+RUNTIME_BUNDLE = ROOT / "skills/android-design-explore/gallery/public/runtime/m3e.js"
 
 # Names the mapping uses that are not in the material3 artifact. A root listed here also allows its members
 # (Modifier.size, Alignment.BottomCenter, PaletteStyle.TonalSpot).

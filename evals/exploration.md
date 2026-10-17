@@ -22,7 +22,7 @@ The design evals need Node.js 22+ and Google Chrome or `CHROME_PATH`; no Android
 
 Run in an expendable Git repository. Needs Node.js 22+ and Google Chrome; no Gradle or Android SDK, and no browser tool in the harness.
 
-1. Create an exploration with `node skills/android-design/gallery/cli.mjs create --project <fixture-repo>`. Record the production app and installed starter hashes.
+1. Create an exploration with `node skills/android-design-explore/gallery/cli.mjs create --project <fixture-repo>`. Record the production app and installed starter hashes.
 2. Author two to three distinct proposals in `project/proposals/`, each with its own seed color; at least one layers three or more tactics and names them.
 3. Run `cli.mjs render <exploration>`. Every proposal gets six PNGs, a `checks.json`, and a `view.html`, and `renders/contact-sheet.png` has one row per proposal across phone, foldable, tablet, and desktop. Fix every failing or incomplete check (`complete: false` is unverified) and look at every PNG. With no way to view images, the agent must report visual quality unverified.
 4. Open a `view.html` from `file://`. Double-click to switch devices with the Phone, Foldable, Tablet, and Desktop buttons, light and dark, seed color, and palette variant; the proposal updates in place and nothing is saved after reload.

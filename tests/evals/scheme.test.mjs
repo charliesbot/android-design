@@ -8,11 +8,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { Browser, chromeExecutable } from '../../skills/android-design/gallery/cdp.mjs';
-import { ORIGIN, makeRoute } from '../../skills/android-design/gallery/render.mjs';
+import { Browser, chromeExecutable } from '../../skills/android-design-explore/gallery/cdp.mjs';
+import { ORIGIN, makeRoute } from '../../skills/android-design-explore/gallery/render.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const CLI = join(ROOT, 'skills/android-design/gallery/cli.mjs');
+const CLI = join(ROOT, 'skills/android-design-explore/gallery/cli.mjs');
 let chrome;
 try { chrome = chromeExecutable(); } catch { chrome = null; }
 

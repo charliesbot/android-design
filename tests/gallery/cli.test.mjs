@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { help, parse } from '../../skills/android-design/gallery/cli.mjs';
+import { help, parse } from '../../skills/android-design-explore/gallery/cli.mjs';
 import { workspace, writeProposal, STYLE } from './fixture.mjs';
 
-const CLI = fileURLToPath(new URL('../../skills/android-design/gallery/cli.mjs', import.meta.url));
+const CLI = fileURLToPath(new URL('../../skills/android-design-explore/gallery/cli.mjs', import.meta.url));
 const run = (...args) => spawnSync('node', [CLI, ...args], { encoding: 'utf8' });
 
 test('parse splits the command from its arguments and options', () => {

@@ -20,7 +20,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 from checks import run as run_checks  # noqa: E402
-from run import build  # noqa: E402
+from run import CASE_SKILLS, build  # noqa: E402
 
 
 def load_briefs():
@@ -31,8 +31,8 @@ def load_briefs():
 
 
 def prune(variant_dir):
-    """Keeps the variant's proposal and exploration for later diffing but drops the skill copy."""
-    shutil.rmtree(variant_dir / "skill", ignore_errors=True)
+    """Keeps the variant's proposal and exploration for later diffing but drops the skill copies."""
+    shutil.rmtree(variant_dir / CASE_SKILLS, ignore_errors=True)
 
 
 def run_variant(case, variant_dir, backend, model=None):

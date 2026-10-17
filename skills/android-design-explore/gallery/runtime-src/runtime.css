@@ -4,7 +4,7 @@
  */
 
 /* Bundled typefaces, Latin subsets with every variable axis (OFL, see fonts/OFL.txt and fonts/<Name>-OFL.txt).
-   Google Sans Flex is the plain face. A proposal may name the others only inside a .voice-* rule (see exploration.md). */
+   Google Sans Flex is the plain face. A proposal may name the others only inside a .voice-* rule (see the android-design-explore SKILL.md). */
 @font-face {
   font-family: "Google Sans Flex";
   src: url("fonts/GoogleSansFlex.woff2") format("woff2");

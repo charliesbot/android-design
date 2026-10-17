@@ -5,10 +5,10 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync }
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromeExecutable } from '../../skills/android-design/gallery/cdp.mjs';
-import { RENDERS } from '../../skills/android-design/gallery/render.mjs';
+import { chromeExecutable } from '../../skills/android-design-explore/gallery/cdp.mjs';
+import { RENDERS } from '../../skills/android-design-explore/gallery/render.mjs';
 
-const CLI = fileURLToPath(new URL('../../skills/android-design/gallery/cli.mjs', import.meta.url));
+const CLI = fileURLToPath(new URL('../../skills/android-design-explore/gallery/cli.mjs', import.meta.url));
 let chrome;
 try { chrome = chromeExecutable(); } catch (error) { chrome = null; }
 

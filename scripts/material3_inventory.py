@@ -6,9 +6,9 @@ Usage: material3_inventory.py
 Reads the material3 version from the exploration starter's libs.versions.toml, finds the matching AAR in the
 local Gradle cache, and writes:
 
-- skills/android-design/references/material3-inventory.txt: one name per line (`Class`, `Class.member`, or a bare
+- skills/android-design-explore/references/material3-inventory.txt: one name per line (`Class`, `Class.member`, or a bare
   top-level function name), no signatures. compose-mapping.md may only use names that appear here.
-- skills/android-design/gallery/runtime-src/type-scale.json: sizes, line heights, tracking, and weights read from
+- skills/android-design-explore/gallery/runtime-src/type-scale.json: sizes, line heights, tracking, and weights read from
   androidx.compose.material3.tokens.TypeScaleTokens.
 
 Needs `javap` from a JDK. Build the exploration starter once so Gradle downloads the artifacts.
@@ -22,9 +22,9 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-LIBS_TOML = ROOT / "skills/android-design/assets/exploration-starter/gradle/libs.versions.toml"
-INVENTORY = ROOT / "skills/android-design/references/material3-inventory.txt"
-TYPE_SCALE = ROOT / "skills/android-design/gallery/runtime-src/type-scale.json"
+LIBS_TOML = ROOT / "skills/android-design-explore/assets/exploration-starter/gradle/libs.versions.toml"
+INVENTORY = ROOT / "skills/android-design-explore/references/material3-inventory.txt"
+TYPE_SCALE = ROOT / "skills/android-design-explore/gallery/runtime-src/type-scale.json"
 GRADLE_FILES = Path.home() / ".gradle/caches/modules-2/files-2.1"
 
 MATERIAL3_ROOT = "androidx/compose/material3/"

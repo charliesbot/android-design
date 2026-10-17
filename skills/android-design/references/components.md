@@ -50,7 +50,7 @@ Usage rules from each component's Guidelines tab on m3.material.io (quotes are G
 - Pair by stepping down: filled next to text or outlined; outlined next to text. Place buttons side by side when there's room, not stacked.
 - "Don't clutter your UI with too many buttons. Consider presenting low-priority actions in overflow menus or as icon buttons."
 - Labels 1 to 3 words, sentence case, never wrapped or truncated; the icon leads. Don't stretch buttons into long flat bars on large screens.
-- The container is never narrower than its label. Size can change "across different breakpoints", so when a label does not fit at the planned size, shorten it, give it more room, or step the size down rather than clipping it (in an HTML proposal, only to a size marked `verified` in `compose-mapping.md`); emphasis also comes from color and shape, not size alone.
+- The container is never narrower than its label. Size can change "across different breakpoints", so when a label does not fit at the planned size, shorten it, give it more room, or step the size down rather than clipping it (in an HTML proposal, only to a size marked `verified` in the `android-design-explore` skill's `compose-mapping.md`); emphasis also comes from color and shape, not size alone.
 - Toggle buttons are for binary selections (Save, Favorite): outlined icon off, filled on, and the shape morphs, so selection shows through more than color.
 
 ### Icon buttons
@@ -227,7 +227,7 @@ Use Material Symbols in one style (outlined, rounded, or sharp) across the app.
 2. Delete only the `android:tint="?attr/colorControlNormal"` attribute from each file's `<vector>` tag, keeping the tag's closing `>`; in Compose, `Icon` applies the color.
 3. Draw with `Icon(painterResource(R.drawable.ic_favorite), contentDescription = "Like", tint = ...)`; leave `tint` at its default (`LocalContentColor`) inside components so the role pair stays correct.
 
-`androidx.compose.material:material-icons-extended` is the older Material Icons set, frozen at 1.7.8 and large; use it only for quick prototypes. Proposal ports always use Material Symbols drawables (see the Icons section of `compose-mapping.md`); the `Icons.Rounded.*` in the snippets below is shorthand only.
+`androidx.compose.material:material-icons-extended` is the older Material Icons set, frozen at 1.7.8 and large; use it only for quick prototypes. Proposal ports always use Material Symbols drawables (see the Icons section of the `android-design-explore` skill's `compose-mapping.md`); the `Icons.Rounded.*` in the snippets below is shorthand only.
 
 ## Snippets
 
