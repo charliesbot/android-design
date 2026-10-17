@@ -71,7 +71,7 @@ A proposal is `proposals/<id>/index.html` and `style.css` on the runtime, plus o
 Do not judge from code alone. `<exploration>` is the folder `create` printed (`design-explorations/<unique-id>`), not its parent. Render every proposal, or only the ids you name:
 
 ```bash
-node <skill-dir>/gallery/cli.mjs render <exploration> [id ...]
+node <skill-dir>/gallery/cli.mjs render <exploration> [id ...] [--open]
 ```
 
 `render` lints first. A lint error prints `file:line` and exits 2 with nothing rendered: fix and rerun. Otherwise it renders headlessly in Chrome, with no server and no port, and writes under `<exploration>/renders/`:
@@ -90,7 +90,7 @@ If the harness cannot view images, report visual quality as unverified and do no
 
 ## Show the user
 
-Show `renders/contact-sheet.png` in chat: attach the image if your harness can, otherwise give its absolute path. Also give the absolute path of each `<id>/view.html` so the user can open it from disk and try other devices, colors, and states. When a direction's idea lives in an overlay, show its state renders too (attach `<state>-light.png`, or give the path). Say what each direction is in one line, name the tactics the hero layers, and report any unverified check. Then stop and wait for the user.
+Show `renders/contact-sheet.png` in chat: attach the image if your harness can, otherwise give its absolute path. Then open the proposals in the user's browser: when you run on the user's own machine, rerun the final render with `--open` (`node <skill-dir>/gallery/cli.mjs render <exploration> [id ...] --open`), which opens each rendered `<id>/view.html` in the default browser after the render finishes, so the user can try other devices, colors, and states. Open only the final render of a round, never while you are still iterating: `render` rewrites `renders/<id>/`. When you run remotely (a cloud session) or the user is not at that machine, give the absolute path of each `view.html` instead. When a direction's idea lives in an overlay, show its state renders too (attach `<state>-light.png`, or give the path). Say what each direction is in one line, name the tactics the hero layers, and report any unverified check. Then stop and wait for the user.
 
 ## Iterate in chat
 
