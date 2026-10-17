@@ -19,6 +19,20 @@ private val googleSansFlex =
       )
     }
   )
+
+/**
+ * One font instance for a proposal's `.voice-*` rule: its weight plus every other axis the rule names in
+ * `font-variation-settings` (`FontVariation.opticalSizing(size.sp)` for `opsz`, `FontVariation.width` for `wdth`,
+ * `FontVariation.Setting("SOFT", 100f)`, and so on). Compose never sets an axis it is not given, and the runtime
+ * turns browser optical sizing off, so an unnamed axis is the font's default on both sides and a named one must be passed.
+ */
+fun voiceFont(resId: Int, weight: Int, vararg axes: FontVariation.Setting) =
+  Font(
+    resId,
+    weight = FontWeight(weight),
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight), *axes),
+  )
+
 private val baseline = Typography()
 val AppTypography =
   Typography(

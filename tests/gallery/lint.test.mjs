@@ -84,6 +84,17 @@ const htmlRejections = [
   ['inline style element', '<!doctype html>\n<style>p {}</style>', /index\.html:2: .*<style>/],
   ['an unknown p-icon name', '<!doctype html>\n<p-icon\n  name="not_a_real_symbol"></p-icon>', /index\.html:2: <p-icon name="not_a_real_symbol"> is not a Material Symbols name/],
   ['a p-icon with no name', '<!doctype html>\n<p-icon filled></p-icon>', /index\.html:2: <p-icon> needs a quoted name/],
+  ['a p-icon size that is not a Compose icon size', '<!doctype html>\n<p-icon\n  name="search" size="30"></p-icon>', /index\.html:2: <p-icon size="30"> is not a Compose icon size/],
+  ['a p-icon size without quotes', '<!doctype html>\n<p-icon name="search" size=24></p-icon>', /index\.html:2: <p-icon size> needs a quoted value/],
+  ['a p-icon size inside an icon button', '<!doctype html>\n<m3e-icon-button><p-icon\n  name="search" size="40"></p-icon></m3e-icon-button>', /index\.html:2: <p-icon size> is ignored inside <m3e-icon-button>: the component sets this icon's size; port with its default icon size/],
+  ['a p-icon size inside a nested slot of a fab', '<!doctype html>\n<m3e-fab><div><p-icon name="add" size="32"></p-icon></div></m3e-fab>', /index\.html:2: <p-icon size> is ignored inside <m3e-fab>/],
+  ['a p-icon size inside a nav item', '<!doctype html>\n<m3e-nav-bar><m3e-nav-item><p-icon slot="icon" name="home" size="32"></p-icon>Home</m3e-nav-item></m3e-nav-bar>', /index\.html:2: <p-icon size> is ignored inside <m3e-nav-item>/],
+  ['a p-icon size inside a button', '<!doctype html>\n<m3e-theme><m3e-button><p-icon slot="icon" name="add" size="32"></p-icon>Add</m3e-button></m3e-theme>', /index\.html:2: <p-icon size> is ignored inside <m3e-button>/],
+  ['a p-icon size inside a filter chip', '<!doctype html>\n<m3e-filter-chip><p-icon slot="icon" name="add" size="20"></p-icon>Add</m3e-filter-chip>', /index\.html:2: <p-icon size> is ignored inside <m3e-filter-chip>/],
+  ['a p-icon size inside a fab menu item', '<!doctype html>\n<m3e-fab-menu><m3e-fab-menu-item><p-icon slot="icon" name="add" size="20"></p-icon>Add</m3e-fab-menu-item></m3e-fab-menu>', /index\.html:2: <p-icon size> is ignored inside <m3e-fab-menu-item>/],
+  ['a self-closed p-icon size inside an icon button', '<!doctype html>\n<m3e-icon-button><p-icon name="add" size="40"/></m3e-icon-button>', /index\.html:2: <p-icon size> is ignored inside <m3e-icon-button>/],
+  ['a p-icon size inside a menu item', '<!doctype html>\n<m3e-menu-item><p-icon slot="icon" name="add" size="24"></p-icon>Add</m3e-menu-item>', /index\.html:2: <p-icon size> is ignored inside <m3e-menu-item>/],
+  ['a p-icon size inside a radio menu item', '<!doctype html>\n<m3e-menu-item-radio><p-icon slot="icon" name="add" size="24"></p-icon>Add</m3e-menu-item-radio>', /index\.html:2: <p-icon size> is ignored inside <m3e-menu-item-radio>/],
   ['inline script', '<!doctype html>\n\n<script>alert(1)</script>', /index\.html:3: .*<script>/],
 ];
 for (const [name, page, message] of htmlRejections) {
@@ -98,6 +109,23 @@ test('lint allows script with src and ignores commented markup', t => {
 
 test('lint allows any Material Symbols name on p-icon, filled or not', t => {
   publish(t, { page: `${PAGE}<p-icon name="directions_car"></p-icon><p-icon name='hiking' filled label="Hike"></p-icon><p-icon name="cloud"></p-icon><p-icon name="3d_rotation"></p-icon>` })();
+});
+
+test('lint allows p-icon size inside m3e-theme, a card, and layout elements', t => {
+  publish(t, { page: '<!doctype html>\n<m3e-theme color="#6750A4"><p-icon name="add" size="48"></p-icon><m3e-card><div slot="content"><p-icon name="add" size="32"></p-icon></div></m3e-card><m3e-app-bar><p-icon name="add" size="20"></p-icon></m3e-app-bar></m3e-theme>' })();
+});
+
+test('lint allows p-icon size in the body of components that force only a named icon slot', t => {
+  publish(t, { page: '<!doctype html>\n<m3e-theme><m3e-expansion-panel><div><p-icon name="add" size="32"></p-icon></div></m3e-expansion-panel><m3e-dialog><div><p-icon name="add" size="40"></p-icon></div></m3e-dialog><m3e-tree-item><p-icon name="add" size="24"></p-icon></m3e-tree-item></m3e-theme>' })();
+});
+
+test('lint allows each Compose icon size on p-icon', t => {
+  const sizes = [18, 20, 24, 28, 32, 36, 40, 48];
+  publish(t, { page: PAGE + sizes.map(size => `<p-icon name="search" size="${size}"></p-icon>`).join('') })();
+});
+
+test('lint allows p-icon size inside a list item and outside components, also after a component closes', t => {
+  publish(t, { page: PAGE + '<m3e-icon-button><p-icon name="search"></p-icon></m3e-icon-button><m3e-list><m3e-list-item><p-icon slot="leading" name="person" size="40"></p-icon>Name</m3e-list-item></m3e-list><div><p-icon name="add" size="48"></p-icon></div>' })();
 });
 
 test('lint allows the bundled families in voices at their minimum sizes', t => {

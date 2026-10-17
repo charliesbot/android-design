@@ -18,7 +18,7 @@ RUNTIME_BUNDLE = ROOT / "skills/android-design-explore/gallery/public/runtime/m3
 # (Modifier.size, Alignment.BottomCenter, PaletteStyle.TonalSpot).
 ALLOWED_ROOTS = {
     # androidx.compose.foundation and androidx.compose.ui, which the inventory does not cover.
-    "Modifier", "Arrangement", "Alignment", "WindowInsets", "BoxWithConstraints", "Row", "Column", "Spacer",
+    "Modifier", "Arrangement", "Alignment", "WindowInsets", "BoxWithConstraints", "Box", "Row", "Column", "Spacer", "BorderStroke",
     "RectangleShape", "CircleShape", "ZeroCornerSize", "Color", "TextStyle", "FontFamily", "Font", "FontVariation", "FontWeight",
     # MaterialKolor, the Kotlin port of Google's color utilities.
     "PaletteStyle", "ColorSpec",
@@ -135,9 +135,16 @@ class MappingTest(unittest.TestCase):
         scale = json.loads((RUNTIME_SRC / "type-scale.json").read_text())["roles"]
         for heading, cells in self.rows:
             if heading == "Type roles" and cells[1].startswith("`MaterialTheme.typography."):
-                role = cells[1].split(".")[-1].rstrip("`")
+                # A baseline role maps to the style itself. An emphasized class maps to the baseline role copied with the token weight and
+                # tracking, because the pinned Typography() gives every *Emphasized style the baseline values (see the section's text).
+                copy = re.fullmatch(r"`MaterialTheme\.typography\.(\w+)\.copy\(fontWeight = FontWeight\((\d+)\), letterSpacing = ([\d.]+)\.sp\)`", cells[1])
+                role = copy.group(1) + "Emphasized" if copy else cells[1].split(".")[-1].rstrip("`")
                 data = scale[role[0].upper() + role[1:]]
                 self.assertIn(f"{data['size']:g}sp / {data['lineheight']:g}sp, weight {data['weight']}", cells[2], role)
+                if copy:
+                    self.assertEqual((int(copy.group(2)), float(copy.group(3))), (data["weight"], data["tracking"]), role)
+                else:
+                    self.assertFalse(role.endswith("Emphasized"), f"{role}: use the baseline role copied with the token weight")
 
     def test_icons_port_as_symbol_drawables_not_the_legacy_icon_set(self):
         self.assertNotRegex(self.text, r"Icons\.(Auto)?(Mirrored\.)?Rounded\.[A-Z]")

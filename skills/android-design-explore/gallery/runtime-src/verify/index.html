@@ -201,6 +201,30 @@
           <div class="demo"><m3e-icon-button toggle selected variant="filled" aria-label="Favorite"><p-icon name="favorite" filled></p-icon></m3e-icon-button></div>
           <figcaption class="t-label-small">toggle selected</figcaption>
         </figure>
+        <figure class="case">
+          <div class="demo"><m3e-icon-button toggle variant="filled" aria-label="Favorite"><p-icon name="favorite"></p-icon></m3e-icon-button></div>
+          <figcaption class="t-label-small">toggle variant="filled"</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo"><m3e-icon-button toggle variant="tonal" aria-label="Favorite"><p-icon name="favorite"></p-icon></m3e-icon-button></div>
+          <figcaption class="t-label-small">toggle variant="tonal"</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo"><m3e-icon-button toggle selected variant="tonal" aria-label="Favorite"><p-icon name="favorite" filled></p-icon></m3e-icon-button></div>
+          <figcaption class="t-label-small">toggle selected variant="tonal"</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo"><m3e-icon-button toggle variant="standard" aria-label="Favorite"><p-icon name="favorite"></p-icon></m3e-icon-button></div>
+          <figcaption class="t-label-small">toggle variant="standard"</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo"><m3e-icon-button toggle selected variant="standard" aria-label="Favorite"><p-icon name="favorite" filled></p-icon></m3e-icon-button></div>
+          <figcaption class="t-label-small">toggle selected variant="standard"</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo"><m3e-icon-button toggle selected variant="outlined" aria-label="Favorite"><p-icon name="favorite" filled></p-icon></m3e-icon-button></div>
+          <figcaption class="t-label-small">toggle selected variant="outlined"</figcaption>
+        </figure>
       </div>
     </section>
     <section id="m3e-split-button">
@@ -227,7 +251,7 @@
     </section>
     <section id="m3e-fab">
       <h2 class="t-title-large-em">m3e-fab</h2>
-      <p class="t-body-medium note">Compose: FloatingActionButton, SmallFloatingActionButton, LargeFloatingActionButton, ExtendedFloatingActionButton.</p>
+      <p class="t-body-medium note">Compose: FloatingActionButton (size small), MediumFloatingActionButton, LargeFloatingActionButton, and the three Extended forms.</p>
       <div class="cases">
         <figure class="case">
           <div class="demo"><m3e-fab size="small" aria-label="Create"><p-icon name="add"></p-icon></m3e-fab></div>
@@ -244,6 +268,14 @@
         <figure class="case">
           <div class="demo"><m3e-fab extended><p-icon name="add"></p-icon><span slot="label">Create</span></m3e-fab></div>
           <figcaption class="t-label-small">extended</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo"><m3e-fab extended size="small"><p-icon name="add"></p-icon><span slot="label">Create</span></m3e-fab></div>
+          <figcaption class="t-label-small">extended size="small"</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo"><m3e-fab extended size="large"><p-icon name="add"></p-icon><span slot="label">Create</span></m3e-fab></div>
+          <figcaption class="t-label-small">extended size="large"</figcaption>
         </figure>
         <figure class="case">
           <div class="demo"><m3e-fab variant="primary-container" aria-label="Create"><p-icon name="add"></p-icon></m3e-fab></div>
@@ -324,6 +356,18 @@
           <figcaption class="t-label-small">list variant="standard"</figcaption>
         </figure>
         <figure class="case">
+          <div class="demo"><m3e-list variant="standard"><m3e-list-item><p-icon slot="leading" name="person"></p-icon>Headline<span slot="trailing">Trailing</span></m3e-list-item></m3e-list></div>
+          <figcaption class="t-label-small">list-item one line, leading icon, trailing text</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo"><m3e-list variant="standard"><m3e-list-item><p-icon slot="leading" name="person"></p-icon>Headline<span slot="supporting-text">Supporting text</span><span slot="trailing">Trailing</span></m3e-list-item></m3e-list></div>
+          <figcaption class="t-label-small">list-item two lines, leading icon, trailing text</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo"><m3e-list variant="standard"><m3e-list-item><p-icon slot="leading" name="person"></p-icon><span slot="overline">Overline</span>Headline<span slot="supporting-text">Supporting text that is long enough to wrap onto a second line of supporting text here</span><span slot="trailing">Trailing</span></m3e-list-item></m3e-list></div>
+          <figcaption class="t-label-small">list-item three lines, leading icon, trailing text</figcaption>
+        </figure>
+        <figure class="case">
           <div class="demo"><m3e-list variant="segmented"><m3e-list-item><p-icon slot="leading" name="person"></p-icon>Headline<span slot="supporting-text">Supporting text</span></m3e-list-item><m3e-list-item><p-icon slot="leading" name="person"></p-icon>Second item<span slot="supporting-text">More text</span></m3e-list-item><m3e-list-item><p-icon slot="leading" name="person"></p-icon>Third item<span slot="supporting-text">Even more</span></m3e-list-item></m3e-list></div>
           <figcaption class="t-label-small">list variant="segmented"</figcaption>
         </figure>
@@ -360,6 +404,10 @@
         <figure class="case">
           <div class="demo"><m3e-filter-chip-set multi><m3e-filter-chip variant="elevated" selected>Vegan</m3e-filter-chip><m3e-filter-chip variant="elevated">Quick</m3e-filter-chip><m3e-filter-chip variant="elevated">Dessert</m3e-filter-chip></m3e-filter-chip-set></div>
           <figcaption class="t-label-small">filter-chip-set, filter-chip variant="elevated"</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo"><m3e-filter-chip-set multi><m3e-filter-chip variant="outlined" selected><p-icon slot="icon" name="bookmark"></p-icon>Saved</m3e-filter-chip><m3e-filter-chip variant="outlined"><p-icon slot="icon" name="bookmark"></p-icon>Saved</m3e-filter-chip></m3e-filter-chip-set></div>
+          <figcaption class="t-label-small">filter-chip with leading icon, variant="outlined"</figcaption>
         </figure>
         <figure class="case">
           <div class="demo"><m3e-chip-set><m3e-input-chip removable remove-label="Remove">Basil</m3e-input-chip><m3e-input-chip removable remove-label="Remove">Feta</m3e-input-chip></m3e-chip-set></div>

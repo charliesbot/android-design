@@ -19,6 +19,15 @@ const BUNDLED = [FONTS.plain, ...FONTS.faces.map(face => face.family)];
 // Every Material Symbols name (public/runtime/symbols.json, emitted by the runtime build from the pinned `material-symbols` package).
 // <p-icon name> draws the name as a font ligature, so an unknown name would render as plain text; the lint rejects it instead.
 const SYMBOLS = new Set(JSON.parse(readFileSync(new URL('./public/runtime/symbols.json', import.meta.url), 'utf8')));
+// The Compose icon sizes a proposal may use (runtime-src/icon-sizes.json). <p-icon size="N"> sets the glyph size; font-size is not allowed outside a voice.
+const ICON_SIZES = JSON.parse(readFileSync(new URL('./runtime-src/icon-sizes.json', import.meta.url), 'utf8')).sizes;
+// @m3e/web 2.9.2 elements whose every slotted icon is sized by the component with `!important` (`::slotted(...) { font-size: ... !important }` or an
+// `--m3e-*-icon-size` token), found by grepping dist/*.js, so a p-icon size inside them has no effect. Components that force only a named slot
+// (the close icon of a dialog or snackbar, an expansion toggle, paginator or slide-group arrows, a search clear icon) are not linted because none
+// is verified for proposals; m3e-list-item, m3e-theme, m3e-card and m3e-app-bar do not force it.
+const FORCES_ICON_SIZE = new Set(['m3e-button', 'm3e-button-segment', 'm3e-icon-button', 'm3e-fab', 'm3e-fab-menu-item', 'm3e-chip', 'm3e-assist-chip', 'm3e-filter-chip',
+  'm3e-input-chip', 'm3e-suggestion-chip', 'm3e-nav-item', 'm3e-tab', 'm3e-step', 'm3e-menu-item', 'm3e-menu-item-checkbox', 'm3e-menu-item-radio',
+  'm3e-breadcrumb-item', 'm3e-breadcrumb-item-button']);
 const TYPE_PROPERTIES = new Set(['font', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'font-variation-settings']);
 const blank = text => text.replace(/[^\n]/g, ' ');
 const lineAt = (text, index) => text.slice(0, index).split('\n').length;
@@ -125,8 +134,13 @@ function lintJs(file, source) {
 function lintHtml(file, source) {
   const text = source.replace(/<!--[\s\S]*?-->/g, blank);
   const fail = (index, message) => { throw new LintError(`${file}:${lineAt(text, index)}: ${message}`); };
-  for (const tag of text.matchAll(/<([a-zA-Z][\w-]*)\b[^>]*>/g)) {
-    const name = tag[1].toLowerCase();
+  const open = []; // open element names, to find the component a p-icon sits in
+  const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+  for (const tag of text.matchAll(/<(\/?)([a-zA-Z][\w-]*)\b[^>]*>/g)) {
+    const name = tag[2].toLowerCase();
+    if (tag[1]) { const at = open.lastIndexOf(name); if (at >= 0) open.length = at; continue; }
+    const pushed = !VOID.has(name) && !tag[0].endsWith('/>');
+    if (pushed) open.push(name);
     if (name === 'style') fail(tag.index, 'Inline <style> is not allowed. Put styles in a .css file');
     if (name === 'script' && !/\ssrc\s*=/i.test(tag[0])) fail(tag.index, 'Inline <script> is not allowed. Use <script src="...">');
     if (name === 'p-icon') {
@@ -134,6 +148,14 @@ function lintHtml(file, source) {
       const symbol = icon ? icon[1] ?? icon[2] : undefined;
       if (symbol === undefined) fail(tag.index, '<p-icon> needs a quoted name="..." attribute that is a Material Symbols name from fonts.google.com/icons (name=home without quotes is not accepted)');
       else if (!SYMBOLS.has(symbol)) fail(tag.index, `<p-icon name="${symbol}"> is not a Material Symbols name. Pick one from fonts.google.com/icons, written in snake_case`);
+      if (/\ssize\b/i.test(tag[0])) {
+        const size = /\ssize\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag[0]);
+        if (!size) fail(tag.index, '<p-icon size> needs a quoted value such as size="24"');
+        const value = size[1] ?? size[2];
+        const host = (pushed ? open.slice(0, -1) : open).slice().reverse().find(item => FORCES_ICON_SIZE.has(item) || item === 'm3e-list-item');
+        if (host && host !== 'm3e-list-item') fail(tag.index, `<p-icon size> is ignored inside <${host}>: the component sets this icon's size; port with its default icon size (an icon button or FAB follows its container size). Remove size`);
+        if (!ICON_SIZES.includes(Number(value)) || !/^\d+$/.test(value)) fail(tag.index, `<p-icon size="${value}"> is not a Compose icon size. Use one of ${ICON_SIZES.join(', ')} (the size of the Compose icon it ports to)`);
+      }
     }
     const attribute = /\sstyle\s*=/i.exec(tag[0]);
     if (attribute) fail(tag.index + attribute.index, 'style="" attributes are not allowed. Put styles in a .css file');

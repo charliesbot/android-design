@@ -1,0 +1,13 @@
+{
+ "sizes": [
+  18,
+  20,
+  24,
+  28,
+  32,
+  36,
+  40,
+  48
+ ],
+ "source": "Compose constants measured in a render: 18 AssistChipDefaults.IconSize and FilterChipDefaults.IconSize; 20 ButtonDefaults.ExtraSmallIconSize and IconButtonDefaults.extraSmallIconSize; 24 the baseline icon, ButtonDefaults.MediumIconSize, IconButtonDefaults.smallIconSize and mediumIconSize; 28 FloatingActionButtonDefaults.MediumIconSize; 32 ButtonDefaults.LargeIconSize and IconButtonDefaults.largeIconSize; 36 FloatingActionButtonDefaults.LargeIconSize; 40 ButtonDefaults.ExtraLargeIconSize and IconButtonDefaults.extraLargeIconSize; 48 the largest supported optical size (m3.material.io/styles/icons)"
+}
