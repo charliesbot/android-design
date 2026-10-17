@@ -15,7 +15,7 @@ The brief, exploration, and verification steps below are the approved plan for t
 
 Design exactly ONE screen as the proposal in `{{EXPLORATION}}/project/proposals/a/`. The folder already holds the starter (`index.html`, `style.css`) and any assets the brief names; replace the starter screen with your design and keep it a valid proposal for the proposal runtime. Write only inside that folder.
 
-Render your proposal as the android-design-explore workflow describes (`node {{EXPLORE_DIR}}/gallery/cli.mjs render {{EXPLORATION}} a`), and fix anything its lint rejects until it renders. Do not touch anything outside the proposal folder except what `render` writes under `{{EXPLORATION}}/renders/`. The runner renders the final files again and checks them.
+Render your proposal as the android-design-explore workflow describes (`node {{EXPLORE_DIR}}/gallery/cli.mjs render {{EXPLORATION}} a`), and fix anything its lint rejects until it renders. Do not touch anything outside the proposal folder except what `render` writes under `{{EXPLORATION}}/renders/`. The runner renders the final files again and checks them. Never pass `--open`: nobody is watching this run, so skip the skill's step of opening proposals in a browser.
 
 The screen must work and adapt across phone (411x923), foldable (933x704), tablet (1280x800), and desktop (1920x1080) windows, in light and dark.
 

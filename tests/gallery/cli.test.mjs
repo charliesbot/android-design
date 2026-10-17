@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { help, parse } from '../../skills/android-design-explore/gallery/cli.mjs';
+import { join } from 'node:path';
+import { help, openCommand, openViews, parse } from '../../skills/android-design-explore/gallery/cli.mjs';
 import { workspace, writeProposal, STYLE } from './fixture.mjs';
 
 const CLI = fileURLToPath(new URL('../../skills/android-design-explore/gallery/cli.mjs', import.meta.url));
@@ -41,4 +42,24 @@ test('render rejects an unknown proposal id', t => {
   const done = run('render', root, 'zzz');
   assert.equal(done.status, 1);
   assert.match(done.stderr, /Unknown proposal "zzz"\. Available: a/);
+});
+
+test('render --open is parsed as a flag', () => {
+  assert.equal(parse(['render', '/x', 'a', '--open']).values.open, true);
+  assert.deepEqual(parse(['render', '/x', 'a', '--open']).rest, ['/x', 'a']);
+});
+
+test('openCommand picks the platform opener', () => {
+  assert.deepEqual(openCommand('/r/a/view.html', 'darwin'), ['open', ['/r/a/view.html']]);
+  assert.deepEqual(openCommand('/r/a/view.html', 'linux'), ['xdg-open', ['/r/a/view.html']]);
+  assert.deepEqual(openCommand('C:\\r\\a\\view.html', 'win32'), ['explorer.exe', ['C:\\r\\a\\view.html']]);
+});
+
+test('openViews opens each proposal view.html detached', () => {
+  const calls = [];
+  const spawn = (cmd, args, options) => { calls.push({ cmd, args, options }); return { unref() {}, on() {} }; };
+  const opened = openViews({ proposals: [{ dir: '/r/a' }, { dir: '/r/b' }] }, { platform: 'darwin', spawn });
+  assert.deepEqual(opened, [join('/r/a', 'view.html'), join('/r/b', 'view.html')]);
+  assert.deepEqual(calls.map(c => [c.cmd, c.args]), [['open', ['/r/a/view.html']], ['open', ['/r/b/view.html']]]);
+  assert.ok(calls.every(c => c.options.detached && c.options.stdio === 'ignore'));
 });
