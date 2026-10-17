@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Proposal A</title>
+  <link rel="stylesheet" href="/runtime/runtime.css">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="/runtime/m3e.js"></script>
+  <meta name="p-states" content="queue">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <m3e-theme color="#6750A4" variant="tonal-spot" scheme="light">
+    <div class="layout">
+      <m3e-nav-rail class="rail" mode="compact">
+        <m3e-nav-item selected><p-icon slot="icon" name="home"></p-icon>Home</m3e-nav-item>
+        <m3e-nav-item><p-icon slot="icon" name="favorite"></p-icon>Saved</m3e-nav-item>
+        <m3e-nav-item><p-icon slot="icon" name="calendar_month"></p-icon>Plan</m3e-nav-item>
+      </m3e-nav-rail>
+      <main class="screen">
+        <h1 class="t-headline-large-em">Headline</h1>
+        <p class="t-body-large supporting">Replace this screen with the proposal.</p>
+        <p class="t-body-large supporting">Page text line 1, which an open overlay may cover.</p>
+        <p class="t-body-large supporting">Page text line 2, which an open overlay may cover.</p>
+        <p class="t-body-large supporting">Page text line 3, which an open overlay may cover.</p>
+        <p class="t-body-large supporting">Page text line 4, which an open overlay may cover.</p>
+        <p class="t-body-large supporting">Page text line 5, which an open overlay may cover.</p>
+        <p class="t-body-large supporting">Page text line 6, which an open overlay may cover.</p>
+        <p class="t-body-large supporting">Page text line 7, which an open overlay may cover.</p>
+        <p class="t-body-large supporting">Page text line 8, which an open overlay may cover.</p>
+        <p class="t-body-large supporting">Page text line 9, which an open overlay may cover.</p>
+        <p class="t-body-large supporting">Page text line 10, which an open overlay may cover.</p>
+        <m3e-button variant="filled" size="extra-large" class="primary" data-primary>
+          <p-icon slot="icon" name="add"></p-icon>Add
+        </m3e-button>
+      </main>
+    </div>
+    <p-floating-toolbar class="toolbar">
+      <m3e-toolbar>
+        <m3e-button toggle selected variant="tonal"><p-icon slot="icon" name="home"></p-icon>Home</m3e-button>
+        <m3e-button toggle variant="text"><p-icon slot="icon" name="favorite"></p-icon>Saved</m3e-button>
+        <m3e-button toggle variant="text"><p-icon slot="icon" name="calendar_month"></p-icon>Plan</m3e-button>
+      </m3e-toolbar>
+    </p-floating-toolbar>
+    <m3e-bottom-sheet id="queue" modal handle>
+      <div class="queue-title t-title-large">Up next</div>
+      <p class="t-body-medium">Golden Hour, Mara Vale</p>
+    </m3e-bottom-sheet>
+  </m3e-theme>
+</body>
+</html>

@@ -170,3 +170,25 @@ test('lint allows a self-contained script and ignores commented imports', t => {
 test('lint rejects a CSS @import', t => {
   assert.throws(publish(t, { style: '\n@import url("other.css");\nbody { color: var(--md-sys-color-on-surface); }' }), /style\.css:2: @import is not allowed/);
 });
+
+// Named open states: <meta name="p-states" content="queue lyrics"> and a script that defines window.proposalState.
+const STATES_PAGE = content => `<!doctype html>\n<meta\n  name="p-states" content="${content}">\n<script src="app.js"></script>`;
+const STATES_SCRIPT = { 'app.js': 'window.proposalState = name => { document.body.dataset.state = name; };\n' };
+
+test('lint allows declared p-states when the proposal has a script', t => {
+  publish(t, { page: STATES_PAGE('queue lyrics credits-2'), files: STATES_SCRIPT })();
+});
+
+const stateRejections = [
+  ['an uppercase state name', STATES_PAGE('queue Lyrics'), STATES_SCRIPT, /index\.html:2: p-states name "Lyrics" is not valid/],
+  ['a state name with an underscore', STATES_PAGE('queue_list'), STATES_SCRIPT, /index\.html:2: p-states name "queue_list" is not valid/],
+  ['a duplicate state name', STATES_PAGE('queue lyrics queue'), STATES_SCRIPT, /index\.html:2: p-states name "queue" is declared twice/],
+  ['an empty p-states', STATES_PAGE('  '), STATES_SCRIPT, /index\.html:2: p-states needs at least one name/],
+  ['p-states with no proposal script', STATES_PAGE('queue'), {}, /index\.html:2: p-states declares states but the proposal has no script file/],
+  ['two p-states metas', `${STATES_PAGE('queue')}\n<meta name="p-states" content="lyrics">`, STATES_SCRIPT, /index\.html:5: p-states is declared twice/],
+];
+for (const [name, page, files, message] of stateRejections) {
+  test(`lint rejects ${name}`, t => {
+    assert.throws(publish(t, { page, files }), message);
+  });
+}

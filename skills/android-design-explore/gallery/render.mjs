@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, w
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Browser } from './cdp.mjs';
-import { LintError, lintProposal, proposalFiles } from './lint.mjs';
+import { LintError, lintProposal, proposalFiles, proposalStates } from './lint.mjs';
 import { dataUri, inlineHtml, viewerHtml } from './view.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -23,8 +23,15 @@ export const RENDERS = [
   { name: 'tablet', viewport: [1280, 800], scheme: 'light' },
   { name: 'desktop', viewport: [1920, 1080], scheme: 'light' },
 ];
-// The contact sheet shows one row per proposal and these columns.
+// The contact sheet shows one row per proposal and these columns. It shows the default state only.
 export const SHEET_COLUMNS = ['light', 'foldable', 'tablet', 'desktop'];
+// Each state a proposal declares in <meta name="p-states"> renders at these two sizes in light, after the default views:
+// <state>-light.png (phone) and <state>-tablet.png.
+const STATE_VIEWS = [
+  { suffix: 'light', viewport: PHONE },
+  { suffix: 'tablet', viewport: [1280, 800] },
+];
+export const stateRenders = states => states.flatMap(state => STATE_VIEWS.map(view => ({ name: `${state}-${view.suffix}`, state, viewport: view.viewport, scheme: 'light' })));
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -63,8 +70,9 @@ export function makeRoute({ runtimeDir = RUNTIME_DIR, proposalsDir }) {
   };
 }
 
-// Runs in the page: apply the theme, wait for fonts, two frames, a stable primary color, and no running transitions, then run the checks.
-async function prepare({ scheme, color }) {
+// Runs in the page: apply the theme, wait for fonts, two frames, a stable primary color, open the state if the view is one, and
+// wait for no running transitions, then run the checks.
+async function prepare({ scheme, color, state }) {
   const theme = document.querySelector('m3e-theme');
   if (theme) {
     theme.setAttribute('scheme', scheme);
@@ -86,14 +94,29 @@ async function prepare({ scheme, color }) {
   if (typeof window.runtimeChecks !== 'function') {
     return { pass: false, complete: false, error: 'runtimeChecks is missing: the page does not load /runtime/m3e.js' };
   }
+  if (state) {
+    // A sheet runs a 250ms close animation when it first renders, and would hide itself again if opened before it ends.
+    await window.runtimeSettle();
+    if (typeof window.proposalState !== 'function') {
+      return { pass: false, complete: false, error: `proposalState is missing: index.html declares the state "${state}" in p-states, but no script defines window.proposalState` };
+    }
+    try { await window.proposalState(state); } catch (error) {
+      return { pass: false, complete: false, error: `proposalState("${state}") threw: ${error?.message ?? error}` };
+    }
+  }
   await window.runtimeSettle();
-  return window.runtimeChecks();
+  const result = window.runtimeChecks();
+  // An open modal exempts the page behind it, so it may only be open in a declared state; opened on load it would hide failures.
+  if (!state && result.modal?.open > 0) {
+    return { ...result, pass: false, error: 'a modal is open in the default state; declare it in p-states and open it from proposalState' };
+  }
+  return result;
 }
 
-// Renders `url` once per RENDERS row on an open page. `onShot(name, png)` receives each screenshot.
-export async function renderViews(page, url, onShot = () => {}) {
+// Renders `url` once per RENDERS row, then once per state view, on an open page. `onShot(name, png)` receives each screenshot.
+export async function renderViews(page, url, onShot = () => {}, states = []) {
   const renders = [];
-  for (const spec of RENDERS) {
+  for (const spec of [...RENDERS, ...stateRenders(states)]) {
     await page.setViewport(...spec.viewport);
     await page.goto(url);
     const result = await page.evaluate(prepare, spec);
@@ -105,8 +128,9 @@ export async function renderViews(page, url, onShot = () => {}) {
 
 // One line per failing render: which check keys failed, or the page error.
 export function failures(renders) {
-  const bad = result => Object.entries(result).filter(([key, value]) => !['pass', 'complete', 'unresolved'].includes(key)
-    && (Array.isArray(value) ? value.length : value && typeof value === 'object' ? value.fails || value.under48?.length || value.offenders?.length || value.status === 'fail' || value.ok === false : false)).map(([key]) => key);
+  const flagged = value => (Array.isArray(value) ? value.length > 0 : Boolean(value && typeof value === 'object'
+    && ((Array.isArray(value.fails) ? value.fails.length : value.fails) || value.under48?.length || value.offenders?.length || value.status === 'fail' || value.ok === false)));
+  const bad = result => Object.entries(result).filter(([key, value]) => !['pass', 'complete', 'unresolved', 'viewport'].includes(key) && flagged(value)).map(([key]) => key);
   return renders.filter(r => r.result.pass !== true || r.result.complete !== true).map(r => {
     const keys = bad(r.result);
     return `${r.name}: ${r.result.error ?? (keys.length ? keys.join(', ') : r.result.pass === true ? 'checks incomplete' : 'failed')}`;
@@ -175,10 +199,11 @@ export function lintAll(proposalsDir, ids) {
 
 export function viewHtml(exploration, id, route) {
   const pageUrl = new URL(`${ORIGIN}/draft/${id}/`);
-  const doc = inlineHtml(route(new URL('index.html', pageUrl)).body.toString('utf8'), pageUrl, route);
+  const source = route(new URL('index.html', pageUrl)).body.toString('utf8');
+  const doc = inlineHtml(source, pageUrl, route);
   let title = 'Design exploration';
   try { title = JSON.parse(readFileSync(join(exploration, 'exploration.json'), 'utf8')).title ?? title; } catch { /* the title is optional */ }
-  return viewerHtml({ title: `${id} - ${title}`, doc });
+  return viewerHtml({ title: `${id} - ${title}`, doc, states: proposalStates(source) });
 }
 
 // Returns { renders: <dir>, sheet, proposals: [{ id, dir, summary, problems }] }. Throws a LintError listing every lint failure first.
@@ -207,12 +232,13 @@ export async function renderExploration(exploration, requested = []) {
       mkdirSync(dir, { recursive: true });
       const images = {};
       const url = `${ORIGIN}/draft/${id}/`;
+      const states = proposalStates(readFileSync(join(proposalsDir, id, 'index.html'), 'utf8'));
       missing.clear();
-      const renders = await renderViews(page, url, (name, png) => { writeFileSync(join(dir, `${name}.png`), png); images[name] = dataUri('image/png', png); });
+      const renders = await renderViews(page, url, (name, png) => { writeFileSync(join(dir, `${name}.png`), png); images[name] = dataUri('image/png', png); }, states);
       const summary = summarize(url, renders);
       writeFileSync(join(dir, 'checks.json'), `${JSON.stringify(summary, null, 2)}\n`);
       writeFileSync(join(dir, 'view.html'), viewHtml(exploration, id, route));
-      proposals.push({ id, dir, summary, images, problems: failures(renders), missing: [...missing] });
+      proposals.push({ id, dir, summary, images, problems: failures(renders), missing: [...missing], states });
     }
     await page.close();
     const sheet = join(out, 'contact-sheet.png');
@@ -226,9 +252,9 @@ export async function renderExploration(exploration, requested = []) {
 // The text `cli.mjs render` prints.
 export function report(result) {
   const lines = [`Contact sheet: ${result.sheet}`];
-  for (const { id, dir, summary, problems, missing } of result.proposals) {
+  for (const { id, dir, summary, problems, missing, states = [] } of result.proposals) {
     lines.push(`${id}: ${summary.pass && summary.complete ? 'pass' : `FAIL (${problems.join('; ')})`}`);
-    lines.push(`  ${dir}/{${RENDERS.map(r => r.name).join(',')}}.png, checks.json, view.html`);
+    lines.push(`  ${dir}/{${[...RENDERS, ...stateRenders(states)].map(r => r.name).join(',')}}.png, checks.json, view.html`);
     if (missing.length) lines.push(`  not found: ${missing.join(', ')}`);
   }
   return lines.join('\n');

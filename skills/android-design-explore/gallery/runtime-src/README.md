@@ -27,7 +27,7 @@ Proposals have no inline `<style>`, no `style=""`, and no inline scripts (the li
 
 ## Registered elements
 
-The runtime registers these `@m3e/web` elements: `m3e-theme`, `m3e-app-bar`, `m3e-button`, `m3e-button-group`, `m3e-icon-button`, `m3e-split-button`, `m3e-fab`, `m3e-fab-menu` (with `-item` and `-trigger`), `m3e-card`, `m3e-list` and the list item elements, the chip elements (`m3e-chip`, `m3e-assist-chip`, `m3e-filter-chip`, `m3e-input-chip`, `m3e-suggestion-chip` and their sets), `m3e-toolbar`, `m3e-nav-bar`, `m3e-nav-item`, `m3e-nav-rail`, `m3e-loading-indicator`, `m3e-circular-progress-indicator`, `m3e-linear-progress-indicator`, `m3e-shape`, `m3e-switch`, `m3e-slider`, `m3e-form-field`.
+The runtime registers these `@m3e/web` elements: `m3e-theme`, `m3e-app-bar`, `m3e-button`, `m3e-button-group`, `m3e-icon-button`, `m3e-split-button`, `m3e-fab`, `m3e-fab-menu` (with `-item` and `-trigger`), `m3e-card`, `m3e-list` and the list item elements, the chip elements (`m3e-chip`, `m3e-assist-chip`, `m3e-filter-chip`, `m3e-input-chip`, `m3e-suggestion-chip` and their sets), `m3e-toolbar`, `m3e-nav-bar`, `m3e-nav-item`, `m3e-nav-rail`, `m3e-loading-indicator`, `m3e-circular-progress-indicator`, `m3e-linear-progress-indicator`, `m3e-shape`, `m3e-switch`, `m3e-slider`, `m3e-form-field`, `m3e-bottom-sheet` (with `-action` and `-trigger`), `m3e-dialog` (with `-action` and `-trigger`), `m3e-menu` (with the `m3e-menu-item` family, `-trigger`, and `-item-group`).
 
 Registered does not mean usable. A proposal may use only the components `references/compose-mapping.md` marks verified. Anything else it builds from plain HTML layout (`div`, `span`, headings, lists) styled with role tokens, as long as the result has a plain Compose layout counterpart (`Box`, `Row`, `Column`, `Text`, `Surface`).
 
@@ -67,9 +67,19 @@ Slots: `label`, `prefix` and `suffix` (a `p-icon`), `prefix-text` and `suffix-te
 - Type roles: the emphasized classes above, because `@m3e/web` has no type scale component.
 - `--p-inset-top`, `--p-inset-bottom`: default `0px`. Stand-ins for the status and navigation bars, which do not exist on the web. A proposal sets them to show system bars.
 
+## Open states
+
+A sheet, dialog, or menu is hidden until opened, so a default render never shows it. A proposal names its hidden states in the head of `index.html`, `<meta name="p-states" content="queue lyrics">`, and defines `window.proposalState = name => { ... }` in its own script (the lint wants a valid, unique list and at least one script file). For example, with `<m3e-bottom-sheet id="queue" modal handle>` in the page:
+
+```js
+window.proposalState = name => { document.getElementById(name).show(); };
+```
+
+`render` loads the page, applies the theme, waits for it to settle (a bottom sheet runs a 250ms close animation when it first renders and would hide itself again if opened sooner), awaits `proposalState(name)`, settles again, shoots `<name>-light.png` (411x923) and `<name>-tablet.png` (1280x800, light), and stores `runtimeChecks()` under `queue-light` and `queue-tablet` in `checks.json`. A page with no `proposalState`, or one that throws, fails those views with that reason. `view.html` shows a State picker (Default plus each name) that sends the same `proposalState` call through a `{type: "state", name}` message; Default reloads the page.
+
 ## Theme messages
 
-`view.html`'s theme controls post `{type: "theme", color, variant, scheme}` to the proposal frame. `m3e.js` applies valid values to the page's `m3e-theme` and ignores messages from other origins. `render` does not use messages: it sets the `scheme` and `color` attributes on `m3e-theme` directly in the page.
+`view.html`'s theme controls post `{type: "theme", color, variant, scheme}` to the proposal frame, and its state picker posts `{type: "state", name}`. `m3e.js` applies valid theme values to the page's `m3e-theme`, waits for `runtimeSettle()` and then calls the page's `window.proposalState(name)` for a state message, and ignores messages from other origins. `render` does not use messages: it sets the `scheme` and `color` attributes on `m3e-theme` directly in the page and calls `proposalState` itself.
 
 ## Rule checker
 
@@ -86,17 +96,19 @@ Checks: the page wider than its viewport (`pageOverflow`, a failure; names up to
 
 Text is measured where it renders. Slotted text, such as a button label, is attributed to the element its slot places it under inside the component's shadow root (`m3e-button#cta > div.label`), not to the light-DOM host. Color and font come from that element, the fill from the first opaque background up the flat tree (slot, shadow ancestors, host, light ancestors), so a filled button is measured against its container, not the page. Clipping is tested on the shadow element that clips. Cases it cannot resolve, such as a gradient or translucent background, a page with no `data-primary`, or an ancestor with opacity below 1, are listed in `unresolved`. Decorative text (`aria-hidden`) is exempt from overflow and contrast. Run it at each device size you review; it reads the live layout.
 
+Open overlays are found through the library's own open state: a modal `m3e-bottom-sheet` that is `:popover-open` and an `m3e-dialog` whose inner `<dialog>` is open are modal surfaces, and an open `m3e-menu` is a floating one. Behind an open modal the page is inert under a scrim, so its interactive elements are not measured for the 48px target, its text is not measured for overlap or contrast, and the `data-primary` check is reported as `skipped` (the default views check it). The modal itself and everything inside it are checked in full. Text under an open menu is not an overlap (a menu floats over content on purpose), though the menu's own text is checked. A bottom sheet that is not open sits below the viewport and is not measured at all. A dialog's text is measured against the dialog's container, which the library paints with a `::before` layer: the first opaque `::before` that covers its box counts as a fill. The drag handle's 48px target is its `.handle-touch` element.
+
 `m3e-icon-button` draws a 40px visual. `runtime.css` gives it the 48px minimum box Compose `IconButton` has, so a proposal needs no per-page CSS for the touch target.
 
 ## Render output
 
-`cli.mjs render` loads each proposal at exactly 411x923, 933x704, 1280x800, and 1920x1080, awaits `runtimeSettle()`, and stores `runtimeChecks()` for every view in `renders/<id>/checks.json`:
+`cli.mjs render` loads each proposal at exactly 411x923 (light, dark, and a red wallpaper color), 933x704, 1280x800, and 1920x1080, awaits `runtimeSettle()`, and stores `runtimeChecks()` for every view in `renders/<id>/checks.json`:
 
 ```
 { url, renders: [{ name, viewport: [width, height], result }], pass, complete }
 ```
 
-`pass` and `complete` fold every view's `result`. `complete: false` means not verified.
+`pass` and `complete` fold every view's `result`. `complete: false` means not verified. A proposal that declares states adds two more views per state after these four device views, `<state>-light` and `<state>-tablet`; they count in `pass` and `complete` like the others.
 
 ## Rebuild
 

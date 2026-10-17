@@ -6,6 +6,8 @@ Page contract: load `/runtime/runtime.css`, your `style.css`, and `/runtime/m3e.
 
 Check a draft with `node <skill-dir>/gallery/cli.mjs render <exploration>`; it needs no server.
 
+Hidden states (a sheet, dialog, or menu): declare them in the head as `<meta name="p-states" content="queue lyrics">` and define `window.proposalState = name => { ... }` in a script that opens each one; `render` shoots and checks every state (`runtime-src/README.md`, Open states).
+
 ## Styling rules
 
 Publishing fails on a violation and names the file and line. Each rule keeps a proposal a lookup into Compose tokens.

@@ -32,6 +32,9 @@
       <a class="t-label-large" href="#m3e-switch">m3e-switch</a>
       <a class="t-label-large" href="#m3e-slider">m3e-slider</a>
       <a class="t-label-large" href="#m3e-form-field">m3e-form-field</a>
+      <a class="t-label-large" href="#m3e-bottom-sheet">m3e-bottom-sheet</a>
+      <a class="t-label-large" href="#m3e-dialog">m3e-dialog</a>
+      <a class="t-label-large" href="#m3e-menu">m3e-menu</a>
       <a class="t-label-large" href="#m3e-shape">m3e-shape</a>
       <a class="t-label-large" href="#p-icon">p-icon</a>
       <a class="t-label-large" href="#type">type</a>
@@ -761,6 +764,59 @@
           <figcaption class="t-label-small">variant="outlined", multi-line</figcaption>
         </figure>
       </div>
+    </section>
+    <section id="m3e-bottom-sheet">
+      <h2 class="t-title-large-em">m3e-bottom-sheet</h2>
+      <p class="t-body-medium note">Compose: ModalBottomSheet with a drag handle. Each button opens a modal sheet over the page (scrim, top layer). Compare at 411px and at 1280px wide: Compose is full width up to 640dp (BottomSheetDefaults.SheetMaxWidth), centered.</p>
+      <div class="cases">
+        <figure class="case">
+          <div class="demo">
+            <m3e-button variant="tonal"><m3e-bottom-sheet-trigger for="sheet-basic">Open sheet</m3e-bottom-sheet-trigger></m3e-button>
+          </div>
+          <figcaption class="t-label-small">modal handle: title and supporting text</figcaption>
+        </figure>
+      </div>
+      <m3e-bottom-sheet id="sheet-basic" modal handle>
+        <div class="t-title-large">Sheet title</div>
+        <div class="t-body-medium">Supporting text for the sheet body.</div>
+      </m3e-bottom-sheet>
+    </section>
+    <section id="m3e-dialog">
+      <h2 class="t-title-large-em">m3e-dialog</h2>
+      <p class="t-body-medium note">Compose: AlertDialog with a title, text, a confirm button, and a dismiss button (both TextButton). The button opens the dialog over the page (scrim, top layer).</p>
+      <div class="cases">
+        <figure class="case">
+          <div class="demo">
+            <m3e-button variant="tonal"><m3e-dialog-trigger for="dialog-basic">Open dialog</m3e-dialog-trigger></m3e-button>
+          </div>
+          <figcaption class="t-label-small">title, text, and two text-button actions</figcaption>
+        </figure>
+      </div>
+      <m3e-dialog id="dialog-basic">
+        <span slot="header">Dialog title</span>
+        A short message that explains the choice the dialog asks for.
+        <div slot="actions" end>
+          <m3e-button variant="text"><m3e-dialog-action>Dismiss</m3e-dialog-action></m3e-button>
+          <m3e-button variant="text"><m3e-dialog-action>Confirm</m3e-dialog-action></m3e-button>
+        </div>
+      </m3e-dialog>
+    </section>
+    <section id="m3e-menu">
+      <h2 class="t-title-large-em">m3e-menu</h2>
+      <p class="t-body-medium note">Compose: DropdownMenuPopup with one DropdownMenuGroup (the expressive menu), not the older DropdownMenu. The button opens the menu below it.</p>
+      <div class="cases">
+        <figure class="case">
+          <div class="demo">
+            <m3e-button variant="tonal"><m3e-menu-trigger for="menu-basic">Open menu</m3e-menu-trigger></m3e-button>
+          </div>
+          <figcaption class="t-label-small">three text items</figcaption>
+        </figure>
+      </div>
+      <m3e-menu id="menu-basic">
+        <m3e-menu-item>Edit</m3e-menu-item>
+        <m3e-menu-item>Share</m3e-menu-item>
+        <m3e-menu-item>Delete</m3e-menu-item>
+      </m3e-menu>
     </section>
     <section id="m3e-slider">
       <h2 class="t-title-large-em">m3e-slider and m3e-slider-thumb</h2>

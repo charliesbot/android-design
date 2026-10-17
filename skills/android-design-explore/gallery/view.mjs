@@ -59,8 +59,8 @@ export const SEEDS = [['Purple', '#6750a4'], ['Blue', '#0061a4'], ['Green', '#38
 export const VARIANTS = ['tonal-spot', 'neutral', 'vibrant', 'expressive'];
 
 // The viewer chrome is plain JS and CSS on purpose: it is not a proposal and has no build step.
-export function viewerHtml({ title, doc }) {
-  const data = JSON.stringify({ doc, devices: DEVICES, seeds: SEEDS, variants: VARIANTS }).replace(/</g, '\\u003c');
+export function viewerHtml({ title, doc, states = [] }) {
+  const data = JSON.stringify({ doc, devices: DEVICES, seeds: SEEDS, variants: VARIANTS, states }).replace(/</g, '\\u003c');
   const esc = value => String(value).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
   return `<!doctype html>
 <html lang="en">
@@ -86,19 +86,23 @@ export function viewerHtml({ title, doc }) {
 <header>
   <div class="group" id="devices"><span>Device</span></div>
   <div class="group" id="schemes"><span>Mode</span></div>
-  <div class="group" id="seeds"><span>Color</span></div>
+  <div class="group" id="seeds"><span>Color</span></div>${states.length ? `
+  <div class="group" id="states"><span>State</span></div>` : ''}
   <div class="group"><span>Palette</span><select id="variant"></select></div>
   <button id="reset">Reset to proposal's theme</button>
 </header>
 <main id="stage"><div id="wrap"></div></main>
 <script>
-const { doc, devices, seeds, variants } = ${data};
+const { doc, devices, seeds, variants, states } = ${data};
 const $ = id => document.getElementById(id);
-let size = devices[0].size, theme = {}, frame;
+let size = devices[0].size, theme = {}, frame, state = '';
 
 function mount() {
   frame = document.createElement('iframe');
-  frame.addEventListener('load', () => frame.contentWindow.postMessage({ type: 'theme', ...theme }, '*'));
+  frame.addEventListener('load', () => {
+    frame.contentWindow.postMessage({ type: 'theme', ...theme }, '*');
+    if (state) frame.contentWindow.postMessage({ type: 'state', name: state }, '*');
+  });
   frame.srcdoc = doc;
   $('wrap').replaceChildren(frame);
   fit();
@@ -133,6 +137,13 @@ for (const [name, color] of seeds) {
   b.style.background = color;
   Object.assign(b.dataset, { key: 'color', value: color });
 }
+// A state is opened by the proposal's own window.proposalState; Default reloads the page, since nothing closes a state.
+for (const name of states.length ? ['', ...states] : []) {
+  const b = button('states', name || 'Default', {}, () => { state = name; mount(); mark(); });
+  Object.assign(b.dataset, { state: name });
+}
+function mark() { for (const b of document.querySelectorAll('[data-state]')) b.setAttribute('aria-pressed', String(b.dataset.state === state)); }
+mark();
 $('variant').add(new Option("Proposal's palette", ''));
 for (const v of variants) $('variant').add(new Option(v, v));
 $('variant').addEventListener('change', e => e.target.value && apply({ variant: e.target.value }));

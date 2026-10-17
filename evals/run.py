@@ -126,8 +126,9 @@ def render(case_dir):
     (case_dir / 'lint.json').write_text(json.dumps({'ok': True}, indent=2))
     source = exploration / 'renders' / PROPOSAL
     renders.mkdir()
-    for name in [f'{n}.png' for n in RENDER_NAMES] + ['checks.json']:
-        shutil.copy(source / name, renders / name)
+    # The six default views, plus <state>-light.png and <state>-tablet.png for each state the proposal declares in p-states.
+    for path in [*sorted(source.glob('*.png')), source / 'checks.json']:
+        shutil.copy(path, renders / path.name)
     return sorted(str(p.resolve()) for p in renders.glob('*.png')), None
 
 
@@ -195,7 +196,7 @@ def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1)
     started = time.time()
     directory = out / case['name']
     images, render_error = render(directory)
-    checks = run_checks(directory, case['surface'])
+    checks = run_checks(directory, case['surface'], [a['id'] for a in case['assertions'] if a['type'] == 'code'])
     if render_error:
         checks['C-review'] = {'pass': False, 'detail': render_error}
     (directory / 'checks.json').write_text(json.dumps(checks, indent=2))

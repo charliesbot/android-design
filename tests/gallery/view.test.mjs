@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromeExecutable } from '../../skills/android-design-explore/gallery/cdp.mjs';
-import { ORIGIN, RENDERS, SHEET_COLUMNS, contactSheetHtml, failures, makeRoute, summarize } from '../../skills/android-design-explore/gallery/render.mjs';
+import { ORIGIN, RENDERS, SHEET_COLUMNS, contactSheetHtml, failures, makeRoute, report, stateRenders, summarize } from '../../skills/android-design-explore/gallery/render.mjs';
 import { dataUri, inlineCss, inlineHtml, viewerHtml } from '../../skills/android-design-explore/gallery/view.mjs';
 import { workspace } from './fixture.mjs';
 
@@ -84,6 +84,11 @@ test('failures names the failing check keys of each render', () => {
   assert.deepEqual(failures([{ name: 'x', result: { pass: false, complete: false, error: 'boom' } }]), ['x: boom']);
 });
 
+test('failures does not name the viewport or a check with an empty list of failures', () => {
+  const result = { pass: false, complete: true, viewport: [411, 923], contrast: { fails: [], passed: 3 }, touchTargets: { under48: [{}] }, overlaps: [], primary: { status: 'skipped' } };
+  assert.deepEqual(failures([{ name: 'queue-light', result }]), ['queue-light: touchTargets']);
+});
+
 test('contactSheetHtml has one row per proposal and a pass or fail label', () => {
   const images = Object.fromEntries(SHEET_COLUMNS.map(name => [name, `data:image/png;base64,${name}`]));
   const out = contactSheetHtml('T', [{ id: 'a', pass: true, images }, { id: 'b', pass: false, images }]);
@@ -97,4 +102,27 @@ test('chromeExecutable honors CHROME_PATH and explains a missing Chrome', () => 
   assert.throws(() => chromeExecutable({ env: { CHROME_PATH: '/x/chrome' }, exists: () => false }), /CHROME_PATH does not exist/);
   assert.throws(() => chromeExecutable({ env: { PATH: '/bin' }, exists: () => false }), /Chrome not found/);
   assert.equal(chromeExecutable({ env: { PATH: '/a:/b' }, exists: p => p === '/b/chromium' }), '/b/chromium');
+});
+
+test('each declared state renders at phone and tablet size in light', () => {
+  const specs = stateRenders(['queue', 'lyrics']);
+  assert.deepEqual(specs.map(r => [r.name, r.state, r.viewport, r.scheme]), [
+    ['queue-light', 'queue', [411, 923], 'light'], ['queue-tablet', 'queue', [1280, 800], 'light'],
+    ['lyrics-light', 'lyrics', [411, 923], 'light'], ['lyrics-tablet', 'lyrics', [1280, 800], 'light'],
+  ]);
+  assert.deepEqual(stateRenders([]), []);
+});
+
+test('the render report lists a proposal\'s state renders after the default views', () => {
+  const summary = { pass: true, complete: true };
+  const text = report({ sheet: '/s.png', proposals: [{ id: 'a', dir: '/r/a', summary, problems: [], missing: [], states: ['queue'] }, { id: 'b', dir: '/r/b', summary, problems: [], missing: [], states: [] }] });
+  assert.match(text, /\/r\/a\/\{light,dark,wallpaper,foldable,tablet,desktop,queue-light,queue-tablet\}\.png/);
+  assert.match(text, /\/r\/b\/\{light,dark,wallpaper,foldable,tablet,desktop\}\.png/);
+});
+
+test('view.html gets a state picker only for a proposal that declares states', () => {
+  const data = html => JSON.parse(/const \{ doc, devices, seeds, variants, states \} = (.*);\n/.exec(html)[1].replace(/\\u003c/g, '<'));
+  assert.deepEqual(data(viewerHtml({ title: 't', doc: '<p>', states: ['queue', 'lyrics'] })).states, ['queue', 'lyrics']);
+  assert.deepEqual(data(viewerHtml({ title: 't', doc: '<p>' })).states, []);
+  assert.match(viewerHtml({ title: 't', doc: '', states: ['queue'] }), /id="states"/);
 });

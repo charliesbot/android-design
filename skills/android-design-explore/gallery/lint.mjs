@@ -162,6 +162,42 @@ function lintHtml(file, source) {
   }
 }
 
+// A proposal names its open states (a sheet, a dialog, a menu, or any other hidden state worth rendering) in the head of
+// index.html: <meta name="p-states" content="queue lyrics">. Its own script defines window.proposalState(name), which opens that
+// state; `render` calls it and checks and shoots each state.
+const STATE_NAME = /^[a-z0-9-]+$/;
+function stateMetas(html) {
+  const text = html.replace(/<!--[\s\S]*?-->/g, blank);
+  const metas = [...text.matchAll(/<meta\b[^>]*>/gi)].filter(tag => /\sname\s*=\s*["']p-states["']/i.test(tag[0])).map(tag => ({
+    index: tag.index,
+    names: (/\scontent\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag[0])?.slice(1).find(value => value !== undefined) ?? '').split(/\s+/).filter(Boolean),
+  }));
+  return { text, metas };
+}
+
+// The state names of an index.html, [] when it declares none. The lint has already vetted the names of a proposal that renders.
+export function proposalStates(html) {
+  return stateMetas(html).metas[0]?.names ?? [];
+}
+
+function lintStates(label, html, files) {
+  const { text, metas } = stateMetas(html);
+  if (!metas.length) return;
+  const fail = (meta, message) => { throw new LintError(`${label}:${lineAt(text, meta.index)}: ${message}`); };
+  if (metas.length > 1) fail(metas[1], 'p-states is declared twice: list every state name in one <meta name="p-states">');
+  const [meta] = metas;
+  if (!meta.names.length) fail(meta, 'p-states needs at least one name, such as content="queue lyrics"');
+  const seen = new Set();
+  for (const name of meta.names) {
+    if (!STATE_NAME.test(name)) fail(meta, `p-states name "${name}" is not valid: use lowercase letters, digits, and hyphens`);
+    if (seen.has(name)) fail(meta, `p-states name "${name}" is declared twice`);
+    seen.add(name);
+  }
+  if (!files.some(file => /\.m?js$/i.test(file.path))) {
+    fail(meta, 'p-states declares states but the proposal has no script file: add a .js file that defines window.proposalState = name => { ... } to open each state');
+  }
+}
+
 export function lintProposal(id, files) {
   for (const file of files) {
     const label = `proposals/${id}/${file.path}`;
@@ -169,6 +205,8 @@ export function lintProposal(id, files) {
     else if (/\.html?$/i.test(file.path)) lintHtml(label, file.bytes.toString('utf8'));
     else if (/\.m?js$/i.test(file.path)) lintJs(label, file.bytes.toString('utf8'));
   }
+  const index = files.find(file => file.path === 'index.html');
+  if (index) lintStates(`proposals/${id}/index.html`, index.bytes.toString('utf8'), files);
 }
 
 const skipped = name => SKIP.has(name) || name.startsWith('.env') || /\.(pem|key|keystore|jks)$/.test(name);

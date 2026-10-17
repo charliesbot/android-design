@@ -9,7 +9,7 @@ const INTERACTIVE = [
   '[role=switch]', '[role=checkbox]', '[role=menuitem]', '[tabindex]:not([tabindex="-1"])',
   'm3e-button', 'm3e-icon-button', 'm3e-fab', 'm3e-fab-menu-trigger', 'm3e-fab-menu-item', 'm3e-nav-item',
   'm3e-switch', 'm3e-slider', 'm3e-split-button', 'm3e-card[actionable]', 'm3e-list-item-button', 'm3e-list-action',
-  'm3e-list-option', 'm3e-chip', 'm3e-assist-chip', 'm3e-filter-chip', 'm3e-input-chip', 'm3e-suggestion-chip',
+  'm3e-list-option', 'm3e-menu-item', 'm3e-menu-item-checkbox', 'm3e-menu-item-radio', 'm3e-chip', 'm3e-assist-chip', 'm3e-filter-chip', 'm3e-input-chip', 'm3e-suggestion-chip',
 ].join(',');
 const FAB = 'm3e-fab, m3e-fab-menu, [data-fab]';
 const MIN_TARGET = 48;
@@ -69,6 +69,16 @@ const hiddenFromAssistiveTech = el => {
   return false;
 };
 
+// Open overlays, found through the library's own open state. A modal surface (an open modal m3e-bottom-sheet or m3e-dialog) puts a
+// scrim over the page, so everything behind it is inert and dimmed: it is exempt from the touch-target, overlap, and contrast checks,
+// while the modal and everything inside it are checked as usual. A menu has no scrim, but it floats over content on purpose, so the
+// text it covers is not an overlap.
+const openModals = () => [...document.querySelectorAll('m3e-bottom-sheet[modal], m3e-dialog')]
+  .filter(el => (el.localName === 'm3e-dialog' ? el.shadowRoot?.querySelector('dialog')?.open : el.matches(':popover-open')));
+// A bottom sheet that is not open sits below the viewport and is not part of the screen: nothing inside it is measured.
+const inClosedSheet = el => { for (let node = el; node; node = flatParent(node)) if (node.localName === 'm3e-bottom-sheet') return !node.open; return false; };
+const openMenus = () => [...document.querySelectorAll('m3e-menu')].filter(el => el.matches(':popover-open'));
+
 // Visit every element in the light DOM and in open shadow roots. `visit` returns false to skip a subtree's shadow root.
 function walk(root, visit) {
   for (const el of root.querySelectorAll('*')) {
@@ -104,6 +114,13 @@ function backdrop(el) {
     const color = rgba(style.backgroundColor);
     if (color.a === 1) return { color };
     if (color.a > 0) return { reason: 'background is translucent' };
+    // A container drawn by an opaque absolutely positioned ::before that covers the whole box (the m3e-dialog surface).
+    const before = getComputedStyle(node, '::before');
+    if (before.content !== 'none' && before.position === 'absolute' && parseFloat(before.opacity) === 1
+        && parseFloat(before.width) >= node.clientWidth - 1 && parseFloat(before.height) >= node.clientHeight - 1) {
+      const fill = rgba(before.backgroundColor);
+      if (fill.a === 1) return { color: fill };
+    }
   }
   return { reason: 'no opaque background found' };
 }
@@ -203,7 +220,7 @@ function occludes(el, coverer, textRect) {
   if ((box.top + box.bottom) / 2 >= frame.top + view / 2) return up > 0 && textRect.bottom - up <= box.top;
   return down > 0 && textRect.top + down >= box.bottom;
 }
-function coveredText(node, el) {
+function coveredText(node, el, floating = () => false) {
   const range = document.createRange();
   range.selectNodeContents(node);
   const lines = [...range.getClientRects()].filter(r => r.width > 0 && r.height > 0);
@@ -218,7 +235,7 @@ function coveredText(node, el) {
       if (own < 0) continue; // the text itself is not hit-testable here (pointer-events: none), so it is unknown
       samples++;
       const cover = hits.slice(0, own).find(hit => !flatContains(el, hit) && !fullyTransparent(hit) && paintsAt(hit, x, y)
-        && !occludes(el, hit, line));
+        && !occludes(el, hit, line) && !floating(hit));
       if (cover) { covered++; top ??= cover; }
     }
   }
@@ -310,6 +327,11 @@ export async function runtimeSettle() {
 
 export function runtimeChecks() {
   const unresolved = [];
+  const modals = openModals(), menus = openMenus();
+  // Behind an open modal: not inside any modal surface.
+  const behindModal = el => modals.length > 0 && !modals.some(modal => flatContains(modal, el));
+  // A floating menu covering content that is not part of the menu.
+  const floatingOver = el => hit => menus.some(menu => flatContains(menu, hit)) && !menus.some(menu => flatContains(menu, el));
 
   // Interactive elements: a matched host is measured as a whole, so its own shadow root is not searched.
   // The target is the host box united with any .touch element in its shadow root (the 48dp minimum
@@ -319,17 +341,18 @@ export function runtimeChecks() {
     if (!el.matches(INTERACTIVE)) return true;
     // Compose's whole Slider is the touch target; its thumb has none, so the m3e-slider host is measured instead.
     if (el.localName === 'm3e-slider-thumb') return true;
-    if (visible(el)) {
+    if (visible(el) && !inClosedSheet(el)) {
       // A native input or textarea inside m3e-form-field is the text field's input, not the field: Compose's whole TextField (56dp) is the target, so the form field is measured.
       const host = (el.closest('m3e-form-field') ?? el).getBoundingClientRect();
-      const touch = el.shadowRoot?.querySelector('.touch')?.getBoundingClientRect();
+      // The target around a control is its .touch element (m3e components), or the .handle-touch child of the bottom sheet's drag handle.
+      const touch = (el.shadowRoot?.querySelector('.touch') ?? el.querySelector(':scope > .handle-touch'))?.getBoundingClientRect();
       const width = Math.max(host.width, touch?.width ?? 0);
       const height = Math.max(host.height, touch?.height ?? 0);
-      interactive.push({ el: describe(el), node: el, w: Math.round(width * 10) / 10, h: Math.round(height * 10) / 10, area: width * height });
+      interactive.push({ el: describe(el), node: el, behind: behindModal(el), w: Math.round(width * 10) / 10, h: Math.round(height * 10) / 10, area: width * height });
     }
     return false;
   });
-  const under48 = interactive.filter(i => i.w < MIN_TARGET - 0.05 || i.h < MIN_TARGET - 0.05).map(({ el, w, h }) => ({ el, w, h }));
+  const under48 = interactive.filter(i => !i.behind && (i.w < MIN_TARGET - 0.05 || i.h < MIN_TARGET - 0.05)).map(({ el, w, h }) => ({ el, w, h }));
   // Navigation chrome, slider or progress tracks, and text fields span the screen by design; they are not competing actions.
   const NAV = 'm3e-nav-bar, m3e-nav-rail, m3e-nav-menu, m3e-nav-item, m3e-drawer-container > [slot=start], m3e-drawer-container > [slot=end], nav, [role=navigation]';
   const TRACK = 'm3e-slider, input[type=range], [role=slider], [role=progressbar], m3e-form-field';
@@ -339,7 +362,11 @@ export function runtimeChecks() {
   // The page marks its primary action with data-primary; it must be the largest interactive element.
   const marked = interactive.filter(i => i.node.hasAttribute('data-primary'));
   const primary = { marked: marked.length, largest: largest && { el: largest.el, w: largest.w, h: largest.h } };
-  if (marked.length === 0) {
+  if (modals.length) {
+    // The primary action sits behind the scrim of an open modal: the default views check it.
+    primary.status = 'skipped';
+    primary.reason = 'a modal is open, so the page behind it is inert; the default views check the primary action';
+  } else if (marked.length === 0) {
     primary.status = 'unresolved';
     unresolved.push({ check: 'primary', reason: 'no visible element has data-primary' });
   } else if (marked.length > 1) {
@@ -360,7 +387,7 @@ export function runtimeChecks() {
   const once = (...keys) => { const key = keys.join('|'); if (seen.has(key)) return false; seen.add(key); return true; };
   walkText(document, node => {
     const el = flatParent(node);
-    if (!el || el.closest?.('p-icon, m3e-icon')) return;
+    if (!el || el.closest?.('p-icon, m3e-icon') || inClosedSheet(el)) return;
     const style = getComputedStyle(el);
     const range = document.createRange();
     range.selectNodeContents(node);
@@ -374,7 +401,9 @@ export function runtimeChecks() {
     const broken = midWordBreaks(node, style);
     if (broken.length && once('midword', name)) midWord.push({ el: name, words: broken.slice(0, 3) });
     let covered = null;
-    try { covered = coveredText(node, el); } catch (error) { if (once('overlap-error', name)) unresolved.push({ check: 'overlaps', el: name, reason: String(error) }); }
+    // Overlap and contrast of text behind an open modal are not measured: the scrim dims it and nothing can reach it.
+    const behind = behindModal(el);
+    try { covered = behind ? null : coveredText(node, el, floatingOver(el)); } catch (error) { if (once('overlap-error', name)) unresolved.push({ check: 'overlaps', el: name, reason: String(error) }); }
     if (covered && once('overlap', name)) overlaps.push({ el: name, coveredBy: describeFlat(covered.by), share: covered.share });
 
     // Overflow: the box holding the text overflows itself, or an ancestor that clips cuts the text off.
@@ -387,7 +416,7 @@ export function runtimeChecks() {
     const clipper = clippedBy(rect, el);
     if (clipper && clipper !== box && once('overflow', name, 'clip')) overflow.push({ el: name, clippedBy: describeFlat(clipper) });
 
-    if (!once('contrast', name)) return;
+    if (behind || !once('contrast', name)) return;
     const back = backdrop(el);
     if (!back.color) { unresolved.push({ check: 'contrast', el: name, reason: back.reason }); return; }
     const text = over(rgba(style.color), back.color);
@@ -412,6 +441,7 @@ export function runtimeChecks() {
     overlaps,
     pageOverflow,
     primary,
+    modal: { open: modals.length },
     fabs: { count: fabs, ok: fabs <= 1 },
     contrast,
     unresolved,
