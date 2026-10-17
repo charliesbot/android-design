@@ -19,6 +19,7 @@ import '@m3e/web/progress-indicator';
 import '@m3e/web/shape';
 import '@m3e/web/switch';
 import '@m3e/web/slider';
+import '@m3e/web/form-field';
 
 import './p-icon.js';
 import './p-floating-toolbar.js';

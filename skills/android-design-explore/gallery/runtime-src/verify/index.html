@@ -31,6 +31,7 @@
       <a class="t-label-large" href="#m3e-progress">m3e-progress</a>
       <a class="t-label-large" href="#m3e-switch">m3e-switch</a>
       <a class="t-label-large" href="#m3e-slider">m3e-slider</a>
+      <a class="t-label-large" href="#m3e-form-field">m3e-form-field</a>
       <a class="t-label-large" href="#m3e-shape">m3e-shape</a>
       <a class="t-label-large" href="#p-icon">p-icon</a>
       <a class="t-label-large" href="#type">type</a>
@@ -562,6 +563,202 @@
         <figure class="case">
           <div class="demo"><m3e-switch checked icons="both" aria-label="Notifications"></m3e-switch></div>
           <figcaption class="t-label-small">checked icons="both"</figcaption>
+        </figure>
+      </div>
+    </section>
+    <section id="m3e-form-field">
+      <h2 class="t-title-large-em">m3e-form-field</h2>
+      <p class="t-body-medium note">Compose: TextField and OutlinedTextField. A native input or textarea sits inside; the proposal draws its static text only. Every case is 280px wide (Compose: Modifier.width(280.dp)).</p>
+      <div class="cases">
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="filled" hide-subscript="always">
+            <label slot="label" for="ff1">Label</label>
+            <input id="ff1" type="text" value="Input text">
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="filled", label and value</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="filled" hide-subscript="always">
+            <label slot="label" for="ff2">Label</label>
+            <input id="ff2" type="text">
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="filled", label, empty</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="filled" hide-subscript="always">
+            <input id="ff3" type="text" placeholder="Placeholder" aria-label="Search">
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="filled", placeholder, no label</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="filled" hide-subscript="never">
+            <label slot="label" for="ff4">Label</label>
+            <input id="ff4" type="text" value="Input text">
+            <span slot="hint">Supporting text</span>
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="filled", label, value, supporting text</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="filled" hide-subscript="always">
+            <label slot="label" for="ff5">Label</label>
+            <p-icon slot="prefix" name="search"></p-icon>
+            <input id="ff5" type="text" value="Input text">
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="filled", leading icon</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="filled" hide-subscript="always">
+            <label slot="label" for="ff6">Label</label>
+            <input id="ff6" type="text" value="Input text">
+            <p-icon slot="suffix" name="close"></p-icon>
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="filled", trailing icon</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="filled" hide-subscript="always">
+            <label slot="label" for="ff7">Amount</label>
+            <span slot="prefix-text">$</span>
+            <input id="ff7" type="text" inputmode="decimal" value="120.00">
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="filled", prefix "$" amount</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="filled" hide-subscript="always">
+            <label slot="label" for="ff8">Amount</label>
+            <span slot="prefix-text">$</span>
+            <input id="ff8" type="text" inputmode="decimal">
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="filled", prefix "$", empty</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="filled" error hide-subscript="never">
+            <label slot="label" for="ff9">Label</label>
+            <input id="ff9" type="text" value="Input text">
+            <span slot="error">Error text</span>
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="filled", error with error text</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="filled" hide-subscript="always">
+            <label slot="label" for="ff10">Label</label>
+            <textarea id="ff10" rows="3">Line one&#10;Line two&#10;Line three</textarea>
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="filled", multi-line</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="outlined" hide-subscript="always">
+            <label slot="label" for="ff11">Label</label>
+            <input id="ff11" type="text" value="Input text">
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="outlined", label and value</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="outlined" hide-subscript="always">
+            <label slot="label" for="ff12">Label</label>
+            <input id="ff12" type="text">
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="outlined", label, empty</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="outlined" hide-subscript="always">
+            <input id="ff13" type="text" placeholder="Placeholder" aria-label="Search">
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="outlined", placeholder, no label</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="outlined" hide-subscript="never">
+            <label slot="label" for="ff14">Label</label>
+            <input id="ff14" type="text" value="Input text">
+            <span slot="hint">Supporting text</span>
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="outlined", label, value, supporting text</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="outlined" hide-subscript="always">
+            <label slot="label" for="ff15">Label</label>
+            <p-icon slot="prefix" name="search"></p-icon>
+            <input id="ff15" type="text" value="Input text">
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="outlined", leading icon</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="outlined" hide-subscript="always">
+            <label slot="label" for="ff16">Label</label>
+            <input id="ff16" type="text" value="Input text">
+            <p-icon slot="suffix" name="close"></p-icon>
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="outlined", trailing icon</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="outlined" hide-subscript="always">
+            <label slot="label" for="ff17">Amount</label>
+            <span slot="prefix-text">$</span>
+            <input id="ff17" type="text" inputmode="decimal" value="120.00">
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="outlined", prefix "$" amount</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="outlined" hide-subscript="always">
+            <label slot="label" for="ff18">Amount</label>
+            <span slot="prefix-text">$</span>
+            <input id="ff18" type="text" inputmode="decimal">
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="outlined", prefix "$", empty</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="outlined" error hide-subscript="never">
+            <label slot="label" for="ff19">Label</label>
+            <input id="ff19" type="text" value="Input text">
+            <span slot="error">Error text</span>
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="outlined", error with error text</figcaption>
+        </figure>
+        <figure class="case">
+          <div class="demo">
+          <m3e-form-field variant="outlined" hide-subscript="always">
+            <label slot="label" for="ff20">Label</label>
+            <textarea id="ff20" rows="3">Line one&#10;Line two&#10;Line three</textarea>
+          </m3e-form-field>
+          </div>
+          <figcaption class="t-label-small">variant="outlined", multi-line</figcaption>
         </figure>
       </div>
     </section>
