@@ -49,7 +49,8 @@ class ArtifactCliTests(unittest.TestCase):
             with patch.object(sys, 'argv', ['calibrate.py', 'prepare', '--out', str(out)]):
                 self.assertEqual(calibrate.main(), 0)
             labels = json.loads((out / 'labels.json').read_text())
-            self.assertEqual(len(labels), 10)
+            source = json.loads((Path(calibrate.HERE) / 'calibration/labels.json').read_text())['images']
+            self.assertEqual(len(labels), len(source))
             jpeg_directory = None
             for index, label in enumerate(labels):
                 directory = out / str(index)
