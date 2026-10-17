@@ -13,6 +13,8 @@ Copy this project with the installed skill's `gallery/cli.mjs create --starter a
 | `darkTheme: Boolean` | `scheme` | Default follows the system. |
 | `dynamic: Boolean` | none | Default `false`. When true on API 31+, uses wallpaper colors instead of the seed. |
 
+`theme/Typography.kt` also has `voiceFont(R.font.<file>, weight, axes...)` for a proposal's `.voice-*` fonts: pass every axis the rule names in `font-variation-settings` (`opsz`, `SOFT`, `WONK`, `wdth`), because Compose sets only the axes it is given. Its `*Emphasized` styles equal the baseline roles in this material3 version, so copy a baseline role with the emphasized token weight instead (see `references/compose-mapping.md`, type roles).
+
 The scheme comes from MaterialKolor (`rememberDynamicColorScheme`, spec 2025) with Material 3 Expressive motion and the bundled Google Sans Flex typography. Icons are Material Symbols vector drawables in `app/src/main/res/drawable/`, drawn with `Icon(painterResource(...))`; see the Icons section of `references/compose-mapping.md` for how to import them.
 ## Entry points
 

@@ -50,8 +50,12 @@
   font-display: block;
 }
 
-/* @m3e/web has no typeface tokens, so the face is forced on every element. Shadow DOM inherits it. */
-*, *::before, *::after { font-family: "Google Sans Flex", sans-serif; }
+/* @m3e/web has no typeface tokens, so the face is forced on every element. Shadow DOM inherits it.
+   Optical sizing is off: browsers otherwise set a variable font's opsz axis to the font size, while Compose never does
+   (an axis it is not given stays at the font's default, 18 for Google Sans Flex and 9 for Fraunces). With auto, 14px Google Sans Flex
+   measured 5% wider here than in Compose. A voice that wants an optical size sets "opsz" in font-variation-settings and the port passes the
+   same value (compose-mapping.md, type roles). */
+*, *::before, *::after { font-family: "Google Sans Flex", sans-serif; font-optical-sizing: none; }
 
 :root {
   /* Stand-ins for the system bars, which do not exist on the web. A proposal sets them to the
@@ -82,7 +86,9 @@ m3e-theme {
  * Material 3 type roles: 15 baseline (.t-*) and 15 emphasized (.t-*-em).
  * Every value is generated from runtime-src/type-scale.json, which is extracted from the pinned AndroidX
  * Material 3 artifact (androidx.compose.material3:material3-android:1.5.0-alpha29, tokens.TypeScaleTokens).
- * Each class therefore maps exactly to MaterialTheme.typography.<role> or <role>Emphasized in Compose.
+ * Each baseline class therefore equals MaterialTheme.typography.<role> in Compose. An emphasized class carries Google's emphasized token
+ * (weight, tracking), which the pinned material3's Typography() does not apply to its *Emphasized styles (they equal the baseline), so
+ * the port copies the baseline role with the token values (references/compose-mapping.md, type roles).
  * Re-extract when the starter's material3 version changes. @m3e/web's own type tokens differ in places
  * (display-large tracking, title-medium-em line height) and are not used.
  */
@@ -118,8 +124,9 @@ m3e-theme {
 .t-label-medium-em { margin: 0; font-size: 12px; line-height: 16px; letter-spacing: 0.5px; font-weight: 700; }
 .t-label-small-em { margin: 0; font-size: 11px; line-height: 16px; letter-spacing: 0.5px; font-weight: 700; }
 
-/* p-icon: one Material Symbols Rounded glyph, drawn by ligature from the bundled variable font. Size it with font-size.
-   Weight 400 and grade 0; the optical size follows font-size (font-optical-sizing: auto); [filled] sets FILL 1. */
+/* p-icon: one Material Symbols Rounded glyph, drawn by ligature from the bundled variable font. Size it with the size attribute
+   (the Compose icon sizes in icon-sizes.json; the lint rejects others), 24px by default. Weight 400, grade 0, and the font's default
+   optical size (24), which is what a drawable imported at 24dp and scaled to the size draws in Compose; [filled] sets FILL 1. */
 p-icon { display: inline-flex; flex: none; width: 1em; height: 1em; font-size: 24px; vertical-align: middle; color: inherit; overflow: hidden; }
 p-icon > span {
   display: block; width: 1em; height: 1em;
@@ -128,6 +135,14 @@ p-icon > span {
   font-variation-settings: "FILL" 0, "GRAD" 0;
 }
 p-icon[filled] > span { font-variation-settings: "FILL" 1, "GRAD" 0; }
+p-icon[size="18"] { font-size: 18px; }
+p-icon[size="20"] { font-size: 20px; }
+p-icon[size="24"] { font-size: 24px; }
+p-icon[size="28"] { font-size: 28px; }
+p-icon[size="32"] { font-size: 32px; }
+p-icon[size="36"] { font-size: 36px; }
+p-icon[size="40"] { font-size: 40px; }
+p-icon[size="48"] { font-size: 48px; }
 
 /* p-floating-toolbar: an m3e-toolbar floating at the bottom center, 16px above the bottom inset. */
 p-floating-toolbar {
