@@ -17,13 +17,13 @@ Build HTML proposals on the bundled Material 3 Expressive runtime, render them h
 
 ## Understand the brief
 
-Read the requesting app's relevant screens, theme, assets, content, and dependency versions. A feature exploration preserves the surrounding visual language unless structural changes are needed; a redesign can go further. Unless the user specifies otherwise, start with three distinct compositions of the same task and content, not three recolorings.
+Read the requesting app's relevant screens, theme, assets, content, and dependency versions. A feature exploration preserves the surrounding visual language unless structural changes are needed; a redesign can go further. Make one proposal by default: the strongest composition for the task and content. Make several only when the user asks for them ("show me three ideas", "compare directions"), and then make them distinct compositions of the same task and content, not recolorings.
 
-Give each direction its own seed: the app's brand color or a content color from the subject (a dish, an album, a trip), never the runtime's default palette. Make at least one direction a hero moment that layers three or more tactics (type voice, shape, color role, container form; see section 3 of the `android-design` skill) and name them in its rationale.
+Give each proposal its own seed: the app's brand color or a content color from the subject (a dish, an album, a trip), never the runtime's default palette. When the screen is a hero moment (question 3 of section 0 in the `android-design` skill), layer three or more tactics (type voice, shape, color role, container form; see its section 3) and name them in the rationale. With several proposals, make at least one a hero.
 
 Keep app code and dependencies unchanged, so proposals transfer to the app's existing libraries. Use representative data and non-sensitive assets, never credentials, databases, or personal data.
 
-Done when the reply answers section 0 of the `android-design` skill for each direction and each direction has its own seed.
+Done when the reply answers section 0 of the `android-design` skill and each proposal has its own seed. With several proposals, answer the shared questions (goals, adaptation) once, then give each proposal its direction, hero answer, and seed in a line each.
 
 ## Create or resume
 
@@ -41,7 +41,7 @@ Resume the same exploration directory for revisions; `renders/` is regenerated o
 
 ## Author proposals
 
-Before writing markup, read `gallery/runtime-src/README.md`: it is the syntax the lint enforces (type voices, color roles and static colors, icons, text fields, scripts). `project/README.md` is the page contract. A proposal is `proposals/<id>/index.html`, `style.css`, and optional script files. Copy `proposals/a` for each direction and change the design, not the rules. Done when every direction has its own proposal folder and `render` gets past the lint (a violation prints `file:line` and draws nothing).
+Before writing markup, read `gallery/runtime-src/README.md`: it is the syntax the lint enforces (type voices, color roles and static colors, icons, text fields, scripts). `project/README.md` is the page contract. A proposal is `proposals/<id>/index.html`, `style.css`, and optional script files. Build the proposal in the starter's `proposals/a`; for each extra direction, copy it to the next letter and change the design, not the rules. Done when every proposal has its own folder and `render` gets past the lint (a violation prints `file:line` and draws nothing).
 
 - HTML on the runtime only, and only HTML that has a Compose counterpart.
 - Components come only from `references/compose-mapping.md` rows marked `verified`, and a size step-down (see the button label rule in `android-design`) goes only to a size marked `verified` there. Anything else is built from plain HTML layout with role tokens when it has a plain Compose layout counterpart (`Box`, `Row`, `Column`, `Text`, `Surface`); otherwise leave it out. Text fields have verified rows too.
@@ -70,11 +70,11 @@ Done when every proposal's `checks.json` has `pass` and `complete` true and ever
 
 ## Show the user
 
-Show `renders/contact-sheet.png` in chat (attach the image, or give its absolute path). On the user's own machine, rerun the final render of the round with `--open` (never while still iterating: `render` rewrites `renders/<id>/`); when running remotely, give the absolute path of each `view.html` instead. When a direction's idea lives in an overlay, show its state renders too. Say what each direction is in one line, name the tactics the hero layers, and report any unverified check. Then stop and wait for the user.
+Show `renders/contact-sheet.png` in chat (attach the image, or give its absolute path). On the user's own machine, rerun the final render of the round with `--open` (never while still iterating: `render` rewrites `renders/<id>/`); when running remotely, give the absolute path of each `view.html` instead. When a proposal's idea lives in an overlay, show its state renders too. Say what each proposal is in one line, name the tactics a hero layers, and report any unverified check. Then stop and wait for the user.
 
 ## Iterate in chat
 
-The user replies in chat ("I like a and b, make b warmer"). Apply clear instructions and ask a focused question only when a meaningful decision remains. Produce one refinement by default, edit `project/proposals/<id>/`, and rerun `render` for the ids you changed. To keep an earlier version for comparison, copy the folder (`b` to `b2`) before editing. A combination of several ideas becomes one consolidated proposal.
+The user replies in chat ("make it warmer", "show me two other ideas"). A request for more ideas adds new proposal folders next to the existing ones. Apply clear instructions and ask a focused question only when a meaningful decision remains. Produce one refinement by default, edit `project/proposals/<id>/`, and rerun `render` for the ids you changed. To keep an earlier version for comparison, copy the folder (`b` to `b2`) before editing. A combination of several ideas becomes one consolidated proposal.
 
 ## Approve, hand off, or discard
 

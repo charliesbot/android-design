@@ -23,7 +23,7 @@ The design evals need Node.js 22+ and Google Chrome or `CHROME_PATH`; no Android
 Run in an expendable Git repository. Needs Node.js 22+ and Google Chrome; no Gradle or Android SDK, and no browser tool in the harness.
 
 1. Create an exploration with `node skills/android-design-explore/gallery/cli.mjs create --project <fixture-repo>`. Record the production app and installed starter hashes.
-2. Author two to three distinct proposals in `project/proposals/`, each with its own seed color; at least one layers three or more tactics and names them.
+2. Author one proposal in `project/proposals/a/` with its own seed color. Then ask for two more ideas: expect two distinct proposals in new folders, each with its own seed, and at least one of the three layering three or more tactics and naming them.
 3. Run `cli.mjs render <exploration>`. Every proposal gets six PNGs, a `checks.json`, and a `view.html`, and `renders/contact-sheet.png` has one row per proposal across phone, foldable, tablet, and desktop. A proposal that declares `p-states` also gets `<state>-light.png` and `<state>-tablet.png` per state. Fix every failing or incomplete check (`complete: false` is unverified) and look at every PNG. With no way to view images, the agent must report visual quality unverified.
 4. Open a `view.html` from `file://`. Double-click to switch devices with the Phone, Foldable, Tablet, and Desktop buttons, light and dark, seed color, and palette variant; the proposal updates in place and nothing is saved after reload. For a proposal with states, the State buttons (Default and each declared state) open each overlay.
 5. Lint failure: in a copy, add a raw hex color, an inline `style=""`, or a type declaration outside a `.voice-*` class. `render` must exit 2 with file and line and write no new renders.
@@ -36,7 +36,7 @@ The workflow never invokes an agent for the user or implements a selected propos
 
 ## Agent routing checks
 
-- "Show me three home-screen ideas." Expect three HTML proposals in the requesting repository's ignored exploration folder, rendered with checks fixed, and the contact sheet plus `view.html` paths shown in chat. Ask for a repository if none was selected, not a new app scaffold in the current directory.
+- "Explore a home screen idea." Expect one HTML proposal, not several. "Show me three home-screen ideas." Expect three HTML proposals in the requesting repository's ignored exploration folder, rendered with checks fixed, and the contact sheet plus `view.html` paths shown in chat. Ask for a repository if none was selected, not a new app scaffold in the current directory.
 - "Explore a redesign of Today." Expect read-only inspection of app code and dependencies, with writes only to exploration artifacts and the local Git exclusion.
 - "I like a and b, make b warmer." Expect one refinement by default, edited in the same exploration and rendered again, with an earlier version kept only if the user wants to compare.
 - Approving a design in chat must end exploration, not start implementation. "Implement the approved design" explicitly transitions to the requesting project's workflow, ports the proposal with `references/compose-mapping.md`, preserves its library versions, and compares the rendered Compose result with the approved proposal.
