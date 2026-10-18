@@ -33,6 +33,10 @@ Registered does not mean usable. A proposal may use only the components `referen
 
 Wrap the page in `<m3e-theme color="#RRGGBB" variant="tonal-spot" scheme="light">`. `m3e-icon` is not registered: use `p-icon`.
 
+## Page defaults
+
+`runtime.css` sets `box-sizing: border-box` on every light-DOM element and pseudo-element, so padding and borders sit inside a declared size, as in Compose (`Modifier.height(56.dp).padding(12.dp)` is 56dp). Shadow DOM inside `@m3e/web` components is untouched. Only the page's own `m3e-theme` fills the viewport height (`min-height: 100vh`); a nested `m3e-theme`, such as a preview card in another scheme, takes its content height.
+
 ## Type roles
 
 One class per Material 3 role: `.t-display-large`, `.t-display-medium`, `.t-display-small`, `.t-headline-large|medium|small`, `.t-title-large|medium|small`, `.t-body-large|medium|small`, `.t-label-large|medium|small` (15), and the same names with an `-em` suffix for the emphasized roles (15). Sizes, line heights, tracking, and weights are generated from `type-scale.json`, extracted from the pinned AndroidX Material 3 artifact, so each baseline class equals its Compose `MaterialTheme.typography` role exactly. An emphasized class carries Google's emphasized token values, which the pinned material3 does not apply to `typography.<role>Emphasized` (it equals the baseline), so the port copies the baseline role with the token weight and tracking (`references/compose-mapping.md`, type roles).
@@ -66,6 +70,34 @@ Slots: `label`, `prefix` and `suffix` (a `p-icon`), `prefix-text` and `suffix-te
 - `<p-floating-toolbar>`: wrap one `<m3e-toolbar>`. Floats it at bottom center, 16px above `--p-inset-bottom`, rounded and elevated. Its `m3e-button[toggle]` children are single-select: the selected one is `tonal`, the others `text`, 48px tall.
 - Type roles: the emphasized classes above, because `@m3e/web` has no type scale component.
 - `--p-inset-top`, `--p-inset-bottom`: default `0px`. Stand-ins for the status and navigation bars, which do not exist on the web. A proposal sets them to show system bars.
+
+## Component notes
+
+`m3e-list variant="segmented"` items draw no container of their own: the default is the surface color, as in Compose, where `ListItemDefaults.segmentedColors` also defaults to the surface color (`references/compose-mapping.md`). When the list sits on a surface, set the container to a role on the list or an ancestor: `--m3e-segmented-list-item-container-color: var(--md-sys-color-surface-container)`. Setting `--m3e-list-item-container-color` on an ancestor has no effect, because the segmented list resets it from the segmented token; the segmented token is the one to use.
+
+An open modal `m3e-bottom-sheet` moves focus to its drag handle. The browser's default `:focus-visible` outline (blue) would draw around it, so `p-sheet-handle.js` turns that outline off inside the sheet's shadow root. Every other focusable `@m3e/web` part already sets `outline: none` and relies on `m3e-focus-ring`, which `m3e-theme` hides unless its `strong-focus` attribute is set; the sheet's `.handle` is the one part that omits the rule, so the patch makes it behave like the rest of the library. Drop `p-sheet-handle.js` once `@m3e/web` sets `outline: none` on the handle itself.
+
+## Charts
+
+Draw a line or area chart as inline SVG in `index.html`. Its colors come only from classes in `style.css` (role variables or static color variables, never hex in the HTML), and the Compose port draws the same points with `Canvas` and `drawPath`, colors from `MaterialTheme.colorScheme`. Use solid roles (`primary`, `secondary`), not containers: graphics need 3:1 against the surface.
+
+```html
+<svg class="chart" viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label="Steps this week, rising from 4,200 to 9,800">
+  <line class="chart-base" x1="0" y1="39" x2="100" y2="39"/>
+  <path class="chart-line" d="M0 30 L25 24 L50 26 L75 12 L100 6"/>
+  <circle class="chart-dot" cx="100" cy="6" r="2"/>
+</svg>
+<p class="t-label-medium">Mon 4,200, Fri 9,800</p>
+```
+
+```css
+.chart { width: 100%; height: 160px; display: block; }
+.chart-line { fill: none; stroke: var(--md-sys-color-primary); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.chart-base { stroke: var(--md-sys-color-outline-variant); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.chart-dot { fill: var(--md-sys-color-primary); }
+```
+
+Responsive: `preserveAspectRatio="none"` stretches the path to the box, and `vector-effect: non-scaling-stroke` keeps the line width in px (a dot stretches too, so draw markers in HTML or a fixed aspect). For a fixed aspect, drop `preserveAspectRatio` and set `height: auto`. Give the `svg` `role="img"` and an `aria-label`, and repeat the key numbers in text.
 
 ## Open states
 
@@ -109,6 +141,8 @@ Open overlays are found through the library's own open state: a modal `m3e-botto
 ```
 
 `pass` and `complete` fold every view's `result`. `complete: false` means not verified. A proposal that declares states adds two more views per state after these four device views, `<state>-light` and `<state>-tablet`; they count in `pass` and `complete` like the others.
+
+`render` also writes `renders/<id>/light-full.png`: the default-state phone light view (411 wide) captured at the full height of the document, so an agent can review content below the first screen. It is for your own review only: it is not in the contact sheet, not in `checks.json`, and not a judged view, and the checks run on the viewport views only. The capture shows what the document shows: a page whose own inner scroller (`overflow: auto` on an element) holds the content shows only that scroller's visible part, and fixed elements such as the floating toolbar stay at the viewport position.
 
 ## Rebuild
 

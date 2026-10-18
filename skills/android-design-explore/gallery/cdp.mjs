@@ -160,8 +160,15 @@ export class Page {
     return result.value;
   }
 
-  async screenshot() {
-    const { data } = await this.send('Page.captureScreenshot', { format: 'png' });
+  // The viewport by default. `fullPage` captures the whole scrollable document at the viewport width (a page's own inner
+  // scroller still shows only what the document shows). captureBeyondViewport leaves the layout viewport, and so 100vh, alone.
+  async screenshot({ fullPage = false } = {}) {
+    const params = { format: 'png' };
+    if (fullPage) {
+      const { cssContentSize: { width, height } } = await this.send('Page.getLayoutMetrics');
+      Object.assign(params, { captureBeyondViewport: true, clip: { x: 0, y: 0, width: Math.ceil(width), height: Math.ceil(height), scale: 1 } });
+    }
+    const { data } = await this.send('Page.captureScreenshot', params);
     return Buffer.from(data, 'base64');
   }
 

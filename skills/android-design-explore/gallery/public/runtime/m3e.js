@@ -13771,8 +13771,24 @@ var JC = class extends HTMLElement {
 };
 customElements.define("p-floating-toolbar", JC);
 //#endregion
+//#region skills/android-design-explore/gallery/runtime-src/p-sheet-handle.js
+var YC = new CSSStyleSheet();
+YC.replaceSync(".handle { outline: none; }");
+var XC = /* @__PURE__ */ new WeakSet();
+function ZC(e) {
+	let t = e.shadowRoot;
+	t && !XC.has(t) && (XC.add(t), t.adoptedStyleSheets = [...t.adoptedStyleSheets, YC]);
+}
+var QC = customElements.get("m3e-bottom-sheet");
+if (QC) {
+	let e = QC.prototype.connectedCallback;
+	QC.prototype.connectedCallback = function() {
+		e.call(this), ZC(this);
+	}, document.querySelectorAll("m3e-bottom-sheet").forEach(ZC);
+}
+//#endregion
 //#region skills/android-design-explore/gallery/runtime-src/theme-bridge.js
-var YC = [
+var $C = [
 	"monochrome",
 	"neutral",
 	"tonal-spot",
@@ -13782,7 +13798,7 @@ var YC = [
 	"content",
 	"rainbow",
 	"fruit-salad"
-], XC = [
+], ew = [
 	"light",
 	"dark",
 	"auto"
@@ -13796,9 +13812,9 @@ window.addEventListener("message", (e) => {
 	}
 	if (t !== "theme") return;
 	let o = document.querySelector("m3e-theme");
-	o && (typeof n == "string" && /^#[0-9a-f]{6}$/i.test(n) && o.setAttribute("color", n), YC.includes(r) && o.setAttribute("variant", r), XC.includes(i) && o.setAttribute("scheme", i));
+	o && (typeof n == "string" && /^#[0-9a-f]{6}$/i.test(n) && o.setAttribute("color", n), $C.includes(r) && o.setAttribute("variant", r), ew.includes(i) && o.setAttribute("scheme", i));
 });
-var ZC = {
+var tw = {
 	plain: "Google Sans Flex",
 	faces: [
 		{
@@ -13832,71 +13848,71 @@ var ZC = {
 		"sans-serif",
 		"monospace"
 	]
-}, QC = ({ r: e, g: t, b: n }) => {
+}, nw = ({ r: e, g: t, b: n }) => {
 	let r = (e) => (e /= 255, e <= .03928 ? e / 12.92 : ((e + .055) / 1.055) ** 2.4);
 	return .2126 * r(e) + .7152 * r(t) + .0722 * r(n);
-}, $C = (e, t) => {
-	let [n, r] = [QC(e), QC(t)].sort((e, t) => t - e);
+}, rw = (e, t) => {
+	let [n, r] = [nw(e), nw(t)].sort((e, t) => t - e);
 	return (n + .05) / (r + .05);
-}, ew = (e, t) => e.a < 1 ? {
+}, iw = (e, t) => e.a < 1 ? {
 	r: e.r * e.a + t.r * (1 - e.a),
 	g: e.g * e.a + t.g * (1 - e.a),
 	b: e.b * e.a + t.b * (1 - e.a),
 	a: 1
-} : e, tw = (e, t) => e >= 24 || e >= 18.66 && t >= 700 ? 3 : 4.5, nw = (/* @__PURE__ */ "a[href].button.input.select.textarea.summary.[role=button].[role=link].[role=tab].[role=switch].[role=checkbox].[role=menuitem].[tabindex]:not([tabindex=\"-1\"]).m3e-button.m3e-icon-button.m3e-fab.m3e-fab-menu-trigger.m3e-fab-menu-item.m3e-nav-item.m3e-switch.m3e-slider.m3e-split-button.m3e-card[actionable].m3e-list-item-button.m3e-list-action.m3e-list-option.m3e-menu-item.m3e-menu-item-checkbox.m3e-menu-item-radio.m3e-chip.m3e-assist-chip.m3e-filter-chip.m3e-input-chip.m3e-suggestion-chip".split(".")).join(","), rw = "m3e-fab, m3e-fab-menu, [data-fab]", iw = (e, t) => {
+} : e, aw = (e, t) => e >= 24 || e >= 18.66 && t >= 700 ? 3 : 4.5, ow = (/* @__PURE__ */ "a[href].button.input.select.textarea.summary.[role=button].[role=link].[role=tab].[role=switch].[role=checkbox].[role=menuitem].[tabindex]:not([tabindex=\"-1\"]).m3e-button.m3e-icon-button.m3e-fab.m3e-fab-menu-trigger.m3e-fab-menu-item.m3e-nav-item.m3e-switch.m3e-slider.m3e-split-button.m3e-card[actionable].m3e-list-item-button.m3e-list-action.m3e-list-option.m3e-menu-item.m3e-menu-item-checkbox.m3e-menu-item-radio.m3e-chip.m3e-assist-chip.m3e-filter-chip.m3e-input-chip.m3e-suggestion-chip".split(".")).join(","), sw = "m3e-fab, m3e-fab-menu, [data-fab]", cw = (e, t) => {
 	let n = e.split(",")[0].trim().replace(/^(["'])(.*)\1$/, "$2").toLowerCase();
-	if (n === ZC.plain.toLowerCase()) return !0;
-	let r = ZC.faces.find((e) => e.family.toLowerCase() === n);
+	if (n === tw.plain.toLowerCase()) return !0;
+	let r = tw.faces.find((e) => e.family.toLowerCase() === n);
 	return !!r && t >= r.minPx;
-}, aw = (e) => (e.getAttribute?.("aria-label") || e.textContent || "").trim().replace(/\s+/g, " ").slice(0, 30), ow = (e) => {
-	let t = aw(e);
+}, lw = (e) => (e.getAttribute?.("aria-label") || e.textContent || "").trim().replace(/\s+/g, " ").slice(0, 30), uw = (e) => {
+	let t = lw(e);
 	return e.localName + (e.id ? `#${e.id}` : "") + (t ? ` "${t}"` : "");
-}, sw = (e) => {
+}, dw = (e) => {
 	let t = e.getRootNode().host, n = e.localName + (e.id ? `#${e.id}` : "") + (t && e.classList[0] ? `.${e.classList[0]}` : "");
-	return t ? `${sw(t)} > ${n}` : n;
-}, cw = (e) => {
-	let t = aw(e);
-	return sw(e) + (t ? ` "${t}"` : "");
-}, lw = (e) => {
+	return t ? `${dw(t)} > ${n}` : n;
+}, fw = (e) => {
+	let t = lw(e);
+	return dw(e) + (t ? ` "${t}"` : "");
+}, pw = (e) => {
 	let t = e.getBoundingClientRect();
 	return t.width <= 0 || t.height <= 0 ? !1 : e.checkVisibility ? e.checkVisibility({ visibilityProperty: !0 }) : getComputedStyle(e).visibility !== "hidden";
 };
-function uw(e) {
+function mw(e) {
 	if (e.assignedSlot) return e.assignedSlot;
 	let t = e.parentNode;
 	return t ? t instanceof ShadowRoot ? t.host : t instanceof Element && t.shadowRoot ? null : t instanceof Element ? t : null : null;
 }
-function dw(e) {
-	for (let t = e; t; t = uw(t)) if (getComputedStyle(t).display !== "contents") return t;
+function hw(e) {
+	for (let t = e; t; t = mw(t)) if (getComputedStyle(t).display !== "contents") return t;
 	return null;
 }
-var fw = (e) => {
-	for (let t = e; t; t = uw(t)) if (parseFloat(getComputedStyle(t).opacity) === 0) return !0;
+var gw = (e) => {
+	for (let t = e; t; t = mw(t)) if (parseFloat(getComputedStyle(t).opacity) === 0) return !0;
 	return !1;
-}, pw = (e) => {
-	for (let t = e; t; t = uw(t)) if (t.getAttribute?.("aria-hidden") === "true") return !0;
+}, _w = (e) => {
+	for (let t = e; t; t = mw(t)) if (t.getAttribute?.("aria-hidden") === "true") return !0;
 	return !1;
-}, mw = () => [...document.querySelectorAll("m3e-bottom-sheet[modal], m3e-dialog")].filter((e) => e.localName === "m3e-dialog" ? e.shadowRoot?.querySelector("dialog")?.open : e.matches(":popover-open")), hw = (e) => {
-	for (let t = e; t; t = uw(t)) if (t.localName === "m3e-bottom-sheet") return !t.open;
+}, vw = () => [...document.querySelectorAll("m3e-bottom-sheet[modal], m3e-dialog")].filter((e) => e.localName === "m3e-dialog" ? e.shadowRoot?.querySelector("dialog")?.open : e.matches(":popover-open")), yw = (e) => {
+	for (let t = e; t; t = mw(t)) if (t.localName === "m3e-bottom-sheet") return !t.open;
 	return !1;
-}, gw = () => [...document.querySelectorAll("m3e-menu")].filter((e) => e.matches(":popover-open"));
-function _w(e, t) {
-	for (let n of e.querySelectorAll("*")) t(n) !== !1 && n.shadowRoot && _w(n.shadowRoot, t);
+}, bw = () => [...document.querySelectorAll("m3e-menu")].filter((e) => e.matches(":popover-open"));
+function xw(e, t) {
+	for (let n of e.querySelectorAll("*")) t(n) !== !1 && n.shadowRoot && xw(n.shadowRoot, t);
 }
-function vw(e, t) {
+function Sw(e, t) {
 	let n = (e) => {
 		for (let n of e.childNodes) n.nodeType === Node.TEXT_NODE && n.textContent.trim() && t(n);
 	};
-	e instanceof ShadowRoot && n(e), _w(e, (e) => {
+	e instanceof ShadowRoot && n(e), xw(e, (e) => {
 		n(e);
 	});
 }
-var yw = document.createElement("canvas");
-yw.width = yw.height = 1;
-var bw = yw.getContext("2d", { willReadFrequently: !0 });
-function xw(e) {
-	bw.clearRect(0, 0, 1, 1), bw.fillStyle = "#000", bw.fillStyle = e, bw.fillRect(0, 0, 1, 1);
-	let [t, n, r, i] = bw.getImageData(0, 0, 1, 1).data;
+var Cw = document.createElement("canvas");
+Cw.width = Cw.height = 1;
+var ww = Cw.getContext("2d", { willReadFrequently: !0 });
+function Tw(e) {
+	ww.clearRect(0, 0, 1, 1), ww.fillStyle = "#000", ww.fillStyle = e, ww.fillRect(0, 0, 1, 1);
+	let [t, n, r, i] = ww.getImageData(0, 0, 1, 1).data;
 	return {
 		r: t,
 		g: n,
@@ -13904,27 +13920,27 @@ function xw(e) {
 		a: i / 255
 	};
 }
-function Sw(e) {
-	for (let t = e; t; t = uw(t)) {
+function Ew(e) {
+	for (let t = e; t; t = mw(t)) {
 		let e = getComputedStyle(t);
 		if (parseFloat(e.opacity) < 1) return { reason: "an ancestor has opacity below 1" };
 		if (e.backgroundImage !== "none") return { reason: "background is an image or gradient" };
-		let n = xw(e.backgroundColor);
+		let n = Tw(e.backgroundColor);
 		if (n.a === 1) return { color: n };
 		if (n.a > 0) return { reason: "background is translucent" };
 		let r = getComputedStyle(t, "::before");
 		if (r.content !== "none" && r.position === "absolute" && parseFloat(r.opacity) === 1 && parseFloat(r.width) >= t.clientWidth - 1 && parseFloat(r.height) >= t.clientHeight - 1) {
-			let e = xw(r.backgroundColor);
+			let e = Tw(r.backgroundColor);
 			if (e.a === 1) return { color: e };
 		}
 	}
 	return { reason: "no opaque background found" };
 }
-var Cw = /[^\s\-\u00ad\u200b\u2010-\u2015/]+/g;
-function ww(e, t) {
+var Dw = /[^\s\-\u00ad\u200b\u2010-\u2015/]+/g;
+function Ow(e, t) {
 	if (t.hyphens === "auto" || /[　-鿿가-힯฀-๿]/.test(e.textContent)) return [];
 	let n = [], r = document.createRange();
-	for (let t of e.textContent.matchAll(Cw)) {
+	for (let t of e.textContent.matchAll(Dw)) {
 		if (t[0].length < 2) continue;
 		r.setStart(e, t.index), r.setEnd(e, t.index + t[0].length);
 		let i = [...r.getClientRects()].filter((e) => e.width > 0 && e.height > 0);
@@ -13934,17 +13950,17 @@ function ww(e, t) {
 	}
 	return n;
 }
-var Tw = .2;
-function Ew(e) {
+var kw = .2;
+function Aw(e) {
 	let t = 1;
-	for (let n = e; n; n = uw(n)) t *= parseFloat(getComputedStyle(n).opacity);
+	for (let n = e; n; n = mw(n)) t *= parseFloat(getComputedStyle(n).opacity);
 	return t;
 }
-function Dw(e, t) {
-	for (let n = t; n; n = uw(n)) if (n === e) return !0;
+function jw(e, t) {
+	for (let n = t; n; n = mw(n)) if (n === e) return !0;
 	return !1;
 }
-function Ow(e, t, n) {
+function Mw(e, t, n) {
 	let r = document.createRange();
 	for (let i of e.childNodes) if (i.nodeType === Node.TEXT_NODE && i.textContent.trim()) {
 		r.selectNodeContents(i);
@@ -13952,35 +13968,35 @@ function Ow(e, t, n) {
 	}
 	return !1;
 }
-function kw(e, t, n) {
+function Nw(e, t, n) {
 	let r = getComputedStyle(e);
-	return r.visibility !== "visible" || Ew(e) < .9 ? !1 : /^(img|svg|canvas|video|picture)$/i.test(e.localName) || r.backgroundImage.includes("url(") || xw(r.backgroundColor).a >= .9 || Ow(e, t, n) ? !0 : !!e.shadowRoot?.elementsFromPoint(t, n).some((r) => r !== e && e.shadowRoot.contains(r) && kw(r, t, n));
+	return r.visibility !== "visible" || Aw(e) < .9 ? !1 : /^(img|svg|canvas|video|picture)$/i.test(e.localName) || r.backgroundImage.includes("url(") || Tw(r.backgroundColor).a >= .9 || Mw(e, t, n) ? !0 : !!e.shadowRoot?.elementsFromPoint(t, n).some((r) => r !== e && e.shadowRoot.contains(r) && Nw(r, t, n));
 }
-var Aw = (e) => /fixed|sticky/.test(getComputedStyle(e).position);
-function jw(e) {
-	for (let t = e; t && t !== document.documentElement && t !== document.body; t = uw(t)) {
-		if (Aw(t)) return null;
+var Pw = (e) => /fixed|sticky/.test(getComputedStyle(e).position);
+function Fw(e) {
+	for (let t = e; t && t !== document.documentElement && t !== document.body; t = mw(t)) {
+		if (Pw(t)) return null;
 		let e = getComputedStyle(t);
 		if (/auto|scroll/.test(e.overflowY) && t.scrollHeight > t.clientHeight + 1) return t;
 	}
 	return document.documentElement.scrollHeight > innerHeight + 1 ? document.documentElement : null;
 }
-function Mw(e, t) {
-	for (let n = t; n; n = uw(n)) {
+function Iw(e, t) {
+	for (let n = t; n; n = mw(n)) {
 		if (n === e) return !1;
-		if (Aw(n)) return !0;
+		if (Pw(n)) return !0;
 	}
 	return e !== document.documentElement;
 }
-function Nw(e, t, n) {
-	let r = jw(e);
-	if (!r || !Mw(r, t)) return !1;
+function Lw(e, t, n) {
+	let r = Fw(e);
+	if (!r || !Iw(r, t)) return !1;
 	let i = r === document.documentElement, a = i ? innerHeight : r.clientHeight, o = t.getBoundingClientRect();
 	if (o.height >= a - 1) return !1;
 	let s = r.scrollHeight - a - r.scrollTop, c = r.scrollTop, l = i ? { top: 0 } : r.getBoundingClientRect();
 	return (o.top + o.bottom) / 2 >= l.top + a / 2 ? s > 0 && n.bottom - s <= o.top : c > 0 && n.top + c >= o.bottom;
 }
-function Pw(e, t, n = () => !1) {
+function Rw(e, t, n = () => !1) {
 	let r = document.createRange();
 	r.selectNodeContents(e);
 	let i = [...r.getClientRects()].filter((e) => e.width > 0 && e.height > 0), a = Math.max(1, Math.ceil(i.length / 8)), o = 0, s = 0, c = null;
@@ -13993,67 +14009,67 @@ function Pw(e, t, n = () => !1) {
 	]) {
 		let i = e.left + e.width * r, a = e.top + e.height / 2;
 		if (i < 0 || a < 0 || i >= innerWidth || a >= innerHeight) continue;
-		let l = document.elementsFromPoint(i, a), u = l.findIndex((e) => Dw(e, t));
+		let l = document.elementsFromPoint(i, a), u = l.findIndex((e) => jw(e, t));
 		if (u < 0) continue;
 		o++;
-		let d = l.slice(0, u).find((r) => !Dw(t, r) && !fw(r) && kw(r, i, a) && !Nw(t, r, e) && !n(r));
+		let d = l.slice(0, u).find((r) => !jw(t, r) && !gw(r) && Nw(r, i, a) && !Lw(t, r, e) && !n(r));
 		d && (s++, c ??= d);
 	}
-	return o > 0 && s / o >= Tw ? {
+	return o > 0 && s / o >= kw ? {
 		by: c,
 		share: Math.round(s / o * 100)
 	} : null;
 }
-var Fw = "button, [role=button], m3e-button, m3e-icon-button, m3e-fab, m3e-fab-menu-trigger, m3e-split-button, m3e-chip, m3e-assist-chip, m3e-filter-chip, m3e-input-chip, m3e-suggestion-chip, m3e-button-group";
-function Iw(e) {
+var zw = "button, [role=button], m3e-button, m3e-icon-button, m3e-fab, m3e-fab-menu-trigger, m3e-split-button, m3e-chip, m3e-assist-chip, m3e-filter-chip, m3e-input-chip, m3e-suggestion-chip, m3e-button-group";
+function Bw(e) {
 	let t = {
 		x: !1,
 		y: !1
 	};
-	for (let n = e; n; n = uw(n)) if (n.matches?.(Fw)) return t;
+	for (let n = e; n; n = mw(n)) if (n.matches?.(zw)) return t;
 	let n = getComputedStyle(e), r = n.getPropertyValue("-webkit-line-clamp") || n.getPropertyValue("line-clamp");
 	return {
 		x: /hidden|clip/.test(n.overflowX) && n.textOverflow.includes("ellipsis"),
 		y: /hidden|clip/.test(n.overflowY) && r !== "" && r !== "none"
 	};
 }
-function Lw(e, t) {
-	for (let n = dw(t); n; n = dw(uw(n))) {
+function Vw(e, t) {
+	for (let n = hw(t); n; n = hw(mw(n))) {
 		let t = getComputedStyle(n);
 		if (/auto|scroll/.test(t.overflowX + t.overflowY)) return null;
 		if (/hidden|clip/.test(t.overflowX + t.overflowY) && n !== document.documentElement) {
-			let t = Iw(n), r = n.getBoundingClientRect(), [i, a] = [r.left + n.clientLeft, r.top + n.clientTop];
+			let t = Bw(n), r = n.getBoundingClientRect(), [i, a] = [r.left + n.clientLeft, r.top + n.clientTop];
 			if (!t.x && (e.left < i - 1 || e.right > i + n.clientWidth + 1) || e.top < a - 1 || !t.y && e.bottom > a + n.clientHeight + 1) return n;
 		}
 	}
 	return null;
 }
-function Rw() {
+function Hw() {
 	let e = innerWidth, t = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth), n = (e) => {
 		let t = 0;
-		for (let n = uw(e); n; n = uw(n)) t++;
+		for (let n = mw(e); n; n = mw(n)) t++;
 		return t;
 	}, r = (t) => {
-		for (let n = uw(t); n; n = uw(n)) {
+		for (let n = mw(t); n; n = mw(n)) {
 			if (n === document.documentElement || n === document.body) return !1;
 			let t = getComputedStyle(n);
 			if (/auto|scroll/.test(t.overflowX) && n.getBoundingClientRect().width <= e + 1) return !0;
 		}
 		return !1;
 	}, i = t > e + 1, a = [];
-	return _w(document, (t) => {
+	return xw(document, (t) => {
 		let o = getComputedStyle(t);
 		if (o.display === "none" || o.display === "contents") return;
 		let s = o.position === "fixed" || o.position === "sticky";
 		if (!s && !i) return;
 		let { left: c, right: l } = t.getBoundingClientRect();
-		s ? (c < -1 && l > 1 || l > e + 1 && c < e - 1) && lw(t) && !fw(t) && !r(t) && a.push({
-			el: cw(t),
+		s ? (c < -1 && l > 1 || l > e + 1 && c < e - 1) && pw(t) && !gw(t) && !r(t) && a.push({
+			el: fw(t),
 			right: Math.round(l),
 			left: Math.round(c),
 			depth: n(t)
 		}) : l > e + 1 && !r(t) && a.push({
-			el: cw(t),
+			el: fw(t),
 			right: Math.round(l),
 			depth: n(t)
 		});
@@ -14063,7 +14079,7 @@ function Rw() {
 		offenders: a.slice(0, 5).map(({ depth: e, ...t }) => t)
 	};
 }
-async function zw() {
+async function Uw() {
 	let e = () => new Promise((e) => requestAnimationFrame(() => requestAnimationFrame(e))), t = (e = document) => {
 		if (e.getAnimations().some((e) => e.playState === "running" && Number.isFinite(e.effect?.getComputedTiming().endTime))) return !0;
 		for (let n of e.querySelectorAll("*")) if (n.shadowRoot && t(n.shadowRoot)) return !0;
@@ -14072,14 +14088,14 @@ async function zw() {
 	await e();
 	for (let n = 0; n < 90 && t(); n++) await e();
 }
-function Bw() {
-	let e = [], t = mw(), n = gw(), r = (e) => t.length > 0 && !t.some((t) => Dw(t, e)), i = (e) => (t) => n.some((e) => Dw(e, t)) && !n.some((t) => Dw(t, e)), a = [];
-	_w(document, (e) => {
-		if (!e.matches(nw) || e.localName === "m3e-slider-thumb") return !0;
-		if (lw(e) && !hw(e)) {
+function Ww() {
+	let e = [], t = vw(), n = bw(), r = (e) => t.length > 0 && !t.some((t) => jw(t, e)), i = (e) => (t) => n.some((e) => jw(e, t)) && !n.some((t) => jw(t, e)), a = [];
+	xw(document, (e) => {
+		if (!e.matches(ow) || e.localName === "m3e-slider-thumb") return !0;
+		if (pw(e) && !yw(e)) {
 			let t = (e.closest("m3e-form-field") ?? e).getBoundingClientRect(), n = (e.shadowRoot?.querySelector(".touch") ?? e.querySelector(":scope > .handle-touch"))?.getBoundingClientRect(), i = Math.max(t.width, n?.width ?? 0), o = Math.max(t.height, n?.height ?? 0), s = (e.shadowRoot?.querySelector(".base") ?? e).getBoundingClientRect();
 			a.push({
-				el: ow(e),
+				el: uw(e),
 				node: e,
 				behind: r(e),
 				w: Math.round(i * 10) / 10,
@@ -14095,7 +14111,7 @@ function Bw() {
 		w: t,
 		h: n
 	})), s = (e) => {
-		for (let t = e; t; t = uw(t)) if (t.matches?.("m3e-nav-bar, m3e-nav-rail, m3e-nav-menu, m3e-nav-item, m3e-drawer-container > [slot=start], m3e-drawer-container > [slot=end], nav, [role=navigation], p-floating-toolbar m3e-button[toggle]") || t.matches?.("m3e-slider, input[type=range], [role=slider], [role=progressbar], m3e-form-field")) return !0;
+		for (let t = e; t; t = mw(t)) if (t.matches?.("m3e-nav-bar, m3e-nav-rail, m3e-nav-menu, m3e-nav-item, m3e-drawer-container > [slot=start], m3e-drawer-container > [slot=end], nav, [role=navigation], p-floating-toolbar m3e-button[toggle]") || t.matches?.("m3e-slider, input[type=range], [role=slider], [role=progressbar], m3e-form-field")) return !0;
 		return !1;
 	}, c = (e) => e.matches("m3e-button, m3e-icon-button, m3e-fab, m3e-fab-menu-trigger, m3e-split-button, m3e-chip, m3e-assist-chip, m3e-filter-chip, m3e-input-chip, m3e-suggestion-chip") || e.matches("button, [role=button]") && !e.closest("m3e-list-item, m3e-card, li") && !/^(link|listitem|row|option)$/.test(e.getAttribute("role") ?? ""), l = a.filter((e) => !s(e.node) && c(e.node)).reduce((e, t) => !e || t.vh > e.vh ? t : e, null), u = a.filter((e) => e.node.hasAttribute("data-primary")), d = {
 		marked: u.length,
@@ -14109,33 +14125,33 @@ function Bw() {
 		check: "primary",
 		reason: "no visible element has data-primary"
 	})) : u.length > 1 ? (d.status = "fail", d.reason = "more than one visible element has data-primary") : (d.status = !l || u[0].vh >= l.vh - 1 ? "pass" : "fail", d.status === "fail" && (d.reason = `${u[0].el} (${u[0].vh}px tall) is shorter than ${l.el} (${l.vh}px tall)`));
-	let f = [...document.querySelectorAll(rw)].filter((e) => !e.parentElement?.closest("m3e-fab-menu") && lw(e)).length, p = [], m = [], h = [], ee = [], te = {
+	let f = [...document.querySelectorAll(sw)].filter((e) => !e.parentElement?.closest("m3e-fab-menu") && pw(e)).length, p = [], m = [], h = [], ee = [], te = {
 		fails: [],
 		passed: 0
 	}, ne = /* @__PURE__ */ new Set(), g = (...e) => {
 		let t = e.join("|");
 		return !ne.has(t) && (ne.add(t), !0);
 	};
-	vw(document, (t) => {
-		let n = uw(t);
-		if (!n || n.closest?.("p-icon, m3e-icon") || hw(n)) return;
+	Sw(document, (t) => {
+		let n = mw(t);
+		if (!n || n.closest?.("p-icon, m3e-icon") || yw(n)) return;
 		let a = getComputedStyle(n), o = document.createRange();
 		o.selectNodeContents(t);
 		let s = o.getBoundingClientRect();
-		if (s.width <= 0 || s.height <= 0 || a.visibility !== "visible" || fw(n)) return;
-		let c = cw(dw(n) || n);
-		if (!iw(a.fontFamily, parseFloat(a.fontSize)) && g("font", c) && p.push({
+		if (s.width <= 0 || s.height <= 0 || a.visibility !== "visible" || gw(n)) return;
+		let c = fw(hw(n) || n);
+		if (!cw(a.fontFamily, parseFloat(a.fontSize)) && g("font", c) && p.push({
 			el: c,
 			font: a.fontFamily
-		}), pw(n)) return;
-		let l = ww(t, a);
+		}), _w(n)) return;
+		let l = Ow(t, a);
 		l.length && g("midword", c) && h.push({
 			el: c,
 			words: l.slice(0, 3)
 		});
 		let u = null, d = r(n);
 		try {
-			u = d ? null : Pw(t, n, i(n));
+			u = d ? null : Rw(t, n, i(n));
 		} catch (t) {
 			g("overlap-error", c) && e.push({
 				check: "overlaps",
@@ -14145,21 +14161,21 @@ function Bw() {
 		}
 		u && g("overlap", c) && ee.push({
 			el: c,
-			coveredBy: cw(u.by),
+			coveredBy: fw(u.by),
 			share: u.share
 		});
-		let f = dw(n), ne = /auto|scroll/.test(a.overflowX + a.overflowY);
-		f && !ne && getComputedStyle(f).display !== "inline" && (!Iw(f).x && f.scrollWidth > f.clientWidth + 1 || !Iw(f).y && f.scrollHeight > f.clientHeight + 1) && g("overflow", c) && m.push({
+		let f = hw(n), ne = /auto|scroll/.test(a.overflowX + a.overflowY);
+		f && !ne && getComputedStyle(f).display !== "inline" && (!Bw(f).x && f.scrollWidth > f.clientWidth + 1 || !Bw(f).y && f.scrollHeight > f.clientHeight + 1) && g("overflow", c) && m.push({
 			el: c,
 			scroll: [f.scrollWidth, f.scrollHeight],
 			client: [f.clientWidth, f.clientHeight]
 		});
-		let re = Lw(s, n);
+		let re = Vw(s, n);
 		if (re && re !== f && g("overflow", c, "clip") && m.push({
 			el: c,
-			clippedBy: cw(re)
+			clippedBy: fw(re)
 		}), d || !g("contrast", c)) return;
-		let _ = Sw(n);
+		let _ = Ew(n);
 		if (!_.color) {
 			e.push({
 				check: "contrast",
@@ -14168,14 +14184,14 @@ function Bw() {
 			});
 			return;
 		}
-		let ie = ew(xw(a.color), _.color), v = tw(parseFloat(a.fontSize), parseInt(a.fontWeight, 10)), ae = $C(ie, _.color);
+		let ie = iw(Tw(a.color), _.color), v = aw(parseFloat(a.fontSize), parseInt(a.fontWeight, 10)), ae = rw(ie, _.color);
 		ae < v ? te.fails.push({
 			el: c,
 			ratio: Math.round(ae * 100) / 100,
 			need: v
 		}) : te.passed++;
 	});
-	let re = Rw(), _ = e.length === 0, ie = !re.fails && o.length === 0 && p.length === 0 && m.length === 0 && h.length === 0 && ee.length === 0 && d.status !== "fail" && f <= 1 && te.fails.length === 0;
+	let re = Hw(), _ = e.length === 0, ie = !re.fails && o.length === 0 && p.length === 0 && m.length === 0 && h.length === 0 && ee.length === 0 && d.status !== "fail" && f <= 1 && te.fails.length === 0;
 	return JSON.parse(JSON.stringify({
 		pass: ie,
 		complete: _,
@@ -14199,5 +14215,5 @@ function Bw() {
 		unresolved: e
 	}));
 }
-window.runtimeChecks = Bw, window.runtimeSettle = zw;
+window.runtimeChecks = Ww, window.runtimeSettle = Uw;
 //#endregion
