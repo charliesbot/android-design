@@ -32,9 +32,9 @@ Implementing or reviewing real Compose code needs the `compose-preview` CLI and 
 
 ## Exploration or implementation
 
-For brainstorming, idea exploration, or visual alternatives before implementation, use the `android-design-explore` skill; it builds on this one. Porting an approved proposal to Compose also follows that skill's mapping table.
+A new app, a new screen, or a redesign starts with a proposal, even when the request says "build" or names only this skill: follow the `android-design-explore` skill, show its proposal in chat, and wait for the user to approve a direction before writing any Compose. Skip the proposal only when the user says to ("skip the proposal", "just code it") or an approved proposal already exists; port an approved proposal with that skill's mapping table.
 
-For implementation or review requests, work in the actual project under its own approval and branch rules, using the design decisions and screen check below.
+Changes inside an existing design (a fix, a tweak, a review, a new state of an approved screen) go straight to the actual project under its own approval and branch rules, using the design decisions and screen check below.
 
 ## 0. Before writing UI
 

@@ -13,7 +13,7 @@ Read and follow the `android-design` skill for every design decision: its sectio
 
 Requirements: Node.js 22+ and Google Chrome (`render` drives it headlessly). If either is missing, report it rather than installing it. Use image generation only for assets, not as a substitute for a proposal.
 
-Build HTML proposals on the bundled Material 3 Expressive runtime, render them headlessly, and iterate with the user in chat. The user's approval, said in chat, finishes exploration without implementing anything.
+Build HTML proposals on the bundled Material 3 Expressive runtime, render them headlessly, and iterate with the user in chat. The user's approval, said in chat, ends an explore-only request; a build request continues to the port.
 
 ## Understand the brief
 
@@ -32,10 +32,10 @@ Set `CHROME_PATH` when Chrome is not at its usual location.
 Resolve this skill's installed directory and run:
 
 ```bash
-node <skill-dir>/gallery/cli.mjs create --project <requesting-repo> --title "Today screen redesign"
+node <skill-dir>/gallery/cli.mjs create --project <folder> --title "Today screen redesign"
 ```
 
-The helper copies the HTML proposal starter to `design-explorations/<unique-id>/project/` in that Git repository and records a local Git exclusion without editing the tracked `.gitignore`. Tell the user the returned absolute exploration path. A new app idea still needs a user-selected repository; do not silently write to the skill repository.
+`<folder>` is the app's folder, or any folder for a quick idea; it does not need to be a Git repository. The helper copies the HTML proposal starter to `<folder>/design-explorations/<unique-id>/project/` and writes a `.gitignore` of `*` in `design-explorations/`, so proposals never land in a commit. Tell the user the returned absolute exploration path. Never write explorations into this skill's own repository.
 
 Resume the same exploration directory for revisions; `renders/` is regenerated output. Wear stays outside this workflow; use the Android starter's experimental Wear shell (`create --starter android`) only when explicitly requested, without claiming validated Wear quality.
 
@@ -78,14 +78,14 @@ The user replies in chat ("make it warmer", "show me two other ideas"). A reques
 
 ## Approve, hand off, or discard
 
-Approval is the user saying so in chat. This skill's job ends there: do not implement. Report the approved proposal, the path of its folder, and that `references/compose-mapping.md` is the porting table. Approval does not authorize implementation or library version changes.
+Approval is the user saying so in chat. Report the approved proposal, the path of its folder, and that `references/compose-mapping.md` is the porting table. When the request was only to explore, this skill's job ends there: do not implement. When the request was to build (the `android-design` skill sends a build of a new app, screen, or redesign here first), approval of the direction lets you continue to the port below. Approval never authorizes library version changes.
 
-A later explicit implementation request follows the requesting project's planning, branch, verification, and review rules. Port the approved proposal with the mapping table, keeping the app's library versions, then render the Compose result and compare it with the approved proposal's screenshots at the same viewports. Report unmapped or unverified elements instead of inventing a Compose equivalent. If the design cannot be preserved with the app's dependencies, ask rather than silently change the design or versions.
+The port follows the requesting project's planning, branch, verification, and review rules. Port the approved proposal with the mapping table, keeping the app's library versions, then render the Compose result and compare it with the approved proposal's screenshots at the same viewports. Report unmapped or unverified elements instead of inventing a Compose equivalent. If the design cannot be preserved with the app's dependencies, ask rather than silently change the design or versions.
 
-Keep proposals and renders until the user explicitly requests deletion, then run from the requesting repository:
+Keep proposals and renders until the user explicitly requests deletion, then run:
 
 ```bash
-node <skill-dir>/gallery/cli.mjs cleanup <exploration> --project <requesting-repo> --yes
+node <skill-dir>/gallery/cli.mjs cleanup <exploration> --project <folder> --yes
 ```
 
 Cleanup removes only a directly contained, identity-marked exploration and refuses symlinks or mismatched markers. It never deletes the installed starter or the requesting app.

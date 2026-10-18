@@ -9,8 +9,8 @@ import { renderExploration, report } from './render.mjs';
 
 export const help = `Design exploration helper (Node.js 22+, Google Chrome for render).
 
-node <skill>/gallery/cli.mjs create --project <repo> [--title "..."] [--starter html|android]
-  Copy a starter into <repo>/design-explorations/ and print the exploration path.
+node <skill>/gallery/cli.mjs create --project <folder> [--title "..."] [--starter html|android]
+  Copy a starter into <folder>/design-explorations/ and print the exploration path.
   html (default): the HTML proposal starter. Proposals are folders:
   <exploration>/project/proposals/<id>/index.html plus its files.
   android: the Compose starter, for implementation sandboxes and the experimental Wear shell.
@@ -26,7 +26,7 @@ node <skill>/gallery/cli.mjs render <exploration> [id ...] [--open]
     <id>/view.html         one self-contained file: double-click to try theme colors and device sizes
   --open: after the render finishes, open each rendered view.html in the default browser.
   Set CHROME_PATH when Chrome is not at its usual location.
-node <skill>/gallery/cli.mjs cleanup <exploration> --project <repo> --yes
+node <skill>/gallery/cli.mjs cleanup <exploration> --project <folder> --yes
   Delete a marked exploration after the user confirms.`;
 
 export function parse(argv) {
