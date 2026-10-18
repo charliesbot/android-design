@@ -1,5 +1,5 @@
 // `render`: lint each proposal, then render it headlessly in the system Chrome and write the images, the rule-check
-// results, a contact sheet, and a self-contained view.html per proposal. No server and no content port: Chrome is
+// results, a contact sheet, a review sheet, and a self-contained view.html per proposal. No server and no content port: Chrome is
 // driven over a pipe (cdp.mjs) and its requests for https://proposal.invalid/ are answered from disk.
 import { mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, resolve, sep } from 'node:path';
@@ -163,13 +163,37 @@ export function contactSheetHtml(title, rows) {
 ${sections}`;
 }
 
-async function writeContactSheet(browser, file, title, rows) {
+// The review sheet is one proposal's checked views on one image, for the agent's own review: a phone row (every phone-width
+// view, states included) over a large row (the rest), wrapped so the image is never wider than REVIEW_SHEET_WIDTH. Pure.
+export const REVIEW_SHEET_WIDTH = 1600;
+const REVIEW_ROW_HEIGHTS = { phone: 560, large: 360 };
+export function reviewSheetHtml(id, images, states = []) {
+  const views = [...RENDERS, ...stateRenders(states)];
+  const row = (label, height, list) => `<section><h2>${label}</h2>
+<div>${list.map(view => `<figure><img src="${images[view.name]}" style="height: ${height}px"><figcaption>${view.name}</figcaption></figure>`).join('')}</div></section>`;
+  const isPhone = view => view.viewport[0] === PHONE[0];
+  return `<!doctype html><meta charset="utf-8"><title>${escape(id)}</title>
+<style>
+  body { box-sizing: border-box; margin: 0; padding: 16px; max-width: ${REVIEW_SHEET_WIDTH}px; font: 14px system-ui, sans-serif; background: #eee; color: #222; }
+  h1 { margin: 0 0 8px; font-size: 20px; }
+  h2 { margin: 12px 0 6px; font-size: 14px; color: #666; }
+  section > div { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+  figure { margin: 0; }
+  img { display: block; border: 1px solid #bbb; background: #fff; }
+  figcaption { margin-top: 4px; color: #666; }
+</style>
+<h1>${escape(id)}</h1>
+${row('phone', REVIEW_ROW_HEIGHTS.phone, views.filter(isPhone))}
+${row('large', REVIEW_ROW_HEIGHTS.large, views.filter(view => !isPhone(view)))}`;
+}
+
+// Serves `html`, sizes the viewport to the laid-out document (at least `width` wide), and screenshots it to `file`.
+async function writeSheet(browser, file, html, width = 1200) {
   const page = await browser.newPage();
   try {
-    const html = contactSheetHtml(title, rows);
-    await page.serve(url => (url.href === `${ORIGIN}/contact-sheet.html` ? { type: 'text/html; charset=utf-8', body: Buffer.from(html) } : null));
-    await page.setViewport(1200, 800);
-    await page.goto(`${ORIGIN}/contact-sheet.html`);
+    await page.serve(url => (url.href === `${ORIGIN}/sheet.html` ? { type: 'text/html; charset=utf-8', body: Buffer.from(html) } : null));
+    await page.setViewport(width, 800);
+    await page.goto(`${ORIGIN}/sheet.html`);
     const size = await page.evaluate(async () => {
       await Promise.all([...document.images].map(image => image.decode()));
       return [document.documentElement.scrollWidth, document.documentElement.scrollHeight];
@@ -239,6 +263,7 @@ export async function renderExploration(exploration, requested = []) {
       const states = proposalStates(readFileSync(join(proposalsDir, id, 'index.html'), 'utf8'));
       missing.clear();
       const renders = await renderViews(page, url, (name, png) => { writeFileSync(join(dir, `${name}.png`), png); images[name] = dataUri('image/png', png); }, states);
+      await writeSheet(browser, join(dir, 'review.png'), reviewSheetHtml(id, images, states), REVIEW_SHEET_WIDTH);
       const summary = summarize(url, renders);
       writeFileSync(join(dir, 'checks.json'), `${JSON.stringify(summary, null, 2)}\n`);
       writeFileSync(join(dir, 'view.html'), viewHtml(exploration, id, route));
@@ -246,7 +271,7 @@ export async function renderExploration(exploration, requested = []) {
     }
     await page.close();
     const sheet = join(out, 'contact-sheet.png');
-    await writeContactSheet(browser, sheet, 'Contact sheet', proposals.map(p => ({ id: p.id, pass: p.summary.pass && p.summary.complete, images: p.images })));
+    await writeSheet(browser, sheet, contactSheetHtml('Contact sheet', proposals.map(p => ({ id: p.id, pass: p.summary.pass && p.summary.complete, images: p.images }))));
     return { renders: out, sheet, proposals: proposals.map(({ images: _images, ...rest }) => rest) };
   } finally {
     await browser.close();
@@ -260,6 +285,7 @@ export function report(result) {
     lines.push(`${id}: ${summary.pass && summary.complete ? 'pass' : `FAIL (${problems.join('; ')})`}`);
     lines.push(`  ${dir}/{${[...RENDERS, ...stateRenders(states)].map(r => r.name).join(',')}}.png, checks.json, view.html`);
     lines.push(`  ${dir}/${FULL_PAGE_VIEW}-full.png: the phone light view at the full document height (your own review; a page whose inner scroller holds the content shows only what the document shows)`);
+    lines.push(`  ${dir}/review.png: every checked view of this proposal on one image (your own review)`);
     if (missing.length) lines.push(`  not found: ${missing.join(', ')}`);
   }
   return lines.join('\n');

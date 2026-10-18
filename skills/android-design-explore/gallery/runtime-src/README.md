@@ -165,6 +165,8 @@ Open overlays are found through the library's own open state: a modal `m3e-botto
 
 `render` also writes `renders/<id>/light-full.png`: the default-state phone light view (411 wide) captured at the full height of the document, so an agent can review content below the first screen. It is for your own review only: it is not in the contact sheet, not in `checks.json`, and not a judged view, and the checks run on the viewport views only. The capture shows what the document shows: a page whose own inner scroller (`overflow: auto` on an element) holds the content shows only that scroller's visible part, and fixed elements such as the floating toolbar stay at the viewport position.
 
+`render` also writes `renders/<id>/review.png`: every checked view of the proposal on one image, so an agent reviews one image per proposal instead of one per view. A phone row (`light`, `dark`, `wallpaper`, then `<state>-light` for each state) sits over a large row (`foldable`, `tablet`, `desktop`, then `<state>-tablet` for each state), each view captioned and scaled to a fixed height per row, wrapping so the image is never wider than 1600px. It is for your own review only: it is not judged, not in `checks.json`, not in the contact sheet, and not in `view.html`. `light-full.png` is not on it.
+
 ## Rebuild
 
 ```

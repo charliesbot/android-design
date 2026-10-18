@@ -170,6 +170,13 @@ test('render also writes light-full.png at the full document height, outside che
   assert.deepEqual(checks.renders.map(r => r.name), RENDERS.map(r => r.name));
   assert.equal(checks.pass, true);
   assert.doesNotMatch(readFileSync(join(out, 'view.html'), 'utf8'), /light-full/);
+  // review.png holds every checked view on one image no wider than 1600px, and is likewise outside checks and views.
+  assert.match(done.stdout, /review\.png/);
+  const [reviewWidth, reviewHeight] = pngSize(join(out, 'review.png'));
+  assert.ok(reviewWidth <= 1600, `review.png is ${reviewWidth}px wide`);
+  assert.ok(reviewHeight > 560, `review.png is ${reviewHeight}px tall`);
+  assert.ok(checks.renders.every(r => !r.name.startsWith('review')));
+  assert.doesNotMatch(readFileSync(join(out, 'view.html'), 'utf8'), /review\.png/);
 });
 
 test('light-full.png of a page shorter than the viewport is the viewport size', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH', timeout: 180000 }, t => {

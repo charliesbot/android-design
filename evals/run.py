@@ -25,7 +25,7 @@ CASE_SKILLS = "skills"
 CLI = EXPLORE_DIR / "gallery" / "cli.mjs"
 PROPOSAL = "a"
 # The views `cli.mjs render` writes, in its order. test_run.py keeps this in step with gallery/render.mjs.
-REVIEW_ONLY_RENDERS = ("light-full.png",)
+REVIEW_ONLY_RENDERS = ("light-full.png", "review.png")
 RENDER_NAMES = ("light", "dark", "wallpaper", "foldable", "tablet", "desktop")
 GIT = ["git", "-c", "user.name=android-design-evals", "-c", "user.email=evals@example.invalid"]
 
@@ -128,7 +128,8 @@ def render(case_dir):
     source = exploration / 'renders' / PROPOSAL
     renders.mkdir()
     # The six default views, plus <state>-light.png and <state>-tablet.png for each state the proposal declares in p-states.
-    # light-full.png (the phone view at full document height) is for the agent's own review, not for judging.
+    # light-full.png (the phone view at full document height) and review.png (every view on one image) are for the agent's
+    # own review, not for judging.
     for path in [*sorted(source.glob('*.png')), source / 'checks.json']:
         if path.name in REVIEW_ONLY_RENDERS:
             continue
