@@ -1,0 +1,17 @@
+[
+  {"query": "my compose settings screen in app/src/main/kotlin/settings/SettingsScreen.kt looks like a template, can you polish it so it feels more material 3 expressive", "should_trigger": true},
+  {"query": "review this Compose home screen for hierarchy problems, the primary button gets lost next to the cards", "should_trigger": true},
+  {"query": "set up a MaterialExpressiveTheme for my android app with a brand color #2E6B5E and google sans flex", "should_trigger": true},
+  {"query": "which component should I use for page actions on my android player screen, a bottom app bar or something newer?", "should_trigger": true},
+  {"query": "build the checkout screen for my android shop app in jetpack compose, phone and tablet layouts", "should_trigger": true},
+  {"query": "the tablet layout of my compose notes app is just the phone stretched, make it adapt properly", "should_trigger": true},
+  {"query": "pick the type scale and a display face for the hero numbers on my android fitness stats screen", "should_trigger": true},
+  {"query": "my android list screen uses dividers and chevrons everywhere, make it look like a modern android app", "should_trigger": true},
+  {"query": "add expressive motion to the FAB and the card transitions in my compose app", "should_trigger": true},
+  {"query": "do a design review of the screenshots in docs/screens/ for my android banking app", "should_trigger": true},
+  {"query": "my swiftui onboarding flow on iPhone feels flat, help me add more personality", "should_trigger": false},
+  {"query": "build a marketing landing page for my startup with tailwind and react", "should_trigger": false},
+  {"query": "gradle sync fails with AGP 9.1 and kotlin 2.4 in my android project, fix the build", "should_trigger": false},
+  {"query": "write unit tests for the repository layer of my android app using fakes", "should_trigger": false},
+  {"query": "my room database migration crashes on upgrade from version 3 to 4", "should_trigger": false}
+]

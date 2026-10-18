@@ -1,11 +1,9 @@
 ---
 name: android-design
 description: >
-  Material 3 Expressive design judgment for Android apps in Jetpack Compose, distilled from Google's
-  guidelines, UX research, and I/O talks. Use when designing, building, or reviewing Android phone, tablet,
-  or desktop screens; choosing components;
-  setting up a theme (color, type, shape, motion); or when a Compose UI looks generic and needs hierarchy,
-  emphasis, or polish.
+  Material 3 Expressive design for Android. Use when designing, building, or reviewing Android phone, tablet,
+  or desktop screens in Jetpack Compose; choosing components; setting up a theme (color, type, shape, motion);
+  or when a Compose UI looks generic and needs hierarchy, emphasis, or polish.
 ---
 
 # Android Design
@@ -317,23 +315,6 @@ Code checks, separately:
 - [ ] Text and icons use their intended role pairs: no `copy(alpha = ...)`, no hard-coded hex colors.
 - [ ] Custom animations use `MaterialTheme.motionScheme`, not `tween()`.
 - [ ] Navigation, dismissal, and selection match the chosen Android component's semantics (section 12); content drawn edge-to-edge.
-
-## Quick reference
-
-| Need | Technique | Value / API |
-| --- | --- | --- |
-| Expressive defaults | Expressive theme | `MaterialExpressiveTheme(motionScheme = MotionScheme.expressive())`, material3 1.5.0-alpha+ |
-| Primary action | Largest interactive element, strongest fill, where the hands already are | `ButtonDefaults.shapesFor(height)` at the size the context needs (XS 32 to XL 136dp), `primary` |
-| Hierarchy by color | Role contrast | `primary` action, `secondary` selection, `tertiary` accent, `on*` pairs |
-| Key text | Emphasized type | `typography.headlineLargeEmphasized` |
-| Hero numbers | Display plus tabular figures | `displayLarge` + `fontFeatureSettings = "tnum"` |
-| Decorative shape | Shape library | `MaterialShapes.Cookie9Sided.toShape()` (opt-in) |
-| Nested corners | Optical roundness | inner = outer minus padding |
-| Component motion | Theme springs | `MaterialTheme.motionScheme.fastSpatialSpec()`, `defaultEffectsSpec()` |
-| Grouping | Gaps and containers | `ListItemDefaults.SegmentedGap`, `surfaceContainer*` |
-| Short wait | Loading indicator | `LoadingIndicator()` for 200ms to 5s |
-| Page actions | Floating toolbar | `HorizontalFloatingToolbar` + `vibrantFloatingToolbarColors()` for emphasis |
-| Hero moments | Combine tactics | one or two per product |
 
 ## References
 

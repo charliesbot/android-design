@@ -89,6 +89,16 @@ python3 promote.py /tmp/design-eval
 
 Agents vary across runs. A failure is a signal; inspect repeated results before attributing it to a skill change. Keep briefs, assets, skill snapshot, render sizes, generator, and judge settings fixed for comparisons. Preparation snapshots both skills, case specifications, and rubric. Record the actual model separately when relying on a CLI's configured default.
 
+## Trigger evals
+
+`triggers/android-design.json` and `triggers/android-design-explore.json` hold realistic prompts with `should_trigger`, for checking that each skill's description reaches its own requests and stays quiet on near-misses. Run them after changing a skill's `description`, with the skill-creator skill's runner (it calls `claude -p`, so it needs a signed-in Claude Code CLI and measures Claude Code only):
+
+```bash
+python3 <skill-creator>/scripts/run_eval.py --eval-set evals/triggers/android-design.json --skill-path skills/android-design --runs-per-query 3
+```
+
+The runner counts a trigger only when Claude reads its temporary copy of the skill, so uninstall the same-named skill first (or count the installed one too); with both present, every query reads as a miss. Pass bar: every `should_trigger: true` query triggers in at least two of three runs, and every near-miss in at most one.
+
 ## Compose port check
 
 The evals judge HTML proposals, so they cannot show whether an approved proposal survives the port to Compose. Check that by hand after changing `skills/android-design-explore/references/compose-mapping.md` or the pinned material3 version, not on every skill change.
