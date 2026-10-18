@@ -54,7 +54,7 @@ What the runtime contains and how its rule checker works: [`docs/proposal-runtim
 | `skills/android-design-explore/` | The exploration skill: HTML proposals, render and view tooling, and the Compose porting table |
 | `docs/research/` | Distilled research from m3.material.io, developer.android.com/design/ui, and official videos and articles |
 | `docs/research/source-coverage.md` | Every official source page and whether its guidance reached the research |
-| `evals/` | Headless agents build four phone briefs (plus parked Wear and widget briefs), and the renders are checked against the skill's rules. `evals/compose-starter/` is the Compose sandbox for the manual port check |
+| `evals/` | Headless agents build four phone briefs, and the renders are checked against the skill's rules. `evals/compose-starter/` is the Compose sandbox and `evals/verify/` the component verify page for the manual port check |
 | `sources/` | Every official source page as Markdown, fetched by `scripts/fetch.py` |
 | `scripts/` | `fetch.py` refreshes `sources/`; `check_coverage.py` checks it against the coverage ledger |
 

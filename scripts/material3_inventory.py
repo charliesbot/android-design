@@ -3,15 +3,15 @@
 
 Usage: material3_inventory.py
 
-Reads the material3 version from the exploration starter's libs.versions.toml, finds the matching AAR in the
+Reads the material3 version from the Compose sandbox's (`evals/compose-starter`) libs.versions.toml, finds the matching AAR in the
 local Gradle cache, and writes:
 
-- skills/android-design-explore/references/material3-inventory.txt: one name per line (`Class`, `Class.member`, or a bare
+- scripts/material3-inventory.txt: one name per line (`Class`, `Class.member`, or a bare
   top-level function name), no signatures. compose-mapping.md may only use names that appear here.
 - skills/android-design-explore/gallery/runtime-src/type-scale.json: sizes, line heights, tracking, and weights read from
   androidx.compose.material3.tokens.TypeScaleTokens.
 
-Needs `javap` from a JDK. Build the exploration starter once so Gradle downloads the artifacts.
+Needs `javap` from a JDK. Build the Compose sandbox (`evals/compose-starter`) once so Gradle downloads the artifacts.
 """
 import json
 import re
@@ -23,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LIBS_TOML = ROOT / "evals/compose-starter/gradle/libs.versions.toml"
-INVENTORY = ROOT / "skills/android-design-explore/references/material3-inventory.txt"
+INVENTORY = ROOT / "scripts/material3-inventory.txt"
 TYPE_SCALE = ROOT / "skills/android-design-explore/gallery/runtime-src/type-scale.json"
 GRADLE_FILES = Path.home() / ".gradle/caches/modules-2/files-2.1"
 
@@ -268,7 +268,7 @@ def main():
     version = material3_version(LIBS_TOML.read_text())
     _, aar = find_aar("androidx.compose.material3", "material3-android", version)
     if not aar:
-        sys.exit(f"material3-android {version} is not in {GRADLE_FILES}. Build the exploration starter once so Gradle downloads it.")
+        sys.exit(f"material3-android {version} is not in {GRADLE_FILES}. Build the Compose sandbox (`evals/compose-starter`) once so Gradle downloads it.")
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)

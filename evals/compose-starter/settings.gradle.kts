@@ -41,5 +41,3 @@ include(":core:data")
 include(":core:strings")
 
 include(":core:designsystem:common")
-
-include(":wear")

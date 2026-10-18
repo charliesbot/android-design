@@ -6,7 +6,7 @@ import { homedir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SURFACES = ['app', 'wear'];
+const SURFACES = ['app'];
 
 function isSymlink(path) {
   try { return lstatSync(path).isSymbolicLink(); } catch { return false; }

@@ -10,7 +10,8 @@ import { dirname, join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { Browser, chromeExecutable } from '../../skills/android-design-explore/gallery/cdp.mjs';
-import { ORIGIN, RENDERS, lintFolder, makeRoute, renderViews, summarize } from '../../skills/android-design-explore/gallery/render.mjs';
+import { LintError, lintFolder } from '../../skills/android-design-explore/gallery/lint.mjs';
+import { ORIGIN, RENDERS, makeRoute, renderViews, summarize } from '../../skills/android-design-explore/gallery/render.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const CHECKS = join(ROOT, 'evals/checks.py');
@@ -38,7 +39,7 @@ const CASES = {
   'icon-unknown': { fails: ['C-lint', 'C-review'], detail: /<p-icon name="homey"> is not a Material Symbols name/ }, // a made-up symbol would render as plain text
   'palette-expressive': { fails: ['C-palette'], detail: /variant expressive/ },
   'tiny-target': { fails: ['C-review'], detail: /light: touchTargets/ },
-  'non-flex-font': { fails: ['C-lint', 'C-review'], detail: /font-family is not allowed: "Georgia" is not bundled/ }, // publish lint rejects unbundled families, so the runtime fonts check has no seeded case
+  'non-flex-font': { fails: ['C-lint', 'C-review'], detail: /font-family is not allowed: "Georgia" is not bundled/ }, // lint rejects unbundled families, so the runtime fonts check has no seeded case
   'brand-font-small': { fails: ['C-lint', 'C-review'], detail: /Fraunces is only for headline small/ }, // a brand face below 24px
   'control-brand-font': { fails: [] }, // a brand face at display size is allowed and renders
   'low-contrast': { fails: ['C-review'], detail: /light: contrast/ },
@@ -129,9 +130,15 @@ if (!chrome) {
       cpSync(name === 'control' ? STARTER : join(DEFECTS, name), proposal, { recursive: true });
       mkdirSync(join(caseDir, 'renders'), { recursive: true });
       writeFileSync(join(caseDir, 'case.json'), JSON.stringify({ proposal_dir: proposal }));
-      const errors = lintFolder(proposal);
-      writeFileSync(join(caseDir, 'lint.json'), JSON.stringify({ ok: errors.length === 0, output: errors.join('\n') }));
-      if (!errors.length) {
+      let lintError = '';
+      try {
+        lintFolder(proposal);
+      } catch (error) {
+        if (!(error instanceof LintError)) throw error;
+        lintError = error.message;
+      }
+      writeFileSync(join(caseDir, 'lint.json'), JSON.stringify({ ok: !lintError, output: lintError }));
+      if (!lintError) {
         const url = `${ORIGIN}/proposal/`;
         const renders = await renderViews(page, url);
         if (open) for (const view of OPEN_VIEWS) renders.push(await renderOpen(url, open, view));

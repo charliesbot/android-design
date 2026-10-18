@@ -1,5 +1,5 @@
 // Entry of the proposal runtime: registers the @m3e/web elements proposals may use,
-// then the runtime's own pieces. Built to ../public/runtime/m3e.js (see README.md).
+// then the runtime's own pieces. Built to ../public/runtime/m3e.js (see docs/proposal-runtime.md).
 import '@m3e/web/theme';
 import '@m3e/web/app-bar';
 import '@m3e/web/button';

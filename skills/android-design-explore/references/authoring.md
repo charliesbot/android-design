@@ -1,6 +1,6 @@
 # Proposal authoring guide
 
-A proposal is an `index.html` and a `style.css` that load this runtime, in one folder. Read this before writing markup. The maintainer notes (what the runtime contains, the rule checker's internals, theme messages, rebuild) are in [`docs/proposal-runtime.md`](../../../../docs/proposal-runtime.md).
+A proposal is an `index.html` and a `style.css` that load this runtime, in one folder. Read this before writing markup.
 
 ## Page contract
 
@@ -12,7 +12,7 @@ A proposal page starts like this:
 <script type="module" src="/runtime/m3e.js"></script>
 ```
 
-Wrap the page in `<m3e-theme color="#RRGGBB" variant="tonal-spot" scheme="light">`. The folder's own files are referenced by relative path, because `view.html` inlines the runtime, fonts, and proposal files as data URIs. `sample/` has a working page.
+Wrap the page in `<m3e-theme color="#RRGGBB" variant="tonal-spot" scheme="light">`. The folder's own files are referenced by relative path, because `view.html` inlines the runtime, fonts, and proposal files as data URIs. `assets/proposal-starter/` is a working page.
 
 ## Authoring rules
 
@@ -103,12 +103,4 @@ Draw a line or area chart as inline SVG in `index.html`. Its colors come only fr
 
 ## Render output
 
-`cli.mjs render <proposal-folder> [--open]` lints the proposal, then loads it at exactly 411x923 (light, dark, and a red wallpaper color), 933x704, 1280x800, and 1920x1080 and runs the rule checks on every view. It writes `<proposal-folder>/renders/`, removed and rewritten each run:
-
-- `light.png`, `dark.png`, `wallpaper.png`, `foldable.png`, `tablet.png`, `desktop.png`: the checked views.
-- `light-full.png`: the phone light view at the full height of the document, for review below the first screen. It is not checked. A page whose inner scroller (`overflow: auto` on an element) holds the content shows only that scroller's visible part.
-- `review.png`: every checked view on one captioned image, a phone row over a large row, at most 1600px wide. It is not checked.
-- `checks.json`: `{ url, renders: [{ name, viewport: [width, height], result }], pass, complete }`.
-- `view.html`: one self-contained file to switch devices, light and dark, seed color, and palette. `--open` opens it in the default browser.
-
-`pass` is false when any view fails a check (touch target under 48x48, text outside Google Sans Flex, clipped or overlapped text, a page wider than its viewport, text contrast below 4.5:1, a `data-primary` shorter than another action, more than one FAB). `complete` is false when a check could not be resolved, such as text over a gradient. Treat `complete: false` as not verified, whatever `pass` says. The checker's details are in `docs/proposal-runtime.md`.
+`SKILL.md` and `cli.mjs --help` describe what `render` writes and how to read `checks.json`.

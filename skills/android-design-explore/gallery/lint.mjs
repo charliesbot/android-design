@@ -1,13 +1,10 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Build caches, secrets, dotfiles, and the render output never belong to a proposal.
-const SKIP = new Set(['build', 'renders', 'local.properties', '__pycache__', 'screenshotTestDebug', 'node_modules']);
-
 export class LintError extends Error {}
 
 
-// Strict styling lint. Each rule keeps a proposal a lookup into Compose tokens (documented in runtime-src/README.md, Authoring rules).
+// Strict styling lint. Each rule keeps a proposal a lookup into Compose tokens (documented in references/authoring.md, Authoring rules).
 const NAMED_COLORS = ('aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen').split(' ');
 const COLOR_WORD = new RegExp(`(?<![\\w-])(?:${NAMED_COLORS.join('|')})(?![\\w-])`, 'i');
 const COLOR_FUNCTION = /(?<![\w-])(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i;
@@ -162,7 +159,7 @@ function lintHtml(file, source) {
   }
 }
 
-export function lintProposal(files) {
+function lintProposal(files) {
   for (const file of files) {
     if (/\.css$/i.test(file.path)) lintCss(file.path, file.bytes.toString('utf8'));
     else if (/\.html?$/i.test(file.path)) lintHtml(file.path, file.bytes.toString('utf8'));
@@ -170,10 +167,11 @@ export function lintProposal(files) {
   }
 }
 
-const skipped = name => SKIP.has(name) || name.startsWith('.') || /\.(pem|key|keystore|jks)$/.test(name);
+// The render output and dotfiles never belong to a proposal.
+const skipped = name => name === 'renders' || name.startsWith('.');
 
-// Regular files of a proposal folder with their bytes. Build caches, dotfiles, `renders/`, and secrets are skipped; symlinks and special files are refused.
-export function proposalFiles(root, prefix = '') {
+// Regular files of a proposal folder with their bytes. `renders/` and dotfiles are skipped; symlinks and special files are refused.
+function proposalFiles(root, prefix = '') {
   return readdirSync(join(root, prefix), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name)).flatMap(entry => {
     if (skipped(entry.name)) return [];
     const path = prefix ? `${prefix}/${entry.name}` : entry.name;
@@ -182,4 +180,11 @@ export function proposalFiles(root, prefix = '') {
     if (!entry.isFile()) throw new LintError('Proposal source must contain regular files');
     return [{ path, bytes: readFileSync(join(root, path)) }];
   });
+}
+
+// Lints a proposal folder. Throws a LintError whose message is "file:line: message" for the first problem.
+export function lintFolder(folder) {
+  const files = proposalFiles(folder);
+  if (!files.some(file => file.path === 'index.html')) throw new LintError('index.html: missing');
+  lintProposal(files);
 }

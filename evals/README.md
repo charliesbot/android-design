@@ -105,6 +105,7 @@ The evals judge HTML proposals, so they cannot show whether an approved proposal
 2. Copy `evals/compose-starter/` to a scratch folder. It is the Android sandbox the port lands in.
 3. Have an agent that has not seen the proposal's renders port it to Compose using only the proposal source and `compose-mapping.md`, then render it by running `node render.mjs app` in the scratch folder.
 4. Compare the Compose render with the HTML phone render. Differences the HTML determined (layout, hierarchy, color roles, type roles, component choice) are mapping bugs to fix in `compose-mapping.md`. Small style choices the HTML left open are expected.
+5. To mark a `compose-mapping.md` row `verified`, render its component from the verify page with `node skills/android-design-explore/gallery/cli.mjs render evals/verify` and compare the Compose render of the same component with the section in `evals/verify/renders/light.png` or `view.html`. The page lists every registered component with its variants; its checks fail by design (many FABs, small targets), so only the render matters. Delete `evals/verify/renders/` afterwards (it is gitignored).
 
 ## Verification and files
 
@@ -116,6 +117,7 @@ Run `python3 -m unittest discover evals` from the repository root to test adapte
 | `run.py`, `backends.py` | Artifact lifecycle and optional CLI launchers |
 | `checks.py`, `judge.py`, `rubric.md` | Deterministic checks and provider-independent rubric judgments |
 | `calibration/`, `baseline/` | Labeled renders and explicitly accepted baselines |
+| `verify/` | One section per `compose-mapping.md` component with its variants, rendered for the Compose port check |
 | `skills/android-design-explore/gallery/render.mjs` | Headless Chrome renders of a proposal plus its in-page `runtimeChecks` (what `cli.mjs render` runs) |
 | `preference/` | Owner preference rounds |
 

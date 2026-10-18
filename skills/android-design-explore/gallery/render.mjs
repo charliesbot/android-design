@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, wr
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Browser } from './cdp.mjs';
-import { LintError, lintProposal, proposalFiles } from './lint.mjs';
+import { lintFolder } from './lint.mjs';
 import { dataUri, inlineHtml, viewerHtml } from './view.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -144,7 +144,7 @@ ${row('large', REVIEW_ROW_HEIGHTS.large, views.filter(view => !isPhone(view)))}`
 }
 
 // Serves `html`, sizes the viewport to the laid-out document (at least `width` wide), and screenshots it to `file`.
-async function writeSheet(browser, file, html, width = 1200) {
+async function writeSheet(browser, file, html, width) {
   const page = await browser.newPage();
   try {
     await page.serve(url => (url.href === `${ORIGIN}/sheet.html` ? { type: 'text/html; charset=utf-8', body: Buffer.from(html) } : null));
@@ -161,19 +161,6 @@ async function writeSheet(browser, file, html, width = 1200) {
   }
 }
 
-// Lints the folder and returns the errors as "file:line: message" lines; nothing is rendered when there are any.
-export function lintFolder(folder) {
-  try {
-    const files = proposalFiles(folder);
-    if (!files.some(file => file.path === 'index.html')) throw new LintError('index.html: missing');
-    lintProposal(files);
-    return [];
-  } catch (error) {
-    if (!(error instanceof LintError)) throw error;
-    return [error.message];
-  }
-}
-
 export function viewHtml(folder, route) {
   const pageUrl = new URL(`${ORIGIN}/proposal/`);
   const source = route(new URL('index.html', pageUrl)).body.toString('utf8');
@@ -185,8 +172,7 @@ export async function renderProposal(folder) {
   const given = resolve(folder);
   if (!existsSync(given) || !statSync(given).isDirectory()) throw new Error(`Not a proposal folder: ${given}`);
   folder = realpathSync(given);
-  const errors = lintFolder(folder);
-  if (errors.length) throw new LintError(errors.join('\n'));
+  lintFolder(folder);
 
   const route = makeRoute({ proposalDir: folder });
   const dir = join(folder, 'renders');

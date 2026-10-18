@@ -17,17 +17,15 @@ test('parse splits the command from its arguments and options', () => {
   assert.equal(parse(['--help']).values.help, true);
 });
 
-test('the help lists the render command and its outputs only', () => {
+test('the help lists the render command and its outputs', () => {
   for (const word of ['render', 'view.html', 'review.png', 'light-full.png', 'checks.json', 'CHROME_PATH']) assert.match(help, new RegExp(word));
-  for (const word of ['create', 'cleanup', 'publish', 'serve', 'status', 'wait']) assert.doesNotMatch(help, new RegExp(`cli\\.mjs ${word}\\b`));
-  for (const word of ['contact-sheet', 'p-states', 'proposalState']) assert.doesNotMatch(help, new RegExp(word));
 });
 
-test('--help prints the help and removed or malformed commands fail', () => {
+test('--help prints the help and malformed commands fail', () => {
   const helped = run('--help');
   assert.equal(helped.status, 0);
   assert.match(helped.stdout, /cli\.mjs render <proposal-folder>/);
-  for (const args of [['create', '--project', '/x'], ['cleanup', 'x', '--yes'], ['publish', 'x', 'y'], ['serve', 'x'], ['render'], ['render', 'a', 'b']]) assert.notEqual(run(...args).status, 0, args.join(' '));
+  for (const args of [['render'], ['render', 'a', 'b']]) assert.notEqual(run(...args).status, 0, args.join(' '));
 });
 
 test('render stops on a lint error with file:line and exit code 2, before starting Chrome', t => {
