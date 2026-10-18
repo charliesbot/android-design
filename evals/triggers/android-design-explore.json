@@ -1,0 +1,16 @@
+[
+  {"query": "explore three visual directions for the home screen of a habit tracker app idea before we write any compose code", "should_trigger": true},
+  {"query": "brainstorm redesign alternatives for my android recipe app's detail screen, don't touch the app code yet", "should_trigger": true},
+  {"query": "i have an idea for an android budgeting app, can you mock up a few options for the main screen so I can compare them", "should_trigger": true},
+  {"query": "show me 3 different design proposals for a now playing screen for my music app, phone and tablet", "should_trigger": true},
+  {"query": "before implementing, let's iterate on visual directions for the onboarding of my android meditation app", "should_trigger": true},
+  {"query": "explore ideas for a stock detail screen in an open source trading app, I want to compare directions in chat", "should_trigger": true},
+  {"query": "I like proposal b but make it warmer and try a version with the chart bigger", "should_trigger": true},
+  {"query": "sketch some alternative layouts for the settings screen of my android notes app, render them so I can see them on phone and desktop", "should_trigger": true},
+  {"query": "fix the padding and colors in app/src/main/kotlin/ui/HomeScreen.kt, the cards are too cramped", "should_trigger": false},
+  {"query": "implement this figma frame for the profile screen in compose and wire it to the viewmodel", "should_trigger": false},
+  {"query": "review my compose PR for material 3 component usage", "should_trigger": false},
+  {"query": "build a figma design system file for my web app", "should_trigger": false},
+  {"query": "create a react prototype of my saas dashboard with three color themes", "should_trigger": false},
+  {"query": "set up MaterialExpressiveTheme with dynamic color in my existing android app", "should_trigger": false}
+]
