@@ -58,9 +58,12 @@ export const DEVICES = [
 export const SEEDS = [['Purple', '#6750a4'], ['Blue', '#0061a4'], ['Green', '#386a20'], ['Amber', '#8b5000'], ['Rose', '#984061']];
 export const VARIANTS = ['tonal-spot', 'neutral', 'vibrant', 'expressive'];
 
+// How long a frame may stay hidden waiting for its proposal to report {type: "state-ready"}.
+export const REVEAL_MS = 3000;
+
 // The viewer chrome is plain JS and CSS on purpose: it is not a proposal and has no build step.
-export function viewerHtml({ title, doc, states = [] }) {
-  const data = JSON.stringify({ doc, devices: DEVICES, seeds: SEEDS, variants: VARIANTS, states }).replace(/</g, '\\u003c');
+export function viewerHtml({ title, doc, states = [], revealMs = REVEAL_MS }) {
+  const data = JSON.stringify({ doc, devices: DEVICES, seeds: SEEDS, variants: VARIANTS, states, revealMs }).replace(/</g, '\\u003c');
   const esc = value => String(value).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
   return `<!doctype html>
 <html lang="en">
@@ -78,8 +81,11 @@ export function viewerHtml({ title, doc, states = [] }) {
   button[aria-pressed="true"] { background: CanvasText; color: Canvas; }
   .swatch { width: 24px; height: 24px; padding: 0; border-radius: 50%; }
   main { flex: 1; overflow: auto; padding: 16px; display: flex; justify-content: center; align-items: flex-start; }
-  #wrap { flex: none; }
-  iframe { border: 1px solid color-mix(in srgb, CanvasText 30%, transparent); background: #fff; transform-origin: top left; }
+  #wrap { flex: none; display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 16px; }
+  figure { margin: 0; flex: none; }
+  figcaption { padding: 0 0 6px; opacity: .7; text-align: center; }
+  iframe { display: block; box-sizing: border-box; border: 1px solid color-mix(in srgb, CanvasText 30%, transparent); background: #fff; transform-origin: top left; }
+  iframe[data-pending] { visibility: hidden; }
 </style>
 </head>
 <body>
@@ -93,29 +99,66 @@ export function viewerHtml({ title, doc, states = [] }) {
 </header>
 <main id="stage"><div id="wrap"></div></main>
 <script>
-const { doc, devices, seeds, variants, states } = ${data};
+const { doc, devices, seeds, variants, states, revealMs } = ${data};
 const $ = id => document.getElementById(id);
-let size = devices[0].size, theme = {}, frame, state = '';
+// A proposal with states opens on All screens: Default and each state, live side by side. Otherwise one frame.
+let size = devices[0].size, theme = {}, allMode = states.length > 0, state = '', frames = [];
+const MIN_SCALE = 0.5, GAP = 16;
+
+const screens = () => allMode ? ['', ...states] : [state];
+const post = (frame, message) => frame.contentWindow.postMessage(message, '*');
+// A frame stays hidden until its screen is ready, so the default screen never flashes before a state opens.
+const reveal = frame => frame.removeAttribute('data-pending');
 
 function mount() {
-  frame = document.createElement('iframe');
-  frame.addEventListener('load', () => {
-    frame.contentWindow.postMessage({ type: 'theme', ...theme }, '*');
-    if (state) frame.contentWindow.postMessage({ type: 'state', name: state }, '*');
+  frames = screens().map(name => {
+    const frame = document.createElement('iframe');
+    frame.dataset.pending = '';
+    frame.addEventListener('load', () => {
+      post(frame, { type: 'theme', ...theme });
+      if (name) {
+        post(frame, { type: 'state', name });
+        setTimeout(() => reveal(frame), revealMs);
+      } else reveal(frame);
+    });
+    frame.srcdoc = doc;
+    const figure = document.createElement('figure');
+    if (allMode) figure.append(Object.assign(document.createElement('figcaption'), { textContent: name || 'Default' }));
+    figure.append(frame);
+    return frame;
   });
-  frame.srcdoc = doc;
-  $('wrap').replaceChildren(frame);
+  $('wrap').replaceChildren(...frames.map(f => f.parentElement));
   fit();
 }
+// The proposal reports {type: "state-ready", name} once its state is open (name, error when it could not open).
+// The sender must be one of our own frames: from a file:// page the origin is "null", so the source window is the check.
+addEventListener('message', event => {
+  if (event.data?.type !== 'state-ready') return;
+  const frame = frames.find(f => f.contentWindow === event.source);
+  if (!frame) return;
+  if (event.data.error) console.error('state "' + event.data.name + '": ' + event.data.error);
+  reveal(frame);
+});
 function fit() {
-  const [w, h] = size, stage = $('stage');
-  const scale = Math.min(1, (stage.clientWidth - 32) / w, (stage.clientHeight - 32) / h);
-  frame.style.cssText = 'width:' + w + 'px;height:' + h + 'px;transform:scale(' + scale + ')';
-  $('wrap').style.cssText = 'width:' + w * scale + 'px;height:' + h * scale + 'px';
+  const [w, h] = size, stage = $('stage'), avail = stage.clientWidth - 32, n = frames.length;
+  let scale, columns = 1;
+  if (allMode) {
+    // The most frames per row that still keep a readable scale; below that, wrap into more rows.
+    for (let c = n; c >= 1; c--) {
+      scale = Math.min(1, (avail - GAP * (c - 1)) / (c * w));
+      columns = c;
+      if (scale >= MIN_SCALE) break;
+    }
+  } else scale = Math.min(1, avail / w, (stage.clientHeight - 32) / h);
+  for (const frame of frames) {
+    // The transform scales the paint, not the layout box, so negative margins shrink the box to the scaled size.
+    frame.style.cssText = 'width:' + w + 'px;height:' + h + 'px;transform:scale(' + scale + ');margin:0 ' + (w * scale - w) + 'px ' + (h * scale - h) + 'px 0';
+  }
+  $('wrap').style.maxWidth = allMode ? Math.ceil(columns * w * scale + GAP * (columns - 1)) + 1 + 'px' : '';
 }
 function apply(change) {
   Object.assign(theme, change);
-  frame.contentWindow.postMessage({ type: 'theme', ...theme }, '*');
+  for (const frame of frames) post(frame, { type: 'theme', ...theme });
   for (const b of document.querySelectorAll('[data-key]')) b.setAttribute('aria-pressed', String(theme[b.dataset.key] === b.dataset.value));
   $('variant').value = theme.variant ?? '';
 }
@@ -138,11 +181,15 @@ for (const [name, color] of seeds) {
   Object.assign(b.dataset, { key: 'color', value: color });
 }
 // A state is opened by the proposal's own window.proposalState; Default reloads the page, since nothing closes a state.
+if (states.length) button('states', 'All screens', {}, () => { allMode = true; mount(); mark(); }).dataset.all = '';
 for (const name of states.length ? ['', ...states] : []) {
-  const b = button('states', name || 'Default', {}, () => { state = name; mount(); mark(); });
+  const b = button('states', name || 'Default', {}, () => { allMode = false; state = name; mount(); mark(); });
   Object.assign(b.dataset, { state: name });
 }
-function mark() { for (const b of document.querySelectorAll('[data-state]')) b.setAttribute('aria-pressed', String(b.dataset.state === state)); }
+function mark() {
+  for (const b of document.querySelectorAll('[data-state]')) b.setAttribute('aria-pressed', String(!allMode && b.dataset.state === state));
+  document.querySelector('[data-all]')?.setAttribute('aria-pressed', String(allMode));
+}
 mark();
 $('variant').add(new Option("Proposal's palette", ''));
 for (const v of variants) $('variant').add(new Option(v, v));
