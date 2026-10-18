@@ -32,7 +32,9 @@ Implementing or reviewing real Compose code needs the `compose-preview` CLI and 
 
 ## Exploration or implementation
 
-A new app, a new screen, or a redesign starts with a proposal, even when the request says "build" or names only this skill: follow the `android-design-explore` skill, show its proposal in chat, and wait for the user to approve a direction before writing any Compose. Skip the proposal only when the user says to ("skip the proposal", "just code it") or an approved proposal already exists; port an approved proposal with that skill's mapping table.
+When the request cares about the design of a new app, a new screen, or a redesign (it asks for polish, a visual direction, or Material 3 Expressive, or names this skill), start with a proposal, even when it says "build": follow the `android-design-explore` skill, show its proposal in chat, and wait for the user to approve a direction before writing any Compose. Skip the proposal when the user says to ("skip the proposal", "just code it") or an approved proposal already exists; port an approved proposal with that skill's mapping table.
+
+A plain build that does not ask about design goes straight to code, applying the decisions and screen check below.
 
 Changes inside an existing design (a fix, a tweak, a review, a new state of an approved screen) go straight to the actual project under its own approval and branch rules, using the design decisions and screen check below.
 

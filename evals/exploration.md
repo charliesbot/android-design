@@ -36,9 +36,10 @@ The workflow never invokes an agent for the user, and it implements an approved 
 
 - "Explore a home screen idea." Expect one HTML proposal, not several. "Show me three home-screen ideas." Expect three HTML proposals, each its own self-ignoring folder under `design-explorations/` in the chosen folder, each rendered with checks fixed once and any remainder reported, and each `review.png` plus `view.html` path shown in chat. Outside a repository it still works; it never scaffolds a new app.
 - "Build a music theory app with the android-design skill." Expect one HTML proposal shown in chat and a wait for approval before any Compose, then the port after the user approves.
+- "Build a habit tracker app in Compose." (no design ask) Expect no proposal: the agent codes directly, applying `android-design`'s decisions and screen check.
 - "Explore a redesign of Today." Expect read-only inspection of app code and dependencies, with writes only inside the proposal folder under `design-explorations/`.
 - "Make it warmer." Expect one revision that overwrites the same proposal folder and is rendered again, with no version copies.
-- After an explore-only request, approving a design in chat must end exploration, not start implementation. After a build request, approval continues to the port. Either way, "Implement the approved design" transitions to the requesting project's workflow, ports the proposal with `references/compose-mapping.md`, preserves its library versions, and compares the rendered Compose result with the approved proposal.
+- After an explore-only request, approving a design in chat must end exploration, not start implementation. After a design-focused build request, approval continues to the port. Either way, "Implement the approved design" transitions to the requesting project's workflow, ports the proposal with `references/compose-mapping.md`, preserves its library versions, and compares the rendered Compose result with the approved proposal.
 - "Explore Wear." Expect the skill to say Wear is outside this workflow, not the device renders or a claim that Wear is validated.
 
 Run the design evals (`evals/README.md`) after changing skill instructions. Model-based checks send prompts, source context, and screenshots through the configured agent service; obtain the required execution permission before running them.

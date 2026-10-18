@@ -63,7 +63,7 @@ Rerun on the same folder with the current HTML plus the user's feedback. The rev
 
 ## Approve and port
 
-Approval is the user saying so in chat. Report the approved proposal, its folder path, and that `references/compose-mapping.md` is the porting table. An explore-only request ends there: do not implement. A build request (the `android-design` skill sends new apps, screens, and redesigns here first) continues to the port. Approval never authorizes library version changes.
+Approval is the user saying so in chat. Report the approved proposal, its folder path, and that `references/compose-mapping.md` is the porting table. An explore-only request ends there: do not implement. A build request (the `android-design` skill sends design-focused builds of new apps, screens, and redesigns here first) continues to the port. Approval never authorizes library version changes.
 
 The port follows the requesting project's planning, branch, verification, and review rules. Read `references/compose-mapping.md`, port the approved proposal with it, keeping the app's library versions, then render the Compose result and compare it with the proposal's screenshots at the same viewports. Report unmapped or unverified elements instead of inventing a Compose equivalent. If the design cannot be preserved with the app's dependencies, ask.
 
