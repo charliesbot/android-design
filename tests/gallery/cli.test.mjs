@@ -2,64 +2,64 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { help, openCommand, openViews, parse } from '../../skills/android-design-explore/gallery/cli.mjs';
+import { help, openCommand, openView, parse } from '../../skills/android-design-explore/gallery/cli.mjs';
 import { workspace, writeProposal, STYLE } from './fixture.mjs';
 
 const CLI = fileURLToPath(new URL('../../skills/android-design-explore/gallery/cli.mjs', import.meta.url));
 const run = (...args) => spawnSync('node', [CLI, ...args], { encoding: 'utf8' });
 
 test('parse splits the command from its arguments and options', () => {
-  assert.deepEqual(parse(['render', '/x', 'a', 'b']).rest, ['/x', 'a', 'b']);
-  const { command, values } = parse(['create', '--project', '/repo', '--title', 'T', '--starter', 'android']);
-  assert.equal(command, 'create');
-  assert.deepEqual({ ...values }, { project: '/repo', title: 'T', starter: 'android' });
-  assert.equal(parse(['cleanup', '/x', '--yes']).values.yes, true);
+  assert.deepEqual(parse(['render', '/x']).rest, ['/x']);
+  assert.equal(parse(['render', '/x']).command, 'render');
+  assert.equal(parse(['render', '/x', '--open']).values.open, true);
+  assert.equal(parse(['--help']).values.help, true);
 });
 
-test('the help lists create, render, and cleanup only', () => {
-  for (const word of ['create', 'render', 'cleanup', 'view.html', 'contact-sheet.png']) assert.match(help, new RegExp(word));
-  for (const word of ['publish', 'serve', 'status', 'wait']) assert.doesNotMatch(help, new RegExp(`cli\\.mjs ${word}\\b`));
+test('the help lists the render command and its outputs only', () => {
+  for (const word of ['render', 'view.html', 'review.png', 'light-full.png', 'checks.json', 'CHROME_PATH']) assert.match(help, new RegExp(word));
+  for (const word of ['create', 'cleanup', 'publish', 'serve', 'status', 'wait']) assert.doesNotMatch(help, new RegExp(`cli\\.mjs ${word}\\b`));
+  for (const word of ['contact-sheet', 'p-states', 'proposalState']) assert.doesNotMatch(help, new RegExp(word));
 });
 
-test('removed and malformed commands fail', () => {
-  for (const args of [['publish', 'x', 'y'], ['serve', 'x'], ['render'], ['cleanup', 'x']]) assert.notEqual(run(...args).status, 0, args.join(' '));
+test('--help prints the help and removed or malformed commands fail', () => {
+  const helped = run('--help');
+  assert.equal(helped.status, 0);
+  assert.match(helped.stdout, /cli\.mjs render <proposal-folder>/);
+  for (const args of [['create', '--project', '/x'], ['cleanup', 'x', '--yes'], ['publish', 'x', 'y'], ['serve', 'x'], ['render'], ['render', 'a', 'b']]) assert.notEqual(run(...args).status, 0, args.join(' '));
 });
 
 test('render stops on a lint error with file:line and exit code 2, before starting Chrome', t => {
-  const root = workspace(t);
-  writeProposal(root, 'a', { style: `${STYLE}p {\n  color: #000;\n}\n` });
-  writeProposal(root, 'b');
-  const done = run('render', root);
+  const folder = writeProposal(join(workspace(t), 'a'), { style: `${STYLE}p {\n  color: #000;\n}\n` });
+  const done = run('render', folder);
   assert.equal(done.status, 2);
-  assert.match(done.stderr, /proposals\/a\/style\.css:5: .*Raw color/);
-  assert.doesNotMatch(done.stderr, /proposals\/b\//);
+  assert.match(done.stderr, /style\.css:5: .*Raw color/);
+  assert.equal(existsSync(join(folder, 'renders')), false);
 });
 
-test('render rejects an unknown proposal id', t => {
+test('render needs an existing folder with an index.html', t => {
   const root = workspace(t);
-  writeProposal(root, 'a');
-  const done = run('render', root, 'zzz');
-  assert.equal(done.status, 1);
-  assert.match(done.stderr, /Unknown proposal "zzz"\. Available: a/);
-});
-
-test('render --open is parsed as a flag', () => {
-  assert.equal(parse(['render', '/x', 'a', '--open']).values.open, true);
-  assert.deepEqual(parse(['render', '/x', 'a', '--open']).rest, ['/x', 'a']);
+  const missing = run('render', join(root, 'nope'));
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /Not a proposal folder/);
+  mkdirSync(join(root, 'empty'));
+  const empty = run('render', join(root, 'empty'));
+  assert.equal(empty.status, 2);
+  assert.match(empty.stderr, /index\.html: missing/);
 });
 
 test('openCommand picks the platform opener', () => {
-  assert.deepEqual(openCommand('/r/a/view.html', 'darwin'), ['open', ['/r/a/view.html']]);
-  assert.deepEqual(openCommand('/r/a/view.html', 'linux'), ['xdg-open', ['/r/a/view.html']]);
-  assert.deepEqual(openCommand('C:\\r\\a\\view.html', 'win32'), ['explorer.exe', ['C:\\r\\a\\view.html']]);
+  assert.deepEqual(openCommand('/r/view.html', 'darwin'), ['open', ['/r/view.html']]);
+  assert.deepEqual(openCommand('/r/view.html', 'linux'), ['xdg-open', ['/r/view.html']]);
+  assert.deepEqual(openCommand('C:\\r\\view.html', 'win32'), ['explorer.exe', ['C:\\r\\view.html']]);
 });
 
-test('openViews opens each proposal view.html detached', () => {
+test('openView opens the rendered view.html detached', () => {
   const calls = [];
   const spawn = (cmd, args, options) => { calls.push({ cmd, args, options }); return { unref() {}, on() {} }; };
-  const opened = openViews({ proposals: [{ dir: '/r/a' }, { dir: '/r/b' }] }, { platform: 'darwin', spawn });
-  assert.deepEqual(opened, [join('/r/a', 'view.html'), join('/r/b', 'view.html')]);
-  assert.deepEqual(calls.map(c => [c.cmd, c.args]), [['open', ['/r/a/view.html']], ['open', ['/r/b/view.html']]]);
+  const opened = openView({ dir: '/p/renders' }, { platform: 'darwin', spawn });
+  assert.equal(opened, join('/p/renders', 'view.html'));
+  assert.deepEqual(calls.map(c => [c.cmd, c.args]), [['open', ['/p/renders/view.html']]]);
   assert.ok(calls.every(c => c.options.detached && c.options.stdio === 'ignore'));
 });

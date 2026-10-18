@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -9,158 +9,103 @@ import { Browser, chromeExecutable } from '../../skills/android-design-explore/g
 import { RENDERS } from '../../skills/android-design-explore/gallery/render.mjs';
 
 const CLI = fileURLToPath(new URL('../../skills/android-design-explore/gallery/cli.mjs', import.meta.url));
+const STARTER = fileURLToPath(new URL('../../skills/android-design-explore/assets/proposal-starter', import.meta.url));
 let chrome;
 try { chrome = chromeExecutable(); } catch (error) { chrome = null; }
+const skip = chrome ? false : 'Chrome not found; install it or set CHROME_PATH';
+const opts = { skip, timeout: 180000 };
 
-test('render writes images, checks, a contact sheet, and a self-contained view.html', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH', timeout: 180000 }, t => {
-  const repo = realpathSync(mkdtempSync(join(tmpdir(), 'render-chrome-')));
-  t.after(() => rmSync(repo, { recursive: true, force: true }));
-  assert.equal(spawnSync('git', ['init', '-q', repo]).status, 0);
-  const created = spawnSync('node', [CLI, 'create', '--project', repo], { encoding: 'utf8' });
-  assert.equal(created.status, 0, created.stderr);
-  const exploration = created.stdout.trim();
-  const done = spawnSync('node', [CLI, 'render', exploration], { encoding: 'utf8' });
+// A proposal folder copied from the starter, as the agent does it.
+function proposal(t) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'render-chrome-')));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const folder = join(root, 'design-explorations', 'music');
+  cpSync(STARTER, folder, { recursive: true });
+  return folder;
+}
+
+const render = (folder, ...flags) => spawnSync('node', [CLI, 'render', folder, ...flags], { encoding: 'utf8' });
+
+test('the starter ignores itself and is a flat proposal folder', () => {
+  assert.equal(readFileSync(join(STARTER, '.gitignore'), 'utf8'), '*\n');
+  assert.deepEqual(readdirSync(STARTER).sort(), ['.gitignore', 'index.html', 'style.css']);
+});
+
+test('rendering a folder copied from the starter writes the images, checks, review sheet, and a self-contained view.html', opts, t => {
+  const folder = proposal(t);
+  assert.equal(readFileSync(join(folder, '.gitignore'), 'utf8'), '*\n');
+  const done = render(folder);
   assert.equal(done.status, 0, done.stderr);
-  assert.match(done.stdout, /^a: pass$/m);
-  const dir = join(exploration, 'renders/a');
+  assert.match(done.stdout, /^music: pass$/m);
+  const dir = join(folder, 'renders');
   for (const { name } of RENDERS) assert.ok(statSync(join(dir, `${name}.png`)).size > 1000, name);
-  assert.ok(statSync(join(exploration, 'renders/contact-sheet.png')).size > 1000);
+  for (const name of ['light-full.png', 'review.png']) assert.ok(statSync(join(dir, name)).size > 1000, name);
+  assert.deepEqual(readdirSync(dir).sort(), [...RENDERS.map(r => `${r.name}.png`), 'checks.json', 'light-full.png', 'review.png', 'view.html'].sort());
   const checks = JSON.parse(readFileSync(join(dir, 'checks.json'), 'utf8'));
   assert.deepEqual([checks.pass, checks.complete, checks.renders.length], [true, true, RENDERS.length]);
   const view = readFileSync(join(dir, 'view.html'), 'utf8');
-  assert.equal(existsSync(join(dir, 'view.html')), true);
   assert.doesNotMatch(view, /src=\\?"\/runtime|href=\\?"\/runtime|url\(\\?"?fonts\//);
   assert.match(view, /font\/woff2;base64/);
+  assert.match(view, /id="devices"/);
 });
 
-// A proposal that declares open states: a modal bottom sheet (queue) and a dialog (credits) over the starter screen.
-function exploration(t) {
-  const repo = realpathSync(mkdtempSync(join(tmpdir(), 'render-states-')));
-  t.after(() => rmSync(repo, { recursive: true, force: true }));
-  assert.equal(spawnSync('git', ['init', '-q', repo]).status, 0);
-  const created = spawnSync('node', [CLI, 'create', '--project', repo], { encoding: 'utf8' });
-  assert.equal(created.status, 0, created.stderr);
-  return created.stdout.trim();
-}
-
-function declareStates(root, script) {
-  const dir = join(root, 'project/proposals/a');
-  const page = readFileSync(join(dir, 'index.html'), 'utf8')
-    .replace('</head>', '  <meta name="p-states" content="queue credits">\n  <script type="module" src="app.js"></script>\n</head>')
-    .replace('</m3e-theme>', `<m3e-bottom-sheet id="queue" modal handle><div class="t-title-large">Up next</div><p class="t-body-medium">Golden Hour</p></m3e-bottom-sheet>
-    <m3e-dialog id="credits"><span slot="header">Credits</span>Written by Mara Vale.<div slot="actions" end><m3e-button variant="text"><m3e-dialog-action>Close</m3e-dialog-action></m3e-button></div></m3e-dialog>
-  </m3e-theme>`);
-  writeFileSync(join(dir, 'index.html'), page);
-  writeFileSync(join(dir, 'app.js'), script);
-}
-
-test('render opens each declared state and writes its renders and checks', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH', timeout: 180000 }, t => {
-  const root = exploration(t);
-  declareStates(root, 'window.proposalState = name => document.getElementById(name).show();\n');
-  const done = spawnSync('node', [CLI, 'render', root], { encoding: 'utf8' });
+test('rendering again replaces the renders folder and does not lint it', opts, t => {
+  const folder = proposal(t);
+  assert.equal(render(folder).status, 0);
+  writeFileSync(join(folder, 'renders/stale.png'), 'old');
+  const done = render(folder);
   assert.equal(done.status, 0, done.stderr);
-  assert.match(done.stdout, /^a: pass$/m);
-  assert.match(done.stdout, /queue-light,queue-tablet,credits-light,credits-tablet\}\.png/);
-  const dir = join(root, 'renders/a');
-  for (const name of ['queue-light', 'queue-tablet', 'credits-light', 'credits-tablet']) assert.ok(statSync(join(dir, `${name}.png`)).size > 1000, name);
-  const checks = JSON.parse(readFileSync(join(dir, 'checks.json'), 'utf8'));
-  assert.deepEqual(checks.renders.map(r => r.name), [...RENDERS.map(r => r.name), 'queue-light', 'queue-tablet', 'credits-light', 'credits-tablet']);
-  assert.deepEqual(checks.renders.slice(RENDERS.length).map(r => [r.result.pass, r.result.complete]), Array(4).fill([true, true]));
-  assert.equal(checks.renders.find(r => r.name === 'queue-light').viewport.join('x'), '411x923');
-  // Each state view really has its overlay open (a regression to the open-then-hidden race would leave it closed).
-  for (const render of checks.renders.slice(RENDERS.length)) assert.deepEqual([render.name, render.result.modal.open, render.result.primary.status], [render.name, 1, 'skipped']);
-  for (const render of checks.renders.slice(0, RENDERS.length)) assert.equal(render.result.modal.open, 0, render.name);
+  assert.equal(existsSync(join(folder, 'renders/stale.png')), false);
 });
 
-test('render fails clearly when a declared state has no window.proposalState', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH', timeout: 180000 }, t => {
-  const root = exploration(t);
-  declareStates(root, 'window.somethingElse = () => {};\n');
-  const done = spawnSync('node', [CLI, 'render', root], { encoding: 'utf8' });
+test('render fails a page that opens a modal on load', opts, t => {
+  const folder = proposal(t);
+  const page = readFileSync(join(folder, 'index.html'), 'utf8')
+    .replace('</head>', '  <script type="module" src="app.js"></script>\n</head>')
+    .replace('</m3e-theme>', '<m3e-dialog id="credits"><span slot="header">Credits</span>Written by Mara Vale.<div slot="actions" end><m3e-button variant="text"><m3e-dialog-action>Close</m3e-dialog-action></m3e-button></div></m3e-dialog>\n</m3e-theme>');
+  writeFileSync(join(folder, 'index.html'), page);
+  writeFileSync(join(folder, 'app.js'), "customElements.whenDefined('m3e-dialog').then(() => requestAnimationFrame(() => document.getElementById('credits').show()));\n");
+  const done = render(folder);
   assert.equal(done.status, 0, done.stderr);
-  assert.match(done.stdout, /^a: FAIL \(queue-light: proposalState is missing/m);
-  const checks = JSON.parse(readFileSync(join(root, 'renders/a/checks.json'), 'utf8'));
-  assert.equal(checks.pass, false);
+  assert.match(done.stdout, /^music: FAIL \(light: a modal is open on load; open it from a control in the page's script instead/m);
+  assert.equal(JSON.parse(readFileSync(join(folder, 'renders/checks.json'), 'utf8')).pass, false);
 });
 
-test('render reports a state that throws instead of crashing', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH', timeout: 180000 }, t => {
-  const root = exploration(t);
-  declareStates(root, 'window.proposalState = name => { throw new Error("no such " + name); };\n');
-  const done = spawnSync('node', [CLI, 'render', root], { encoding: 'utf8' });
-  assert.equal(done.status, 0, done.stderr);
-  assert.match(done.stdout, /queue-light: proposalState\("queue"\) threw: no such queue/);
-});
-
-test('view.html opens on All screens, opens one state from its picker, and returns to Default', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH', timeout: 180000 }, async t => {
-  const root = exploration(t);
-  declareStates(root, 'window.proposalState = name => document.getElementById(name).show();\n');
-  assert.equal(spawnSync('node', [CLI, 'render', root], { encoding: 'utf8' }).status, 0);
+test('view.html opens a modal from a page script control and still checks its overlay', opts, async t => {
+  const folder = proposal(t);
+  const page = readFileSync(join(folder, 'index.html'), 'utf8')
+    .replace('</head>', '  <script type="module" src="app.js"></script>\n</head>')
+    .replace('</m3e-theme>', '<m3e-dialog id="credits"><span slot="header">Credits</span>Written by Mara Vale.<div slot="actions" end><m3e-button variant="text"><m3e-dialog-action>Close</m3e-dialog-action></m3e-button></div></m3e-dialog>\n</m3e-theme>');
+  writeFileSync(join(folder, 'index.html'), page);
+  writeFileSync(join(folder, 'app.js'), "window.openCredits = () => document.getElementById('credits').show();\n");
+  assert.equal(render(folder).status, 0);
   const browser = await Browser.launch(chrome);
   t.after(() => browser.close());
-  const page = await browser.newPage();
-  await page.setViewport(1400, 1000);
-  await page.goto(pathToFileURL(join(root, 'renders/a/view.html')).href);
-  const pressed = () => page.evaluate(() => [...document.querySelectorAll('#states button')].map(b => `${b.textContent}:${b.getAttribute('aria-pressed')}`));
-  const sheetOpen = () => page.evaluate(async () => {
+  const tab = await browser.newPage();
+  await tab.setViewport(1400, 1000);
+  await tab.goto(pathToFileURL(join(folder, 'renders/view.html')).href);
+  const open = await tab.evaluate(async () => {
     await new Promise(resolve => setTimeout(resolve, 1500));
-    return document.querySelector('iframe').contentDocument.getElementById('queue').matches(':popover-open');
+    const doc = document.querySelector('iframe').contentDocument;
+    const before = doc.getElementById('credits').matches(':popover-open, [open]');
+    await document.querySelector('iframe').contentWindow.openCredits();
+    await document.querySelector('iframe').contentWindow.runtimeSettle();
+    return { before, modal: document.querySelector('iframe').contentWindow.runtimeChecks().modal.open };
   });
-  assert.deepEqual(await pressed(), ['All screens:true', 'Default:false', 'queue:false', 'credits:false']);
-  // All screens: one live frame per screen, and only the queue frame has its sheet open.
-  const open = await page.evaluate(async () => {
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    return [...document.querySelectorAll('iframe')].map(f => f.contentDocument.getElementById('queue').matches(':popover-open'));
-  });
-  assert.deepEqual(open, [false, true, false]);
-  await page.evaluate(() => document.querySelector('#states [data-state=""]').click());
-  assert.deepEqual(await pressed(), ['All screens:false', 'Default:true', 'queue:false', 'credits:false']);
-  assert.equal(await sheetOpen(), false);
-  await page.evaluate(() => document.querySelector('#states [data-state="queue"]').click());
-  assert.deepEqual(await pressed(), ['All screens:false', 'Default:false', 'queue:true', 'credits:false']);
-  assert.equal(await sheetOpen(), true);
-  await page.evaluate(() => document.querySelector('#states [data-state=""]').click());
-  assert.equal(await sheetOpen(), false);
-});
-
-test('the proposal reports state-ready after proposalState resolves, with an error when it throws or is missing', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH', timeout: 240000 }, async t => {
-  const reports = async script => {
-    const root = exploration(t);
-    declareStates(root, script);
-    assert.equal(spawnSync('node', [CLI, 'render', root], { encoding: 'utf8' }).status, 0);
-    const browser = await Browser.launch(chrome);
-    t.after(() => browser.close());
-    const page = await browser.newPage();
-    await page.setViewport(1400, 1000);
-    await page.goto(pathToFileURL(join(root, 'renders/a/view.html')).href);
-    // The viewer opens on All screens, so every frame has already reported; listen from here for the picked state.
-    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 2500)));
-    await page.evaluate(() => { window.__ready = []; addEventListener('message', e => { if (e.data?.type === 'state-ready') window.__ready.push(e.data); }); });
-    return await page.evaluate(async () => {
-      document.querySelector('#states [data-state="queue"]').click();
-      await new Promise(resolve => setTimeout(resolve, 2500));
-      document.querySelector('#states [data-state="credits"]').click();
-      await new Promise(resolve => setTimeout(resolve, 2500));
-      return window.__ready;
-    });
-  };
-  const ok = await reports('window.proposalState = name => new Promise(resolve => setTimeout(() => { document.getElementById(name).show(); resolve(); }, 400));\n');
-  assert.deepEqual(ok, [{ type: 'state-ready', name: 'queue' }, { type: 'state-ready', name: 'credits' }]);
-  const threw = await reports('window.proposalState = name => { throw new Error("no such " + name); };\n');
-  assert.deepEqual(threw.map(m => [m.name, m.error]), [['queue', 'no such queue'], ['credits', 'no such credits']]);
-  const missing = await reports('window.somethingElse = () => {};\n');
-  assert.deepEqual(missing.map(m => [m.name, m.error]), [['queue', 'proposalState is missing'], ['credits', 'proposalState is missing']]);
+  assert.deepEqual(open, { before: false, modal: 1 });
 });
 
 // Width and height from a PNG's IHDR chunk.
 const pngSize = file => { const head = readFileSync(file); return [head.readUInt32BE(16), head.readUInt32BE(20)]; };
 
-test('render also writes light-full.png at the full document height, outside checks and views', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH', timeout: 180000 }, t => {
-  const root = exploration(t);
-  const dir = join(root, 'project/proposals/a');
+test('render also writes light-full.png at the full document height, outside checks and views', opts, t => {
+  const root = proposal(t);
+  const dir = root;
   writeFileSync(join(dir, 'style.css'), `${readFileSync(join(dir, 'style.css'), 'utf8')}\n.screen { min-height: 2000px; }\n`);
-  const done = spawnSync('node', [CLI, 'render', root], { encoding: 'utf8' });
+  const done = render(root);
   assert.equal(done.status, 0, done.stderr);
   assert.match(done.stdout, /light-full\.png/);
-  const out = join(root, 'renders/a');
+  const out = join(root, 'renders');
   const [width, height] = pngSize(join(out, 'light-full.png'));
   assert.equal(width, 411);
   assert.ok(height >= 2000, `light-full.png is ${height}px tall`);
@@ -179,9 +124,9 @@ test('render also writes light-full.png at the full document height, outside che
   assert.doesNotMatch(readFileSync(join(out, 'view.html'), 'utf8'), /review\.png/);
 });
 
-test('light-full.png of a page shorter than the viewport is the viewport size', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH', timeout: 180000 }, t => {
-  const root = exploration(t);
-  assert.equal(spawnSync('node', [CLI, 'render', root], { encoding: 'utf8' }).status, 0);
-  const [width, height] = pngSize(join(root, 'renders/a/light-full.png'));
+test('light-full.png of a page shorter than the viewport is the viewport size', opts, t => {
+  const root = proposal(t);
+  assert.equal(render(root).status, 0);
+  const [width, height] = pngSize(join(root, 'renders/light-full.png'));
   assert.deepEqual([width, height >= 923], [411, true]);
 });

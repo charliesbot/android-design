@@ -31,7 +31,7 @@ def load_briefs():
 
 
 def prune(variant_dir):
-    """Keeps the variant's proposal and exploration for later diffing but drops the skill copies."""
+    """Keeps the variant's proposal for later diffing but drops the skill copies."""
     shutil.rmtree(variant_dir / CASE_SKILLS, ignore_errors=True)
 
 

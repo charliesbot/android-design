@@ -100,7 +100,7 @@ The relevant browser path is Compose UI on Kotlin/Wasm, not a separately authore
 
 ## Version alignment is the concrete gap
 
-The [starter version catalog](../../skills/android-design-explore/assets/exploration-starter/gradle/libs.versions.toml) pins AndroidX Material3 `1.5.0-alpha29`, Compose BOM `2026.03.01`, and Kotlin `2.3.20`. The releases inspected advertise these mappings:
+The [starter version catalog](../../evals/compose-starter/gradle/libs.versions.toml) pins AndroidX Material3 `1.5.0-alpha29`, Compose BOM `2026.03.01`, and Kotlin `2.3.20`. The releases inspected advertise these mappings:
 
 | Compose Multiplatform release | JetBrains Material3 artifact version | AndroidX Material3 baseline |
 | --- | --- | --- |
@@ -126,7 +126,7 @@ The source inspection found platform glue, not evidence that the proposal layout
 | `ProposalScreen` uses Android `stringResource` and `R.string` | Use shared resources or caller-provided proposal content. |
 | Android activity, application, and Koin Android setup | These are host wiring, not transferable browser entry points. A design preview need not port the entire app's data layer. |
 
-Local evidence: [AppTheme](../../skills/android-design-explore/assets/exploration-starter/app/src/main/kotlin/com/example/designsandbox/theme/AppTheme.kt), [Typography](../../skills/android-design-explore/assets/exploration-starter/app/src/main/kotlin/com/example/designsandbox/theme/Typography.kt), [ProposalScreen](../../skills/android-design-explore/assets/exploration-starter/app/src/main/kotlin/com/example/designsandbox/ProposalScreen.kt), and [app build](../../skills/android-design-explore/assets/exploration-starter/app/build.gradle.kts).
+Local evidence: [AppTheme](../../evals/compose-starter/app/src/main/kotlin/com/example/designsandbox/theme/AppTheme.kt), [Typography](../../evals/compose-starter/app/src/main/kotlin/com/example/designsandbox/theme/Typography.kt), [ProposalScreen](../../evals/compose-starter/app/src/main/kotlin/com/example/designsandbox/ProposalScreen.kt), and [app build](../../evals/compose-starter/app/build.gradle.kts).
 
 JetBrains explicitly identifies `LocalContext`, Android resource access, activities, and other Android APIs as platform-specific. Camera, permissions, maps, and device services are not made portable simply by sharing Compose UI. Accordingly, transferable screen structure does not imply transferable host integration. [Android-only components](https://kotlinlang.org/docs/multiplatform/compose-android-only-components.html)
 

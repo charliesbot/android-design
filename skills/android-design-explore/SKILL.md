@@ -3,89 +3,70 @@ name: android-design-explore
 description: >
   Explore Android app ideas as HTML proposals before implementation, without editing the app. Use for
   brainstorming screens, redesign alternatives, visual directions, or proposals to compare and iterate on in
-  chat: it renders phone, foldable, tablet, and desktop views plus a contact sheet and a self-contained view.html.
+  chat: it renders phone, foldable, tablet, and desktop views and a self-contained view.html.
   Builds on the android-design skill, which owns every design decision.
 ---
 
 # Visual design exploration
 
-Read and follow the `android-design` skill for every design decision: its section 0 answers, component choices, theming, layout, and its screen check. This skill owns the workflow around them: brief, create, author, render, iterate in chat, approve, hand off and port, clean up.
+Follow the `android-design` skill for every design decision: its section 0 answers, components, theming, layout, and screen check. This skill owns the workflow. Each run is one shot: brief in, one proposal written, rendered, shown, then stop. Phone, foldable, tablet, and desktop are in scope; Wear is not.
 
-Requirements: Node.js 22+ and Google Chrome (`render` drives it headlessly). If either is missing, report it rather than installing it. Use image generation only for assets, not as a substitute for a proposal.
+Requirements: Node.js 22+ and Google Chrome (set `CHROME_PATH` when Chrome is not at its usual location). If either is missing, report it rather than installing it. Use image generation only for assets, not as a substitute for a proposal.
 
-Build HTML proposals on the bundled Material 3 Expressive runtime, render them headlessly, and iterate with the user in chat. The user's approval, said in chat, ends an explore-only request; a build request continues to the port.
+## Brief
 
-## Understand the brief
+When there is an app, read its relevant screens, theme, and assets first. Answer section 0 of `android-design` in the reply.
 
-Read the requesting app's relevant screens, theme, assets, content, and dependency versions. A feature exploration preserves the surrounding visual language unless structural changes are needed; a redesign can go further. Make one proposal by default: the strongest composition for the task and content. Make several only when the user asks for them ("show me three ideas", "compare directions"), and then make them distinct compositions of the same task and content, not recolorings.
+- Pick one seed: the brand color, or a content color from the subject (a dish, an album, a trip), never the runtime's default.
+- When the screen is a hero moment (question 3 of section 0), layer three or more tactics (section 3) and name them.
+- Keep app code and dependencies unchanged.
+- Use representative, non-sensitive data and assets.
 
-Give each proposal its own seed: the app's brand color or a content color from the subject (a dish, an album, a trip), never the runtime's default palette. When the screen is a hero moment (question 3 of section 0 in the `android-design` skill), layer three or more tactics (type voice, shape, color role, container form; see its section 3) and name them in the rationale. With several proposals, make at least one a hero.
+Make several proposals only when the user asks. Each is its own folder, a distinct composition (not a recoloring) with its own seed, and at least one is a hero.
 
-Keep app code and dependencies unchanged, so proposals transfer to the app's existing libraries. Use representative data and non-sensitive assets, never credentials, databases, or personal data.
+## Start the folder
 
-Done when the reply answers section 0 of the `android-design` skill and each proposal has its own seed. With several proposals, answer the shared questions (goals, adaptation) once, then give each proposal its direction, hero answer, and seed in a line each.
+Copy `<skill-dir>/assets/proposal-starter/` (including its `.gitignore`) to `<folder>/design-explorations/<slug>/`. `<folder>` is the app's folder or any folder; Git is not needed. The `.gitignore` of `*` keeps the proposal out of commits. Never write into this skill's own repository. Tell the user the absolute path.
 
-## Create or resume
+## Write
 
-Set `CHROME_PATH` when Chrome is not at its usual location.
+Read `gallery/runtime-src/README.md` first: it is the syntax the lint enforces. Edit `index.html`, `style.css`, and optional scripts in the folder.
 
-Resolve this skill's installed directory and run:
-
-```bash
-node <skill-dir>/gallery/cli.mjs create --project <folder> --title "Today screen redesign"
-```
-
-`<folder>` is the app's folder, or any folder for a quick idea; it does not need to be a Git repository. The helper copies the HTML proposal starter to `<folder>/design-explorations/<unique-id>/project/` and writes a `.gitignore` of `*` in `design-explorations/`, so proposals never land in a commit. Tell the user the returned absolute exploration path. Never write explorations into this skill's own repository.
-
-Resume the same exploration directory for revisions; `renders/` is regenerated output. Wear stays outside this workflow; use the Android starter's experimental Wear shell (`create --starter android`) only when explicitly requested, without claiming validated Wear quality.
-
-## Author proposals
-
-Before writing markup, read `gallery/runtime-src/README.md`: it is the syntax the lint enforces (type voices, color roles and static colors, icons, text fields, scripts). `project/README.md` is the page contract. A proposal is `proposals/<id>/index.html`, `style.css`, and optional script files. Build the proposal in the starter's `proposals/a`; for each extra direction, copy it to the next letter and change the design, not the rules. Done when every proposal has its own folder and `render` gets past the lint (a violation prints `file:line` and draws nothing).
-
-- HTML on the runtime only, and only HTML that has a Compose counterpart.
-- Components come only from `references/compose-mapping.md` rows marked `verified`, and a size step-down (see the button label rule in `android-design`) goes only to a size marked `verified` there. Anything else is built from plain HTML layout with role tokens when it has a plain Compose layout counterpart (`Box`, `Row`, `Column`, `Text`, `Surface`); otherwise leave it out. Text fields have verified rows too.
-- Overlays: a bottom sheet, dialog, or menu comes only from its `verified` row (`m3e-bottom-sheet modal handle`, `m3e-dialog`, `m3e-menu`), never plain HTML. A hidden overlay is invisible to default renders and checks, so declare each one, and any other important hidden state, as a named state: `<meta name="p-states" content="queue lyrics">` in the head and `window.proposalState = name => { ... }` in the proposal's script (`gallery/runtime-src/README.md`, Open states: a menu opens from its anchor, and each state opens from the closed default). A brief where an action opens something over the screen (lyrics, a queue, credits) needs one state per overlay. A modal bottom sheet opens at about half the window height and scrolls inside, so put its key action and content near the top. Leave out a side sheet: it has no verified row.
-- Mark the primary action `data-primary`. It leads its peers as `android-design` section 2 describes (normal size with the strongest fill by default). The check compares its visual height (the button size step) with the other actions on the screen; content (list rows, and `m3e-card actionable` cards or tiles), navigation chrome, sliders, progress, and text fields are not compared. Build a tappable tile as `m3e-card actionable`: a bare native button is compared as an action.
-- Type: plain text (Title, Body, Label) is Google Sans Flex. One bundled brand face per proposal may take Display and Headline voices only, and Google Sans Code serves numbers and data.
-- Corners come from the corner scale, spacing from the 8dp scale. Compact below 840px, expanded (nav rail instead of the floating toolbar) from 840px up.
-- Truncate on purpose (ellipsis or a line clamp, like Compose's `Text(maxLines, overflow = Ellipsis)`); button labels never truncate or wrap. Pad a scroller by the height of any opaque pinned bar over it (Compose `contentPadding`).
-- Scripts hold in-memory state only (toggles, an add sheet, a selected tab): no `localStorage`, cookies, or network requests; the lint cannot check these.
+- Use only HTML that has a Compose counterpart. Any registered element may be used; the port reports what `references/compose-mapping.md` has not verified or mapped. Build anything else from plain layout with role tokens when `Box`, `Row`, `Column`, `Text`, or `Surface` can express it; otherwise leave it out.
+- Overlays come only from `m3e-bottom-sheet modal handle`, `m3e-dialog`, or `m3e-menu`, opened from a control by the page's own script. A render fails if a modal is open on load. A modal bottom sheet opens at about half the window height and scrolls inside, so put its key action near the top. Leave out a side sheet.
+- Mark the primary action `data-primary`. It leads its peers as `android-design` section 2 describes. Build a tappable tile as `m3e-card actionable`: a bare native button is compared as an action.
+- Plain text is Google Sans Flex. One bundled brand face may take Display and Headline only; Google Sans Code serves numbers and data.
+- Corners come from the corner scale, spacing from the 8dp scale. Compact below 840px; nav rail instead of the floating toolbar from 840px.
+- Truncate on purpose (ellipsis or a line clamp); button labels never truncate or wrap. Pad a scroller by the height of any opaque pinned bar over it.
+- Scripts hold in-memory state only: no `localStorage`, cookies, or network requests.
 
 ## Render and check
 
-Do not judge from code alone. `<exploration>` is the folder `create` printed (`design-explorations/<unique-id>`). Render every proposal, or only the ids you name:
-
 ```bash
-node <skill-dir>/gallery/cli.mjs render <exploration> [id ...] [--open]
+node <skill-dir>/gallery/cli.mjs render <proposal-folder> [--open]
 ```
 
-`render` lints first, then renders headlessly in Chrome (no server, no port) into `<exploration>/renders/`: per proposal `<id>/` holds PNGs for light, dark, wallpaper, foldable, tablet, and desktop views, `review.png` (every checked view of the proposal on one image, for your own review; not checked or judged), `light-full.png` (the phone light view at full page height, for your own review below the first screen; not checked or judged), `<state>-light.png` and `<state>-tablet.png` for each declared state (a missing or throwing `proposalState` fails that state with the reason), `checks.json` (the runtime checks of every view, with `pass` and `complete`), and `view.html`, one self-contained file (opened in the default browser by `--open`, or from disk) to switch devices, light and dark, seed colors, palette, and declared states (a proposal that declares states opens on All screens: every screen live side by side at the chosen device size). `contact-sheet.png` has one row per proposal across the four devices, default state only. Dimensions are in `gallery/runtime-src/README.md`, Render output.
+It lints first: errors print as `file:line`, exit 2, and nothing is drawn. Fix them and rerun. Then it renders headlessly into `<proposal-folder>/renders/` (rewritten each run): `light`, `dark`, `wallpaper`, `foldable`, `tablet`, and `desktop` PNGs, `light-full.png` (phone light at full document height), `review.png` (every checked view on one image), `checks.json` (`{url, renders, pass, complete}`), and `view.html` (self-contained viewer).
 
-1. Read `checks.json` for each proposal and fix every failure. Treat `unresolved` entries as unchecked, not passed, and `complete: false` as not verified: report it.
-2. Review each proposal's `review.png` yourself (it holds every checked view, state renders included). Open a single PNG only to inspect something the sheet raises, and open `light-full.png` when the screen scrolls past the first screen. Judge hierarchy, character, and color balance with the `android-design` screen check, and confirm each larger view reveals what your section 0 adaptation answer promised: a second pane, more of a list, more detail. Google: "Additional space doesn't just mean making the same thing bigger." The same single view only rearranged fails.
-3. Rerun `render` after each edit.
+1. Fix every `checks.json` failure once, then rerun. Report anything still failing, or `complete: false` (unchecked, not passed), instead of looping.
+2. Review `review.png`, not each PNG; add `light-full.png` when the screen scrolls. Judge hierarchy, character, and color balance with the `android-design` screen check. Confirm each larger view reveals what your section 0 adaptation answer promised. Google: "Additional space doesn't just mean making the same thing bigger." The same view only rearranged fails.
 
-Done when every proposal's `checks.json` has `pass` and `complete` true and every proposal's `review.png` has been looked at. If the harness cannot view images, report visual quality as unverified and do not claim the screen check passed.
+If the harness cannot view images, report visual quality as unverified.
 
-## Show the user
+## Show
 
-Show `renders/contact-sheet.png` in chat (attach the image, or give its absolute path). On the user's own machine, rerun the final render of the round with `--open` (never while still iterating: `render` rewrites `renders/<id>/`); when running remotely, give the absolute path of each `view.html` instead. When a proposal's idea lives in an overlay, show its state renders too. Say what each proposal is in one line, name the tactics a hero layers, and report any unverified check. Then stop and wait for the user.
+On the user's machine, rerun the final render with `--open`; otherwise give the absolute path of `renders/view.html`. Show `renders/review.png` in chat. Say in one line what the proposal is, name the tactics a hero layers, and report any unresolved check. Then stop and wait.
 
-## Iterate in chat
+## Revise
 
-The user replies in chat ("make it warmer", "show me two other ideas"). A request for more ideas adds new proposal folders next to the existing ones. Apply clear instructions and ask a focused question only when a meaningful decision remains. Produce one refinement by default, edit `project/proposals/<id>/`, and rerun `render` for the ids you changed. To keep an earlier version for comparison, copy the folder (`b` to `b2`) before editing. A combination of several ideas becomes one consolidated proposal.
+Rerun on the same folder with the current HTML plus the user's feedback. The revision overwrites the proposal; keep no copies.
 
-## Approve, hand off, or discard
+## Approve and port
 
-Approval is the user saying so in chat. Report the approved proposal, the path of its folder, and that `references/compose-mapping.md` is the porting table. When the request was only to explore, this skill's job ends there: do not implement. When the request was to build (the `android-design` skill sends a build of a new app, screen, or redesign here first), approval of the direction lets you continue to the port below. Approval never authorizes library version changes.
+Approval is the user saying so in chat. Report the approved proposal, its folder path, and that `references/compose-mapping.md` is the porting table. An explore-only request ends there: do not implement. A build request (the `android-design` skill sends new apps, screens, and redesigns here first) continues to the port. Approval never authorizes library version changes.
 
-The port follows the requesting project's planning, branch, verification, and review rules. Port the approved proposal with the mapping table, keeping the app's library versions, then render the Compose result and compare it with the approved proposal's screenshots at the same viewports. Report unmapped or unverified elements instead of inventing a Compose equivalent. If the design cannot be preserved with the app's dependencies, ask rather than silently change the design or versions.
+The port follows the requesting project's planning, branch, verification, and review rules. Read `references/compose-mapping.md`, port the approved proposal with it, keeping the app's library versions, then render the Compose result and compare it with the proposal's screenshots at the same viewports. Report unmapped or unverified elements instead of inventing a Compose equivalent. If the design cannot be preserved with the app's dependencies, ask.
 
-Keep proposals and renders until the user explicitly requests deletion, then run:
+## Delete
 
-```bash
-node <skill-dir>/gallery/cli.mjs cleanup <exploration> --project <folder> --yes
-```
-
-Cleanup removes only a directly contained, identity-marked exploration and refuses symlinks or mismatched markers. It never deletes the installed starter or the requesting app.
+When the user asks, remove `<folder>/design-explorations/<slug>/`.

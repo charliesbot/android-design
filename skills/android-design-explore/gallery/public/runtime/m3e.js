@@ -13805,22 +13805,10 @@ var $C = [
 ];
 window.addEventListener("message", (e) => {
 	if (e.origin !== window.location.origin) return;
-	let { type: t, color: n, variant: r, scheme: i, name: a } = e.data ?? {};
-	if (t === "state") {
-		if (typeof a != "string") return;
-		let e = (e) => window.parent.postMessage({
-			type: "state-ready",
-			name: a,
-			...e && { error: String(e.message ?? e) }
-		}, "*");
-		(typeof window.proposalState == "function" ? window.runtimeSettle().then(() => window.proposalState(a)).then(() => window.runtimeSettle()) : Promise.reject(/* @__PURE__ */ Error("proposalState is missing"))).then(() => e(), (t) => {
-			console.error(t), e(t);
-		});
-		return;
-	}
+	let { type: t, color: n, variant: r, scheme: i } = e.data ?? {};
 	if (t !== "theme") return;
-	let o = document.querySelector("m3e-theme");
-	o && (typeof n == "string" && /^#[0-9a-f]{6}$/i.test(n) && o.setAttribute("color", n), $C.includes(r) && o.setAttribute("variant", r), ew.includes(i) && o.setAttribute("scheme", i));
+	let a = document.querySelector("m3e-theme");
+	a && (typeof n == "string" && /^#[0-9a-f]{6}$/i.test(n) && a.setAttribute("color", n), $C.includes(r) && a.setAttribute("variant", r), ew.includes(i) && a.setAttribute("scheme", i));
 });
 var tw = {
 	plain: "Google Sans Flex",

@@ -13,38 +13,41 @@ import run
 
 def fake_case(directory, *, files=()):
     """A case directory shaped like prepare() leaves it, without running git or node."""
-    exploration = directory / 'design-explorations/x'
-    proposal = exploration / 'project/proposals/a'
+    proposal = directory / 'design-explorations/proposal'
     proposal.mkdir(parents=True)
     (proposal / 'index.html').write_text('<m3e-theme variant="tonal-spot"></m3e-theme>')
-    (directory / 'case.json').write_text(json.dumps({'exploration': str(exploration), 'proposal': 'a', 'title': 'music'}))
+    (directory / 'case.json').write_text(json.dumps({'proposal_dir': str(proposal), 'title': 'music'}))
     return proposal
 
 
 class PrepareTest(unittest.TestCase):
-    def test_prepare_builds_a_fixture_repo_with_an_exploration_and_assets(self):
+    def test_prepare_builds_a_fixture_repo_with_a_starter_proposal_and_assets(self):
         case = next(iter(run.select_cases('music')))
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp) / 'music'
-            exploration = run.prepare(case, directory)
+            proposal = run.prepare(case, directory)
             log = subprocess.run(['git', 'log', '--oneline'], cwd=directory, capture_output=True, text=True)
             self.assertEqual(log.returncode, 0)
             self.assertEqual(len(log.stdout.strip().splitlines()), 1)
             self.assertTrue((directory / 'skills/android-design/SKILL.md').is_file())
             self.assertTrue((directory / 'skills/android-design-explore/SKILL.md').is_file())
-            self.assertTrue((exploration / 'project/proposals/a/index.html').is_file())
-            self.assertTrue((exploration / 'project/proposals/a/assets/album_art.jpg').is_file())
+            self.assertEqual(proposal, directory / 'design-explorations/proposal')
+            self.assertTrue((proposal / 'index.html').is_file())
+            self.assertTrue((proposal / 'style.css').is_file())
+            self.assertTrue((proposal / 'assets/album_art.jpg').is_file())
+            for entry in (run.STARTER).iterdir():
+                self.assertTrue((proposal / entry.name).exists(), entry.name)
             info = json.loads((directory / 'case.json').read_text())
-            self.assertEqual(info['exploration'], str(exploration))
-            self.assertEqual(run.proposal_dir(directory), exploration / 'project/proposals/a')
+            self.assertEqual(info, {'proposal_dir': str(proposal), 'title': 'music'})
+            self.assertEqual(run.proposal_dir(directory), proposal)
 
-    def test_prompt_names_the_exploration_and_both_skill_copies(self):
+    def test_prompt_names_the_proposal_folder_and_both_skill_copies(self):
         case = next(iter(run.select_cases('music')))
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp) / 'music'
-            exploration = run.prepare(case, directory)
+            proposal = run.prepare(case, directory)
             text = run.prompt_for(case, directory)
-            self.assertIn(str(exploration), text)
+            self.assertIn(str(proposal), text)
             self.assertIn(str(directory / 'skills/android-design'), text)
             self.assertIn(str(directory / 'skills/android-design-explore'), text)
             self.assertIn(case['prompt'], text)
@@ -57,7 +60,7 @@ class PrepareTest(unittest.TestCase):
             self.assertNotRegex(case['prompt'], r'R\.drawable|Compose|Kotlin|EvalScreen')
             self.assertIn('1920x1080', case['prompt'])
             codes = [a['id'] for a in case['assertions'] if a['type'] == 'code']
-            self.assertEqual(codes, ['C-lint', 'C-review', 'C-palette'] + (['C-states'] if case['name'] == 'music' else []))
+            self.assertEqual(codes, ['C-lint', 'C-review', 'C-palette'])
             self.assertIn('R-adaptive', [a['id'] for a in case['assertions']])
 
     def test_render_names_match_the_skill_render(self):
@@ -83,7 +86,7 @@ class ArtifactPipelineTests(unittest.TestCase):
             fake_case(directory)
             (directory / 'renders').mkdir()
             (directory / 'renders/light.png').write_bytes(b'old')
-            failed = subprocess.CompletedProcess([], 2, '', 'proposals/a/style.css:3: Raw color')
+            failed = subprocess.CompletedProcess([], 2, '', 'style.css:3: Raw color')
             with mock.patch.object(run.subprocess, 'run', return_value=failed):
                 images, error = run.render(directory)
             self.assertEqual(images, [])
@@ -107,12 +110,12 @@ class ArtifactPipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             fake_case(directory)
-            exploration = Path(run.case_info(directory)['exploration'])
+            proposal = Path(run.case_info(directory)['proposal_dir'])
             calls = []
 
             def fake_run(command, **kwargs):
                 calls.append(command)
-                out = exploration / 'renders' / 'a'
+                out = proposal / 'renders'
                 out.mkdir(parents=True)
                 for name in run.RENDER_NAMES:
                     (out / f'{name}.png').write_bytes(b'png')
@@ -123,23 +126,23 @@ class ArtifactPipelineTests(unittest.TestCase):
             with mock.patch.object(run.subprocess, 'run', side_effect=fake_run):
                 images, error = run.render(directory)
             self.assertIsNone(error)
-            self.assertEqual(calls[0][2:], ['render', str(exploration), 'a'])
+            self.assertEqual(calls[0][2:], ['render', str(proposal)])
             self.assertEqual(len(images), 6)
             self.assertTrue(run.render_complete(images))
             self.assertTrue((directory / 'renders/checks.json').is_file())
             self.assertFalse((directory / 'renders/view.html').exists())
             self.assertTrue(json.loads((directory / 'lint.json').read_text())['ok'])
 
-    def test_render_copies_the_state_renders_of_a_proposal_that_declares_states(self):
+    def test_render_leaves_the_review_images_out_of_the_judged_renders(self):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             fake_case(directory)
-            exploration = Path(run.case_info(directory)['exploration'])
+            proposal = Path(run.case_info(directory)['proposal_dir'])
 
             def fake_run(command, **kwargs):
-                out = exploration / 'renders' / 'a'
+                out = proposal / 'renders'
                 out.mkdir(parents=True)
-                for name in (*run.RENDER_NAMES, 'queue-light', 'queue-tablet'):
+                for name in (*run.RENDER_NAMES, 'light-full', 'review'):
                     (out / f'{name}.png').write_bytes(b'png')
                 (out / 'checks.json').write_text('{"renders": []}')
                 (out / 'view.html').write_text('big')
@@ -148,46 +151,10 @@ class ArtifactPipelineTests(unittest.TestCase):
             with mock.patch.object(run.subprocess, 'run', side_effect=fake_run):
                 images, error = run.render(directory)
             self.assertIsNone(error)
-            self.assertEqual(sorted(Path(p).stem for p in images), sorted([*run.RENDER_NAMES, 'queue-light', 'queue-tablet']))
-            self.assertTrue(run.render_complete(images))
-            self.assertTrue((directory / 'renders/queue-tablet.png').is_file())
-            self.assertFalse((directory / 'renders/view.html').exists())
-
-    def test_render_leaves_the_review_images_out_of_the_judged_renders(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            directory = Path(tmp)
-            fake_case(directory)
-            exploration = Path(run.case_info(directory)['exploration'])
-
-            def fake_run(command, **kwargs):
-                out = exploration / 'renders' / 'a'
-                out.mkdir(parents=True)
-                for name in (*run.RENDER_NAMES, 'light-full', 'review'):
-                    (out / f'{name}.png').write_bytes(b'png')
-                (out / 'checks.json').write_text('{"renders": []}')
-                return subprocess.CompletedProcess(command, 0, 'a: pass', '')
-
-            with mock.patch.object(run.subprocess, 'run', side_effect=fake_run):
-                images, error = run.render(directory)
-            self.assertIsNone(error)
             self.assertEqual(sorted(Path(p).stem for p in images), sorted(run.RENDER_NAMES))
             self.assertFalse((directory / 'renders/light-full.png').exists())
             self.assertFalse((directory / 'renders/review.png').exists())
-
-    def test_judge_request_lists_state_renders_and_says_how_to_judge_them(self):
-        case = next(iter(run.select_cases('music')))
-        with tempfile.TemporaryDirectory() as tmp:
-            directory = Path(tmp)
-            fake_case(directory)
-            (directory / 'renders').mkdir()
-            for name in (*run.RENDER_NAMES, 'queue-light', 'queue-tablet'):
-                (directory / 'renders' / f'{name}.png').write_bytes(b'png')
-            request = run.make_request(case, directory, (run.HERE / 'rubric.md').read_text())
-            self.assertIn('queue-light', [Path(p).stem for p in request['images']])
-            self.assertIn('- queue-tablet: ', request['prompt'])
-            self.assertIn('State renders', request['prompt'])
-            self.assertIn('on its own surface', request['prompt'])
-            self.assertTrue(any(k.endswith('renders/queue-light.png') for k in request['artifacts']))
+            self.assertFalse((directory / 'renders/view.html').exists())
 
     def test_missing_judge_is_pending_not_passed(self):
         case = {'name': 'music', 'surface': 'phone', 'assertions': [{'type': 'rubric', 'id': 'R-one'}]}
@@ -242,7 +209,7 @@ class ArtifactPipelineTests(unittest.TestCase):
             self.assertNotIn('C-lint', request['item_ids'])
             self.assertIn('desktop', request['prompt'])
             hashed = set(request['artifacts'])
-            self.assertTrue(any(k.endswith('proposals/a/index.html') for k in hashed))
+            self.assertTrue(any(k.endswith('design-explorations/proposal/index.html') for k in hashed))
             self.assertTrue(any(k.endswith('renders/desktop.png') for k in hashed))
 
     def test_import_refuses_changed_artifacts_and_wrong_request(self):
