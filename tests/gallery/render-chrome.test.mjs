@@ -90,7 +90,7 @@ test('render reports a state that throws instead of crashing', { skip: chrome ? 
   assert.match(done.stdout, /queue-light: proposalState\("queue"\) threw: no such queue/);
 });
 
-test('view.html opens a declared state from its picker and returns to Default', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH', timeout: 180000 }, async t => {
+test('view.html opens on All screens, opens one state from its picker, and returns to Default', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH', timeout: 180000 }, async t => {
   const root = exploration(t);
   declareStates(root, 'window.proposalState = name => document.getElementById(name).show();\n');
   assert.equal(spawnSync('node', [CLI, 'render', root], { encoding: 'utf8' }).status, 0);
@@ -104,13 +104,50 @@ test('view.html opens a declared state from its picker and returns to Default', 
     await new Promise(resolve => setTimeout(resolve, 1500));
     return document.querySelector('iframe').contentDocument.getElementById('queue').matches(':popover-open');
   });
-  assert.deepEqual(await pressed(), ['Default:true', 'queue:false', 'credits:false']);
+  assert.deepEqual(await pressed(), ['All screens:true', 'Default:false', 'queue:false', 'credits:false']);
+  // All screens: one live frame per screen, and only the queue frame has its sheet open.
+  const open = await page.evaluate(async () => {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    return [...document.querySelectorAll('iframe')].map(f => f.contentDocument.getElementById('queue').matches(':popover-open'));
+  });
+  assert.deepEqual(open, [false, true, false]);
+  await page.evaluate(() => document.querySelector('#states [data-state=""]').click());
+  assert.deepEqual(await pressed(), ['All screens:false', 'Default:true', 'queue:false', 'credits:false']);
   assert.equal(await sheetOpen(), false);
   await page.evaluate(() => document.querySelector('#states [data-state="queue"]').click());
-  assert.deepEqual(await pressed(), ['Default:false', 'queue:true', 'credits:false']);
+  assert.deepEqual(await pressed(), ['All screens:false', 'Default:false', 'queue:true', 'credits:false']);
   assert.equal(await sheetOpen(), true);
   await page.evaluate(() => document.querySelector('#states [data-state=""]').click());
   assert.equal(await sheetOpen(), false);
+});
+
+test('the proposal reports state-ready after proposalState resolves, with an error when it throws or is missing', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH', timeout: 240000 }, async t => {
+  const reports = async script => {
+    const root = exploration(t);
+    declareStates(root, script);
+    assert.equal(spawnSync('node', [CLI, 'render', root], { encoding: 'utf8' }).status, 0);
+    const browser = await Browser.launch(chrome);
+    t.after(() => browser.close());
+    const page = await browser.newPage();
+    await page.setViewport(1400, 1000);
+    await page.goto(pathToFileURL(join(root, 'renders/a/view.html')).href);
+    // The viewer opens on All screens, so every frame has already reported; listen from here for the picked state.
+    await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 2500)));
+    await page.evaluate(() => { window.__ready = []; addEventListener('message', e => { if (e.data?.type === 'state-ready') window.__ready.push(e.data); }); });
+    return await page.evaluate(async () => {
+      document.querySelector('#states [data-state="queue"]').click();
+      await new Promise(resolve => setTimeout(resolve, 2500));
+      document.querySelector('#states [data-state="credits"]').click();
+      await new Promise(resolve => setTimeout(resolve, 2500));
+      return window.__ready;
+    });
+  };
+  const ok = await reports('window.proposalState = name => new Promise(resolve => setTimeout(() => { document.getElementById(name).show(); resolve(); }, 400));\n');
+  assert.deepEqual(ok, [{ type: 'state-ready', name: 'queue' }, { type: 'state-ready', name: 'credits' }]);
+  const threw = await reports('window.proposalState = name => { throw new Error("no such " + name); };\n');
+  assert.deepEqual(threw.map(m => [m.name, m.error]), [['queue', 'no such queue'], ['credits', 'no such credits']]);
+  const missing = await reports('window.somethingElse = () => {};\n');
+  assert.deepEqual(missing.map(m => [m.name, m.error]), [['queue', 'proposalState is missing'], ['credits', 'proposalState is missing']]);
 });
 
 // Width and height from a PNG's IHDR chunk.

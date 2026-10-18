@@ -121,8 +121,14 @@ test('the render report lists a proposal\'s state renders after the default view
 });
 
 test('view.html gets a state picker only for a proposal that declares states', () => {
-  const data = html => JSON.parse(/const \{ doc, devices, seeds, variants, states \} = (.*);\n/.exec(html)[1].replace(/\\u003c/g, '<'));
+  const data = html => JSON.parse(/const \{ doc, devices, seeds, variants, states, revealMs \} = (.*);\n/.exec(html)[1].replace(/\\u003c/g, '<'));
   assert.deepEqual(data(viewerHtml({ title: 't', doc: '<p>', states: ['queue', 'lyrics'] })).states, ['queue', 'lyrics']);
   assert.deepEqual(data(viewerHtml({ title: 't', doc: '<p>' })).states, []);
   assert.match(viewerHtml({ title: 't', doc: '', states: ['queue'] }), /id="states"/);
+});
+
+test('view.html waits up to 3 seconds for a state to be ready unless told otherwise', () => {
+  const data = html => JSON.parse(/const \{ doc, devices, seeds, variants, states, revealMs \} = (.*);\n/.exec(html)[1]);
+  assert.equal(data(viewerHtml({ title: 't', doc: '', states: ['queue'] })).revealMs, 3000);
+  assert.equal(data(viewerHtml({ title: 't', doc: '', states: ['queue'], revealMs: 50 })).revealMs, 50);
 });
