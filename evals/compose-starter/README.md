@@ -1,6 +1,6 @@
 # Compose starter
 
-This is the Compose sandbox for the manual Compose port check in `evals/README.md`. Copy it to a scratch folder and implement an approved HTML proposal there as a Compose screen (or use the Wear OS shell). HTML exploration starts from the skill's `assets/proposal-starter`, not here. Develop in the copy, not here or in production app code. This is an executable sandbox, not a production app template or a claim of integration compatibility.
+This is the Compose sandbox for the manual Compose port check in `evals/README.md`. Copy it to a scratch folder and implement an approved HTML proposal there as a Compose screen. HTML exploration starts from the skill's `assets/proposal-starter`, not here. Develop in the copy, not here or in production app code. This is an executable sandbox, not a production app template or a claim of integration compatibility.
 
 ## Theme
 
@@ -19,17 +19,11 @@ The scheme comes from MaterialKolor (`rememberDynamicColorScheme`, spec 2025) wi
 ## Entry points
 
 - `app/src/main/kotlin/com/example/designsandbox/ProposalScreen.kt`: phone/tablet proposal with sample state.
-- `wear/src/main/kotlin/com/example/designsandbox/wear/ProposalScreen.kt`: experimental watch proposal.
-- Each shell's `theme/`: independent phone Expressive and Wear Material 3 themes. Phone uses bundled Google Sans Flex; Wear uses bundled Roboto Flex.
-- For exploration, add named `@Preview` functions alongside the proposal code in the requested shell's main source set and render through the installed `compose-preview` skill.
-- Each shell's `src/screenshotTest/kotlin/` contains fixed `@PreviewTest` entry points for starter maintenance, separate from the exploration workflow.
+- `app/.../theme/`: the Expressive theme, with bundled Google Sans Flex.
+- `app/src/screenshotTest/kotlin/` contains fixed `@PreviewTest` entry points for starter maintenance.
 - `core/strings` holds shared text; `core/designsystem/common` holds fonts and other non-string resources. The remaining core modules preserve `android-dev` boundaries without sample business logic.
 
-Both shells start Koin and have a single Navigation 3 destination. Previews call the screen with sample state directly, without starting navigation, DI, databases, or network requests. Separate composables can hold alternatives inside the same shell. The `android-dev` skill is needed only if you choose to generate further modules, not to use this starter.
-
-## Exploration rendering
-
-Assume the `compose-preview` CLI and skill are installed, as documented in the repository README. Follow that skill to render the named previews in the exploration copy and inspect its returned image paths. Add matched light/dark, smaller-window, and large-font previews. Report rendering failures instead of switching to the maintenance harness.
+The app starts Koin and has a single Navigation 3 destination. Previews call the screen with sample state directly, without starting navigation, DI, databases, or network requests. Separate composables can hold alternatives in the same module. The `android-dev` skill is needed only if you choose to generate further modules, not to use this starter.
 
 ## Device previews
 
@@ -52,32 +46,28 @@ Requires Node.js 22+, JDK 17+, Android SDK platform 37, and initial network acce
 
 ```bash
 ./gradlew projects
-./gradlew :app:assembleDebug :wear:assembleDebug
+./gradlew :app:assembleDebug
 node render.mjs app
-node render.mjs wear
 ./gradlew spotlessApply spotlessCheck
 ```
 
-The maintenance renderer clears that surface's previous generated screenshots before running Gradle, then prints absolute PNG paths under `renders/<surface>/`. Open them to inspect the result. Add matched light/dark, smaller-window, and large-font previews when evaluating designs. Device behavior and integration still need testing in the real project.
-
-Wear builds and screenshots are scaffold checks only. Its design guidance remains experimental; including this shell does not unpark the design evals. Widgets and complications are intentionally absent.
+The maintenance renderer clears the previous generated screenshots before running Gradle, then prints absolute PNG paths under `renders/<surface>/`. Open them to inspect the result. Add matched light/dark, smaller-window, and large-font previews when evaluating designs. Device behavior and integration still need testing in the real project.
 
 ## Provenance and maintenance
 
-Generated once using `android create empty-activity` and `android-dev`'s `bootstrap.sh`, `generate.sh app`, and `generate.sh wear`. Catalog aliases were merged, themes/fonts and navigation completed, and the existing eval screenshot approach adapted for exploration. Consumers copy the result without invoking those generators.
+Generated once using `android create empty-activity` and `android-dev`'s `bootstrap.sh` and `generate.sh app`. Catalog aliases were merged, themes/fonts and navigation completed, and the existing eval screenshot approach adapted. Consumers copy the result without invoking those generators.
 
-Keep this starter's dependencies explicitly pinned. When updating it, build both shells, render both screenshot entry points, inspect the PNGs, and run Spotless in a disposable copy. Keep build outputs, local SDK paths, caches, and exploration results out of the installed template.
+Keep this starter's dependencies explicitly pinned. When updating it, build the app, render its screenshot entry point, inspect the PNGs, and run Spotless in a disposable copy. Keep build outputs, local SDK paths, caches, and exploration results out of the installed template.
 
 Unmodified fonts come from the official [Google Fonts repository](https://github.com/google/fonts) (`main` branch). Their redistribution licenses are in `licenses/`. Google Sans Flex is the default typography; the other faces are a curated set an exploration may use for a direction (brand faces on Display and Headline only, Doto at Display sizes only, Google Sans Code for numbers and data), and are not referenced by the starter's `Typography`.
 
 | File in `res/font/` | Source (`https://raw.githubusercontent.com/google/fonts/main/ofl/...`) | License in `licenses/` |
 | --- | --- | --- |
 | `google_sans_flex.ttf` | `googlesansflex/` (variable TTF) | `google-sans-flex-OFL.txt` |
-| `roboto_flex.ttf` | `robotoflex/` (variable TTF, Wear) | `roboto-flex-OFL.txt` |
 | `fraunces.ttf` | `fraunces/Fraunces[SOFT,WONK,opsz,wght].ttf` | `fraunces-OFL.txt` (`fraunces/OFL.txt`) |
 | `bricolage_grotesque.ttf` | `bricolagegrotesque/BricolageGrotesque[opsz,wdth,wght].ttf` | `bricolage-grotesque-OFL.txt` (`bricolagegrotesque/OFL.txt`) |
 | `big_shoulders_display.ttf` | `bigshouldersdisplay/BigShouldersDisplay[wght].ttf` | `big-shoulders-display-OFL.txt` (`bigshouldersdisplay/OFL.txt`) |
 | `doto.ttf` | `doto/Doto[ROND,wght].ttf` | `doto-OFL.txt` (`doto/OFL.txt`) |
 | `google_sans_code.ttf` | `googlesanscode/GoogleSansCode[wght].ttf` | `google-sans-code-OFL.txt` (`googlesanscode/OFL.txt`) |
 
-The gallery runtime builds its Latin-subset woff2 files from these TTFs (`gallery/runtime-src/assets.mjs`).
+`skills/android-design-explore/assets/fonts/` holds identical copies of these TTFs, which the gallery runtime reads; `tests/gallery/fonts.test.mjs` checks they match.

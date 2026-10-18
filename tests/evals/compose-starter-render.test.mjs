@@ -62,15 +62,15 @@ test('failed build removes stale outputs and reports unverified', t => {
 test('successful build collects references into renders', t => {
   const root = temp(t);
   t.mock.method(console, 'log', () => {});
-  const code = main(['wear'], {
+  const code = main(['app'], {
     root,
     run: () => {
-      const reference = join(root, 'wear/src/screenshotTestDebug/reference/pkg');
+      const reference = join(root, 'app/src/screenshotTestDebug/reference/pkg');
       mkdirSync(reference, { recursive: true });
       writeFileSync(join(reference, 'x.png'), 'png');
       return { status: 0 };
     },
   });
   assert.equal(code, 0);
-  assert.equal(readFileSync(join(root, 'renders/wear/pkg/x.png'), 'utf8'), 'png');
+  assert.equal(readFileSync(join(root, 'renders/app/pkg/x.png'), 'utf8'), 'png');
 });

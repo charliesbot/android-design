@@ -2,25 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { lintFolder } from '../../skills/android-design-explore/gallery/render.mjs';
+import { lintFolder } from '../../skills/android-design-explore/gallery/lint.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { workspace, writeProposal, PAGE } from './fixture.mjs';
 
 const starter = name => readFileSync(fileURLToPath(new URL(`../../skills/android-design-explore/assets/proposal-starter/${name}`, import.meta.url)), 'utf8');
 
-// Returns a function that throws the lint errors of a proposal folder, as `render` would report them.
-function publish(t, files) {
+// Returns a function that throws the lint error of a proposal folder, as `render` would report it.
+function lint(t, files) {
   const folder = writeProposal(join(workspace(t), 'a'), files);
-  return () => {
-    const errors = lintFolder(folder);
-    if (errors.length) throw new Error(errors.join('\n'));
-  };
+  return () => lintFolder(folder);
 }
 
 test('the shipped starter and the fixture pass the lint', t => {
-  publish(t, { page: starter('index.html'), style: starter('style.css') })();
-  publish(t, {})();
+  lint(t, { page: starter('index.html'), style: starter('style.css') })();
+  lint(t, {})();
 });
 
 const cssRejections = [
@@ -54,7 +51,7 @@ const cssRejections = [
 ];
 for (const [name, style, message] of cssRejections) {
   test(`lint rejects ${name}`, t => {
-    assert.throws(publish(t, { style }), message);
+    assert.throws(lint(t, { style }), message);
   });
 }
 
@@ -65,7 +62,7 @@ test('lint allows surface-dim and the fixed-dim roles that Compose has', t => {
     'c { color: var(--md-sys-color-secondary-fixed-dim); }',
     'd { color: var(--md-sys-color-tertiary-fixed-dim); }',
   ].join('\n');
-  publish(t, { style })();
+  lint(t, { style })();
 });
 
 test('lint allows voices, role variables, and neutral color keywords', t => {
@@ -75,7 +72,7 @@ test('lint allows voices, role variables, and neutral color keywords', t => {
     '.x { color: var(--md-sys-color-primary); background: transparent; border-color: currentColor; outline-color: inherit; fill: var(--static-red); }',
     '/* color: #fff; font-size: 99px; */',
   ].join('\n');
-  publish(t, { style })();
+  lint(t, { style })();
 });
 
 const htmlRejections = [
@@ -98,33 +95,33 @@ const htmlRejections = [
 ];
 for (const [name, page, message] of htmlRejections) {
   test(`lint rejects ${name}`, t => {
-    assert.throws(publish(t, { page }), message);
+    assert.throws(lint(t, { page }), message);
   });
 }
 
 test('lint allows script with src and ignores commented markup', t => {
-  publish(t, { page: `${PAGE}<!-- <p style="x"> --><script type="module" src="/runtime/m3e.js"></script>` })();
+  lint(t, { page: `${PAGE}<!-- <p style="x"> --><script type="module" src="/runtime/m3e.js"></script>` })();
 });
 
 test('lint allows any Material Symbols name on p-icon, filled or not', t => {
-  publish(t, { page: `${PAGE}<p-icon name="directions_car"></p-icon><p-icon name='hiking' filled label="Hike"></p-icon><p-icon name="cloud"></p-icon><p-icon name="3d_rotation"></p-icon>` })();
+  lint(t, { page: `${PAGE}<p-icon name="directions_car"></p-icon><p-icon name='hiking' filled label="Hike"></p-icon><p-icon name="cloud"></p-icon><p-icon name="3d_rotation"></p-icon>` })();
 });
 
 test('lint allows p-icon size inside m3e-theme, a card, and layout elements', t => {
-  publish(t, { page: '<!doctype html>\n<m3e-theme color="#6750A4"><p-icon name="add" size="48"></p-icon><m3e-card><div slot="content"><p-icon name="add" size="32"></p-icon></div></m3e-card><m3e-app-bar><p-icon name="add" size="20"></p-icon></m3e-app-bar></m3e-theme>' })();
+  lint(t, { page: '<!doctype html>\n<m3e-theme color="#6750A4"><p-icon name="add" size="48"></p-icon><m3e-card><div slot="content"><p-icon name="add" size="32"></p-icon></div></m3e-card><m3e-app-bar><p-icon name="add" size="20"></p-icon></m3e-app-bar></m3e-theme>' })();
 });
 
 test('lint allows p-icon size in the body of components that force only a named icon slot', t => {
-  publish(t, { page: '<!doctype html>\n<m3e-theme><m3e-expansion-panel><div><p-icon name="add" size="32"></p-icon></div></m3e-expansion-panel><m3e-dialog><div><p-icon name="add" size="40"></p-icon></div></m3e-dialog><m3e-tree-item><p-icon name="add" size="24"></p-icon></m3e-tree-item></m3e-theme>' })();
+  lint(t, { page: '<!doctype html>\n<m3e-theme><m3e-expansion-panel><div><p-icon name="add" size="32"></p-icon></div></m3e-expansion-panel><m3e-dialog><div><p-icon name="add" size="40"></p-icon></div></m3e-dialog><m3e-tree-item><p-icon name="add" size="24"></p-icon></m3e-tree-item></m3e-theme>' })();
 });
 
 test('lint allows each Compose icon size on p-icon', t => {
   const sizes = [18, 20, 24, 28, 32, 36, 40, 48];
-  publish(t, { page: PAGE + sizes.map(size => `<p-icon name="search" size="${size}"></p-icon>`).join('') })();
+  lint(t, { page: PAGE + sizes.map(size => `<p-icon name="search" size="${size}"></p-icon>`).join('') })();
 });
 
 test('lint allows p-icon size inside a list item and outside components, also after a component closes', t => {
-  publish(t, { page: PAGE + '<m3e-icon-button><p-icon name="search"></p-icon></m3e-icon-button><m3e-list><m3e-list-item><p-icon slot="leading" name="person" size="40"></p-icon>Name</m3e-list-item></m3e-list><div><p-icon name="add" size="48"></p-icon></div>' })();
+  lint(t, { page: PAGE + '<m3e-icon-button><p-icon name="search"></p-icon></m3e-icon-button><m3e-list><m3e-list-item><p-icon slot="leading" name="person" size="40"></p-icon>Name</m3e-list-item></m3e-list><div><p-icon name="add" size="48"></p-icon></div>' })();
 });
 
 test('lint allows the bundled families in voices at their minimum sizes', t => {
@@ -138,7 +135,7 @@ test('lint allows the bundled families in voices at their minimum sizes', t => {
     '@media (min-width: 840px) { .voice-doto { font-size: 57px; } .voice-fraunces { font-size: 36px; } }',
     '/* .voice-bad { font-family: Georgia; } */',
   ].join('\n');
-  publish(t, { style })();
+  lint(t, { style })();
 });
 
 const scriptRejections = [
@@ -152,27 +149,27 @@ const scriptRejections = [
 ];
 for (const [name, script, message] of scriptRejections) {
   test(`lint rejects ${name} in a proposal script`, t => {
-    assert.throws(publish(t, { files: { 'app.js': script } }), message);
+    assert.throws(lint(t, { files: { 'app.js': script } }), message);
   });
 }
 
 test('lint allows a self-contained script and ignores commented imports', t => {
-  publish(t, { files: { 'app.js': "// import './x.js';\n/* import('./y.js') */\nconst important = 'import from ./z';\ndocument.title = important;\n" } })();
+  lint(t, { files: { 'app.js': "// import './x.js';\n/* import('./y.js') */\nconst important = 'import from ./z';\ndocument.title = important;\n" } })();
 });
 
 test('lint rejects a CSS @import', t => {
-  assert.throws(publish(t, { style: '\n@import url("other.css");\nbody { color: var(--md-sys-color-on-surface); }' }), /style\.css:2: @import is not allowed/);
+  assert.throws(lint(t, { style: '\n@import url("other.css");\nbody { color: var(--md-sys-color-on-surface); }' }), /style\.css:2: @import is not allowed/);
 });
 
 test('lint skips renders/ and dotfiles, so a rendered folder and its .gitignore pass', t => {
   const folder = writeProposal(join(workspace(t), 'a'), { files: { '.gitignore': '*\n' } });
   mkdirSync(join(folder, 'renders'));
   writeFileSync(join(folder, 'renders/view.html'), '<div style="color: #fff"></div>');
-  assert.deepEqual(lintFolder(folder), []);
+  assert.doesNotThrow(() => lintFolder(folder));
 });
 
 test('lint reports a folder without index.html', t => {
   const folder = join(workspace(t), 'a');
   mkdirSync(folder);
-  assert.deepEqual(lintFolder(folder), ['index.html: missing']);
+  assert.throws(() => lintFolder(folder), /index\.html: missing/);
 });

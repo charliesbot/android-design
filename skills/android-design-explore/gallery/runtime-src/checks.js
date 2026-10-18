@@ -15,7 +15,7 @@ const FAB = 'm3e-fab, m3e-fab-menu, [data-fab]';
 const MIN_TARGET = 48;
 
 // The first computed family must be a bundled one: Google Sans Flex always, Google Sans Code at any size, a brand face from headline small
-// (24px) up, Doto from display small (36px) up. The publish lint enforces the same sizes on the source; this checks what renders.
+// (24px) up, Doto from display small (36px) up. The lint enforces the same sizes on the source; this checks what renders.
 const bundledFont = (family, size) => {
   const name = family.split(',')[0].trim().replace(/^(["'])(.*)\1$/, '$2').toLowerCase();
   if (name === bundled.plain.toLowerCase()) return true;

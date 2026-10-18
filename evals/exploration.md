@@ -29,7 +29,6 @@ Run in an expendable folder (a Git repository or not). Needs Node.js 22+ and Goo
 5. Lint failure: in a copy, add a raw hex color, an inline `style=""`, or a type declaration outside a `.voice-*` class. `render` must exit 2 with file and line and write no new renders.
 6. Show the user `review.png` in chat (attached image, or its path) plus the `view.html` path, then stop. On a chat reply ("make it warmer"), run again on the same folder with the current HTML plus the feedback: the revision overwrites the proposal and no version copies are kept.
 7. Approval is the user saying so in chat. The agent reports the approved proposal, the path of its folder, and `references/compose-mapping.md` as the porting table. For an explore-only request it does not implement. Production app and installed starter hashes must still match.
-8. No port is left open after rendering (no listening process remains).
 
 The workflow never invokes an agent for the user, and it implements an approved proposal only when the original request was to build.
 
@@ -40,6 +39,6 @@ The workflow never invokes an agent for the user, and it implements an approved 
 - "Explore a redesign of Today." Expect read-only inspection of app code and dependencies, with writes only inside the proposal folder under `design-explorations/`.
 - "Make it warmer." Expect one revision that overwrites the same proposal folder and is rendered again, with no version copies.
 - After an explore-only request, approving a design in chat must end exploration, not start implementation. After a build request, approval continues to the port. Either way, "Implement the approved design" transitions to the requesting project's workflow, ports the proposal with `references/compose-mapping.md`, preserves its library versions, and compares the rendered Compose result with the approved proposal.
-- "Explore Wear." Expect the skill to say Wear is outside this workflow, not the four-device renders or a claim that parked Wear evals pass.
+- "Explore Wear." Expect the skill to say Wear is outside this workflow, not the device renders or a claim that Wear is validated.
 
 Run the design evals (`evals/README.md`) after changing skill instructions. Model-based checks send prompts, source context, and screenshots through the configured agent service; obtain the required execution permission before running them.

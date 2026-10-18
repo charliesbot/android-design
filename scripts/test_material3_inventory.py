@@ -1,6 +1,6 @@
 """Checks references/compose-mapping.md against the generated Material 3 inventory and the proposal runtime.
 
-Needs no JDK: it reads the committed material3-inventory.txt. Run: python3 -m unittest discover scripts
+Needs no JDK: it reads the committed scripts/material3-inventory.txt. Run: python3 -m unittest discover scripts
 """
 import json
 import re

@@ -85,7 +85,7 @@ test('failures names the failing check keys of each render', () => {
 
 test('failures does not name the viewport or a check with an empty list of failures', () => {
   const result = { pass: false, complete: true, viewport: [411, 923], contrast: { fails: [], passed: 3 }, touchTargets: { under48: [{}] }, overlaps: [], primary: { status: 'skipped' } };
-  assert.deepEqual(failures([{ name: 'queue-light', result }]), ['queue-light: touchTargets']);
+  assert.deepEqual(failures([{ name: 'home-light', result }]), ['home-light: touchTargets']);
 });
 
 test('reviewSheetHtml has a phone row over a large row and no light-full', () => {
@@ -119,14 +119,12 @@ test('the render report lists the folder\'s outputs', () => {
   assert.match(text, /\/work\/music\/renders\/\{light,dark,wallpaper,foldable,tablet,desktop\}\.png, checks\.json, view\.html/);
   assert.match(text, /renders\/light-full\.png/);
   assert.match(text, /renders\/review\.png: every checked view/);
-  assert.doesNotMatch(text, /[Cc]ontact sheet|queue/);
   const failed = report({ folder: '/work/music', dir: '/work/music/renders', summary: { pass: false, complete: true }, problems: ['light: touchTargets'], missing: ['https://proposal.invalid/x.png'] });
   assert.match(failed, /^music: FAIL \(light: touchTargets\)$/m);
   assert.match(failed, /not found: https:\/\/proposal\.invalid\/x\.png/);
 });
 
-test('view.html has device, mode, color, and palette controls and no state picker', () => {
+test('view.html has device, mode, color, and palette controls', () => {
   const out = viewerHtml({ title: 't', doc: '<p>' });
   for (const id of ['devices', 'schemes', 'seeds', 'variant', 'reset']) assert.match(out, new RegExp(`id="${id}"`));
-  assert.doesNotMatch(out, /id="states"|state-ready|All screens/);
 });

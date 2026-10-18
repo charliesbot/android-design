@@ -5,11 +5,8 @@ androidGradlePlugin = "9.4.1"
 kotlin = "2.3.20"
 compileSdk = "37"
 minSdk = "26"
-wearMinSdk = "30"
 composeBom = "2026.03.01"
 material3 = "1.5.0-alpha29"
-wearCompose = "1.7.0"
-wearTooling = "1.0.0"
 activity = "1.13.0"
 core = "1.18.0"
 screenshot = "0.0.1-alpha16"
@@ -35,9 +32,6 @@ compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
 material-kolor = { module = "com.materialkolor:material-kolor", version.ref = "materialKolor" }
-wear-compose-material3 = { module = "androidx.wear.compose:compose-material3", version.ref = "wearCompose" }
-wear-compose-foundation = { module = "androidx.wear.compose:compose-foundation", version.ref = "wearCompose" }
-wear-tooling-preview = { module = "androidx.wear:wear-tooling-preview", version.ref = "wearTooling" }
 screenshot-validation-api = { module = "com.android.tools.screenshot:screenshot-validation-api", version.ref = "screenshot" }
 
 compose-runtime = { module = "androidx.compose.runtime:runtime" }
@@ -49,7 +43,6 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }
 androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "navigation3" }
-wear-compose-navigation3 = { module = "androidx.wear.compose:compose-navigation3", version.ref = "wearCompose" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
 koin-androidx-compose = { module = "io.insert-koin:koin-androidx-compose", version.ref = "koin" }

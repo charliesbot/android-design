@@ -46,7 +46,6 @@ section { margin-top: 48px; scroll-margin-top: 16px; }
 .role-inverse-surface { background: var(--md-sys-color-inverse-surface); }
 .role-inverse-on-surface { background: var(--md-sys-color-inverse-on-surface); }
 .role-primary { background: var(--md-sys-color-primary); }
-.role-primary-dim { background: var(--md-sys-color-primary-dim); }
 .role-on-primary { background: var(--md-sys-color-on-primary); }
 .role-primary-container { background: var(--md-sys-color-primary-container); }
 .role-on-primary-container { background: var(--md-sys-color-on-primary-container); }
@@ -56,7 +55,6 @@ section { margin-top: 48px; scroll-margin-top: 16px; }
 .role-on-primary-fixed-variant { background: var(--md-sys-color-on-primary-fixed-variant); }
 .role-inverse-primary { background: var(--md-sys-color-inverse-primary); }
 .role-secondary { background: var(--md-sys-color-secondary); }
-.role-secondary-dim { background: var(--md-sys-color-secondary-dim); }
 .role-on-secondary { background: var(--md-sys-color-on-secondary); }
 .role-secondary-container { background: var(--md-sys-color-secondary-container); }
 .role-on-secondary-container { background: var(--md-sys-color-on-secondary-container); }
@@ -65,7 +63,6 @@ section { margin-top: 48px; scroll-margin-top: 16px; }
 .role-on-secondary-fixed { background: var(--md-sys-color-on-secondary-fixed); }
 .role-on-secondary-fixed-variant { background: var(--md-sys-color-on-secondary-fixed-variant); }
 .role-tertiary { background: var(--md-sys-color-tertiary); }
-.role-tertiary-dim { background: var(--md-sys-color-tertiary-dim); }
 .role-on-tertiary { background: var(--md-sys-color-on-tertiary); }
 .role-tertiary-container { background: var(--md-sys-color-tertiary-container); }
 .role-on-tertiary-container { background: var(--md-sys-color-on-tertiary-container); }
@@ -74,7 +71,6 @@ section { margin-top: 48px; scroll-margin-top: 16px; }
 .role-on-tertiary-fixed { background: var(--md-sys-color-on-tertiary-fixed); }
 .role-on-tertiary-fixed-variant { background: var(--md-sys-color-on-tertiary-fixed-variant); }
 .role-error { background: var(--md-sys-color-error); }
-.role-error-dim { background: var(--md-sys-color-error-dim); }
 .role-on-error { background: var(--md-sys-color-on-error); }
 .role-error-container { background: var(--md-sys-color-error-container); }
 .role-on-error-container { background: var(--md-sys-color-on-error-container); }

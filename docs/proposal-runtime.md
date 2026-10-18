@@ -1,6 +1,6 @@
 # Proposal runtime
 
-Maintainer notes for the proposal runtime in `skills/android-design-explore/gallery/runtime-src/`. Proposal authors read that folder's `README.md` instead; this document covers what is inside the runtime, how the rule checker works, how `view.html` talks to a proposal, and how to rebuild it.
+Maintainer notes for the proposal runtime in `skills/android-design-explore/gallery/runtime-src/`. Proposal authors read `skills/android-design-explore/references/authoring.md` instead; this document covers what is inside the runtime, how the rule checker works, how `view.html` talks to a proposal, and how to rebuild it.
 
 The runtime is built from `runtime-src/` into `skills/android-design-explore/gallery/public/runtime/` and committed, so the installed skill never runs npm. `cli.mjs render` serves it to headless Chrome at `/runtime/`, and `view.html` inlines it.
 
@@ -10,20 +10,11 @@ Paths are in the built `public/runtime/`; the sources sit directly in `runtime-s
 
 | File | Purpose |
 | --- | --- |
-| `runtime/m3e.js` | ES module: registers the `@m3e/web` 2.9.2 elements listed in the runtime README, the `p-` pieces, the theme message listener, `window.runtimeChecks`, and `window.runtimeSettle` (resolves once no finite animation or transition is running; call it before `runtimeChecks()`) |
-| `runtime/runtime.css` | Google Sans Flex `@font-face`, page defaults, type role classes, shim styles |
+| `runtime/m3e.js` | ES module: registers the `@m3e/web` 2.9.2 elements listed in the authoring guide, the `p-` pieces, the theme message listener, `window.runtimeChecks`, and `window.runtimeSettle` (resolves once no finite animation or transition is running; call it before `runtimeChecks()`) |
+| `runtime/runtime.css` | Google Sans Flex `@font-face`, page defaults, type role classes (`@m3e/web` has no type scale component), and the `--p-inset-*` stand-ins for the status and navigation bars. `p-floating-toolbar` is a runtime piece too; the authoring guide covers both |
 | `runtime/fonts/` | Latin-subset text woff2 with all variable axes and each OFL license: `GoogleSansFlex` (plain text, always), `Fraunces`, `BricolageGrotesque`, `BigShouldersDisplay`, `Doto` (optional brand faces for Display and Headline voices), `GoogleSansCode` (numbers and data). The family list and minimum sizes are in `fonts.json`, read by the lint and the fonts check |
 | `runtime/fonts/MaterialSymbolsRounded.woff2` | The full Material Symbols Rounded variable font (axes FILL, GRAD, opsz, wght), unmodified from the pinned `material-symbols` npm package; provenance in `MaterialSymbolsRounded-SOURCE.txt`, Apache 2.0 license in `MaterialSymbolsRounded-LICENSE.txt` |
 | `runtime/symbols.json` | Every Material Symbols name (from the package's type list). The lint rejects a `p-icon` name that is not in it |
-| `runtime/sample/` | A small page that uses only runtime pieces |
-| `runtime/checks-fixture/` | Known-bad and known-good component text (low-contrast and clipped button labels, clipped plain text) that `runtimeChecks()` must flag, plus opacity 0 text it must skip instead of leaving unresolved, and bundled-face text (Fraunces at 40px and Google Sans Code at 12px pass, Doto at 24px must be listed in `fonts.offenders`) |
-| `runtime/verify/` | One section per component in `references/compose-mapping.md`, with its variants, for comparing against Compose; it marks nothing verified |
-
-## Shims
-
-- `<p-floating-toolbar>`: wrap one `<m3e-toolbar>`. Floats it at bottom center, 16px above `--p-inset-bottom`, rounded and elevated. Its `m3e-button[toggle]` children are single-select: the selected one is `tonal`, the others `text`, 48px tall.
-- Type roles: the emphasized classes above, because `@m3e/web` has no type scale component.
-- `--p-inset-top`, `--p-inset-bottom`: default `0px`. Stand-ins for the status and navigation bars, which do not exist on the web. A proposal sets them to show system bars.
 
 ## Sheet handle patch
 

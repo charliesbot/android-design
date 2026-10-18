@@ -30,7 +30,7 @@ Copy `<skill-dir>/assets/proposal-starter/` (including its `.gitignore`) to `<fo
 
 ## Write
 
-Read `gallery/runtime-src/README.md` first: it is the syntax the lint enforces. Edit `index.html`, `style.css`, and optional scripts in the folder.
+Read `references/authoring.md` first: it is the syntax the lint enforces. Edit `index.html`, `style.css`, and optional scripts in the folder.
 
 - Use only HTML that has a Compose counterpart. Any registered element may be used; the port reports what `references/compose-mapping.md` has not verified or mapped. Build anything else from plain layout with role tokens when `Box`, `Row`, `Column`, `Text`, or `Surface` can express it; otherwise leave it out.
 - Overlays come only from `m3e-bottom-sheet modal handle`, `m3e-dialog`, or `m3e-menu`, opened from a control by the page's own script. A render fails if a modal is open on load. A modal bottom sheet opens at about half the window height and scrolls inside, so put its key action near the top. Leave out a side sheet.

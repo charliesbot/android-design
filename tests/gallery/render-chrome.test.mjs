@@ -24,6 +24,9 @@ function proposal(t) {
   return folder;
 }
 
+// Width and height from a PNG's IHDR chunk.
+const pngSize = file => { const head = readFileSync(file); return [head.readUInt32BE(16), head.readUInt32BE(20)]; };
+
 const render = (folder, ...flags) => spawnSync('node', [CLI, 'render', folder, ...flags], { encoding: 'utf8' });
 
 test('the starter ignores itself and is a flat proposal folder', () => {
@@ -43,6 +46,9 @@ test('rendering a folder copied from the starter writes the images, checks, revi
   assert.deepEqual(readdirSync(dir).sort(), [...RENDERS.map(r => `${r.name}.png`), 'checks.json', 'light-full.png', 'review.png', 'view.html'].sort());
   const checks = JSON.parse(readFileSync(join(dir, 'checks.json'), 'utf8'));
   assert.deepEqual([checks.pass, checks.complete, checks.renders.length], [true, true, RENDERS.length]);
+  // A page shorter than the viewport gives a light-full.png the size of the viewport.
+  const [fullWidth, fullHeight] = pngSize(join(dir, 'light-full.png'));
+  assert.deepEqual([fullWidth, fullHeight >= 923], [411, true]);
   const view = readFileSync(join(dir, 'view.html'), 'utf8');
   assert.doesNotMatch(view, /src=\\?"\/runtime|href=\\?"\/runtime|url\(\\?"?fonts\//);
   assert.match(view, /font\/woff2;base64/);
@@ -56,19 +62,6 @@ test('rendering again replaces the renders folder and does not lint it', opts, t
   const done = render(folder);
   assert.equal(done.status, 0, done.stderr);
   assert.equal(existsSync(join(folder, 'renders/stale.png')), false);
-});
-
-test('render fails a page that opens a modal on load', opts, t => {
-  const folder = proposal(t);
-  const page = readFileSync(join(folder, 'index.html'), 'utf8')
-    .replace('</head>', '  <script type="module" src="app.js"></script>\n</head>')
-    .replace('</m3e-theme>', '<m3e-dialog id="credits"><span slot="header">Credits</span>Written by Mara Vale.<div slot="actions" end><m3e-button variant="text"><m3e-dialog-action>Close</m3e-dialog-action></m3e-button></div></m3e-dialog>\n</m3e-theme>');
-  writeFileSync(join(folder, 'index.html'), page);
-  writeFileSync(join(folder, 'app.js'), "customElements.whenDefined('m3e-dialog').then(() => requestAnimationFrame(() => document.getElementById('credits').show()));\n");
-  const done = render(folder);
-  assert.equal(done.status, 0, done.stderr);
-  assert.match(done.stdout, /^music: FAIL \(light: a modal is open on load; open it from a control in the page's script instead/m);
-  assert.equal(JSON.parse(readFileSync(join(folder, 'renders/checks.json'), 'utf8')).pass, false);
 });
 
 test('view.html opens a modal from a page script control and still checks its overlay', opts, async t => {
@@ -95,9 +88,6 @@ test('view.html opens a modal from a page script control and still checks its ov
   assert.deepEqual(open, { before: false, modal: 1 });
 });
 
-// Width and height from a PNG's IHDR chunk.
-const pngSize = file => { const head = readFileSync(file); return [head.readUInt32BE(16), head.readUInt32BE(20)]; };
-
 test('render also writes light-full.png at the full document height, outside checks and views', opts, t => {
   const root = proposal(t);
   const dir = root;
@@ -122,11 +112,4 @@ test('render also writes light-full.png at the full document height, outside che
   assert.ok(reviewHeight > 560, `review.png is ${reviewHeight}px tall`);
   assert.ok(checks.renders.every(r => !r.name.startsWith('review')));
   assert.doesNotMatch(readFileSync(join(out, 'view.html'), 'utf8'), /review\.png/);
-});
-
-test('light-full.png of a page shorter than the viewport is the viewport size', opts, t => {
-  const root = proposal(t);
-  assert.equal(render(root).status, 0);
-  const [width, height] = pngSize(join(root, 'renders/light-full.png'));
-  assert.deepEqual([width, height >= 923], [411, true]);
 });

@@ -19,5 +19,4 @@
   .rail { display: flex; }
   .toolbar { display: none; }
   .screen { padding: calc(var(--p-inset-top) + 32px) 24px 32px; max-width: 720px; }
-  .primary { align-self: flex-start; }
 }

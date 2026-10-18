@@ -39,13 +39,12 @@ const frames = page => page.evaluate(() => [...document.querySelectorAll('iframe
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const click = (page, selector) => page.evaluate(sel => document.querySelector(sel).click(), selector);
 
-test('view.html shows one frame fitted to the window, with no state picker', opts, async t => {
+test('view.html shows one frame fitted to the window', opts, async t => {
   const page = await open(t, { width: 700 });
   await wait(200);
   const shown = await frames(page);
   assert.equal(shown.length, 1);
   assert.ok(shown[0].right <= 700, 'the frame fits the window width');
-  assert.equal(await page.evaluate(() => !!document.getElementById('states')), false);
 });
 
 test('changing device, mode, or color reaches the frame', opts, async t => {

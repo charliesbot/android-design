@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import subsetFont from 'subset-font';
 
@@ -18,15 +18,12 @@ const FONTS = [
   { name: 'GoogleSansCode', file: 'google_sans_code', license: 'google-sans-code' },
 ];
 // Material Symbols Rounded: the variable font (FILL, GRAD, opsz, wght) from the pinned `material-symbols` npm package, unsubsetted.
-// Icon names are ligatures, so the package's name list becomes runtime/symbols.json for the publish lint.
+// Icon names are ligatures, so the package's name list becomes runtime/symbols.json for the lint.
 const SYMBOLS = new URL('node_modules/material-symbols/', repo);
 
 // Basic Latin, Latin-1 Supplement, and the punctuation and symbols that appear in UI copy.
 const RANGES = [[0x20, 0x7e], [0xa0, 0xff], [0x2010, 0x2027], [0x2030, 0x203a], [0x2190, 0x2193], [0x2212, 0x2212], [0x20ac, 0x20ac], [0x2122, 0x2122]];
 const LATIN = RANGES.flatMap(([from, to]) => Array.from({ length: to - from + 1 }, (_, i) => String.fromCodePoint(from + i))).join('');
-
-// Folders copied unchanged to public/runtime/<name>/.
-const PAGES = ['sample', 'verify', 'checks-fixture'];
 
 function symbolNames() {
   const names = [...read(new URL('index.d.ts', SYMBOLS), 'utf8').matchAll(/^\s*"([a-z0-9_]+)",?$/gm)].map(match => match[1]);
@@ -51,9 +48,6 @@ export function runtimeAssets() {
       emit('fonts/MaterialSymbolsRounded-SOURCE.txt', `Material Symbols Rounded variable font (axes FILL, GRAD, opsz, wght), unmodified.\nSource: npm package material-symbols@${version} (github.com/marella/material-symbols, built from github.com/google/material-design-icons), file material-symbols-rounded.woff2.\nLicense: Apache 2.0, see MaterialSymbolsRounded-LICENSE.txt.\n`);
       emit('symbols.json', `${JSON.stringify(symbolNames())}\n`);
       emit('runtime.css', read(new URL('runtime.css', here)));
-      for (const dir of PAGES) {
-        for (const name of readdirSync(fileURLToPath(new URL(`${dir}/`, here))).sort()) emit(`${dir}/${name}`, read(new URL(`${dir}/${name}`, here)));
-      }
     },
   };
 }
