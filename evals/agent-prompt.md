@@ -23,7 +23,7 @@ The screen must work and adapt across phone (411x923), foldable (933x704), table
 
 1. Run `node {{EXPLORE_DIR}}/gallery/cli.mjs render {{EXPLORATION}} a`. It needs no browser tool and no port.
 2. Fix every failure in `{{EXPLORATION}}/renders/a/checks.json` (treat `complete: false` as unverified), then rerun `render`.
-3. Look at every PNG in `{{EXPLORATION}}/renders/a/` (phone light, dark, wallpaper, foldable, tablet, desktop, and the `<state>-light` and `<state>-tablet` renders of each state you declared), not just the phone. Check that each larger view reveals what your section 0 adaptation answer promised, rather than rearranging the phone content.
+3. Look at `{{EXPLORATION}}/renders/a/review.png` (every checked view on one image: phone light, dark, wallpaper, foldable, tablet, desktop, and the `<state>-light` and `<state>-tablet` renders of each state you declared). Open a single PNG only to inspect something it raises, and `light-full.png` when the screen scrolls past the first screen. Check that each larger view reveals what your section 0 adaptation answer promised, rather than rearranging the phone content.
 
 If your harness cannot view images, say in your final message that visual review is unverified.
 
@@ -34,7 +34,7 @@ If your harness cannot view images, say in your final message that visual review
 ## Definition of done
 
 - The proposal in `{{EXPLORATION}}/project/proposals/a/` implements the brief and adapts across all four window sizes.
-- You rendered it, fixed every failure in `checks.json`, and looked at every screenshot, or you reported visual review as unverified.
+- You rendered it, fixed every failure in `checks.json`, and looked at `review.png`, or you reported visual review as unverified.
 
 ## Final message (under 250 words)
 

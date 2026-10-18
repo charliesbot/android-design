@@ -33,7 +33,7 @@ Chai syncs the whole `skills/` folder, which installs two skills: `android-desig
 
 ### Render and view
 
-`node skills/android-design-explore/gallery/cli.mjs render <exploration>` lints each proposal, renders it headlessly in Chrome (no port), and writes `renders/<id>/` screenshots for phone, foldable, tablet, and desktop, a `checks.json`, and a self-contained `view.html`, plus `renders/contact-sheet.png`. Add `--open` to open each `view.html` in your default browser when the render finishes (or double-click it) to switch devices, light and dark, seed colors, palette, and declared states. Iteration happens in chat: the agent shows the contact sheet, you reply, it edits and renders again.
+`node skills/android-design-explore/gallery/cli.mjs render <exploration>` lints each proposal, renders it headlessly in Chrome (no port), and writes `renders/<id>/` screenshots for phone, foldable, tablet, and desktop, a `review.png` (every checked view on one image, for the agent's own review), a `checks.json`, and a self-contained `view.html`, plus `renders/contact-sheet.png`. Add `--open` to open each `view.html` in your default browser when the render finishes (or double-click it) to switch devices, light and dark, seed colors, palette, and declared states. Iteration happens in chat: the agent shows the contact sheet, you reply, it edits and renders again.
 
 Google Sans Flex is shared with the proposal runtime, including its local font license. The runtime also bundles the optional brand and data faces (Fraunces, Bricolage Grotesque, Big Shoulders Display, Doto, Google Sans Code).
 

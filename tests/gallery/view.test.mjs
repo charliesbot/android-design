@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromeExecutable } from '../../skills/android-design-explore/gallery/cdp.mjs';
-import { ORIGIN, RENDERS, SHEET_COLUMNS, contactSheetHtml, failures, makeRoute, report, stateRenders, summarize } from '../../skills/android-design-explore/gallery/render.mjs';
+import { ORIGIN, RENDERS, SHEET_COLUMNS, contactSheetHtml, failures, makeRoute, report, reviewSheetHtml, stateRenders, summarize } from '../../skills/android-design-explore/gallery/render.mjs';
 import { dataUri, inlineCss, inlineHtml, viewerHtml } from '../../skills/android-design-explore/gallery/view.mjs';
 import { workspace } from './fixture.mjs';
 
@@ -97,6 +97,24 @@ test('contactSheetHtml has one row per proposal and a pass or fail label', () =>
   assert.equal(out.split('<img').length - 1, 2 * SHEET_COLUMNS.length);
 });
 
+test('reviewSheetHtml has a phone row over a large row, state columns, and no light-full', () => {
+  const states = ['queue'];
+  const names = [...RENDERS, ...stateRenders(states)].map(r => r.name);
+  const images = Object.fromEntries([...names, 'light-full'].map(name => [name, `data:image/png;base64,${name}`]));
+  const out = reviewSheetHtml('a', images, states);
+  const [phone, large] = out.split('<h2>').slice(1);
+  assert.match(phone, /^phone/);
+  assert.match(large, /^large/);
+  const captions = part => [...part.matchAll(/<figcaption>([^<]+)</g)].map(m => m[1]);
+  assert.deepEqual(captions(phone), ['light', 'dark', 'wallpaper', 'queue-light']);
+  assert.deepEqual(captions(large), ['foldable', 'tablet', 'desktop', 'queue-tablet']);
+  assert.equal(out.split('<img').length - 1, names.length);
+  assert.doesNotMatch(out, /light-full/);
+  assert.match(out, /<title>a<\/title>/);
+  assert.match(out, /max-width: 1600px/);
+  assert.match(out, /flex-wrap: wrap/);
+});
+
 test('chromeExecutable honors CHROME_PATH and explains a missing Chrome', () => {
   assert.equal(chromeExecutable({ env: { CHROME_PATH: '/x/chrome' }, exists: () => true }), '/x/chrome');
   assert.throws(() => chromeExecutable({ env: { CHROME_PATH: '/x/chrome' }, exists: () => false }), /CHROME_PATH does not exist/);
@@ -118,6 +136,7 @@ test('the render report lists a proposal\'s state renders after the default view
   const text = report({ sheet: '/s.png', proposals: [{ id: 'a', dir: '/r/a', summary, problems: [], missing: [], states: ['queue'] }, { id: 'b', dir: '/r/b', summary, problems: [], missing: [], states: [] }] });
   assert.match(text, /\/r\/a\/\{light,dark,wallpaper,foldable,tablet,desktop,queue-light,queue-tablet\}\.png/);
   assert.match(text, /\/r\/b\/\{light,dark,wallpaper,foldable,tablet,desktop\}\.png/);
+  assert.match(text, /\/r\/a\/review\.png: every checked view/);
 });
 
 test('view.html gets a state picker only for a proposal that declares states', () => {
