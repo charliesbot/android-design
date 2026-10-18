@@ -90,39 +90,47 @@ test('cleanup does not follow internal symlinks', t => {
   assert.equal(existsSync(join(template, 'proposals/a/index.html')), true);
 });
 
-test('local git exclusion and the exploration marker', t => {
+test('in a Git repository the exploration ignores itself and the repo files stay untouched', t => {
   const { root, template } = repo(t);
+  writeFileSync(join(root, '.gitignore'), 'node_modules\n');
   const result = create({ template, root });
   create({ template, root });
   assert.equal(dirname(result), join(root, 'design-explorations'));
   assert.equal(lstatSync(join(result, 'exploration.json')).isFile(), true);
+  assert.equal(readFileSync(join(root, 'design-explorations/.gitignore'), 'utf8'), '*\n');
   assert.equal(git(root, 'check-ignore', result).status, 0);
-  assert.equal(existsSync(join(root, '.gitignore')), false);
-  const exclude = readFileSync(join(root, '.git/info/exclude'), 'utf8');
-  assert.equal(exclude.split('\n').filter(line => line === '/design-explorations/').length, 1);
+  assert.equal(readFileSync(join(root, '.gitignore'), 'utf8'), 'node_modules\n');
+  assert.equal(existsSync(join(root, '.git/info/exclude')) && /design-explorations/.test(readFileSync(join(root, '.git/info/exclude'), 'utf8')), false);
 });
 
-test('exclude rule is appended after a missing trailing newline', t => {
-  const { root, template } = repo(t);
-  mkdirSync(join(root, '.git/info'), { recursive: true });
-  writeFileSync(join(root, '.git/info/exclude'), '*.log');
-  create({ template, root });
-  assert.equal(readFileSync(join(root, '.git/info/exclude'), 'utf8'), '*.log\n/design-explorations/\n');
-});
-
-test('refuse non-repository, symlink storage and tracked storage', t => {
-  const { root, template } = repo(t);
+test('a plain folder works and gets no Git metadata', t => {
+  const { template } = repo(t);
   const plain = realpathSync(mkdtempSync(join(tmpdir(), 'workspace-plain-')));
   t.after(() => rmSync(plain, { recursive: true, force: true }));
-  assert.throws(() => create({ template, root: plain }), /existing Git repository/);
+  const result = create({ template, root: plain });
+  assert.equal(dirname(result), join(plain, 'design-explorations'));
+  assert.equal(readFileSync(join(plain, 'design-explorations/.gitignore'), 'utf8'), '*\n');
+  assert.equal(existsSync(join(plain, '.git')), false);
+  cleanup(result, plain);
+  assert.equal(existsSync(result), false);
+});
+
+test('an existing design-explorations/.gitignore is left untouched', t => {
+  const { root, template } = repo(t);
+  mkdirSync(join(root, 'design-explorations'));
+  writeFileSync(join(root, 'design-explorations/.gitignore'), 'custom\n');
+  create({ template, root });
+  create({ template, root });
+  assert.equal(readFileSync(join(root, 'design-explorations/.gitignore'), 'utf8'), 'custom\n');
+});
+
+test('refuse symlink storage and a missing root', t => {
+  const { root, template } = repo(t);
+  assert.throws(() => create({ template, root: join(root, 'missing') }), /not an existing directory/);
+  assert.throws(() => create({ template, root: join(root, 'starter/proposals/a/index.html') }), /not an existing directory/);
   const storage = join(root, 'design-explorations');
   symlinkSync(template, storage, 'dir');
   assert.throws(() => create({ template, root }), /symlink/);
-  rmSync(storage);
-  mkdirSync(storage);
-  writeFileSync(join(storage, 'tracked'), 'keep');
-  assert.equal(git(root, 'add', 'design-explorations/tracked').status, 0);
-  assert.throws(() => create({ template, root }), /tracked/);
 });
 
 test('installed starter is the HTML proposal starter and contains only portable inputs', () => {

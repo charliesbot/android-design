@@ -14,7 +14,7 @@ Requests for multiple designs or for exploration start an exploration; ordinary 
 
 Iteration happens in chat. The agent shows the contact sheet and the `view.html` paths, the user replies ("keep a, make b warmer"), and the agent edits and renders again; to keep a version it copies the folder before editing. Approval is the user saying so in chat.
 
-Each exploration lives under `design-explorations/` in the requesting app's repository, Git-ignored by default, with representative data and no credentials or personal data. Approval does not implement the design or change the app; a later explicit implementation request follows the app's own workflow, and adapts the design to the app's existing library versions rather than the reverse.
+Each exploration lives under `design-explorations/` in the folder the agent is given (the app's, or any folder for a quick idea; it need not be a Git repository). That folder ignores itself through its own `.gitignore`. Proposals use representative data and no credentials or personal data. Approval ends an explore-only request without changing the app; a build request continues to the port, which follows the app's own workflow and adapts the design to the app's existing library versions rather than the reverse.
 
 ### A proposal is HTML on a Material 3 Expressive runtime
 
@@ -49,7 +49,7 @@ When an agent cannot view images, it reports visual quality as unverified instea
 
 ### Compose is written at implementation, from a verified mapping
 
-The skill's job ends at an approved design: the exploration hands the parent agent the approved proposal's source, its renders, and a mapping table from every `m3e-*` element and pattern the runtime allows to its Compose API, with each Compose name verified against the pinned Material 3 artifact. The parent agent writes the Compose in the app under the app's own approval and branch workflow, renders it, and compares it with the approved renders.
+For an explore-only request the skill's job ends at an approved design; a build request continues to the port. Either way the exploration hands the parent agent the approved proposal's source, its renders, and a mapping table from every `m3e-*` element and pattern the runtime allows to its Compose API, with each Compose name verified against the pinned Material 3 artifact. The parent agent writes the Compose in the app under the app's own approval and branch workflow, renders it, and compares it with the approved renders.
 
 A blind port tested this on 2026-10-10: the approved Compose screen from the first recipes exploration was rebuilt in HTML, then ported back to Compose by an agent that could not see the original. The port compiled in under two minutes and rendered nearly identical to the original, with seed-tinted surfaces the original lacked. Its differences were small style choices the HTML did not determine (a headline weight, a selected-pill color, card padding); strict role-based styling removes them. The one wrong API name was the same mistake every Compose round had made, and the verified table removes it.
 

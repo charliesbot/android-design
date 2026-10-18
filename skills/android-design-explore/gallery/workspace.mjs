@@ -1,5 +1,4 @@
-import { spawnSync } from 'node:child_process';
-import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,16 +12,10 @@ export const ANDROID_TEMPLATE = join(ASSETS, 'exploration-starter');
 const STARTERS = { html: [TEMPLATE, 'proposals/a/index.html'], android: [ANDROID_TEMPLATE, 'settings.gradle.kts'] };
 const SKIP = new Set(['build', '.gradle', '.kotlin', '.git', 'renders', 'local.properties', '__pycache__', 'screenshotTestDebug']);
 
-function git(root, ...args) {
-  const result = spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' });
-  if (result.error || result.status !== 0) {
-    throw new Error(`Exploration requires an existing Git repository: ${(result.stderr || result.error?.message || '').trim()}`);
-  }
-  return result.stdout.trim();
-}
-
-function repository(root) {
-  return realpathSync(git(realpathSync(resolve(root ?? process.cwd())), 'rev-parse', '--show-toplevel'));
+function projectRoot(root) {
+  const path = resolve(root ?? process.cwd());
+  if (!existsSync(path) || !statSync(path).isDirectory()) throw new Error(`Project folder is not an existing directory: ${path}`);
+  return realpathSync(path);
 }
 
 function isSymlink(path) {
@@ -39,19 +32,15 @@ export function create({ starter = 'html', template, root, title = 'Design explo
   if (!Object.hasOwn(STARTERS, starter)) throw new Error(`Invalid --starter: expected html or android, got ${starter}`);
   const [defaultTemplate, entryFile] = STARTERS[starter];
   template = realpathSync(resolve(template ?? defaultTemplate));
-  root = repository(root);
+  root = projectRoot(root);
   if (typeof title !== 'string' || !title.trim() || title.length > 200) throw new Error('Title must contain 1 to 200 characters');
   const entry = join(template, entryFile);
   if (!existsSync(entry) || !statSync(entry).isFile()) throw new Error(`Missing starter: ${template}`);
   const base = storage(root);
-  if (git(root, 'ls-files', '--', DIRECTORY)) throw new Error('Exploration storage is already tracked; leave it untouched');
-  // Local Git metadata keeps generated proposals out of commits without editing .gitignore.
-  const exclude = git(root, 'rev-parse', '--path-format=absolute', '--git-path', 'info/exclude');
-  mkdirSync(dirname(exclude), { recursive: true });
-  const existing = existsSync(exclude) ? readFileSync(exclude, 'utf8') : '';
-  const rule = `/${DIRECTORY}/`;
-  if (!existing.split('\n').includes(rule)) appendFileSync(exclude, `${existing && !existing.endsWith('\n') ? '\n' : ''}${rule}\n`);
   mkdirSync(base, { recursive: true });
+  // Inside a Git repository this makes the folder ignore itself, `.gitignore` included; elsewhere it does nothing.
+  const ignore = join(base, '.gitignore');
+  if (!existsSync(ignore)) writeFileSync(ignore, '*\n');
   const destination = mkdtempSync(join(base, PREFIX));
   try {
     cpSync(template, join(destination, 'project'), { recursive: true, filter: source => !SKIP.has(basename(source)) });
@@ -65,7 +54,7 @@ export function create({ starter = 'html', template, root, title = 'Design explo
 }
 
 export function cleanup(path, root) {
-  root = repository(root);
+  root = projectRoot(root);
   if (isSymlink(path)) throw new Error('Refusing to remove a symlink');
   path = resolve(path);
   if (!existsSync(path)) throw new Error(`Not a direct exploration directory in ${join(root, DIRECTORY)}: ${path}`);
