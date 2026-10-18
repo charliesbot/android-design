@@ -78,6 +78,7 @@ node <skill-dir>/gallery/cli.mjs render <exploration> [id ...] [--open]
 
 - `<id>/light.png`, `dark.png`, `wallpaper.png` (phone, 411x923), `foldable.png` (933x704), `tablet.png` (1280x800), `desktop.png` (1920x1080).
 - `<id>/<state>-light.png` (phone) and `<id>/<state>-tablet.png` for each state the proposal declares in `p-states`, taken after `window.proposalState(<state>)` opens it. A missing `proposalState`, or one that throws, fails that state's views with the reason.
+- `<id>/light-full.png`: the phone light view at the full document height, for your own review of content below the first screen (not checked, not judged; an inner scroller shows only its visible part).
 - `<id>/checks.json`: the runtime checks of every view, state views included (named `<state>-light`, `<state>-tablet`), with `pass` and `complete`.
 - `<id>/view.html`: one self-contained file the user can double-click to switch devices, light and dark, seed colors, palette, and, for a proposal that declares states, the state (Default or any declared one).
 - `contact-sheet.png`: one row per proposal across phone, foldable, tablet, and desktop, default state only.

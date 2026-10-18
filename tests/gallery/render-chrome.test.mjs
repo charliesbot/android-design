@@ -112,3 +112,32 @@ test('view.html opens a declared state from its picker and returns to Default', 
   await page.evaluate(() => document.querySelector('#states [data-state=""]').click());
   assert.equal(await sheetOpen(), false);
 });
+
+// Width and height from a PNG's IHDR chunk.
+const pngSize = file => { const head = readFileSync(file); return [head.readUInt32BE(16), head.readUInt32BE(20)]; };
+
+test('render also writes light-full.png at the full document height, outside checks and views', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH', timeout: 180000 }, t => {
+  const root = exploration(t);
+  const dir = join(root, 'project/proposals/a');
+  writeFileSync(join(dir, 'style.css'), `${readFileSync(join(dir, 'style.css'), 'utf8')}\n.screen { min-height: 2000px; }\n`);
+  const done = spawnSync('node', [CLI, 'render', root], { encoding: 'utf8' });
+  assert.equal(done.status, 0, done.stderr);
+  assert.match(done.stdout, /light-full\.png/);
+  const out = join(root, 'renders/a');
+  const [width, height] = pngSize(join(out, 'light-full.png'));
+  assert.equal(width, 411);
+  assert.ok(height >= 2000, `light-full.png is ${height}px tall`);
+  // The viewport shots keep their size, and the extra capture is not a checked view.
+  assert.deepEqual(pngSize(join(out, 'light.png')), [411, 923]);
+  const checks = JSON.parse(readFileSync(join(out, 'checks.json'), 'utf8'));
+  assert.deepEqual(checks.renders.map(r => r.name), RENDERS.map(r => r.name));
+  assert.equal(checks.pass, true);
+  assert.doesNotMatch(readFileSync(join(out, 'view.html'), 'utf8'), /light-full/);
+});
+
+test('light-full.png of a page shorter than the viewport is the viewport size', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH', timeout: 180000 }, t => {
+  const root = exploration(t);
+  assert.equal(spawnSync('node', [CLI, 'render', root], { encoding: 'utf8' }).status, 0);
+  const [width, height] = pngSize(join(root, 'renders/a/light-full.png'));
+  assert.deepEqual([width, height >= 923], [411, true]);
+});

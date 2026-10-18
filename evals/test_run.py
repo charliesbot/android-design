@@ -153,6 +153,26 @@ class ArtifactPipelineTests(unittest.TestCase):
             self.assertTrue((directory / 'renders/queue-tablet.png').is_file())
             self.assertFalse((directory / 'renders/view.html').exists())
 
+    def test_render_leaves_the_full_page_review_image_out_of_the_judged_renders(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            fake_case(directory)
+            exploration = Path(run.case_info(directory)['exploration'])
+
+            def fake_run(command, **kwargs):
+                out = exploration / 'renders' / 'a'
+                out.mkdir(parents=True)
+                for name in (*run.RENDER_NAMES, 'light-full'):
+                    (out / f'{name}.png').write_bytes(b'png')
+                (out / 'checks.json').write_text('{"renders": []}')
+                return subprocess.CompletedProcess(command, 0, 'a: pass', '')
+
+            with mock.patch.object(run.subprocess, 'run', side_effect=fake_run):
+                images, error = run.render(directory)
+            self.assertIsNone(error)
+            self.assertEqual(sorted(Path(p).stem for p in images), sorted(run.RENDER_NAMES))
+            self.assertFalse((directory / 'renders/light-full.png').exists())
+
     def test_judge_request_lists_state_renders_and_says_how_to_judge_them(self):
         case = next(iter(run.select_cases('music')))
         with tempfile.TemporaryDirectory() as tmp:

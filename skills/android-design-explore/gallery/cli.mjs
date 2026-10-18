@@ -19,6 +19,7 @@ node <skill>/gallery/cli.mjs render <exploration> [id ...] [--open]
   Lint errors print as file:line and stop the render (exit 2). Writes, under <exploration>/renders/:
     contact-sheet.png      one row per proposal; show this to the user in chat
     <id>/<view>.png        light, dark, wallpaper, foldable, tablet, desktop
+    <id>/light-full.png    the phone light view at the full document height, for your own review (not checked, not in the contact sheet)
     <id>/<state>-light.png, <state>-tablet.png   each state in the proposal's p-states, opened by window.proposalState
     <id>/checks.json       window.runtimeChecks() result of every view
     <id>/view.html         one self-contained file: double-click to try theme colors and device sizes

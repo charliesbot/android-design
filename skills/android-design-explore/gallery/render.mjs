@@ -13,6 +13,7 @@ export const RUNTIME_DIR = join(HERE, 'public/runtime');
 export const ORIGIN = 'https://proposal.invalid';
 const PROPOSAL_ID = /^[a-z][a-z0-9-]{0,39}$/;
 const PHONE = [411, 923];
+const FULL_PAGE_VIEW = 'light';
 
 // One row per render. `color` stands in for a red dynamic-color wallpaper.
 export const RENDERS = [
@@ -113,7 +114,9 @@ async function prepare({ scheme, color, state }) {
   return result;
 }
 
-// Renders `url` once per RENDERS row, then once per state view, on an open page. `onShot(name, png)` receives each screenshot.
+// Renders `url` once per RENDERS row, then once per state view, on an open page. `onShot(name, png)` receives each screenshot,
+// plus `light-full`: the default phone light view captured at the full document height, for the agent's own review. It is not a
+// checked view, so it is not in the returned renders.
 export async function renderViews(page, url, onShot = () => {}, states = []) {
   const renders = [];
   for (const spec of [...RENDERS, ...stateRenders(states)]) {
@@ -121,6 +124,7 @@ export async function renderViews(page, url, onShot = () => {}, states = []) {
     await page.goto(url);
     const result = await page.evaluate(prepare, spec);
     onShot(spec.name, await page.screenshot());
+    if (spec.name === FULL_PAGE_VIEW) onShot(`${spec.name}-full`, await page.screenshot({ fullPage: true }));
     renders.push({ name: spec.name, viewport: spec.viewport, result });
   }
   return renders;
@@ -255,6 +259,7 @@ export function report(result) {
   for (const { id, dir, summary, problems, missing, states = [] } of result.proposals) {
     lines.push(`${id}: ${summary.pass && summary.complete ? 'pass' : `FAIL (${problems.join('; ')})`}`);
     lines.push(`  ${dir}/{${[...RENDERS, ...stateRenders(states)].map(r => r.name).join(',')}}.png, checks.json, view.html`);
+    lines.push(`  ${dir}/${FULL_PAGE_VIEW}-full.png: the phone light view at the full document height (your own review; a page whose inner scroller holds the content shows only what the document shows)`);
     if (missing.length) lines.push(`  not found: ${missing.join(', ')}`);
   }
   return lines.join('\n');

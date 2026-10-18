@@ -26,6 +26,7 @@ import '@m3e/web/menu';
 
 import './p-icon.js';
 import './p-floating-toolbar.js';
+import './p-sheet-handle.js';
 import './theme-bridge.js';
 import { runtimeChecks, runtimeSettle } from './checks.js';
 
