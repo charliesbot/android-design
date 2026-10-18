@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-Design exploration proposals become live HTML built with the Material 3 Expressive web components in `@m3e/web` and themed by Google's own color utilities, instead of Compose code rendered to PNG. The agent renders each proposal headlessly with `cli.mjs render`, fixes the rule checks, looks at the screenshots, and shows the user a contact sheet in chat; the user answers in chat. Each proposal also gets a self-contained `view.html` the user can double-click to try theme colors and device sizes with no server. Compose is written once, at implementation time, from the approved design and a verified mapping to Compose components. The point is speed: first results in minutes rather than ten, sharp previews, and instant device and theme switching, without giving up proposals that map one-to-one onto real Compose components. The v1 gallery, rounds, and Refine are gone; see the history line at the end.
+Design exploration proposals become live HTML built with the Material 3 Expressive web components in `@m3e/web` and themed by Google's own color utilities, instead of Compose code rendered to PNG. The agent renders each proposal headlessly with `cli.mjs render`, fixes the rule checks, looks at one review image, and shows it to the user in chat; the user answers in chat. Each proposal also gets a self-contained `view.html` the user can double-click to try theme colors and device sizes with no server. Compose is written once, at implementation time, from the approved design and a verified mapping to Compose components. The point is speed: first results in minutes rather than ten, sharp previews, and instant device and theme switching, without giving up proposals that map one-to-one onto real Compose components. The v1 gallery, rounds, and Refine are gone; see the history line at the end.
 
 ## Design
 
@@ -12,9 +12,9 @@ Design exploration proposals become live HTML built with the Material 3 Expressi
 
 Requests for multiple designs or for exploration start an exploration; ordinary implementation requests do not. The prompt sets the scope: a feature exploration preserves the app's visual language, a redesign can go further, and alternatives differ in design approach rather than color. Image-generated UI mockups are not proposals.
 
-Iteration happens in chat. The agent shows the contact sheet and the `view.html` paths, the user replies ("keep a, make b warmer"), and the agent edits and renders again; to keep a version it copies the folder before editing. Approval is the user saying so in chat.
+Each run of the skill is one shot: a brief in, one proposal written, rendered, and shown, then the agent stops. Iteration happens in chat. The agent shows `review.png` and gives the `view.html` path, the user replies ("make it warmer"), and the agent runs again on the same folder with the current HTML plus the feedback, overwriting the proposal; it keeps no version copies. The agent makes several proposals only when the user asks, each in its own folder. Approval is the user saying so in chat.
 
-Each exploration lives under `design-explorations/` in the folder the agent is given (the app's, or any folder for a quick idea; it need not be a Git repository). That folder ignores itself through its own `.gitignore`. Proposals use representative data and no credentials or personal data. Approval ends an explore-only request without changing the app; a build request continues to the port, which follows the app's own workflow and adapts the design to the app's existing library versions rather than the reverse.
+One folder is one proposal. The agent copies the skill's `assets/proposal-starter/` to `design-explorations/<slug>/` in the folder it is given (the app's, or any folder for a quick idea; it need not be a Git repository). The starter's own `.gitignore` of `*` keeps the proposal out of commits, and the agent never writes inside the skill's repository. There are no exploration or proposal ids and no `create` or `cleanup` command: the only command is `render`, and deleting a proposal is deleting its folder. Proposals use representative data and no credentials or personal data. Approval ends an explore-only request without changing the app; a build request continues to the port, which follows the app's own workflow and adapts the design to the app's existing library versions rather than the reverse.
 
 ### A proposal is HTML on a Material 3 Expressive runtime
 
@@ -33,15 +33,15 @@ The runtime fills the library's confirmed gaps with small shims rather than leav
 
 ### `render` and `view.html` show proposals
 
-`render` loads each proposal at its real device viewport: Pixel 11 at 411 by 923, Galaxy Z Fold8 inner screen at 933 by 704, Pixel Tablet at 1280 by 800, and a 1080p desktop at 1920 by 1080, in dp, which equal CSS pixels. Each lands in its own window size class (the Fold8 inner screen turned to landscape is expanded, the desktop is extra large); medium has no device. It also renders phone dark and a red wallpaper-seed view. The contact sheet shows one row per proposal across phone, foldable, tablet, and desktop.
+`render` loads each proposal at its real device viewport: Pixel 11 at 411 by 923, Galaxy Z Fold8 inner screen at 933 by 704, Pixel Tablet at 1280 by 800, and a 1080p desktop at 1920 by 1080, in dp, which equal CSS pixels. Each lands in its own window size class (the Fold8 inner screen turned to landscape is expanded, the desktop is extra large); medium has no device. It also renders phone dark and a red wallpaper-seed view. `review.png` puts every checked view on one image, a phone row over a large row, so the agent reviews one image instead of one per view; `light-full.png` shows the phone light view at full document height for a screen that scrolls.
 
-`view.html` is one file with the runtime, fonts, and the proposal inlined, opened from `file://`. Its Phone, Foldable, Tablet, and Desktop buttons resize the frame, and its light or dark, seed color, and palette variant controls re-theme it instantly and save nothing. To keep a change, the user says so in chat.
+`view.html` is one file with the runtime, fonts, and the proposal inlined, opened from `file://` or by `render --open`. Its Phone, Foldable, Tablet, and Desktop buttons resize the frame, and its light or dark, seed color, and palette variant controls re-theme it instantly and save nothing. To keep a change, the user says so in chat.
 
 Only HTML proposals are rendered. Explorations recorded as PNG rounds stay on disk but are not displayed.
 
 ### The agent checks every render
 
-Before showing anything, the agent runs `render`, which lints the proposal and runs the in-page rule checker on every view, then looks at the screenshots. The checker covers what the rules make measurable: touch targets of at least 48dp, Google Sans Flex on every text node, text that clips or overflows, contrast of each text and background pair, the largest interactive element being the primary action, and at most one FAB. Checks it cannot resolve are reported as unresolved, never as passing.
+Before showing anything, the agent runs `render`, which lints the proposal and runs the in-page rule checker on every view, then looks at `review.png`. It fixes check failures once; anything still failing, or incomplete, is reported rather than looped on. The checker covers what the rules make measurable: touch targets of at least 48dp, Google Sans Flex on every text node, text that clips or overflows, contrast of each text and background pair, the largest interactive element being the primary action, and at most one FAB. Checks it cannot resolve are reported as unresolved, never as passing.
 
 The screenshot stays because the rules cannot see everything. A music screen in this project's evals passed every code check and still failed the distinctive-design criterion, and in the first recipes exploration a button used `primary` exactly as the rules prescribe and still competed with the hero's color. Hierarchy, character, and color balance are judged by looking.
 
@@ -67,7 +67,7 @@ UI fidelity is the priority: layout, hierarchy, type, color, shape, and componen
 
 ### Scope
 
-Phone, tablet, desktop, and foldable layouts are in scope. Wear OS stays outside this workflow and keeps its experimental Android path, without claiming validated Wear quality.
+Phone, tablet, desktop, and foldable layouts are in scope. Wear OS stays outside this workflow, without claiming validated Wear quality. Its experimental Compose shell remains in `evals/compose-starter/`.
 
 
 ## Links
@@ -83,3 +83,5 @@ Phone, tablet, desktop, and foldable layouts are in scope. Wear OS stays outside
 ## History
 
 2026-10-15: the gallery, its server, the feedback store, rounds, publish, and the watch session were replaced by `cli.mjs render`, a self-contained `view.html` per proposal, and iteration in chat. `render` lints, renders headlessly with no port, and writes per-proposal screenshots, `checks.json`, `view.html`, and a contact sheet. The agent fixes the checks, looks at the screenshots, and shows the user the contact sheet; the user replies in chat, and approval is the user saying so. Descriptions above of the gallery, rounds, Refine, Finish, and `status` or `wait` are history. The proposal format, runtime, rule checker, and Compose port flow are unchanged. See [references/exploration.md](../../skills/android-design-explore/SKILL.md).
+
+2026-10-17: the workflow was flattened to one folder per proposal. `create`, `cleanup`, exploration and proposal ids, named states (`p-states` and `proposalState`), the contact sheet, and the workspace helper were removed; the Compose sandbox moved from the skill to `evals/compose-starter/` and is used only by the manual port check. Overlays still exist, opened by the page's own script. The only command is `cli.mjs render <proposal-folder> [--open]`. Descriptions above of the contact sheet or of `create` in the 2026-10-15 entry are history. Runtime maintainer notes moved to [proposal-runtime.md](../proposal-runtime.md).

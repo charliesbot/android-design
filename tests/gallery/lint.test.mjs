@@ -2,19 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { lintAll } from '../../skills/android-design-explore/gallery/render.mjs';
-import { writeFileSync } from 'node:fs';
+import { lintFolder } from '../../skills/android-design-explore/gallery/render.mjs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { workspace, writeProposal, PAGE } from './fixture.mjs';
 
-const starter = name => readFileSync(fileURLToPath(new URL(`../../skills/android-design-explore/assets/proposal-starter/proposals/a/${name}`, import.meta.url)), 'utf8');
+const starter = name => readFileSync(fileURLToPath(new URL(`../../skills/android-design-explore/assets/proposal-starter/${name}`, import.meta.url)), 'utf8');
 
-// Returns a function that throws the lint errors of proposal `a`, as `render` would report them.
+// Returns a function that throws the lint errors of a proposal folder, as `render` would report them.
 function publish(t, files) {
-  const root = workspace(t);
-  writeProposal(root, 'a', files);
+  const folder = writeProposal(join(workspace(t), 'a'), files);
   return () => {
-    const errors = lintAll(`${root}/project/proposals`, ['a']);
+    const errors = lintFolder(folder);
     if (errors.length) throw new Error(errors.join('\n'));
   };
 }
@@ -153,42 +152,27 @@ const scriptRejections = [
 ];
 for (const [name, script, message] of scriptRejections) {
   test(`lint rejects ${name} in a proposal script`, t => {
-    const root = workspace(t);
-    writeProposal(root, 'a');
-    writeFileSync(join(root, 'project/proposals/a/app.js'), script);
-    assert.throws(() => { const e = lintAll(`${root}/project/proposals`, ['a']); if (e.length) throw new Error(e.join('\n')); }, message);
+    assert.throws(publish(t, { files: { 'app.js': script } }), message);
   });
 }
 
 test('lint allows a self-contained script and ignores commented imports', t => {
-  const root = workspace(t);
-  writeProposal(root, 'a');
-  writeFileSync(join(root, 'project/proposals/a/app.js'), "// import './x.js';\n/* import('./y.js') */\nconst important = 'import from ./z';\ndocument.title = important;\n");
-  assert.deepEqual(lintAll(`${root}/project/proposals`, ['a']), []);
+  publish(t, { files: { 'app.js': "// import './x.js';\n/* import('./y.js') */\nconst important = 'import from ./z';\ndocument.title = important;\n" } })();
 });
 
 test('lint rejects a CSS @import', t => {
   assert.throws(publish(t, { style: '\n@import url("other.css");\nbody { color: var(--md-sys-color-on-surface); }' }), /style\.css:2: @import is not allowed/);
 });
 
-// Named open states: <meta name="p-states" content="queue lyrics"> and a script that defines window.proposalState.
-const STATES_PAGE = content => `<!doctype html>\n<meta\n  name="p-states" content="${content}">\n<script src="app.js"></script>`;
-const STATES_SCRIPT = { 'app.js': 'window.proposalState = name => { document.body.dataset.state = name; };\n' };
-
-test('lint allows declared p-states when the proposal has a script', t => {
-  publish(t, { page: STATES_PAGE('queue lyrics credits-2'), files: STATES_SCRIPT })();
+test('lint skips renders/ and dotfiles, so a rendered folder and its .gitignore pass', t => {
+  const folder = writeProposal(join(workspace(t), 'a'), { files: { '.gitignore': '*\n' } });
+  mkdirSync(join(folder, 'renders'));
+  writeFileSync(join(folder, 'renders/view.html'), '<div style="color: #fff"></div>');
+  assert.deepEqual(lintFolder(folder), []);
 });
 
-const stateRejections = [
-  ['an uppercase state name', STATES_PAGE('queue Lyrics'), STATES_SCRIPT, /index\.html:2: p-states name "Lyrics" is not valid/],
-  ['a state name with an underscore', STATES_PAGE('queue_list'), STATES_SCRIPT, /index\.html:2: p-states name "queue_list" is not valid/],
-  ['a duplicate state name', STATES_PAGE('queue lyrics queue'), STATES_SCRIPT, /index\.html:2: p-states name "queue" is declared twice/],
-  ['an empty p-states', STATES_PAGE('  '), STATES_SCRIPT, /index\.html:2: p-states needs at least one name/],
-  ['p-states with no proposal script', STATES_PAGE('queue'), {}, /index\.html:2: p-states declares states but the proposal has no script file/],
-  ['two p-states metas', `${STATES_PAGE('queue')}\n<meta name="p-states" content="lyrics">`, STATES_SCRIPT, /index\.html:5: p-states is declared twice/],
-];
-for (const [name, page, files, message] of stateRejections) {
-  test(`lint rejects ${name}`, t => {
-    assert.throws(publish(t, { page, files }), message);
-  });
-}
+test('lint reports a folder without index.html', t => {
+  const folder = join(workspace(t), 'a');
+  mkdirSync(folder);
+  assert.deepEqual(lintFolder(folder), ['index.html: missing']);
+});

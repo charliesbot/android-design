@@ -12,9 +12,9 @@ From this directory:
 python3 run.py prepare --out /tmp/design-eval --cases music
 ```
 
-Preparation makes `music/` a fresh Git repository fixture (one empty commit) with an exploration created by `gallery/cli.mjs create`, the brief's assets copied into its proposal folder `proposals/a/`, and a snapshot of both skills (`skills/android-design` and `skills/android-design-explore`). `music/case.json` records the exploration path, and the command prints the proposal folder.
+Preparation makes `music/` a fresh Git repository fixture (one empty commit) with a proposal folder `design-explorations/proposal/` (a copy of `assets/proposal-starter/` plus the brief's assets), and a snapshot of both skills (`skills/android-design` and `skills/android-design-explore`). `music/case.json` records the proposal folder and title, and the command prints the proposal folder.
 
-Read `/tmp/design-eval/music/prompt.md` in the agent session you want to test. Have that agent design the brief as the proposal in `proposals/a/` using the copied skills. It renders with `cli.mjs render` to check its work; the runner renders again. The output directory must be new; preparation never overwrites existing work. Omit `--cases` to prepare all four cases (music, finance, settings, trek).
+Read `/tmp/design-eval/music/prompt.md` in the agent session you want to test. Have that agent design the brief as the proposal in `design-explorations/proposal/` using the copied skills. It renders with `cli.mjs render` to check its work; the runner renders again. The output directory must be new; preparation never overwrites existing work. Omit `--cases` to prepare all four cases (music, finance, settings, trek).
 
 The Wear OS and widget cases were removed: they have no HTML harness. They need a new harness before they return.
 
@@ -24,13 +24,11 @@ After implementation, render and check the artifacts without launching an agent:
 python3 run.py evaluate --out /tmp/design-eval --no-open
 ```
 
-For each case this runs `gallery/cli.mjs render` on proposal `a` (headless, no server), copies its screenshots (the six renders below, plus the state renders) and `checks.json`, runs deterministic checks, and writes a report plus `<case>/judge-request.json`. No provider CLI is required for either command.
+For each case this runs `gallery/cli.mjs render` on the proposal folder (headless, no server), copies its screenshots (the six renders below) and `checks.json`, runs deterministic checks, and writes a report plus `<case>/judge-request.json`. No provider CLI is required for either command.
 
 The six renders: `light`, `dark`, `wallpaper` (red theme color standing in for a red dynamic-color wallpaper) at phone size 411x923; `foldable` (933x704), `tablet` (1280x800), and `desktop` (1920x1080) in light.
 
-A proposal that declares open states (`<meta name="p-states" content="queue lyrics">` plus a script that defines `window.proposalState`) adds `<state>-light` (phone) and `<state>-tablet`, both in light, for each state. They are copied with the rest, listed in `judge-request.json` and its image hashes, checked by `C-review` like any render (a failure reads `queue-light: contrast`), and judged by the rubric on the overlay's own surface. The music brief opens lyrics, the queue, and credits over the player, so those are states.
-
-The deterministic checks are `C-lint` (the render succeeded, so the lint passed), `C-review` (every render's `runtimeChecks` result passes; an incomplete check counts as a failure, reported as unverified), and `C-palette` (the proposal's `<m3e-theme>` variant is not `expressive` or `vibrant`). The music case adds `C-states`: `index.html` declares at least three `p-states` (its lyrics, queue, and credits open over the player) and the case renders hold `<state>-light.png` and `<state>-tablet.png` for each.
+The deterministic checks are `C-lint` (the render succeeded, so the lint passed), `C-review` (every render's `runtimeChecks` result passes; an incomplete check counts as a failure, reported as unverified), and `C-palette` (the proposal's `<m3e-theme>` variant is not `expressive` or `vibrant`).
 
 For visual assessment, give each `judge-request.json` to your chosen reviewer. They must inspect every listed screenshot against its included rubric. Prefer a separate session for a blind judgment; the current chat is useful for interactive checks but is not a controlled independent evaluation.
 
@@ -104,13 +102,13 @@ The runner counts a trigger only when Claude reads its temporary copy of the ski
 The evals judge HTML proposals, so they cannot show whether an approved proposal survives the port to Compose. Check that by hand after changing `skills/android-design-explore/references/compose-mapping.md` or the pinned material3 version, not on every skill change.
 
 1. Take one approved proposal from an eval run that passed, with its renders.
-2. Create an Android sandbox with `node skills/android-design-explore/gallery/cli.mjs create --project <scratch repo> --starter android`.
-3. Have an agent that has not seen the proposal's renders port it to Compose using only the proposal source and `compose-mapping.md`, then render it by running `node render.mjs app` in the sandbox's `project/` directory.
+2. Copy `evals/compose-starter/` to a scratch folder. It is the Android sandbox the port lands in.
+3. Have an agent that has not seen the proposal's renders port it to Compose using only the proposal source and `compose-mapping.md`, then render it by running `node render.mjs app` in the scratch folder.
 4. Compare the Compose render with the HTML phone render. Differences the HTML determined (layout, hierarchy, color roles, type roles, component choice) are mapping bugs to fix in `compose-mapping.md`. Small style choices the HTML left open are expected.
 
 ## Verification and files
 
-Run `python3 -m unittest discover evals` from the repository root to test adapters, artifact contracts, ballot validation, and preference persistence without model calls. Also run the [exploration workflow checks](exploration.md) for the isolated starter. Those separate rendering/isolation checks from agent routing behavior. `node --test tests/evals/*.test.mjs` covers the runtime checks and renderer.
+Run `python3 -m unittest discover evals` from the repository root to test adapters, artifact contracts, ballot validation, and preference persistence without model calls. Also run the [exploration workflow checks](exploration.md). Those separate rendering/isolation checks from agent routing behavior. `node --test tests/evals/*.test.mjs` covers the runtime checks and renderer.
 
 | Path | Responsibility |
 | --- | --- |

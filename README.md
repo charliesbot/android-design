@@ -33,7 +33,7 @@ Chai syncs the whole `skills/` folder, which installs two skills: `android-desig
 
 ### Render and view
 
-`node skills/android-design-explore/gallery/cli.mjs render <exploration>` lints each proposal, renders it headlessly in Chrome (no port), and writes `renders/<id>/` screenshots for phone, foldable, tablet, and desktop, a `review.png` (every checked view on one image, for the agent's own review), a `checks.json`, and a self-contained `view.html`, plus `renders/contact-sheet.png`. Add `--open` to open each `view.html` in your default browser when the render finishes (or double-click it) to switch devices, light and dark, seed colors, palette, and declared states. Iteration happens in chat: the agent shows the contact sheet, you reply, it edits and renders again.
+One folder is one proposal. The agent copies `skills/android-design-explore/assets/proposal-starter/` to `<folder>/design-explorations/<slug>/` in the app's folder or any folder (no Git needed), and `node skills/android-design-explore/gallery/cli.mjs render <proposal-folder>` lints it, renders it headlessly in Chrome (no port), and writes `renders/`: screenshots for phone, foldable, tablet, and desktop, a `review.png` (every checked view on one image, for the agent's own review), a `checks.json`, and a self-contained `view.html`. Add `--open` to open `view.html` in your default browser when the render finishes (or double-click it) to switch devices, light and dark, seed colors, and palette. Iteration happens in chat: the agent shows `review.png`, you reply, and it edits and renders the same folder again.
 
 Google Sans Flex is shared with the proposal runtime, including its local font license. The runtime also bundles the optional brand and data faces (Fraunces, Bricolage Grotesque, Big Shoulders Display, Doto, Google Sans Code).
 
@@ -44,6 +44,8 @@ The runtime source is in `skills/android-design-explore/gallery/runtime-src/`, b
 1. Edit the runtime source.
 2. Run `npm run build` to rebuild the runtime, then `npm test`.
 
+What the runtime contains and how its rule checker works: [`docs/proposal-runtime.md`](docs/proposal-runtime.md).
+
 ## What is here
 
 | Path | Job |
@@ -52,7 +54,7 @@ The runtime source is in `skills/android-design-explore/gallery/runtime-src/`, b
 | `skills/android-design-explore/` | The exploration skill: HTML proposals, render and view tooling, and the Compose porting table |
 | `docs/research/` | Distilled research from m3.material.io, developer.android.com/design/ui, and official videos and articles |
 | `docs/research/source-coverage.md` | Every official source page and whether its guidance reached the research |
-| `evals/` | Headless agents build four phone briefs (plus parked Wear and widget briefs), and the renders are checked against the skill's rules |
+| `evals/` | Headless agents build four phone briefs (plus parked Wear and widget briefs), and the renders are checked against the skill's rules. `evals/compose-starter/` is the Compose sandbox for the manual port check |
 | `sources/` | Every official source page as Markdown, fetched by `scripts/fetch.py` |
 | `scripts/` | `fetch.py` refreshes `sources/`; `check_coverage.py` checks it against the coverage ledger |
 

@@ -1,11 +1,12 @@
 // Runtime CSS gotchas that eval agents kept working around: box sizing, nested themes, segmented list color, the sheet drag handle.
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { Browser, chromeExecutable } from '../../skills/android-design-explore/gallery/cdp.mjs';
 import { ORIGIN, makeRoute } from '../../skills/android-design-explore/gallery/render.mjs';
+import { writeProposal } from './fixture.mjs';
 
 let chrome;
 try { chrome = chromeExecutable(); } catch { chrome = null; }
@@ -36,17 +37,15 @@ const FIXTURES = {
 };
 
 describe('runtime gotchas', { skip: chrome ? false : 'Chrome not found; install it or set CHROME_PATH' }, () => {
-  let browser, page, root;
+  let browser, page, root, current;
   before(async () => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'runtime-gotchas-')));
     for (const [name, { page: html, style }] of Object.entries(FIXTURES)) {
-      mkdirSync(join(root, 'proposals', name), { recursive: true });
-      writeFileSync(join(root, 'proposals', name, 'index.html'), html);
-      writeFileSync(join(root, 'proposals', name, 'style.css'), style);
+      writeProposal(join(root, name), { page: html, style });
     }
     browser = await Browser.launch(chrome);
     page = await browser.newPage();
-    await page.serve(makeRoute({ proposalsDir: join(root, 'proposals') }));
+    await page.serve(url => makeRoute({ proposalDir: join(root, current) })(url));
     await page.setViewport(411, 923);
   });
   after(async () => {
@@ -55,7 +54,8 @@ describe('runtime gotchas', { skip: chrome ? false : 'Chrome not found; install 
   });
 
   async function load(name, run) {
-    await page.goto(`${ORIGIN}/draft/${name}/`);
+    current = name;
+    await page.goto(`${ORIGIN}/proposal/`);
     return page.evaluate(async fn => {
       await document.fonts.ready;
       await window.runtimeSettle();

@@ -22,7 +22,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-LIBS_TOML = ROOT / "skills/android-design-explore/assets/exploration-starter/gradle/libs.versions.toml"
+LIBS_TOML = ROOT / "evals/compose-starter/gradle/libs.versions.toml"
 INVENTORY = ROOT / "skills/android-design-explore/references/material3-inventory.txt"
 TYPE_SCALE = ROOT / "skills/android-design-explore/gallery/runtime-src/type-scale.json"
 GRADLE_FILES = Path.home() / ".gradle/caches/modules-2/files-2.1"

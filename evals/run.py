@@ -23,9 +23,10 @@ EXPLORE_DIR = ROOT / "skills" / "android-design-explore"
 # Where prepare() copies both skills inside a case directory.
 CASE_SKILLS = "skills"
 CLI = EXPLORE_DIR / "gallery" / "cli.mjs"
-PROPOSAL = "a"
+STARTER = EXPLORE_DIR / "assets" / "proposal-starter"
 # The views `cli.mjs render` writes, in its order. test_run.py keeps this in step with gallery/render.mjs.
-REVIEW_ONLY_RENDERS = ("light-full.png", "review.png")
+# These files are for the agent's own review, not for judging.
+REVIEW_ONLY_RENDERS = ("light-full.png", "review.png", "view.html")
 RENDER_NAMES = ("light", "dark", "wallpaper", "foldable", "tablet", "desktop")
 GIT = ["git", "-c", "user.name=android-design-evals", "-c", "user.email=evals@example.invalid"]
 
@@ -43,36 +44,33 @@ def case_info(case_dir):
 
 
 def proposal_dir(case_dir):
-    return Path(case_info(case_dir)["exploration"]) / "project" / "proposals" / PROPOSAL
+    return Path(case_info(case_dir)["proposal_dir"])
 
 
 def prepare(case, case_dir):
-    """A fresh fixture repository with an exploration whose proposal `a` holds the case assets."""
+    """A fresh fixture repository whose proposal folder is a copy of the starter plus the case assets."""
     case_dir.mkdir(parents=True)
     # Give the agent copies, not repository paths. This is not a security sandbox.
     for skill in (SKILL_DIR, EXPLORE_DIR):
         shutil.copytree(skill, case_dir / CASE_SKILLS / skill.name)
     run_tool(["git", "init", "-q"], cwd=case_dir)
     run_tool([*GIT, "commit", "-q", "--allow-empty", "-m", "Initial commit"], cwd=case_dir)
-    created = run_tool(["node", str(CLI), "create", "--project", str(case_dir), "--title", case["name"]])
-    lines = created.strip().splitlines()
-    exploration = Path(lines[-1].strip()) if lines else None
-    if exploration is None or not (exploration / "project" / "proposals" / PROPOSAL).is_dir():
-        raise RuntimeError(f"cli.mjs create did not report an exploration with proposal {PROPOSAL}: {created!r}")
+    proposal = case_dir / "design-explorations" / "proposal"
+    shutil.copytree(STARTER, proposal)
     for f in case.get("files", []):
-        target = exploration / "project" / "proposals" / PROPOSAL / f["to"]
+        target = proposal / f["to"]
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(HERE / f["from"], target)
     (case_dir / "case.json").write_text(json.dumps(
-        {"exploration": str(exploration), "proposal": PROPOSAL, "title": case["name"]}, indent=2))
-    return exploration
+        {"proposal_dir": str(proposal), "title": case["name"]}, indent=2))
+    return proposal
 
 
 def prompt_for(case, case_dir):
     text = (HERE / "agent-prompt.md").read_text()
     return (text.replace("{{SKILL_DIR}}", str(case_dir / CASE_SKILLS / SKILL_DIR.name))
                 .replace("{{EXPLORE_DIR}}", str(case_dir / CASE_SKILLS / EXPLORE_DIR.name))
-                .replace("{{EXPLORATION}}", case_info(case_dir)["exploration"])
+                .replace("{{PROPOSAL_DIR}}", case_info(case_dir)["proposal_dir"])
                 .replace("{{BRIEF}}", case["prompt"]))
 
 
@@ -97,7 +95,7 @@ def generate(case_dir, backend, model=None):
 
 
 def render(case_dir):
-    """Renders proposal `a` with the skill's `cli.mjs render` and copies the result into <case>/renders/.
+    """Renders the proposal folder with the skill's `cli.mjs render` and copies the result into <case>/renders/.
 
     Stale renders are removed first. Returns (images, error). Lint errors (exit 2) are not an error here: they
     leave no renders and checks.py reports them as C-lint from lint.json. Only an infrastructure failure
@@ -110,9 +108,9 @@ def render(case_dir):
         shutil.rmtree(renders)
     for stale in ('lint.json', 'render.log'):
         (case_dir / stale).unlink(missing_ok=True)
-    exploration = Path(case_info(case_dir)['exploration'])
+    proposal = Path(case_info(case_dir)['proposal_dir'])
     try:
-        done = subprocess.run(['node', str(CLI), 'render', str(exploration), PROPOSAL],
+        done = subprocess.run(['node', str(CLI), 'render', str(proposal)],
                               cwd=ROOT, capture_output=True, text=True, timeout=900, stdin=subprocess.DEVNULL)
     except (OSError, subprocess.TimeoutExpired) as error:
         (case_dir / 'render.log').write_text(str(error))
@@ -125,11 +123,10 @@ def render(case_dir):
     if done.returncode:
         return [], f'render exited {done.returncode}: {log[-1500:]}'
     (case_dir / 'lint.json').write_text(json.dumps({'ok': True}, indent=2))
-    source = exploration / 'renders' / PROPOSAL
+    source = proposal / 'renders'
     renders.mkdir()
-    # The six default views, plus <state>-light.png and <state>-tablet.png for each state the proposal declares in p-states.
-    # light-full.png (the phone view at full document height) and review.png (every view on one image) are for the agent's
-    # own review, not for judging.
+    # light-full.png (the phone view at full document height), review.png (every view on one image), and view.html are
+    # for the agent's own review, not for judging.
     for path in [*sorted(source.glob('*.png')), source / 'checks.json']:
         if path.name in REVIEW_ONLY_RENDERS:
             continue
@@ -201,7 +198,7 @@ def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1)
     started = time.time()
     directory = out / case['name']
     images, render_error = render(directory)
-    checks = run_checks(directory, case['surface'], [a['id'] for a in case['assertions'] if a['type'] == 'code'])
+    checks = run_checks(directory, case['surface'])
     if render_error:
         checks['C-review'] = {'pass': False, 'detail': render_error}
     (directory / 'checks.json').write_text(json.dumps(checks, indent=2))

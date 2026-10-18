@@ -1,12 +1,13 @@
 // What runtimeChecks() measures while a modal sheet or dialog is open: the page behind the scrim is inert, so its touch targets
 // and contrast are not measured, while the modal's own surface and contents are.
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { Browser, chromeExecutable } from '../../skills/android-design-explore/gallery/cdp.mjs';
 import { ORIGIN, makeRoute } from '../../skills/android-design-explore/gallery/render.mjs';
+import { writeProposal } from './fixture.mjs';
 
 let chrome;
 try { chrome = chromeExecutable(); } catch { chrome = null; }
@@ -36,13 +37,10 @@ describe('checks while a modal is open', { skip: chrome ? false : 'Chrome not fo
   let browser, page, root;
   before(async () => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'modal-checks-')));
-    const dir = join(root, 'proposals/a');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'index.html'), PAGE);
-    writeFileSync(join(dir, 'style.css'), STYLE);
+    writeProposal(root, { page: PAGE, style: STYLE });
     browser = await Browser.launch(chrome);
     page = await browser.newPage();
-    await page.serve(makeRoute({ proposalsDir: join(root, 'proposals') }));
+    await page.serve(makeRoute({ proposalDir: root }));
     await page.setViewport(411, 923);
   });
   after(async () => {
@@ -52,7 +50,7 @@ describe('checks while a modal is open', { skip: chrome ? false : 'Chrome not fo
 
   // Loads the page, optionally opens one modal, and returns the checks.
   async function checks(open) {
-    await page.goto(`${ORIGIN}/draft/a/`);
+    await page.goto(`${ORIGIN}/proposal/`);
     return page.evaluate(async id => {
       await document.fonts.ready;
       await window.runtimeSettle(); // a sheet runs a close animation when it first renders; opening it earlier would be undone

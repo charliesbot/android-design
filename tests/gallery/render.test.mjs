@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { collect, main } from '../../skills/android-design-explore/assets/exploration-starter/render.mjs';
+import { collect, main } from '../../evals/compose-starter/render.mjs';
 
 function temp(t) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'render-test-')));
