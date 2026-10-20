@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromeExecutable } from '../../skills/android-design-explore/gallery/cdp.mjs';
 import { ORIGIN, RENDERS, failures, makeRoute, report, reviewSheetHtml, summarize } from '../../skills/android-design-explore/gallery/render.mjs';
-import { dataUri, inlineCss, inlineHtml, viewerHtml } from '../../skills/android-design-explore/gallery/view.mjs';
+import { DEVICES, PALETTES, STYLES, dataUri, inlineCss, inlineHtml, proposalTheme, runtimeAssets, screenName, spring, viewerHtml } from '../../skills/android-design-explore/gallery/view.mjs';
 import { workspace } from './fixture.mjs';
 
 const files = {
@@ -25,25 +25,46 @@ test('inlineCss turns local url() into data URIs and leaves remote and missing o
   assert.match(css, /url\(gone\.png\)/);
 });
 
-test('inlineHtml inlines the runtime script and CSS, fonts, proposal files, and images', () => {
+test('inlineHtml inlines proposal files and images but leaves the shared runtime as a bare path', () => {
   const html = [
     '<link rel="stylesheet" href="/runtime/runtime.css">', '<link rel="stylesheet" href="style.css">',
-    '<script type="module" src="/runtime/m3e.js"></script>', '<script src="app.js"></script>',
+    '<script type="module" src="https://proposal.invalid/runtime/m3e.js"></script>', '<script src="app.js"></script>',
     '<img alt="" src="hero.png">', '<img src="https://example.com/r.png">',
   ].join('\n');
   const out = inlineHtml(html, page, fetchLocal);
-  assert.doesNotMatch(out, /href="|src="(?!data:|https:\/\/example)/);
-  assert.match(out, /<style>@font-face \{ src: url\("data:font\/woff2;base64,/);
-  assert.match(out, /<script type="module">window\.x = "<\\\/script><\\!--";<\/script>/);
+  assert.match(out, /<link rel="stylesheet" href="\/runtime\/runtime\.css">/);
+  assert.match(out, /<script type="module" src="\/runtime\/m3e\.js"><\/script>/);
+  assert.doesNotMatch(out, /data:font|font\/woff2/);
+  assert.match(out, /<style>\.hero \{ background: url\("data:image\/png;base64,/);
   assert.match(out, /<script>console\.log\(1\)<\/script>/);
   assert.match(out, /<img alt="" src="data:image\/png;base64,/);
   assert.match(out, /src="https:\/\/example\.com\/r\.png"/);
 });
 
+test('inlineHtml still inlines a script from another path and keeps source text from closing its tag', () => {
+  const out = inlineHtml('<script type="module" src="/runtime/other.js"></script>', page, url => (url.pathname === '/runtime/other.js' ? { type: 'text/javascript', body: Buffer.from('x = "</script><!--";') } : null));
+  assert.match(out, /^<script type="module">x = "<\\\/script><\\!--";<\/script>$/);
+});
+
+test('runtimeAssets reads runtime.css, m3e.js, and each font the css names', () => {
+  const runtime = runtimeAssets(fetchLocal, ORIGIN);
+  assert.equal(runtime.css, files['/runtime/runtime.css'][1]);
+  assert.equal(runtime.js, files['/runtime/m3e.js'][1]);
+  assert.deepEqual(runtime.fonts, { 'fonts/F.woff2': Buffer.from('FONT').toString('base64') });
+  assert.throws(() => runtimeAssets(() => null, ORIGIN), /runtime\/runtime\.css is missing/);
+});
+
+test('proposalTheme reads color and variant from the first m3e-theme and defaults the rest', () => {
+  assert.deepEqual(proposalTheme('<body><m3e-theme color="#AA3355" variant="vibrant" scheme="dark">'), { color: '#aa3355', variant: 'vibrant' });
+  assert.deepEqual(proposalTheme("<m3e-theme variant='neutral'>"), { color: '#6750a4', variant: 'neutral' });
+  assert.deepEqual(proposalTheme('<m3e-theme color="red">'), { color: '#6750a4', variant: 'tonal-spot' });
+  assert.deepEqual(proposalTheme('<p>no theme</p>'), { color: '#6750a4', variant: 'tonal-spot' });
+});
+
 test('viewerHtml embeds the document so it cannot close the script tag', () => {
-  const out = viewerHtml({ title: 'a <b>', doc: '<p>hi</p></script><script>alert(1)</script>' });
+  const out = viewerHtml({ title: 'a <b>', doc: '<p>hi</p></script><script>alert(1)</script>', runtime: { css: '', js: '', fonts: {} } });
   assert.match(out, /<title>a &#60;b&#62;<\/title>/);
-  assert.equal(out.split('</script>').length, 2);
+  assert.equal(out.split('</script>').length, 3, 'the data block and the viewer script only');
   assert.match(out, /\\u003cp>hi\\u003c\/p>/);
 });
 
@@ -124,7 +145,40 @@ test('the render report lists the folder\'s outputs', () => {
   assert.match(failed, /not found: https:\/\/proposal\.invalid\/x\.png/);
 });
 
-test('view.html has device, mode, color, and palette controls', () => {
-  const out = viewerHtml({ title: 't', doc: '<p>' });
-  for (const id of ['devices', 'schemes', 'seeds', 'variant', 'reset']) assert.match(out, new RegExp(`id="${id}"`));
+test('screenName humanizes a folder name', () => {
+  assert.equal(screenName('learn-home'), 'Learn home');
+  assert.equal(screenName('music_player--v2'), 'Music player v2');
+  assert.equal(screenName('home'), 'Home');
+});
+
+test('view.html has the section headings, the brightness group, the two color groups, the device group, and the label', () => {
+  const out = viewerHtml({ title: 't', name: 'Learn home', doc: '<p>', runtime: { css: '', js: '', fonts: {} }, theme: { color: '#aa3355', variant: 'vibrant' } });
+  assert.match(out, /<m3e-list-option value="proposal" data-color="#aa3355" selected>/);
+  for (const { id, color } of PALETTES) assert.match(out, new RegExp(`<m3e-list-option value="${id}" data-color="${color}">`));
+  assert.doesNotMatch(out, /value="mono"/);
+  assert.equal(out.match(/<m3e-theme class="pal color" color="#[0-9a-f]{6}" variant="vibrant"/g).length, PALETTES.length + 1, 'every row previews the proposal style');
+  assert.deepEqual([...out.matchAll(/<m3e-list-option value="([^"]+)" data-variant="[^"]+"( selected)?>/g)].map(m => [m[1], Boolean(m[2])]), STYLES.map(([value]) => [value, value === 'vibrant']));
+  assert.equal(out.match(/<m3e-theme class="pal variant" color="#aa3355"/g).length, STYLES.length, 'every style row previews the proposal color');
+  assert.match(out, /<m3e-button-group id="devices" variant="connected">/);
+  for (const { size } of DEVICES) assert.match(out, new RegExp(`data-w="${size[0]}" data-h="${size[1]}"`));
+  const unstyled = viewerHtml({ title: 't', doc: '<p>', runtime: { css: '', js: '', fonts: {} }, theme: { color: '#aa3355', variant: 'fidelity' } });
+  assert.doesNotMatch(unstyled, /<m3e-list-option value="[^"]+" data-variant="[^"]+" selected>/, 'no style row is selected for a variant that is not one of the styles');
+  assert.doesNotMatch(out, /filter-chip/);
+  for (const id of ['schemes', 'proposal-list', 'preset-list', 'styles']) assert.match(out, new RegExp(`id="${id}"`));
+  assert.deepEqual([...out.matchAll(/<h2 class="t-title-small">([^<]+)<\/h2>/g)].map(m => m[1]), ['Brightness', 'Color', 'Style']);
+  assert.match(out, /<h1 class="t-title-small" id="name">Learn home \u00b7 <span class="mono" id="size">411\u00d7923<\/span><\/h1>/);
+  assert.deepEqual([...out.matchAll(/<m3e-icon-button[^>]* data-bezel="(\w+)"/g)].map(m => m[1]), ['true', 'true', 'false', 'false']);
+  assert.doesNotMatch(out, /<select|id="reset"|id="seed"|id="tabs"|id="variants"|contrast|dynamic/i);
+});
+
+test('spring turns a Material spring into a CSS duration and linear() easing', () => {
+  const spatial = spring(0.8, 380);
+  assert.ok(spatial.ms > 300 && spatial.ms < 500, `default spatial settles in ${spatial.ms}ms`);
+  const points = spatial.easing.slice('linear('.length, -1).split(', ').map(Number);
+  assert.equal(points[0], 0);
+  assert.equal(points.at(-1), 1);
+  assert.ok(Math.max(...points) > 1, 'an underdamped spatial spring overshoots');
+  const effects = spring(1, 1600);
+  assert.ok(effects.ms < spatial.ms);
+  assert.ok(Math.max(...effects.easing.slice('linear('.length, -1).split(', ').map(Number)) <= 1, 'a critically damped effects spring never overshoots');
 });

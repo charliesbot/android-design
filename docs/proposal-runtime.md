@@ -2,7 +2,7 @@
 
 Maintainer notes for the proposal runtime in `skills/android-design-explore/gallery/runtime-src/`. Proposal authors read `skills/android-design-explore/references/authoring.md` instead; this document covers what is inside the runtime, how the rule checker works, how `view.html` talks to a proposal, and how to rebuild it.
 
-The runtime is built from `runtime-src/` into `skills/android-design-explore/gallery/public/runtime/` and committed, so the installed skill never runs npm. `cli.mjs render` serves it to headless Chrome at `/runtime/`, and `view.html` inlines it.
+The runtime is built from `runtime-src/` into `skills/android-design-explore/gallery/public/runtime/` and committed, so the installed skill never runs npm. `cli.mjs render` serves it to headless Chrome at `/runtime/`, and `view.html` carries it once: the viewer builds the viewer chrome from the same elements, turns `runtime.css`, `m3e.js`, and the fonts into Blob URLs on load (fonts first, so the rewritten `runtime.css` points at them), and points both its own page and the proposal frame at those URLs. A proposal's own files are still inlined into the frame's document.
 
 ## What it contains
 
@@ -22,7 +22,7 @@ An open modal `m3e-bottom-sheet` moves focus to its drag handle. The browser's d
 
 ## Theme messages
 
-`view.html`'s theme controls post `{type: "theme", color, variant, scheme}` to the proposal frame. `m3e.js` applies valid theme values to the page's `m3e-theme`, waits for `runtimeSettle()`, and ignores messages from other origins. `render` does not use messages: it sets the `scheme` and `color` attributes on `m3e-theme` directly in the page.
+`view.html`'s theme panel posts `{type: "theme", color, variant, scheme}` to the proposal frame. `m3e.js` applies valid theme values to the page's `m3e-theme`, waits for `runtimeSettle()`, and ignores messages from other origins. `render` does not use messages: it sets the `scheme` and `color` attributes on `m3e-theme` directly in the page.
 
 A page's own script opens overlays (a sheet, dialog, or menu) from its controls, so a person can open them in `view.html`. `render` fails a view when a modal is open on load, because an open modal makes the page behind it inert and hides its failures, and it never opens an overlay itself. The checker below still measures an overlay while it is open.
 

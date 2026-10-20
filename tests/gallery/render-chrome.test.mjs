@@ -50,8 +50,9 @@ test('rendering a folder copied from the starter writes the images, checks, revi
   const [fullWidth, fullHeight] = pngSize(join(dir, 'light-full.png'));
   assert.deepEqual([fullWidth, fullHeight >= 923], [411, true]);
   const view = readFileSync(join(dir, 'view.html'), 'utf8');
-  assert.doesNotMatch(view, /src=\\?"\/runtime|href=\\?"\/runtime|url\(\\?"?fonts\//);
-  assert.match(view, /font\/woff2;base64/);
+  // The proposal's own files are inlined; the runtime is carried once as data, and no file or font data URI stands in the proposal document.
+  assert.doesNotMatch(view, /href=\\?"style\.css|src=\\?"\/runtime\/fonts|data:font\//);
+  assert.match(view, /"fonts\/GoogleSansFlex\.woff2":"/);
   assert.match(view, /id="devices"/);
 });
 

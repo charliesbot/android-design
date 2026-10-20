@@ -12,7 +12,7 @@ A proposal page starts like this:
 <script type="module" src="/runtime/m3e.js"></script>
 ```
 
-Wrap the page in `<m3e-theme color="#RRGGBB" variant="tonal-spot" scheme="light">`. The folder's own files are referenced by relative path, because `view.html` inlines the runtime, fonts, and proposal files as data URIs. `assets/proposal-starter/` is a working page.
+Wrap the page in `<m3e-theme color="#RRGGBB" variant="tonal-spot" scheme="light">`. The folder's own files are referenced by relative path, because `view.html` inlines the proposal files as data URIs and shares one copy of the runtime. `assets/proposal-starter/` is a working page.
 
 ## Authoring rules
 
