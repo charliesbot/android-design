@@ -6,7 +6,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Browser } from './cdp.mjs';
 import { lintFolder } from './lint.mjs';
-import { dataUri, inlineHtml, viewerHtml } from './view.mjs';
+import { dataUri, inlineHtml, proposalTheme, runtimeAssets, screenName, viewerHtml } from './view.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const RUNTIME_DIR = join(HERE, 'public/runtime');
@@ -160,7 +160,10 @@ async function writeSheet(browser, file, html, width) {
 export function viewHtml(folder, route) {
   const pageUrl = new URL(`${ORIGIN}/proposal/`);
   const source = route(new URL('index.html', pageUrl)).body.toString('utf8');
-  return viewerHtml({ title: `${basename(folder)} - Design proposal`, doc: inlineHtml(source, pageUrl, route) });
+  return viewerHtml({
+    title: `${basename(folder)} - Design proposal`, name: screenName(basename(folder)), doc: inlineHtml(source, pageUrl, route),
+    runtime: runtimeAssets(route, ORIGIN), theme: proposalTheme(source),
+  });
 }
 
 // Returns { folder, dir: <folder>/renders, summary, problems, missing }. Throws a LintError first when the lint fails.
