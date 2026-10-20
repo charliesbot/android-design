@@ -27,7 +27,7 @@ STARTER = EXPLORE_DIR / "assets" / "proposal-starter"
 # The views `cli.mjs render` writes, in its order. test_run.py keeps this in step with gallery/render.mjs.
 # These files are for the agent's own review, not for judging.
 REVIEW_ONLY_RENDERS = ("light-full.png", "review.png", "view.html")
-RENDER_NAMES = ("light", "dark", "wallpaper", "foldable", "tablet", "desktop")
+RENDER_NAMES = ("light", "dark", "foldable", "tablet", "desktop")
 GIT = ["git", "-c", "user.name=android-design-evals", "-c", "user.email=evals@example.invalid"]
 
 

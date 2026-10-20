@@ -24,9 +24,9 @@ After implementation, render and check the artifacts without launching an agent:
 python3 run.py evaluate --out /tmp/design-eval --no-open
 ```
 
-For each case this runs `gallery/cli.mjs render` on the proposal folder (headless, no server), copies its screenshots (the six renders below) and `checks.json`, runs deterministic checks, and writes a report plus `<case>/judge-request.json`. No provider CLI is required for either command.
+For each case this runs `gallery/cli.mjs render` on the proposal folder (headless, no server), copies its screenshots (the five renders below) and `checks.json`, runs deterministic checks, and writes a report plus `<case>/judge-request.json`. No provider CLI is required for either command.
 
-The six renders: `light`, `dark`, `wallpaper` (red theme color standing in for a red dynamic-color wallpaper) at phone size 411x923; `foldable` (933x704), `tablet` (1280x800), and `desktop` (1920x1080) in light.
+The five renders: `light` and `dark` at phone size 411x923; `foldable` (933x704), `tablet` (1280x800), and `desktop` (1920x1080) in light.
 
 The deterministic checks are `C-lint` (the render succeeded, so the lint passed), `C-review` (every render's `runtimeChecks` result passes; an incomplete check counts as a failure, reported as unverified), and `C-palette` (the proposal's `<m3e-theme>` variant is not `expressive` or `vibrant`).
 

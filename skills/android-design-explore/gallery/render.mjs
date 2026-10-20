@@ -14,11 +14,10 @@ export const ORIGIN = 'https://proposal.invalid';
 const PHONE = [411, 923];
 const FULL_PAGE_VIEW = 'light';
 
-// One row per render. `color` stands in for a red dynamic-color wallpaper.
+// One row per render.
 export const RENDERS = [
   { name: 'light', viewport: PHONE, scheme: 'light' },
   { name: 'dark', viewport: PHONE, scheme: 'dark' },
-  { name: 'wallpaper', viewport: PHONE, scheme: 'light', color: '#b3261e' },
   { name: 'foldable', viewport: [933, 704], scheme: 'light' },
   { name: 'tablet', viewport: [1280, 800], scheme: 'light' },
   { name: 'desktop', viewport: [1920, 1080], scheme: 'light' },
@@ -59,12 +58,9 @@ export function makeRoute({ runtimeDir = RUNTIME_DIR, proposalDir }) {
 
 // Runs in the page: apply the theme, wait for fonts, two frames, a stable primary color, and no running transitions,
 // then run the checks.
-async function prepare({ scheme, color }) {
+async function prepare({ scheme }) {
   const theme = document.querySelector('m3e-theme');
-  if (theme) {
-    theme.setAttribute('scheme', scheme);
-    if (color) theme.setAttribute('color', color);
-  }
+  if (theme) theme.setAttribute('scheme', scheme);
   const frames = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   const primary = () => getComputedStyle(document.documentElement).getPropertyValue('--md-sys-color-primary');
   await document.fonts.ready;

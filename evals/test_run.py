@@ -127,7 +127,7 @@ class ArtifactPipelineTests(unittest.TestCase):
                 images, error = run.render(directory)
             self.assertIsNone(error)
             self.assertEqual(calls[0][2:], ['render', str(proposal)])
-            self.assertEqual(len(images), 6)
+            self.assertEqual(len(images), 5)
             self.assertTrue(run.render_complete(images))
             self.assertTrue((directory / 'renders/checks.json').is_file())
             self.assertFalse((directory / 'renders/view.html').exists())

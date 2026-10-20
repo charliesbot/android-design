@@ -46,7 +46,7 @@ Read `references/authoring.md` first: it is the syntax the lint enforces. Edit `
 node <skill-dir>/gallery/cli.mjs render <proposal-folder> [--open]
 ```
 
-It lints first: errors print as `file:line`, exit 2, and nothing is drawn. Fix them and rerun. Then it renders headlessly into `<proposal-folder>/renders/` (rewritten each run): `light`, `dark`, `wallpaper`, `foldable`, `tablet`, and `desktop` PNGs, `light-full.png` (phone light at full document height), `review.png` (every checked view on one image), `checks.json` (`{url, renders, pass, complete}`), and `view.html` (self-contained viewer).
+It lints first: errors print as `file:line`, exit 2, and nothing is drawn. Fix them and rerun. Then it renders headlessly into `<proposal-folder>/renders/` (rewritten each run): `light`, `dark`, `foldable`, `tablet`, and `desktop` PNGs, `light-full.png` (phone light at full document height), `review.png` (every checked view on one image), `checks.json` (`{url, renders, pass, complete}`), and `view.html` (self-contained viewer).
 
 1. Fix every `checks.json` failure once, then rerun. Report anything still failing, or `complete: false` (unchecked, not passed), instead of looping.
 2. Review `review.png`, not each PNG; add `light-full.png` when the screen scrolls. Judge hierarchy, character, and color balance with the `android-design` screen check. Confirm each larger view reveals what your section 0 adaptation answer promised. Google: "Additional space doesn't just mean making the same thing bigger." The same view only rearranged fails.

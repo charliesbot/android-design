@@ -33,7 +33,7 @@ The runtime fills the library's confirmed gaps with small shims rather than leav
 
 ### `render` and `view.html` show proposals
 
-`render` loads each proposal at its real device viewport: Pixel 11 at 411 by 923, Galaxy Z Fold8 inner screen at 933 by 704, Pixel Tablet at 1280 by 800, and a 1080p desktop at 1920 by 1080, in dp, which equal CSS pixels. Each lands in its own window size class (the Fold8 inner screen turned to landscape is expanded, the desktop is extra large); medium has no device. It also renders phone dark and a red wallpaper-seed view. `review.png` puts every checked view on one image, a phone row over a large row, so the agent reviews one image instead of one per view; `light-full.png` shows the phone light view at full document height for a screen that scrolls.
+`render` loads each proposal at its real device viewport: Pixel 11 at 411 by 923, Galaxy Z Fold8 inner screen at 933 by 704, Pixel Tablet at 1280 by 800, and a 1080p desktop at 1920 by 1080, in dp, which equal CSS pixels. Each lands in its own window size class (the Fold8 inner screen turned to landscape is expanded, the desktop is extra large); medium has no device. It also renders phone dark. `review.png` puts every checked view on one image, a phone row over a large row, so the agent reviews one image instead of one per view; `light-full.png` shows the phone light view at full document height for a screen that scrolls.
 
 `view.html` is one file with the runtime, fonts, and the proposal inlined, opened from `file://` or by `render --open`. Its Phone, Foldable, Tablet, and Desktop buttons resize the frame, and its light or dark, seed color, and palette variant controls re-theme it instantly and save nothing. To keep a change, the user says so in chat.
 
