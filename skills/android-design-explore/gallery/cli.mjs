@@ -11,7 +11,7 @@ export const help = `Design exploration helper (Node.js 22+, Google Chrome for r
 node <skill>/gallery/cli.mjs render <proposal-folder> [--open]
   Lint the proposal folder, then render it headlessly in Chrome. One folder is one proposal: an index.html plus its files.
   Lint errors print as file:line and stop the render (exit 2). Writes, under <proposal-folder>/renders/ (recreated each render):
-    light.png, dark.png, wallpaper.png, foldable.png, tablet.png, desktop.png   the checked views
+    light.png, dark.png, foldable.png, tablet.png, desktop.png   the checked views
     light-full.png   the phone light view at the full document height, for your own review (not checked)
     review.png       every checked view on one image, for your own review; show this to the user in chat
     checks.json      window.runtimeChecks() result of every view

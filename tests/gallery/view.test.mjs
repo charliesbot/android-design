@@ -64,7 +64,7 @@ test('makeRoute serves the runtime and the proposal folder and refuses to leave 
 
 test('the render table has the fixed names and sizes', () => {
   assert.deepEqual(Object.fromEntries(RENDERS.map(r => [r.name, r.viewport])), {
-    light: [411, 923], dark: [411, 923], wallpaper: [411, 923], foldable: [933, 704], tablet: [1280, 800], desktop: [1920, 1080],
+    light: [411, 923], dark: [411, 923], foldable: [933, 704], tablet: [1280, 800], desktop: [1920, 1080],
   });
 });
 
@@ -96,7 +96,7 @@ test('reviewSheetHtml has a phone row over a large row and no light-full', () =>
   assert.match(phone, /^phone/);
   assert.match(large, /^large/);
   const captions = part => [...part.matchAll(/<figcaption>([^<]+)</g)].map(m => m[1]);
-  assert.deepEqual(captions(phone), ['light', 'dark', 'wallpaper']);
+  assert.deepEqual(captions(phone), ['light', 'dark']);
   assert.deepEqual(captions(large), ['foldable', 'tablet', 'desktop']);
   assert.equal(out.split('<img').length - 1, names.length);
   assert.doesNotMatch(out, /light-full/);
@@ -116,7 +116,7 @@ test('the render report lists the folder\'s outputs', () => {
   const summary = { pass: true, complete: true };
   const text = report({ folder: '/work/music', dir: '/work/music/renders', summary, problems: [], missing: [] });
   assert.match(text, /^music: pass$/m);
-  assert.match(text, /\/work\/music\/renders\/\{light,dark,wallpaper,foldable,tablet,desktop\}\.png, checks\.json, view\.html/);
+  assert.match(text, /\/work\/music\/renders\/\{light,dark,foldable,tablet,desktop\}\.png, checks\.json, view\.html/);
   assert.match(text, /renders\/light-full\.png/);
   assert.match(text, /renders\/review\.png: every checked view/);
   const failed = report({ folder: '/work/music', dir: '/work/music/renders', summary: { pass: false, complete: true }, problems: ['light: touchTargets'], missing: ['https://proposal.invalid/x.png'] });
