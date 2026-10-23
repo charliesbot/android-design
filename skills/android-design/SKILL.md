@@ -8,23 +8,13 @@ description: >
 
 # Android Design
 
-How Google designs Android apps with Material 3 Expressive, translated into decisions and Compose code. Expressive is not a separate design language: it is Material 3 plus opt-in APIs, components, and design tactics that Google calls an "expansion pack." The guidelines, research, and API names here come from m3.material.io, Android's design guides (developer.android.com/design/ui), the Wear OS design guide, six Google I/O and Android Developers talks, and androidx sources checked in September 2026.
+How Google designs Android apps with Material 3 Expressive, translated into decisions and Compose code. Expressive is not a separate design language: it is Material 3 plus opt-in APIs, components, and design tactics that Google calls an "expansion pack." The guidelines, research, and API names here come from m3.material.io, Android's design guides (developer.android.com/design/ui), the Wear OS design guide, Google I/O and Android Developers talks, and androidx sources.
 
 The through-line: **a screen feels designed when emphasis is spent deliberately.** Rank what the screen is for, then spend size, color contrast, shape, type, containment, and motion on the top goal, less on the next, and almost none on the rest. Stock Material code gives every element equal weight, which is why it looks like a template.
 
-> "Why did all these apps look so similar? So boring? Wasn't there room to dial up the feeling?" (The question from Google's research team that started M3 Expressive.)
-
 Quotes and rules marked **(Google)** come from Google's guidance. Rules marked **(default)** are this skill's starting points: follow them unless the screen's direction gives a reason not to.
 
-**Surfaces.** This skill targets phone, tablet, and desktop apps. Wear OS and home screen widgets are not yet in scope: their references hold distilled Google guidance but have not reached this skill's quality bar. When building one anyway, start from that reference and check the result yourself. Wear OS uses its own theme, Roboto Flex, and Wear components ([references/wear-os.md](references/wear-os.md)); widgets use `GlanceTheme` and Glance components ([references/widgets.md](references/widgets.md)). Where those references differ from this file, they win for their surface.
-
-## Why stock Compose code looks generic
-
-Three causes, each fixable:
-
-1. **Plain `MaterialTheme` is pre-Expressive.** It defaults to `MotionScheme.standard()` (minimal bounce), baseline shapes, and baseline type. Only `MaterialExpressiveTheme` defaults to expressive motion.
-2. **Many default components were replaced but not deprecated.** Medium/large top app bars, the bottom app bar, segmented buttons, the navigation drawer, and the small FAB still compile without warnings. See section 9.
-3. **Nobody decided what matters most.** Tokens can't make that decision. Section 0 does.
+**Surfaces.** This skill targets phone, tablet, and desktop apps. Wear OS and home screen widgets are not yet in scope: their references hold distilled Google guidance but have not reached this skill's quality bar. When building or reviewing one anyway, read its reference first and check the result yourself: Wear OS uses its own theme, Roboto Flex, and Wear components ([references/wear-os.md](references/wear-os.md), plus the `wear-compose-m3` skill for scaffolding and migration); widgets use `GlanceTheme` and Glance components ([references/widgets.md](references/widgets.md)). Where those references differ from this file, they win for their surface.
 
 ## Visual tooling
 
@@ -76,11 +66,11 @@ fun AppTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> U
 
 - There is no `expressiveDarkColorScheme`; use `darkColorScheme()` or a generated dark scheme.
 - `MaterialShapes`, `toShape()`, `LoadingIndicator`, and `ContainedLoadingIndicator` still need `@OptIn(ExperimentalMaterial3ExpressiveApi::class)`. Everything else here is non-experimental in 1.5.0 alphas.
-- Full setup, seed schemes, a spacing object, and version notes: [references/theming.md](references/theming.md).
+- Full setup, seed schemes, custom type scales, shape morphing, motion specs, spacing, and version notes: read [references/theming.md](references/theming.md) when setting up or changing a theme.
 
 ## 2. Emphasis and hierarchy
 
-Google's research justifies Expressive through usability, not decoration: participants found key UI elements **up to 4x faster** on expressive screens, and the age gap in finding them nearly disappeared. Emphasis is how people find the primary action.
+Emphasis is how people find the primary action: larger key actions and deliberate hierarchy reduce errors and make key UI elements faster to find (Google).
 
 - **Size is the loudest lever, and it is relative.** "The most important action or the main call to action (CTA) should be the largest element" (Google): larger key actions mean fewer errors and more satisfied users, so the primary *leads* the actions around it, whatever their size. Content is not competing with it: a summary card or a list row can be physically bigger. Start from the component's default size with the strongest fill (a small button; for a FAB, Google's "medium FAB is recommended for most situations") and grow it only as far as leading its peers takes; one focal point per screen, and when everything is large, nothing is. Grouped actions share one size by default ("all buttons in a standard group should be the same size"), and the primary leads through fill or shape: Google's group rule is "largest, widest, or most visually prominent." Extra-large belongs to a control-led hero, such as a player or a breathing session, where the control is the screen's content. The label sets the floor: Google says "Don't truncate or wrap label text" and a container "shouldn't be narrower than its label text." When a label does not fit on one line at the chosen size in its container (a phone-width card, a pane), shorten it to 1 to 3 words, give the button more room, or step down a size (Google: size can change "across different breakpoints", and emphasis comes "through size, color, or shape").
 - **Placement:** put the key action where the hands and eyes already are. Google's email study: moving Send from a small top-bar icon to a larger button just above the keyboard, in `secondary`, made people find it 4x faster; Aura's home screen puts its extra-large start button low, last in the vertical flow. Choose the position from the interaction and the space the content needs (default).
@@ -113,7 +103,7 @@ Their v1-to-v2 lesson: ungrouped settings of similar size and inconsistent color
 - In a hero moment, **one custom thing moves**: keep text stable while the shape animates (Google). Built-in component morphs (a button changing shape on press) don't count.
 - **When content is the product, the content is the hero.** In players, galleries, and trips, give the album art or photo scale and let its color set the screen. A library-shape mask, a full bleed, or a title layered over the image are options, not requirements: an ordinary rounded crop is just as strong when the composition around it carries the idea.
 - **Keep familiar patterns.** Expressive styles the patterns; it doesn't replace them. In Google's tests, a playlist rebuilt as scattered album art "looked modern and exciting" but people didn't recognize it as a playlist, and removing text labels from email actions hurt usability. Context matters too: what suits a media player may not suit a banking app.
-- A "strong minority" of users prefer calmer designs, and "no amount of emotion can compensate for a lack of clarity." Expressive sharpens a screen that already works; it doesn't rescue a confused one.
+- "No amount of emotion can compensate for a lack of clarity." Expressive sharpens a screen that already works; it doesn't rescue a confused one.
 
 ## 4. Color
 
@@ -126,7 +116,7 @@ Their v1-to-v2 lesson: ungrouped settings of similar size and inconsistent color
 - **Different jobs get different roles.** Use "a variety of primary, secondary, and tertiary accent colors for hierarchy and distinction": action (`primary`), selection (`secondary`), status or delight (`tertiary`). Google's example: data in `primary`, progress accents in `secondary` yellow.
 - **Surfaces are most of the screen.** Surface colors "represent the majority of your app's colors. Don't be shy to use lots of surface space; the human eye needs space to relax." (Google) Build hierarchy with surface steps and put accent containers only on elements with a job (the hero, a selection, a key status), not on every card.
 - **Apply roles only in their intended pairs or layering orders** (Google's rule): `onX` on `X`; `onSurface`, `onSurfaceVariant`, and `primary` on surfaces; `inverseOnSurface` and `inversePrimary` on `inverseSurface`. Containers are fills, never text colors. Default text is `onSurface`; `onSurfaceVariant` for lower emphasis.
-- **Never fade text or icons with alpha.** `copy(alpha = ...)` breaks the contrast the pairs guarantee. Lower emphasis is a different role, not a transparent one.
+- **Lower emphasis on text or icons by stepping down to a quieter role** (such as `onSurfaceVariant`), never with `copy(alpha = ...)`, which breaks the contrast the role pairs guarantee.
 - **Surfaces:** `surface` for the body, `surfaceContainer` for navigation regions, and the five container levels for nesting. The most important container gets the brightest surface.
 - Dividers use `outlineVariant`; text field borders use `outline`.
 - **Surface steps:** use each component's prescribed surface mapping (search, for example, specifies containers "more than one step apart"; see the components reference). For custom groups, use a surface difference when the boundary needs emphasis; proximity and alignment can group without another fill.
@@ -143,7 +133,7 @@ Their v1-to-v2 lesson: ungrouped settings of similar size and inconsistent color
 
 - Use the role scale: **Display** for short important text and numerals, **Headline** for short high-emphasis text on phones, **Title** for secondary regions, **Body** for reading, **Label** inside components. Most screens need about five styles; pick sizes with clear contrast between them, not near-duplicates.
 - **Emphasized styles** (`MaterialTheme.typography.displayLargeEmphasized` through `labelSmallEmphasized`) are heavier variants. Components don't use them by default; apply them to the primary button label, selected items, unread items, key numbers, and headlines. "Give extra impact to a headline, or subtly strengthen text of the same size."
-- **Google Sans Flex for plain text and by default** in phone, tablet, and desktop apps (this skill's standard, not a Google requirement; Wear uses Roboto Flex). It is open source on Google Fonts since November 2025, most of the shipped Expressive apps sampled for this skill use it, and its shapes echo the Material shape library. Six variable axes: weight (1 to 1000), width (25 to 151), optical size (6 to 144), slant (0 to -10), grade (0 to 100), and roundness (`ROND`, 0 to 100). Bundle the variable font and set axes per style ([references/theming.md](references/theming.md#google-sans-flex)).
+- **Google Sans Flex for plain text and by default** in phone, tablet, and desktop apps (this skill's standard, not a Google requirement). Six variable axes: weight (1 to 1000), width (25 to 151), optical size (6 to 144), slant (0 to -10), grade (0 to 100), and roundness (`ROND`, 0 to 100). Bundle the variable font and set axes per style ([references/theming.md](references/theming.md#google-sans-flex)).
 - **Optionally one brand face for Display and Headline.** Material's type scale has a brand typeface "used for larger type styles, like Headline and Display, to focus on expression" and a plain one "used for smaller type styles, like Body and Label, to focus on readability", and says "Consider replacing Roboto with different typefaces to boost brand expression in your product." The face set, one brand face per proposal, Doto's display-only limit, and keeping Title on Google Sans Flex are this skill's choices, not Google's. Explorations pick at most one face from this bundled set (all OFL, no fetching), used only on Display and Headline voices (24px and up) while Title, Body, and Label stay Google Sans Flex. By direction:
   - **Fraunces** (`opsz`, `SOFT`, `WONK`, `wght`): warm, editorial soft serif for food, reading, journaling, and heritage.
   - **Bricolage Grotesque** (`opsz`, `wdth`, `wght`): quirky, characterful grotesque for playful, indie, and creative tools.
@@ -153,7 +143,7 @@ Their v1-to-v2 lesson: ungrouped settings of similar size and inconsistent color
 - Brand faces change character, not size: keep the scale's sizes and adjust line height and tracking ("Avoid changing the type size; this can affect how components render and reflow").
 - **Expressive voices on large styles, the text voice on small:** give Display and Headline the voice that serves the direction; keep Body and Label on default axes so they stay highly readable. Be careful at Title.
 - **The hero title or number needs a real voice.** With Google Sans Flex (default) the character comes through strong axis settings (heavy weight, very narrow or very wide width, or high roundness); a medium weight at a middle width looks like any sans. With a bundled brand face, use it at Display or Headline size on purpose (its own axes, weight, tracking), not as a regular-weight swap. Keep the calm voices for secondary text.
-- **Axes carry feeling and meaning.** Google describes weight as ranging from "calm as a whisper" to "loud and rugged" and roundness as "personal, playful." In their research with 3,000+ readers, taller, more elegant (narrower) styles read as more premium and engaging. Axes also carry state: heavy in a filled container for the selected item, light for the rest, at the same size so nothing reflows. Grade adds emphasis without changing width.
+- **Axes carry feeling and meaning.** Google describes weight as ranging from "calm as a whisper" to "loud and rugged", roundness as "personal, playful", and taller, narrower styles as more premium and engaging. Axes also carry state: heavy in a filled container for the selected item, light for the rest, at the same size so nothing reflows. Grade adds emphasis without changing width.
 - **Always match optical size to the text size.** It reshapes letters to stay legible at every size; one setting across Display and Label hurts both. Set `opsz` per style (see the theming reference).
 - **Pick voices, not random axis values.** Define each voice once as a style and reuse it; two or three per app, each with one job. Starting points for Google Sans Flex voices and the brand faces are in [references/theming.md](references/theming.md#google-sans-flex); tune them to the direction rather than copying the nearest preset.
 
@@ -211,7 +201,7 @@ val tint by animateColorAsState(if (selected) colors.primary else colors.surface
 - Use an 8dp scale (4, 8, 12, 16, 24, 32, 48). Put padding and gaps on parents, not margins on children. Compact screens use 16dp side margins; medium and up 24dp.
 - **Group with gaps and containers instead of dividers.** Expressive lists, menus, and search results separate groups with gaps between filled items; dividers are for uncontained lists only.
 - Keep reading text at 40 to 60 characters per line.
-- **Adapt by breakpoint:** compact (under 600dp) one pane with a navigation bar; medium (600 to 839dp) one pane (two only for low-density content); expanded and up two panes with a navigation rail. Moving up a breakpoint, *reveal* more: "Additional space doesn't just mean making the same thing bigger." Build what your section 0 adaptation answer says each size class reveals. Details: [references/layout.md](references/layout.md).
+- **Adapt by breakpoint:** compact (under 600dp) one pane with a navigation bar; medium (600 to 839dp) one pane (two only for low-density content); expanded and up two panes with a navigation rail. Moving up a breakpoint, *reveal* more: "Additional space doesn't just mean making the same thing bigger." Build what your section 0 adaptation answer says each size class reveals. Read [references/layout.md](references/layout.md) when adapting to tablets, foldables, landscape, or desktop windows, or supporting mouse and keyboard.
 
 ### Composing the screen
 
@@ -246,11 +236,10 @@ Stock code reaches for the left column. Lint won't flag it.
 | Flat dropdown menu | Grouped vertical menu | `DropdownMenuPopup` + `DropdownMenuGroup` |
 | One-size buttons | Sized, morphing buttons (XS 32 to XL 136dp) | `Button(shapes = ButtonDefaults.shapesFor(height))` |
 
-- **App bar vs toolbar:** "Where app bar supports navigation, toolbar provides critical actions for the current page." App bars get one action (two at most), boosted with a filled or tonal icon button; many actions go in a toolbar. Never show a toolbar and a navigation bar together.
-- **Page controls go in a toolbar, not loose text buttons.** Actions for the current page (lyrics and queue in a player) go in a floating toolbar of icon buttons, or in the app bar within its one or two actions. A floating toolbar can instead be local navigation when the selection swaps the content in place: labeled items with one selected. Decide by what the controls do; details in [references/components.md](references/components.md#toolbars).
+- **App bar vs toolbar:** "Where app bar supports navigation, toolbar provides critical actions for the current page." App bars get one action (two at most), boosted with a filled or tonal icon button; page controls (such as lyrics and queue in a player) go in a floating toolbar of icon buttons or in the app bar within its one or two actions, never as loose text buttons. A floating toolbar can instead be local navigation when the selection swaps the content in place (labeled items with one selected); never show a toolbar and a navigation bar together ([references/components.md](references/components.md#toolbars)).
 - **One FAB per screen** for the single most important action; not every screen needs one. An action that belongs to one card or section (logging water in a water card) is a button inside that container: "individual components, such as cards, shouldn't have their own FAB," and FABs aren't for minor actions (Google). When a screen's only action belongs to one section, it has no FAB.
 - **Button groups:** same size and shape by default; mixed sizes only in hero moments.
-- Component selection, usage rules, and code: [references/components.md](references/components.md).
+- Read [references/components.md](references/components.md) when choosing a component or writing one you haven't used in this session.
 
 ## 10. Customize without forking
 
@@ -288,12 +277,7 @@ Material says how components look; Android's own design guides say how an app be
 - **Settings:** only infrequent preferences; frequent ones sit next to their feature. App version, licenses, and account management get their own destinations, not settings rows. The overview shows each setting's current value; 15 or more settings means subscreens whose titles match the row that opened them. Labels lead with the important word and avoid generic verbs (Set, Change, Manage, Use). A switch for on/off, never a lone radio button. Place "Settings" in secondary navigation, after everything except "Help & feedback."
 - **Onboarding and sign-in:** show value before asking for permissions or an account; ask for a permission at the moment it's needed, after explaining why; every intro step is skippable. Passkeys first ("Create a passkey," "Sign in"), with recovery always visible.
 - **Notifications:** only timely value (never promotions, "we miss you," or rating requests). Title under 30 characters, text under 40, up to three actions, a large icon only when it adds content (circular for a person, square otherwise), never for branding. Pick channel importance honestly (HIGH only for time-critical messages, calls, alarms), and a tap must open the screen that notification is about.
-- **Never lock orientation or theme:** support landscape, resizing, and light and dark.
-- **Widgets:** read [references/widgets.md](references/widgets.md) before designing one.
-
-## Wear OS
-
-Watches build from black, use edge-hugging buttons, Roboto Flex with numeral and arc styles, percentage margins, and a 225dp breakpoint; Wear's `MaterialTheme` also defaults to Standard motion. Read [references/wear-os.md](references/wear-os.md) before designing Wear screens; use the `wear-compose-m3` skill for Wear scaffolding and migration.
+- **Support landscape, window resizing, and both light and dark themes** on every screen; never lock orientation or theme.
 
 ## Screen check
 
@@ -312,16 +296,8 @@ When the render contradicts the direction or the hierarchy, fix the largest mism
 
 Code checks, separately:
 
-- [ ] Theme and type for the surface: phone, tablet, and desktop use `MaterialExpressiveTheme` with the color source from section 4 and Google Sans Flex for plain text (plus at most one bundled brand face on Display and Headline); Wear and widgets follow their references.
-- [ ] Components from the right column of section 9's table (Wear and widgets: the components their references name).
+- [ ] Theme and type: `MaterialExpressiveTheme` with the color source from section 4 and Google Sans Flex for plain text (plus at most one bundled brand face on Display and Headline).
+- [ ] Components from the right column of section 9's table.
 - [ ] Text and icons use their intended role pairs: no `copy(alpha = ...)`, no hard-coded hex colors.
 - [ ] Custom animations use `MaterialTheme.motionScheme`, not `tween()`.
 - [ ] Navigation, dismissal, and selection match the chosen Android component's semantics (section 12); content drawn edge-to-edge.
-
-## References
-
-- [references/theming.md](references/theming.md): read when setting up or changing a theme, color scheme, type scale, shapes, motion scheme, or spacing.
-- [references/components.md](references/components.md): read when choosing a component or writing one you haven't used in this session; its patterns section after choosing the composition.
-- [references/layout.md](references/layout.md): read when a screen must adapt to tablets, foldables, landscape, or desktop windows, or support mouse and keyboard.
-- [references/widgets.md](references/widgets.md): read before designing or reviewing a home screen widget (not yet in scope, see Surfaces).
-- [references/wear-os.md](references/wear-os.md): read before designing any Wear OS screen or tile (not yet in scope, see Surfaces).
