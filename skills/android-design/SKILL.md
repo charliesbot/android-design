@@ -33,7 +33,7 @@ Changes inside an existing design (a fix, a tweak, a review, a new state of an a
 Answer these in your reply before any code, a sentence or two each. Skipping this step is what produces generic screens.
 
 1. **Rank the goals.** What is the one primary task on this screen? What is secondary and tertiary? (Google: "Simplifying to one primary task on each page.")
-2. **Choose a direction.** Name the screen's emotional character, the content or interaction that defines it, and one visual idea that ties type, imagery, color, and shape together. Each answer must name a decision ("the total set in tall numerals fills the top third"), not an adjective ("modern, clean"). If the idea describes how most apps of this type already look, it isn't an idea yet.
+2. **Choose a direction and display typeface.** Name the screen's emotional character, the content or interaction that defines it, one visual idea that ties type, imagery, color, and shape together, and the Display/Headline typeface from section 5 (**Fraunces**, **Bricolage Grotesque**, **Big Shoulders Display**, **Doto**, or **Google Sans Flex** on strong axes; **Google Sans Flex** carries plain text and **Google Sans Code** carries numbers and data). Each answer must name a decision ("the total set in tall Big Shoulders Display numerals fills the top third"), not an adjective ("modern, clean"). If the idea describes how most apps of this type already look, it isn't an idea yet.
 3. **Decide the hero moment.** Is this screen one of the product's one or two hero moments (the most emotional or most central interaction)? If yes, plan how several tactics combine there. If no, keep it calm (Google).
 4. **Choose the color source.** Dynamic (wallpaper), brand (a generated scheme), or content-based (from an image on screen). See section 4.
 5. **Spend emphasis by rank.** The primary goal gets the most, usually size first. Secondary goals get fewer tactics; tertiary ones get containment and type (Google). Content can dominate the screen when it is the product, as long as the primary action stays unmistakable.
@@ -58,7 +58,7 @@ fun AppTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> U
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
         motionScheme = MotionScheme.expressive(),
-        typography = AppTypography, // Google Sans Flex voices plus an optional brand face, see section 5
+        typography = AppTypography, // Google Sans Flex plain text plus the chosen Display/Headline face, see section 5
         content = content,
     )
 }
@@ -133,21 +133,21 @@ Their v1-to-v2 lesson: ungrouped settings of similar size and inconsistent color
 
 - Use the role scale: **Display** for short important text and numerals, **Headline** for short high-emphasis text on phones, **Title** for secondary regions, **Body** for reading, **Label** inside components. Most screens need about five styles; pick sizes with clear contrast between them, not near-duplicates.
 - **Emphasized styles** (`MaterialTheme.typography.displayLargeEmphasized` through `labelSmallEmphasized`) are heavier variants. Components don't use them by default; apply them to the primary button label, selected items, unread items, key numbers, and headlines. "Give extra impact to a headline, or subtly strengthen text of the same size."
-- **Google Sans Flex for plain text and by default** in phone, tablet, and desktop apps (this skill's standard, not a Google requirement). Six variable axes: weight (1 to 1000), width (25 to 151), optical size (6 to 144), slant (0 to -10), grade (0 to 100), and roundness (`ROND`, 0 to 100). Bundle the variable font and set axes per style ([references/theming.md](references/theming.md#google-sans-flex)).
-- **Optionally one brand face for Display and Headline.** Material's type scale has a brand typeface "used for larger type styles, like Headline and Display, to focus on expression" and a plain one "used for smaller type styles, like Body and Label, to focus on readability", and says "Consider replacing Roboto with different typefaces to boost brand expression in your product." The face set, one brand face per proposal, Doto's display-only limit, and keeping Title on Google Sans Flex are this skill's choices, not Google's. Explorations pick at most one face from this bundled set (all OFL, no fetching), used only on Display and Headline voices (24px and up) while Title, Body, and Label stay Google Sans Flex. By direction:
-  - **Fraunces** (`opsz`, `SOFT`, `WONK`, `wght`): warm, editorial soft serif for food, reading, journaling, and heritage.
-  - **Bricolage Grotesque** (`opsz`, `wdth`, `wght`): quirky, characterful grotesque for playful, indie, and creative tools.
-  - **Big Shoulders Display** (`wght`): tall, condensed poster type for sport, fitness, transit, and loud energy.
-  - **Doto** (`ROND`, `wght`): dot-matrix type for retro-tech, timers, and music; Display sizes only (36px and up).
-- **Google Sans Code for numbers and data** (timers, tabular values, codes, metadata), at any size, in any proposal; it is a mono face that pairs with any of the above.
+- **Bundled 6-font palette by role** (this skill's standard, not a Google requirement; all OFL and bundled in `android-design-explore/assets/fonts/` so neither proposals nor Compose apps fetch fonts). Material splits typography into a plain typeface "used for smaller type styles, like Body and Label, to focus on readability" and a brand typeface "used for larger type styles, like Headline and Display, to focus on expression", and says "Consider replacing Roboto with different typefaces to boost brand expression in your product." Assign the bundled faces by job ([references/theming.md](references/theming.md#typography)):
+  - **Plain text (`Title`, `Body`, `Label`): always Google Sans Flex** (`wght` 1 to 1000, `wdth` 25 to 151, `opsz` 6 to 144, `slnt` 0 to -10, `GRAD` 0 to 100, `ROND` 0 to 100) on readable default axes.
+  - **Display and Headline (24sp and up): pick one face per app or proposal** that fits the direction from section 0:
+    - **Fraunces** (`opsz`, `SOFT`, `WONK`, `wght`): warm, editorial soft serif for food, reading, journaling, and heritage.
+    - **Bricolage Grotesque** (`opsz`, `wdth`, `wght`): quirky, characterful grotesque for playful, indie, and creative tools.
+    - **Big Shoulders Display** (`wght`): tall, condensed poster type for sport, fitness, transit, and loud energy.
+    - **Doto** (`ROND`, `wght`): dot-matrix type for retro-tech, timers, and music; Display sizes only (36sp and up).
+    - **Google Sans Flex** on expressive axes: heavy weight, very narrow or very wide width, or high roundness.
+  - **Numbers and data (any size): Google Sans Code** (`wght` 300 to 800) for timers, tabular values, codes, timecodes, and metadata; it is a mono face that pairs with any Display/Headline choice above.
 - Brand faces change character, not size: keep the scale's sizes and adjust line height and tracking ("Avoid changing the type size; this can affect how components render and reflow").
 - **Expressive voices on large styles, the text voice on small:** give Display and Headline the voice that serves the direction; keep Body and Label on default axes so they stay highly readable. Be careful at Title.
-- **The hero title or number needs a real voice.** With Google Sans Flex (default) the character comes through strong axis settings (heavy weight, very narrow or very wide width, or high roundness); a medium weight at a middle width looks like any sans. With a bundled brand face, use it at Display or Headline size on purpose (its own axes, weight, tracking), not as a regular-weight swap. Keep the calm voices for secondary text.
+- **The hero title or number needs a real voice.** With a brand face, use its own axes, weight, and tracking at Display or Headline size on purpose, not as a regular-weight swap. With Google Sans Flex, the character comes through strong axis settings (heavy weight, very narrow or very wide width, or high roundness); a medium weight at a middle width looks like any sans. Keep the calm voices for secondary text.
 - **Axes carry feeling and meaning.** Google describes weight as ranging from "calm as a whisper" to "loud and rugged", roundness as "personal, playful", and taller, narrower styles as more premium and engaging. Axes also carry state: heavy in a filled container for the selected item, light for the rest, at the same size so nothing reflows. Grade adds emphasis without changing width.
-- **Always match optical size to the text size.** It reshapes letters to stay legible at every size; one setting across Display and Label hurts both. Set `opsz` per style (see the theming reference).
-- **Pick voices, not random axis values.** Define each voice once as a style and reuse it; two or three per app, each with one job. Starting points for Google Sans Flex voices and the brand faces are in [references/theming.md](references/theming.md#google-sans-flex); tune them to the direction rather than copying the nearest preset.
-
-- **Other voices:** Google Sans Code (or Roboto Mono) for code, metadata, and timecodes; Google Sans Mono only at medium and large editorial sizes, never for code. Roboto Serif for long reading.
+- **Set optical size (`opsz`) explicitly on custom Display and Headline voices** that have the axis (`Fraunces`, `Bricolage Grotesque`, and `Google Sans Flex` display voices) so letters reshape for their size and Compose matches the HTML proposal; baseline plain styles stay at the font's default `opsz` ([references/theming.md](references/theming.md#typography)).
+- **Pick voices, not random axis values.** Define each voice once as a style and reuse it; two or three per app, each with one job. Starting points and the `voiceFont` helper for all six bundled faces are in [references/theming.md](references/theming.md#typography); tune them to the direction rather than copying the nearest preset.
 - **Editorial treatments** let type dominate a hero moment: a huge number, an album title over a photo, text that widens as a slider rises. Keep them consistent, match the emotion (narrow and light for calm, bold and wide for energy), and never use them for labels.
 - **Contrast inside one line:** two voices in the same phrase can carry meaning, such as a flight's origin light and condensed and its destination heavy, wide, and slanted ("PDX › SFO"). The line reads as past and future without extra UI.
 - **Type as graphic:** oversized words or numbers cropped by the screen edge, or tinted close to their background ("68" behind a weather summary, a trip name behind the traveler). When text becomes art, repeat the information readably elsewhere and hide the decorative copy from accessibility services (`Modifier.clearAndSetSemantics {}`).
@@ -296,7 +296,7 @@ When the render contradicts the direction or the hierarchy, fix the largest mism
 
 Code checks, separately:
 
-- [ ] Theme and type: `MaterialExpressiveTheme` with the color source from section 4 and Google Sans Flex for plain text (plus at most one bundled brand face on Display and Headline).
+- [ ] Theme and type: `MaterialExpressiveTheme` with the color source from section 4, `Google Sans Flex` for plain text (`Title`, `Body`, `Label`), the chosen Display/Headline face from section 5 (`Fraunces`, `Bricolage Grotesque`, `Big Shoulders Display`, `Doto`, or expressive `Google Sans Flex`), and `Google Sans Code` for numbers and data.
 - [ ] Components from the right column of section 9's table.
 - [ ] Text and icons use their intended role pairs: no `copy(alpha = ...)`, no hard-coded hex colors.
 - [ ] Custom animations use `MaterialTheme.motionScheme`, not `tween()`.

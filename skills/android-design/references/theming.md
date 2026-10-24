@@ -135,36 +135,28 @@ The brand and content-based snippets above already pass it. For a static Theme B
 ## Typography
 
 - 15 baseline styles plus 15 emphasized ones (`displayLargeEmphasized` ... `labelSmallEmphasized`, 1.5.0 only). Emphasized raises weight: Display, Headline, Body, and Title Large go Regular to Medium; Title Medium/Small and Labels go Medium to Bold.
-- `Typography(fontFamily = ...)` sets one family everywhere. To put a brand face only on large styles, copy the defaults:
-
-```kotlin
-private val Brand = FontFamily(Font(R.font.brand_display_medium, FontWeight.Medium), Font(R.font.brand_display_bold, FontWeight.Bold))
-private val base = Typography()
-
-val AppTypography = base.copy(
-    displayLarge = base.displayLarge.copy(fontFamily = Brand),
-    displayMedium = base.displayMedium.copy(fontFamily = Brand),
-    displaySmall = base.displaySmall.copy(fontFamily = Brand),
-    headlineLarge = base.headlineLarge.copy(fontFamily = Brand),
-    headlineMedium = base.headlineMedium.copy(fontFamily = Brand),
-    headlineSmall = base.headlineSmall.copy(fontFamily = Brand),
-    displayLargeEmphasized = base.displayLargeEmphasized.copy(fontFamily = Brand),
-    headlineLargeEmphasized = base.headlineLargeEmphasized.copy(fontFamily = Brand),
-    // repeat for the other Display and Headline emphasized styles you use
-)
-```
-
 - Change letter spacing and line height to fit a new face, not the scale's sizes: "Avoid changing the type size; this can affect how components render and reflow." (Google) For editorial sizes (a total that fills the top of the screen), define a separate style outside the scale, like `numeralStyle` below.
 
-### Google Sans Flex
+### Bundled typefaces and voices
 
-Open source on [Google Fonts](https://fonts.google.com/specimen/Google+Sans+Flex) (since November 2025) and this skill's default family: plain text always uses it, and so does every Display and Headline unless you choose a brand face (below). Axes: `wght` 1 to 1000, `wdth` 25 to 151, `opsz` 6 to 144, `slnt` -10 to 0, `GRAD` 0 to 100, `ROND` 0 to 100.
+All six variable TTFs are OFL and bundled in the `android-design-explore` skill's `assets/fonts/` folder (copy the ones the app uses into `res/font/`, so neither explorations nor Compose apps fetch fonts). Material splits typography into the plain typeface (smaller styles, "to focus on readability") and the brand typeface (larger styles, "to focus on expression"). The face set, one Display/Headline face per app or proposal, Doto's display-only limit, and keeping Title on Google Sans Flex are this skill's choices, not Google's:
 
-Bundle the variable TTF in `res/font/` (downloadable Google Fonts don't carry variation settings). Variation settings apply on API 26+. Because optical size should match each style's size, build the font per text style. A plain `FontFamily(Font(R.font.google_sans_flex))` draws every weight at 400: each weight needs its own `Font` with `FontVariation.weight`, as below.
+- **Plain text (`Title`, `Body`, `Label`):** always `Google Sans Flex` (`google_sans_flex`).
+- **Display and Headline (`24sp+`, or `36sp+` for `Doto`):** pick **one** face from the table below (`Fraunces`, `Bricolage Grotesque`, `Big Shoulders Display`, `Doto`, or `Google Sans Flex` on expressive axes). Do not use a brand face on Title, Body, or Label.
+- **Numbers and data (any size):** `Google Sans Code` (`google_sans_code`) for timers, tabular values, codes, timecodes, and metadata.
 
-Voice starting points (tune them to the screen's direction; they are not presets to copy):
+| Face | File (`res/font/`) | Roles & min size | Variable axes | Use for & starting point |
+| --- | --- | --- | --- | --- |
+| Google Sans Flex | `google_sans_flex` | Plain text always; Display & Headline (`24sp+`) | `wght` 1-1000, `wdth` 25-151, `opsz` 6-144, `slnt` -10-0, `GRAD` 0-100, `ROND` 0-100 | Plain text at default axes (`wght` 400-700). Display/Headline voices: see table below |
+| Fraunces | `fraunces` | Display & Headline (`24sp+`) | `opsz` 9-144, `wght` 100-900, `SOFT` 0-100, `WONK` 0-1 | Warm editorial serif: food, reading, journaling, heritage (`wght` 600, `opsz` = size, `SOFT` 100, `WONK` 1) |
+| Bricolage Grotesque | `bricolage_grotesque` | Display & Headline (`24sp+`) | `opsz` 12-96, `wdth` 75-100, `wght` 200-800 | Playful, quirky grotesque: indie, creative tools (`wght` 800, `wdth` 80 to 100, `opsz` = size up to 96) |
+| Big Shoulders Display | `big_shoulders_display` | Display & Headline (`24sp+`) | `wght` 100-900 | Tall condensed poster type: sport, fitness, transit, loud energy (`wght` 800 to 900, tight tracking, line height 1.2x) |
+| Doto | `doto` | Display only (`36sp+`) | `ROND` 0-100, `wght` 100-900 | Dot-matrix: timers, music, retro-tech (`wght` 700 to 900, `ROND` 100 for round dots) |
+| Google Sans Code | `google_sans_code` | Numbers & data (any size) | `wght` 300-800 | Timers, tabular values, codes, metadata (`wght` 400 to 700, `fontFeatureSettings = "tnum"`) |
 
-| Voice | Axes (approx.) | Use for |
+When `Google Sans Flex` is chosen for Display and Headline, tune its axes to the screen's direction rather than leaving it at regular weight and width:
+
+| Google Sans Flex voice | Axes (approx.) | Use for |
 | --- | --- | --- |
 | Friendly hero | weight 800 to 900, roundness 100 | The one hero title or number in a warm, playful product |
 | Tall numerals | width 25 to 50; weight 300 off, 800 on | Numbers that fill a card (times, totals, calculators), state through weight |
@@ -172,79 +164,98 @@ Voice starting points (tune them to the screen's direction; they are not presets
 | Airy display | weight 100 to 300, large sizes only | Calm headers, inactive states |
 | Wide header | width 125 to 151, weight 500 to 700, roundness 0 | Confident section or dialog titles; never in app bars |
 | Loud expressive | width 151, weight 900, slant -10 | Celebrations and the user's own voice; rare |
-| Text | default axes, weight 400 to 500 | Body and labels; don't vary it |
+| Text | default axes, weight 400 to 700 | Title, Body, and Label; keep default axes |
 
-Code:
+### Compose font utilities (`googleSansFlex` and `voiceFont`)
+
+A plain `FontFamily(Font(R.font.google_sans_flex))` draws every weight at 400 because variable TTFs require a `Font` instance with `FontVariation.weight` per weight. Use two helpers across every app:
+
+1. `googleSansFlex`: the 4-weight plain `FontFamily` (`400, 500, 600, 700`) applied to the baseline type scale.
+2. `voiceFont(resId, weight, vararg axes)`: builds a `FontFamily` for any custom Display, Headline, or `Google Sans Code` voice. Variation settings apply on API 26+.
 
 ```kotlin
-/** A Google Sans Flex voice: fixed axes, optical size matched to this style's font size. */
-fun TextStyle.flex(weight: Int = 400, width: Float = 100f, round: Float = 0f, slant: Float = 0f) = copy(
-    fontFamily = FontFamily(
+// Plain text family: one wght instance per weight so baseline and emphasized styles render their weights.
+private val googleSansFlex = FontFamily(
+    listOf(400, 500, 600, 700).map { weight ->
         Font(
             resId = R.font.google_sans_flex,
             weight = FontWeight(weight),
-            variationSettings = FontVariation.Settings(
-                FontVariation.weight(weight),
-                FontVariation.width(width),
-                FontVariation.slant(slant),
-                FontVariation.opticalSizing(fontSize),
-                FontVariation.Setting("ROND", round),
-            ),
-        ),
+            variationSettings = FontVariation.Settings(FontVariation.weight(weight)),
+        )
+    },
+)
+
+/**
+ * One font family for a custom voice (Display, Headline, or Google Sans Code): its weight plus every
+ * other axis the voice uses (`FontVariation.opticalSizing(size.sp)` for `opsz`, `FontVariation.width`
+ * for `wdth`, `FontVariation.Setting("SOFT", 100f)`, `FontVariation.Setting("ROND", 100f)`, and so on).
+ */
+fun voiceFont(resId: Int, weight: Int, vararg axes: FontVariation.Setting) = FontFamily(
+    Font(
+        resId = resId,
+        weight = FontWeight(weight),
+        variationSettings = FontVariation.Settings(FontVariation.weight(weight), *axes),
     ),
-    fontWeight = FontWeight(weight),
 )
 
 private val base = Typography()
 
-val AppTypography = base.copy(
-    displayLarge = base.displayLarge.flex(weight = 850, round = 100f),   // friendly hero
-    displayMedium = base.displayMedium.flex(weight = 850, round = 100f),
-    headlineLarge = base.headlineLarge.flex(weight = 500, width = 85f),  // premium display
-    headlineMedium = base.headlineMedium.flex(weight = 500, width = 85f),
-    titleLarge = base.titleLarge.flex(weight = 500),
-    bodyLarge = base.bodyLarge.flex(),
-    bodyMedium = base.bodyMedium.flex(),
-    labelLarge = base.labelLarge.flex(weight = 500),
-    // ...every style you use, including the *Emphasized ones with a heavier weight
+// Example 1: a brand face (Fraunces) on Display/Headline, Google Sans Flex on Title/Body/Label.
+private fun heroVoice(sizeSp: Int) = voiceFont(
+    R.font.fraunces,
+    weight = 600,
+    FontVariation.opticalSizing(sizeSp.sp),
+    FontVariation.Setting("SOFT", 100f),
+    FontVariation.Setting("WONK", 1f),
 )
 
-// A voice used outside the type scale, such as tall numerals with state:
+// Example 2: or an expressive Google Sans Flex voice on Display/Headline:
+// private fun heroVoice(sizeSp: Int) = voiceFont(
+//     R.font.google_sans_flex,
+//     weight = 850,
+//     FontVariation.opticalSizing(sizeSp.sp),
+//     FontVariation.Setting("ROND", 100f),
+// )
+
+val AppTypography = base.copy(
+    displayLarge = base.displayLarge.copy(fontFamily = heroVoice(57), fontWeight = FontWeight(600)),
+    displayMedium = base.displayMedium.copy(fontFamily = heroVoice(45), fontWeight = FontWeight(600)),
+    headlineLarge = base.headlineLarge.copy(fontFamily = heroVoice(32), fontWeight = FontWeight(600)),
+    headlineMedium = base.headlineMedium.copy(fontFamily = heroVoice(28), fontWeight = FontWeight(600)),
+    titleLarge = base.titleLarge.copy(fontFamily = googleSansFlex),
+    titleMedium = base.titleMedium.copy(fontFamily = googleSansFlex),
+    titleSmall = base.titleSmall.copy(fontFamily = googleSansFlex),
+    bodyLarge = base.bodyLarge.copy(fontFamily = googleSansFlex),
+    bodyMedium = base.bodyMedium.copy(fontFamily = googleSansFlex),
+    bodySmall = base.bodySmall.copy(fontFamily = googleSansFlex),
+    labelLarge = base.labelLarge.copy(fontFamily = googleSansFlex),
+    labelMedium = base.labelMedium.copy(fontFamily = googleSansFlex),
+    labelSmall = base.labelSmall.copy(fontFamily = googleSansFlex),
+    // ...plus the *Emphasized styles you use
+)
+
+// Numbers and data voice with Google Sans Code:
+val dataVoice = voiceFont(R.font.google_sans_code, weight = 500)
+
+// A voice outside the type scale, such as tall numerals with state:
 @Composable
-fun numeralStyle(selected: Boolean) =
-    MaterialTheme.typography.displayLarge.flex(weight = if (selected) 800 else 300, width = 35f)
-        .copy(fontFeatureSettings = "tnum")
+fun numeralStyle(selected: Boolean) = MaterialTheme.typography.displayLarge.copy(
+    fontFamily = voiceFont(
+        R.font.google_sans_flex,
+        weight = if (selected) 800 else 300,
+        FontVariation.width(35f),
+        FontVariation.opticalSizing(57.sp),
+    ),
+    fontWeight = FontWeight(if (selected) 800 else 300),
+    fontFeatureSettings = "tnum",
+)
 ```
 
 - Define two or three voices once per app and apply them consistently; don't invent new axis values per screen.
 - State through axes: selected items heavy (700 to 900), unselected light (200 to 300); keep sizes equal so nothing reflows. `FontVariation.grade(...)` changes emphasis without changing width.
 - Each distinct axis combination is a separate font instance; for animated axes (text that widens as a slider moves), step through a small set of values and keep it to a hero moment.
-- Other voices that pair well: Google Sans Code for numbers and data, Roboto Serif for long reading.
 - Tabular numbers: `style.copy(fontFeatureSettings = "tnum")`.
-
-### Brand faces (Display and Headline only)
-
-Optional: one face from the set below on Display and Headline styles, with everything else on Google Sans Flex. The face set, one face per proposal, Doto's display-only limit, and keeping Title on Google Sans Flex are this skill's choices, not Google's. All are OFL and bundled as variable TTFs in the `android-design-explore` skill's `assets/fonts/` folder (copy them into the app's `res/font/`), so an exploration never fetches fonts. Material calls this the brand typeface (larger styles, "to focus on expression") against the plain typeface (smaller styles, "to focus on readability"); do not use a brand face on Body or Label. Build each style the same way as `flex` above: one `Font` per weight with `FontVariation.Settings`, and keep the scale's sizes (change line height and tracking).
-
-| Face | File | Axes | Use for | Starting point |
-| --- | --- | --- | --- | --- |
-| Fraunces | `fraunces` | `opsz` 9-144, `wght` 100-900, `SOFT` 0-100, `WONK` 0-1 | Warm editorial serif: food, reading, journaling | `wght` 600, `opsz` = size, `SOFT` 100, `WONK` 1 |
-| Bricolage Grotesque | `bricolage_grotesque` | `opsz` 12-96, `wdth` 75-100, `wght` 200-800 | Playful, quirky grotesque: indie, creative tools | `wght` 800, `wdth` 80 to 100, `opsz` = size (max 96) |
-| Big Shoulders Display | `big_shoulders_display` | `wght` 100-900 | Tall condensed poster type: sport, transit, energy | `wght` 800 to 900, tight tracking, line height 1.2x |
-| Doto | `doto` | `ROND` 0-100, `wght` 100-900 | Dot-matrix: timers, music, retro-tech. Display sizes only (36sp and up) | `wght` 700 to 900, `ROND` 100 for round dots |
-
-```kotlin
-private fun brand(weight: Int, vararg axes: FontVariation.Setting) = FontFamily(
-    Font(R.font.fraunces, FontWeight(weight), variationSettings = FontVariation.Settings(FontVariation.weight(weight), *axes)),
-)
-val AppTypography = base.copy(
-    displayLarge = base.displayLarge.copy(fontFamily = brand(600, FontVariation.opticalSizing(57.sp), FontVariation.Setting("SOFT", 100f), FontVariation.Setting("WONK", 1f))),
-)
-```
-
-Measured line boxes (Pixel_10_Pro_XL emulator, M3 `bodyLarge` base style with the token size and line height): Fraunces, Bricolage Grotesque, and Big Shoulders Display match the token line height at 36/44 and 32/40 (Fraunces 44.7dp at 36/44 from pixel rounding), so no extra vertical room is needed. Doto at 45/52 renders 54dp tall, so leave about 2dp of room around a Doto line. Google Sans Flex, by comparison, renders 52.7dp at 36/44 and 46.7dp at 32/40. Widths in Compose differ from the HTML runtime unless you copy its tracking (the runtime adds 0.5px letter spacing) and set `FontVariation.opticalSizing` to the style's size for Fraunces and Bricolage Grotesque; without it, Bricolage Grotesque rendered about 10% narrower than the proposal in the preview.
-
-Google Sans Code (`google_sans_code`, `wght` 300-800) is the mono face for numbers and data (timers, tabular values, codes, metadata) at any size, in any proposal: `Font(R.font.google_sans_code, FontWeight(w), variationSettings = FontVariation.Settings(FontVariation.weight(w)))`.
+- Measured line boxes (Pixel_10_Pro_XL emulator, M3 `bodyLarge` base style with the token size and line height): Fraunces, Bricolage Grotesque, and Big Shoulders Display match the token line height at 36/44 and 32/40 (Fraunces 44.7dp at 36/44 from pixel rounding), so no extra vertical room is needed. Doto at 45/52 renders 54dp tall, so leave about 2dp of room around a Doto line. Google Sans Flex, by comparison, renders 52.7dp at 36/44 and 46.7dp at 32/40. Widths in Compose differ from the HTML runtime unless you copy its tracking (the runtime adds 0.5px letter spacing) and set `FontVariation.opticalSizing` to the style's size for Fraunces and Bricolage Grotesque; without it, Bricolage Grotesque rendered about 10% narrower than the proposal in the preview.
 
 ## Shapes
 
