@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.domain.validation
 
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
+import bot.charlies.androiddesign.preview.model.BundledFont
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.MaterialShape
@@ -8,7 +9,6 @@ import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.StyleDef
 import bot.charlies.androiddesign.preview.model.ThemeOverride
-import bot.charlies.androiddesign.preview.model.TypeGroup
 import bot.charlies.androiddesign.preview.model.TypeRole
 
 /**
@@ -133,8 +133,7 @@ internal class ThemeValidator(private val sink: ErrorSink, private val design: D
         sink.add(path.child("contrast"), "contrast must be between -1.0 and 1.0")
     }
     scheme.seed?.let {
-      val reference = Regex("^\\{colors\\.[A-Za-z0-9-]+}$").matches(it)
-      if (!reference && DesignSystemResolver.parseHex(it) == null) {
+      if (!DesignSystemResolver.isColorReference(it) && DesignSystemResolver.parseHex(it) == null) {
         sink.add(
           path.child("seed"),
           "seed must be a #RRGGBB color or a reference such as {colors.primary}",
@@ -171,32 +170,12 @@ internal class ThemeValidator(private val sink: ErrorSink, private val design: D
     fun isShape(value: String): Boolean =
       ShapeToken.fromWire(value) != null || MaterialShape.fromWire(value) != null
 
-    /**
-     * Google Sans Flex and Google Sans Code serve every role. Brand faces take display and
-     * headline; Doto is for display sizes only.
-     */
     fun familyAllowed(role: TypeRole, family: String): Boolean =
-      when (family) {
-        "Google Sans Flex",
-        "Google Sans Code" -> true
-        "Fraunces",
-        "Bricolage Grotesque",
-        "Big Shoulders Display" ->
-          role.group == TypeGroup.Display || role.group == TypeGroup.Headline
-        "Doto" -> role.group == TypeGroup.Display
-        else -> false
-      }
+      BundledFont.byFamily(family)?.let { role.group in it.groups } ?: false
 
     private fun allowedFamilies(role: TypeRole): String =
-      listOf(
-          "Google Sans Flex",
-          "Google Sans Code",
-          "Fraunces",
-          "Bricolage Grotesque",
-          "Big Shoulders Display",
-          "Doto",
-        )
-        .filter { familyAllowed(role, it) }
-        .joinToString(prefix = "use ")
+      BundledFont.entries
+        .filter { role.group in it.groups }
+        .joinToString(prefix = "use ") { it.family }
   }
 }

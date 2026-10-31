@@ -21,7 +21,6 @@ class ModelTest {
     assertEquals(TypeRole.LabelSmallEmphasized, TypeRole.fromKebab("label-small-emphasized"))
     assertEquals(ShapeToken.LargeIncreased, ShapeToken.fromKebab("large-increased"))
     assertNull(ColorRole.fromKebab("surfaceContainerHigh"))
-    assertEquals("surfaceContainerHigh", "surface-container-high".kebabToCamel())
   }
 
   @Test

@@ -4,19 +4,20 @@ import bot.charlies.androiddesign.preview.domain.PreviewException
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.domain.validation.ScreenValidator
 import bot.charlies.androiddesign.preview.model.ActionFunction
+import bot.charlies.androiddesign.preview.model.BundledFont
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.MaterialShape
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.PaneRole
+import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.PropDef
 import bot.charlies.androiddesign.preview.model.PropKind
 import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.SizeClass
 import bot.charlies.androiddesign.preview.model.TypeRole
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -37,13 +38,9 @@ object CatalogJson {
   const val PROPOSAL_SCHEMA_URL = "$RAW/$PROPOSAL_SCHEMA_FILE"
   private const val DRAFT = "https://json-schema.org/draft/2020-12/schema"
 
-  private val pretty = Json {
-    prettyPrint = true
-    prettyPrintIndent = "  "
-  }
-
   /** Two-space pretty JSON with a trailing newline. */
-  fun render(json: JsonObject): String = pretty.encodeToString(JsonObject.serializer(), json) + "\n"
+  fun render(json: JsonObject): String =
+    PreviewJson.pretty.encodeToString(JsonObject.serializer(), json) + "\n"
 
   /** The catalog an agent reads through `get_catalog`, written to `m3-expressive.catalog.json`. */
   fun catalog(): JsonObject =
@@ -393,7 +390,8 @@ object CatalogJson {
                 obj(
                   "enum" to strings("primary", *ColorRole.entries.map { it.kebab }.toTypedArray()),
                 ),
-              "additionalProperties" to obj("type" to "string", "pattern" to "^#[0-9a-fA-F]{6}$"),
+              "additionalProperties" to
+                obj("type" to "string", "pattern" to DesignSystemResolver.HEX.pattern),
             ),
           "typography" to
             obj(
@@ -456,15 +454,7 @@ object CatalogJson {
             obj(
               "fontFamily" to
                 obj(
-                  "enum" to
-                    strings(
-                      "Google Sans Flex",
-                      "Google Sans Code",
-                      "Fraunces",
-                      "Bricolage Grotesque",
-                      "Big Shoulders Display",
-                      "Doto",
-                    ),
+                  "enum" to JsonArray(BundledFont.entries.map { JsonPrimitive(it.family) }),
                 ),
               "fontVariation" to obj("type" to "string"),
               "fontWeight" to obj("type" to "integer"),

@@ -1,5 +1,7 @@
 package bot.charlies.androiddesign.preview.domain.findings
 
+import bot.charlies.androiddesign.preview.domain.design.TypeScale
+import bot.charlies.androiddesign.preview.model.BundledFont
 import bot.charlies.androiddesign.preview.model.ComponentGroup
 import bot.charlies.androiddesign.preview.model.Finding
 import bot.charlies.androiddesign.preview.model.FindingRule
@@ -76,18 +78,10 @@ object FindingRules {
   }
 
   private val allGroups = TypeGroup.entries.toSet()
-  private val displayAndHeadline = setOf(TypeGroup.Display, TypeGroup.Headline)
 
   /** Bundled families (lowercase) and the type groups each may set. */
   private val fontGroups: Map<String, Set<TypeGroup>> =
-    mapOf(
-      "google sans flex" to allGroups,
-      "google sans code" to allGroups,
-      "fraunces" to displayAndHeadline,
-      "bricolage grotesque" to displayAndHeadline,
-      "big shoulders display" to displayAndHeadline,
-      "doto" to setOf(TypeGroup.Display),
-    )
+    BundledFont.entries.associate { it.family.lowercase() to it.groups }
 
   fun evaluate(tree: LayoutTree): List<Finding> {
     val view = View(tree)
@@ -158,7 +152,7 @@ object FindingRules {
   private fun fonts(view: View): List<Finding> =
     view.nodes.mapNotNull { node ->
       val family = node.text?.font ?: return@mapNotNull null
-      val name = normalizeFamily(family)
+      val name = displayName(family).lowercase()
       val role = node.roles?.type
       val group = role?.let(TypeRole::fromWire)?.group
       val allowed = fontGroups[name]
@@ -173,9 +167,6 @@ object FindingRules {
         }
       detail?.let { error(node, FindingRule.Font, it) }
     }
-
-  private fun normalizeFamily(family: String): String =
-    family.substringBefore(',').trim().trim('"', '\'').trim().lowercase()
 
   private fun displayName(family: String): String =
     family.substringBefore(',').trim().trim('"', '\'').trim()

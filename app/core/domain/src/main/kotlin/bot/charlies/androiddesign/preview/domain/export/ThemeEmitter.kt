@@ -1,8 +1,8 @@
 package bot.charlies.androiddesign.preview.domain.export
 
-import bot.charlies.androiddesign.preview.domain.findings.TypeScale
-import bot.charlies.androiddesign.preview.domain.findings.TypeScale.baseRole
-import bot.charlies.androiddesign.preview.domain.findings.TypeScale.isEmphasized
+import bot.charlies.androiddesign.preview.domain.design.TypeScale
+import bot.charlies.androiddesign.preview.domain.design.TypeScale.baseRole
+import bot.charlies.androiddesign.preview.domain.design.TypeScale.isEmphasized
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.TypeRole

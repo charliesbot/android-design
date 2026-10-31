@@ -43,12 +43,16 @@ object DesignSystemResolver {
       ShapeToken.Full to 9999f,
     )
 
-  private val HEX = Regex("^#[0-9a-fA-F]{6}$")
+  /** A `#RRGGBB` color. */
+  val HEX = Regex("^#[0-9a-fA-F]{6}$")
   private val DIMENSION = Regex("^(-?\\d+(?:\\.\\d+)?)\\s*(?:px|dp)?$")
   private val COLOR_REFERENCE = Regex("^\\{colors\\.([A-Za-z0-9-]+)}$")
 
   /** `#RRGGBB` upper-cased, or null when [value] is not that form. */
   fun parseHex(value: String): String? = value.takeIf { HEX.matches(it) }?.uppercase()
+
+  /** True for a reference to a design system color, such as `{colors.primary}`. */
+  fun isColorReference(value: String): Boolean = COLOR_REFERENCE.matches(value)
 
   /** The largest spacing a design system holds, in dp; the validator rejects more. */
   const val MAX_SPACING_DP = 1000f

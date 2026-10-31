@@ -5,24 +5,26 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
+import bot.charlies.androiddesign.preview.model.BundledFont
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * The faces the app bundles. [family] is the name a DESIGN.md uses, [resource] the classpath path
- * of the (variable) TTF.
- */
-enum class FontFace(val family: String, val resource: String) {
-  GoogleSansFlex("Google Sans Flex", "fonts/google_sans_flex.ttf"),
-  Fraunces("Fraunces", "fonts/fraunces.ttf"),
-  BricolageGrotesque("Bricolage Grotesque", "fonts/bricolage_grotesque.ttf"),
-  BigShouldersDisplay("Big Shoulders Display", "fonts/big_shoulders_display.ttf"),
-  Doto("Doto", "fonts/doto.ttf"),
-  GoogleSansCode("Google Sans Code", "fonts/google_sans_code.ttf");
+/** The faces the app bundles: each [BundledFont] with the classpath path of its (variable) TTF. */
+enum class FontFace(val font: BundledFont, val resource: String) {
+  GoogleSansFlex(BundledFont.GoogleSansFlex, "fonts/google_sans_flex.ttf"),
+  Fraunces(BundledFont.Fraunces, "fonts/fraunces.ttf"),
+  BricolageGrotesque(BundledFont.BricolageGrotesque, "fonts/bricolage_grotesque.ttf"),
+  BigShouldersDisplay(BundledFont.BigShouldersDisplay, "fonts/big_shoulders_display.ttf"),
+  Doto(BundledFont.Doto, "fonts/doto.ttf"),
+  GoogleSansCode(BundledFont.GoogleSansCode, "fonts/google_sans_code.ttf");
+
+  val family: String
+    get() = font.family
 
   companion object {
     /** The face named [family], ignoring case; null for names the app does not bundle. */
-    fun byFamily(family: String?): FontFace? = entries.firstOrNull {
-      it.family.equals(family?.trim(), ignoreCase = true)
+    fun byFamily(family: String?): FontFace? {
+      val font = family?.let { BundledFont.byFamily(it.trim(), ignoreCase = true) }
+      return entries.firstOrNull { it.font == font }
     }
   }
 }

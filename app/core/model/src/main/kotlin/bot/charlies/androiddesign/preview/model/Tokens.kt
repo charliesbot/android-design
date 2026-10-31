@@ -78,6 +78,27 @@ enum class TypeGroup {
   Label,
 }
 
+/**
+ * The typefaces the app bundles, in schema order. [family] is the name a DESIGN.md uses and
+ * [groups] the type groups the face may set: Google Sans Flex and Google Sans Code serve every
+ * role, brand faces take display and headline, and Doto is for display sizes only.
+ */
+enum class BundledFont(val family: String, val groups: Set<TypeGroup>) {
+  GoogleSansFlex("Google Sans Flex", TypeGroup.entries.toSet()),
+  GoogleSansCode("Google Sans Code", TypeGroup.entries.toSet()),
+  Fraunces("Fraunces", setOf(TypeGroup.Display, TypeGroup.Headline)),
+  BricolageGrotesque("Bricolage Grotesque", setOf(TypeGroup.Display, TypeGroup.Headline)),
+  BigShouldersDisplay("Big Shoulders Display", setOf(TypeGroup.Display, TypeGroup.Headline)),
+  Doto("Doto", setOf(TypeGroup.Display));
+
+  companion object {
+    /** The face named [family], matching the exact case unless [ignoreCase]. */
+    fun byFamily(family: String, ignoreCase: Boolean = false): BundledFont? = entries.firstOrNull {
+      it.family.equals(family, ignoreCase)
+    }
+  }
+}
+
 /** `androidx.compose.material3.Typography` roles, including the Emphasized set. */
 enum class TypeRole(val group: TypeGroup) {
   DisplayLarge(TypeGroup.Display),

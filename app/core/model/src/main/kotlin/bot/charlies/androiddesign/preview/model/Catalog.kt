@@ -154,8 +154,6 @@ object M3ExpressiveCatalog {
 
   val components: List<ComponentDef> by lazy { buildComponents() }
 
-  fun component(name: String): ComponentDef? = components.firstOrNull { it.name == name }
-
   private val byName: Map<String, ComponentDef> by lazy { components.associateBy { it.name } }
 
   fun find(name: String): ComponentDef? = byName[name]

@@ -1,4 +1,4 @@
-package bot.charlies.androiddesign.preview.domain.findings
+package bot.charlies.androiddesign.preview.domain.design
 
 import bot.charlies.androiddesign.preview.model.TypeGroup
 import bot.charlies.androiddesign.preview.model.TypeRole

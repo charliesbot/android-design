@@ -96,7 +96,12 @@ internal class ScreenValidator(
           val prop = declared[key]
           if (prop == null) {
             val known =
-              (declared.keys + listOf("showIn", "sizeClass", "style")).sorted().joinToString()
+              (declared.keys +
+                  M3ExpressiveCatalog.SHOW_IN +
+                  M3ExpressiveCatalog.SIZE_CLASS +
+                  M3ExpressiveCatalog.STYLE)
+                .sorted()
+                .joinToString()
             sink.add(path.child(key), "unknown prop '$key' on ${def.name} (known: $known)")
           } else {
             validateValue(path.child(key), prop, value)
@@ -129,41 +134,31 @@ internal class ScreenValidator(
     fun touched(vararg keys: String) = changed == null || keys.any { it in changed }
     /** Where to report a problem between [first] and the range: the first if it is set here. */
     fun at(first: String) = path.child(if (touched(first)) first else "range")
-    when (def.name) {
-      "Slider" -> {
-        val (min, max) = rangeOf(props) ?: return
-        if (min >= max) {
-          if (touched("range")) sink.add(path.child("range"), rangeOrderMessage(min, max))
-          return
-        }
-        val value = props["value"]?.number() ?: return
-        if (value !in min..max && touched("value", "range")) {
+    if (def.name != "Slider" && def.name != "RangeSlider") return
+    val (min, max) = rangeOf(props) ?: return
+    if (min >= max) {
+      if (touched("range")) sink.add(path.child("range"), rangeOrderMessage(min, max))
+      return
+    }
+    if (def.name == "Slider") {
+      val value = props["value"]?.number() ?: return
+      if (value !in min..max && touched("value", "range")) {
+        sink.add(
+          at("value"),
+          "value ${format(value)} is outside the range [${format(min)}, ${format(max)}]",
+        )
+      }
+    } else {
+      val (start, end) = numbersOf(props["value"]) ?: return
+      if (!touched("value", "range")) return
+      when {
+        start > end ->
+          sink.add(path.child("value"), "start ${format(start)} must not exceed end ${format(end)}")
+        start < min || end > max ->
           sink.add(
             at("value"),
-            "value ${format(value)} is outside the range [${format(min)}, ${format(max)}]",
+            "value [${format(start)}, ${format(end)}] is outside the range [${format(min)}, ${format(max)}]",
           )
-        }
-      }
-      "RangeSlider" -> {
-        val (min, max) = rangeOf(props) ?: return
-        if (min >= max) {
-          if (touched("range")) sink.add(path.child("range"), rangeOrderMessage(min, max))
-          return
-        }
-        val (start, end) = numbersOf(props["value"]) ?: return
-        if (!touched("value", "range")) return
-        when {
-          start > end ->
-            sink.add(
-              path.child("value"),
-              "start ${format(start)} must not exceed end ${format(end)}",
-            )
-          start < min || end > max ->
-            sink.add(
-              at("value"),
-              "value [${format(start)}, ${format(end)}] is outside the range [${format(min)}, ${format(max)}]",
-            )
-        }
       }
     }
   }
@@ -332,12 +327,13 @@ internal class ScreenValidator(
       return
     }
     val target = byId[id]
+    val allowed = prop.allowedChildren
     when {
       target == null -> sink.add(path, "references unknown component '$id'")
-      prop.allowedChildren != null && target.component !in prop.allowedChildren!! ->
+      allowed != null && target.component !in allowed ->
         sink.add(
           path,
-          "'$id' is a ${target.component}, but ${prop.name} takes ${prop.allowedChildren!!.joinToString(" or ")}",
+          "'$id' is a ${target.component}, but ${prop.name} takes ${allowed.joinToString(" or ")}",
         )
     }
   }
