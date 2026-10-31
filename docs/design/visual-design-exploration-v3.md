@@ -26,7 +26,7 @@ Rejected alternatives:
 
 1. The agent edits `design/<slug>.proposal.json` with its normal file tools. Small edits are ordinary file edits, so no patch protocol is needed.
 2. The app watches the file, parses it, and updates Compose state. The window redraws in the next frame.
-3. The agent calls `get_tree` and reads a few hundred tokens of layout text.
+3. The agent calls `check_proposal`, which checks every screen at all five views and returns only the errors. It reads a full tree with `get_tree` only where it needs geometry.
 4. The owner looks at the window and replies in chat.
 
 Measured on this Mac with Compose Multiplatform 1.13.0-beta01:
@@ -169,12 +169,15 @@ The app is the catalog's single source of truth and serves it over MCP (`get_cat
 
 **Tools:**
 - `open_proposal(path)`
-- `get_tree(screen?, view?)`
+- `check_proposal(screens?, views?)`: every screen at all five views by default, tree-only, returning pass or fail per view and each error grouped by rule with its node ids. About 0.7 s for two screens.
+- `get_tree(screen?, view?)`: the full tree of one view
 - `set_view(device, brightness, seed, style)`
 - `show_preview()`
-- `get_catalog()`
+- `get_catalog(component?)`: a compact text catalog (about 11K characters, one line per component) by default, or the full JSON Schema of the named components. The full catalog exceeds MCP result limits, so it is never sent whole.
 - `export_kotlin(screen?)`
 - `status()`
+
+An early timed benchmark showed why `check_proposal` exists: with one view per `get_tree`, agents made a median 13 check calls per run.
 
 The agent never edits proposals through MCP; the file on disk is the source of truth.
 

@@ -1,5 +1,6 @@
 package bot.charlies.androiddesign.preview.domain.catalog
 
+import bot.charlies.androiddesign.preview.domain.PreviewException
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.domain.validation.ScreenValidator
 import bot.charlies.androiddesign.preview.model.ActionFunction
@@ -70,6 +71,25 @@ object CatalogJson {
           ) + tokenDefs(),
         ),
     )
+
+  /**
+   * The full catalog entries of the components named in [names], keyed by name, in the order asked.
+   * An unknown name is a [PreviewException] that lists the known ones.
+   */
+  fun components(names: List<String>): JsonObject {
+    val unknown = names.filter { M3ExpressiveCatalog.find(it) == null }
+    if (unknown.isNotEmpty()) {
+      throw PreviewException(
+        "no component ${unknown.joinToString { "'$it'" }}; the components are " +
+          M3ExpressiveCatalog.components.joinToString { it.name },
+      )
+    }
+    return JsonObject(
+      names.distinct().associateWith {
+        component(checkNotNull(M3ExpressiveCatalog.find(it)), Refs.Catalog)
+      },
+    )
+  }
 
   /** The JSON Schema of a `design/<slug>.proposal.json` file; self-contained. */
   fun proposalSchema(): JsonObject =
@@ -533,7 +553,7 @@ object CatalogJson {
   private fun strings(vararg values: String): JsonArray =
     JsonArray(values.map { JsonPrimitive(it) })
 
-  private val INSTRUCTIONS =
+  internal val INSTRUCTIONS =
     """
     Design guidelines for the m3-expressive catalog.
 

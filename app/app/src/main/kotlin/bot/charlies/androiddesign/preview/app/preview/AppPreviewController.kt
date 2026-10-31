@@ -1,19 +1,26 @@
 package bot.charlies.androiddesign.preview.app.preview
 
+import bot.charlies.androiddesign.preview.domain.CheckError
 import bot.charlies.androiddesign.preview.domain.OpenedProposal
 import bot.charlies.androiddesign.preview.domain.PreviewController
 import bot.charlies.androiddesign.preview.domain.PreviewException
 import bot.charlies.androiddesign.preview.domain.PreviewStatus
+import bot.charlies.androiddesign.preview.domain.ProposalCheck
 import bot.charlies.androiddesign.preview.domain.ProposalRepository
 import bot.charlies.androiddesign.preview.domain.ProposalSnapshot
 import bot.charlies.androiddesign.preview.domain.ViewChange
+import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.ViewState
 import bot.charlies.androiddesign.preview.domain.catalog.CatalogJson
+import bot.charlies.androiddesign.preview.domain.catalog.CatalogSummary
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.domain.export.KotlinExporter
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
+import bot.charlies.androiddesign.preview.model.PreviewJson
+import bot.charlies.androiddesign.preview.model.Proposal
+import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
@@ -26,6 +33,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Glues the proposal file, the viewer and the headless renderer into what the MCP tools call.
@@ -126,7 +134,79 @@ class AppPreviewController(
     window.show()
   }
 
-  override fun getCatalog(): String = CatalogJson.render(CatalogJson.catalog())
+  override suspend fun checkProposal(screens: List<String>?, views: List<String>?): ProposalCheck {
+    val snapshot = validSnapshot()
+    val proposal = checkNotNull(snapshot.proposal)
+    val screenIds = screens.orEmpty().distinct().ifEmpty { proposal.screens.keys.toList() }
+    screenIds
+      .filter { it !in proposal.screens }
+      .takeIf { it.isNotEmpty() }
+      ?.let { unknown ->
+        throw PreviewException(
+          "no screen ${unknown.joinToString { "'$it'" }}; the proposal has ${proposal.screens.keys.joinToString()}",
+        )
+      }
+    val specs =
+      views
+        .orEmpty()
+        .distinct()
+        .ifEmpty { Views.all.map { it.name } }
+        .map { name ->
+          Views.byName(name)
+            ?: throw PreviewException(
+              "no view '$name'; the views are ${Views.all.joinToString { it.name }}",
+            )
+        }
+    val started = System.nanoTime()
+    val results = screenIds.associateWith { screen ->
+      specs.associate { view ->
+        view.name to check(proposal, snapshot, screen, view)
+      }
+    }
+    return ProposalCheck(
+      pass = results.values.all { views -> views.values.all { it.pass } },
+      ms = (System.nanoTime() - started) / NANOS_PER_MS,
+      screens = results,
+    )
+  }
+
+  /** One fresh headless render. A render that throws fails its view and not the whole check. */
+  private suspend fun check(
+    proposal: Proposal,
+    snapshot: ProposalSnapshot,
+    screen: String,
+    view: ViewSpec,
+  ): ViewCheck {
+    val tree =
+      try {
+        renderer.render(proposal, snapshot.designSystem, snapshot.path.parent, screen, view)
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        val reason = e.message?.lineSequence()?.firstOrNull() ?: e::class.simpleName
+        return ViewCheck(pass = false, errors = listOf(CheckError("render-error", detail = reason)))
+      }
+    val errors =
+      tree.findings
+        .filter { it.severity == Severity.Error }
+        .groupBy({ it.rule.wire to it.detail }, { it.id })
+        .map { (key, ids) -> CheckError(key.first, ids.filterNotNull(), key.second) }
+    return ViewCheck(
+      pass = errors.isEmpty(),
+      info = tree.findings.count { it.severity == Severity.Info },
+      errors = errors,
+    )
+  }
+
+  override fun getCatalog(components: List<String>?): String =
+    if (components.isNullOrEmpty()) {
+      CatalogSummary.render()
+    } else {
+      PreviewJson.compact.encodeToString(
+        JsonObject.serializer(),
+        CatalogJson.components(components),
+      )
+    }
 
   override suspend fun exportKotlin(screen: String?): String {
     val snapshot = validSnapshot()
@@ -247,5 +327,6 @@ class AppPreviewController(
   private companion object {
     const val RENDER_ERROR_PATH = ViewerViewModel.RENDER_ERROR_PATH
     const val MAX_ERRORS = 20
+    const val NANOS_PER_MS = 1_000_000L
   }
 }

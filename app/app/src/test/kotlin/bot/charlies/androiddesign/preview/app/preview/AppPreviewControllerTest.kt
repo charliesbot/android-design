@@ -3,12 +3,16 @@ package bot.charlies.androiddesign.preview.app.preview
 import bot.charlies.androiddesign.preview.app.AppInfo
 import bot.charlies.androiddesign.preview.data.FileProposalRepository
 import bot.charlies.androiddesign.preview.domain.PreviewException
+import bot.charlies.androiddesign.preview.domain.ProposalCheck
 import bot.charlies.androiddesign.preview.domain.ViewChange
+import bot.charlies.androiddesign.preview.domain.catalog.CatalogJson
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
 import bot.charlies.androiddesign.preview.model.Device
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.PaletteVariant
+import bot.charlies.androiddesign.preview.model.PreviewJson
+import bot.charlies.androiddesign.preview.model.Views
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.AfterTest
@@ -27,6 +31,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class AppPreviewControllerTest {
   private val fixtures = Path.of(System.getProperty("fixtures.dir"))
@@ -272,7 +279,8 @@ class AppPreviewControllerTest {
 
   @Test
   fun `catalog and export come from the domain`() = runBlocking {
-    assertTrue("\"protocolVersion\"" in controller.getCatalog())
+    assertTrue("Button: " in controller.getCatalog())
+    assertTrue("\"protocolVersion\"" in CatalogJson.render(CatalogJson.catalog()))
     controller.openProposal(workspace().toString())
     val screen = controller.exportKotlin("plates")
     assertTrue("fun PlatesScreen" in screen)
@@ -281,6 +289,123 @@ class AppPreviewControllerTest {
     assertFailsWith<PreviewException> { controller.exportKotlin("nope") }
     Unit
   }
+
+  @Test
+  fun `check_proposal renders every screen at every view by default`() = runBlocking {
+    controller.openProposal(workspace().toString())
+
+    val check = controller.checkProposal()
+
+    assertEquals(listOf("plates", "plate_detail"), check.screens.keys.toList())
+    for ((screen, views) in check.screens) {
+      assertEquals(Views.all.map { it.name }, views.keys.toList(), screen)
+    }
+    assertTrue(check.pass, check.toString())
+    assertTrue(check.ms > 0)
+    val json = PreviewJson.compact.encodeToString(ProposalCheck.serializer(), check)
+    assertTrue(json.length < 1_500, "a passing check stays small: ${json.length} characters")
+  }
+
+  @Test
+  fun `check_proposal renders only the screens and views asked for`() = runBlocking {
+    controller.openProposal(workspace().toString())
+
+    val check =
+      controller.checkProposal(screens = listOf("plate_detail"), views = listOf("dark", "tablet"))
+
+    assertEquals(listOf("plate_detail"), check.screens.keys.toList())
+    assertEquals(listOf("dark", "tablet"), check.screens.getValue("plate_detail").keys.toList())
+  }
+
+  @Test
+  fun `check_proposal names the rule and the node of a failure and only counts info`() =
+    runBlocking {
+      val file = workspace()
+      Files.writeString(
+        file,
+        Files.readString(file)
+          .replace(
+            "\"label\": \"Cook\"",
+            "\"label\": \"A label that is far too long to fit on one line of a phone\"",
+          ),
+      )
+      controller.openProposal(file.toString())
+
+      val check =
+        controller.checkProposal(screens = listOf("plate_detail"), views = listOf("light"))
+
+      assertFalse(check.pass)
+      val light = check.screens.getValue("plate_detail").getValue("light")
+      assertFalse(light.pass)
+      val error = light.errors.first { it.rule == "label-truncated" }
+      assertEquals(listOf("cook"), error.ids)
+      assertTrue(error.detail.orEmpty().isNotBlank())
+      assertTrue(light.errors.all { it.rule != "text-truncated" }, "info findings are not errors")
+    }
+
+  @Test
+  fun `check_proposal stays compact on a proposal full of failures`() = runBlocking {
+    val verify =
+      Path.of(System.getProperty("repo.dir")).resolve("evals/verify/verify.proposal.json")
+    controller.openProposal(verify.toString())
+
+    val check = controller.checkProposal(screens = listOf("fabs"))
+
+    assertFalse(check.pass)
+    val light = check.screens.getValue("fabs").getValue("light")
+    val oneFab = light.errors.single { it.rule == "one-fab" }
+    assertTrue(oneFab.ids.size > 10, "one entry names every offender: ${oneFab.ids}")
+    val json = PreviewJson.compact.encodeToString(ProposalCheck.serializer(), check)
+    assertTrue(json.length < 4_000, "five views of 12 failures: ${json.length} characters")
+  }
+
+  @Test
+  fun `check_proposal reports a bad proposal, screen or view like the other tools`() {
+    for (call in listOf<suspend () -> Any>({ controller.checkProposal() })) {
+      val error = assertFailsWith<PreviewException> { runBlocking { call() } }
+      assertTrue("open_proposal" in error.message.orEmpty())
+    }
+    runBlocking {
+      val file = workspace()
+      controller.openProposal(file.toString())
+      val screen =
+        assertFailsWith<PreviewException> { controller.checkProposal(screens = listOf("nope")) }
+      assertTrue("plates" in screen.message.orEmpty())
+      val view =
+        assertFailsWith<PreviewException> { controller.checkProposal(views = listOf("huge")) }
+      assertTrue("tablet" in view.message.orEmpty())
+      Files.writeString(file, Files.readString(file).replace("\"Scaffold\"", "\"Scaffoldd\""))
+      val invalid = assertFailsWith<PreviewException> { controller.checkProposal() }
+      assertTrue("Scaffoldd" in invalid.message.orEmpty())
+    }
+  }
+
+  @Test
+  fun `get_catalog is a compact summary, or the full entries of the named components`() =
+    runBlocking {
+      val summary = controller.getCatalog()
+      assertTrue(summary.length < 20_000, "the summary is ${summary.length} characters")
+      assertTrue("Button: " in summary && "variant: filled|tonal" in summary)
+
+      val entries =
+        Json.parseToJsonElement(controller.getCatalog(listOf("Slider", "Button"))).jsonObject
+      assertEquals(listOf("Slider", "Button"), entries.keys.toList())
+      assertEquals(
+        "Slider",
+        entries
+          .getValue("Slider")
+          .jsonObject
+          .getValue("properties")
+          .jsonObject
+          .getValue("component")
+          .jsonObject
+          .getValue("const")
+          .jsonPrimitive
+          .content,
+      )
+      assertFailsWith<PreviewException> { controller.getCatalog(listOf("Nope")) }
+      Unit
+    }
 
   @Test
   fun `a bad seed is refused`() = runBlocking {

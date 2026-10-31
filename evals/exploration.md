@@ -23,7 +23,7 @@ Run in an expendable folder (a Git repository or not). Needs the previewer app a
 
 1. In the harness, register the app as the stdio server `android_design_preview` with the app's executable as its command. The agent should check that the server is connected before it starts, and tell the user how to register it if not.
 2. Have the agent author `<fixture-folder>/design/<slug>.proposal.json` and `DESIGN.md` with its own seed color, then call `open_proposal`. Then ask for two more ideas: expect two distinct proposals as new sibling files, each with its own seed, and at least one of the three layering three or more tactics and naming them.
-3. Have the agent call `get_tree` for each proposal and every view (`light`, `dark`, `foldable`, `tablet`, `desktop`). Fix every `error` finding (`text-truncated` is informational). With no way to view the window, the agent must report visual quality unverified.
+3. Have the agent call `check_proposal` for each proposal (every screen at all five views in one call), fix every error once, and call it again until it passes or the remaining errors are reported. Then it calls `get_tree` for the phone `light` and `tablet` views of each screen to confirm the adaptation. With no way to view the window, the agent must report visual quality unverified.
 4. Look at the window. Switch devices with the Phone, Foldable, Tablet, and Desktop buttons, and pick a brightness (Light or Dark), a Color row (the proposal's seed or one of six presets), or a Style row in the side panel; the proposal and the viewer recolor in place and nothing is written to the proposal file.
 5. Invalid proposal: in a copy, use an unknown component, a raw hex color, or a `navigate` to a missing screen. `open_proposal` must return the validation error with its path, the window must show the errors in place of the frame, and `<app> render` must exit 2 and list the same errors in `report.json`.
 6. Show the user the window (or `show_preview`) and the proposal path, then stop. On a chat reply ("make it warmer"), edit the same proposal file in place: the window redraws and no version copies are kept.
@@ -34,7 +34,7 @@ The workflow never invokes an agent for the user, and it implements an approved 
 
 ## Agent routing checks
 
-- "Explore a home screen idea." Expect one proposal, not several. "Show me three home-screen ideas." Expect three proposals, each its own `design/<slug>.proposal.json` in the chosen folder, each with its `get_tree` findings fixed once and any remainder reported, and each opened in the window for the owner. Outside a repository it still works; it never scaffolds a new app.
+- "Explore a home screen idea." Expect one proposal, not several. "Show me three home-screen ideas." Expect three proposals, each its own `design/<slug>.proposal.json` in the chosen folder, each with its `check_proposal` errors fixed once and any remainder reported, and each opened in the window for the owner. Outside a repository it still works; it never scaffolds a new app.
 - "Build a music theory app with the android-design skill." Expect one proposal shown in the window and a wait for approval before any Compose, then the export after the user approves.
 - "Build a habit tracker app in Compose." (no design ask) Expect no proposal: the agent codes directly, applying `android-design`'s decisions and screen check.
 - "Explore a redesign of Today." Expect read-only inspection of app code and dependencies, with writes only to the proposal and `DESIGN.md`.

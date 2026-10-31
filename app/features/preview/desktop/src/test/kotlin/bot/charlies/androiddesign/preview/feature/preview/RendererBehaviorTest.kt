@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.Views
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -222,6 +223,59 @@ class RendererBehaviorTest {
     assertEquals(
       setOf(true),
       setOf(cook.colors?.container?.matches(Regex("#[0-9A-F]{6}"))),
+    )
+  }
+
+  /**
+   * Compose wraps both sliders in `minimumInteractiveComponentSize()`, so their layout box is 48dp
+   * tall around a 44dp handle (the M3 slider spec's handle height). The wrapper is the touch
+   * target; the slider's own semantics node sits inside it and reports only the 44dp handle.
+   */
+  @Test
+  fun `a slider and a range slider keep Compose's 48dp touch target around the 44dp handle`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"col"},{"id":"col","component":"Column","padding":"lg","children":["seek","span"]},""" +
+          """{"id":"seek","component":"Slider","value":0.4},""" +
+          """{"id":"span","component":"RangeSlider","range":[0,100],"value":[20,80]}""",
+      )
+    val tree = render(proposal).tree
+    for (id in listOf("seek", "span")) {
+      val node = tree.node(id)
+      assertEquals(48f, node.touch!!.height, "$id touch height")
+      assertTrue(node.touch!!.width >= node.bounds.width, "$id touch width")
+    }
+    assertEquals(
+      emptyList(),
+      tree.findings.filter { it.rule == FindingRule.TouchTarget },
+      "no slider fails the touch target rule",
+    )
+  }
+
+  /**
+   * A slider's semantics node is 10dp wider than its layout box on each side (the handle's
+   * overhang). Bounds describe the layout box, so a full-width slider 8dp from the edges is not
+   * flagged as off screen.
+   */
+  @Test
+  fun `a full-width slider and range slider stay inside the view`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"col"},{"id":"col","component":"Column","padding":"sm","children":["seek","span"]},""" +
+          """{"id":"seek","component":"Slider","value":0.4},""" +
+          """{"id":"span","component":"RangeSlider","range":[0,100],"value":[20,80]}""",
+      )
+    val tree = render(proposal).tree
+    val width = tree.view.width.toFloat()
+    for (id in listOf("seek", "span")) {
+      val bounds = tree.node(id).bounds
+      assertEquals(8f, bounds.x, "$id x")
+      assertEquals(width - 16f, bounds.width, "$id width")
+    }
+    assertEquals(
+      emptyList(),
+      tree.findings.filter { it.rule == FindingRule.Offscreen },
+      "no slider is flagged off screen",
     )
   }
 

@@ -18,15 +18,15 @@ Design exactly ONE screen as a proposal, in two files:
 - `{{PROPOSAL}}`: the proposal. Create it. The folder already holds any assets the brief names, under `assets/`; reference them relative to the proposal file.
 - `{{DESIGN_MD}}`: the design system. Create it. Its front matter holds the seed color, scheme variant, typography, and shapes.
 
-Write only those two files. The previewer app is connected to you over MCP as the server `android_design_preview`; its tools are your only way to check the proposal. Call `open_proposal` with the proposal's absolute path, edit the file, and read `get_tree` after each change. Do not take screenshots and do not run `render` yourself: the runner renders the final files headlessly and checks them.
+Write only those two files. The previewer app is connected to you over MCP as the server `android_design_preview`; its tools are your only way to check the proposal. Call `open_proposal` with the proposal's absolute path, edit the file, and call `check_proposal` after each change. Do not take screenshots and do not run `render` yourself: the runner renders the final files headlessly and checks them.
 
 The screen must work and adapt across phone (411x923), foldable (933x704), tablet (1280x800), and desktop (1920x1080) windows, in light and dark.
 
 ## Review (the android-design screen check)
 
-1. Call `status`, then `get_tree` for the phone light view. A proposal that does not validate shows its errors in both.
-2. Fix every `error` finding once (`text-truncated` is informational), then call `get_tree` again. Report anything still failing or unresolved.
-3. Call `get_tree` with `view` set to `dark`, `foldable`, `tablet`, and `desktop`. Check that each larger view reveals what your section 0 adaptation answer promised, rather than rearranging the phone content.
+1. Call `check_proposal`. It checks every screen at all five views in one call and lists only the errors. A proposal that does not validate returns its validation errors instead.
+2. Fix every error once, then call `check_proposal` again. Report anything still failing or unresolved.
+3. Call `get_tree` for the phone `light` view and the `tablet` view of each screen. Check that the larger view reveals what your section 0 adaptation answer promised, rather than rearranging the phone content.
 
 You cannot see the window. In your final message, say that visual quality was judged from the layout tree only.
 
@@ -37,7 +37,7 @@ You cannot see the window. In your final message, say that visual quality was ju
 ## Definition of done
 
 - `{{PROPOSAL}}` and `{{DESIGN_MD}}` implement the brief and adapt across all four window sizes.
-- You read `get_tree` for every view and fixed every `error` finding, or you reported what still fails.
+- `check_proposal` passes, or you reported what still fails, and you confirmed the adaptation from the trees.
 
 ## Final message (under 250 words)
 

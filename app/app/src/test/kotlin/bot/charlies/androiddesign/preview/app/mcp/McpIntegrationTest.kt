@@ -104,7 +104,7 @@ class McpIntegrationTest {
   private fun CallToolResult.json(): JsonObject = Json.parseToJsonElement(text()).jsonObject
 
   @Test
-  fun `the server lists exactly the seven tools with schemas and descriptions`() {
+  fun `the server lists exactly the eight tools with schemas and descriptions`() {
     connect()
     val tools = runBlocking { client.listTools().tools }
     assertEquals(PreviewMcpServer.TOOL_NAMES.sorted(), tools.map { it.name }.sorted())
@@ -112,6 +112,7 @@ class McpIntegrationTest {
       setOf(
         "open_proposal",
         "get_tree",
+        "check_proposal",
         "set_view",
         "show_preview",
         "get_catalog",
@@ -136,6 +137,21 @@ class McpIntegrationTest {
       },
     )
     assertEquals(setOf("screen", "view"), byName.getValue("get_tree").inputSchema.properties?.keys)
+    val check = byName.getValue("check_proposal").inputSchema.properties
+    assertNotNull(check)
+    assertEquals(setOf("screens", "views"), check.keys)
+    assertEquals(
+      listOf("light", "dark", "foldable", "tablet", "desktop"),
+      check
+        .getValue("views")
+        .jsonObject
+        .getValue("items")
+        .jsonObject
+        .getValue("enum")
+        .jsonArray
+        .map { it.jsonPrimitive.content },
+    )
+    assertEquals(setOf("component"), byName.getValue("get_catalog").inputSchema.properties?.keys)
   }
 
   @Test
@@ -180,8 +196,47 @@ class McpIntegrationTest {
     assertTrue(call("show_preview").text().isNotBlank())
     assertTrue(window.visible.value)
 
-    val catalog = call("get_catalog").json()
-    assertEquals("1.0", catalog.getValue("protocolVersion").jsonPrimitive.content)
+    val check = call("check_proposal").json()
+    assertTrue(check.getValue("pass").jsonPrimitive.boolean, check.toString())
+    assertEquals(
+      listOf("plates", "plate_detail"),
+      check.getValue("screens").jsonObject.keys.toList(),
+    )
+    assertEquals(
+      listOf("light", "dark", "foldable", "tablet", "desktop"),
+      check.getValue("screens").jsonObject.getValue("plates").jsonObject.keys.toList(),
+    )
+    val some =
+      call(
+          "check_proposal",
+          mapOf("screens" to listOf("plate_detail"), "views" to listOf("tablet")),
+        )
+        .json()
+    assertEquals(
+      listOf("tablet"),
+      some.getValue("screens").jsonObject.getValue("plate_detail").jsonObject.keys.toList(),
+    )
+
+    val summary = call("get_catalog").text()
+    assertTrue(summary.length < 20_000, "the compact catalog is ${summary.length} characters")
+    assertTrue("Slider: " in summary && "colorRole: " in summary && "navigate(" in summary)
+    val one = call("get_catalog", mapOf("component" to "Slider")).json()
+    assertEquals(listOf("Slider"), one.keys.toList())
+    val several = call("get_catalog", mapOf("component" to listOf("Button", "Slider"))).json()
+    assertEquals(listOf("Button", "Slider"), several.keys.toList())
+    assertEquals(
+      "Slider",
+      several
+        .getValue("Slider")
+        .jsonObject
+        .getValue("properties")
+        .jsonObject
+        .getValue("component")
+        .jsonObject
+        .getValue("const")
+        .jsonPrimitive
+        .content,
+    )
 
     val kotlin = call("export_kotlin", mapOf("screen" to "plates")).text()
     assertTrue("@Composable" in kotlin && "fun PlatesScreen" in kotlin)
@@ -206,6 +261,8 @@ class McpIntegrationTest {
     assertEquals(true, unknownScreen.isError)
     assertTrue("plates" in unknownScreen.text())
 
+    assertEquals(true, call("check_proposal", mapOf("screens" to listOf("nope"))).isError)
+    assertEquals(true, call("get_catalog", mapOf("component" to "Nope")).isError)
     assertEquals(true, call("set_view", mapOf("device" to "watch")).isError)
     assertEquals(true, call("set_view", mapOf("seed" to "blue")).isError)
     assertEquals(true, call("open_proposal").isError, "path is required")

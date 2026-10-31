@@ -33,8 +33,21 @@ interface PreviewController {
   /** `show_preview`: shows the window if it is hidden. */
   suspend fun showPreview()
 
-  /** `get_catalog`: the catalog JSON text. */
-  fun getCatalog(): String
+  /**
+   * `check_proposal`: renders each of [screens] (every screen when null or empty) at each of
+   * [views] (every named view when null or empty) headlessly, tree only, and reports which pass.
+   */
+  suspend fun checkProposal(
+    screens: List<String>? = null,
+    views: List<String>? = null,
+  ): ProposalCheck
+
+  /**
+   * `get_catalog`: with no [components], a compact summary of the catalog (every component, its
+   * props, the token vocabularies and the action functions); otherwise the full JSON Schema entries
+   * of the named components.
+   */
+  fun getCatalog(components: List<String>? = null): String
 
   /** `export_kotlin`: Kotlin source for [screen], or for every screen when null. */
   suspend fun exportKotlin(screen: String? = null): String
@@ -60,6 +73,38 @@ data class ViewState(
   val seed: String? = null,
   /** The viewer's variant override as a wire name, or null for the proposal's. */
   val variant: String? = null,
+)
+
+/**
+ * What `check_proposal` returns: small enough to read after every edit. [screens] maps a screen id
+ * to its views by name; [ms] is the time the renders took.
+ */
+@Serializable
+data class ProposalCheck(
+  val pass: Boolean,
+  val ms: Long,
+  val screens: Map<String, Map<String, ViewCheck>>,
+)
+
+/** One screen at one view. Info findings are only counted; [errors] fail the view. */
+@Serializable
+data class ViewCheck(
+  val pass: Boolean,
+  val info: Int = 0,
+  val errors: List<CheckError> = emptyList(),
+)
+
+/**
+ * The error findings of one view that share a [rule] and [detail], with the components they are
+ * about in [ids] (empty when the finding concerns the whole view). A rule such as `one-fab` words
+ * its detail once for all offenders, so grouping keeps the result small without dropping a node. A
+ * render that threw is the rule `render-error`.
+ */
+@Serializable
+data class CheckError(
+  val rule: String,
+  val ids: List<String> = emptyList(),
+  val detail: String? = null,
 )
 
 @Serializable

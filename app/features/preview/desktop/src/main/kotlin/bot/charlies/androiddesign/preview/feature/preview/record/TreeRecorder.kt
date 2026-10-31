@@ -169,11 +169,11 @@ class TreeRecorder {
     val unmerged = semantics?.unmerged(meta.id)
     val merged = semantics?.merged(meta.id) ?: unmerged
     val layout = positions[meta.id]
-    val bounds = unmerged?.boundsInRoot ?: layout ?: return null
+    val bounds = unmerged?.boundsInRoot?.within(layout) ?: layout ?: return null
     val touchPx =
       when {
         !meta.interactive -> null
-        unmerged != null -> unmerged.touchBoundsInRoot
+        unmerged != null -> unmerged.touchBoundsInRoot.union(layout)
         else -> expandToMinimumTouch(bounds, density)
       }
     return LayoutNode(
@@ -227,6 +227,42 @@ class TreeRecorder {
     return A11yInfo(role ?: meta.a11yRole, label ?: meta.a11yLabel, actions)
   }
 
+  /**
+   * Bounds describe the layout box. A semantics node usually sits inside it (a button's 40 dp
+   * container in its 48 dp box) and is kept, but a slider's reaches 10 dp past the box on each side
+   * for the handle, which would overlap its neighbours and trip the off screen rule. On an axis
+   * where the node is larger than [box], the box's extent is used instead.
+   */
+  private fun Rect.within(box: Rect?): Rect {
+    if (box == null) return this
+    val wider = width > box.width + SIZE_TOLERANCE_PX
+    val taller = height > box.height + SIZE_TOLERANCE_PX
+    return Rect(
+      if (wider) box.left else left,
+      if (taller) box.top else top,
+      if (wider) box.right else right,
+      if (taller) box.bottom else bottom,
+    )
+  }
+
+  /**
+   * Material components wrap themselves in `minimumInteractiveComponentSize()`, which pads the
+   * layout box of the component to 48 dp, and that box is the touch target Google asks for ("at
+   * least 48 dp, even if this extends past the UI element visual", the Android accessibility
+   * guide). Most components report it through `touchBoundsInRoot`. A slider's semantics node sits
+   * inside the wrapper and reports only its 44 dp handle, so the layout box measured outside the
+   * wrapper (what [reportPosition] records) is added.
+   */
+  private fun Rect.union(other: Rect?): Rect =
+    if (other == null) this
+    else
+      Rect(
+        minOf(left, other.left),
+        minOf(top, other.top),
+        maxOf(right, other.right),
+        maxOf(bottom, other.bottom),
+      )
+
   private fun expandToMinimumTouch(bounds: Rect, density: Float): Rect {
     val min = MIN_TOUCH_DP * density
     val dx = ((min - bounds.width) / 2f).coerceAtLeast(0f)
@@ -246,5 +282,8 @@ class TreeRecorder {
 
   companion object {
     const val MIN_TOUCH_DP = 48f
+
+    /** Rounding slack when comparing a semantics size with a layout size. */
+    private const val SIZE_TOLERANCE_PX = 0.5f
   }
 }

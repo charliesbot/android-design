@@ -2,6 +2,7 @@ package bot.charlies.androiddesign.preview.mcp
 
 import bot.charlies.androiddesign.preview.domain.PreviewController
 import bot.charlies.androiddesign.preview.domain.PreviewException
+import bot.charlies.androiddesign.preview.domain.ProposalCheck
 import bot.charlies.androiddesign.preview.domain.ViewChange
 import bot.charlies.androiddesign.preview.model.Device
 import bot.charlies.androiddesign.preview.model.LayoutTree
@@ -20,6 +21,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolAnnotations
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -30,7 +32,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * The MCP face of the previewer: seven tools that call a [PreviewController]. It does not own any
+ * The MCP face of the previewer: eight tools that call a [PreviewController]. It does not own any
  * transport; [connect] attaches it to one, so the app can use stdio and tests can use pipes.
  *
  * Problems the agent can fix (an unknown screen, an invalid proposal) come back as tool errors with
@@ -156,14 +158,48 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
       "The preview window is visible."
     }
     tool(
+      name = "check_proposal",
+      title = "Check every screen and view",
+      description =
+        "Renders each screen at each view without a window, tree only, and returns whether the " +
+          "proposal passes: per screen and view, pass plus every error finding (rule, component " +
+          "id, detail), and a count of info findings. No geometry; call get_tree for a failing " +
+          "view's bounds. With no arguments it checks every screen at light, dark, foldable, " +
+          "tablet and desktop. Call this after each edit instead of get_tree per view.",
+      schema =
+        schema(
+          stringList("screens", "Screen ids to check. Defaults to every screen."),
+          enumList(
+            "views",
+            "Views to check. Defaults to all five.",
+            Views.all.map { it.name },
+          ),
+        ),
+    ) { args ->
+      PreviewJson.compact.encodeToString(
+        ProposalCheck.serializer(),
+        controller.checkProposal(args.strings("screens"), args.strings("views")),
+      )
+    }
+    tool(
       name = "get_catalog",
       title = "Read the component catalog",
       description =
-        "Returns the A2UI catalog JSON this app renders: every component, its props, token enums " +
-          "and its Compose counterpart. A proposal may only use what the catalog declares.",
-      schema = schema(),
-    ) {
-      controller.getCatalog()
+        "With no arguments, returns a compact catalog: every component with its purpose and its " +
+          "props as name: kind (enum values inline, child slots and required props marked), then " +
+          "the color, type, shape and spacing tokens and the action functions. With component, " +
+          "returns the full JSON Schema entries of those components. A proposal may only use " +
+          "what the catalog declares.",
+      schema =
+        schema(
+          stringOrList(
+            "component",
+            "A component name or a list of names, for their full JSON Schema entries. Omit for " +
+              "the compact catalog.",
+          ),
+        ),
+    ) { args ->
+      controller.getCatalog(args.strings("component"))
     }
     tool(
       name = "export_kotlin",
@@ -233,14 +269,16 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
 
     private const val INSTRUCTIONS =
       "Live previewer for Material 3 Expressive design proposals. open_proposal once, then edit " +
-        "the proposal file and read get_tree after each edit. The file on disk is the source of " +
-        "truth; there is no tool that edits it."
+        "the proposal file and call check_proposal after each edit; use get_tree for the geometry " +
+        "of a failing view. The file on disk is the source of truth; there is no tool that edits " +
+        "it."
 
     /** The names of the tools this server exposes, in the order it lists them. */
     val TOOL_NAMES =
       listOf(
         "open_proposal",
         "get_tree",
+        "check_proposal",
         "set_view",
         "show_preview",
         "get_catalog",
@@ -280,6 +318,46 @@ private fun enum(name: String, description: String, values: List<String>) =
     },
   )
 
+private fun stringList(name: String, description: String) =
+  Prop(
+    name,
+    buildJsonObject {
+      put("type", "array")
+      put("description", description)
+      putJsonObject("items") { put("type", "string") }
+    },
+  )
+
+private fun enumList(name: String, description: String, values: List<String>) =
+  Prop(
+    name,
+    buildJsonObject {
+      put("type", "array")
+      put("description", description)
+      putJsonObject("items") {
+        put("type", "string")
+        putJsonArray("enum") { values.forEach { add(JsonPrimitive(it)) } }
+      }
+    },
+  )
+
+private fun stringOrList(name: String, description: String) =
+  Prop(
+    name,
+    buildJsonObject {
+      put("description", description)
+      putJsonArray("anyOf") {
+        add(buildJsonObject { put("type", "string") })
+        add(
+          buildJsonObject {
+            put("type", "array")
+            putJsonObject("items") { put("type", "string") }
+          },
+        )
+      }
+    },
+  )
+
 private fun schema(vararg props: Prop, required: List<String> = emptyList()): ToolSchema =
   ToolSchema(
     properties =
@@ -296,3 +374,12 @@ private fun JsonObject.bool(name: String): Boolean? = (this[name] as? JsonPrimit
 
 private fun JsonObject.requiredString(name: String): String =
   string(name) ?: throw PreviewException("missing required argument '$name'")
+
+/** A string argument given once or as a list; null when absent. */
+private fun JsonObject.strings(name: String): List<String>? =
+  when (val value = this[name]) {
+    is JsonArray ->
+      value.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.contentOrNull }
+    is JsonPrimitive -> listOfNotNull(value.takeIf { it.isString }?.contentOrNull)
+    else -> null
+  }
