@@ -192,7 +192,7 @@ Every case is reported through the tool result and `status`, as validation error
 **Harness setup:**
 - **Claude Code:** registered as a stdio server with the app binary as its command. Verified end to end.
 - **Codex:** registered under `mcp_servers.<name>` with `default_tools_approval_mode = "approve"`. Without that, `approval_policy = "never"` refuses the call. Verified end to end.
-- **Antigravity:** registered with `agy mcp add <name> <binary>`, or through its `mcp_config.json`. Not yet run end to end.
+- **Antigravity:** registered with `agy mcp add <name> <binary>`, or through its `mcp_config.json`. Verified end to end. Interactive sessions ask before each tool call. Headless runs (`agy -p`) cannot ask, so they need `mcp(<name>/<tool>)` allow rules in the global `settings.json`, because a project-level `.agents/settings.json` is not read for this.
 
 The skill checks that the server is connected before it starts and, if not, tells the user how to register it.
 
@@ -252,10 +252,6 @@ The export is checked in two ways. Golden tests export a two-screen fixture and 
 v3 replaces the HTML proposal runtime: `@m3e/web`, `gallery/runtime-src/`, `gallery/public/`, the lint, `view.html`, the proposal starter, and the HTML half of `compose-mapping.md`. It also moves the evals onto the app's headless renderer.
 
 `android-design` is unchanged: it still owns every design decision. `android-design-explore` becomes the workflow that connects to the app, writes proposals, reads trees, and hands an approved proposal to the export.
-
-## Open questions
-
-- Antigravity has not run the app end to end. Its registration format is known, but testing it means adding the server to Antigravity's global config.
 
 ## Links
 
