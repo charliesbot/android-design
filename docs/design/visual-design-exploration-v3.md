@@ -154,7 +154,7 @@ The app is the catalog's single source of truth and serves it over MCP (`get_cat
 
 **Navigation.** A proposal is a navigation graph of screens. The app runs it with Navigation 3, using Material 3's `ListDetailSceneStrategy` and `SupportingPaneSceneStrategy`, so at expanded widths a list and its detail appear side by side. That is the same stack the `android-dev` skill uses for real apps.
 
-**Interaction.** Interaction stays inside the renderer. The catalog declares local functions (`navigate(screen)`, `openSheet(sheet)`, `dismiss()`), which components call through A2UI `functionCall`, never through events to the agent. Sheets, dialogs, and menus open over a screen, and selection and tabs switch locally. The navigation edges are exactly these `navigate` calls, which the app collects and checks against the declared screens, so the graph has one source of truth.
+**Interaction.** Interaction stays inside the renderer. The catalog declares local functions (`navigate(screen)`, `back()`, `open(overlay)`, `dismiss()`), which components call through A2UI `functionCall`, never through events to the agent. Sheets, dialogs, and menus open over a screen, and selection and tabs switch locally. The navigation edges are exactly these `navigate` calls, which the app collects and checks against the declared screens, so the graph has one source of truth.
 
 ### MCP
 
@@ -178,7 +178,16 @@ The app is the catalog's single source of truth and serves it over MCP (`get_cat
 
 The agent never edits proposals through MCP; the file on disk is the source of truth.
 
-**Closing the window** hides it and keeps the process serving. A hidden window stops laying out (measured: tree reads go stale), so while hidden, `get_tree` comes from the headless renderer. The Dock icon or `show_preview` brings the window back.
+**Closing the window** hides it and keeps the process serving. The Dock icon or `show_preview` brings the window back.
+
+**The device frame** is its own Compose scene (a `ComposePanel`), scaled by lowering its density. The proposal still lays out at the device's dp size, and sheets, dialogs, and menus open inside the frame instead of over the viewer.
+
+**A proposal that crashes while composing** cannot take the window down:
+- **Validation first.** Numeric props carry bounds in the catalog. The validator rejects literals outside them, and the renderer clamps bound data to the same bounds.
+- **A quick pre-check.** Before the window adopts a new version, the app renders what it is about to show headlessly, tree only: the current screen at the current view, with the window's back stack and open overlays replayed. If that throws, the last good version stays on screen.
+- **A backstop.** Anything that throws later, on another screen or after a device switch, is caught by the frame's own exception handler. The frame then drops to an error panel and rebuilds on the next good version.
+
+Every case is reported through the tool result and `status`, as validation errors are.
 
 **Harness setup:**
 - **Claude Code:** registered as a stdio server with the app binary as its command. Verified end to end.
@@ -196,13 +205,11 @@ The agent reads a flat list of nodes plus findings. Each node carries:
 - the color, type, and shape roles it used
 - its accessibility role, label, and actions
 
-Everything comes from public APIs; no internal Compose APIs (`PlatformContext` and `ComposeScene` are `@InternalComposeUiApi`):
+Everything comes from public APIs; no internal Compose APIs (`PlatformContext` and `ComposeScene` are `@InternalComposeUiApi`). Every tree comes from a headless render with `runDesktopComposeUiTest`:
+- The renderer measures each proposal node itself with `onGloballyPositioned` and `onTextLayout`: ids, bounds, and text overflow and truncation.
+- Compose's semantics tree, keyed by the node ids as test tags, adds touch bounds (a 40 dp button reports a 48 dp touch area) and the accessibility role, label, and actions.
 
-| Source | Gives | Used for |
-|---|---|---|
-| The renderer measuring itself (`onGloballyPositioned`, `onTextLayout`) | Ids, bounds, touch bounds (a 40 dp button reports a 48 dp touch area), text overflow and truncation | The live window, the main source |
-| `javax.accessibility` on the live window | Role, label, states, and bounds, as a screen reader sees them. It updates after changes. | Accessibility facts, matched to nodes by bounds |
-| `runDesktopComposeUiTest` | The full Compose semantics tree with ids as test tags | Headless use: a hidden window, evals |
+For `get_tree` without arguments, the headless render replays the window's back stack and interaction state (open overlays, selections, typed text), so the tree describes exactly what the window shows, whether the window is visible or hidden. With arguments, it renders that screen and view fresh. In a list-detail scene, nodes from the other pane carry their screen as a prefix (`plates/new_plate`), and per-pane rules such as `primary-largest` judge each pane on its own.
 
 Color and type roles come from the proposal and theme, so the app computes contrast from resolved roles instead of sampling pixels.
 
@@ -216,21 +223,24 @@ Color and type roles come from the proposal and theme, so the app computes contr
   "findings": [ { "id": "desc", "rule": "text-truncated" } ] }
 ```
 
-The finding rules carry over from v2's runtime checks:
+The finding rules carry over from v2's runtime checks, with v2's thresholds:
 - touch targets of at least 48 dp
-- Google Sans Flex on every plain-text node
-- clipped or overflowing text
+- the bundled families per type role: Google Sans Flex for plain text, a brand face only on display and headline
+- clipped text, and truncated or wrapped labels on buttons, chips, and navigation items
 - contrast of each text and background pair
-- the primary action as the largest interactive element
-- at most one FAB
+- the primary action as the largest interactive element in its pane
+- at most one FAB per pane
+- nothing wider than the view
 
-**Screenshots** never enter the agent's loop. The owner judges hierarchy, character, and color balance in the window. Evals are the one exception: their grader gets the tree plus one headless PNG per view, because "distinctive design" cannot be judged from structure alone.
+A view passes when it has no error findings. Intentional truncation is reported as information, not an error.
+
+**Screenshots** never enter the agent's loop. The owner judges hierarchy, character, and color balance in the window. Evals are the one exception: their grader gets one headless PNG per screen and view, because "distinctive design" cannot be judged from structure alone, while the tree drives the deterministic checks.
 
 ### Export to Compose
 
 Export walks the proposal and emits Kotlin with component parameters and modifiers, plus Navigation 3 entries and scene strategies for the graph. Named styles become parameters and modifiers, not the experimental Styles API, which material3 components do not accept yet and which would require an alpha foundation and an opt-in in the target app.
 
-Fidelity is checked by rendering the exported code with `compose-preview` and comparing its semantics with the app's tree through `diff_semantics`. Pixels are not compared.
+The export is checked in two ways. Golden tests export a two-screen fixture and `evals/verify/verify.proposal.json`, which uses every catalog component, and compare the output byte for byte. Both goldens compile and assemble in a copy of `evals/compose-starter`, the Android sandbox pinned to material3 1.5.0-alpha29, which proves the exported names exist in the Android library and not only on desktop.
 
 ### Distribution
 
@@ -249,7 +259,7 @@ v3 replaces the HTML proposal runtime: `@m3e/web`, `gallery/runtime-src/`, `gall
 
 ## Links
 
-- [Visual design exploration v2](visual-design-exploration-v2.md), the HTML design this replaces
+- [Visual design exploration v2](../archive/visual-design-exploration-v2.md), the HTML design this replaces
 - [Compose Multiplatform proposal fidelity research](../research/compose-multiplatform-proposal-fidelity.md)
 - [A2UI specification v1.0](https://github.com/a2ui-project/a2ui/tree/main/specification/v1_0)
 - [AndroidX A2UI Compose releases](https://developer.android.com/jetpack/androidx/releases/a2ui-compose)

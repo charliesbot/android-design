@@ -1,0 +1,708 @@
+package bot.charlies.androiddesign.preview.domain.findings
+
+import bot.charlies.androiddesign.preview.model.Bounds
+import bot.charlies.androiddesign.preview.model.FindingRule
+import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
+import bot.charlies.androiddesign.preview.model.Severity
+import bot.charlies.androiddesign.preview.model.Views
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class FindingRulesTest {
+  // region touch-target
+
+  @Test
+  fun `touch-target passes for a 48 dp touch area around a 40 dp button`() {
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(button("cook")))))
+  }
+
+  @Test
+  fun `touch-target fails for an interactive node under 48 dp`() {
+    val small = node("close", "IconButton", w = 32f, h = 32f)
+    val findings = evaluate(tree(nodes = arrayOf(small))).of(FindingRule.TouchTarget)
+    assertEquals(1, findings.size)
+    assertEquals("close", findings.single().id)
+    assertEquals(Severity.Error, findings.single().severity)
+    assertEquals("32 x 32 dp, needs 48 x 48", findings.single().detail)
+  }
+
+  @Test
+  fun `touch-target fails when only one side is short`() {
+    val wide = node("chip", "AssistChip", w = 120f, h = 32f, touch = Bounds(0f, 0f, 120f, 40f))
+    assertEquals(1, evaluate(tree(nodes = arrayOf(wide))).of(FindingRule.TouchTarget).size)
+  }
+
+  @Test
+  fun `touch-target uses the bounds when no touch area is given`() {
+    val field = node("amount", "TextField", w = 280f, h = 56f)
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(field))))
+  }
+
+  @Test
+  fun `touch-target ignores non-interactive components`() {
+    val icon = node("star", "Icon", w = 24f, h = 24f)
+    val label = node("title", "Text", w = 60f, h = 20f, text = text())
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(icon, label))))
+  }
+
+  @Test
+  fun `touch-target tolerates a rounding sliver under 48 dp`() {
+    val almost = node("go", "Button", w = 100f, h = 47.96f)
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(almost))))
+  }
+
+  @Test
+  fun `touch-target skips nodes that are not laid out`() {
+    val hidden = node("ghost", "IconButton", w = 0f, h = 0f)
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(hidden))))
+  }
+
+  // endregion
+
+  // region font
+
+  private fun fontFindings(font: String?, role: String?) =
+    evaluate(
+        tree(
+          nodes =
+            arrayOf(
+              node("t", "Text", h = 24f, text = text(font = font), typeRole = role),
+            ),
+        ),
+      )
+      .of(FindingRule.Font)
+
+  @Test
+  fun `font passes for Google Sans Flex in every group`() {
+    listOf("displayLarge", "headlineSmall", "titleMedium", "bodyLarge", "labelSmall").forEach {
+      assertEquals(emptyList(), fontFindings(FLEX, it), it)
+    }
+  }
+
+  @Test
+  fun `font fails for a family that is not bundled`() {
+    val finding = fontFindings("Georgia", "bodyLarge").single()
+    assertEquals("t", finding.id)
+    assertEquals(Severity.Error, finding.severity)
+    assertEquals("Georgia is not a bundled font", finding.detail)
+  }
+
+  @Test
+  fun `font allows brand faces on display and headline roles`() {
+    listOf("Fraunces", "Bricolage Grotesque", "Big Shoulders Display").forEach { family ->
+      listOf("displayLarge", "displaySmallEmphasized", "headlineMedium").forEach { role ->
+        assertEquals(emptyList(), fontFindings(family, role), "$family $role")
+      }
+    }
+  }
+
+  @Test
+  fun `font rejects brand faces on title body and label roles`() {
+    listOf("titleLarge", "bodyMedium", "labelLarge").forEach { role ->
+      val finding = fontFindings("Fraunces", role).single()
+      assertEquals("Fraunces is for display and headline text, not $role", finding.detail)
+    }
+  }
+
+  @Test
+  fun `font allows Doto on display roles only`() {
+    assertEquals(emptyList(), fontFindings("Doto", "displayMedium"))
+    assertEquals(
+      "Doto is for display text, not headlineLarge",
+      fontFindings("Doto", "headlineLarge").single().detail,
+    )
+  }
+
+  @Test
+  fun `font allows Google Sans Code at any size`() {
+    assertEquals(emptyList(), fontFindings("Google Sans Code", "labelSmall"))
+    assertEquals(emptyList(), fontFindings("Google Sans Code", "displayLarge"))
+  }
+
+  @Test
+  fun `font reads quoted and listed family names`() {
+    assertEquals(emptyList(), fontFindings("\"Google Sans Flex\", sans-serif", "bodyLarge"))
+    assertEquals(emptyList(), fontFindings("google sans flex", "bodyLarge"))
+  }
+
+  @Test
+  fun `font treats an unknown type role as plain text`() {
+    assertEquals(1, fontFindings("Fraunces", null).size)
+    assertEquals(emptyList(), fontFindings(FLEX, null))
+  }
+
+  @Test
+  fun `font skips text nodes that report no family`() {
+    assertEquals(emptyList(), fontFindings(null, "bodyLarge"))
+  }
+
+  // endregion
+
+  // region text-clipped and text-truncated
+
+  private fun textNodeFindings(info: bot.charlies.androiddesign.preview.model.TextInfo) =
+    evaluate(tree(nodes = arrayOf(node("desc", "Text", h = 60f, text = info))))
+
+  @Test
+  fun `text-clipped fails for overflow without an ellipsis`() {
+    val finding =
+      textNodeFindings(text(lines = 1, overflow = true)).of(FindingRule.TextClipped).single()
+    assertEquals("desc", finding.id)
+    assertEquals(Severity.Error, finding.severity)
+    assertEquals("text is cut off with no ellipsis", finding.detail)
+  }
+
+  @Test
+  fun `text-clipped passes when the text fits`() {
+    assertEquals(emptyList(), textNodeFindings(text(lines = 2)))
+  }
+
+  @Test
+  fun `an ellipsis excuses the overflow it causes`() {
+    val findings = textNodeFindings(text(lines = 3, overflow = true, truncated = true))
+    assertEquals(emptyList(), findings.of(FindingRule.TextClipped))
+  }
+
+  @Test
+  fun `text-truncated is informational and does not fail the view`() {
+    val truncatedTree =
+      tree(nodes = arrayOf(node("desc", "Text", text = text(lines = 3, truncated = true))))
+    val findings = evaluate(truncatedTree)
+    val finding = findings.of(FindingRule.TextTruncated).single()
+    assertEquals("desc", finding.id)
+    assertEquals(Severity.Info, finding.severity)
+    assertEquals("3 lines, ellipsized", finding.detail)
+    assertTrue(truncatedTree.copy(findings = findings).pass)
+  }
+
+  @Test
+  fun `text-truncated passes for text that is not truncated`() {
+    assertEquals(emptyList(), textNodeFindings(text(lines = 3)).of(FindingRule.TextTruncated))
+  }
+
+  // endregion
+
+  // region label-truncated
+
+  private fun labelFindings(type: String, info: bot.charlies.androiddesign.preview.model.TextInfo) =
+    evaluate(
+      tree(
+        nodes =
+          arrayOf(
+            node("c", type, w = 160f, h = 48f, text = info, touch = Bounds(0f, 0f, 160f, 48f)),
+          ),
+      ),
+    )
+
+  @Test
+  fun `label-truncated fails for an ellipsized button label`() {
+    val findings = labelFindings("Button", text(truncated = true, overflow = true))
+    val finding = findings.of(FindingRule.LabelTruncated).single()
+    assertEquals(Severity.Error, finding.severity)
+    assertEquals("label is cut off with an ellipsis", finding.detail)
+    assertEquals(emptyList(), findings.of(FindingRule.TextTruncated))
+  }
+
+  @Test
+  fun `label-truncated fails for a wrapped label`() {
+    val finding =
+      labelFindings("FilterChip", text(lines = 2)).of(FindingRule.LabelTruncated).single()
+    assertEquals("label wraps to 2 lines", finding.detail)
+  }
+
+  @Test
+  fun `label-truncated covers chips navigation items fab and menu items`() {
+    listOf(
+        "AssistChip",
+        "NavigationBarItem",
+        "NavigationRailItem",
+        "FloatingActionButton",
+        "MenuItem",
+        "FabMenuItem",
+        "ToggleButton",
+        "SplitButton",
+      )
+      .forEach { type ->
+        assertEquals(
+          1,
+          labelFindings(type, text(truncated = true)).of(FindingRule.LabelTruncated).size,
+          type,
+        )
+      }
+  }
+
+  @Test
+  fun `label-truncated passes for a single line label`() {
+    assertEquals(emptyList(), labelFindings("Button", text(lines = 1)))
+  }
+
+  @Test
+  fun `label-truncated leaves body text and text fields alone`() {
+    assertEquals(
+      emptyList(),
+      labelFindings("Text", text(lines = 2)).of(FindingRule.LabelTruncated),
+    )
+    assertEquals(
+      emptyList(),
+      labelFindings("TextField", text(lines = 2)).of(FindingRule.LabelTruncated),
+    )
+  }
+
+  @Test
+  fun `a clipped button label is a text-clipped failure`() {
+    val findings = labelFindings("Button", text(overflow = true))
+    assertEquals(1, findings.of(FindingRule.TextClipped).size)
+    assertEquals(emptyList(), findings.of(FindingRule.LabelTruncated))
+  }
+
+  // endregion
+
+  // region contrast
+
+  private fun contrastFindings(
+    content: String?,
+    container: String?,
+    role: String = "bodyLarge",
+  ) =
+    evaluate(
+        tree(
+          nodes =
+            arrayOf(
+              node(
+                "body",
+                "Text",
+                text = text(),
+                typeRole = role,
+                content = content,
+                container = container,
+              ),
+            ),
+        ),
+      )
+      .of(FindingRule.Contrast)
+
+  @Test
+  fun `contrast passes for black on white`() {
+    assertEquals(emptyList(), contrastFindings("#000000", "#FFFFFF"))
+  }
+
+  @Test
+  fun `contrast fails below 4_5 to 1 for body text`() {
+    val finding = contrastFindings("#777777", "#FFFFFF").single()
+    assertEquals("body", finding.id)
+    assertEquals(Severity.Error, finding.severity)
+    assertEquals("4.48:1, needs 4.5:1", finding.detail)
+  }
+
+  @Test
+  fun `contrast passes just above 4_5 to 1`() {
+    assertEquals(emptyList(), contrastFindings("#767676", "#FFFFFF"))
+  }
+
+  @Test
+  fun `contrast needs only 3 to 1 for display and headline text`() {
+    assertEquals(emptyList(), contrastFindings("#949494", "#FFFFFF", "displayLarge"))
+    assertEquals(emptyList(), contrastFindings("#949494", "#FFFFFF", "headlineSmall"))
+    assertEquals(1, contrastFindings("#949494", "#FFFFFF", "bodyLarge").size)
+  }
+
+  @Test
+  fun `contrast still fails large text under 3 to 1`() {
+    assertEquals(
+      "1.92:1, needs 3:1",
+      contrastFindings("#BBBBBB", "#FFFFFF", "displayMedium").single().detail,
+    )
+  }
+
+  @Test
+  fun `contrast finds the backdrop on an ancestor`() {
+    val card = node("card", "Card", container = "#FFFFFF", w = 300f, h = 100f)
+    val body =
+      node(
+        "body",
+        "Text",
+        parent = "card",
+        text = text(),
+        typeRole = "bodyLarge",
+        content = "#CCCCCC",
+      )
+    val findings = evaluate(tree(nodes = arrayOf(card, body))).of(FindingRule.Contrast)
+    assertEquals("body", findings.single().id)
+  }
+
+  @Test
+  fun `contrast is not measured without a backdrop or a content color`() {
+    assertEquals(emptyList(), contrastFindings("#CCCCCC", null))
+    assertEquals(emptyList(), contrastFindings(null, "#FFFFFF"))
+  }
+
+  @Test
+  fun `contrast ignores malformed colors`() {
+    assertEquals(emptyList(), contrastFindings("red", "#FFFFFF"))
+  }
+
+  @Test
+  fun `contrast ignores nodes without text`() {
+    val icon = node("star", "Icon", w = 24f, h = 24f, content = "#EEEEEE", container = "#FFFFFF")
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(icon))))
+  }
+
+  // endregion
+
+  // region primary-largest
+
+  @Test
+  fun `primary-largest passes when the primary is the tallest action`() {
+    val primary = button("cook", primary = true, h = 56f)
+    val other = button("skip", y = 200f, h = 40f)
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(primary, other))))
+  }
+
+  @Test
+  fun `primary-largest fails when another action is taller`() {
+    val primary = button("cook", primary = true, h = 40f)
+    val other = button("archive", y = 200f, h = 96f)
+    val finding =
+      evaluate(tree(nodes = arrayOf(primary, other))).of(FindingRule.PrimaryLargest).single()
+    assertEquals("cook", finding.id)
+    assertEquals(Severity.Error, finding.severity)
+    assertEquals("40 dp tall, shorter than archive (96 dp)", finding.detail)
+  }
+
+  @Test
+  fun `primary-largest tolerates 1 dp`() {
+    val primary = button("cook", primary = true, h = 40f)
+    val other = button("skip", y = 200f, h = 41f)
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(primary, other))))
+  }
+
+  @Test
+  fun `primary-largest passes when there is no primary`() {
+    val a = button("a", h = 40f)
+    val b = button("b", y = 200f, h = 96f)
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(a, b))))
+  }
+
+  @Test
+  fun `primary-largest ignores navigation chrome sliders and text fields`() {
+    val primary = button("cook", primary = true, h = 40f)
+    val bar = node("bar", "NavigationBar", y = 800f, w = 411f, h = 80f)
+    val item =
+      node(
+        "home",
+        "NavigationBarItem",
+        parent = "bar",
+        y = 800f,
+        w = 80f,
+        h = 80f,
+        touch = Bounds(0f, 800f, 80f, 80f),
+      )
+    val slider = node("volume", "Slider", y = 300f, w = 280f, h = 56f)
+    val field = node("amount", "TextField", y = 400f, w = 280f, h = 56f)
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(primary, bar, item, slider, field))))
+  }
+
+  @Test
+  fun `primary-largest ignores toggle buttons inside a floating toolbar`() {
+    val primary = button("cook", primary = true, h = 40f)
+    val toolbar = node("toolbar", "FloatingToolbar", y = 800f, w = 280f, h = 64f)
+    val toggle =
+      node(
+        "saved",
+        "ToggleButton",
+        parent = "toolbar",
+        y = 806f,
+        w = 80f,
+        h = 52f,
+        touch = Bounds(0f, 800f, 80f, 64f),
+      )
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(primary, toolbar, toggle))))
+  }
+
+  @Test
+  fun `primary-largest ignores tappable rows and cards`() {
+    val primary = button("cook", primary = true, h = 40f)
+    val row = node("row", "ListItem", y = 200f, w = 411f, h = 72f)
+    val card = node("card", "Card", y = 300f, w = 380f, h = 160f)
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(primary, row, card))))
+  }
+
+  @Test
+  fun `primary-largest compares a standard icon button by its visual size`() {
+    val primary = button("cook", primary = true, h = 40f)
+    val icon =
+      node("more", "IconButton", y = 200f, w = 40f, h = 40f, touch = Bounds(0f, 196f, 48f, 48f))
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(primary, icon))))
+  }
+
+  @Test
+  fun `primary-largest counts a fab as an action`() {
+    val primary = button("cook", primary = true, h = 40f)
+    val fab =
+      node(
+        "add",
+        "FloatingActionButton",
+        y = 700f,
+        w = 80f,
+        h = 80f,
+        touch = Bounds(0f, 700f, 80f, 80f),
+      )
+    assertEquals(
+      1,
+      evaluate(tree(nodes = arrayOf(primary, fab))).of(FindingRule.PrimaryLargest).size,
+    )
+  }
+
+  @Test
+  fun `primary-largest checks every marked primary`() {
+    val a = button("a", primary = true, h = 40f)
+    val b = button("b", y = 200f, primary = true, h = 56f)
+    val findings = evaluate(tree(nodes = arrayOf(a, b))).of(FindingRule.PrimaryLargest)
+    assertEquals(listOf("a"), findings.map { it.id })
+  }
+
+  // endregion
+
+  // region one-fab
+
+  private fun fab(id: String, type: String = "FloatingActionButton") =
+    node(id, type, y = 800f, w = 80f, h = 80f, touch = Bounds(0f, 800f, 80f, 80f))
+
+  @Test
+  fun `one-fab passes for a single fab`() {
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(fab("add")))))
+  }
+
+  @Test
+  fun `one-fab fails for each fab after the first`() {
+    val findings =
+      evaluate(tree(nodes = arrayOf(fab("add"), fab("edit"), fab("share")))).of(FindingRule.OneFab)
+    assertEquals(listOf("edit", "share"), findings.map { it.id })
+    assertEquals(Severity.Error, findings.first().severity)
+    assertEquals("3 floating action buttons (add, edit, share), keep one", findings.first().detail)
+  }
+
+  @Test
+  fun `one-fab counts a fab menu but not its items`() {
+    val menu = fab("actions", "FabMenu")
+    val item = fab("compose", "FabMenuItem")
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(menu, item))).of(FindingRule.OneFab))
+    assertEquals(
+      1,
+      evaluate(tree(nodes = arrayOf(menu, fab("add")))).of(FindingRule.OneFab).size,
+    )
+  }
+
+  // endregion
+
+  // region offscreen
+
+  private fun offscreen(
+    view: bot.charlies.androiddesign.preview.model.ViewSpec,
+    vararg nodes: bot.charlies.androiddesign.preview.model.LayoutNode,
+  ) = evaluate(tree(view, *nodes)).of(FindingRule.Offscreen)
+
+  @Test
+  fun `offscreen passes for content inside the view`() {
+    assertEquals(
+      emptyList(),
+      offscreen(Views.Light, node("box", "Box", x = 0f, w = 411f, h = 100f)),
+    )
+  }
+
+  @Test
+  fun `offscreen fails for content wider than the view`() {
+    val finding = offscreen(Views.Light, node("hero", "Box", x = 0f, w = 600f, h = 100f)).single()
+    assertEquals("hero", finding.id)
+    assertEquals(Severity.Error, finding.severity)
+    assertEquals("ends at 600 dp, the view is 411 dp wide", finding.detail)
+  }
+
+  @Test
+  fun `offscreen fails for content crossing the left edge`() {
+    val finding = offscreen(Views.Light, node("pin", "Box", x = -40f, w = 160f, h = 40f)).single()
+    assertEquals("starts at -40 dp, before the view", finding.detail)
+  }
+
+  @Test
+  fun `offscreen tolerates 1 dp`() {
+    assertEquals(
+      emptyList(),
+      offscreen(Views.Light, node("edge", "Box", x = -1f, w = 412f, h = 40f)),
+    )
+  }
+
+  @Test
+  fun `offscreen allows content fully off the left edge`() {
+    assertEquals(
+      emptyList(),
+      offscreen(Views.Light, node("drawer", "Box", x = -9999f, w = 280f, h = 900f)),
+    )
+  }
+
+  @Test
+  fun `offscreen names the widest parent before its children`() {
+    val parent = node("row", "Row", w = 600f, h = 48f)
+    val child = node("last", "Button", parent = "row", x = 500f, w = 100f, h = 40f)
+    assertEquals(listOf("row"), offscreen(Views.Light, parent, child).map { it.id })
+  }
+
+  @Test
+  fun `offscreen reports at most five offenders`() {
+    val boxes = (1..8).map { node("b$it", "Box", w = 500f + it, h = 10f) }
+    assertEquals(5, offscreen(Views.Light, *boxes.toTypedArray()).size)
+  }
+
+  @Test
+  fun `offscreen follows the width of the view`() {
+    val wide = node("hero", "Box", w = 1500f, h = 100f)
+    assertEquals(1, offscreen(Views.Tablet, wide).size)
+    assertEquals(emptyList(), offscreen(Views.Desktop, wide))
+  }
+
+  // endregion
+
+  // region panes
+
+  /**
+   * A list pane (the requested screen's own ids are plain) beside a detail pane prefixed
+   * `plate_detail/`.
+   */
+  @Test
+  fun `primary-largest compares actions within one pane`() {
+    val listFab =
+      node(
+        "new_plate",
+        "FloatingActionButton",
+        x = 300f,
+        y = 800f,
+        w = 80f,
+        h = 80f,
+        primary = true,
+        touch = Bounds(300f, 800f, 80f, 80f),
+      )
+    val detailCook = button("plate_detail/cook", primary = true, h = 40f)
+    val found = evaluate(tree(Views.Tablet, listFab, detailCook))
+    assertEquals(emptyList(), found.of(FindingRule.PrimaryLargest))
+  }
+
+  @Test
+  fun `primary-largest still fails inside a pane`() {
+    val detailCook = button("plate_detail/cook", primary = true, h = 40f)
+    val detailBig = button("plate_detail/archive", y = 200f, h = 96f)
+    val found = evaluate(tree(Views.Tablet, detailCook, detailBig)).of(FindingRule.PrimaryLargest)
+    assertEquals(listOf("plate_detail/cook"), found.map { it.id })
+  }
+
+  @Test
+  fun `one-fab counts each pane on its own`() {
+    val listFab = fab("new_plate")
+    val detailFab = fab("plate_detail/edit")
+    assertEquals(
+      emptyList(),
+      evaluate(tree(Views.Tablet, listFab, detailFab)).of(FindingRule.OneFab),
+    )
+    val twice =
+      evaluate(tree(Views.Tablet, listFab, fab("share"), detailFab)).of(FindingRule.OneFab)
+    assertEquals(listOf("share"), twice.map { it.id })
+  }
+
+  // endregion
+
+  // region modal overlays
+
+  @Test
+  fun `content behind an open sheet is exempt from touch target and contrast`() {
+    val sheet = node("sheet", "BottomSheet", y = 500f, w = 411f, h = 400f, container = "#FFFFFF")
+    val sheetText =
+      node(
+        "sheet_title",
+        "Text",
+        parent = "sheet",
+        y = 520f,
+        text = text(),
+        typeRole = "bodyLarge",
+        content = "#000000",
+      )
+    val behindTiny = node("tiny", "IconButton", w = 32f, h = 32f)
+    val behindText =
+      node(
+        "faint",
+        "Text",
+        text = text(),
+        typeRole = "bodyLarge",
+        content = "#EEEEEE",
+        container = "#FFFFFF",
+      )
+    assertEquals(
+      emptyList(),
+      evaluate(tree(nodes = arrayOf(behindTiny, behindText, sheet, sheetText))),
+    )
+  }
+
+  @Test
+  fun `the open modal and its content are still checked`() {
+    val dialog = node("dialog", "Dialog", y = 300f, w = 300f, h = 200f, container = "#FFFFFF")
+    val tiny = node("confirm", "Button", parent = "dialog", y = 400f, w = 60f, h = 32f)
+    val faint =
+      node(
+        "body",
+        "Text",
+        parent = "dialog",
+        y = 320f,
+        text = text(),
+        typeRole = "bodyLarge",
+        content = "#DDDDDD",
+      )
+    val rules = evaluate(tree(nodes = arrayOf(dialog, tiny, faint))).rules()
+    assertTrue(FindingRule.TouchTarget in rules)
+    assertTrue(FindingRule.Contrast in rules)
+  }
+
+  @Test
+  fun `the primary action check is skipped while a modal is open`() {
+    val primary = button("cook", primary = true, h = 40f)
+    val other = button("archive", y = 200f, h = 96f)
+    val sheet = node("sheet", "BottomSheet", y = 500f, w = 411f, h = 400f)
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(primary, other, sheet))))
+  }
+
+  @Test
+  fun `a menu does not exempt the content behind it`() {
+    val menu = node("menu", "Menu", y = 200f, w = 200f, h = 150f)
+    val tiny = node("tiny", "IconButton", w = 32f, h = 32f)
+    assertEquals(1, evaluate(tree(nodes = arrayOf(menu, tiny))).of(FindingRule.TouchTarget).size)
+  }
+
+  // endregion
+
+  // region output
+
+  @Test
+  fun `findings follow rule order and then document order`() {
+    val tiny = node("tiny", "IconButton", w = 32f, h = 32f, touch = null)
+    val georgia = node("t", "Text", text = text(font = "Georgia"), typeRole = "bodyLarge")
+    val rules = evaluate(tree(nodes = arrayOf(georgia, tiny))).map { it.rule }
+    assertEquals(listOf(FindingRule.TouchTarget, FindingRule.Font), rules)
+  }
+
+  @Test
+  fun `a clean tree has no findings and passes`() {
+    val clean = tree(nodes = arrayOf(button("cook", primary = true)))
+    assertEquals(emptyList(), evaluate(clean))
+    assertTrue(clean.pass)
+  }
+
+  @Test
+  fun `every rule that needs the catalog names a real component`() {
+    FindingRules.fabTypes.forEach { assertTrue(M3ExpressiveCatalog.find(it) != null, it) }
+    FindingRules.modalTypes.forEach {
+      assertTrue(M3ExpressiveCatalog.find(it)?.overlay == true, it)
+    }
+    assertNull(M3ExpressiveCatalog.find("NotAComponent"))
+  }
+
+  // endregion
+}

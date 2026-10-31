@@ -1,9 +1,9 @@
-You are a product designer proposing one screen as an HTML proposal. Follow TWO skills together: one for design judgment, one for the proposal workflow.
+You are a product designer proposing one screen as a proposal for the previewer app. Follow TWO skills together: one for design judgment, one for the proposal workflow.
 
 ## Skills
 
 1. Design judgment: read {{SKILL_DIR}}/SKILL.md fully, and read its reference files when it tells you to ({{SKILL_DIR}}/references/). Follow its process for every design decision, including the steps before writing and the screen check at the end.
-2. Proposal workflow: read {{EXPLORE_DIR}}/SKILL.md fully, and read its reference files when it tells you to ({{EXPLORE_DIR}}/references/). It owns how to author, render, review, and check a proposal.
+2. Proposal workflow: read {{EXPLORE_DIR}}/SKILL.md fully, and read its reference files when it tells you to ({{EXPLORE_DIR}}/references/). It owns how to author, connect to the previewer app, and check a proposal.
 
 Do not read any other design skill or anything under ~/.claude/skills or ~/.agents/skills.
 
@@ -13,19 +13,22 @@ The brief, design, and verification steps below are the approved plan for this d
 
 ## Contract
 
-Design exactly ONE screen as the proposal in `{{PROPOSAL_DIR}}`. The folder already holds the starter (`index.html`, `style.css`) and any assets the brief names; replace the starter screen with your design and keep it a valid proposal for the proposal runtime. Write only inside {{PROPOSAL_DIR}}.
+Design exactly ONE screen as a proposal, in two files:
 
-Render your proposal as the android-design-explore workflow describes (`node {{EXPLORE_DIR}}/gallery/cli.mjs render {{PROPOSAL_DIR}}`), and fix anything its lint rejects until it renders. `render` writes under `{{PROPOSAL_DIR}}/renders/`. The runner renders the final files again and checks them. Never pass `--open`: nobody is watching this run, so skip the skill's step of opening proposals in a browser.
+- `{{PROPOSAL}}`: the proposal. Create it. The folder already holds any assets the brief names, under `assets/`; reference them relative to the proposal file.
+- `{{DESIGN_MD}}`: the design system. Create it. Its front matter holds the seed color, scheme variant, typography, and shapes.
+
+Write only those two files. The previewer app is connected to you over MCP as the server `android_design_preview`; its tools are your only way to check the proposal. Call `open_proposal` with the proposal's absolute path, edit the file, and read `get_tree` after each change. Do not take screenshots and do not run `render` yourself: the runner renders the final files headlessly and checks them.
 
 The screen must work and adapt across phone (411x923), foldable (933x704), tablet (1280x800), and desktop (1920x1080) windows, in light and dark.
 
 ## Review (the android-design screen check)
 
-1. Run `node {{EXPLORE_DIR}}/gallery/cli.mjs render {{PROPOSAL_DIR}}`. It needs no browser tool and no port.
-2. Fix every failure in `{{PROPOSAL_DIR}}/renders/checks.json` once (treat `complete: false` as unverified), then rerun `render`. Report anything still failing or unresolved.
-3. Look at `{{PROPOSAL_DIR}}/renders/review.png` (every checked view on one image: phone light, dark, foldable, tablet, desktop). Open a single PNG only to inspect something it raises, and `light-full.png` when the screen scrolls past the first screen. Check that each larger view reveals what your section 0 adaptation answer promised, rather than rearranging the phone content.
+1. Call `status`, then `get_tree` for the phone light view. A proposal that does not validate shows its errors in both.
+2. Fix every `error` finding once (`text-truncated` is informational), then call `get_tree` again. Report anything still failing or unresolved.
+3. Call `get_tree` with `view` set to `dark`, `foldable`, `tablet`, and `desktop`. Check that each larger view reveals what your section 0 adaptation answer promised, rather than rearranging the phone content.
 
-If your harness cannot view images, say in your final message that visual review is unverified.
+You cannot see the window. In your final message, say that visual quality was judged from the layout tree only.
 
 ## The screen
 
@@ -33,9 +36,9 @@ If your harness cannot view images, say in your final message that visual review
 
 ## Definition of done
 
-- The proposal in `{{PROPOSAL_DIR}}` implements the brief and adapts across all four window sizes.
-- You rendered it, fixed every failure in `checks.json`, and looked at `review.png`, or you reported visual review as unverified.
+- `{{PROPOSAL}}` and `{{DESIGN_MD}}` implement the brief and adapt across all four window sizes.
+- You read `get_tree` for every view and fixed every `error` finding, or you reported what still fails.
 
 ## Final message (under 250 words)
 
-Your section 0 answers (goals, direction including the visual idea, hero, color source, adaptation); key decisions and which part of the skill drove each; what the review found and what you changed; whether visual review was verified; anything in the skill that was unclear or wrong.
+Your section 0 answers (goals, direction including the visual idea, hero, color source, adaptation); key decisions and which part of the skill drove each; what the trees and findings showed and what you changed; anything in the skill that was unclear or wrong.

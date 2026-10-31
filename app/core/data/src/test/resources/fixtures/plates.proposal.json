@@ -1,0 +1,208 @@
+{
+  "$schema": "https://raw.githubusercontent.com/charliesbot/android-design/main/app/schemas/proposal.schema.json",
+  "format": 1,
+  "name": "Tonight's plate",
+  "theme": {
+    "colors": {
+      "primary": "#B5523B"
+    },
+    "material": {
+      "scheme": {
+        "variant": "expressive"
+      },
+      "styles": {
+        "hero_title": {
+          "type": "displaySmallEmphasized",
+          "color": "onSurface"
+        }
+      }
+    }
+  },
+  "navigation": {
+    "start": "plates",
+    "panes": {
+      "plates": "list",
+      "plate_detail": "detail"
+    }
+  },
+  "screens": {
+    "plates": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "dataModel": {
+        "plates": [
+          {
+            "name": "Burrata and tomatoes",
+            "time": "20 min"
+          },
+          {
+            "name": "Roast chicken with lemon",
+            "time": "1 h 10 min"
+          },
+          {
+            "name": "Miso eggplant",
+            "time": "35 min"
+          }
+        ]
+      },
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "topBar": "bar",
+          "floatingActionButton": "new_plate",
+          "content": "plate_list"
+        },
+        {
+          "id": "bar",
+          "component": "TopAppBar",
+          "size": "large",
+          "title": "Tonight's plate"
+        },
+        {
+          "id": "plate_list",
+          "component": "List",
+          "variant": "segmented",
+          "padding": "lg",
+          "children": {
+            "componentId": "plate_row",
+            "path": "/plates"
+          }
+        },
+        {
+          "id": "plate_row",
+          "component": "ListItem",
+          "headline": {
+            "@path": "name"
+          },
+          "supporting": {
+            "@path": "time"
+          },
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "plate_detail"
+              }
+            }
+          }
+        },
+        {
+          "id": "new_plate",
+          "component": "FloatingActionButton",
+          "size": "medium",
+          "extended": true,
+          "color": "primary-container",
+          "icon": "add",
+          "label": "New plate",
+          "primary": true,
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "new_sheet"
+              }
+            }
+          }
+        },
+        {
+          "id": "new_sheet",
+          "component": "BottomSheet",
+          "content": [
+            "sheet_title",
+            "sheet_close"
+          ]
+        },
+        {
+          "id": "sheet_title",
+          "component": "Text",
+          "text": "Add a plate",
+          "type": "headlineSmall"
+        },
+        {
+          "id": "sheet_close",
+          "component": "Button",
+          "variant": "text",
+          "label": "Not now",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        }
+      ]
+    },
+    "plate_detail": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "dataModel": {
+        "plate": {
+          "name": "Burrata and tomatoes",
+          "description": "Slow-roasted tomatoes, burrata, basil oil, and grilled sourdough for two."
+        }
+      },
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "topBar": "bar",
+          "content": "body"
+        },
+        {
+          "id": "bar",
+          "component": "TopAppBar",
+          "title": {
+            "@path": "/plate/name"
+          },
+          "navigationIcon": "back_button"
+        },
+        {
+          "id": "back_button",
+          "component": "IconButton",
+          "icon": "arrow_back",
+          "contentDescription": "Back",
+          "action": {
+            "functionCall": {
+              "@call": "back"
+            }
+          }
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "spacing": "lg",
+          "padding": "lg",
+          "children": [
+            "hero_title",
+            "desc",
+            "cook"
+          ]
+        },
+        {
+          "id": "hero_title",
+          "component": "Text",
+          "style": "hero_title",
+          "text": {
+            "@path": "/plate/name"
+          }
+        },
+        {
+          "id": "desc",
+          "component": "Text",
+          "text": {
+            "@path": "/plate/description"
+          },
+          "type": "bodyLarge",
+          "maxLines": 3,
+          "overflow": "ellipsis"
+        },
+        {
+          "id": "cook",
+          "component": "Button",
+          "size": "large",
+          "label": "Cook",
+          "icon": "skillet",
+          "primary": true
+        }
+      ]
+    }
+  }
+}

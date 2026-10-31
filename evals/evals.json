@@ -15,18 +15,18 @@
       ],
       "assertions": [
         {
-          "id": "C-lint",
-          "text": "The lint run by `cli.mjs render` passed (it rejects raw colors, inline style or script, and misplaced type declarations)",
+          "id": "C-valid",
+          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
           "type": "code"
         },
         {
           "id": "C-review",
-          "text": "Every render's runtimeChecks result has pass true; an incomplete check counts as a failure (unverified)",
+          "text": "Every render in report.json passes the app's finding rules; no renders counts as a failure",
           "type": "code"
         },
         {
           "id": "C-palette",
-          "text": "The proposal's <m3e-theme> variant is not expressive or vibrant",
+          "text": "The merged theme variant in report.json is not expressive or vibrant",
           "type": "code"
         },
         {
@@ -95,18 +95,18 @@
       "files": [],
       "assertions": [
         {
-          "id": "C-lint",
-          "text": "The lint run by `cli.mjs render` passed (it rejects raw colors, inline style or script, and misplaced type declarations)",
+          "id": "C-valid",
+          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
           "type": "code"
         },
         {
           "id": "C-review",
-          "text": "Every render's runtimeChecks result has pass true; an incomplete check counts as a failure (unverified)",
+          "text": "Every render in report.json passes the app's finding rules; no renders counts as a failure",
           "type": "code"
         },
         {
           "id": "C-palette",
-          "text": "The proposal's <m3e-theme> variant is not expressive or vibrant",
+          "text": "The merged theme variant in report.json is not expressive or vibrant",
           "type": "code"
         },
         {
@@ -175,18 +175,18 @@
       "files": [],
       "assertions": [
         {
-          "id": "C-lint",
-          "text": "The lint run by `cli.mjs render` passed (it rejects raw colors, inline style or script, and misplaced type declarations)",
+          "id": "C-valid",
+          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
           "type": "code"
         },
         {
           "id": "C-review",
-          "text": "Every render's runtimeChecks result has pass true; an incomplete check counts as a failure (unverified)",
+          "text": "Every render in report.json passes the app's finding rules; no renders counts as a failure",
           "type": "code"
         },
         {
           "id": "C-palette",
-          "text": "The proposal's <m3e-theme> variant is not expressive or vibrant",
+          "text": "The merged theme variant in report.json is not expressive or vibrant",
           "type": "code"
         },
         {
@@ -260,18 +260,18 @@
       ],
       "assertions": [
         {
-          "id": "C-lint",
-          "text": "The lint run by `cli.mjs render` passed (it rejects raw colors, inline style or script, and misplaced type declarations)",
+          "id": "C-valid",
+          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
           "type": "code"
         },
         {
           "id": "C-review",
-          "text": "Every render's runtimeChecks result has pass true; an incomplete check counts as a failure (unverified)",
+          "text": "Every render in report.json passes the app's finding rules; no renders counts as a failure",
           "type": "code"
         },
         {
           "id": "C-palette",
-          "text": "The proposal's <m3e-theme> variant is not expressive or vibrant",
+          "text": "The merged theme variant in report.json is not expressive or vibrant",
           "type": "code"
         },
         {

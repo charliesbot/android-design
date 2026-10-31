@@ -1,0 +1,288 @@
+package bot.charlies.androiddesign.preview.feature.preview
+
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import bot.charlies.androiddesign.preview.model.Views
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class RendererBehaviorTest {
+  private val platesDetail =
+    """{"id":"root","component":"Scaffold","topBar":"bar","content":"body"},""" +
+      """{"id":"bar","component":"TopAppBar","title":{"@path":"/plate/name"},"navigationIcon":"back"},""" +
+      """{"id":"back","component":"IconButton","icon":"arrow_back","contentDescription":"Back","action":{"functionCall":{"@call":"back"}}},""" +
+      """{"id":"body","component":"Text","text":{"@path":"/plate/name"}}"""
+
+  private val platesList =
+    """{"id":"root","component":"Scaffold","content":"rows"},""" +
+      """{"id":"rows","component":"Column","children":{"componentId":"row","path":"/plates"}},""" +
+      """{"id":"row","component":"ListItem","headline":{"@path":"name"},"supporting":{"@path":"/owner"},"action":{"functionCall":{"@call":"navigate","args":{"screen":"detail"}}}}"""
+
+  private fun twoScreens() =
+    proposalOf(
+      "list" to
+        screenJson(platesList, """{"plates":[{"name":"Burrata"},{"name":"Miso"}],"owner":"Ada"}"""),
+      "detail" to screenJson(platesDetail, """{"plate":{"name":"Burrata"}}"""),
+      panes = """{"list":"list","detail":"detail"}""",
+    )
+
+  @Test
+  fun `templates repeat their component per item with relative and absolute bindings`() {
+    val tree = render(twoScreens(), "list").tree
+    assertEquals("Burrata", tree.node("row[0]").text?.value)
+    assertEquals("Miso", tree.node("row[1]").text?.value)
+    assertEquals("row[0]", tree.nodes.first { it.id == "row[0]" }.id)
+    assertEquals("rows", tree.node("row[1]").parent)
+  }
+
+  @Test
+  fun `index calls resolve to the template position`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"rows"},{"id":"rows","component":"Column","children":{"componentId":"t","path":"/items"}},{"id":"t","component":"Text","text":{"@call":"@index"}}""",
+        """{"items":["a","b","c"]}""",
+      )
+    val tree = render(proposal).tree
+    assertEquals(listOf("0", "1", "2"), (0..2).map { tree.node("t[$it]").text?.value })
+  }
+
+  @Test
+  fun `nodes are listed in document order with parents`() {
+    val tree = render(twoScreens(), "detail", Views.Light).tree
+    assertEquals(listOf("root", "bar", "back", "body"), tree.nodes.map { it.id })
+    assertEquals("root", tree.node("bar").parent)
+    assertNull(tree.node("root").parent)
+    assertEquals("bar", tree.node("back").parent)
+  }
+
+  @Test
+  fun `showIn hides a component outside its size classes`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"col"},{"id":"col","component":"Column","children":["wide","narrow"]},""" +
+          """{"id":"wide","component":"Text","text":"wide","showIn":["expanded"]},{"id":"narrow","component":"Text","text":"narrow","showIn":["compact","medium"]}""",
+      )
+    val phone = render(proposal, view = Views.Light).tree
+    assertFalse(phone.has("wide"))
+    assertTrue(phone.has("narrow"))
+    val tablet = render(proposal, view = Views.Tablet).tree
+    assertTrue(tablet.has("wide"))
+    assertFalse(tablet.has("narrow"))
+  }
+
+  @Test
+  fun `sizeClass overrides apply from medium up using the frame width`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"t"},""" +
+          """{"id":"t","component":"Text","text":"compact","sizeClass":{"medium":{"text":"medium"},"expanded":{"text":"expanded"}}}""",
+      )
+    assertEquals("compact", render(proposal, view = Views.Light).tree.node("t").text?.value)
+    assertEquals("expanded", render(proposal, view = Views.Foldable).tree.node("t").text?.value)
+    assertEquals("expanded", render(proposal, view = Views.Desktop).tree.node("t").text?.value)
+  }
+
+  @Test
+  fun `a detail screen at tablet shows both panes and at phone only the detail`() {
+    val tablet = render(twoScreens(), "detail", Views.Tablet).tree
+    assertTrue(tablet.has("root"), "the detail's own nodes keep plain ids")
+    assertTrue(tablet.has("list/row[0]"), "the list pane's nodes carry the screen prefix")
+    assertTrue(tablet.has("list/root"))
+    val phone = render(twoScreens(), "detail", Views.Light).tree
+    assertTrue(phone.has("body"))
+    assertFalse(phone.nodes.any { it.id.startsWith("list/") })
+  }
+
+  @Test
+  fun `navigate and back actions move through the stack`() {
+    var onDetailAfterClick = false
+    var backOnList = false
+    render(twoScreens(), "list", Views.Light) { host ->
+      assertEquals(listOf("list"), host.backStack.toList())
+      onNodeWithTag("row[0]", useUnmergedTree = true).performClick()
+      onDetailAfterClick = host.backStack.toList() == listOf("list", "detail")
+      settleForTest()
+      onNodeWithTag("back", useUnmergedTree = true).performClick()
+      backOnList = host.backStack.toList() == listOf("list")
+    }
+    assertTrue(onDetailAfterClick)
+    assertTrue(backOnList)
+  }
+
+  private val withSheet =
+    """{"id":"root","component":"Scaffold","content":"stage","floatingActionButton":"fab"},""" +
+      """{"id":"stage","component":"Text","text":"Page"},""" +
+      """{"id":"fab","component":"FloatingActionButton","icon":"add","contentDescription":"New","action":{"functionCall":{"@call":"open","args":{"overlay":"sheet"}}}},""" +
+      """{"id":"sheet","component":"BottomSheet","content":["sheet_text","sheet_close"]},""" +
+      """{"id":"sheet_text","component":"Text","text":"In sheet"},""" +
+      """{"id":"sheet_close","component":"Button","variant":"text","label":"Close","action":{"functionCall":{"@call":"dismiss"}}}"""
+
+  @Test
+  fun `overlays stay closed until opened and close on dismiss`() {
+    val closed = render(singleScreen(withSheet)).tree
+    assertFalse(closed.has("sheet"))
+    assertFalse(closed.has("sheet_text"))
+
+    var openedInside: Boolean? = null
+    var closedAgain: Boolean? = null
+    val opened =
+      render(singleScreen(withSheet)) { host ->
+        onNodeWithTag("fab", useUnmergedTree = true).performClick()
+        openedInside = host.interaction.openOverlay("home") == "sheet"
+        settleForTest()
+        onNodeWithTag("sheet_close", useUnmergedTree = true).performClick()
+        closedAgain = host.interaction.openOverlay("home") == null
+      }
+    assertEquals(true, openedInside)
+    assertEquals(true, closedAgain)
+    assertFalse(opened.tree.has("sheet_text"), "dismissed sheets leave the tree")
+
+    val stillOpen = render(singleScreen(withSheet)) { it.interaction.open("home", "sheet") }.tree
+    assertTrue(stillOpen.has("sheet_text"))
+    assertEquals("In sheet", stillOpen.node("sheet_text").text?.value)
+  }
+
+  @Test
+  fun `toggles keep local state`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"sw"},{"id":"sw","component":"Switch","checked":false,"contentDescription":"Alerts"}""",
+      )
+    var before = false
+    var after = false
+    render(proposal) {
+      onNodeWithTag("sw", useUnmergedTree = true).assertIsOff()
+      before = true
+      onNodeWithTag("sw", useUnmergedTree = true).performClick()
+      settleForTest()
+      onNodeWithTag("sw", useUnmergedTree = true).assertIsOn()
+      after = true
+    }
+    assertTrue(before && after)
+  }
+
+  @Test
+  fun `long text with an ellipsis reports truncation`() {
+    val long =
+      "Slow-roasted tomatoes, burrata, basil oil, and grilled sourdough for two people tonight."
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"col"},{"id":"col","component":"Column","padding":"lg","children":["ellipsized","clipped","fits"]},""" +
+          """{"id":"ellipsized","component":"Text","text":"$long","maxLines":1,"overflow":"ellipsis"},""" +
+          """{"id":"clipped","component":"Text","text":"$long","maxLines":1},""" +
+          """{"id":"fits","component":"Text","text":"Short","maxLines":1,"overflow":"ellipsis"}""",
+      )
+    val tree = render(proposal).tree
+    val ellipsized = tree.node("ellipsized").text!!
+    assertEquals(1, ellipsized.lines)
+    assertTrue(ellipsized.overflow)
+    assertTrue(ellipsized.truncated)
+    val clipped = tree.node("clipped").text!!
+    assertTrue(clipped.overflow)
+    assertFalse(clipped.truncated)
+    val fits = tree.node("fits").text!!
+    assertFalse(fits.overflow)
+    assertFalse(fits.truncated)
+    assertEquals("Google Sans Flex", fits.font)
+  }
+
+  @Test
+  fun `a wrapped button label reports more than one line`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"col"},{"id":"col","component":"Column","padding":"lg","children":["b"]},""" +
+          """{"id":"b","component":"Button","label":"A label that is far too long to fit on one line of a phone"}""",
+      )
+    assertTrue(render(proposal).tree.node("b").text!!.lines > 1)
+  }
+
+  @Test
+  fun `a 40dp button has a 48dp touch target and accessibility facts`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"col"},{"id":"col","component":"Column","padding":"lg","children":["cook"]},""" +
+          """{"id":"cook","component":"Button","label":"Cook","primary":true}""",
+      )
+    val cook = render(proposal).tree.node("cook")
+    assertEquals(40f, cook.bounds.height)
+    assertEquals(48f, cook.touch!!.height)
+    assertEquals(cook.bounds.y - 4f, cook.touch!!.y)
+    assertEquals(true, cook.primary)
+    assertEquals("Button", cook.a11y?.role)
+    assertEquals("Cook", cook.a11y?.label)
+    assertTrue("click" in cook.a11y!!.actions)
+    assertEquals("primary", cook.roles?.container)
+    assertEquals("onPrimary", cook.roles?.content)
+    assertEquals("labelLarge", cook.roles?.type)
+    assertEquals(
+      setOf(true),
+      setOf(cook.colors?.container?.matches(Regex("#[0-9A-F]{6}"))),
+    )
+  }
+
+  @Test
+  fun `named styles and token props resolve`() {
+    val proposal =
+      proposalOf(
+        "home" to
+          screenJson(
+            """{"id":"root","component":"Scaffold","content":"t"},{"id":"t","component":"Text","text":"Styled","style":"hero","padding":"lg"}""",
+          ),
+        theme =
+          """{"material":{"styles":{"hero":{"type":"displaySmallEmphasized","color":"onPrimaryContainer"}}}}""",
+      )
+    val t = render(proposal).tree.node("t")
+    assertEquals("displaySmallEmphasized", t.roles?.type)
+    assertEquals("onPrimaryContainer", t.roles?.content)
+    assertEquals(16f, t.bounds.x, "padding lg is 16dp")
+  }
+
+  @Test
+  fun `the png is two pixels per dp`() {
+    val png =
+      render(
+          singleScreen(
+            """{"id":"root","component":"Scaffold","content":"t"},{"id":"t","component":"Text","text":"x"}""",
+          ),
+        )
+        .png
+    val image = org.jetbrains.skia.Image.makeFromEncoded(png)
+    assertEquals(822, image.width)
+    assertEquals(1846, image.height)
+  }
+
+  @Test
+  fun `a fab at the bottom of a tall frame keeps its shadow against its edge`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","floatingActionButton":"fab","content":"t"},{"id":"t","component":"Text","text":"x"},""" +
+          """{"id":"fab","component":"FloatingActionButton","size":"medium","extended":true,"icon":"add","label":"New plate"}""",
+      )
+    val result = render(proposal, view = Views.Light)
+    val fab = result.tree.node("fab").bounds
+    val bitmap =
+      org.jetbrains.skia.Bitmap.makeFromImage(org.jetbrains.skia.Image.makeFromEncoded(result.png))
+    val x = ((fab.x + fab.width / 2) * 2).toInt()
+    val edge = ((fab.y + fab.height) * 2).toInt()
+    fun luminance(y: Int): Int =
+      bitmap.getColor(x, y).let { ((it shr 16) and 255) + ((it shr 8) and 255) + (it and 255) }
+    val background = luminance(bitmap.height - 2)
+    // Compose Desktop's window light used to push the shadow down and leave background showing
+    // here.
+    for (below in 2..4) {
+      assertTrue(
+        luminance(edge + below) < background - 30,
+        "pixel ${below}px under the fab is background, not shadow",
+      )
+    }
+  }
+
+  private fun androidx.compose.ui.test.ComposeUiTest.settleForTest() {
+    with(bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessRenderer) { settle() }
+  }
+}

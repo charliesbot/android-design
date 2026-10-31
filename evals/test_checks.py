@@ -6,94 +6,108 @@ from pathlib import Path
 import checks
 
 
-def render(name, **result):
-    return {'name': name, 'viewport': [411, 923], 'result': {'pass': True, 'complete': True, **result}}
+def render(screen, view, *failures):
+    return {'screen': screen, 'view': view, 'png': f'{screen}-{view}.png', 'tree': f'{screen}-{view}.tree.json',
+            'pass': not failures, 'failures': list(failures)}
 
 
-class CaseDir:
-    """A synthetic case directory with the files checks.py reads."""
-
-    def __init__(self, tmp, *, lint=None, renders=None, index=None):
-        self.path = Path(tmp)
-        proposal = self.path / 'design-explorations/proposal'
-        proposal.mkdir(parents=True)
-        (self.path / 'case.json').write_text(json.dumps({'proposal_dir': str(proposal)}))
-        if index is not None:
-            (proposal / 'index.html').write_text(index)
-        if lint is not None:
-            (self.path / 'lint.json').write_text(json.dumps(lint))
-        if renders is not None:
-            (self.path / 'renders').mkdir()
-            (self.path / 'renders/checks.json').write_text(json.dumps({'renders': renders}))
+def report(renders, *, valid=True, errors=(), variant='tonal-spot'):
+    return {'proposal': '/case/design/proposal.proposal.json', 'design': '/case/DESIGN.md',
+            'theme': {'seed': '#B5523B', 'variant': variant, 'contrast': 0.0},
+            'valid': valid, 'errors': list(errors), 'renders': renders,
+            'pass': valid and all(r['pass'] for r in renders)}
 
 
-GOOD = '<m3e-theme color="#6750A4" variant="tonal-spot" scheme="light"></m3e-theme>'
+def case_dir(tmp, data=None):
+    """A synthetic case directory holding the report.json the app's `render` leaves."""
+    path = Path(tmp)
+    if data is not None:
+        (path / 'renders').mkdir()
+        (path / 'renders/report.json').write_text(json.dumps(data))
+    return path
+
+
+GOOD = [render('plates', 'light'), render('plates', 'dark')]
 
 
 class ChecksTests(unittest.TestCase):
-    def run_checks(self, **kwargs):
+    def run_checks(self, data=None):
         with tempfile.TemporaryDirectory() as tmp:
-            return checks.run(CaseDir(tmp, **kwargs).path)
+            return checks.run(case_dir(tmp, data))
 
     def test_all_pass(self):
-        out = self.run_checks(lint={'ok': True}, renders=[render('light'), render('dark')], index=GOOD)
-        self.assertEqual(set(out), {'C-lint', 'C-review', 'C-palette'})
+        out = self.run_checks(report(GOOD))
+        self.assertEqual(set(out), {'C-valid', 'C-review', 'C-palette'})
         self.assertTrue(all(v['pass'] for v in out.values()), out)
 
-    def test_lint_failure_carries_the_lint_output(self):
-        out = self.run_checks(lint={'ok': False, 'output': 'index.html:12 raw color #fff'}, index=GOOD)
-        self.assertFalse(out['C-lint']['pass'])
-        self.assertIn('raw color', out['C-lint']['detail'])
+    def test_invalid_proposal_carries_the_first_errors(self):
+        errors = [{'path': 'screens.plates.components[3]', 'message': 'unknown component Carousel'},
+                  {'path': 'navigation.start', 'message': 'no screen named home'}]
+        out = self.run_checks(report([], valid=False, errors=errors))
+        self.assertFalse(out['C-valid']['pass'])
+        self.assertIn('components[3]: unknown component Carousel', out['C-valid']['detail'])
+        self.assertIn('navigation.start', out['C-valid']['detail'])
         self.assertFalse(out['C-review']['pass'])
 
-    def test_lint_that_never_ran_fails(self):
-        self.assertFalse(self.run_checks(index=GOOD)['C-lint']['pass'])
+    def test_only_the_first_errors_are_reported(self):
+        errors = [{'path': f'p{i}', 'message': f'm{i}'} for i in range(10)]
+        detail = self.run_checks(report([], valid=False, errors=errors))['C-valid']['detail']
+        self.assertIn('p0', detail)
+        self.assertNotIn('p9', detail)
 
-    def test_review_fails_when_any_render_fails(self):
-        bad = render('tablet')
-        bad['result'] = {'pass': False, 'complete': True, 'pageOverflow': {'fails': True}}
-        out = self.run_checks(lint={'ok': True}, renders=[render('light'), bad], index=GOOD)
+    def test_a_proposal_that_was_never_rendered_fails_every_report_check(self):
+        out = self.run_checks()
+        for key in ('C-valid', 'C-review', 'C-palette'):
+            self.assertFalse(out[key]['pass'], key)
+        self.assertIn('report.json', out['C-valid']['detail'])
+
+    def test_render_log_explains_a_missing_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = case_dir(tmp)
+            (directory / 'render.log').write_text('no such file: proposal.json')
+            self.assertIn('no such file', checks.run(directory)['C-valid']['detail'])
+
+    def test_review_names_each_failing_screen_view_and_rule(self):
+        bad = render('plates', 'tablet', 'touch-target: open_plate 40x40', 'contrast: desc 3.1:1')
+        out = self.run_checks(report([*GOOD, bad, render('detail', 'dark', 'font: title Roboto')]))
         self.assertFalse(out['C-review']['pass'])
-        self.assertIn('tablet', out['C-review']['detail'])
-        self.assertIn('pageOverflow', out['C-review']['detail'])
+        self.assertEqual(out['C-review']['detail'],
+                         'plates/tablet: touch-target; plates/tablet: contrast; detail/dark: font')
 
-    def test_review_names_the_view_and_check_that_failed(self):
-        bad = render('dark')
-        bad['result'] = {'pass': False, 'complete': True, 'contrast': {'fails': [{'el': 'div', 'ratio': 1, 'need': 4.5}], 'passed': 3}}
-        out = self.run_checks(lint={'ok': True}, renders=[render('light'), render('tablet'), bad], index=GOOD)
+    def test_review_fails_a_failed_render_without_listed_rules(self):
+        bad = render('plates', 'dark')
+        bad['pass'] = False
+        out = self.run_checks(report([render('plates', 'light'), bad]))
         self.assertFalse(out['C-review']['pass'])
-        self.assertEqual(out['C-review']['detail'], 'dark: contrast')
+        self.assertEqual(out['C-review']['detail'], 'plates/dark: failed')
 
-    def test_review_reports_a_render_error(self):
-        bad = render('dark')
-        bad['result'] = {'pass': False, 'complete': False, 'error': 'page crashed'}
-        out = self.run_checks(lint={'ok': True}, renders=[render('light'), bad], index=GOOD)
+    def test_review_with_no_renders_is_not_a_pass(self):
+        out = self.run_checks(report([]))
         self.assertFalse(out['C-review']['pass'])
-        self.assertIn('dark: page crashed', out['C-review']['detail'])
-
-    def test_incomplete_review_is_unverified_not_passed(self):
-        out = self.run_checks(lint={'ok': True}, renders=[render('light'), render('dark', complete=False)], index=GOOD)
-        self.assertFalse(out['C-review']['pass'])
-        self.assertIn('unverified', out['C-review']['detail'])
-        self.assertIn('dark', out['C-review']['detail'])
-
-    def test_missing_review_fails(self):
-        self.assertFalse(self.run_checks(lint={'ok': True}, index=GOOD)['C-review']['pass'])
+        self.assertIn('no renders', out['C-review']['detail'])
 
     def test_palette_rejects_expressive_and_vibrant(self):
         for variant in ('expressive', 'vibrant', 'Vibrant'):
-            html = f'<m3e-theme color="#6750A4" variant="{variant}"></m3e-theme>'
-            out = self.run_checks(lint={'ok': True}, index=html)
+            out = self.run_checks(report(GOOD, variant=variant))
             with self.subTest(variant=variant):
                 self.assertFalse(out['C-palette']['pass'])
                 self.assertIn(variant, out['C-palette']['detail'])
 
-    def test_palette_accepts_other_variants_or_none(self):
-        for html in (GOOD, '<m3e-theme color="#6750A4"></m3e-theme>'):
-            self.assertTrue(self.run_checks(index=html)['C-palette']['pass'])
+    def test_palette_accepts_the_other_variants(self):
+        for variant in ('tonal-spot', 'neutral', 'monochrome', 'fidelity', 'content'):
+            with self.subTest(variant=variant):
+                self.assertTrue(self.run_checks(report(GOOD, variant=variant))['C-palette']['pass'])
 
-    def test_palette_fails_without_a_proposal(self):
-        self.assertFalse(self.run_checks()['C-palette']['pass'])
+    def test_palette_fails_when_the_report_has_no_theme(self):
+        data = report(GOOD)
+        del data['theme']
+        self.assertFalse(self.run_checks(data)['C-palette']['pass'])
+
+    def test_an_unreadable_report_is_a_failure_not_a_crash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = case_dir(tmp, report(GOOD))
+            (directory / 'renders/report.json').write_text('{not json')
+            self.assertFalse(checks.run(directory)['C-valid']['pass'])
 
 
 if __name__ == '__main__':

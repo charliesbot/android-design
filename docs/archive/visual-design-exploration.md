@@ -1,6 +1,6 @@
 # Visual design exploration
 
-> **Archived:** Superseded by [Visual design exploration v2](../design/visual-design-exploration-v2.md).
+> **Archived:** Superseded by [Visual design exploration v2](visual-design-exploration-v2.md).
 
 **Date:** 2026-10-03
 

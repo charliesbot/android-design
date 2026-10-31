@@ -2,12 +2,22 @@
 import html
 from pathlib import Path
 
+# The view a case's baseline image and report lead with, by surface.
 PRIMARY = {"phone": "light"}
 
 
 def score(items):
     passed = sum(1 for v in items.values() if v["pass"] is True)
     return passed, len(items)
+
+
+def label(render):
+    return f"{render['screen']}/{render['view']}"
+
+
+def primary_first(renders, surface):
+    """Renders with the surface's primary view first, otherwise in report order."""
+    return sorted(renders, key=lambda r: r["view"] != PRIMARY[surface])
 
 
 def failures(items):
@@ -30,8 +40,9 @@ def write_report(out: Path, results, baseline_dir: Path):
         baseline = baseline_dir / f"{r['name']}.jpg"
         base_img = f'<figure><img src="{baseline.as_uri()}"><figcaption>baseline</figcaption></figure>' if baseline.exists() else ""
         shots = "".join(
-            f'<figure><img src="{r["name"]}/renders/{html.escape(n)}"><figcaption>{html.escape(Path(n).stem)}</figcaption></figure>'
-            for n in sorted(r["renders"], key=lambda n: Path(n).stem != PRIMARY[r["surface"]])
+            f'<figure><img src="{html.escape(r["name"])}/renders/{html.escape(n["png"])}">'
+            f'<figcaption>{html.escape(label(n))}{"" if n.get("pass") is not False else " (fails checks)"}</figcaption></figure>'
+            for n in primary_first(r["renders"], r["surface"])
         )
         cost = r["agent"]["cost"]
         sections.append(f"""

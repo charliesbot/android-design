@@ -1,8 +1,8 @@
 # Screenshot rubric
 
-The judge sees the fixed renders of one case and answers each applicable item PASS or FAIL with a one-sentence reason. Judge only what is visible. When unsure, FAIL and say why.
+The judge sees the renders of one case and answers each applicable item PASS or FAIL with a one-sentence reason. Judge only what is visible. When unsure, FAIL and say why.
 
-Every case has five renders of the HTML proposal. Two are phone size (411x923): `light` and `dark`. Three show larger windows in light: `foldable` (933x704, expanded), `tablet` (1280x800, large), and `desktop` (1920x1080, extra large). Items about dark look at that render; the rest look at all of them.
+Every case has one render per screen and view of the proposal, each named `screen/view`. The views are `light` and `dark` at phone size (411x923), and three larger windows in light: `foldable` (933x704, expanded), `tablet` (1280x800, large), and `desktop` (1920x1080, extra large). Items about dark look at the `dark` renders; the rest look at all of them.
 
 ## General items
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Model-graded screenshot rubric for one eval case.
+"""Model-graded screenshot rubric for one eval case. Every image is one screen at one view of the previewer app.
 
 Usage: judge.py <case_name> <image>... [--items R-a,R-b] [--runs N]
 Prints JSON: {"R-id": {"pass": bool, "votes": "2/3", "reason": str}}. With several runs, the majority wins.
@@ -19,7 +19,9 @@ def case_items(case_name):
     return [a for a in case["assertions"] if a["type"] == "rubric"]
 
 
-def prompt_for(case_name, images, item_ids, *, case=None, rubric=None):
+def prompt_for(case_name, images, item_ids, *, case=None, rubric=None, labels=None):
+    """`labels` maps an image path to its `screen/view`; an image without one is listed by its file name."""
+    labels = labels or {}
     if case is None:
         spec = json.loads((HERE / "evals.json").read_text())
         case = next(c for c in spec["evals"] if c["name"] == case_name)
@@ -28,7 +30,7 @@ def prompt_for(case_name, images, item_ids, *, case=None, rubric=None):
     listed = "\n".join(
         f"- {a['id']}" + ("" if a.get("text", "See rubric.md") == "See rubric.md" else f": {a['text']}") for a in items
     )
-    shots = "\n".join(f"- {Path(p).stem}: {Path(p).resolve()}" for p in images)
+    shots = "\n".join(f"- {labels.get(str(p)) or Path(p).stem}: {Path(p).resolve()}" for p in images)
     return f"""You are grading screenshots of an Android screen against a design rubric.
 
 {rubric}

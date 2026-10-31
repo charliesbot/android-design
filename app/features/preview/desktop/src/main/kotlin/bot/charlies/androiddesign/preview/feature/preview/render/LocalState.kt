@@ -1,0 +1,19 @@
+package bot.charlies.androiddesign.preview.feature.preview.render
+
+import androidx.compose.runtime.Composable
+
+/** A value that lives in the [InteractionState] under this node, starting at the prop's value. */
+internal class LocalValue<T : Any>(val value: T, val set: (T) -> Unit)
+
+@Composable
+internal fun <T : Any> NodeContext.local(key: String, initial: T): LocalValue<T> {
+  val stateKey = env.stateKey("$id:$key")
+  val interaction = env.host.interaction
+  val current: T = interaction.get<T>(stateKey) ?: initial
+  return LocalValue(current) { interaction[stateKey] = it }
+}
+
+/** The `checked` state of a toggle, starting at the prop. */
+@Composable
+internal fun NodeContext.checkedState(key: String = "checked"): LocalValue<Boolean> =
+  local(key, bool(key))

@@ -1,0 +1,2429 @@
+{
+  "$schema": "https://raw.githubusercontent.com/charliesbot/android-design/main/app/schemas/proposal.schema.json",
+  "format": 1,
+  "name": "Verify",
+  "theme": {
+    "colors": {
+      "primary": "#6750A4"
+    },
+    "material": {
+      "scheme": {
+        "variant": "tonal-spot"
+      },
+      "styles": {
+        "hero_title": {
+          "type": "displaySmallEmphasized",
+          "color": "onSurface"
+        }
+      }
+    }
+  },
+  "navigation": {
+    "start": "home",
+    "panes": {
+      "home": "list",
+      "detail": "detail"
+    }
+  },
+  "screens": {
+    "home": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "dataModel": {
+        "rows": [
+          {
+            "kind": "Overline",
+            "name": "Three-line item",
+            "detail": "With overline and supporting text",
+            "meta": "12:30"
+          },
+          {
+            "kind": "Template",
+            "name": "Bound from the data model",
+            "detail": "Second row of the template",
+            "meta": "Now"
+          }
+        ]
+      },
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "topBar": "top",
+          "bottomBar": "nav_bar",
+          "navigationRail": "nav_rail",
+          "floatingActionButton": "fab",
+          "content": "body"
+        },
+        {
+          "id": "top",
+          "component": "TopAppBar",
+          "size": "large",
+          "title": "Verify",
+          "subtitle": "Every catalog component",
+          "navigationIcon": "menu_button",
+          "actions": [
+            "search_button",
+            "more_button"
+          ]
+        },
+        {
+          "id": "menu_button",
+          "component": "IconButton",
+          "icon": "menu",
+          "contentDescription": "Open menu"
+        },
+        {
+          "id": "search_button",
+          "component": "IconButton",
+          "icon": "search",
+          "contentDescription": "Search"
+        },
+        {
+          "id": "more_button",
+          "component": "IconButton",
+          "icon": "more_vert",
+          "contentDescription": "More options"
+        },
+        {
+          "id": "bar_home",
+          "component": "NavigationBarItem",
+          "label": "Home",
+          "icon": "home",
+          "selectedIcon": "home",
+          "selected": true,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_home",
+          "component": "NavigationRailItem",
+          "label": "Home",
+          "icon": "home",
+          "selected": true,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "bar_actions",
+          "component": "NavigationBarItem",
+          "label": "Actions",
+          "icon": "touch_app",
+          "selectedIcon": "touch_app",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "actions"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_actions",
+          "component": "NavigationRailItem",
+          "label": "Actions",
+          "icon": "touch_app",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "actions"
+              }
+            }
+          }
+        },
+        {
+          "id": "bar_inputs",
+          "component": "NavigationBarItem",
+          "label": "Inputs",
+          "icon": "tune",
+          "selectedIcon": "tune",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "inputs"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_inputs",
+          "component": "NavigationRailItem",
+          "label": "Inputs",
+          "icon": "tune",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "inputs"
+              }
+            }
+          }
+        },
+        {
+          "id": "bar_overlays",
+          "component": "NavigationBarItem",
+          "label": "Overlays",
+          "icon": "layers",
+          "selectedIcon": "layers",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "overlays"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_overlays",
+          "component": "NavigationRailItem",
+          "label": "Overlays",
+          "icon": "layers",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "overlays"
+              }
+            }
+          }
+        },
+        {
+          "id": "nav_bar",
+          "component": "NavigationBar",
+          "children": [
+            "bar_home",
+            "bar_actions",
+            "bar_inputs",
+            "bar_overlays"
+          ],
+          "showIn": [
+            "compact"
+          ]
+        },
+        {
+          "id": "nav_rail",
+          "component": "NavigationRail",
+          "children": [
+            "rail_home",
+            "rail_actions",
+            "rail_inputs",
+            "rail_overlays"
+          ],
+          "showIn": [
+            "medium",
+            "expanded"
+          ],
+          "sizeClass": {
+            "expanded": {
+              "expanded": true
+            }
+          }
+        },
+        {
+          "id": "fab",
+          "component": "FloatingActionButton",
+          "icon": "add",
+          "label": "Create",
+          "extended": true,
+          "primary": true,
+          "sizeClass": {
+            "expanded": {
+              "size": "large"
+            }
+          }
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "scroll": true,
+          "padding": "lg",
+          "spacing": "lg",
+          "children": [
+            "hero",
+            "type_row",
+            "media_row",
+            "box",
+            "divider",
+            "grid",
+            "flex",
+            "plain_list",
+            "segmented_list"
+          ]
+        },
+        {
+          "id": "hero",
+          "component": "Text",
+          "text": "Material 3 Expressive",
+          "style": "hero_title"
+        },
+        {
+          "id": "type_row",
+          "component": "Column",
+          "spacing": "xs",
+          "children": [
+            "t_headline",
+            "t_title",
+            "t_body",
+            "t_label",
+            "t_clip"
+          ]
+        },
+        {
+          "id": "t_headline",
+          "component": "Text",
+          "text": "Headline medium",
+          "type": "headlineMedium",
+          "color": "primary"
+        },
+        {
+          "id": "t_title",
+          "component": "Text",
+          "text": "Title medium emphasized",
+          "type": "titleMediumEmphasized"
+        },
+        {
+          "id": "t_body",
+          "component": "Text",
+          "text": "Body large text that wraps onto more than one line when the window is narrow.",
+          "type": "bodyLarge",
+          "color": "onSurfaceVariant",
+          "maxLines": 2,
+          "overflow": "ellipsis"
+        },
+        {
+          "id": "t_label",
+          "component": "Text",
+          "text": "LABEL SMALL",
+          "type": "labelSmall",
+          "align": "center"
+        },
+        {
+          "id": "t_clip",
+          "component": "Text",
+          "text": "Clipped single line",
+          "type": "bodyMedium",
+          "maxLines": 1,
+          "overflow": "clip"
+        },
+        {
+          "id": "media_row",
+          "component": "Row",
+          "spacing": "md",
+          "verticalAlignment": "center",
+          "arrangement": "start",
+          "children": [
+            "icon_plain",
+            "icon_filled",
+            "spacer",
+            "image",
+            "shape"
+          ]
+        },
+        {
+          "id": "icon_plain",
+          "component": "Icon",
+          "name": "favorite",
+          "size": 24,
+          "color": "primary",
+          "contentDescription": "Favorite"
+        },
+        {
+          "id": "icon_filled",
+          "component": "Icon",
+          "name": "favorite",
+          "size": 32,
+          "filled": true,
+          "color": "tertiary"
+        },
+        {
+          "id": "spacer",
+          "component": "Spacer",
+          "width": "lg"
+        },
+        {
+          "id": "image",
+          "component": "Image",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "fit": "crop",
+          "shape": "large",
+          "aspectRatio": 1.5,
+          "contentDescription": "Sample image",
+          "weight": 1
+        },
+        {
+          "id": "shape",
+          "component": "Shape",
+          "shape": "cookie9Sided",
+          "color": "tertiaryContainer",
+          "content": "shape_icon"
+        },
+        {
+          "id": "shape_icon",
+          "component": "Icon",
+          "name": "star",
+          "size": 40,
+          "color": "onTertiaryContainer"
+        },
+        {
+          "id": "box",
+          "component": "Box",
+          "contentAlignment": "bottomEnd",
+          "children": [
+            "box_fill",
+            "box_label"
+          ]
+        },
+        {
+          "id": "box_fill",
+          "component": "Card",
+          "variant": "filled",
+          "shape": "extraLarge",
+          "content": [
+            "box_spacer"
+          ]
+        },
+        {
+          "id": "box_spacer",
+          "component": "Spacer",
+          "height": "xxxl"
+        },
+        {
+          "id": "box_label",
+          "component": "Text",
+          "text": "Box, bottom end",
+          "type": "labelLarge",
+          "padding": "md"
+        },
+        {
+          "id": "divider",
+          "component": "Divider"
+        },
+        {
+          "id": "grid",
+          "component": "Grid",
+          "columns": 1,
+          "spacing": "md",
+          "sizeClass": {
+            "medium": {
+              "columns": 2
+            },
+            "expanded": {
+              "columns": 3
+            }
+          },
+          "children": [
+            "card_filled",
+            "card_elevated",
+            "card_outlined"
+          ]
+        },
+        {
+          "id": "card_filled",
+          "component": "Card",
+          "variant": "filled",
+          "shape": "large",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "detail"
+              }
+            }
+          },
+          "content": [
+            "card_filled_title",
+            "card_filled_text"
+          ]
+        },
+        {
+          "id": "card_filled_title",
+          "component": "Text",
+          "text": "Filled card",
+          "type": "titleMedium",
+          "padding": "lg"
+        },
+        {
+          "id": "card_filled_text",
+          "component": "Text",
+          "text": "Opens the detail pane",
+          "type": "bodyMedium",
+          "color": "onSurfaceVariant",
+          "padding": "lg"
+        },
+        {
+          "id": "card_elevated",
+          "component": "Card",
+          "variant": "elevated",
+          "content": [
+            "card_elevated_title"
+          ]
+        },
+        {
+          "id": "card_elevated_title",
+          "component": "Text",
+          "text": "Elevated card",
+          "type": "titleMedium",
+          "padding": "lg"
+        },
+        {
+          "id": "card_outlined",
+          "component": "Card",
+          "variant": "outlined",
+          "content": [
+            "card_outlined_title"
+          ]
+        },
+        {
+          "id": "card_outlined_title",
+          "component": "Text",
+          "text": "Outlined card",
+          "type": "titleMedium",
+          "padding": "lg"
+        },
+        {
+          "id": "flex",
+          "component": "FlexBox",
+          "wrap": true,
+          "gap": "sm",
+          "children": [
+            "flex_a",
+            "flex_b",
+            "flex_c",
+            "vertical_rule",
+            "flex_d"
+          ]
+        },
+        {
+          "id": "flex_a",
+          "component": "SuggestionChip",
+          "label": "Layout"
+        },
+        {
+          "id": "flex_b",
+          "component": "SuggestionChip",
+          "label": "Content"
+        },
+        {
+          "id": "flex_c",
+          "component": "SuggestionChip",
+          "label": "Structure"
+        },
+        {
+          "id": "vertical_rule",
+          "component": "Divider",
+          "vertical": true
+        },
+        {
+          "id": "flex_d",
+          "component": "SuggestionChip",
+          "label": "Lists",
+          "variant": "elevated"
+        },
+        {
+          "id": "plain_list",
+          "component": "List",
+          "variant": "standard",
+          "children": {
+            "componentId": "plain_row",
+            "path": "/rows"
+          }
+        },
+        {
+          "id": "plain_row",
+          "component": "ListItem",
+          "overline": {
+            "@path": "kind"
+          },
+          "headline": {
+            "@path": "name"
+          },
+          "supporting": {
+            "@path": "detail"
+          },
+          "leading": "row_icon",
+          "trailing": "row_meta",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "detail"
+              }
+            }
+          }
+        },
+        {
+          "id": "row_icon",
+          "component": "Icon",
+          "name": "article"
+        },
+        {
+          "id": "row_meta",
+          "component": "Text",
+          "text": {
+            "@path": "meta"
+          },
+          "type": "labelSmall"
+        },
+        {
+          "id": "segmented_list",
+          "component": "List",
+          "variant": "segmented",
+          "children": [
+            "seg_one",
+            "seg_two",
+            "seg_three"
+          ]
+        },
+        {
+          "id": "seg_one",
+          "component": "ListItem",
+          "headline": "Segmented, selected",
+          "supporting": "selected is true",
+          "selected": true
+        },
+        {
+          "id": "seg_two",
+          "component": "ListItem",
+          "headline": "Segmented, actionable",
+          "supporting": "Opens the detail pane",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "detail"
+              }
+            }
+          }
+        },
+        {
+          "id": "seg_three",
+          "component": "ListItem",
+          "headline": "Segmented, plain",
+          "trailing": "seg_switch"
+        },
+        {
+          "id": "seg_switch",
+          "component": "Switch",
+          "checked": true,
+          "contentDescription": "Plain item toggle"
+        }
+      ]
+    },
+    "detail": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "topBar": "top",
+          "content": "body"
+        },
+        {
+          "id": "top",
+          "component": "TopAppBar",
+          "size": "small",
+          "title": "Detail",
+          "navigationIcon": "back",
+          "showIn": [
+            "compact",
+            "medium"
+          ]
+        },
+        {
+          "id": "back",
+          "component": "IconButton",
+          "icon": "arrow_back",
+          "contentDescription": "Back",
+          "action": {
+            "functionCall": {
+              "@call": "back"
+            }
+          }
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "padding": "lg",
+          "spacing": "md",
+          "children": [
+            "detail_title",
+            "detail_text"
+          ]
+        },
+        {
+          "id": "detail_title",
+          "component": "Text",
+          "text": "Detail pane",
+          "type": "headlineSmall"
+        },
+        {
+          "id": "detail_text",
+          "component": "Text",
+          "text": "Beside the home list at expanded widths.",
+          "type": "bodyLarge"
+        }
+      ]
+    },
+    "actions": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "topBar": "top",
+          "bottomBar": "nav_bar",
+          "navigationRail": "nav_rail",
+          "content": "body"
+        },
+        {
+          "id": "top",
+          "component": "TopAppBar",
+          "size": "center",
+          "title": "Actions"
+        },
+        {
+          "id": "bar_home",
+          "component": "NavigationBarItem",
+          "label": "Home",
+          "icon": "home",
+          "selectedIcon": "home",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_home",
+          "component": "NavigationRailItem",
+          "label": "Home",
+          "icon": "home",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "bar_actions",
+          "component": "NavigationBarItem",
+          "label": "Actions",
+          "icon": "touch_app",
+          "selectedIcon": "touch_app",
+          "selected": true,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "actions"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_actions",
+          "component": "NavigationRailItem",
+          "label": "Actions",
+          "icon": "touch_app",
+          "selected": true,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "actions"
+              }
+            }
+          }
+        },
+        {
+          "id": "bar_inputs",
+          "component": "NavigationBarItem",
+          "label": "Inputs",
+          "icon": "tune",
+          "selectedIcon": "tune",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "inputs"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_inputs",
+          "component": "NavigationRailItem",
+          "label": "Inputs",
+          "icon": "tune",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "inputs"
+              }
+            }
+          }
+        },
+        {
+          "id": "bar_overlays",
+          "component": "NavigationBarItem",
+          "label": "Overlays",
+          "icon": "layers",
+          "selectedIcon": "layers",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "overlays"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_overlays",
+          "component": "NavigationRailItem",
+          "label": "Overlays",
+          "icon": "layers",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "overlays"
+              }
+            }
+          }
+        },
+        {
+          "id": "nav_bar",
+          "component": "NavigationBar",
+          "children": [
+            "bar_home",
+            "bar_actions",
+            "bar_inputs",
+            "bar_overlays"
+          ],
+          "showIn": [
+            "compact"
+          ]
+        },
+        {
+          "id": "nav_rail",
+          "component": "NavigationRail",
+          "children": [
+            "rail_home",
+            "rail_actions",
+            "rail_inputs",
+            "rail_overlays"
+          ],
+          "showIn": [
+            "medium",
+            "expanded"
+          ],
+          "sizeClass": {
+            "expanded": {
+              "expanded": true
+            }
+          }
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "scroll": true,
+          "padding": "lg",
+          "spacing": "lg",
+          "children": [
+            "variants",
+            "sizes",
+            "square",
+            "toggles",
+            "group_standard",
+            "group_connected",
+            "icon_variants",
+            "icon_sizes",
+            "icon_widths",
+            "icon_toggles",
+            "splits"
+          ]
+        },
+        {
+          "id": "button_filled",
+          "component": "Button",
+          "variant": "filled",
+          "label": "Filled",
+          "icon": "check"
+        },
+        {
+          "id": "button_tonal",
+          "component": "Button",
+          "variant": "tonal",
+          "label": "Tonal"
+        },
+        {
+          "id": "button_elevated",
+          "component": "Button",
+          "variant": "elevated",
+          "label": "Elevated"
+        },
+        {
+          "id": "button_outlined",
+          "component": "Button",
+          "variant": "outlined",
+          "label": "Outlined"
+        },
+        {
+          "id": "button_text",
+          "component": "Button",
+          "variant": "text",
+          "label": "Text"
+        },
+        {
+          "id": "variants",
+          "component": "FlexBox",
+          "wrap": true,
+          "gap": "sm",
+          "children": [
+            "button_filled",
+            "button_tonal",
+            "button_elevated",
+            "button_outlined",
+            "button_text"
+          ]
+        },
+        {
+          "id": "size_extra_small",
+          "component": "Button",
+          "size": "extra-small",
+          "label": "Extra small",
+          "icon": "bolt",
+          "primary": false
+        },
+        {
+          "id": "size_small",
+          "component": "Button",
+          "size": "small",
+          "label": "Small",
+          "icon": "bolt",
+          "primary": false
+        },
+        {
+          "id": "size_medium",
+          "component": "Button",
+          "size": "medium",
+          "label": "Medium",
+          "icon": "bolt",
+          "primary": false
+        },
+        {
+          "id": "size_large",
+          "component": "Button",
+          "size": "large",
+          "label": "Large",
+          "icon": "bolt",
+          "primary": false
+        },
+        {
+          "id": "size_extra_large",
+          "component": "Button",
+          "size": "extra-large",
+          "label": "Extra large",
+          "icon": "bolt",
+          "primary": true
+        },
+        {
+          "id": "sizes",
+          "component": "Column",
+          "spacing": "sm",
+          "horizontalAlignment": "start",
+          "children": [
+            "size_extra_small",
+            "size_small",
+            "size_medium",
+            "size_large",
+            "size_extra_large"
+          ]
+        },
+        {
+          "id": "square",
+          "component": "Button",
+          "variant": "tonal",
+          "shape": "square",
+          "label": "Square shape"
+        },
+        {
+          "id": "toggle_filled",
+          "component": "ToggleButton",
+          "variant": "filled",
+          "label": "Filled",
+          "checked": true
+        },
+        {
+          "id": "toggle_tonal",
+          "component": "ToggleButton",
+          "variant": "tonal",
+          "label": "Tonal",
+          "checked": true
+        },
+        {
+          "id": "toggle_elevated",
+          "component": "ToggleButton",
+          "variant": "elevated",
+          "label": "Elevated",
+          "checked": false
+        },
+        {
+          "id": "toggle_outlined",
+          "component": "ToggleButton",
+          "variant": "outlined",
+          "label": "Outlined",
+          "checked": false
+        },
+        {
+          "id": "toggles",
+          "component": "FlexBox",
+          "wrap": true,
+          "gap": "sm",
+          "children": [
+            "toggle_filled",
+            "toggle_tonal",
+            "toggle_elevated",
+            "toggle_outlined"
+          ]
+        },
+        {
+          "id": "std_one",
+          "component": "Button",
+          "variant": "tonal",
+          "label": "One"
+        },
+        {
+          "id": "std_two",
+          "component": "Button",
+          "variant": "tonal",
+          "label": "Two"
+        },
+        {
+          "id": "std_icon",
+          "component": "IconButton",
+          "variant": "tonal",
+          "icon": "more_horiz",
+          "contentDescription": "More"
+        },
+        {
+          "id": "group_standard",
+          "component": "ButtonGroup",
+          "variant": "standard",
+          "children": [
+            "std_one",
+            "std_two",
+            "std_icon"
+          ]
+        },
+        {
+          "id": "con_day",
+          "component": "ToggleButton",
+          "variant": "tonal",
+          "size": "medium",
+          "label": "Day",
+          "checked": true,
+          "weight": 1
+        },
+        {
+          "id": "con_week",
+          "component": "ToggleButton",
+          "variant": "tonal",
+          "size": "medium",
+          "label": "Week",
+          "checked": false,
+          "weight": 1
+        },
+        {
+          "id": "con_month",
+          "component": "ToggleButton",
+          "variant": "tonal",
+          "size": "medium",
+          "label": "Month",
+          "checked": false,
+          "weight": 1
+        },
+        {
+          "id": "group_connected",
+          "component": "ButtonGroup",
+          "variant": "connected",
+          "children": [
+            "con_day",
+            "con_week",
+            "con_month"
+          ]
+        },
+        {
+          "id": "icon_standard",
+          "component": "IconButton",
+          "variant": "standard",
+          "icon": "edit",
+          "contentDescription": "Edit, standard"
+        },
+        {
+          "id": "icon_filled",
+          "component": "IconButton",
+          "variant": "filled",
+          "icon": "edit",
+          "contentDescription": "Edit, filled"
+        },
+        {
+          "id": "icon_tonal",
+          "component": "IconButton",
+          "variant": "tonal",
+          "icon": "edit",
+          "contentDescription": "Edit, tonal"
+        },
+        {
+          "id": "icon_outlined",
+          "component": "IconButton",
+          "variant": "outlined",
+          "icon": "edit",
+          "contentDescription": "Edit, outlined"
+        },
+        {
+          "id": "icon_variants",
+          "component": "Row",
+          "spacing": "sm",
+          "children": [
+            "icon_standard",
+            "icon_filled",
+            "icon_tonal",
+            "icon_outlined"
+          ]
+        },
+        {
+          "id": "icon_size_extra_small",
+          "component": "IconButton",
+          "variant": "tonal",
+          "size": "extra-small",
+          "icon": "play_arrow",
+          "contentDescription": "Play, extra-small"
+        },
+        {
+          "id": "icon_size_small",
+          "component": "IconButton",
+          "variant": "tonal",
+          "size": "small",
+          "icon": "play_arrow",
+          "contentDescription": "Play, small"
+        },
+        {
+          "id": "icon_size_medium",
+          "component": "IconButton",
+          "variant": "tonal",
+          "size": "medium",
+          "icon": "play_arrow",
+          "contentDescription": "Play, medium"
+        },
+        {
+          "id": "icon_size_large",
+          "component": "IconButton",
+          "variant": "tonal",
+          "size": "large",
+          "icon": "play_arrow",
+          "contentDescription": "Play, large"
+        },
+        {
+          "id": "icon_size_extra_large",
+          "component": "IconButton",
+          "variant": "tonal",
+          "size": "extra-large",
+          "icon": "play_arrow",
+          "contentDescription": "Play, extra-large"
+        },
+        {
+          "id": "icon_sizes",
+          "component": "FlexBox",
+          "wrap": true,
+          "gap": "sm",
+          "children": [
+            "icon_size_extra_small",
+            "icon_size_small",
+            "icon_size_medium",
+            "icon_size_large",
+            "icon_size_extra_large"
+          ]
+        },
+        {
+          "id": "icon_width_narrow",
+          "component": "IconButton",
+          "variant": "filled",
+          "width": "narrow",
+          "icon": "mic",
+          "contentDescription": "Record, narrow"
+        },
+        {
+          "id": "icon_width_uniform",
+          "component": "IconButton",
+          "variant": "filled",
+          "width": "uniform",
+          "icon": "mic",
+          "contentDescription": "Record, uniform"
+        },
+        {
+          "id": "icon_width_wide",
+          "component": "IconButton",
+          "variant": "filled",
+          "width": "wide",
+          "icon": "mic",
+          "contentDescription": "Record, wide"
+        },
+        {
+          "id": "icon_widths",
+          "component": "Row",
+          "spacing": "sm",
+          "children": [
+            "icon_width_narrow",
+            "icon_width_uniform",
+            "icon_width_wide"
+          ]
+        },
+        {
+          "id": "icon_toggle_standard_off",
+          "component": "IconButton",
+          "variant": "standard",
+          "toggle": true,
+          "checked": false,
+          "icon": "bookmark",
+          "contentDescription": "Bookmark, standard"
+        },
+        {
+          "id": "icon_toggle_standard_on",
+          "component": "IconButton",
+          "variant": "standard",
+          "toggle": true,
+          "checked": true,
+          "icon": "bookmark",
+          "contentDescription": "Bookmark, standard"
+        },
+        {
+          "id": "icon_toggle_filled_off",
+          "component": "IconButton",
+          "variant": "filled",
+          "toggle": true,
+          "checked": false,
+          "icon": "bookmark",
+          "contentDescription": "Bookmark, filled"
+        },
+        {
+          "id": "icon_toggle_filled_on",
+          "component": "IconButton",
+          "variant": "filled",
+          "toggle": true,
+          "checked": true,
+          "icon": "bookmark",
+          "contentDescription": "Bookmark, filled"
+        },
+        {
+          "id": "icon_toggle_tonal_off",
+          "component": "IconButton",
+          "variant": "tonal",
+          "toggle": true,
+          "checked": false,
+          "icon": "bookmark",
+          "contentDescription": "Bookmark, tonal"
+        },
+        {
+          "id": "icon_toggle_tonal_on",
+          "component": "IconButton",
+          "variant": "tonal",
+          "toggle": true,
+          "checked": true,
+          "icon": "bookmark",
+          "contentDescription": "Bookmark, tonal"
+        },
+        {
+          "id": "icon_toggle_outlined_off",
+          "component": "IconButton",
+          "variant": "outlined",
+          "toggle": true,
+          "checked": false,
+          "icon": "bookmark",
+          "contentDescription": "Bookmark, outlined"
+        },
+        {
+          "id": "icon_toggle_outlined_on",
+          "component": "IconButton",
+          "variant": "outlined",
+          "toggle": true,
+          "checked": true,
+          "icon": "bookmark",
+          "contentDescription": "Bookmark, outlined"
+        },
+        {
+          "id": "icon_toggles",
+          "component": "FlexBox",
+          "wrap": true,
+          "gap": "sm",
+          "children": [
+            "icon_toggle_standard_off",
+            "icon_toggle_standard_on",
+            "icon_toggle_filled_off",
+            "icon_toggle_filled_on",
+            "icon_toggle_tonal_off",
+            "icon_toggle_tonal_on",
+            "icon_toggle_outlined_off",
+            "icon_toggle_outlined_on"
+          ]
+        },
+        {
+          "id": "split_item_filled",
+          "component": "MenuItem",
+          "label": "Send later",
+          "icon": "schedule",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "split_menu_filled",
+          "component": "Menu",
+          "items": [
+            "split_item_filled"
+          ]
+        },
+        {
+          "id": "split_filled",
+          "component": "SplitButton",
+          "variant": "filled",
+          "label": "Send",
+          "icon": "send",
+          "menu": "split_menu_filled"
+        },
+        {
+          "id": "split_item_tonal",
+          "component": "MenuItem",
+          "label": "Send later",
+          "icon": "schedule",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "split_menu_tonal",
+          "component": "Menu",
+          "items": [
+            "split_item_tonal"
+          ]
+        },
+        {
+          "id": "split_tonal",
+          "component": "SplitButton",
+          "variant": "tonal",
+          "label": "Send",
+          "icon": "send",
+          "menu": "split_menu_tonal"
+        },
+        {
+          "id": "split_item_elevated",
+          "component": "MenuItem",
+          "label": "Send later",
+          "icon": "schedule",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "split_menu_elevated",
+          "component": "Menu",
+          "items": [
+            "split_item_elevated"
+          ]
+        },
+        {
+          "id": "split_elevated",
+          "component": "SplitButton",
+          "variant": "elevated",
+          "label": "Send",
+          "icon": "send",
+          "menu": "split_menu_elevated"
+        },
+        {
+          "id": "split_item_outlined",
+          "component": "MenuItem",
+          "label": "Send later",
+          "icon": "schedule",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "split_menu_outlined",
+          "component": "Menu",
+          "items": [
+            "split_item_outlined"
+          ]
+        },
+        {
+          "id": "split_outlined",
+          "component": "SplitButton",
+          "variant": "outlined",
+          "label": "Send",
+          "icon": "send",
+          "menu": "split_menu_outlined"
+        },
+        {
+          "id": "splits",
+          "component": "FlexBox",
+          "wrap": true,
+          "gap": "sm",
+          "children": [
+            "split_filled",
+            "split_tonal",
+            "split_elevated",
+            "split_outlined"
+          ]
+        }
+      ]
+    },
+    "inputs": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "topBar": "top",
+          "bottomBar": "toolbar",
+          "navigationRail": "nav_rail",
+          "content": "body"
+        },
+        {
+          "id": "top",
+          "component": "TopAppBar",
+          "size": "small",
+          "title": "Inputs and feedback"
+        },
+        {
+          "id": "rail_home",
+          "component": "NavigationRailItem",
+          "label": "Home",
+          "icon": "home",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_actions",
+          "component": "NavigationRailItem",
+          "label": "Actions",
+          "icon": "touch_app",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "actions"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_inputs",
+          "component": "NavigationRailItem",
+          "label": "Inputs",
+          "icon": "tune",
+          "selected": true,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "inputs"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_overlays",
+          "component": "NavigationRailItem",
+          "label": "Overlays",
+          "icon": "layers",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "overlays"
+              }
+            }
+          }
+        },
+        {
+          "id": "nav_rail",
+          "component": "NavigationRail",
+          "children": [
+            "rail_home",
+            "rail_actions",
+            "rail_inputs",
+            "rail_overlays"
+          ],
+          "showIn": [
+            "medium",
+            "expanded"
+          ],
+          "sizeClass": {
+            "expanded": {
+              "expanded": true
+            }
+          }
+        },
+        {
+          "id": "tb_draw",
+          "component": "ToggleButton",
+          "label": "Draw",
+          "icon": "draw",
+          "checked": true
+        },
+        {
+          "id": "tb_erase",
+          "component": "ToggleButton",
+          "label": "Erase",
+          "icon": "ink_eraser",
+          "checked": false
+        },
+        {
+          "id": "tb_select",
+          "component": "ToggleButton",
+          "label": "Select",
+          "icon": "select",
+          "checked": false
+        },
+        {
+          "id": "toolbar",
+          "component": "FloatingToolbar",
+          "orientation": "horizontal",
+          "colors": "standard",
+          "children": [
+            "tb_draw",
+            "tb_erase",
+            "tb_select"
+          ]
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "scroll": true,
+          "padding": "lg",
+          "spacing": "lg",
+          "children": [
+            "chips",
+            "chip_group",
+            "controls",
+            "slider",
+            "range_slider",
+            "fields",
+            "feedback",
+            "vertical_toolbar"
+          ]
+        },
+        {
+          "id": "assist_outlined",
+          "component": "AssistChip",
+          "variant": "outlined",
+          "label": "Assist",
+          "icon": "event"
+        },
+        {
+          "id": "assist_elevated",
+          "component": "AssistChip",
+          "variant": "elevated",
+          "label": "Assist elevated"
+        },
+        {
+          "id": "filter_outlined",
+          "component": "FilterChip",
+          "variant": "outlined",
+          "label": "Filter",
+          "selected": true
+        },
+        {
+          "id": "filter_elevated",
+          "component": "FilterChip",
+          "variant": "elevated",
+          "label": "Filter elevated",
+          "icon": "tune"
+        },
+        {
+          "id": "input_chip",
+          "component": "InputChip",
+          "label": "Input",
+          "icon": "person",
+          "selected": false
+        },
+        {
+          "id": "suggestion_outlined",
+          "component": "SuggestionChip",
+          "variant": "outlined",
+          "label": "Suggestion"
+        },
+        {
+          "id": "suggestion_elevated",
+          "component": "SuggestionChip",
+          "variant": "elevated",
+          "label": "Suggestion elevated"
+        },
+        {
+          "id": "chips",
+          "component": "FlexBox",
+          "wrap": true,
+          "gap": "sm",
+          "children": [
+            "assist_outlined",
+            "assist_elevated",
+            "filter_outlined",
+            "filter_elevated",
+            "input_chip",
+            "suggestion_outlined",
+            "suggestion_elevated"
+          ]
+        },
+        {
+          "id": "group_quick",
+          "component": "FilterChip",
+          "label": "Quick",
+          "selected": true
+        },
+        {
+          "id": "group_vegan",
+          "component": "FilterChip",
+          "label": "Vegan",
+          "selected": true
+        },
+        {
+          "id": "group_dessert",
+          "component": "FilterChip",
+          "label": "Dessert",
+          "selected": false
+        },
+        {
+          "id": "chip_group",
+          "component": "ChipGroup",
+          "multi": true,
+          "children": [
+            "group_quick",
+            "group_vegan",
+            "group_dessert"
+          ]
+        },
+        {
+          "id": "controls",
+          "component": "Row",
+          "spacing": "lg",
+          "verticalAlignment": "center",
+          "children": [
+            "switch_on",
+            "switch_off",
+            "check_on",
+            "check_off"
+          ]
+        },
+        {
+          "id": "switch_on",
+          "component": "Switch",
+          "checked": true,
+          "contentDescription": "Wi-Fi"
+        },
+        {
+          "id": "switch_off",
+          "component": "Switch",
+          "checked": false,
+          "contentDescription": "Bluetooth"
+        },
+        {
+          "id": "check_on",
+          "component": "Checkbox",
+          "checked": true,
+          "label": "Checked"
+        },
+        {
+          "id": "check_off",
+          "component": "Checkbox",
+          "checked": false,
+          "label": "Unchecked"
+        },
+        {
+          "id": "slider",
+          "component": "Slider",
+          "value": 40,
+          "range": [
+            0,
+            100
+          ],
+          "contentDescription": "Volume"
+        },
+        {
+          "id": "range_slider",
+          "component": "RangeSlider",
+          "value": [
+            20,
+            60
+          ],
+          "range": [
+            0,
+            100
+          ],
+          "steps": 9,
+          "contentDescription": "Price range"
+        },
+        {
+          "id": "field_filled",
+          "component": "TextField",
+          "variant": "filled",
+          "label": "Filled",
+          "value": "Value"
+        },
+        {
+          "id": "field_outlined",
+          "component": "TextField",
+          "variant": "outlined",
+          "label": "Outlined",
+          "value": "Value"
+        },
+        {
+          "id": "field_supporting",
+          "component": "TextField",
+          "variant": "filled",
+          "label": "With supporting",
+          "value": "Value",
+          "supporting": "Supporting text"
+        },
+        {
+          "id": "field_error",
+          "component": "TextField",
+          "variant": "outlined",
+          "label": "With error",
+          "value": "Value",
+          "error": true,
+          "supporting": "Error text"
+        },
+        {
+          "id": "field_icons",
+          "component": "TextField",
+          "variant": "filled",
+          "label": "Search",
+          "leadingIcon": "search",
+          "trailingIcon": "close"
+        },
+        {
+          "id": "field_prefix",
+          "component": "TextField",
+          "variant": "outlined",
+          "label": "Amount",
+          "prefix": "$",
+          "value": "120.00"
+        },
+        {
+          "id": "field_placeholder",
+          "component": "TextField",
+          "variant": "filled",
+          "placeholder": "Placeholder only"
+        },
+        {
+          "id": "field_multiline",
+          "component": "TextField",
+          "variant": "filled",
+          "label": "Notes",
+          "lines": 3,
+          "value": "Three lines"
+        },
+        {
+          "id": "fields",
+          "component": "Column",
+          "spacing": "md",
+          "children": [
+            "field_filled",
+            "field_outlined",
+            "field_supporting",
+            "field_error",
+            "field_icons",
+            "field_prefix",
+            "field_placeholder",
+            "field_multiline"
+          ]
+        },
+        {
+          "id": "loading",
+          "component": "LoadingIndicator"
+        },
+        {
+          "id": "loading_contained",
+          "component": "LoadingIndicator",
+          "contained": true
+        },
+        {
+          "id": "progress_linear",
+          "component": "ProgressIndicator",
+          "shape": "linear",
+          "progress": 0.4,
+          "weight": 1
+        },
+        {
+          "id": "progress_linear_wavy",
+          "component": "ProgressIndicator",
+          "shape": "linear",
+          "wavy": true,
+          "weight": 1
+        },
+        {
+          "id": "progress_circular",
+          "component": "ProgressIndicator",
+          "shape": "circular",
+          "progress": 0.7
+        },
+        {
+          "id": "progress_circular_wavy",
+          "component": "ProgressIndicator",
+          "shape": "circular",
+          "wavy": true
+        },
+        {
+          "id": "feedback",
+          "component": "FlexBox",
+          "wrap": true,
+          "gap": "md",
+          "children": [
+            "loading",
+            "loading_contained",
+            "progress_linear",
+            "progress_linear_wavy",
+            "progress_circular",
+            "progress_circular_wavy"
+          ]
+        },
+        {
+          "id": "vt_undo",
+          "component": "IconButton",
+          "icon": "undo",
+          "contentDescription": "Undo"
+        },
+        {
+          "id": "vt_redo",
+          "component": "IconButton",
+          "icon": "redo",
+          "contentDescription": "Redo"
+        },
+        {
+          "id": "vertical_toolbar",
+          "component": "FloatingToolbar",
+          "orientation": "vertical",
+          "colors": "vibrant",
+          "children": [
+            "vt_undo",
+            "vt_redo"
+          ]
+        }
+      ]
+    },
+    "overlays": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "topBar": "top",
+          "bottomBar": "nav_bar",
+          "navigationRail": "nav_rail",
+          "floatingActionButton": "fab_menu",
+          "content": "body"
+        },
+        {
+          "id": "top",
+          "component": "TopAppBar",
+          "size": "small",
+          "title": "Overlays",
+          "actions": [
+            "menu_anchor"
+          ]
+        },
+        {
+          "id": "menu_anchor",
+          "component": "IconButton",
+          "icon": "more_vert",
+          "contentDescription": "More options",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "menu"
+              }
+            }
+          }
+        },
+        {
+          "id": "bar_home",
+          "component": "NavigationBarItem",
+          "label": "Home",
+          "icon": "home",
+          "selectedIcon": "home",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_home",
+          "component": "NavigationRailItem",
+          "label": "Home",
+          "icon": "home",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "bar_actions",
+          "component": "NavigationBarItem",
+          "label": "Actions",
+          "icon": "touch_app",
+          "selectedIcon": "touch_app",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "actions"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_actions",
+          "component": "NavigationRailItem",
+          "label": "Actions",
+          "icon": "touch_app",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "actions"
+              }
+            }
+          }
+        },
+        {
+          "id": "bar_inputs",
+          "component": "NavigationBarItem",
+          "label": "Inputs",
+          "icon": "tune",
+          "selectedIcon": "tune",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "inputs"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_inputs",
+          "component": "NavigationRailItem",
+          "label": "Inputs",
+          "icon": "tune",
+          "selected": false,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "inputs"
+              }
+            }
+          }
+        },
+        {
+          "id": "bar_overlays",
+          "component": "NavigationBarItem",
+          "label": "Overlays",
+          "icon": "layers",
+          "selectedIcon": "layers",
+          "selected": true,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "overlays"
+              }
+            }
+          }
+        },
+        {
+          "id": "rail_overlays",
+          "component": "NavigationRailItem",
+          "label": "Overlays",
+          "icon": "layers",
+          "selected": true,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "overlays"
+              }
+            }
+          }
+        },
+        {
+          "id": "nav_bar",
+          "component": "NavigationBar",
+          "children": [
+            "bar_home",
+            "bar_actions",
+            "bar_inputs",
+            "bar_overlays"
+          ],
+          "showIn": [
+            "compact"
+          ]
+        },
+        {
+          "id": "nav_rail",
+          "component": "NavigationRail",
+          "children": [
+            "rail_home",
+            "rail_actions",
+            "rail_inputs",
+            "rail_overlays"
+          ],
+          "showIn": [
+            "medium",
+            "expanded"
+          ],
+          "sizeClass": {
+            "expanded": {
+              "expanded": true
+            }
+          }
+        },
+        {
+          "id": "fab_item_note",
+          "component": "FabMenuItem",
+          "label": "Note",
+          "icon": "note",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "sheet"
+              }
+            }
+          }
+        },
+        {
+          "id": "fab_item_photo",
+          "component": "FabMenuItem",
+          "label": "Photo",
+          "icon": "photo_camera"
+        },
+        {
+          "id": "fab_menu",
+          "component": "FabMenu",
+          "icon": "add",
+          "expanded": false,
+          "children": [
+            "fab_item_note",
+            "fab_item_photo"
+          ]
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "padding": "lg",
+          "spacing": "md",
+          "children": [
+            "open_sheet",
+            "open_dialog",
+            "open_fabs"
+          ]
+        },
+        {
+          "id": "open_sheet",
+          "component": "Button",
+          "variant": "tonal",
+          "label": "Open bottom sheet",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "sheet"
+              }
+            }
+          },
+          "primary": true
+        },
+        {
+          "id": "open_dialog",
+          "component": "Button",
+          "variant": "outlined",
+          "label": "Open dialog",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "dialog"
+              }
+            }
+          }
+        },
+        {
+          "id": "open_fabs",
+          "component": "Button",
+          "variant": "text",
+          "label": "All floating action buttons",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "fabs"
+              }
+            }
+          }
+        },
+        {
+          "id": "sheet",
+          "component": "BottomSheet",
+          "content": [
+            "sheet_title",
+            "sheet_text",
+            "sheet_close"
+          ]
+        },
+        {
+          "id": "sheet_title",
+          "component": "Text",
+          "text": "Bottom sheet",
+          "type": "titleLarge"
+        },
+        {
+          "id": "sheet_text",
+          "component": "Text",
+          "text": "Modal, with a drag handle.",
+          "type": "bodyMedium",
+          "color": "onSurfaceVariant"
+        },
+        {
+          "id": "sheet_close",
+          "component": "Button",
+          "label": "Done",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "dialog",
+          "component": "Dialog",
+          "title": "Discard draft?",
+          "text": "Your changes will be lost.",
+          "confirm": "dialog_confirm",
+          "dismiss": "dialog_dismiss"
+        },
+        {
+          "id": "dialog_confirm",
+          "component": "Button",
+          "variant": "text",
+          "label": "Discard",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "dialog_dismiss",
+          "component": "Button",
+          "variant": "text",
+          "label": "Cancel",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "menu_edit",
+          "component": "MenuItem",
+          "label": "Edit",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "menu_share",
+          "component": "MenuItem",
+          "label": "Share",
+          "icon": "share",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "menu_delete",
+          "component": "MenuItem",
+          "label": "Delete",
+          "icon": "delete",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "menu",
+          "component": "Menu",
+          "anchor": "menu_anchor",
+          "items": [
+            "menu_edit",
+            "menu_share",
+            "menu_delete"
+          ]
+        }
+      ]
+    },
+    "fabs": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "topBar": "top",
+          "content": "body"
+        },
+        {
+          "id": "top",
+          "component": "TopAppBar",
+          "size": "medium",
+          "title": "Floating action buttons",
+          "navigationIcon": "back"
+        },
+        {
+          "id": "back",
+          "component": "IconButton",
+          "icon": "arrow_back",
+          "contentDescription": "Back",
+          "action": {
+            "functionCall": {
+              "@call": "back"
+            }
+          }
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "scroll": true,
+          "padding": "lg",
+          "spacing": "lg",
+          "children": [
+            "fab_sizes",
+            "fab_extended",
+            "fab_colors"
+          ]
+        },
+        {
+          "id": "fab_small",
+          "component": "FloatingActionButton",
+          "size": "small",
+          "icon": "edit",
+          "contentDescription": "Edit, small"
+        },
+        {
+          "id": "fab_medium",
+          "component": "FloatingActionButton",
+          "size": "medium",
+          "icon": "edit",
+          "contentDescription": "Edit, medium"
+        },
+        {
+          "id": "fab_large",
+          "component": "FloatingActionButton",
+          "size": "large",
+          "icon": "edit",
+          "contentDescription": "Edit, large"
+        },
+        {
+          "id": "fab_sizes",
+          "component": "Row",
+          "spacing": "md",
+          "verticalAlignment": "center",
+          "children": [
+            "fab_small",
+            "fab_medium",
+            "fab_large"
+          ]
+        },
+        {
+          "id": "fab_ext_small",
+          "component": "FloatingActionButton",
+          "size": "small",
+          "extended": true,
+          "icon": "edit",
+          "label": "Compose",
+          "primary": false
+        },
+        {
+          "id": "fab_ext_medium",
+          "component": "FloatingActionButton",
+          "size": "medium",
+          "extended": true,
+          "icon": "edit",
+          "label": "Compose",
+          "primary": false
+        },
+        {
+          "id": "fab_ext_large",
+          "component": "FloatingActionButton",
+          "size": "large",
+          "extended": true,
+          "icon": "edit",
+          "label": "Compose",
+          "primary": true
+        },
+        {
+          "id": "fab_extended",
+          "component": "Column",
+          "spacing": "md",
+          "children": [
+            "fab_ext_small",
+            "fab_ext_medium",
+            "fab_ext_large"
+          ]
+        },
+        {
+          "id": "fab_color_primary_container",
+          "component": "FloatingActionButton",
+          "size": "small",
+          "color": "primary-container",
+          "icon": "palette",
+          "contentDescription": "primary-container"
+        },
+        {
+          "id": "fab_color_primary",
+          "component": "FloatingActionButton",
+          "size": "small",
+          "color": "primary",
+          "icon": "palette",
+          "contentDescription": "primary"
+        },
+        {
+          "id": "fab_color_secondary_container",
+          "component": "FloatingActionButton",
+          "size": "small",
+          "color": "secondary-container",
+          "icon": "palette",
+          "contentDescription": "secondary-container"
+        },
+        {
+          "id": "fab_color_secondary",
+          "component": "FloatingActionButton",
+          "size": "small",
+          "color": "secondary",
+          "icon": "palette",
+          "contentDescription": "secondary"
+        },
+        {
+          "id": "fab_color_tertiary_container",
+          "component": "FloatingActionButton",
+          "size": "small",
+          "color": "tertiary-container",
+          "icon": "palette",
+          "contentDescription": "tertiary-container"
+        },
+        {
+          "id": "fab_color_tertiary",
+          "component": "FloatingActionButton",
+          "size": "small",
+          "color": "tertiary",
+          "icon": "palette",
+          "contentDescription": "tertiary"
+        },
+        {
+          "id": "fab_color_surface",
+          "component": "FloatingActionButton",
+          "size": "small",
+          "color": "surface",
+          "icon": "palette",
+          "contentDescription": "surface"
+        },
+        {
+          "id": "fab_colors",
+          "component": "FlexBox",
+          "wrap": true,
+          "gap": "md",
+          "children": [
+            "fab_color_primary_container",
+            "fab_color_primary",
+            "fab_color_secondary_container",
+            "fab_color_secondary",
+            "fab_color_tertiary_container",
+            "fab_color_tertiary",
+            "fab_color_surface"
+          ]
+        }
+      ]
+    }
+  }
+}

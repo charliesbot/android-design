@@ -1,0 +1,98 @@
+package bot.charlies.androiddesign.preview.feature.preview.theme
+
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.platform.Font
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * The faces the app bundles. [family] is the name a DESIGN.md uses, [resource] the classpath path
+ * of the (variable) TTF.
+ */
+enum class FontFace(val family: String, val resource: String) {
+  GoogleSansFlex("Google Sans Flex", "fonts/google_sans_flex.ttf"),
+  Fraunces("Fraunces", "fonts/fraunces.ttf"),
+  BricolageGrotesque("Bricolage Grotesque", "fonts/bricolage_grotesque.ttf"),
+  BigShouldersDisplay("Big Shoulders Display", "fonts/big_shoulders_display.ttf"),
+  Doto("Doto", "fonts/doto.ttf"),
+  GoogleSansCode("Google Sans Code", "fonts/google_sans_code.ttf");
+
+  companion object {
+    /** The face named [family], ignoring case; null for names the app does not bundle. */
+    fun byFamily(family: String?): FontFace? = entries.firstOrNull {
+      it.family.equals(family?.trim(), ignoreCase = true)
+    }
+  }
+}
+
+/** One axis of a variable font, such as `wght` 500. */
+data class FontAxis(val tag: String, val value: Float)
+
+/** Builds and caches the Compose font families for the bundled variable fonts. */
+object ProposalFonts {
+  /** The weights a variable font accepts. */
+  val WEIGHTS = 1..1000
+
+  const val SYMBOLS_RESOURCE = "fonts/material_symbols_rounded.ttf"
+
+  private val cache = ConcurrentHashMap<Key, FontFamily>()
+  private val symbolCache = ConcurrentHashMap<Pair<Boolean, Int>, FontFamily>()
+
+  private data class Key(val face: FontFace, val weight: Int, val axes: List<FontAxis>)
+
+  /**
+   * A family holding [face] at [weight] with the extra variation [axes]. A variable font needs one
+   * entry per weight, so each text style gets the family built for its own weight. A weight outside
+   * [WEIGHTS] is brought to the nearest one and an axis value that is not finite is left out,
+   * because Compose throws on them and the validator is not the only way a value gets here.
+   */
+  fun family(face: FontFace, weight: Int, axes: List<FontAxis> = emptyList()): FontFamily {
+    val clamped = weight.coerceIn(WEIGHTS)
+    val usable = axes.filter { it.tag != "wght" && it.value.isFinite() }
+    return cache.getOrPut(Key(face, clamped, usable)) {
+      FontFamily(
+        Font(
+          face.resource,
+          FontWeight(clamped),
+          FontStyle.Normal,
+          FontVariation.Settings(
+            FontVariation.weight(clamped),
+            *usable.map { FontVariation.Setting(it.tag, it.value) }.toTypedArray(),
+          ),
+        ),
+      )
+    }
+  }
+
+  /** Material Symbols Rounded at weight 400, grade 0, with the optical size matching [sizeDp]. */
+  fun symbols(filled: Boolean, sizeDp: Int): FontFamily {
+    val opticalSize = sizeDp.coerceIn(20, 48)
+    return symbolCache.getOrPut(filled to opticalSize) {
+      FontFamily(
+        Font(
+          SYMBOLS_RESOURCE,
+          FontWeight.Normal,
+          FontStyle.Normal,
+          FontVariation.Settings(
+            FontVariation.Setting("FILL", if (filled) 1f else 0f),
+            FontVariation.Setting("GRAD", 0f),
+            FontVariation.Setting("opsz", opticalSize.toFloat()),
+            FontVariation.weight(400),
+          ),
+        ),
+      )
+    }
+  }
+
+  private val AXIS = Regex("""['"]([A-Za-z0-9]{4})['"]\s*(-?\d+(?:\.\d+)?)""")
+
+  /** Reads a CSS `font-variation-settings` string such as `'opsz' 72, 'SOFT' 50`. */
+  fun parseVariation(value: String?): List<FontAxis> =
+    value
+      ?.let { text ->
+        AXIS.findAll(text).map { FontAxis(it.groupValues[1], it.groupValues[2].toFloat()) }.toList()
+      }
+      .orEmpty()
+}

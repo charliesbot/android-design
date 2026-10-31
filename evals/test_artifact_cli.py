@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -17,7 +18,7 @@ class ArtifactCliTests(unittest.TestCase):
     def test_promotion_rejects_pending_judgments(self):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
-            (directory / 'results.json').write_text(json.dumps({'cases':[{'name':'music','surface':'phone','status':'pending','checks':{'C-build':{'pass':True}},'judge':{'R-one':{'pass':None}}}]}))
+            (directory / 'results.json').write_text(json.dumps({'cases':[{'name':'music','surface':'phone','status':'pending','checks':{'C-valid':{'pass':True}},'judge':{'R-one':{'pass':None}}}]}))
             result = subprocess.run([sys.executable, str(HERE / 'promote.py'), str(directory)], capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('incomplete', result.stderr)
@@ -35,7 +36,8 @@ class ArtifactCliTests(unittest.TestCase):
             (directory / 'judge-ballot.json').write_text(json.dumps(ballot))
             (out / 'manifest.json').write_text(json.dumps({'version':1,'cases':[case]}))
             result = {'name':'music','surface':'phone','status':'pending','request_id':request['request_id'],
-                      'checks':{'C-lint':{'pass':True}},'judge':{'R-one':{'pass':None}},'renders':[f'{n}.png' for n in run.RENDER_NAMES],
+                      'checks':{'C-valid':{'pass':True}},'judge':{'R-one':{'pass':None}},
+                      'renders':[{'screen':'plates','view':v,'png':f'plates-{v}.png','pass':True} for v in ('light','dark')],
                       'agent':{'cost':None,'message':'fixture'},'minutes':0}
             (out / 'results.json').write_text(json.dumps({'cases':[result]}))
             with patch.object(sys, 'argv', ['run.py','score','--out',str(out),'--judge-label','test fixture','--no-open']), patch('backends.execute') as backend:
@@ -73,6 +75,34 @@ class ArtifactCliTests(unittest.TestCase):
             image.write_bytes(image.read_bytes() + b'changed')
             with self.assertRaisesRegex(ValueError, 'artifacts changed'):
                 run.import_ballot(jpeg_directory)
+
+    def test_report_labels_each_render_with_its_screen_and_view_and_leads_with_light(self):
+        renders = [{'screen': 'plates', 'view': 'dark', 'png': 'plates-dark.png', 'pass': True},
+                   {'screen': 'plates', 'view': 'tablet', 'png': 'plates-tablet.png', 'pass': False},
+                   {'screen': 'plates', 'view': 'light', 'png': 'plates-light.png', 'pass': True}]
+        result = {'name': 'music', 'surface': 'phone', 'status': 'failed', 'minutes': 0, 'renders': renders,
+                  'checks': {'C-valid': {'pass': True}}, 'judge': {'R-one': {'pass': True}},
+                  'agent': {'cost': None, 'message': 'fixture'}}
+        with tempfile.TemporaryDirectory() as tmp:
+            page = report.write_report(Path(tmp), [result], Path(tmp) / 'baseline').read_text()
+        self.assertLess(page.index('music/renders/plates-light.png'), page.index('music/renders/plates-dark.png'))
+        self.assertIn('plates/tablet (fails checks)', page)
+        self.assertIn('<figcaption>plates/dark</figcaption>', page)
+
+    def test_promotion_copies_the_primary_render(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            (directory / 'music/renders').mkdir(parents=True)
+            (directory / 'music/renders/plates-light.png').write_bytes(b'png')
+            case = {'name': 'music', 'surface': 'phone', 'status': 'passed', 'checks': {}, 'judge': {'R-one': {'pass': True}},
+                    'renders': [{'screen': 'plates', 'view': 'dark', 'png': 'plates-dark.png'},
+                                {'screen': 'plates', 'view': 'light', 'png': 'plates-light.png'}]}
+            (directory / 'results.json').write_text(json.dumps({'cases': [case]}))
+            with patch('subprocess.run') as sips:
+                with patch.object(sys, 'argv', ['promote.py', str(directory)]):
+                    runpy.run_path(str(HERE / 'promote.py'), run_name='__main__')
+            command = sips.call_args.args[0]
+            self.assertTrue(command[-3].endswith('music/renders/plates-light.png'), command)
 
     def test_pending_is_visible_in_report(self):
         self.assertIn('Pending:', report.failures({'R-one':{'pass':None,'reason':'not graded'}}))
