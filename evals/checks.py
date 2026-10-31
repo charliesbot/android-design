@@ -32,9 +32,7 @@ def missing_report(case_dir: Path):
     return result(False, f"no renders/report.json: the proposal was not rendered{why}")
 
 
-def check_valid(case_dir: Path, report):
-    if report is None:
-        return missing_report(case_dir)
+def check_valid(report):
     if report.get("valid") is True:
         return result(True)
     errors = report.get("errors") or []
@@ -48,9 +46,7 @@ def failed_rules(render):
     return rules or ["failed"]
 
 
-def check_review(case_dir: Path, report):
-    if report is None:
-        return missing_report(case_dir)
+def check_review(report):
     renders = report.get("renders")
     if not isinstance(renders, list) or not renders:
         return result(False, "no renders: nothing was reviewed")
@@ -59,9 +55,7 @@ def check_review(case_dir: Path, report):
     return result(not failed, "; ".join(failed)[:MAX_DETAIL])
 
 
-def check_palette(case_dir: Path, report):
-    if report is None:
-        return missing_report(case_dir)
+def check_palette(report):
     theme = report.get("theme")
     variant = theme.get("variant") if isinstance(theme, dict) else None
     if not isinstance(variant, str):
@@ -74,10 +68,13 @@ def run(case_dir: Path, surface: str = "phone"):
     """The deterministic checks every case gets."""
     case_dir = Path(case_dir)
     report = read_report(case_dir)
+    if report is None:
+        missing = missing_report(case_dir)
+        return {"C-valid": missing, "C-review": missing, "C-palette": missing}
     return {
-        "C-valid": check_valid(case_dir, report),
-        "C-review": check_review(case_dir, report),
-        "C-palette": check_palette(case_dir, report),
+        "C-valid": check_valid(report),
+        "C-review": check_review(report),
+        "C-palette": check_palette(report),
     }
 
 

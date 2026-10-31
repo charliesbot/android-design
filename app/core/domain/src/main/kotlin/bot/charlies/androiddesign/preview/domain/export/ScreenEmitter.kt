@@ -400,8 +400,6 @@ internal class ScreenEmitter(
 
   fun dp(value: Float): String = "${number(value)}.${file.use(Sym.dp)}"
 
-  fun drawable(symbol: String): String = file.drawable(Naming.snake(symbol))
-
   // endregion
 
   // region modifiers
@@ -488,11 +486,8 @@ internal class ScreenEmitter(
   }
 
   /** `{ ... }` for an action: the statements, or an empty lambda. */
-  fun actionLambda(
-    action: JsonElement?,
-    componentId: String,
-    extra: List<Stmt> = emptyList(),
-  ): Lambda = lambda(actionStatements(action, componentId) + extra)
+  fun actionLambda(action: JsonElement?, componentId: String): Lambda =
+    lambda(actionStatements(action, componentId))
 
   fun overlayVar(id: String) = "show${Naming.pascal(id)}"
 

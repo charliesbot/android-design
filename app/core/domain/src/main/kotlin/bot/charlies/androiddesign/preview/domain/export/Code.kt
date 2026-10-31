@@ -73,12 +73,6 @@ internal data class IfStmt(val branches: List<Pair<String, List<Stmt>>>, val orE
   override fun flat(): String? = null
 }
 
-internal data class CommentStmt(val text: String) : Stmt {
-  override fun flat(): String? = null
-}
-
-internal fun raw(text: String): Expr = Raw(text)
-
 internal fun arg(name: String, value: Expr) = Arg(name, value)
 
 internal fun arg(name: String, value: String) = Arg(name, Raw(value))
@@ -204,7 +198,6 @@ internal object CodePrinter {
     when (stmt) {
       is ExprStmt -> printWithPrefix("", stmt.expr, "", indent, out)
       is Assign -> printWithPrefix("${stmt.lhs} ${stmt.op}", stmt.rhs, "", indent, out)
-      is CommentStmt -> out += "${pad(indent)}// ${stmt.text}"
       is IfStmt -> {
         stmt.branches.forEachIndexed { i, (condition, body) ->
           out += "${pad(indent)}${if (i == 0) "" else "} else "}if ($condition) {"

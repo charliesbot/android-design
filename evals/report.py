@@ -12,7 +12,7 @@ def score(items):
 
 
 def label(render):
-    return f"{render['screen']}/{render['view']}"
+    return f"{render.get('screen')}/{render.get('view')}"
 
 
 def primary_first(renders, surface):

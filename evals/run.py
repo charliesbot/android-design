@@ -11,11 +11,11 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from checks import run as run_checks
+from checks import read_report, run as run_checks
 from judge import judge, parse, aggregate, validate_runs, SCHEMA, prompt_for as judge_prompt
 from backends import BACKENDS, execute
 from preview_app import app_binary
-from report import write_report, write_summary
+from report import label, write_report, write_summary
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -120,15 +120,12 @@ def render(case_dir):
     (case_dir / 'render.log').write_text(log)
     if done.returncode not in (0, 1, 2) or not (renders / 'report.json').is_file():
         return [], f'render exited {done.returncode} without report.json: {log[-1500:]}'
-    return [str(Path(r['png_path'])) for r in report_renders(case_dir)], None
+    return [r['png_path'] for r in report_renders(case_dir)], None
 
 
 def report_renders(case_dir):
     """The renders listed in renders/report.json whose PNG exists, each with its absolute `png_path`."""
-    try:
-        listed = json.loads((case_dir / 'renders' / 'report.json').read_text()).get('renders') or []
-    except (OSError, ValueError, AttributeError):
-        return []
+    listed = (read_report(case_dir) or {}).get('renders') or []
     found = []
     for entry in listed:
         png = (case_dir / 'renders' / str(entry.get('png', ''))).resolve()
@@ -139,7 +136,7 @@ def report_renders(case_dir):
 
 def image_labels(case_dir):
     """Maps each rendered PNG's absolute path to `screen/view`, for the judge request."""
-    return {r['png_path']: f"{r.get('screen')}/{r.get('view')}" for r in report_renders(case_dir)}
+    return {r['png_path']: label(r) for r in report_renders(case_dir)}
 
 
 def build(case, case_dir, backend, model=None):
