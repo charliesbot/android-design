@@ -61,7 +61,7 @@ class AppPreviewController(
   private var latestReading: ProposalSnapshot? = null
 
   /** What the window was told about [latestReading]: the reading itself, or its render error. */
-  @Volatile private var latest: ProposalSnapshot? = null
+  @Volatile private var lastShown: ProposalSnapshot? = null
 
   override suspend fun openProposal(path: String): OpenedProposal {
     val file = Path.of(path).toAbsolutePath().normalize()
@@ -70,7 +70,7 @@ class AppPreviewController(
     watcher?.cancel()
     current = file
     latestReading = null
-    latest = null
+    lastShown = null
     val first = CompletableDeferred<ProposalSnapshot>()
     watcher = scope.launch {
       repository.watch(file).collect { snapshot ->
@@ -104,13 +104,7 @@ class AppPreviewController(
         "no screen '$screenId'; the proposal has ${proposal.screens.keys.joinToString()}",
       )
     }
-    val spec: ViewSpec =
-      if (view == null) state.view
-      else
-        Views.byName(view)
-          ?: throw PreviewException(
-            "no view '$view'; the views are ${Views.all.joinToString { it.name }}",
-          )
+    val spec: ViewSpec = if (view == null) state.view else viewNamed(view)
     // The window's color choices go with the window's view; a named view is the proposal's own.
     val design =
       if (view == null) state.effectiveDesign ?: snapshot.designSystem else snapshot.designSystem
@@ -146,17 +140,7 @@ class AppPreviewController(
           "no screen ${unknown.joinToString { "'$it'" }}; the proposal has ${proposal.screens.keys.joinToString()}",
         )
       }
-    val specs =
-      views
-        .orEmpty()
-        .distinct()
-        .ifEmpty { Views.all.map { it.name } }
-        .map { name ->
-          Views.byName(name)
-            ?: throw PreviewException(
-              "no view '$name'; the views are ${Views.all.joinToString { it.name }}",
-            )
-        }
+    val specs = views.orEmpty().distinct().ifEmpty { Views.all.map { it.name } }.map(::viewNamed)
     val started = System.nanoTime()
     val results = screenIds.associateWith { screen ->
       specs.associate { view ->
@@ -183,7 +167,7 @@ class AppPreviewController(
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        val reason = e.message?.lineSequence()?.firstOrNull() ?: e::class.simpleName
+        val reason = firstLine(e)
         return ViewCheck(pass = false, errors = listOf(CheckError("render-error", detail = reason)))
       }
     val errors =
@@ -256,11 +240,11 @@ class AppPreviewController(
   private suspend fun apply(snapshot: ProposalSnapshot): ProposalSnapshot = applying.withLock {
     // A reading of a file that is no longer the open one is stale.
     if (snapshot.path != current) return@withLock snapshot
-    val known = latest
+    val known = lastShown
     if (known != null && snapshot == latestReading) return@withLock known
     val shown = withRenderCheck(snapshot)
     latestReading = snapshot
-    latest = shown
+    lastShown = shown
     viewer.show(shown)
     shown
   }
@@ -283,7 +267,7 @@ class AppPreviewController(
     val screen =
       viewer.currentScreen?.takeIf { it in proposal.screens } ?: proposal.navigation.start
     val failure =
-      attempt("screen '$screen'", window.view) {
+      try {
         renderer.render(
           proposal,
           snapshot.designSystem,
@@ -292,24 +276,17 @@ class AppPreviewController(
           window.view,
           live = window.host,
         )
+        null
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        ValidationError(
+          ViewerViewModel.RENDER_ERROR_PATH,
+          "screen '$screen' failed to render at ${window.view.name}: ${firstLine(e)}",
+        )
       }
     return if (failure == null) snapshot else snapshot.copy(errors = listOf(failure))
   }
-
-  private suspend fun attempt(
-    what: String,
-    view: ViewSpec,
-    draw: suspend () -> LayoutTree,
-  ): ValidationError? =
-    try {
-      draw()
-      null
-    } catch (e: CancellationException) {
-      throw e
-    } catch (e: Exception) {
-      val reason = e.message?.lineSequence()?.firstOrNull() ?: e::class.simpleName
-      ValidationError(RENDER_ERROR_PATH, "$what failed to render at ${view.name}: $reason")
-    }
 
   private suspend fun validSnapshot(): ProposalSnapshot {
     val file = current ?: throw PreviewException("no proposal is open; call open_proposal first")
@@ -318,6 +295,16 @@ class AppPreviewController(
     return snapshot
   }
 
+  private fun viewNamed(name: String): ViewSpec =
+    Views.byName(name)
+      ?: throw PreviewException(
+        "no view '$name'; the views are ${Views.all.joinToString { it.name }}",
+      )
+
+  /** The first line of what went wrong, which is enough to point at the failure. */
+  private fun firstLine(e: Exception): String? =
+    e.message?.lineSequence()?.firstOrNull() ?: e::class.simpleName
+
   private fun invalidMessage(errors: List<ValidationError>): String = buildString {
     append("the proposal is invalid; fix these and try again:")
     errors.take(MAX_ERRORS).forEach { append("\n- ${it.path}: ${it.message}") }
@@ -325,7 +312,6 @@ class AppPreviewController(
   }
 
   private companion object {
-    const val RENDER_ERROR_PATH = ViewerViewModel.RENDER_ERROR_PATH
     const val MAX_ERRORS = 20
     const val NANOS_PER_MS = 1_000_000L
   }

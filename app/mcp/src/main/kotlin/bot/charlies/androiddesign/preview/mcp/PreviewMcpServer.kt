@@ -272,19 +272,6 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
         "the proposal file and call check_proposal after each edit; use get_tree for the geometry " +
         "of a failing view. The file on disk is the source of truth; there is no tool that edits " +
         "it."
-
-    /** The names of the tools this server exposes, in the order it lists them. */
-    val TOOL_NAMES =
-      listOf(
-        "open_proposal",
-        "get_tree",
-        "check_proposal",
-        "set_view",
-        "show_preview",
-        "get_catalog",
-        "export_kotlin",
-        "status",
-      )
   }
 }
 

@@ -21,6 +21,44 @@ interface Command {
   fun run(args: List<String>, out: PrintStream, err: PrintStream): Int
 }
 
+/** The arguments of a command: its one positional argument and the value of each flag given. */
+class ParsedArgs(val positional: String?, val flags: Map<String, String>)
+
+/**
+ * Splits [args] into one positional argument and the values of [flags], which each take a value.
+ * Prints the mistake to [err] and returns null for an unknown option, a flag without a value, or a
+ * second positional argument.
+ */
+fun parseArgs(args: List<String>, flags: Set<String>, err: PrintStream): ParsedArgs? {
+  var positional: String? = null
+  val values = mutableMapOf<String, String>()
+  var index = 0
+  while (index < args.size) {
+    val arg = args[index]
+    when {
+      arg in flags -> {
+        val value = args.getOrNull(++index)
+        if (value == null) {
+          err.println("$arg needs a value")
+          return null
+        }
+        values[arg] = value
+      }
+      arg.startsWith("--") -> {
+        err.println("unknown option $arg")
+        return null
+      }
+      positional == null -> positional = arg
+      else -> {
+        err.println("unexpected argument $arg")
+        return null
+      }
+    }
+    index++
+  }
+  return ParsedArgs(positional, values)
+}
+
 /**
  * Dispatches the first argument to its [Command]. Running with no arguments starts the app (see
  * `Main.kt`), so it never reaches here; if it does, it prints the usage.

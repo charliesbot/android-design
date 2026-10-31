@@ -72,11 +72,11 @@ fun ConfinedFrame(
 
 /**
  * A panel that draws the frame. [paramsOf] and [scaleOf] read snapshot state, so the panel's
- * composition follows them. Exposed for the confinement check.
+ * composition follows them.
  */
 @OptIn(ExperimentalComposeUiApi::class)
-internal fun newFramePanel(
-  paramsOf: () -> Any,
+private fun newFramePanel(
+  paramsOf: () -> FrameParams,
   scaleOf: () -> Float,
   onFailure: (Throwable) -> Unit,
   content: @Composable (ProposalHostState, DesignSystem, ViewSpec) -> Unit,
@@ -86,7 +86,7 @@ internal fun newFramePanel(
     // window stays frozen on its last picture for the rest of the session.
     exceptionHandler = WindowExceptionHandler { onFailure(it) }
     setContent {
-      val p = paramsOf() as FrameParams
+      val p = paramsOf()
       val base = LocalDensity.current
       CompositionLocalProvider(
         LocalDensity provides Density(base.density * scaleOf(), base.fontScale),

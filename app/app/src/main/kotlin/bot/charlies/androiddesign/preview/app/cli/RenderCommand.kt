@@ -170,33 +170,13 @@ class RenderCommand(
   }
 
   private fun parse(args: List<String>, err: PrintStream): Options? {
-    var proposal: String? = null
-    var out: String? = null
-    var design: String? = null
-    var views: String? = null
-    var screens: String? = null
-    var index = 0
-    fun value(flag: String): String? =
-      args.getOrNull(++index).also { if (it == null) err.println("$flag needs a value") }
-    while (index < args.size) {
-      when (val arg = args[index]) {
-        "--out" -> out = value(arg) ?: return null
-        "--design" -> design = value(arg) ?: return null
-        "--views" -> views = value(arg) ?: return null
-        "--screens" -> screens = value(arg) ?: return null
-        else ->
-          if (arg.startsWith("--")) {
-            err.println("unknown option $arg")
-            return null
-          } else if (proposal == null) {
-            proposal = arg
-          } else {
-            err.println("unexpected argument $arg")
-            return null
-          }
-      }
-      index++
-    }
+    val parsed =
+      parseArgs(args, setOf("--out", "--design", "--views", "--screens"), err) ?: return null
+    val proposal = parsed.positional
+    val out = parsed.flags["--out"]
+    val design = parsed.flags["--design"]
+    val views = parsed.flags["--views"]
+    val screens = parsed.flags["--screens"]
     if (proposal == null || out == null) {
       err.println("usage: $usage")
       return null

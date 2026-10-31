@@ -69,6 +69,23 @@ internal fun NodeContext.describedBy(): Modifier =
   string("contentDescription")?.let { text -> Modifier.semantics { contentDescription = text } }
     ?: Modifier
 
+/** The icon, spacer and label inside a button of [height]; the icon is [filled] when selected. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ButtonContent(
+  ctx: NodeContext,
+  icon: String?,
+  label: String,
+  height: Dp,
+  filled: Boolean = false,
+) {
+  if (icon != null) {
+    SymbolIcon(icon, size = ButtonDefaults.iconSizeFor(height), filled = filled)
+    Spacer(Modifier.width(ButtonDefaults.iconSpacingFor(height)))
+  }
+  ctx.PartText(label, style = ButtonDefaults.textStyleFor(height))
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderButton(ctx: NodeContext) {
@@ -85,13 +102,7 @@ internal fun RenderButton(ctx: NodeContext) {
     }
   val contentPadding = ButtonDefaults.contentPaddingFor(height, icon != null, false)
   val modifier = ctx.modifier().heightIn(min = height).then(ctx.describedBy())
-  val content: @Composable RowScope.() -> Unit = {
-    if (icon != null) {
-      SymbolIcon(icon, size = ButtonDefaults.iconSizeFor(height))
-      Spacer(Modifier.width(ButtonDefaults.iconSpacingFor(height)))
-    }
-    ctx.PartText(label, style = ButtonDefaults.textStyleFor(height))
-  }
+  val content: @Composable RowScope.() -> Unit = { ButtonContent(ctx, icon, label, height) }
   val onClick = { env.act(action) }
   val enabled = ctx.enabled
   fun colors(base: ButtonColors): ButtonColors =
@@ -184,11 +195,7 @@ internal fun RenderToggleButton(ctx: NodeContext) {
     env.act(action)
   }
   val content: @Composable RowScope.() -> Unit = {
-    if (icon != null) {
-      SymbolIcon(icon, size = ButtonDefaults.iconSizeFor(height), filled = checked.value)
-      Spacer(Modifier.width(ButtonDefaults.iconSpacingFor(height)))
-    }
-    ctx.PartText(label, style = ButtonDefaults.textStyleFor(height))
+    ButtonContent(ctx, icon, label, height, filled = checked.value)
   }
   val enabled = ctx.enabled
   when (ctx.enum("variant", "filled")) {
@@ -475,7 +482,7 @@ internal fun RenderSplitButton(ctx: NodeContext) {
   }
 }
 
-private fun fabColors(name: String): Pair<ColorRole, ColorRole> =
+internal fun fabColors(name: String): Pair<ColorRole, ColorRole> =
   when (name) {
     "primary" -> ColorRole.Primary to ColorRole.OnPrimary
     "secondary-container" -> ColorRole.SecondaryContainer to ColorRole.OnSecondaryContainer

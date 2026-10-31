@@ -18,29 +18,10 @@ object ExportCommand : Command {
   override val usage = "export <proposal.json> [--design <DESIGN.md>] [--screen id]"
 
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
-    var proposal: String? = null
-    var design: String? = null
-    var screen: String? = null
-    var index = 0
-    fun value(flag: String): String? =
-      args.getOrNull(++index).also { if (it == null) err.println("$flag needs a value") }
-    while (index < args.size) {
-      when (val arg = args[index]) {
-        "--design" -> design = value(arg) ?: return ExitCode.USAGE
-        "--screen" -> screen = value(arg) ?: return ExitCode.USAGE
-        else ->
-          if (arg.startsWith("--")) {
-            err.println("unknown option $arg")
-            return ExitCode.USAGE
-          } else if (proposal == null) {
-            proposal = arg
-          } else {
-            err.println("unexpected argument $arg")
-            return ExitCode.USAGE
-          }
-      }
-      index++
-    }
+    val parsedArgs = parseArgs(args, setOf("--design", "--screen"), err) ?: return ExitCode.USAGE
+    val proposal = parsedArgs.positional
+    val design = parsedArgs.flags["--design"]
+    val screen = parsedArgs.flags["--screen"]
     if (proposal == null) {
       err.println("usage: $usage")
       return ExitCode.USAGE

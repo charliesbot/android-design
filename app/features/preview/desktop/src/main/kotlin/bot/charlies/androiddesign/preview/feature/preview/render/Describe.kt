@@ -199,16 +199,7 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look {
       Look(container, content, TypeRole.LabelLarge, "full", ctx.string("label"), "Button")
     }
     "FloatingActionButton" -> {
-      val (container, content) =
-        when (ctx.enum("color", "primary-container")) {
-          "primary" -> ColorRole.Primary to ColorRole.OnPrimary
-          "secondary-container" -> ColorRole.SecondaryContainer to ColorRole.OnSecondaryContainer
-          "secondary" -> ColorRole.Secondary to ColorRole.OnSecondary
-          "tertiary-container" -> ColorRole.TertiaryContainer to ColorRole.OnTertiaryContainer
-          "tertiary" -> ColorRole.Tertiary to ColorRole.OnTertiary
-          "surface" -> ColorRole.SurfaceContainerHigh to ColorRole.Primary
-          else -> ColorRole.PrimaryContainer to ColorRole.OnPrimaryContainer
-        }
+      val (container, content) = fabColors(ctx.enum("color", "primary-container"))
       val shape =
         when (ctx.enum("size", "small")) {
           "medium" -> "largeIncreased"

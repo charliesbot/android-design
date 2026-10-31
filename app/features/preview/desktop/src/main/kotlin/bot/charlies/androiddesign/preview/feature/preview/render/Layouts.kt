@@ -121,7 +121,7 @@ internal fun RenderBox(ctx: NodeContext) {
       modifier = ctx.modifier(fillWidth = true, fillHeight = true).then(ctx.styleBackground()),
       contentAlignment = alignmentOf(ctx.string("contentAlignment")),
     ) {
-      ctx.Children("children", 0, ChildHost(fillWidth = false, box = this))
+      ctx.Children("children", 0, ChildHost(fillWidth = false))
     }
   }
 }

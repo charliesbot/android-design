@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.feature.preview.viewer
 
 import bot.charlies.androiddesign.preview.domain.ProposalSnapshot
+import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.Device
@@ -72,12 +73,22 @@ data class ViewerState(
   val effectiveDesign: DesignSystem?
     get() = design?.copy(seed = seed ?: design.seed, variant = variant ?: design.variant)
 
+  /** The variant the viewer shows: its own choice, else the proposal's, else the default. */
+  val effectiveVariant: PaletteVariant
+    get() = variant ?: design?.variant ?: PaletteVariant.TonalSpot
+
   val hasProposal: Boolean
     get() = host != null
 
   val valid: Boolean
     get() = errors.isEmpty()
 }
+
+/** The default design system with [seed] and [variant] swapped in where given. */
+internal fun defaultDesign(seed: String?, variant: PaletteVariant?): DesignSystem =
+  DesignSystemResolver.resolve(null, null).let { base ->
+    base.copy(seed = seed ?: base.seed, variant = variant ?: base.variant)
+  }
 
 /** What the viewer's controls can do. [ViewerViewModel] is the implementation. */
 interface ViewerActions {

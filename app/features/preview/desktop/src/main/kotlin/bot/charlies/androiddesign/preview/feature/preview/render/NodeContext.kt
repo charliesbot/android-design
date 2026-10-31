@@ -143,11 +143,6 @@ internal class NodeContext(
       RenderNode(env, ref, id, order + listOf(slot, index), host.at(index, refs.size))
     }
   }
-
-  fun childCount(key: String): Int = props.children(key).size
-
-  /** The component of the child behind a `Child` prop, for parents that look inside. */
-  fun childComponent(key: String): String? = props.childId(key)?.let { env.nodes[it]?.component }
 }
 
 /** The props of [node] at [sizeClass], with its size class overrides applied. */

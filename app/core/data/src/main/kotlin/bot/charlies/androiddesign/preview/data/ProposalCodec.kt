@@ -3,7 +3,6 @@ package bot.charlies.androiddesign.preview.data
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.ValidationError
-import kotlinx.serialization.SerializationException
 
 sealed interface ProposalParse {
   data class Parsed(val proposal: Proposal) : ProposalParse
@@ -22,9 +21,8 @@ object ProposalCodec {
   fun parse(text: String): ProposalParse =
     try {
       ProposalParse.Parsed(json.decodeFromString(Proposal.serializer(), text))
-    } catch (e: SerializationException) {
-      ProposalParse.Failed(listOf(ValidationError(pointerOf(e.message), summarize(e.message))))
     } catch (e: IllegalArgumentException) {
+      // Also catches SerializationException, which extends it.
       ProposalParse.Failed(listOf(ValidationError(pointerOf(e.message), summarize(e.message))))
     }
 

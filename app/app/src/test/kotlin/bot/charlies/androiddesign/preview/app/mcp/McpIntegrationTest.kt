@@ -107,7 +107,6 @@ class McpIntegrationTest {
   fun `the server lists exactly the eight tools with schemas and descriptions`() {
     connect()
     val tools = runBlocking { client.listTools().tools }
-    assertEquals(PreviewMcpServer.TOOL_NAMES.sorted(), tools.map { it.name }.sorted())
     assertEquals(
       setOf(
         "open_proposal",

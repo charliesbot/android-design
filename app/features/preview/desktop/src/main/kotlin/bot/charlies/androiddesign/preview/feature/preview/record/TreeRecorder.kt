@@ -138,14 +138,6 @@ class TreeRecorder {
     texts.getOrPut(id) { linkedMapOf() }[part] = report
   }
 
-  /** Drops everything, e.g. when another screen replaces the one being drawn. */
-  @Synchronized
-  fun clear() {
-    metas.clear()
-    positions.clear()
-    texts.clear()
-  }
-
   /**
    * The tree as drawn now. [density] converts pixels to dp; [semantics] supplies visual bounds,
    * touch bounds and accessibility facts when the harness has them.

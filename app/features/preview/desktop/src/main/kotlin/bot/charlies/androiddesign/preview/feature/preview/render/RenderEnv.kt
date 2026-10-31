@@ -1,6 +1,5 @@
 package bot.charlies.androiddesign.preview.feature.preview.render
 
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.FloatingActionButtonMenuScope
@@ -23,18 +22,10 @@ import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.PaneRole
 import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.Screen
-import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.SizeClass
 import bot.charlies.androiddesign.preview.model.StyleDef
 import bot.charlies.androiddesign.preview.model.TypeRole
 import java.nio.file.Path
-
-/** Moves between screens. [ProposalHostState] is the implementation. */
-interface Navigator {
-  fun navigate(screen: String)
-
-  fun back()
-}
 
 /**
  * Everything a proposal changes locally: toggles, selections, typed text, slider positions, and
@@ -87,8 +78,7 @@ class InteractionState {
  * and where relative images load from. Actions call into it.
  */
 @Stable
-class ProposalHostState(proposal: Proposal, proposalDir: Path? = null, screen: String? = null) :
-  Navigator {
+class ProposalHostState(proposal: Proposal, proposalDir: Path? = null, screen: String? = null) {
   var proposal: Proposal by mutableStateOf(proposal)
     private set
 
@@ -135,7 +125,7 @@ class ProposalHostState(proposal: Proposal, proposalDir: Path? = null, screen: S
     interaction.reset()
   }
 
-  override fun navigate(screen: String) {
+  fun navigate(screen: String) {
     if (screen !in proposal.screens) return
     val existing = backStack.indexOf(screen)
     if (existing >= 0) {
@@ -150,7 +140,7 @@ class ProposalHostState(proposal: Proposal, proposalDir: Path? = null, screen: S
     backStack.add(screen)
   }
 
-  override fun back() {
+  fun back() {
     if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
   }
 }
@@ -205,8 +195,6 @@ internal class RenderEnv(
 
   fun typeStyle(role: TypeRole) = theme.style(role)
 
-  fun cornerDp(token: ShapeToken): Dp = (design.rounded[token] ?: 0f).dp
-
   fun style(name: String?): StyleDef? = name?.let { design.styles[it] }
 
   fun act(action: ActionCall?) {
@@ -240,7 +228,6 @@ internal data class ChildHost(
   val fillHeight: Boolean = false,
   val column: ColumnScope? = null,
   val row: RowScope? = null,
-  val box: BoxScope? = null,
   val fabMenu: FloatingActionButtonMenuScope? = null,
   val flexItem: Boolean = false,
   val groupKey: String? = null,
