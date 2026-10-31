@@ -1,5 +1,7 @@
 # Visual design exploration v2
 
+> **Being replaced:** [Visual design exploration v3](visual-design-exploration-v3.md) replaces this design with a native macOS previewer app. This document describes the HTML system until the app ships, then moves to `docs/archive/`.
+
 **Date:** 2026-10-10
 
 ## TL;DR
