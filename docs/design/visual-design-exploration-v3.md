@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-Design exploration moves from HTML proposals to a native macOS previewer app built with Compose Multiplatform. The agent writes a proposal as an A2UI v1.0 file against our own Material 3 Expressive catalog. The app watches that file and draws it with real Compose Material 3 components in a live window, redrawing in one frame with no compile step. The agent checks its work from a layout tree it reads over a stdio MCP server, never from screenshots, while the owner judges taste in the live window. Speed and likeness to native Compose are the two goals, and every earlier version traded one for the other.
+Design exploration moves from HTML proposals to a native macOS previewer app built with Compose Multiplatform. The agent writes a proposal as an A2UI v1.0 file against our own Material 3 Expressive catalog. The app watches that file and draws it with real Compose Material 3 components in a live window, redrawing about 130 ms after a save with no compile step. The agent checks its work from a layout tree it reads over a stdio MCP server, never from screenshots, while the owner judges taste in the live window. Speed and likeness to native Compose are the two goals, and every earlier version traded one for the other.
 
 ## Design
 
@@ -33,7 +33,7 @@ Measured on this Mac with Compose Multiplatform 1.13.0-beta01:
 - From saving the file to the window adopting it takes about 130 ms warm (median of 10). About 70 ms of that is noticing the change: the watcher polls every 20 ms and waits 50 ms for the writes to settle. About 40 ms is the pre-check. Adopting the new state then reaches the screen in one 60 Hz frame (6 to 17 ms).
 - `check_proposal` takes about 0.2 s for one screen at five views, and `get_tree` about 40 to 100 ms.
 
-The tools add about 2.5 s to a typical 160 s agent run; the rest is model time.
+In a timed benchmark on 2026-11-01 (the `music` eval brief, the default Claude model, three runs, traced by event timestamps), the tools added about 2.5 s to a median 160 s agent run; the rest was model time. The same benchmark on the HTML version took a median 281 s. Three runs on one brief is a small sample.
 
 ### The app
 
@@ -177,11 +177,13 @@ The app is the catalog's single source of truth and serves it over MCP (`get_cat
 - `export_kotlin(screen?)`
 - `status()`
 
-An early timed benchmark showed why `check_proposal` exists: with one view per `get_tree`, agents made a median 13 check calls per run.
+An earlier round of that benchmark showed why `check_proposal` exists: with one view per `get_tree`, agents made a median 13 check calls per run.
 
 The agent never edits proposals through MCP; the file on disk is the source of truth.
 
 **Closing the window** hides it and keeps the process serving. The Dock icon or `show_preview` brings the window back.
+
+**App Nap.** macOS throttles an idle background app about 30 s after its last activity, which slowed a check from about 0.2 s to 1 to 2.6 s. The `Info.plist` opt-out keys are ignored for a binary an MCP client launches directly, so at launch the app sets `NSAppSleepDisabled` in its own preferences domain whenever it is not already on. The timings in this document depend on it.
 
 **The device frame** is its own Compose scene (a `ComposePanel`), scaled by lowering its density. The proposal still lays out at the device's dp size, and sheets, dialogs, and menus open inside the frame instead of over the viewer.
 

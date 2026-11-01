@@ -10,8 +10,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The v2 seeded-defect fixtures (`tests/evals/defects/`) as synthetic layout trees. Each test is
- * named after its fixture. The starter is v2's proposal starter: a headline, supporting text, a
+ * Seeded defects as synthetic layout trees, ported from the HTML version's defect fixtures (since
+ * removed). Each test is named after its defect. The base screen is a headline, supporting text, a
  * small primary button, and either a floating toolbar (compact) or a navigation rail (expanded).
  * Every defect must fail exactly the rule it seeds, and every control must pass.
  *

@@ -1,13 +1,13 @@
 package bot.charlies.androiddesign.preview.feature.preview.theme
 
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontVariation
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.platform.Font
+import androidx.compose.ui.text.platform.Typeface
 import bot.charlies.androiddesign.preview.model.BundledFont
 import java.util.concurrent.ConcurrentHashMap
+import org.jetbrains.skia.Data
+import org.jetbrains.skia.FontMgr
+import org.jetbrains.skia.FontVariation as SkiaFontVariation
+import org.jetbrains.skia.Typeface as SkiaTypeface
 
 /** The faces the app bundles: each [BundledFont] with the classpath path of its (variable) TTF. */
 enum class FontFace(val font: BundledFont, val resource: String) {
@@ -42,21 +42,32 @@ object ProposalFonts {
 
   private val cache = ConcurrentHashMap<Key, FontFamily>()
   private val symbolCache = ConcurrentHashMap<Pair<Boolean, Int>, FontFamily>()
-  private val files = ConcurrentHashMap<String, ByteArray>()
+  private val bases = ConcurrentHashMap<String, SkiaTypeface>()
 
   private data class Key(val face: FontFace, val weight: Int, val axes: List<FontAxis>)
 
   /**
-   * The bytes of a bundled font, read from the classpath once. A font given to Compose by resource
-   * name is read and inflated again by every scene that uses it, which for the 15 MB symbols font
-   * dominates a headless render; bytes in memory only need copying.
+   * How many fonts have been loaded from the classpath: one per resource, however many variants.
    */
-  private fun bytesOf(resource: String): ByteArray =
-    files.getOrPut(resource) {
-      checkNotNull(ProposalFonts::class.java.classLoader.getResourceAsStream(resource)) {
-          "missing font resource $resource"
-        }
-        .use { it.readAllBytes() }
+  internal val baseTypefaceCount: Int
+    get() = bases.size
+
+  /**
+   * The typeface of a bundled font with its default axes, loaded once per resource. Every variant
+   * is a clone of it. Compose would otherwise copy the whole file into native memory for each
+   * variant and keep each copy in its font cache for the life of the process, which for the 15 MB
+   * symbols font at up to 58 variants is close to a gigabyte. A clone shares the font data.
+   */
+  private fun baseOf(resource: String): SkiaTypeface =
+    bases.getOrPut(resource) {
+      val bytes =
+        checkNotNull(ProposalFonts::class.java.classLoader.getResourceAsStream(resource)) {
+            "missing font resource $resource"
+          }
+          .use { it.readAllBytes() }
+      checkNotNull(FontMgr.default.makeFromData(Data.makeFromBytes(bytes))) {
+        "cannot read font resource $resource"
+      }
     }
 
   /**
@@ -70,7 +81,7 @@ object ProposalFonts {
     val usable = axes.filter { it.tag != "wght" && it.value.isFinite() }
     return cache.getOrPut(Key(face, clamped, usable)) {
       val settings = listOf("wght" to clamped.toFloat()) + usable.map { it.tag to it.value }
-      FontFamily(variableFont(face.resource, clamped, settings))
+      variableFont(face.resource, settings)
     }
   }
 
@@ -78,43 +89,32 @@ object ProposalFonts {
   fun symbols(filled: Boolean, sizeDp: Int): FontFamily {
     val opticalSize = sizeDp.coerceIn(20, 48)
     return symbolCache.getOrPut(filled to opticalSize) {
-      FontFamily(
-        variableFont(
-          SYMBOLS_RESOURCE,
-          weight = 400,
-          settings =
-            listOf(
-              "FILL" to if (filled) 1f else 0f,
-              "GRAD" to 0f,
-              "opsz" to opticalSize.toFloat(),
-              "wght" to 400f,
-            ),
-        ),
+      variableFont(
+        SYMBOLS_RESOURCE,
+        settings =
+          listOf(
+            "FILL" to if (filled) 1f else 0f,
+            "GRAD" to 0f,
+            "opsz" to opticalSize.toFloat(),
+            "wght" to 400f,
+          ),
       )
     }
   }
 
   /**
-   * A font from [resource] with the axes in [settings]. Its identity names those axes: Compose keys
-   * its typeface cache by identity, weight and style and not by variation settings, so two fonts
-   * that differ only in their axes would otherwise share whichever typeface a resolver loaded
-   * first, and which one that is would depend on the order things were drawn in.
+   * A family of [resource] cloned with the axes in [settings]. Its alias names those axes: Compose
+   * keys its typeface cache by identity, weight and style and not by the variation, so two
+   * typefaces that differ only in their axes would otherwise share whichever one a resolver loaded
+   * first, and which one that is would depend on the order things were drawn in. Weight comes from
+   * the `wght` setting, so the family answers every requested weight with the same face.
    */
-  private fun variableFont(
-    resource: String,
-    weight: Int,
-    settings: List<Pair<String, Float>>,
-  ): Font =
-    Font(
-      identity = "$resource?" + settings.joinToString("&") { (tag, value) -> "$tag=$value" },
-      data = bytesOf(resource),
-      weight = FontWeight(weight),
-      style = FontStyle.Normal,
-      variationSettings =
-        FontVariation.Settings(
-          *settings.map { (tag, value) -> FontVariation.Setting(tag, value) }.toTypedArray(),
-        ),
-    )
+  private fun variableFont(resource: String, settings: List<Pair<String, Float>>): FontFamily {
+    val variations = settings.map { (tag, value) -> SkiaFontVariation(tag, value) }
+    val typeface = baseOf(resource).makeClone(variations.toTypedArray(), 0)
+    val alias = "$resource?" + settings.joinToString("&") { (tag, value) -> "$tag=$value" }
+    return FontFamily(Typeface(typeface, alias))
+  }
 
   private val AXIS = Regex("""['"]([A-Za-z0-9]{4})['"]\s*(-?\d+(?:\.\d+)?)""")
 

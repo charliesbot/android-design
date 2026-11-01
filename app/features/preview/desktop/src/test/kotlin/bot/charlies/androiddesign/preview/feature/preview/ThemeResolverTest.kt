@@ -133,6 +133,25 @@ class ThemeResolverTest {
   }
 
   @Test
+  fun `variants of one font resource share a single base typeface`() {
+    // Warm both resources, then count: further variants must not load the font data again.
+    ProposalFonts.symbols(filled = false, sizeDp = 24)
+    ProposalFonts.family(FontFace.Fraunces, 400)
+    val before = ProposalFonts.baseTypefaceCount
+
+    val symbols =
+      (20..48).flatMap { size -> listOf(false, true).map { ProposalFonts.symbols(it, size) } }
+    val frauncesAxes =
+      (0..20).map {
+        ProposalFonts.family(FontFace.Fraunces, 300 + it * 10, listOf(FontAxis("SOFT", it * 5f)))
+      }
+
+    assertEquals(58, symbols.toSet().size)
+    assertEquals(21, frauncesAxes.toSet().size)
+    assertEquals(before, ProposalFonts.baseTypefaceCount)
+  }
+
+  @Test
   fun `a family ignores a variation axis value that is not finite`() {
     val axes = listOf(FontAxis("opsz", Float.POSITIVE_INFINITY), FontAxis("SOFT", Float.NaN))
     ProposalFonts.family(FontFace.Fraunces, 400, axes)
