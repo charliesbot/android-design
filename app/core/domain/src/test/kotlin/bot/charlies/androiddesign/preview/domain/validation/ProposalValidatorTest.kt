@@ -33,6 +33,23 @@ class ProposalValidatorTest {
   }
 
   @Test
+  fun `a prop may state its catalog default`() {
+    val stated =
+      base
+        .with(
+          "open_plate",
+          """{"id":"open_plate","component":"Button","label":"Cook","variant":"filled","size":"small","shape":"round","enabled":true,"primary":true}""",
+        )
+        .with(
+          "body",
+          """{"id":"body","component":"Column","children":["open_plate","more","icon","field"],"spacing":"md","horizontalAlignment":"start","arrangement":"start","scroll":false}""",
+        )
+        .with("icon", """{"id":"icon","component":"Icon","name":"home","size":24,"filled":false}""")
+        .with("field", """{"id":"field","component":"TextField","variant":"filled","lines":1}""")
+    assertEquals(emptyList(), errors(stated))
+  }
+
+  @Test
   fun `format must be 1`() {
     errors(base.withFormat(2)).assertHas("/format", "1")
   }

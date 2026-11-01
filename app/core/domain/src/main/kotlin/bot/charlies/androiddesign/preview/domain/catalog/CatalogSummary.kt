@@ -51,7 +51,8 @@ object CatalogSummary {
   }
 
   private const val KEY =
-    "Component lines read `Name: purpose. prop: kind, ...`. `*` marks a required prop. A kind is " +
+    "Component lines read `Name: purpose. prop: kind, ...`. `*` marks a required prop. `= value` " +
+      "is a prop's default: leave the prop out to get it. A kind is " +
       "string, boolean, number, numberRange ([min, max]), one of the enum values joined with |, " +
       "child (one component id), childList (component ids or a template {componentId, path}); " +
       "a slot that accepts only some components lists them, as child(FloatingToolbar|NavigationBar). " +
@@ -79,7 +80,8 @@ object CatalogSummary {
 
   private fun prop(prop: PropDef): String {
     val allowed = prop.allowedChildren?.sorted()?.joinToString("|", prefix = "(", postfix = ")")
-    return "${prop.name}${if (prop.required) "*" else ""}: ${kind(prop.kind)}${allowed.orEmpty()}"
+    val default = prop.default?.let { " = ${it.content}" }.orEmpty()
+    return "${prop.name}${if (prop.required) "*" else ""}: ${kind(prop.kind)}${allowed.orEmpty()}$default"
   }
 
   private fun kind(kind: PropKind): String =

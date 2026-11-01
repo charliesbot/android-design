@@ -70,6 +70,25 @@ class CatalogJsonTest {
   }
 
   @Test
+  fun `a prop with a catalog default emits it, and a prop without one does not`() {
+    val button = catalog.obj("components").obj("Button").obj("properties")
+    assertEquals(JsonPrimitive("filled"), button.obj("variant").getValue("default"))
+    assertEquals(JsonPrimitive("small"), button.obj("size").getValue("default"))
+    assertEquals(JsonPrimitive(true), button.obj("enabled").getValue("default"))
+    assertEquals(JsonPrimitive(false), button.obj("primary").getValue("default"))
+    val icon = catalog.obj("components").obj("Icon").obj("properties")
+    assertEquals(JsonPrimitive(24), icon.obj("size").getValue("default"))
+    assertTrue("default" !in button.obj("label"))
+    val declared =
+      M3ExpressiveCatalog.components.flatMap { it.props }.filter { it.default != null }.size
+    val emitted =
+      catalog.obj("components").values.sumOf { component ->
+        component.jsonObject.obj("properties").values.count { "default" in it.jsonObject }
+      }
+    assertEquals(declared, emitted)
+  }
+
+  @Test
   fun `token props reference the token defs`() {
     val color = catalog.obj("components").obj("Text").obj("properties").obj("color")
     assertEquals("#/\$defs/ColorRole", color.getValue("\$ref").jsonPrimitive.content)

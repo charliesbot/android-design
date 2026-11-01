@@ -163,9 +163,13 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
       description =
         "Renders each screen at each view without a window, tree only, and returns whether the " +
           "proposal passes: per screen and view, pass plus every error finding (rule, component " +
-          "id, detail), and a count of info findings. No geometry; call get_tree for a failing " +
-          "view's bounds. With no arguments it checks every screen at light, dark, foldable, " +
-          "tablet and desktop. Call this after each edit instead of get_tree per view.",
+          "id, detail), a count of info findings, and a layout summary: the navigation component " +
+          "shown (NavigationBar, NavigationRail, FloatingToolbar or none) and the screens shown " +
+          "left to right, each with the direct children of its content root as \"Type id width\" " +
+          "(dp). Compare the layout of two views to see that a wider one reveals more, with no " +
+          "need for get_tree. No other geometry; call get_tree for a failing view's bounds. With " +
+          "no arguments it checks every screen at light, dark, foldable, tablet and desktop. Call " +
+          "this after each edit instead of get_tree per view.",
       schema =
         schema(
           stringList("screens", "Screen ids to check. Defaults to every screen."),

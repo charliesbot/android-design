@@ -169,7 +169,7 @@ The app is the catalog's single source of truth and serves it over MCP (`get_cat
 
 **Tools:**
 - `open_proposal(path)`
-- `check_proposal(screens?, views?)`: every screen at all five views by default, tree-only, returning pass or fail per view and each error grouped by rule with its node ids. About 0.7 s for two screens.
+- `check_proposal(screens?, views?)`: every screen at all five views by default, tree-only, returning pass or fail per view, each error grouped by rule with its node ids, and a `layout` summary per view (navigation shown, panes, and each pane's main regions as `Type id width`, under 300 bytes) so the agent confirms adaptation without full trees. About 0.2 s for one screen at five views.
 - `get_tree(screen?, view?)`: the full tree of one view
 - `set_view(device, brightness, seed, style)`
 - `show_preview()`

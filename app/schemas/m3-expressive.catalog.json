@@ -34,7 +34,8 @@
             "start",
             "center",
             "end"
-          ]
+          ],
+          "default": "start"
         },
         "arrangement": {
           "type": "string",
@@ -45,11 +46,13 @@
             "spaceBetween",
             "spaceAround",
             "spaceEvenly"
-          ]
+          ],
+          "default": "start"
         },
         "scroll": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Makes the column vertically scrollable."
+          "description": "Makes the column vertically scrollable.",
+          "default": false
         }
       },
       "required": [
@@ -85,7 +88,8 @@
             "top",
             "center",
             "bottom"
-          ]
+          ],
+          "default": "top"
         },
         "arrangement": {
           "type": "string",
@@ -96,7 +100,8 @@
             "spaceBetween",
             "spaceAround",
             "spaceEvenly"
-          ]
+          ],
+          "default": "start"
         }
       },
       "required": [
@@ -133,7 +138,8 @@
             "bottomStart",
             "bottomCenter",
             "bottomEnd"
-          ]
+          ],
+          "default": "topStart"
         }
       },
       "required": [
@@ -195,7 +201,8 @@
           "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList"
         },
         "wrap": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         },
         "gap": {
           "type": "string",
@@ -252,7 +259,8 @@
           "const": "Divider"
         },
         "vertical": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
         }
       },
       "required": [
@@ -360,7 +368,8 @@
           "enum": [
             "ellipsis",
             "clip"
-          ]
+          ],
+          "default": "clip"
         },
         "align": {
           "type": "string",
@@ -396,7 +405,8 @@
         },
         "size": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
-          "description": "Size in dp; 24 by default. Must be a number from 1 to 512."
+          "description": "Size in dp. Must be a number from 1 to 512.",
+          "default": 24
         },
         "color": {
           "$ref": "#/$defs/ColorRole",
@@ -404,7 +414,8 @@
         },
         "filled": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Fill 1 instead of Fill 0."
+          "description": "Fill 1 instead of Fill 0.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
@@ -442,7 +453,8 @@
             "fillWidth",
             "fillHeight",
             "inside"
-          ]
+          ],
+          "default": "fit"
         },
         "shape": {
           "$ref": "#/$defs/ShapeValue"
@@ -530,7 +542,8 @@
             "center",
             "medium",
             "large"
-          ]
+          ],
+          "default": "small"
         },
         "title": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
@@ -609,7 +622,8 @@
           "description": "Material Symbols name, such as \"home\"."
         },
         "selected": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
         },
         "action": {
           "$ref": "#/$defs/Action",
@@ -643,7 +657,8 @@
           ]
         },
         "expanded": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
         }
       },
       "required": [
@@ -678,7 +693,8 @@
           "description": "Material Symbols name, such as \"home\"."
         },
         "selected": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
         },
         "action": {
           "$ref": "#/$defs/Action",
@@ -710,14 +726,16 @@
           "enum": [
             "horizontal",
             "vertical"
-          ]
+          ],
+          "default": "horizontal"
         },
         "colors": {
           "type": "string",
           "enum": [
             "standard",
             "vibrant"
-          ]
+          ],
+          "default": "standard"
         },
         "children": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList"
@@ -748,7 +766,8 @@
             "filled",
             "elevated",
             "outlined"
-          ]
+          ],
+          "default": "filled"
         },
         "action": {
           "$ref": "#/$defs/Action",
@@ -785,7 +804,8 @@
           "enum": [
             "standard",
             "segmented"
-          ]
+          ],
+          "default": "standard"
         },
         "children": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
@@ -829,7 +849,8 @@
           "$ref": "a2ui-v1_0/common_types.json#/$defs/Child"
         },
         "selected": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
         },
         "action": {
           "$ref": "#/$defs/Action",
@@ -864,7 +885,8 @@
             "elevated",
             "outlined",
             "text"
-          ]
+          ],
+          "default": "filled"
         },
         "size": {
           "type": "string",
@@ -874,14 +896,16 @@
             "medium",
             "large",
             "extra-large"
-          ]
+          ],
+          "default": "small"
         },
         "shape": {
           "type": "string",
           "enum": [
             "round",
             "square"
-          ]
+          ],
+          "default": "round"
         },
         "label": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
@@ -896,14 +920,16 @@
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -933,7 +959,8 @@
             "tonal",
             "elevated",
             "outlined"
-          ]
+          ],
+          "default": "filled"
         },
         "size": {
           "type": "string",
@@ -943,10 +970,12 @@
             "medium",
             "large",
             "extra-large"
-          ]
+          ],
+          "default": "small"
         },
         "checked": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
         },
         "label": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
@@ -961,14 +990,16 @@
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -995,7 +1026,8 @@
           "enum": [
             "standard",
             "connected"
-          ]
+          ],
+          "default": "standard"
         },
         "children": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
@@ -1033,7 +1065,8 @@
             "filled",
             "tonal",
             "outlined"
-          ]
+          ],
+          "default": "standard"
         },
         "size": {
           "type": "string",
@@ -1043,7 +1076,8 @@
             "medium",
             "large",
             "extra-large"
-          ]
+          ],
+          "default": "small"
         },
         "width": {
           "type": "string",
@@ -1051,7 +1085,8 @@
             "narrow",
             "uniform",
             "wide"
-          ]
+          ],
+          "default": "uniform"
         },
         "icon": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
@@ -1059,11 +1094,13 @@
         },
         "toggle": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Makes the button a toggle."
+          "description": "Makes the button a toggle.",
+          "default": false
         },
         "checked": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "State of a toggle."
+          "description": "State of a toggle.",
+          "default": false
         },
         "action": {
           "$ref": "#/$defs/Action",
@@ -1071,14 +1108,16 @@
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -1108,7 +1147,8 @@
             "tonal",
             "elevated",
             "outlined"
-          ]
+          ],
+          "default": "filled"
         },
         "label": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
@@ -1129,14 +1169,16 @@
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -1165,10 +1207,12 @@
             "small",
             "medium",
             "large"
-          ]
+          ],
+          "default": "small"
         },
         "extended": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
         },
         "color": {
           "type": "string",
@@ -1180,7 +1224,8 @@
             "tertiary-container",
             "tertiary",
             "surface"
-          ]
+          ],
+          "default": "primary-container"
         },
         "icon": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
@@ -1195,14 +1240,16 @@
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -1231,7 +1278,8 @@
         },
         "expanded": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Shows the menu open."
+          "description": "Shows the menu open.",
+          "default": false
         },
         "children": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
@@ -1241,14 +1289,16 @@
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -1310,7 +1360,8 @@
           "enum": [
             "outlined",
             "elevated"
-          ]
+          ],
+          "default": "outlined"
         },
         "label": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
@@ -1325,14 +1376,16 @@
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -1360,7 +1413,8 @@
           "enum": [
             "outlined",
             "elevated"
-          ]
+          ],
+          "default": "outlined"
         },
         "label": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
@@ -1374,18 +1428,21 @@
           "description": "What a tap does."
         },
         "selected": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -1420,18 +1477,21 @@
           "description": "What a tap does."
         },
         "selected": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -1459,7 +1519,8 @@
           "enum": [
             "outlined",
             "elevated"
-          ]
+          ],
+          "default": "outlined"
         },
         "label": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
@@ -1474,14 +1535,16 @@
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -1514,7 +1577,8 @@
         },
         "multi": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Allows more than one selected chip."
+          "description": "Allows more than one selected chip.",
+          "default": false
         }
       },
       "required": [
@@ -1538,7 +1602,8 @@
           "const": "Switch"
         },
         "checked": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
         },
         "action": {
           "$ref": "#/$defs/Action",
@@ -1546,14 +1611,16 @@
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -1576,7 +1643,8 @@
           "const": "Checkbox"
         },
         "checked": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
         },
         "label": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
@@ -1587,14 +1655,16 @@
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -1631,18 +1701,21 @@
         },
         "steps": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
-          "description": "Must be a whole number from 0 to 100."
+          "description": "Must be a whole number from 0 to 100.",
+          "default": 0
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -1684,18 +1757,21 @@
         },
         "steps": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
-          "description": "Must be a whole number from 0 to 100."
+          "description": "Must be a whole number from 0 to 100.",
+          "default": 0
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -1722,7 +1798,8 @@
           "enum": [
             "filled",
             "outlined"
-          ]
+          ],
+          "default": "filled"
         },
         "label": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
@@ -1737,7 +1814,8 @@
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
         },
         "error": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
         },
         "leadingIcon": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
@@ -1752,18 +1830,21 @@
         },
         "lines": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
-          "description": "Must be a whole number from 1 to 20."
+          "description": "Must be a whole number from 1 to 20.",
+          "default": 1
         },
         "primary": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Marks the screen's primary action. Exactly one is expected per screen."
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
         },
         "enabled": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
         }
       },
       "required": [
@@ -1785,7 +1866,8 @@
           "const": "LoadingIndicator"
         },
         "contained": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
         }
       },
       "required": [
@@ -1811,10 +1893,12 @@
           "enum": [
             "linear",
             "circular"
-          ]
+          ],
+          "default": "linear"
         },
         "wavy": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
         },
         "progress": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",

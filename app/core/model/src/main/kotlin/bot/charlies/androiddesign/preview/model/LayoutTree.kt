@@ -44,7 +44,11 @@ data class LayoutNode(
   val roles: NodeRoles? = null,
   val colors: NodeColors? = null,
   val a11y: A11yInfo? = null,
-)
+) {
+  /** A node with no area was not laid out, such as an overlay that is closed. */
+  val isLaidOut: Boolean
+    get() = bounds.width > 0f && bounds.height > 0f
+}
 
 /** `[x, y, width, height]` in dp. */
 @Serializable(with = BoundsSerializer::class)

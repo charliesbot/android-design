@@ -41,8 +41,27 @@ object ProposalFonts {
 
   private val cache = ConcurrentHashMap<Key, FontFamily>()
   private val symbolCache = ConcurrentHashMap<Pair<Boolean, Int>, FontFamily>()
+  private val files = ConcurrentHashMap<String, ByteArray>()
 
   private data class Key(val face: FontFace, val weight: Int, val axes: List<FontAxis>)
+
+  /**
+   * The bytes of a bundled font, read from the classpath once. A font given to Compose by resource
+   * name is read and inflated again by every scene that uses it, which for the 15 MB symbols font
+   * dominates a headless render; bytes in memory only need copying.
+   *
+   * The font's identity stays its resource name, as it was for a font loaded by name. Compose keys
+   * its typeface cache by identity, weight and style and not by variation settings, so fonts that
+   * differ only in their axes share one typeface. Giving each its own identity would be more exact
+   * and would change the drawn glyphs.
+   */
+  private fun bytesOf(resource: String): ByteArray =
+    files.getOrPut(resource) {
+      checkNotNull(ProposalFonts::class.java.classLoader.getResourceAsStream(resource)) {
+          "missing font resource $resource"
+        }
+        .use { it.readAllBytes() }
+    }
 
   /**
    * A family holding [face] at [weight] with the extra variation [axes]. A variable font needs one
@@ -56,13 +75,15 @@ object ProposalFonts {
     return cache.getOrPut(Key(face, clamped, usable)) {
       FontFamily(
         Font(
-          face.resource,
-          FontWeight(clamped),
-          FontStyle.Normal,
-          FontVariation.Settings(
-            FontVariation.weight(clamped),
-            *usable.map { FontVariation.Setting(it.tag, it.value) }.toTypedArray(),
-          ),
+          identity = face.resource,
+          data = bytesOf(face.resource),
+          weight = FontWeight(clamped),
+          style = FontStyle.Normal,
+          variationSettings =
+            FontVariation.Settings(
+              FontVariation.weight(clamped),
+              *usable.map { FontVariation.Setting(it.tag, it.value) }.toTypedArray(),
+            ),
         ),
       )
     }
@@ -74,15 +95,17 @@ object ProposalFonts {
     return symbolCache.getOrPut(filled to opticalSize) {
       FontFamily(
         Font(
-          SYMBOLS_RESOURCE,
-          FontWeight.Normal,
-          FontStyle.Normal,
-          FontVariation.Settings(
-            FontVariation.Setting("FILL", if (filled) 1f else 0f),
-            FontVariation.Setting("GRAD", 0f),
-            FontVariation.Setting("opsz", opticalSize.toFloat()),
-            FontVariation.weight(400),
-          ),
+          identity = SYMBOLS_RESOURCE,
+          data = bytesOf(SYMBOLS_RESOURCE),
+          weight = FontWeight.Normal,
+          style = FontStyle.Normal,
+          variationSettings =
+            FontVariation.Settings(
+              FontVariation.Setting("FILL", if (filled) 1f else 0f),
+              FontVariation.Setting("GRAD", 0f),
+              FontVariation.Setting("opsz", opticalSize.toFloat()),
+              FontVariation.weight(400),
+            ),
         ),
       )
     }

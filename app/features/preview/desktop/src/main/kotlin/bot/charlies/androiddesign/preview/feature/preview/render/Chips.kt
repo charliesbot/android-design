@@ -60,7 +60,7 @@ private fun NodeContext.chipIcon(
 internal fun RenderAssistChip(ctx: NodeContext) {
   val onClick = { ctx.env.act(ctx.props.action("action")) }
   val modifier = ctx.modifier().then(ctx.describedBy())
-  if (ctx.enum("variant", "outlined") == "elevated") {
+  if (ctx.enum("variant") == "elevated") {
     ElevatedAssistChip(
       onClick,
       ctx.chipLabel(),
@@ -77,7 +77,7 @@ internal fun RenderAssistChip(ctx: NodeContext) {
 internal fun RenderSuggestionChip(ctx: NodeContext) {
   val onClick = { ctx.env.act(ctx.props.action("action")) }
   val modifier = ctx.modifier().then(ctx.describedBy())
-  if (ctx.enum("variant", "outlined") == "elevated") {
+  if (ctx.enum("variant") == "elevated") {
     ElevatedSuggestionChip(onClick, ctx.chipLabel(), modifier, ctx.enabled, icon = ctx.chipIcon())
   } else {
     SuggestionChip(onClick, ctx.chipLabel(), modifier, ctx.enabled, icon = ctx.chipIcon())
@@ -89,7 +89,7 @@ internal fun RenderFilterChip(ctx: NodeContext) {
   val selected = ctx.chipSelected()
   val modifier = ctx.modifier().then(ctx.describedBy())
   val leading = ctx.chipIcon(selected, checkWhenSelected = true)
-  if (ctx.enum("variant", "outlined") == "elevated") {
+  if (ctx.enum("variant") == "elevated") {
     ElevatedFilterChip(
       selected,
       { ctx.toggleChip() },

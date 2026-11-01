@@ -50,7 +50,7 @@ internal fun RenderIcon(ctx: NodeContext) {
   SymbolIcon(
     name = ctx.string("name").orEmpty(),
     modifier = ctx.modifier(),
-    size = (ctx.number("size") ?: 24f).dp,
+    size = ctx.numberOrDefault("size").dp,
     tint = color,
     filled = ctx.bool("filled"),
     contentDescription = ctx.string("contentDescription"),

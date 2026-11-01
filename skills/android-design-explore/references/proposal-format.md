@@ -80,6 +80,16 @@ Parents refer to children by id, never by nesting objects:
 
 A slot may restrict what it holds (a `Scaffold`'s `bottomBar` takes a `NavigationBar` or `FloatingToolbar`); `get_catalog` lists those limits and the validator enforces them.
 
+## Writing it compactly
+
+Writing the file is most of the time a proposal takes, so keep it short:
+
+- **One component per line**, as a compact object, the way the example below is written. Indent only the envelope.
+- **Leave out every prop that equals its default.** `get_catalog` shows each default after the kind, as in `variant: filled|tonal|elevated|outlined|text = filled`.
+- **Repeat with a template**, not with copies: one row component bound to a `dataModel` array.
+- **Name a style once** in `material.styles` when several components share the same type, color, and shape.
+- **Revise with small edits** to the lines that change. Rewrite the whole file only for a new direction, and never generate it with a script.
+
 ## Data and bindings
 
 Any text, number, or boolean prop may be a binding instead of a literal: `{"@path": "/user/name"}` reads from the screen's `dataModel`. Inside a template, a relative path reads from the current item: `{"@path": "name"}`, and `{"@call": "@index"}` is the item's index. Keep sample data representative and non-sensitive.
@@ -144,13 +154,7 @@ A list that opens a detail screen, side by side at expanded widths. It assumes t
         { "id": "root", "component": "Scaffold", "topBar": "bar", "content": "list", "floatingActionButton": "add" },
         { "id": "bar", "component": "TopAppBar", "size": "large", "title": "Tonight's plate" },
         { "id": "list", "component": "List", "variant": "segmented", "padding": "lg", "children": { "componentId": "plate_row", "path": "/plates" } },
-        {
-          "id": "plate_row",
-          "component": "ListItem",
-          "headline": { "@path": "name" },
-          "supporting": { "@path": "time" },
-          "action": { "functionCall": { "@call": "navigate", "args": { "screen": "plate_detail" } } }
-        },
+        { "id": "plate_row", "component": "ListItem", "headline": { "@path": "name" }, "supporting": { "@path": "time" }, "action": { "functionCall": { "@call": "navigate", "args": { "screen": "plate_detail" } } } },
         { "id": "add", "component": "FloatingActionButton", "icon": "add", "label": "New plate", "extended": true, "primary": true }
       ]
     },
@@ -159,14 +163,7 @@ A list that opens a detail screen, side by side at expanded widths. It assumes t
       "components": [
         { "id": "root", "component": "Scaffold", "topBar": "bar", "content": "body" },
         { "id": "bar", "component": "TopAppBar", "title": "Burrata and tomatoes", "navigationIcon": "back" },
-        {
-          "id": "back",
-          "component": "IconButton",
-          "icon": "arrow_back",
-          "contentDescription": "Back",
-          "showIn": ["compact", "medium"],
-          "action": { "functionCall": { "@call": "back" } }
-        },
+        { "id": "back", "component": "IconButton", "icon": "arrow_back", "contentDescription": "Back", "showIn": ["compact", "medium"], "action": { "functionCall": { "@call": "back" } } },
         { "id": "body", "component": "Column", "padding": "lg", "spacing": "lg", "children": ["hero", "cook"] },
         { "id": "hero", "component": "Text", "text": "15 minutes, no stove", "style": "hero_title" },
         { "id": "cook", "component": "Button", "size": "large", "label": "Start cooking", "icon": "skillet", "primary": true }

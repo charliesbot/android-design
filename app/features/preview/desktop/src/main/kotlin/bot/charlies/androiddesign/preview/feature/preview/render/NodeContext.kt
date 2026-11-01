@@ -38,6 +38,8 @@ import bot.charlies.androiddesign.preview.model.TypeRole
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.float
 
 /** A node's named style, read from `material.styles`. Explicit props win over it. */
 internal class ResolvedStyle(
@@ -71,15 +73,20 @@ internal class NodeContext(
 
   fun string(key: String) = props.string(key)
 
-  fun bool(key: String, default: Boolean = false) = props.bool(key) ?: default
+  /** A boolean prop: its value, else the catalog default, else false. */
+  fun bool(key: String): Boolean = props.bool(key) ?: def.defaultOf(key)?.booleanOrNull ?: false
 
-  fun enum(key: String, default: String) = props.string(key) ?: default
+  /** An enum prop: its value, else the catalog default, which every enum read here has. */
+  fun enum(key: String): String = props.string(key) ?: requiredDefault(key).content
 
   val primary: Boolean
     get() = bool("primary")
 
   val enabled: Boolean
-    get() = bool("enabled", true)
+    get() = bool("enabled")
+
+  private fun requiredDefault(key: String): JsonPrimitive =
+    def.defaultOf(key) ?: error("${def.name}.$key has no catalog default")
 
   /** The padding around the component: the `padding` prop, else its style. */
   val padding: Dp?
@@ -98,6 +105,12 @@ internal class NodeContext(
 
   /** A whole-number prop, moved into its bounds like [number]. */
   fun whole(key: String): Int? = number(key)?.toInt()
+
+  /** A number prop with a catalog default: [number], else the default. */
+  fun numberOrDefault(key: String): Float = number(key) ?: requiredDefault(key).float
+
+  /** A whole-number prop with a catalog default: [whole], else the default. */
+  fun wholeOrDefault(key: String): Int = numberOrDefault(key).toInt()
 
   private fun boundsOf(key: String): NumberBounds? =
     ((def.props + M3ExpressiveCatalog.commonProps).firstOrNull { it.name == key }?.kind

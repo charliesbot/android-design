@@ -6,6 +6,7 @@ import bot.charlies.androiddesign.preview.domain.PreviewException
 import bot.charlies.androiddesign.preview.domain.ProposalCheck
 import bot.charlies.androiddesign.preview.domain.ViewChange
 import bot.charlies.androiddesign.preview.domain.catalog.CatalogJson
+import bot.charlies.androiddesign.preview.domain.layout.ViewLayout
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
 import bot.charlies.androiddesign.preview.model.Device
 import bot.charlies.androiddesign.preview.model.LayoutTree
@@ -303,7 +304,7 @@ class AppPreviewControllerTest {
     assertTrue(check.pass, check.toString())
     assertTrue(check.ms > 0)
     val json = PreviewJson.compact.encodeToString(ProposalCheck.serializer(), check)
-    assertTrue(json.length < 1_500, "a passing check stays small: ${json.length} characters")
+    assertTrue(json.length < 2_500, "a passing check stays small: ${json.length} characters")
   }
 
   @Test
@@ -356,7 +357,38 @@ class AppPreviewControllerTest {
     val oneFab = light.errors.single { it.rule == "one-fab" }
     assertTrue(oneFab.ids.size > 10, "one entry names every offender: ${oneFab.ids}")
     val json = PreviewJson.compact.encodeToString(ProposalCheck.serializer(), check)
-    assertTrue(json.length < 4_000, "five views of 12 failures: ${json.length} characters")
+    assertTrue(json.length < 4_500, "five views of 12 failures: ${json.length} characters")
+  }
+
+  private val verifyProposal: Path
+    get() = Path.of(System.getProperty("repo.dir")).resolve("evals/verify/verify.proposal.json")
+
+  @Test
+  fun `check_proposal says what each view shows, so adaptation can be compared`() = runBlocking {
+    controller.openProposal(verifyProposal.toString())
+
+    val check = controller.checkProposal()
+
+    fun layout(screen: String, view: String) =
+      assertNotNull(check.screens.getValue(screen).getValue(view).layout, "$screen/$view")
+    assertEquals("NavigationBar", layout("home", "light").nav)
+    assertEquals("NavigationBar", layout("home", "dark").nav)
+    assertEquals("NavigationRail", layout("home", "tablet").nav)
+    assertEquals("NavigationRail", layout("home", "desktop").nav)
+    assertEquals("none", layout("fabs", "light").nav)
+    // The detail opens over the list on a phone and beside it from the foldable up.
+    assertEquals(listOf("detail"), layout("detail", "light").panes.keys.toList())
+    assertEquals(listOf("home", "detail"), layout("detail", "tablet").panes.keys.toList())
+    assertEquals(listOf("home", "detail"), layout("detail", "foldable").panes.keys.toList())
+    val region = Regex("""[A-Z]\w+ \S+ \d+|\+\d+ more""")
+    for ((screen, views) in check.screens) {
+      for ((view, result) in views) {
+        val summary = assertNotNull(result.layout, "$screen/$view")
+        val json = PreviewJson.compact.encodeToString(ViewLayout.serializer(), summary)
+        assertTrue(json.length <= 300, "$screen/$view is ${json.length} bytes: $json")
+        assertTrue(summary.panes.values.flatten().all(region::matches), json)
+      }
+    }
   }
 
   @Test

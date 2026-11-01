@@ -21,7 +21,7 @@ internal fun RenderLoadingIndicator(ctx: NodeContext) {
 internal fun RenderProgressIndicator(ctx: NodeContext) {
   val progress = ctx.number("progress")
   val wavy = ctx.bool("wavy")
-  if (ctx.enum("shape", "linear") == "circular") {
+  if (ctx.enum("shape") == "circular") {
     val modifier = ctx.modifier()
     when {
       wavy && progress != null -> CircularWavyProgressIndicator({ progress }, modifier)

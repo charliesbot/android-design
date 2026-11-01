@@ -166,7 +166,7 @@ private fun GridOf(ctx: NodeContext, columns: Int, gap: Dp, modifier: Modifier) 
 @Composable
 internal fun RenderFlexBox(ctx: NodeContext) {
   val gap = ctx.spacing("gap") ?: 0.dp
-  val wrap = ctx.bool("wrap", true)
+  val wrap = ctx.bool("wrap")
   ctx.StyledAmbient {
     FlexBox(
       modifier = ctx.modifier(fillWidth = true).then(ctx.styleBackground()),

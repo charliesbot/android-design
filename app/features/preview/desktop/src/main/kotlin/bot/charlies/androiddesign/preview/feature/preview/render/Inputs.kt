@@ -85,7 +85,7 @@ internal fun RenderSlider(ctx: NodeContext) {
     modifier = ctx.modifier(fillWidth = true).then(ctx.describedBy()),
     enabled = ctx.enabled,
     valueRange = range,
-    steps = ctx.whole("steps") ?: 0,
+    steps = ctx.wholeOrDefault("steps"),
   )
 }
 
@@ -110,7 +110,7 @@ internal fun RenderRangeSlider(ctx: NodeContext) {
     modifier = ctx.modifier(fillWidth = true).then(ctx.describedBy()),
     enabled = ctx.enabled,
     valueRange = range,
-    steps = ctx.whole("steps") ?: 0,
+    steps = ctx.wholeOrDefault("steps"),
   )
 }
 
@@ -118,7 +118,7 @@ internal fun RenderRangeSlider(ctx: NodeContext) {
 @Composable
 internal fun RenderTextField(ctx: NodeContext) {
   val text = ctx.local("value", ctx.string("value").orEmpty())
-  val lines = ctx.whole("lines") ?: 1
+  val lines = ctx.wholeOrDefault("lines")
   val label = ctx.string("label")?.let { value -> @Composable { ctx.PartText(value, "label") } }
   val placeholder =
     ctx.string("placeholder")?.let { value -> @Composable { ctx.PartText(value, "placeholder") } }
@@ -128,7 +128,7 @@ internal fun RenderTextField(ctx: NodeContext) {
   val trailing = ctx.string("trailingIcon")?.let { name -> @Composable { SymbolIcon(name) } }
   val prefix = ctx.string("prefix")?.let { value -> @Composable { Text(value) } }
   val modifier = ctx.modifier(fillWidth = true).then(ctx.describedBy())
-  if (ctx.enum("variant", "filled") == "outlined") {
+  if (ctx.enum("variant") == "outlined") {
     OutlinedTextField(
       value = text.value,
       onValueChange = { text.set(it) },

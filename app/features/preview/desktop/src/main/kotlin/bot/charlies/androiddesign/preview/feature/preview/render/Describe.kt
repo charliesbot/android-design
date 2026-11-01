@@ -102,7 +102,7 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look {
         a11yRole = "Tab",
       )
     "FloatingToolbar" ->
-      if (ctx.enum("colors", "standard") == "vibrant") {
+      if (ctx.enum("colors") == "vibrant") {
         Look(ColorRole.PrimaryContainer, ColorRole.OnPrimaryContainer, shape = "full")
       } else {
         Look(ColorRole.SurfaceContainer, ColorRole.OnSurface, shape = "full")
@@ -110,7 +110,7 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look {
     "Card" -> {
       val container =
         ctx.style.container
-          ?: when (ctx.enum("variant", "filled")) {
+          ?: when (ctx.enum("variant")) {
             "elevated" -> ColorRole.SurfaceContainerLow
             "outlined" -> ColorRole.Surface
             else -> ColorRole.SurfaceContainerHighest
@@ -127,7 +127,7 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look {
       )
     "Button" -> {
       val (container, content) =
-        when (ctx.enum("variant", "filled")) {
+        when (ctx.enum("variant")) {
           "tonal" -> ColorRole.SecondaryContainer to ColorRole.OnSecondaryContainer
           "elevated" -> ColorRole.SurfaceContainerLow to ColorRole.Primary
           "outlined",
@@ -137,8 +137,8 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look {
       Look(
         container,
         content,
-        buttonType(ctx.enum("size", "small")),
-        if (ctx.enum("shape", "round") == "square") "large" else "full",
+        buttonType(ctx.enum("size")),
+        if (ctx.enum("shape") == "square") "large" else "full",
         ctx.string("label"),
         "Button",
       )
@@ -146,7 +146,7 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look {
     "ToggleButton" -> {
       val checked = ctx.bool("checked")
       val (container, content) =
-        when (ctx.enum("variant", "filled")) {
+        when (ctx.enum("variant")) {
           "tonal" ->
             if (checked) ColorRole.Secondary to ColorRole.OnSecondary
             else ColorRole.SecondaryContainer to ColorRole.OnSecondaryContainer
@@ -163,7 +163,7 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look {
       Look(
         container,
         content,
-        buttonType(ctx.enum("size", "small")),
+        buttonType(ctx.enum("size")),
         "full",
         ctx.string("label"),
         "Checkbox",
@@ -174,7 +174,7 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look {
       val checked = ctx.bool("toggle") && ctx.bool("checked")
       val toggle = ctx.bool("toggle")
       val (container, content) =
-        when (ctx.enum("variant", "standard")) {
+        when (ctx.enum("variant")) {
           "filled" ->
             if (toggle && !checked) ColorRole.SurfaceContainerHighest to ColorRole.Primary
             else ColorRole.Primary to ColorRole.OnPrimary
@@ -190,7 +190,7 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look {
     }
     "SplitButton" -> {
       val (container, content) =
-        when (ctx.enum("variant", "filled")) {
+        when (ctx.enum("variant")) {
           "tonal" -> ColorRole.SecondaryContainer to ColorRole.OnSecondaryContainer
           "elevated" -> ColorRole.SurfaceContainerLow to ColorRole.Primary
           "outlined" -> on to ColorRole.Primary
@@ -199,9 +199,9 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look {
       Look(container, content, TypeRole.LabelLarge, "full", ctx.string("label"), "Button")
     }
     "FloatingActionButton" -> {
-      val (container, content) = fabColors(ctx.enum("color", "primary-container"))
+      val (container, content) = fabColors(ctx.enum("color"))
       val shape =
-        when (ctx.enum("size", "small")) {
+        when (ctx.enum("size")) {
           "medium" -> "largeIncreased"
           "large" -> "extraLarge"
           else -> "large"
@@ -234,7 +234,7 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look {
     "AssistChip",
     "SuggestionChip" ->
       Look(
-        if (ctx.enum("variant", "outlined") == "elevated") ColorRole.SurfaceContainerLow else on,
+        if (ctx.enum("variant") == "elevated") ColorRole.SurfaceContainerLow else on,
         ColorRole.OnSurface,
         TypeRole.LabelLarge,
         "small",
@@ -247,7 +247,8 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look {
       val container =
         when {
           selected -> ColorRole.SecondaryContainer
-          ctx.enum("variant", "outlined") == "elevated" -> ColorRole.SurfaceContainerLow
+          // InputChip has no variant prop, so this is read without a catalog default.
+          ctx.string("variant") == "elevated" -> ColorRole.SurfaceContainerLow
           else -> on
         }
       Look(
@@ -281,7 +282,7 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look {
     "Slider",
     "RangeSlider" -> Look(on, ColorRole.Primary)
     "TextField" -> {
-      val filled = ctx.enum("variant", "filled") == "filled"
+      val filled = ctx.enum("variant") == "filled"
       Look(
         if (filled) ColorRole.SurfaceContainerHighest else on,
         ColorRole.OnSurface,

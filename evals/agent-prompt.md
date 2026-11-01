@@ -26,7 +26,7 @@ The screen must work and adapt across phone (411x923), foldable (933x704), table
 
 1. Call `check_proposal`. It checks every screen at all five views in one call and lists only the errors. A proposal that does not validate returns its validation errors instead.
 2. Fix every error once, then call `check_proposal` again. Report anything still failing or unresolved.
-3. Call `get_tree` for the phone `light` view and the `tablet` view of each screen. Check that the larger view reveals what your section 0 adaptation answer promised, rather than rearranging the phone content.
+3. Read each view's `layout` summary in the `check_proposal` result (navigation, panes, and regions). Check that the larger views reveal what your section 0 adaptation answer promised, rather than rearranging the phone content. Call `get_tree` only when a summary is not enough.
 
 You cannot see the window. In your final message, say that visual quality was judged from the layout tree only.
 
@@ -37,7 +37,7 @@ You cannot see the window. In your final message, say that visual quality was ju
 ## Definition of done
 
 - `{{PROPOSAL}}` and `{{DESIGN_MD}}` implement the brief and adapt across all four window sizes.
-- `check_proposal` passes, or you reported what still fails, and you confirmed the adaptation from the trees.
+- `check_proposal` passes, or you reported what still fails, and you confirmed the adaptation from its `layout` summaries.
 
 ## Final message (under 250 words)
 

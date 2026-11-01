@@ -603,15 +603,9 @@ fun HomeScreen(
       },
       floatingActionButton = {
         if (!atLeastExpanded) {
-          MediumExtendedFloatingActionButton(
+          ExtendedFloatingActionButton(
             onClick = {},
-            icon = {
-              Icon(
-                painterResource(R.drawable.add),
-                contentDescription = null,
-                modifier = Modifier.size(FloatingActionButtonDefaults.MediumIconSize),
-              )
-            },
+            icon = { Icon(painterResource(R.drawable.add), contentDescription = null) },
             text = { Text("Create") },
           )
         } else if (atLeastExpanded) {

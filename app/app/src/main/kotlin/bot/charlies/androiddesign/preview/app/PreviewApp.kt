@@ -42,6 +42,8 @@ fun runPreviewApp() {
   val protocolOut = PrintStream(FileOutputStream(FileDescriptor.out), false)
   System.setOut(System.err)
 
+  AppNap.optOutInBackground()
+
   val koin = startKoin { modules(appModule) }.koin
   val viewer: ViewerViewModel = koin.get()
   val window: PreviewWindow = koin.get()

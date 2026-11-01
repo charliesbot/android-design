@@ -1,5 +1,7 @@
 package bot.charlies.androiddesign.preview.model
 
+import kotlinx.serialization.json.JsonPrimitive
+
 /** What a prop's value may be. Any [String], [Boolean] or [Number] prop may also be a binding. */
 sealed interface PropKind {
   /** The id of one component. */
@@ -72,6 +74,10 @@ data class NumberBounds(val min: Double, val max: Double, val whole: Boolean = f
 /**
  * One prop of a component. For [PropKind.Child] and [PropKind.ChildList], [allowedChildren] lists
  * the component names it may reference, or is null when any component is allowed.
+ *
+ * @property default The value the renderer and the exporter use when a proposal leaves the prop
+ *   out, or null when the prop has no fixed default. This is the only place a default is written
+ *   down, and the catalog shows it to agents so they can omit it.
  */
 data class PropDef(
   val name: String,
@@ -79,6 +85,7 @@ data class PropDef(
   val required: Boolean = false,
   val description: String = "",
   val allowedChildren: Set<String>? = null,
+  val default: JsonPrimitive? = null,
 )
 
 enum class ComponentGroup {
@@ -111,6 +118,9 @@ data class ComponentDef(
   val overlay: Boolean = false,
 ) {
   fun prop(name: String): PropDef? = props.firstOrNull { it.name == name }
+
+  /** The catalog default of prop [name], or null when it is not a prop or has no default. */
+  fun defaultOf(name: String): JsonPrimitive? = prop(name)?.default
 }
 
 /** Renderer-only functions an `action` may call. */
@@ -167,17 +177,42 @@ object M3ExpressiveCatalog {
 private fun text(name: String, required: Boolean = false, description: String = "") =
   PropDef(name, PropKind.Text, required, description)
 
-private fun bool(name: String, description: String = "") =
-  PropDef(name, PropKind.Bool, description = description)
+private fun bool(name: String, description: String = "", default: Boolean? = false) =
+  PropDef(
+    name,
+    PropKind.Bool,
+    description = description,
+    default = default?.let(::JsonPrimitive),
+  )
 
-private fun num(name: String, description: String = "", bounds: NumberBounds? = null) =
-  PropDef(name, PropKind.Number(bounds), description = description)
+private fun num(
+  name: String,
+  description: String = "",
+  bounds: NumberBounds? = null,
+  default: Int? = null,
+) =
+  PropDef(
+    name,
+    PropKind.Number(bounds),
+    description = description,
+    default = default?.let(::JsonPrimitive),
+  )
 
 private fun range(name: String, description: String = "") =
   PropDef(name, PropKind.NumberRange, description = description)
 
-private fun oneOf(name: String, vararg values: String, description: String = "") =
-  PropDef(name, PropKind.Enum(values.toList()), description = description)
+private fun oneOf(
+  name: String,
+  vararg values: String,
+  description: String = "",
+  default: String? = null,
+) =
+  PropDef(
+    name,
+    PropKind.Enum(values.toList()),
+    description = description,
+    default = default?.let(::JsonPrimitive),
+  )
 
 private fun child(
   name: String,
@@ -212,7 +247,7 @@ private val interactiveProps =
   listOf(
     bool("primary", "Marks the screen's primary action. Exactly one is expected per screen."),
     text("contentDescription", description = "Accessibility label when it differs from the label."),
-    bool("enabled"),
+    bool("enabled", default = true),
   )
 
 private val buttonSizes = arrayOf("extra-small", "small", "medium", "large", "extra-large")
@@ -253,8 +288,8 @@ private fun layout(): List<ComponentDef> =
       listOf(
         children("children", required = true),
         spacing("spacing", "Gap between children (Arrangement.spacedBy)."),
-        oneOf("horizontalAlignment", "start", "center", "end"),
-        oneOf("arrangement", *arrangements),
+        oneOf("horizontalAlignment", "start", "center", "end", default = "start"),
+        oneOf("arrangement", *arrangements, default = "start"),
         bool("scroll", "Makes the column vertically scrollable."),
       ),
     ),
@@ -266,8 +301,8 @@ private fun layout(): List<ComponentDef> =
       listOf(
         children("children", required = true),
         spacing("spacing", "Gap between children (Arrangement.spacedBy)."),
-        oneOf("verticalAlignment", "top", "center", "bottom"),
-        oneOf("arrangement", *arrangements),
+        oneOf("verticalAlignment", "top", "center", "bottom", default = "top"),
+        oneOf("arrangement", *arrangements, default = "start"),
       ),
     ),
     ComponentDef(
@@ -275,7 +310,10 @@ private fun layout(): List<ComponentDef> =
       ComponentGroup.Layout,
       "Stacks children on top of each other.",
       "Box",
-      listOf(children("children", required = true), oneOf("contentAlignment", *alignments)),
+      listOf(
+        children("children", required = true),
+        oneOf("contentAlignment", *alignments, default = "topStart"),
+      ),
     ),
     ComponentDef(
       "Grid",
@@ -302,7 +340,11 @@ private fun layout(): List<ComponentDef> =
       ComponentGroup.Layout,
       "Lays children out in a row that wraps.",
       "FlexBox (experimental Compose FlexBox)",
-      listOf(children("children", required = true), bool("wrap"), spacing("gap")),
+      listOf(
+        children("children", required = true),
+        bool("wrap", default = true),
+        spacing("gap"),
+      ),
     ),
     ComponentDef(
       "Spacer",
@@ -343,7 +385,7 @@ private fun content(): List<ComponentDef> =
         type(),
         color("color", "Content color role."),
         num("maxLines", bounds = NumberBounds(1.0, 100.0, whole = true)),
-        oneOf("overflow", "ellipsis", "clip"),
+        oneOf("overflow", "ellipsis", "clip", default = "clip"),
         oneOf("align", "start", "center", "end"),
       ),
     ),
@@ -354,7 +396,7 @@ private fun content(): List<ComponentDef> =
       "Icon",
       listOf(
         icon("name", required = true),
-        num("size", "Size in dp; 24 by default.", NumberBounds(1.0, 512.0)),
+        num("size", "Size in dp.", NumberBounds(1.0, 512.0), default = 24),
         color("color", "Content color role."),
         bool("filled", "Fill 1 instead of Fill 0."),
         text("contentDescription"),
@@ -372,7 +414,16 @@ private fun content(): List<ComponentDef> =
           required = true,
           description = "Path relative to the proposal, or a data: URI.",
         ),
-        oneOf("fit", "crop", "fit", "fillBounds", "fillWidth", "fillHeight", "inside"),
+        oneOf(
+          "fit",
+          "crop",
+          "fit",
+          "fillBounds",
+          "fillWidth",
+          "fillHeight",
+          "inside",
+          default = "fit",
+        ),
         shape(),
         num("aspectRatio", "Width divided by height.", NumberBounds(0.1, 10.0)),
         text("contentDescription"),
@@ -401,7 +452,7 @@ private fun structure(): List<ComponentDef> =
       "The screen's top bar.",
       "TopAppBar, CenterAlignedTopAppBar, MediumFlexibleTopAppBar, LargeFlexibleTopAppBar",
       listOf(
-        oneOf("size", "small", "center", "medium", "large"),
+        oneOf("size", "small", "center", "medium", "large", default = "small"),
         text("title", required = true),
         text("subtitle"),
         child("navigationIcon", "IconButton"),
@@ -456,8 +507,8 @@ private fun structure(): List<ComponentDef> =
       "A floating toolbar of actions.",
       "HorizontalFloatingToolbar, VerticalFloatingToolbar",
       listOf(
-        oneOf("orientation", "horizontal", "vertical"),
-        oneOf("colors", "standard", "vibrant"),
+        oneOf("orientation", "horizontal", "vertical", default = "horizontal"),
+        oneOf("colors", "standard", "vibrant", default = "standard"),
         children("children", required = true),
       ),
     ),
@@ -467,7 +518,7 @@ private fun structure(): List<ComponentDef> =
       "A container for related content.",
       "Card, ElevatedCard, OutlinedCard",
       listOf(
-        oneOf("variant", "filled", "elevated", "outlined"),
+        oneOf("variant", "filled", "elevated", "outlined", default = "filled"),
         action(),
         shape(),
         children("content", required = true),
@@ -483,7 +534,7 @@ private fun lists(): List<ComponentDef> =
       "A list of ListItems.",
       "Column of ListItem, or of SegmentedListItem for the segmented variant",
       listOf(
-        oneOf("variant", "standard", "segmented"),
+        oneOf("variant", "standard", "segmented", default = "standard"),
         children("children", "ListItem", required = true),
       ),
     ),
@@ -512,9 +563,9 @@ private fun actions(): List<ComponentDef> =
       "A button.",
       "Button, FilledTonalButton, ElevatedButton, OutlinedButton, TextButton",
       listOf(
-        oneOf("variant", "filled", "tonal", "elevated", "outlined", "text"),
-        oneOf("size", *buttonSizes),
-        oneOf("shape", "round", "square"),
+        oneOf("variant", "filled", "tonal", "elevated", "outlined", "text", default = "filled"),
+        oneOf("size", *buttonSizes, default = "small"),
+        oneOf("shape", "round", "square", default = "round"),
         text("label", required = true),
         icon(),
         action(),
@@ -527,8 +578,8 @@ private fun actions(): List<ComponentDef> =
       "A button with an on and off state.",
       "ToggleButton, FilledTonalToggleButton, ElevatedToggleButton, OutlinedToggleButton",
       listOf(
-        oneOf("variant", "filled", "tonal", "elevated", "outlined"),
-        oneOf("size", *buttonSizes),
+        oneOf("variant", "filled", "tonal", "elevated", "outlined", default = "filled"),
+        oneOf("size", *buttonSizes, default = "small"),
         bool("checked"),
         text("label", required = true),
         icon(),
@@ -542,7 +593,7 @@ private fun actions(): List<ComponentDef> =
       "Buttons laid out as one group.",
       "ButtonGroup, or a Row of toggle buttons with ButtonGroupDefaults.connected shapes",
       listOf(
-        oneOf("variant", "standard", "connected"),
+        oneOf("variant", "standard", "connected", default = "standard"),
         children("children", "Button", "ToggleButton", "IconButton", required = true),
       ),
     ),
@@ -552,9 +603,9 @@ private fun actions(): List<ComponentDef> =
       "A button that shows only an icon.",
       "IconButton, FilledIconButton, FilledTonalIconButton, OutlinedIconButton, IconToggleButton",
       listOf(
-        oneOf("variant", "standard", "filled", "tonal", "outlined"),
-        oneOf("size", *buttonSizes),
-        oneOf("width", "narrow", "uniform", "wide"),
+        oneOf("variant", "standard", "filled", "tonal", "outlined", default = "standard"),
+        oneOf("size", *buttonSizes, default = "small"),
+        oneOf("width", "narrow", "uniform", "wide", default = "uniform"),
         icon(required = true),
         bool("toggle", "Makes the button a toggle."),
         bool("checked", "State of a toggle."),
@@ -568,7 +619,7 @@ private fun actions(): List<ComponentDef> =
       "A button with a leading action and a trailing menu.",
       "SplitButtonLayout with SplitButtonDefaults.LeadingButton and TrailingButton",
       listOf(
-        oneOf("variant", "filled", "tonal", "elevated", "outlined"),
+        oneOf("variant", "filled", "tonal", "elevated", "outlined", default = "filled"),
         text("label", required = true),
         icon(),
         action(),
@@ -582,7 +633,7 @@ private fun actions(): List<ComponentDef> =
       "The screen's floating action button.",
       "FloatingActionButton, MediumFloatingActionButton, LargeFloatingActionButton, ExtendedFloatingActionButton",
       listOf(
-        oneOf("size", "small", "medium", "large"),
+        oneOf("size", "small", "medium", "large", default = "small"),
         bool("extended"),
         oneOf(
           "color",
@@ -593,6 +644,7 @@ private fun actions(): List<ComponentDef> =
           "tertiary-container",
           "tertiary",
           "surface",
+          default = "primary-container",
         ),
         icon(required = true),
         text("label"),
@@ -634,7 +686,7 @@ private fun chips(): List<ComponentDef> =
       ComponentGroup.Chips,
       "A chip that starts a smart or automated action.",
       "AssistChip, ElevatedAssistChip",
-      listOf(oneOf("variant", *chipVariants)) + chipProps(selectable = false),
+      listOf(oneOf("variant", *chipVariants, default = "outlined")) + chipProps(selectable = false),
       interactive = true,
     ),
     ComponentDef(
@@ -642,7 +694,7 @@ private fun chips(): List<ComponentDef> =
       ComponentGroup.Chips,
       "A chip that toggles a filter.",
       "FilterChip, ElevatedFilterChip",
-      listOf(oneOf("variant", *chipVariants)) + chipProps(selectable = true),
+      listOf(oneOf("variant", *chipVariants, default = "outlined")) + chipProps(selectable = true),
       interactive = true,
     ),
     ComponentDef(
@@ -658,7 +710,7 @@ private fun chips(): List<ComponentDef> =
       ComponentGroup.Chips,
       "A chip that offers a suggestion.",
       "SuggestionChip, ElevatedSuggestionChip",
-      listOf(oneOf("variant", *chipVariants)) + chipProps(selectable = false),
+      listOf(oneOf("variant", *chipVariants, default = "outlined")) + chipProps(selectable = false),
       interactive = true,
     ),
     ComponentDef(
@@ -706,7 +758,7 @@ private fun inputs(): List<ComponentDef> =
       listOf(
         num("value", "Current value."),
         range("range", "[min, max]; [0, 1] by default."),
-        num("steps", bounds = NumberBounds(0.0, 100.0, whole = true)),
+        num("steps", bounds = NumberBounds(0.0, 100.0, whole = true), default = 0),
       ) + interactiveProps,
       interactive = true,
     ),
@@ -718,7 +770,7 @@ private fun inputs(): List<ComponentDef> =
       listOf(
         range("value", "[start, end]."),
         range("range", "[min, max]; [0, 1] by default."),
-        num("steps", bounds = NumberBounds(0.0, 100.0, whole = true)),
+        num("steps", bounds = NumberBounds(0.0, 100.0, whole = true), default = 0),
       ) + interactiveProps,
       interactive = true,
     ),
@@ -728,7 +780,7 @@ private fun inputs(): List<ComponentDef> =
       "A text input.",
       "TextField, OutlinedTextField",
       listOf(
-        oneOf("variant", "filled", "outlined"),
+        oneOf("variant", "filled", "outlined", default = "filled"),
         text("label"),
         text("placeholder"),
         text("value"),
@@ -737,7 +789,7 @@ private fun inputs(): List<ComponentDef> =
         icon("leadingIcon"),
         icon("trailingIcon"),
         text("prefix"),
-        num("lines", bounds = NumberBounds(1.0, 20.0, whole = true)),
+        num("lines", bounds = NumberBounds(1.0, 20.0, whole = true), default = 1),
       ) + interactiveProps,
       interactive = true,
     ),
@@ -758,7 +810,7 @@ private fun feedback(): List<ComponentDef> =
       "A linear or circular progress indicator; indeterminate when progress is absent.",
       "LinearProgressIndicator, CircularProgressIndicator, and the Wavy variants",
       listOf(
-        oneOf("shape", "linear", "circular"),
+        oneOf("shape", "linear", "circular", default = "linear"),
         bool("wavy"),
         num("progress", "Completed fraction.", NumberBounds(0.0, 1.0)),
       ),

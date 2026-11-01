@@ -47,7 +47,7 @@ Both are ordinary tracked files; committing them follows the project's own workf
 ## Write
 
 1. Call `get_catalog`. It is the only component vocabulary: one line per component with its props, allowed values, and slots, plus the token names and actions. Call it with `component` for one component's full schema when a line is not enough. A component it lacks is out of reach; build the idea from `Box`, `Row`, `Column`, `Text`, and `Shape`, or leave it out.
-2. Read `references/proposal-format.md`, then write `DESIGN.md` and the proposal.
+2. Read `references/proposal-format.md`, then write `DESIGN.md` and the proposal. Write it compactly, one component per line with every default left out, as "Writing it compactly" there describes: writing the file is most of a proposal's time.
 
 Rules the file must carry:
 
@@ -61,11 +61,12 @@ Rules the file must carry:
 The check reads the layout tree, never pixels. Screenshots stay out of this loop: never take one or ask for one.
 
 1. Call `open_proposal` with the proposal's absolute path. It loads the file, watches it, shows the window, and returns validation errors. Fix them and call `status` until it reports none.
-2. Call `check_proposal`. One call checks every screen at all five views (`light`, `dark`, `foldable`, `tablet`, `desktop`) and returns only what fails: each error's rule, node ids, and detail. `info` findings are counted, not listed, and pass.
+2. Call `check_proposal`. One call checks every screen at all five views (`light`, `dark`, `foldable`, `tablet`, `desktop`) and returns only what fails: each error's rule, node ids, and detail. `info` findings are counted, not listed, and pass. Each view also carries a `layout` summary: the navigation shown (`NavigationBar`, `NavigationRail`, `FloatingToolbar`, or none), the panes, and each pane's main regions as `Type id width`.
 3. Fix every error once, then call `check_proposal` again. Report anything still failing instead of looping.
-4. Call `get_tree` only where you need geometry: the phone `light` view and one expanded view (`tablet`) of each screen, plus any view whose error you cannot place. Each node carries its id, bounds, text overflow and truncation, roles, resolved colors, and accessibility facts. Confirm from them that the larger view reveals what your section 0 adaptation answer promised: a second pane, a rail, more detail. Google: "Additional space doesn't just mean making the same thing bigger." The phone's nodes only spread wider fail.
+4. Confirm the adaptation from the `layout` summaries: each larger view reveals what your section 0 adaptation answer promised, such as a second pane, a rail, or more regions. Google: "Additional space doesn't just mean making the same thing bigger." A larger view with the phone's regions only spread wider fails.
+5. Call `get_tree` only when a summary or an error is not enough: it gives one view's full geometry, with each node's bounds, text overflow and truncation, roles, resolved colors, and accessibility facts.
 
-The step is done when `check_proposal` passes or each remaining error is on the list you report, and the adaptation is confirmed from the trees.
+The step is done when `check_proposal` passes or each remaining error is on the list you report, and the adaptation is confirmed.
 
 ## Show
 

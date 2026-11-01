@@ -16,7 +16,7 @@ import bot.charlies.androiddesign.preview.model.ColorRole
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderList(ctx: NodeContext) {
-  val segmented = ctx.enum("variant", "standard") == "segmented"
+  val segmented = ctx.enum("variant") == "segmented"
   ctx.StyledAmbient {
     Column(
       modifier = ctx.modifier(fillWidth = true).then(ctx.styleBackground()),

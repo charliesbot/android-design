@@ -5,6 +5,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
 
 class ModelTest {
   @Test
@@ -13,6 +15,25 @@ class ModelTest {
     assertEquals("displayLargeEmphasized", TypeRole.DisplayLargeEmphasized.wire)
     assertEquals("extraExtraLarge", ShapeToken.ExtraExtraLarge.wire)
     assertEquals("cookie9Sided", MaterialShape.Cookie9Sided.wire)
+  }
+
+  @Test
+  fun `every catalog default is a value its prop accepts`() {
+    for (def in M3ExpressiveCatalog.components) {
+      for (prop in def.props) {
+        val default = prop.default ?: continue
+        val label = "${def.name}.${prop.name}"
+        when (val kind = prop.kind) {
+          is PropKind.Enum -> assertTrue(default.isString && default.content in kind.values, label)
+          PropKind.Bool -> assertNotNull(default.booleanOrNull, label)
+          is PropKind.Number -> {
+            val number = assertNotNull(default.doubleOrNull, label)
+            assertTrue(kind.bounds == null || number in kind.bounds, label)
+          }
+          else -> error("$label: a ${kind::class.simpleName} prop has no default")
+        }
+      }
+    }
   }
 
   @Test

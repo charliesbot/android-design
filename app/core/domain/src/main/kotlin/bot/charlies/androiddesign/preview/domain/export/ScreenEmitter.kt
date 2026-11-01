@@ -282,6 +282,30 @@ internal class ScreenEmitter(
   fun JsonObject.literal(key: String): String? =
     (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
+  /** An enum prop of [component]: the stated value, else its catalog default. */
+  fun JsonObject.choice(component: String, key: String): String =
+    literal(key)
+      ?: checkNotNull(catalogDefault(component, key)) { "$component.$key has no default" }
+
+  /**
+   * An enum prop of [component] the proposal states with a value other than its catalog default,
+   * else null: Compose needs code only for a choice that is not its own default.
+   */
+  fun JsonObject.nonDefault(component: String, key: String): String? =
+    literal(key)?.takeIf { it != catalogDefault(component, key) }
+
+  /** A boolean prop of [component]: the stated literal, else its catalog default. */
+  fun JsonObject.option(component: String, key: String): Boolean =
+    flag(key)
+      ?: checkNotNull(
+        M3ExpressiveCatalog.find(component)?.defaultOf(key)?.content?.toBooleanStrictOrNull(),
+      ) {
+        "$component.$key has no default"
+      }
+
+  private fun catalogDefault(component: String, key: String): String? =
+    M3ExpressiveCatalog.find(component)?.defaultOf(key)?.content
+
   fun JsonObject.flag(key: String): Boolean? =
     (this[key] as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toBooleanStrictOrNull()
 

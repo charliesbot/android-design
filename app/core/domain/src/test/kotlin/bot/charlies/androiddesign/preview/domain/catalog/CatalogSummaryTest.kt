@@ -51,6 +51,22 @@ class CatalogSummaryTest {
   }
 
   @Test
+  fun `a prop with a catalog default shows it after the kind`() {
+    assertTrue("variant: filled|tonal|elevated|outlined|text = filled" in line("Button"))
+    assertTrue("size: extra-small|small|medium|large|extra-large = small" in line("Button"))
+    assertTrue("enabled: boolean = true" in line("Button"))
+    assertTrue("size: number = 24" in line("Icon"))
+    assertTrue("label*: string," in line("Button"))
+    for (def in M3ExpressiveCatalog.components) {
+      for (prop in def.props.filter { it.default != null }) {
+        val shown =
+          Regex("(^|[ ,])${prop.name}: [^,]* = ${Regex.escape(prop.default!!.content)}(,|$)")
+        assertTrue(shown.containsMatchIn(line(def.name)), "${def.name}.${prop.name}")
+      }
+    }
+  }
+
+  @Test
   fun `a restricted slot lists the components it accepts`() {
     M3ExpressiveCatalog.components.forEach { def ->
       def.props.forEach { prop ->

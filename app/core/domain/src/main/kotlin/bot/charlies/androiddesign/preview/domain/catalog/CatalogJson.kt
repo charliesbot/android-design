@@ -229,6 +229,7 @@ object CatalogJson {
     prop.allowedChildren?.let { fields["x-allowedComponents"] = strings(*it.toTypedArray()) }
     val description = describe(prop)
     if (description.isNotEmpty()) fields["description"] = JsonPrimitive(description)
+    prop.default?.let { fields["default"] = it }
     return JsonObject(fields)
   }
 

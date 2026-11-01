@@ -245,7 +245,7 @@ private fun ScreenEmitter.arrangement(p: JsonObject, vertical: Boolean): String?
 }
 
 private fun ScreenEmitter.box(p: JsonObject, place: Place): List<Stmt> {
-  val alignment = p.literal("contentAlignment")?.takeIf { it != "topStart" }?.let(::alignmentName)
+  val alignment = p.nonDefault("Box", "contentAlignment")?.let(::alignmentName)
   return one(
     file.use(Sym.Box),
     listOf(modifier(place, p, containerBackground(p)), opt("contentAlignment", alignment)),
@@ -283,7 +283,7 @@ private fun ScreenEmitter.grid(p: JsonObject, place: Place): List<Stmt> {
 
 private fun ScreenEmitter.flexBox(p: JsonObject, place: Place): List<Stmt> {
   val config = mutableListOf<Stmt>()
-  if (p.flag("wrap") == true) config += stmt(Raw("wrap(${file.use(Sym.FlexWrap)}.Wrap)"))
+  if (p.option("FlexBox", "wrap")) config += stmt(Raw("wrap(${file.use(Sym.FlexWrap)}.Wrap)"))
   p.literal("gap")?.let { config += stmt(Raw("gap(${spacing(it)})")) }
   return one(
     file.use(Sym.FlexBox),
@@ -376,13 +376,13 @@ private fun ScreenEmitter.image(node: ComponentNode, p: JsonObject, place: Place
   val symbol =
     if (src.startsWith("data:")) node.id else src.substringAfterLast('/').substringBeforeLast('.')
   val scale =
-    when (p.literal("fit")) {
-      "fit" -> "Fit"
+    when (p.choice("Image", "fit")) {
+      "crop" -> "Crop"
       "fillBounds" -> "FillBounds"
       "fillWidth" -> "FillWidth"
       "fillHeight" -> "FillHeight"
       "inside" -> "Inside"
-      else -> "Crop"
+      else -> "Fit"
     }
   val shape = p.literal("shape")?.let { "${useModifier("clip")}(${shapeToken(it)})" }
   val aspect = p.floatExpr("aspectRatio", place)?.let { "${useModifier("aspectRatio")}($it)" }
@@ -505,7 +505,7 @@ private fun ScreenEmitter.scaffoldContent(
 }
 
 private fun ScreenEmitter.topAppBar(p: JsonObject, place: Place): List<Stmt> {
-  val size = p.literal("size") ?: "small"
+  val size = p.choice("TopAppBar", "size")
   val flexible = size == "medium" || size == "large"
   if (flexible) expressive() else experimental()
   val callee =
@@ -855,7 +855,7 @@ private fun ScreenEmitter.buttonGroup(p: JsonObject, place: Place): List<Stmt> {
 private fun ScreenEmitter.iconButton(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val defaults = m3("IconButtonDefaults")
   val toggle = p.flag("toggle") == true
-  val variant = p.literal("variant") ?: "standard"
+  val variant = p.choice("IconButton", "variant")
   val callee =
     if (toggle)
       when (variant) {
@@ -871,9 +871,9 @@ private fun ScreenEmitter.iconButton(node: ComponentNode, p: JsonObject, place: 
         "outlined" -> "OutlinedIconButton"
         else -> "IconButton"
       }
-  val size = p.literal("size")?.takeIf { it != "small" }
+  val size = p.nonDefault("IconButton", "size")
   val sizeName = size?.let { Naming.camel(it) }
-  if (toggle || size != null || p.literal("width")?.let { it != "uniform" } == true) expressive()
+  if (toggle || size != null || p.nonDefault("IconButton", "width") != null) expressive()
   // The buttons take no width parameter: Narrow and Wide go through the container size.
   val width =
     p.literal("width")
@@ -1006,7 +1006,7 @@ private fun ScreenEmitter.floatingActionButton(
   p: JsonObject,
   place: Place,
 ): List<Stmt> {
-  val size = p.literal("size") ?: "medium"
+  val size = p.choice("FloatingActionButton", "size")
   val label = p.text("label", place)
   val extended = p.flag("extended") == true && label != null
   val prefix =

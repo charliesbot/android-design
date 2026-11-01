@@ -90,12 +90,12 @@ private fun ButtonContent(
 @Composable
 internal fun RenderButton(ctx: NodeContext) {
   val env = ctx.env
-  val height = buttonHeight(ctx.enum("size", "small"))
+  val height = buttonHeight(ctx.enum("size"))
   val icon = ctx.string("icon")
   val label = ctx.string("label").orEmpty()
   val action = ctx.props.action("action")
   val shapes: ButtonShapes =
-    if (ctx.enum("shape", "round") == "square") {
+    if (ctx.enum("shape") == "square") {
       ButtonDefaults.shapes(ButtonDefaults.squareShape, ButtonDefaults.pressedShape)
     } else {
       ButtonDefaults.shapesFor(height)
@@ -114,7 +114,7 @@ internal fun RenderButton(ctx: NodeContext) {
     } else {
       base
     }
-  when (ctx.enum("variant", "filled")) {
+  when (ctx.enum("variant")) {
     "tonal" ->
       FilledTonalButton(
         onClick,
@@ -172,7 +172,7 @@ internal fun RenderButton(ctx: NodeContext) {
 @Composable
 internal fun RenderToggleButton(ctx: NodeContext) {
   val env = ctx.env
-  val height = buttonHeight(ctx.enum("size", "small"))
+  val height = buttonHeight(ctx.enum("size"))
   val icon = ctx.string("icon")
   val label = ctx.string("label").orEmpty()
   val action = ctx.props.action("action")
@@ -198,7 +198,7 @@ internal fun RenderToggleButton(ctx: NodeContext) {
     ButtonContent(ctx, icon, label, height, filled = checked.value)
   }
   val enabled = ctx.enabled
-  when (ctx.enum("variant", "filled")) {
+  when (ctx.enum("variant")) {
     "tonal" ->
       FilledTonalToggleButton(
         checked.value,
@@ -245,7 +245,7 @@ internal fun RenderToggleButton(ctx: NodeContext) {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun RenderButtonGroup(ctx: NodeContext) {
-  if (ctx.enum("variant", "standard") == "connected") {
+  if (ctx.enum("variant") == "connected") {
     Row(
       modifier = ctx.modifier(),
       horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
@@ -275,12 +275,12 @@ internal fun RenderIconButton(ctx: NodeContext) {
   val toggle = ctx.bool("toggle")
   val checked = ctx.checkedState()
   val width =
-    when (ctx.enum("width", "uniform")) {
+    when (ctx.enum("width")) {
       "narrow" -> IconButtonDefaults.IconButtonWidthOption.Narrow
       "wide" -> IconButtonDefaults.IconButtonWidthOption.Wide
       else -> IconButtonDefaults.IconButtonWidthOption.Uniform
     }
-  val size = ctx.enum("size", "small")
+  val size = ctx.enum("size")
   val container =
     when (size) {
       "extra-small" -> IconButtonDefaults.extraSmallContainerSize(width)
@@ -299,7 +299,7 @@ internal fun RenderIconButton(ctx: NodeContext) {
     }
   val modifier = ctx.modifier().size(container.width, container.height).then(ctx.describedBy())
   val enabled = ctx.enabled
-  val variant = ctx.enum("variant", "standard")
+  val variant = ctx.enum("variant")
   val onSurfaceVariant = env.color(ColorRole.OnSurfaceVariant)
   val outline = BorderStroke(1.dp, env.color(ColorRole.OutlineVariant))
   val content: @Composable () -> Unit = {
@@ -390,7 +390,7 @@ internal fun RenderSplitButton(ctx: NodeContext) {
   val action = ctx.props.action("action")
   val menuId = ctx.props.childId("menu")
   val menuOpen = menuId != null && env.host.interaction.openOverlay(env.screenId) == menuId
-  val variant = ctx.enum("variant", "filled")
+  val variant = ctx.enum("variant")
   val height = SplitButtonDefaults.SmallContainerHeight
   val leadingContent: @Composable RowScope.() -> Unit = {
     if (icon != null) {
@@ -497,14 +497,14 @@ internal fun fabColors(name: String): Pair<ColorRole, ColorRole> =
 @Composable
 internal fun RenderFab(ctx: NodeContext) {
   val env = ctx.env
-  val (containerRole, contentRole) = fabColors(ctx.enum("color", "primary-container"))
+  val (containerRole, contentRole) = fabColors(ctx.enum("color"))
   val container = env.color(containerRole)
   val content = env.color(contentRole)
   val action = ctx.props.action("action")
   val onClick = { env.act(action) }
   val icon = ctx.string("icon").orEmpty()
   val label = ctx.string("label")
-  val size = ctx.enum("size", "small")
+  val size = ctx.enum("size")
   val noElevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp)
   val extended = ctx.bool("extended") && label != null
   val shape =

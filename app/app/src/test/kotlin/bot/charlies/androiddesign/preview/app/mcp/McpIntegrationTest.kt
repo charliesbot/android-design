@@ -248,6 +248,37 @@ class McpIntegrationTest {
   }
 
   @Test
+  fun `check_proposal returns the layout of each view so adaptation can be compared`() {
+    connect()
+    call("open_proposal", mapOf("path" to workspace().toString()))
+
+    val check =
+      call(
+          "check_proposal",
+          mapOf("screens" to listOf("plate_detail"), "views" to listOf("light", "tablet")),
+        )
+        .json()
+
+    fun layout(view: String) =
+      check
+        .getValue("screens")
+        .jsonObject
+        .getValue("plate_detail")
+        .jsonObject
+        .getValue(view)
+        .jsonObject
+        .getValue("layout")
+        .jsonObject
+    fun panes(view: String) = layout(view).getValue("panes").jsonObject
+    assertEquals(listOf("plate_detail"), panes("light").keys.toList(), "one pane on a phone")
+    assertEquals(listOf("plates", "plate_detail"), panes("tablet").keys.toList(), "two on a tablet")
+    assertEquals("none", layout("light").getValue("nav").jsonPrimitive.content)
+    val regions =
+      panes("tablet").getValue("plate_detail").jsonArray.map { it.jsonPrimitive.content }
+    assertTrue(regions.any { it.startsWith("Button cook ") }, regions.toString())
+  }
+
+  @Test
   fun `a problem the agent can fix is a tool error that says what to do`() {
     connect()
     val noProposal = call("get_tree")

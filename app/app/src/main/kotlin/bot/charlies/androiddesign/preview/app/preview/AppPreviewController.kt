@@ -15,6 +15,7 @@ import bot.charlies.androiddesign.preview.domain.catalog.CatalogJson
 import bot.charlies.androiddesign.preview.domain.catalog.CatalogSummary
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.domain.export.KotlinExporter
+import bot.charlies.androiddesign.preview.domain.layout.LayoutSummary
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
@@ -179,6 +180,7 @@ class AppPreviewController(
       pass = errors.isEmpty(),
       info = tree.findings.count { it.severity == Severity.Info },
       errors = errors,
+      layout = LayoutSummary.of(proposal, tree),
     )
   }
 

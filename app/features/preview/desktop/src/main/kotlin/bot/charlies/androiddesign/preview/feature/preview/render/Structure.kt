@@ -89,7 +89,7 @@ internal fun RenderTopAppBar(ctx: NodeContext) {
   val insets = WindowInsets(0, 0, 0, 0)
   // Medium and large bars draw expanded; the behavior is only here so they are not collapsed.
   val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-  when (ctx.enum("size", "small")) {
+  when (ctx.enum("size")) {
     "center" ->
       CenterAlignedTopAppBar(titleSlot, modifier, navigation, actions, windowInsets = insets)
     "medium" ->
@@ -204,7 +204,7 @@ private fun selectedIcon(ctx: NodeContext, selected: Boolean): String? =
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun RenderFloatingToolbar(ctx: NodeContext) {
-  val vibrant = ctx.enum("colors", "standard") == "vibrant"
+  val vibrant = ctx.enum("colors") == "vibrant"
   val colors =
     if (vibrant) FloatingToolbarDefaults.vibrantFloatingToolbarColors()
     else FloatingToolbarDefaults.standardFloatingToolbarColors()
@@ -212,7 +212,7 @@ internal fun RenderFloatingToolbar(ctx: NodeContext) {
     if (vibrant) Ambient(ColorRole.PrimaryContainer, ColorRole.OnPrimaryContainer)
     else Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurface)
   CompositionLocalProvider(LocalAmbient provides ambient) {
-    if (ctx.enum("orientation", "horizontal") == "vertical") {
+    if (ctx.enum("orientation") == "vertical") {
       VerticalFloatingToolbar(
         expanded = true,
         modifier = ctx.modifier(),
@@ -237,7 +237,7 @@ internal fun RenderFloatingToolbar(ctx: NodeContext) {
 
 @Composable
 internal fun RenderCard(ctx: NodeContext) {
-  val variant = ctx.enum("variant", "filled")
+  val variant = ctx.enum("variant")
   val shape = ctx.shapeName()?.let { shapeFor(it) } ?: MaterialTheme.shapes.medium
   val containerRole =
     ctx.style.container

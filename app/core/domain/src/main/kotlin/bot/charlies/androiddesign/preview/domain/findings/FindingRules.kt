@@ -106,7 +106,7 @@ object FindingRules {
 
     /** Open modal surfaces: a sheet or dialog node that takes up space. */
     private val modals: Set<String> =
-      nodes.filter { it.type in modalTypes && it.isLaidOut() }.map { it.id }.toSet()
+      nodes.filter { it.type in modalTypes && it.isLaidOut }.map { it.id }.toSet()
 
     val modalOpen: Boolean
       get() = modals.isNotEmpty()
@@ -126,15 +126,13 @@ object FindingRules {
       modalOpen && node.id !in modals && ancestors(node).none { it.id in modals }
   }
 
-  private fun LayoutNode.isLaidOut(): Boolean = bounds.width > 0f && bounds.height > 0f
-
   // endregion
 
   // region touch-target (checks.js 337-357)
 
   private fun touchTargets(view: View): List<Finding> =
     view.nodes
-      .filter { it.type in interactiveTypes && it.isLaidOut() && !view.isBehindModal(it) }
+      .filter { it.type in interactiveTypes && it.isLaidOut && !view.isBehindModal(it) }
       .mapNotNull { node ->
         val width = maxOf(node.bounds.width, node.touch?.width ?: 0f)
         val height = maxOf(node.bounds.height, node.touch?.height ?: 0f)
@@ -248,13 +246,13 @@ object FindingRules {
     val actions =
       view.nodes.filter { node ->
         node.type in actionTypes &&
-          node.isLaidOut() &&
+          node.isLaidOut &&
           view.ancestors(node).none { it.type in navigationTypes }
       }
     val largestByPane =
       actions.groupBy(::pane).mapValues { (_, group) -> group.maxBy { it.bounds.height } }
     return view.nodes
-      .filter { it.primary && it.isLaidOut() }
+      .filter { it.primary && it.isLaidOut }
       .mapNotNull { primary ->
         val largest = largestByPane[pane(primary)] ?: return@mapNotNull null
         if (primary.bounds.height >= largest.bounds.height - PRIMARY_SLACK_DP) {
@@ -282,7 +280,7 @@ object FindingRules {
 
   private fun oneFab(view: View): List<Finding> =
     view.nodes
-      .filter { it.type in fabTypes && it.isLaidOut() }
+      .filter { it.type in fabTypes && it.isLaidOut }
       .groupBy(::pane)
       .values
       .filter { it.size > 1 }
@@ -306,7 +304,7 @@ object FindingRules {
     val width = view.tree.view.width.toFloat()
     val flagged =
       view.nodes.filter { node ->
-        node.isLaidOut() &&
+        node.isLaidOut &&
           (node.right() > width + EDGE_SLACK_DP ||
             (node.bounds.x < -EDGE_SLACK_DP && node.right() > EDGE_SLACK_DP))
       }

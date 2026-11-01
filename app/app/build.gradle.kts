@@ -21,16 +21,22 @@ dependencies {
   testImplementation(libs.kotlinx.coroutines.test)
 }
 
+// The packaged app's bundle identifier, which is also its preferences domain (see AppNap).
+val appBundleId = "bot.charlies.androiddesign.preview.app"
+
 compose.desktop {
   application {
     mainClass = "bot.charlies.androiddesign.preview.app.MainKt"
     // HotSpot prints warnings to stdout by default; stdout carries only JSON-RPC in MCP mode.
     jvmArgs += "-XX:+DisplayVMOutputToStderr"
+    // Read by AppNap.BUNDLE_ID_PROPERTY: only the packaged app has a preferences domain.
+    jvmArgs += "-Dapp.bundleId=$appBundleId"
     nativeDistributions {
       targetFormats(TargetFormat.Dmg)
       packageName = "AndroidDesignPreview"
       packageVersion = "1.0.0"
       includeAllModules = true
+      macOS { bundleID = appBundleId }
     }
   }
 }
