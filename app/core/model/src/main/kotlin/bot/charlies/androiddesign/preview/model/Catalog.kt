@@ -1,5 +1,7 @@
 package bot.charlies.androiddesign.preview.model
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 
 /** What a prop's value may be. Any [String], [Boolean] or [Number] prop may also be a binding. */
@@ -88,6 +90,20 @@ data class PropDef(
   val default: JsonPrimitive? = null,
 )
 
+/** When a component stretches to its parent's width. */
+sealed interface WidthFill {
+  /** It keeps the width its content gives it. */
+  data object Never : WidthFill
+
+  data object Always : WidthFill
+
+  /** Only when the proposal gives [prop] a value, such as a Text with an `align`. */
+  data class WhenSet(val prop: String) : WidthFill
+
+  /** Unless [prop] has the value [value], such as a vertical Divider. */
+  data class UnlessIs(val prop: String, val value: String) : WidthFill
+}
+
 enum class ComponentGroup {
   Layout,
   Content,
@@ -107,6 +123,10 @@ enum class ComponentGroup {
  *   docs.
  * @property interactive True when the user taps it, so the touch target rule applies.
  * @property overlay True for components that stay closed until an `open(id)` action.
+ * @property width When the component stretches to its parent's width, if the parent allows it.
+ * @property stretchesChildren True when the parent lets its children stretch to its width (a Column
+ *   does; a Row does not, since that would push its siblings out: they use `weight`). The renderer
+ *   and the exporter both read these two, so a stretched child looks the same in both.
  */
 data class ComponentDef(
   val name: String,
@@ -116,8 +136,24 @@ data class ComponentDef(
   val props: List<PropDef>,
   val interactive: Boolean = false,
   val overlay: Boolean = false,
+  val width: WidthFill = WidthFill.Never,
+  val stretchesChildren: Boolean = false,
 ) {
   fun prop(name: String): PropDef? = props.firstOrNull { it.name == name }
+
+  /**
+   * Whether a node of this component stretches to the width of a parent that lets it. [valueOf] is
+   * the node's value of a prop, or null when it has none; a catalog default counts as a value.
+   */
+  fun fillsWidth(valueOf: (String) -> JsonElement?): Boolean {
+    fun value(prop: String) = valueOf(prop) ?: defaultOf(prop)
+    return when (val rule = width) {
+      WidthFill.Never -> false
+      WidthFill.Always -> true
+      is WidthFill.WhenSet -> value(rule.prop).let { it != null && it !is JsonNull }
+      is WidthFill.UnlessIs -> (value(rule.prop) as? JsonPrimitive)?.content != rule.value
+    }
+  }
 
   /** The catalog default of prop [name], or null when it is not a prop or has no default. */
   fun defaultOf(name: String): JsonPrimitive? = prop(name)?.default
@@ -170,6 +206,9 @@ object M3ExpressiveCatalog {
 
   /** Names of the components that open as overlays. */
   val overlayNames: Set<String> by lazy { components.filter { it.overlay }.map { it.name }.toSet() }
+
+  /** Names of the navigation components, in the order a view lists them. */
+  val navigationNames: List<String> = listOf("NavigationBar", "NavigationRail", "FloatingToolbar")
 }
 
 // region registry definitions
@@ -292,6 +331,8 @@ private fun layout(): List<ComponentDef> =
         oneOf("arrangement", *arrangements, default = "start"),
         bool("scroll", "Makes the column vertically scrollable."),
       ),
+      stretchesChildren = true,
+      width = WidthFill.Always,
     ),
     ComponentDef(
       "Row",
@@ -304,6 +345,7 @@ private fun layout(): List<ComponentDef> =
         oneOf("verticalAlignment", "top", "center", "bottom", default = "top"),
         oneOf("arrangement", *arrangements, default = "start"),
       ),
+      width = WidthFill.Always,
     ),
     ComponentDef(
       "Box",
@@ -314,6 +356,7 @@ private fun layout(): List<ComponentDef> =
         children("children", required = true),
         oneOf("contentAlignment", *alignments, default = "topStart"),
       ),
+      width = WidthFill.Always,
     ),
     ComponentDef(
       "Grid",
@@ -334,6 +377,8 @@ private fun layout(): List<ComponentDef> =
         ),
         spacing("spacing", "Gap between cells."),
       ),
+      stretchesChildren = true,
+      width = WidthFill.Always,
     ),
     ComponentDef(
       "FlexBox",
@@ -345,6 +390,7 @@ private fun layout(): List<ComponentDef> =
         bool("wrap", default = true),
         spacing("gap"),
       ),
+      width = WidthFill.Always,
     ),
     ComponentDef(
       "Spacer",
@@ -359,6 +405,7 @@ private fun layout(): List<ComponentDef> =
       "A thin separating line.",
       "HorizontalDivider, VerticalDivider",
       listOf(bool("vertical")),
+      width = WidthFill.UnlessIs("vertical", "true"),
     ),
     ComponentDef(
       "Shape",
@@ -388,6 +435,7 @@ private fun content(): List<ComponentDef> =
         oneOf("overflow", "ellipsis", "clip", default = "clip"),
         oneOf("align", "start", "center", "end"),
       ),
+      width = WidthFill.WhenSet("align"),
     ),
     ComponentDef(
       "Icon",
@@ -428,6 +476,7 @@ private fun content(): List<ComponentDef> =
         num("aspectRatio", "Width divided by height.", NumberBounds(0.1, 10.0)),
         text("contentDescription"),
       ),
+      width = WidthFill.WhenSet("aspectRatio"),
     ),
   )
 
@@ -458,6 +507,7 @@ private fun structure(): List<ComponentDef> =
         child("navigationIcon", "IconButton"),
         children("actions", "IconButton"),
       ),
+      width = WidthFill.Always,
     ),
     ComponentDef(
       "NavigationBar",
@@ -523,6 +573,8 @@ private fun structure(): List<ComponentDef> =
         shape(),
         children("content", required = true),
       ),
+      stretchesChildren = true,
+      width = WidthFill.Always,
     ),
   )
 
@@ -537,6 +589,8 @@ private fun lists(): List<ComponentDef> =
         oneOf("variant", "standard", "segmented", default = "standard"),
         children("children", "ListItem", required = true),
       ),
+      stretchesChildren = true,
+      width = WidthFill.Always,
     ),
     ComponentDef(
       "ListItem",
@@ -552,6 +606,7 @@ private fun lists(): List<ComponentDef> =
         bool("selected"),
         action(),
       ),
+      width = WidthFill.Always,
     ),
   )
 
@@ -729,6 +784,7 @@ private fun chips(): List<ComponentDef> =
         ),
         bool("multi", "Allows more than one selected chip."),
       ),
+      width = WidthFill.Always,
     ),
   )
 
@@ -761,6 +817,7 @@ private fun inputs(): List<ComponentDef> =
         num("steps", bounds = NumberBounds(0.0, 100.0, whole = true), default = 0),
       ) + interactiveProps,
       interactive = true,
+      width = WidthFill.Always,
     ),
     ComponentDef(
       "RangeSlider",
@@ -773,6 +830,7 @@ private fun inputs(): List<ComponentDef> =
         num("steps", bounds = NumberBounds(0.0, 100.0, whole = true), default = 0),
       ) + interactiveProps,
       interactive = true,
+      width = WidthFill.Always,
     ),
     ComponentDef(
       "TextField",
@@ -792,6 +850,7 @@ private fun inputs(): List<ComponentDef> =
         num("lines", bounds = NumberBounds(1.0, 20.0, whole = true), default = 1),
       ) + interactiveProps,
       interactive = true,
+      width = WidthFill.Always,
     ),
   )
 
@@ -814,6 +873,7 @@ private fun feedback(): List<ComponentDef> =
         bool("wavy"),
         num("progress", "Completed fraction.", NumberBounds(0.0, 1.0)),
       ),
+      width = WidthFill.UnlessIs("shape", "circular"),
     ),
   )
 
@@ -826,6 +886,7 @@ private fun overlays(): List<ComponentDef> =
       "ModalBottomSheet with BottomSheetDefaults.DragHandle",
       listOf(children("content", required = true)),
       overlay = true,
+      stretchesChildren = true,
     ),
     ComponentDef(
       "Dialog",
@@ -847,6 +908,7 @@ private fun overlays(): List<ComponentDef> =
       "DropdownMenuPopup with DropdownMenuGroup and DropdownMenuItem",
       listOf(child("anchor"), children("items", "MenuItem", required = true)),
       overlay = true,
+      stretchesChildren = true,
     ),
     ComponentDef(
       "MenuItem",

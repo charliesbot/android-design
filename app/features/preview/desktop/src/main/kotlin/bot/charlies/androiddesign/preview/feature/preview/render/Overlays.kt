@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import bot.charlies.androiddesign.preview.model.ColorRole
+import bot.charlies.androiddesign.preview.model.TypeRole
 
 /**
  * The overlay open on this screen, if it is one the screen draws itself: menus that hang off a
@@ -27,13 +28,8 @@ import bot.charlies.androiddesign.preview.model.ColorRole
  */
 @Composable
 internal fun RenderOpenOverlay(env: RenderEnv) {
-  val open = env.host.interaction.openOverlay(env.screenId) ?: return
-  val node = env.nodes[open] ?: return
-  if (!env.isOverlay(node)) return
-  if (
-    node.component == "Menu" && (open in env.anchoredMenus.values || open in env.splitButtonMenus)
-  )
-    return
+  val open = env.openOverlay ?: return
+  if (env.placement.screenLevel.none { it.id == open }) return
   RenderNode(
     env = env,
     ref = ChildRef(open, DataScope.root(env.screen.dataModel)),
@@ -52,9 +48,16 @@ internal fun MenuOverlay(
   parentId: String,
   order: List<Int>,
 ) {
-  if (env.host.interaction.openOverlay(env.screenId) != menuId) return
+  if (env.openOverlay != menuId) return
   RenderNode(env, ChildRef(menuId, scope), parentId, order + listOf(99, 0), ChildHost.Wrap)
 }
+
+private val BottomSheetAmbient = Ambient(ColorRole.SurfaceContainerLow, ColorRole.OnSurface)
+private val DialogAmbient = Ambient(ColorRole.SurfaceContainerHigh, ColorRole.OnSurface)
+private val MenuAmbient = Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurface)
+
+internal fun NodeContext.bottomSheetLook() =
+  Look(BottomSheetAmbient.container, BottomSheetAmbient.content, shape = "extraLarge")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,21 +68,26 @@ internal fun RenderBottomSheet(ctx: NodeContext) {
     sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     dragHandle = { BottomSheetDefaults.DragHandle() },
   ) {
-    CompositionLocalProvider(
-      LocalAmbient provides Ambient(ColorRole.SurfaceContainerLow, ColorRole.OnSurface),
-    ) {
-      ctx.Children("content", 0, ChildHost(fillWidth = true, column = this))
+    CompositionLocalProvider(LocalAmbient provides BottomSheetAmbient) {
+      ctx.Children("content", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))
       Spacer(Modifier.height(8.dp))
     }
   }
 }
 
+internal fun NodeContext.dialogLook() =
+  Look(
+    DialogAmbient.container,
+    DialogAmbient.content,
+    TypeRole.HeadlineSmall,
+    "extraLarge",
+    string("title"),
+  )
+
 @Composable
 internal fun RenderDialog(ctx: NodeContext) {
   val text = ctx.string("text")
-  CompositionLocalProvider(
-    LocalAmbient provides Ambient(ColorRole.SurfaceContainerHigh, ColorRole.OnSurface),
-  ) {
+  CompositionLocalProvider(LocalAmbient provides DialogAmbient) {
     AlertDialog(
       onDismissRequest = { ctx.env.act(ActionCall.Dismiss) },
       confirmButton = { ctx.Child("confirm", 1) },
@@ -92,23 +100,33 @@ internal fun RenderDialog(ctx: NodeContext) {
   }
 }
 
+internal fun NodeContext.menuLook() =
+  Look(MenuAmbient.container, MenuAmbient.content, shape = "extraLarge")
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderMenu(ctx: NodeContext) {
-  CompositionLocalProvider(
-    LocalAmbient provides Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurface),
-  ) {
+  CompositionLocalProvider(LocalAmbient provides MenuAmbient) {
     DropdownMenuPopup(expanded = true, onDismissRequest = { ctx.env.act(ActionCall.Dismiss) }) {
       DropdownMenuGroup(
         shapes = MenuDefaults.groupShape(0, 1),
         modifier = ctx.modifier(),
-        containerColor = ctx.env.color(ColorRole.SurfaceContainer),
+        containerColor = ctx.env.color(MenuAmbient.container),
       ) {
-        ctx.Children("items", 0, ChildHost(fillWidth = true, column = this))
+        ctx.Children("items", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))
       }
     }
   }
 }
+
+internal fun NodeContext.menuItemLook() =
+  Look(
+    MenuAmbient.container,
+    MenuAmbient.content,
+    TypeRole.LabelLarge,
+    text = string("label"),
+    a11yRole = "Button",
+  )
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable

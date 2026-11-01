@@ -83,7 +83,7 @@ internal class ThemeEmitter(
     ctx.use(Sym.FontVariation)
     ctx.use(Sym.FontWeight)
     return """
-    /** A variable font at each weight in [weights], with the same variation [axes] on all. */
+    /** A variable font at each weight in [weights] with the variation [axes]; no `wght` among them. */
     private fun variableFontFamily(
       @FontRes font: Int,
       weights: List<Int>,
@@ -98,7 +98,6 @@ internal class ThemeEmitter(
               FontVariation.Settings(
                 FontWeight(weight),
                 FontStyle.Normal,
-                FontVariation.weight(weight),
                 *axes,
               ),
           )

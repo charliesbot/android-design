@@ -216,7 +216,7 @@ internal fun RenderNode(
     SideEffect { recorder.register(describe(ctx, ambient)) }
     DisposableEffect(ctx.id) { onDispose { recorder.unregister(ctx.id) } }
   }
-  val menuId = env.anchoredMenus[node.id]
+  val menuId = env.placement.menuAt(node.id)
   if (menuId != null && !env.isOverlay(node)) {
     androidx.compose.foundation.layout.Box {
       RenderComponent(ctx)
@@ -227,12 +227,12 @@ internal fun RenderNode(
   }
 }
 
-/** The modifier of a component: weight, stretch, padding, then its id for the tree. */
+/**
+ * The modifier of a component: weight, stretch, padding, then its id for the tree. It stretches
+ * across the width when the catalog says the component does and the parent lets it.
+ */
 @Composable
-internal fun NodeContext.modifier(
-  fillWidth: Boolean = false,
-  fillHeight: Boolean = false,
-): Modifier {
+internal fun NodeContext.modifier(fillHeight: Boolean = false): Modifier {
   var modifier: Modifier = Modifier
   if (host.flexItem) modifier = modifier.restoreUnboundedHeight()
   val weight = number("weight")
@@ -240,7 +240,7 @@ internal fun NodeContext.modifier(
     host.column?.let { modifier = modifier.then(with(it) { Modifier.weight(weight) }) }
     host.row?.let { modifier = modifier.then(with(it) { Modifier.weight(weight) }) }
   }
-  if (fillWidth && host.fillWidth) modifier = modifier.fillMaxWidth()
+  if (host.fillWidth && def.fillsWidth(props::value)) modifier = modifier.fillMaxWidth()
   if (fillHeight && host.fillHeight) modifier = modifier.fillMaxHeight()
   padding?.let { modifier = modifier.padding(it) }
   return modifier.then(tagged())
@@ -281,6 +281,14 @@ internal fun NodeContext.tagged(): Modifier {
   }
 }
 
+/** The container role behind this node: its style's `container`, else the [ambient] one. */
+internal fun NodeContext.backdropRole(ambient: Ambient): ColorRole =
+  style.container ?: ambient.container
+
+/** The ambient this node's style makes for its content: its container and color over [ambient]. */
+internal fun NodeContext.styledAmbient(ambient: Ambient): Ambient =
+  Ambient(backdropRole(ambient), style.color ?: ambient.content)
+
 /**
  * The background a style's `container` gives, for components that have no container of their own.
  */
@@ -294,15 +302,13 @@ internal fun NodeContext.styleBackground(): Modifier {
 /** Draws [content] with the style's container and content colors as the ambient ones. */
 @Composable
 internal fun NodeContext.StyledAmbient(content: @Composable () -> Unit) {
-  val ambient = LocalAmbient.current
-  val container = style.container ?: ambient.container
-  val contentRole = style.color ?: ambient.content
   if (style.container == null && style.color == null) {
     content()
   } else {
+    val styled = styledAmbient(LocalAmbient.current)
     CompositionLocalProvider(
-      LocalAmbient provides Ambient(container, contentRole),
-      androidx.compose.material3.LocalContentColor provides env.color(contentRole),
+      LocalAmbient provides styled,
+      androidx.compose.material3.LocalContentColor provides env.color(styled.content),
     ) {
       content()
     }

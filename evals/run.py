@@ -140,7 +140,7 @@ def image_labels(case_dir):
 
 
 def build(case, case_dir, backend, model=None):
-    """Optional automated generation used by preference rounds as well as scored runs."""
+    """Optional automated generation for a scored run."""
     if case_dir.exists():
         raise FileExistsError(f'Preserving existing case directory: {case_dir}')
     prepare(case, case_dir)
@@ -193,6 +193,11 @@ def render_complete(renders):
     return bool(renders)
 
 
+def pending(ids, reason):
+    """A verdict that awaits visual judgment, for every rubric ID."""
+    return {key: {'pass': None, 'votes': '0/0', 'reason': reason} for key in ids}
+
+
 def overall_status(checks, verdict):
     if any(v['pass'] is False for v in checks.values()):
         return 'failed'
@@ -206,23 +211,23 @@ def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1)
     directory = out / case['name']
     images, render_error = render(directory)
     renders = [{k: r.get(k) for k in ('screen', 'view', 'png', 'pass')} for r in report_renders(directory)]
-    checks = run_checks(directory, case['surface'])
+    checks = run_checks(directory)
     if render_error:
         checks['C-review'] = {'pass': False, 'detail': render_error}
     (directory / 'checks.json').write_text(json.dumps(checks, indent=2))
     request = make_request(case, directory, (out / 'rubric.md').read_text())
     (directory / 'judge-request.json').write_text(json.dumps(request, indent=2))
     # An imported ballot must always be explicitly rescored against the latest request.
-    verdict = {key: {'pass': None, 'votes': '0/0', 'reason': 'awaiting visual judgment'}
-               for key in request['item_ids']}
+    ids = request['item_ids']
+    verdict = pending(ids, 'awaiting visual judgment')
     if not render_complete(renders):
-        verdict = {key: {'pass': None, 'votes': '0/0', 'reason': 'render incomplete'} for key in verdict}
+        verdict = pending(ids, 'render incomplete')
     elif judge_backend:
         try:
-            verdict = judge(case['name'], images, request['item_ids'], judge_runs,
-                            backend=judge_backend, model=judge_model, rubric=request['prompt'])
+            verdict = judge(case['name'], images, ids, judge_runs,
+                            backend=judge_backend, model=judge_model, prompt=request['prompt'])
         except (RuntimeError, ValueError) as error:
-            verdict = {key: {'pass': None, 'votes': '0/0', 'reason': f'judge error: {error}'} for key in verdict}
+            verdict = pending(ids, f'judge error: {error}')
     (directory / 'judge.json').write_text(json.dumps(verdict, indent=2))
     agent_path = directory / 'agent.json'
     agent = json.loads(agent_path.read_text()) if agent_path.exists() else {
@@ -243,7 +248,7 @@ def exit_code(results):
 def select_cases(names):
     cases = json.loads((HERE / 'evals.json').read_text())['evals']
     if not names:
-        return [c for c in cases if not c.get('parked')]
+        return cases
     wanted = set(names.split(','))
     unknown = wanted - {c['name'] for c in cases}
     if unknown:

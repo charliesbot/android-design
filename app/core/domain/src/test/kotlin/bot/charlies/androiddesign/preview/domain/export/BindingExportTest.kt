@@ -134,7 +134,7 @@ class BindingExportTest {
       )
     assertHas(
       source,
-      "groups.forEach { group -> Column { group.subs.forEach { sub -> Text(sub.label) } } }",
+      "groups.forEach { group -> Column(modifier = Modifier.fillMaxWidth()) { group.subs.forEach { sub -> Text(sub.label) } } }",
     )
   }
 

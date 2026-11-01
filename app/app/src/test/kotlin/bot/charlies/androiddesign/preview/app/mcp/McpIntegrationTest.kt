@@ -3,7 +3,7 @@ package bot.charlies.androiddesign.preview.app.mcp
 import bot.charlies.androiddesign.preview.app.AppInfo
 import bot.charlies.androiddesign.preview.app.preview.AppPreviewController
 import bot.charlies.androiddesign.preview.app.preview.HeadlessTreeRenderer
-import bot.charlies.androiddesign.preview.app.preview.WindowVisibility
+import bot.charlies.androiddesign.preview.app.preview.PreviewWindow
 import bot.charlies.androiddesign.preview.data.FileProposalRepository
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
 import bot.charlies.androiddesign.preview.mcp.PreviewMcpServer
@@ -48,7 +48,7 @@ import kotlinx.serialization.json.jsonPrimitive
 class McpIntegrationTest {
   private val fixtures = Path.of(System.getProperty("fixtures.dir"))
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-  private val window = WindowVisibility()
+  private val window = PreviewWindow()
   private val closed = CountDownLatch(1)
 
   private val clientOut = PipedOutputStream()

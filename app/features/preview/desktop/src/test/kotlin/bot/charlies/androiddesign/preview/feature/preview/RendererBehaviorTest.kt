@@ -4,6 +4,9 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import bot.charlies.androiddesign.preview.feature.preview.theme.ThemeResolver
+import bot.charlies.androiddesign.preview.feature.preview.theme.toHex
+import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.Views
 import kotlin.test.Test
@@ -294,6 +297,110 @@ class RendererBehaviorTest {
     assertEquals("displaySmallEmphasized", t.roles?.type)
     assertEquals("onPrimaryContainer", t.roles?.content)
     assertEquals(16f, t.bounds.x, "padding lg is 16dp")
+  }
+
+  private val styledTheme =
+    """{"material":{"styles":{"cta":{"container":"tertiaryContainer","color":"onTertiaryContainer"}}}}"""
+
+  private fun hexOf(role: ColorRole) =
+    ThemeResolver.resolve(
+        designOf(proposalOf("home" to screenJson("{}"), theme = styledTheme).theme),
+        dark = false,
+      )
+      .color(role)
+      .toHex()
+
+  @Test
+  fun `a styled button reports its style's container and color`() {
+    val proposal =
+      proposalOf(
+        "home" to
+          screenJson(
+            """{"id":"root","component":"Scaffold","content":"b"},{"id":"b","component":"Button","label":"Go","style":"cta"}""",
+          ),
+        theme = styledTheme,
+      )
+    val b = render(proposal).tree.node("b")
+    assertEquals("tertiaryContainer", b.roles?.container)
+    assertEquals("onTertiaryContainer", b.roles?.content)
+    assertEquals(hexOf(ColorRole.TertiaryContainer), b.colors?.container)
+    assertEquals(hexOf(ColorRole.OnTertiaryContainer), b.colors?.content)
+  }
+
+  @Test
+  fun `a styled text reports its style's container as its backdrop`() {
+    val proposal =
+      proposalOf(
+        "home" to
+          screenJson(
+            """{"id":"root","component":"Scaffold","content":"t"},{"id":"t","component":"Text","text":"Hi","style":"cta"}""",
+          ),
+        theme = styledTheme,
+      )
+    val t = render(proposal).tree.node("t")
+    assertEquals("tertiaryContainer", t.roles?.container)
+    assertEquals("onTertiaryContainer", t.roles?.content)
+    assertEquals(hexOf(ColorRole.TertiaryContainer), t.colors?.container)
+  }
+
+  @Test
+  fun `a styled layout reports its style's container and color`() {
+    for (layout in listOf("Column", "Row", "Box", "Grid", "FlexBox")) {
+      val proposal =
+        proposalOf(
+          "home" to
+            screenJson(
+              """{"id":"root","component":"Scaffold","content":"l"},{"id":"l","component":"$layout","style":"cta","children":["t"]},{"id":"t","component":"Text","text":"Hi"}""",
+            ),
+          theme = styledTheme,
+        )
+      val l = render(proposal).tree.node("l")
+      assertEquals("tertiaryContainer", l.roles?.container, layout)
+      assertEquals("onTertiaryContainer", l.roles?.content, layout)
+      assertEquals(hexOf(ColorRole.TertiaryContainer), l.colors?.container, layout)
+    }
+  }
+
+  @Test
+  fun `a shape reports the color it paints as its container`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"s"},{"id":"s","component":"Shape","shape":"cookie9Sided","color":"tertiaryContainer"}""",
+      )
+    val s = render(proposal).tree.node("s")
+    assertEquals("tertiaryContainer", s.roles?.container)
+    assertEquals(hexOf(ColorRole.TertiaryContainer), s.colors?.container)
+  }
+
+  @Test
+  fun `a selected list item reports the secondary container it is drawn on`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"plain"},""" +
+          """{"id":"plain","component":"List","children":["on","off"]},""" +
+          """{"id":"on","component":"ListItem","headline":"On","selected":true},""" +
+          """{"id":"off","component":"ListItem","headline":"Off"}""",
+      )
+    val tree = render(proposal).tree
+    assertEquals("secondaryContainer", tree.node("on").roles?.container)
+    assertEquals(hexOf(ColorRole.SecondaryContainer), tree.node("on").colors?.container)
+    assertEquals("surface", tree.node("off").roles?.container)
+  }
+
+  @Test
+  fun `a selected segmented list item reports the secondary container and its content color`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"seg"},""" +
+          """{"id":"seg","component":"List","variant":"segmented","children":["on","off"]},""" +
+          """{"id":"on","component":"ListItem","headline":"On","selected":true},""" +
+          """{"id":"off","component":"ListItem","headline":"Off"}""",
+      )
+    val tree = render(proposal).tree
+    assertEquals("secondaryContainer", tree.node("on").roles?.container)
+    assertEquals("onSecondaryContainer", tree.node("on").roles?.content)
+    assertEquals("surfaceContainer", tree.node("off").roles?.container)
+    assertEquals("onSurface", tree.node("off").roles?.content)
   }
 
   @Test

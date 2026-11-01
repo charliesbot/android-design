@@ -3,6 +3,7 @@ package bot.charlies.androiddesign.preview.feature.preview
 import bot.charlies.androiddesign.preview.data.ProposalCodec
 import bot.charlies.androiddesign.preview.data.ProposalParse
 import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessRenderer
+import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PreviewJson
@@ -26,6 +27,7 @@ class TreeOnlyRenderTest {
   private val proposal: Proposal =
     assertIs<ProposalParse.Parsed>(ProposalCodec.parse(Files.readString(verify))).proposal
   private val design = designOf(proposal.theme)
+  private val source = RenderSource(proposal, design, null)
   private val views = listOf(Views.Light, Views.Foldable, Views.Desktop)
   private val overlayKinds = setOf("BottomSheet", "Dialog", "Menu")
 
@@ -37,8 +39,8 @@ class TreeOnlyRenderTest {
     view: ViewSpec,
     replay: ProposalHostState? = null,
   ): String? {
-    val quick = HeadlessRenderer.renderTree(proposal, design, null, screen, view, replay)
-    val slow = HeadlessRenderer.render(proposal, design, null, screen, view, replay = replay).tree
+    val quick = HeadlessRenderer.tree(source, screen, view, replay)
+    val slow = HeadlessRenderer.image(source, screen, view, replay = replay).tree
     return if (json(quick) == json(slow)) null else "$screen/${view.name}"
   }
 
@@ -87,8 +89,8 @@ class TreeOnlyRenderTest {
   @Test
   fun `a replayed expanded fab menu reads the same tree after its short wait`() {
     val live = liveWith("overlays", "fab_menu:expanded" to true)
-    val tree = HeadlessRenderer.renderTree(proposal, design, null, "overlays", Views.Light, live)
-    val closed = HeadlessRenderer.renderTree(proposal, design, null, "overlays", Views.Light)
+    val tree = HeadlessRenderer.tree(source, "overlays", Views.Light, live)
+    val closed = HeadlessRenderer.tree(source, "overlays", Views.Light)
     assertTrue(
       tree.nodes.first { it.id == "fab_item_note" }.bounds.height >
         closed.nodes.first { it.id == "fab_item_note" }.bounds.height,

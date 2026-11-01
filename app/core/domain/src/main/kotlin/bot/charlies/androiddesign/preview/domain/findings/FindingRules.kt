@@ -42,9 +42,6 @@ object FindingRules {
   internal val fabTypes = setOf("FloatingActionButton", "FabMenu")
   internal val modalTypes = setOf("BottomSheet", "Dialog")
 
-  /** Navigation chrome is not compared with the primary action. */
-  private val navigationTypes = setOf("NavigationBar", "NavigationRail", "FloatingToolbar")
-
   /**
    * Components that compete with the primary: buttons, icon buttons, FABs, split buttons, chips.
    */
@@ -138,7 +135,11 @@ object FindingRules {
         val width = maxOf(node.bounds.width, node.touch?.width ?: 0f)
         val height = maxOf(node.bounds.height, node.touch?.height ?: 0f)
         if (width < MIN_TARGET_DP - TARGET_SLACK_DP || height < MIN_TARGET_DP - TARGET_SLACK_DP) {
-          error(node, FindingRule.TouchTarget, "${dp(width)} x ${dp(height)} dp, needs 48 x 48")
+          errorFinding(
+            node,
+            FindingRule.TouchTarget,
+            "${dp(width)} x ${dp(height)} dp, needs 48 x 48",
+          )
         } else {
           null
         }
@@ -164,7 +165,7 @@ object FindingRules {
             "${displayName(family)} is for ${groupsLabel(allowed)} text, not $role"
           else -> null
         }
-      detail?.let { error(node, FindingRule.Font, it) }
+      detail?.let { errorFinding(node, FindingRule.Font, it) }
     }
 
   private fun displayName(family: String): String =
@@ -181,7 +182,7 @@ object FindingRules {
   private fun clippedText(view: View): List<Finding> =
     view.nodes
       .filter { it.text?.let { text -> text.overflow && !text.truncated } == true }
-      .map { error(it, FindingRule.TextClipped, "text is cut off with no ellipsis") }
+      .map { errorFinding(it, FindingRule.TextClipped, "text is cut off with no ellipsis") }
 
   private fun truncatedText(view: View): List<Finding> =
     view.nodes
@@ -207,7 +208,7 @@ object FindingRules {
             text.lines > 1 -> "label wraps to ${text.lines} lines"
             else -> null
           }
-        detail?.let { error(node, FindingRule.LabelTruncated, it) }
+        detail?.let { errorFinding(node, FindingRule.LabelTruncated, it) }
       }
 
   // endregion
@@ -230,7 +231,7 @@ object FindingRules {
           if (spec == null) Contrast.NORMAL_RATIO
           else Contrast.requiredRatio(spec.sizeSp, spec.weight >= BOLD_WEIGHT)
         if (ratio < need) {
-          error(node, FindingRule.Contrast, "${number(ratio)}:1, needs ${number(need)}:1")
+          errorFinding(node, FindingRule.Contrast, "${number(ratio)}:1, needs ${number(need)}:1")
         } else {
           null
         }
@@ -248,7 +249,8 @@ object FindingRules {
       view.nodes.filter { node ->
         node.type in actionTypes &&
           node.isLaidOut &&
-          view.ancestors(node).none { it.type in navigationTypes }
+          // Navigation chrome is not compared with the primary action.
+          view.ancestors(node).none { it.type in M3ExpressiveCatalog.navigationNames }
       }
     val largestByPane =
       actions.groupBy(::pane).mapValues { (_, group) -> group.maxBy { it.bounds.height } }
@@ -259,7 +261,7 @@ object FindingRules {
         if (primary.bounds.height >= largest.bounds.height - PRIMARY_SLACK_DP) {
           null
         } else {
-          error(
+          errorFinding(
             primary,
             FindingRule.PrimaryLargest,
             "${dp(primary.bounds.height)} dp tall, shorter than ${largest.id} (${dp(largest.bounds.height)} dp)",
@@ -288,7 +290,7 @@ object FindingRules {
       .flatMap { fabs ->
         val detail =
           "${fabs.size} floating action buttons (${fabs.joinToString { it.id }}), keep one"
-        fabs.drop(1).map { error(it, FindingRule.OneFab, detail) }
+        fabs.drop(1).map { errorFinding(it, FindingRule.OneFab, detail) }
       }
 
   // endregion
@@ -320,7 +322,7 @@ object FindingRules {
           } else {
             "starts at ${dp(node.bounds.x)} dp, before the view"
           }
-        error(node, FindingRule.Offscreen, detail)
+        errorFinding(node, FindingRule.Offscreen, detail)
       }
   }
 
@@ -328,7 +330,7 @@ object FindingRules {
 
   // endregion
 
-  private fun error(node: LayoutNode, rule: FindingRule, detail: String) =
+  private fun errorFinding(node: LayoutNode, rule: FindingRule, detail: String) =
     Finding(id = node.id, rule = rule, severity = Severity.Error, detail = detail)
 
   /** Whole numbers without a decimal point, others to one place. */

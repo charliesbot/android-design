@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.domain.export
 
 import bot.charlies.androiddesign.preview.model.ComponentNode
+import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.SizeClass
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -31,9 +32,13 @@ internal fun ScreenEmitter.emitComponent(
   props: JsonObject,
   place: Place,
 ): List<Stmt> {
-  val menu =
-    screen.components.firstOrNull { it.component == "Menu" && it.literalOf("anchor") == node.id }
-  val own = dispatch(node, props, if (menu != null) place.copy(parentType = "Box") else place)
+  val menu = placement.menuAt(node.id)?.let(byId::get)
+  // The same rule the previewer uses: the catalog says who stretches and who lets its children.
+  val fillWidth =
+    place.parentStretches &&
+      M3ExpressiveCatalog.find(node.component)?.fillsWidth(props::get) == true
+  val placed = place.copy(fillWidth = fillWidth)
+  val own = dispatch(node, props, if (menu != null) placed.copy(parentType = "Box") else placed)
   if (menu == null || menu.id in placedOverlays) return own
   return besideMenu(menu, own)
 }
@@ -43,9 +48,6 @@ private fun ScreenEmitter.besideMenu(menu: ComponentNode, own: List<Stmt>): List
   placedOverlays += menu.id
   return one(file.use(Sym.Box), emptyList(), own + menuStatements(menu))
 }
-
-private fun ComponentNode.literalOf(key: String): String? =
-  (props[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
 private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> =
   when (node.component) {
@@ -407,7 +409,7 @@ private fun ScreenEmitter.scaffold(p: JsonObject, place: Place): List<Stmt> {
   val statements = mutableListOf<Stmt>()
   val topBar = p.literal("topBar")?.let(byId::get)
   val collapsing =
-    topBar?.component == "TopAppBar" && (topBar.literalOf("size") in setOf("medium", "large"))
+    topBar?.component == "TopAppBar" && (topBar.props.literal("size") in setOf("medium", "large"))
   if (collapsing) {
     experimental()
     statements +=
@@ -500,7 +502,8 @@ private fun ScreenEmitter.scaffoldContent(
     listOf(
       arg("modifier", Chain(file.use(Sym.Modifier), listOf(useModifier("padding(innerPadding)")))),
     ),
-    emit(contentId, inner),
+    // The previewer stretches the content of a Scaffold, which the Box would otherwise wrap.
+    emit(contentId, inner.copy(parentStretches = true)),
   )
 }
 

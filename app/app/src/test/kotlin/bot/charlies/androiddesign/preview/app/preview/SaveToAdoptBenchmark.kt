@@ -39,7 +39,7 @@ class SaveToAdoptBenchmark {
       AppPreviewController(
         repository = FileProposalRepository(),
         viewer = viewer,
-        window = WindowVisibility(),
+        window = PreviewWindow(),
         renderer = HeadlessTreeRenderer(),
         scope = scope,
         version = AppInfo.VERSION,

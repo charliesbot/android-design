@@ -1,19 +1,18 @@
 package bot.charlies.androiddesign.preview.feature.preview
 
 import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessRenderer
+import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
 import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.PropDef
-import bot.charlies.androiddesign.preview.model.PropKind
 import bot.charlies.androiddesign.preview.model.Views
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
@@ -59,40 +58,6 @@ class CatalogDefaultsTest {
       props()
     }
 
-  /** A valid value for a required prop; a child it needs is added to [extra]. */
-  private fun requiredValue(
-    prop: PropDef,
-    id: String,
-    extra: MutableList<JsonObject>,
-  ): JsonElement =
-    when (val kind = prop.kind) {
-      PropKind.Text -> JsonPrimitive("Sample")
-      PropKind.Icon -> JsonPrimitive("home")
-      PropKind.Image -> JsonPrimitive("missing.png")
-      is PropKind.Enum -> JsonPrimitive(kind.values.first())
-      PropKind.Child,
-      PropKind.ChildList -> {
-        val allowed = prop.allowedChildren?.minOrNull()
-        val childId = if (allowed == null) "t1" else "${id}_${prop.name}"
-        if (allowed != null) {
-          extra += requiredNode(checkNotNull(M3ExpressiveCatalog.find(allowed)), childId, extra)
-        }
-        if (prop.kind == PropKind.Child) JsonPrimitive(childId)
-        else JsonArray(listOf(JsonPrimitive(childId)))
-      }
-      else -> error("${prop.name}: no required value for $kind")
-    }
-
-  private fun requiredNode(
-    def: ComponentDef,
-    id: String,
-    extra: MutableList<JsonObject>,
-  ): JsonObject = buildJsonObject {
-    put("id", id)
-    put("component", def.name)
-    def.props.filter { it.required }.forEach { put(it.name, requiredValue(it, id, extra)) }
-  }
-
   /** The components of a screen that shows [def] as `subject`, with [stated] added to its props. */
   private fun screenOf(def: ComponentDef, stated: List<PropDef>): String {
     val extra = mutableListOf<JsonObject>()
@@ -122,7 +87,11 @@ class CatalogDefaultsTest {
   private fun tree(def: ComponentDef, stated: List<PropDef>): String {
     val proposal = singleScreen(screenOf(def, stated))
     val tree: LayoutTree =
-      HeadlessRenderer.renderTree(proposal, designOf(proposal.theme), null, "home", Views.Light)
+      HeadlessRenderer.tree(
+        RenderSource(proposal, designOf(proposal.theme), null),
+        "home",
+        Views.Light,
+      )
     return PreviewJson.pretty.encodeToString(LayoutTree.serializer(), tree)
   }
 

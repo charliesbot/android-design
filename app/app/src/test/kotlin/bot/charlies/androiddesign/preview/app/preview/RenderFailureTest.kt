@@ -4,12 +4,11 @@ import bot.charlies.androiddesign.preview.app.AppInfo
 import bot.charlies.androiddesign.preview.data.FileProposalRepository
 import bot.charlies.androiddesign.preview.domain.PreviewException
 import bot.charlies.androiddesign.preview.domain.ViewChange
+import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
-import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.Device
 import bot.charlies.androiddesign.preview.model.LayoutTree
-import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import java.nio.file.Files
 import java.nio.file.Path
@@ -37,16 +36,14 @@ class RenderFailureTest {
     private val real = HeadlessTreeRenderer()
 
     override suspend fun render(
-      proposal: Proposal,
-      design: DesignSystem,
-      proposalDir: Path?,
+      source: RenderSource,
       screen: String,
       view: ViewSpec,
       live: ProposalHostState?,
     ): LayoutTree {
-      check(proposal.name != BROKEN) { "cannot measure $screen" }
-      if (proposal.name == BLANK) throw IllegalStateException("")
-      val tree = real.render(proposal, design, proposalDir, screen, view, live)
+      check(source.proposal.name != BROKEN) { "cannot measure $screen" }
+      if (source.proposal.name == BLANK) throw IllegalStateException("")
+      val tree = real.render(source, screen, view, live)
       // A bad value that only some states or sizes draw, as a slider with a reversed range does.
       check(tree.nodes.none { it.text?.value == BAD_TEXT }) {
         "cannot draw '$BAD_TEXT' in $screen at ${view.name}"
@@ -62,7 +59,7 @@ class RenderFailureTest {
     AppPreviewController(
       repository = FileProposalRepository(),
       viewer = viewer,
-      window = WindowVisibility(),
+      window = PreviewWindow(),
       renderer = CrashingRenderer(),
       scope = scope,
       version = AppInfo.VERSION,

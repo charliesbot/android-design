@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.navigation.NavigationGraph
 import bot.charlies.androiddesign.preview.feature.preview.record.TreeRecorder
 import bot.charlies.androiddesign.preview.feature.preview.theme.ResolvedTheme
@@ -172,23 +173,16 @@ internal class RenderEnv(
 
   val design = theme.design
 
-  /** Menus that open from another component: anchor component id to menu id. */
-  val anchoredMenus: Map<String, String> =
-    screen.components
-      .filter { it.component == "Menu" }
-      .mapNotNull { menu ->
-        (menu.props["anchor"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.let {
-          it to menu.id
-        }
-      }
-      .toMap()
+  /** Which overlays draw beside a component and which at screen level. */
+  val placement = OverlayPlacement(screen)
 
-  /** Menus a SplitButton draws itself. */
-  val splitButtonMenus: Set<String> =
-    screen.components
-      .filter { it.component == "SplitButton" }
-      .mapNotNull { (it.props["menu"] as? kotlinx.serialization.json.JsonPrimitive)?.content }
-      .toSet()
+  /** The overlay open on this screen, or null. */
+  val openOverlay: String?
+    get() = host.interaction.openOverlay(screenId)
+
+  fun open(overlay: String) = host.interaction.open(screenId, overlay)
+
+  fun dismiss() = host.interaction.dismiss(screenId)
 
   fun stateKey(instanceId: String) = "$screenId::$instanceId"
 
@@ -205,8 +199,8 @@ internal class RenderEnv(
       null -> Unit
       is ActionCall.Navigate -> host.navigate(action.screen)
       ActionCall.Back -> host.back()
-      is ActionCall.Open -> host.interaction.open(screenId, action.overlay)
-      ActionCall.Dismiss -> host.interaction.dismiss(screenId)
+      is ActionCall.Open -> open(action.overlay)
+      ActionCall.Dismiss -> dismiss()
     }
   }
 

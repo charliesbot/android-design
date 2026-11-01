@@ -37,6 +37,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import bot.charlies.androiddesign.preview.model.ColorRole
+import bot.charlies.androiddesign.preview.model.TypeRole
+
+private val ScaffoldAmbient = Ambient(ColorRole.Background, ColorRole.OnBackground)
+
+internal fun NodeContext.scaffoldLook() = Look(ScaffoldAmbient.container, ScaffoldAmbient.content)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,9 +60,7 @@ internal fun RenderScaffold(ctx: NodeContext) {
       Box(Modifier.padding(padding).fillMaxSize()) { ctx.Child("content", 2, ChildHost.Fill) }
     }
   }
-  CompositionLocalProvider(
-    LocalAmbient provides Ambient(ColorRole.Background, ColorRole.OnBackground),
-  ) {
+  CompositionLocalProvider(LocalAmbient provides ScaffoldAmbient) {
     val frame = ctx.modifier().fillMaxSize()
     if (rail == null) {
       scaffold(frame)
@@ -69,6 +72,14 @@ internal fun RenderScaffold(ctx: NodeContext) {
     }
   }
 }
+
+internal fun NodeContext.topAppBarLook() =
+  Look(
+    ColorRole.Surface,
+    ColorRole.OnSurface,
+    TypeRole.TitleLarge,
+    text = string("title"),
+  )
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -85,7 +96,7 @@ internal fun RenderTopAppBar(ctx: NodeContext) {
   val actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
     ctx.Children("actions", 1, ChildHost.Wrap)
   }
-  val modifier = ctx.modifier(fillWidth = true)
+  val modifier = ctx.modifier()
   val insets = WindowInsets(0, 0, 0, 0)
   // Medium and large bars draw expanded; the behavior is only here so they are not collapsed.
   val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -134,12 +145,15 @@ internal fun RenderTopAppBar(ctx: NodeContext) {
   }
 }
 
+private val NavigationBarAmbient = Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurfaceVariant)
+
+internal fun NodeContext.navigationBarLook() =
+  Look(NavigationBarAmbient.container, NavigationBarAmbient.content)
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderNavigationBar(ctx: NodeContext) {
-  CompositionLocalProvider(
-    LocalAmbient provides Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurfaceVariant),
-  ) {
+  CompositionLocalProvider(LocalAmbient provides NavigationBarAmbient) {
     // The bar fills its parent by itself; a size modifier on it breaks EqualWeight.
     ShortNavigationBar(
       modifier = ctx.modifier(),
@@ -149,6 +163,15 @@ internal fun RenderNavigationBar(ctx: NodeContext) {
     }
   }
 }
+
+internal fun NodeContext.navigationBarItemLook() =
+  Look(
+    NavigationBarAmbient.container,
+    NavigationBarAmbient.content,
+    TypeRole.LabelMedium,
+    text = string("label"),
+    a11yRole = "Tab",
+  )
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -163,6 +186,11 @@ internal fun RenderNavigationBarItem(ctx: NodeContext) {
   )
 }
 
+private val NavigationRailAmbient = Ambient(ColorRole.Surface, ColorRole.OnSurfaceVariant)
+
+internal fun NodeContext.navigationRailLook() =
+  Look(NavigationRailAmbient.container, NavigationRailAmbient.content)
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderNavigationRail(ctx: NodeContext) {
@@ -171,18 +199,29 @@ internal fun RenderNavigationRail(ctx: NodeContext) {
       if (ctx.bool("expanded")) WideNavigationRailValue.Expanded
       else WideNavigationRailValue.Collapsed,
     )
-  CompositionLocalProvider(
-    LocalAmbient provides Ambient(ColorRole.Surface, ColorRole.OnSurfaceVariant),
-  ) {
+  CompositionLocalProvider(LocalAmbient provides NavigationRailAmbient) {
     WideNavigationRail(modifier = ctx.modifier(), state = state) {
       ctx.Children(
         "children",
         0,
-        ChildHost(fillWidth = false, groupKey = ctx.id, railExpanded = ctx.bool("expanded")),
+        ChildHost(
+          fillWidth = ctx.def.stretchesChildren,
+          groupKey = ctx.id,
+          railExpanded = ctx.bool("expanded"),
+        ),
       )
     }
   }
 }
+
+internal fun NodeContext.navigationRailItemLook() =
+  Look(
+    NavigationRailAmbient.container,
+    NavigationRailAmbient.content,
+    TypeRole.LabelMedium,
+    text = string("label"),
+    a11yRole = "Tab",
+  )
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -201,23 +240,35 @@ internal fun RenderNavigationRailItem(ctx: NodeContext) {
 private fun selectedIcon(ctx: NodeContext, selected: Boolean): String? =
   if (selected) ctx.string("selectedIcon") ?: ctx.string("icon") else ctx.string("icon")
 
+private val NodeContext.vibrant: Boolean
+  get() = enum("colors") == "vibrant"
+
+private fun NodeContext.floatingToolbarAmbient() =
+  if (vibrant) Ambient(ColorRole.PrimaryContainer, ColorRole.OnPrimaryContainer)
+  else Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurface)
+
+internal fun NodeContext.floatingToolbarLook() =
+  floatingToolbarAmbient().let { Look(it.container, it.content, shape = "full") }
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun RenderFloatingToolbar(ctx: NodeContext) {
-  val vibrant = ctx.enum("colors") == "vibrant"
   val colors =
-    if (vibrant) FloatingToolbarDefaults.vibrantFloatingToolbarColors()
+    if (ctx.vibrant) FloatingToolbarDefaults.vibrantFloatingToolbarColors()
     else FloatingToolbarDefaults.standardFloatingToolbarColors()
-  val ambient =
-    if (vibrant) Ambient(ColorRole.PrimaryContainer, ColorRole.OnPrimaryContainer)
-    else Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurface)
-  CompositionLocalProvider(LocalAmbient provides ambient) {
+  CompositionLocalProvider(LocalAmbient provides ctx.floatingToolbarAmbient()) {
     if (ctx.enum("orientation") == "vertical") {
       VerticalFloatingToolbar(
         expanded = true,
         modifier = ctx.modifier(),
         colors = colors,
-        content = { ctx.Children("children", 0, ChildHost(fillWidth = false, column = this)) },
+        content = {
+          ctx.Children(
+            "children",
+            0,
+            ChildHost(fillWidth = ctx.def.stretchesChildren, column = this),
+          )
+        },
       )
     } else {
       Box(
@@ -228,31 +279,47 @@ internal fun RenderFloatingToolbar(ctx: NodeContext) {
           expanded = true,
           modifier = ctx.modifier(),
           colors = colors,
-          content = { ctx.Children("children", 0, ChildHost(fillWidth = false, row = this)) },
+          content = {
+            ctx.Children(
+              "children",
+              0,
+              ChildHost(fillWidth = ctx.def.stretchesChildren, row = this),
+            )
+          },
         )
       }
     }
   }
 }
 
+/** The card's container and content roles: its style, else its variant's. */
+private fun NodeContext.cardRoles() =
+  Ambient(
+    style.container
+      ?: when (enum("variant")) {
+        "elevated" -> ColorRole.SurfaceContainerLow
+        "outlined" -> ColorRole.Surface
+        else -> ColorRole.SurfaceContainerHighest
+      },
+    style.color ?: ColorRole.OnSurface,
+  )
+
+internal fun NodeContext.cardLook() =
+  cardRoles().let { Look(it.container, it.content, shape = shapeName() ?: "medium") }
+
 @Composable
 internal fun RenderCard(ctx: NodeContext) {
   val variant = ctx.enum("variant")
   val shape = ctx.shapeName()?.let { shapeFor(it) } ?: MaterialTheme.shapes.medium
-  val containerRole =
-    ctx.style.container
-      ?: when (variant) {
-        "elevated" -> ColorRole.SurfaceContainerLow
-        "outlined" -> ColorRole.Surface
-        else -> ColorRole.SurfaceContainerHighest
-      }
+  val roles = ctx.cardRoles()
+  val containerRole = roles.container
   val container = ctx.env.color(containerRole)
-  val contentRole = ctx.style.color ?: ColorRole.OnSurface
+  val contentRole = roles.content
   val action = ctx.props.action("action")
-  val modifier = ctx.modifier(fillWidth = true)
+  val modifier = ctx.modifier()
   val content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
     CompositionLocalProvider(LocalAmbient provides Ambient(containerRole, contentRole)) {
-      ctx.Children("content", 0, ChildHost(fillWidth = true, column = this))
+      ctx.Children("content", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))
     }
   }
   val colors =
@@ -320,14 +387,13 @@ internal fun RenderCard(ctx: NodeContext) {
 @Composable
 internal fun NodeContext.rememberSelection(): Boolean {
   val group = host.groupKey ?: return bool("selected")
-  val key = env.stateKey("selection:$group")
-  val selected = env.host.interaction.get<Int>(key)
+  val selected = groupSelected(group)
   if (selected != null) return selected == host.groupIndex
   return bool("selected")
 }
 
 /** Makes this item the selected one of its group and runs its action. */
 internal fun NodeContext.select() {
-  host.groupKey?.let { env.host.interaction[env.stateKey("selection:$it")] = host.groupIndex }
+  host.groupKey?.let(::selectInGroup)
   env.act(props.action("action"))
 }

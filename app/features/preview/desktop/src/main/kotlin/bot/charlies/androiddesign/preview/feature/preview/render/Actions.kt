@@ -54,6 +54,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import bot.charlies.androiddesign.preview.model.ColorRole
+import bot.charlies.androiddesign.preview.model.TypeRole
 
 internal fun buttonHeight(size: String): Dp =
   when (size) {
@@ -62,6 +63,14 @@ internal fun buttonHeight(size: String): Dp =
     "large" -> ButtonDefaults.LargeContainerHeight
     "extra-large" -> ButtonDefaults.ExtraLargeContainerHeight
     else -> ButtonDefaults.MinHeight
+  }
+
+private fun buttonType(size: String): TypeRole =
+  when (size) {
+    "medium" -> TypeRole.TitleMedium
+    "large" -> TypeRole.HeadlineSmall
+    "extra-large" -> TypeRole.HeadlineLarge
+    else -> TypeRole.LabelLarge
   }
 
 /** Adds the node's `contentDescription` as accessibility text. */
@@ -84,6 +93,26 @@ private fun ButtonContent(
     Spacer(Modifier.width(ButtonDefaults.iconSpacingFor(height)))
   }
   ctx.PartText(label, style = ButtonDefaults.textStyleFor(height))
+}
+
+/** The button's variant colors with its named style over them, as `RenderButton` paints them. */
+internal fun NodeContext.buttonLook(ambient: Ambient): Look {
+  val (container, content) =
+    when (enum("variant")) {
+      "tonal" -> ColorRole.SecondaryContainer to ColorRole.OnSecondaryContainer
+      "elevated" -> ColorRole.SurfaceContainerLow to ColorRole.Primary
+      "outlined",
+      "text" -> ambient.container to ColorRole.Primary
+      else -> ColorRole.Primary to ColorRole.OnPrimary
+    }
+  return Look(
+    style.container ?: container,
+    style.color ?: content,
+    buttonType(enum("size")),
+    if (enum("shape") == "square") "large" else "full",
+    string("label"),
+    "Button",
+  )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -168,6 +197,26 @@ internal fun RenderButton(ctx: NodeContext) {
   }
 }
 
+internal fun NodeContext.toggleButtonLook(ambient: Ambient): Look {
+  val checked = bool("checked")
+  val (container, content) =
+    when (enum("variant")) {
+      "tonal" ->
+        if (checked) ColorRole.Secondary to ColorRole.OnSecondary
+        else ColorRole.SecondaryContainer to ColorRole.OnSecondaryContainer
+      "elevated" ->
+        if (checked) ColorRole.Primary to ColorRole.OnPrimary
+        else ColorRole.SurfaceContainerLow to ColorRole.Primary
+      "outlined" ->
+        if (checked) ColorRole.InverseSurface to ColorRole.InverseOnSurface
+        else ambient.container to ColorRole.OnSurfaceVariant
+      else ->
+        if (checked) ColorRole.Primary to ColorRole.OnPrimary
+        else ColorRole.SurfaceContainer to ColorRole.OnSurface
+    }
+  return Look(container, content, buttonType(enum("size")), "full", string("label"), "Checkbox")
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderToggleButton(ctx: NodeContext) {
@@ -242,6 +291,9 @@ internal fun RenderToggleButton(ctx: NodeContext) {
   }
 }
 
+internal fun NodeContext.buttonGroupLook(ambient: Ambient) =
+  Look(ambient.container, ambient.content)
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun RenderButtonGroup(ctx: NodeContext) {
@@ -253,7 +305,12 @@ internal fun RenderButtonGroup(ctx: NodeContext) {
       ctx.Children(
         "children",
         0,
-        ChildHost(fillWidth = false, row = this, connected = true, groupKey = ctx.id),
+        ChildHost(
+          fillWidth = ctx.def.stretchesChildren,
+          row = this,
+          connected = true,
+          groupKey = ctx.id,
+        ),
       )
     }
   } else {
@@ -261,9 +318,32 @@ internal fun RenderButtonGroup(ctx: NodeContext) {
       modifier = ctx.modifier(),
       horizontalArrangement = ButtonGroupDefaults.HorizontalArrangement,
     ) {
-      ctx.Children("children", 0, ChildHost(fillWidth = false, row = this, groupKey = ctx.id))
+      ctx.Children(
+        "children",
+        0,
+        ChildHost(fillWidth = ctx.def.stretchesChildren, row = this, groupKey = ctx.id),
+      )
     }
   }
+}
+
+internal fun NodeContext.iconButtonLook(ambient: Ambient): Look {
+  val toggle = bool("toggle")
+  val checked = toggle && bool("checked")
+  val (container, content) =
+    when (enum("variant")) {
+      "filled" ->
+        if (toggle && !checked) ColorRole.SurfaceContainerHighest to ColorRole.Primary
+        else ColorRole.Primary to ColorRole.OnPrimary
+      "tonal" ->
+        if (toggle && !checked) ColorRole.SurfaceContainerHighest to ColorRole.OnSurfaceVariant
+        else ColorRole.SecondaryContainer to ColorRole.OnSecondaryContainer
+      "outlined" ->
+        if (checked) ColorRole.InverseSurface to ColorRole.InverseOnSurface
+        else ambient.container to ColorRole.OnSurfaceVariant
+      else -> ambient.container to (if (checked) ColorRole.Primary else ColorRole.OnSurfaceVariant)
+    }
+  return Look(container, content, shape = "full", a11yRole = if (toggle) "Checkbox" else "Button")
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -381,6 +461,17 @@ internal fun RenderIconButton(ctx: NodeContext) {
   }
 }
 
+internal fun NodeContext.splitButtonLook(ambient: Ambient): Look {
+  val (container, content) =
+    when (enum("variant")) {
+      "tonal" -> ColorRole.SecondaryContainer to ColorRole.OnSecondaryContainer
+      "elevated" -> ColorRole.SurfaceContainerLow to ColorRole.Primary
+      "outlined" -> ambient.container to ColorRole.Primary
+      else -> ColorRole.Primary to ColorRole.OnPrimary
+    }
+  return Look(container, content, TypeRole.LabelLarge, "full", string("label"), "Button")
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderSplitButton(ctx: NodeContext) {
@@ -389,7 +480,7 @@ internal fun RenderSplitButton(ctx: NodeContext) {
   val icon = ctx.string("icon")
   val action = ctx.props.action("action")
   val menuId = ctx.props.childId("menu")
-  val menuOpen = menuId != null && env.host.interaction.openOverlay(env.screenId) == menuId
+  val menuOpen = menuId != null && env.openOverlay == menuId
   val variant = ctx.enum("variant")
   val height = SplitButtonDefaults.SmallContainerHeight
   val leadingContent: @Composable RowScope.() -> Unit = {
@@ -401,8 +492,7 @@ internal fun RenderSplitButton(ctx: NodeContext) {
   }
   val toggleMenu: (Boolean) -> Unit = { open ->
     if (menuId != null) {
-      if (open) env.host.interaction.open(env.screenId, menuId)
-      else env.host.interaction.dismiss(env.screenId)
+      if (open) env.open(menuId) else env.dismiss()
     }
   }
   val trailingContent: @Composable RowScope.() -> Unit = {
@@ -492,6 +582,25 @@ internal fun fabColors(name: String): Pair<ColorRole, ColorRole> =
     "surface" -> ColorRole.SurfaceContainerHigh to ColorRole.Primary
     else -> ColorRole.PrimaryContainer to ColorRole.OnPrimaryContainer
   }
+
+internal fun NodeContext.fabLook(): Look {
+  val (container, content) = fabColors(enum("color"))
+  val shape =
+    when (enum("size")) {
+      "medium" -> "largeIncreased"
+      "large" -> "extraLarge"
+      else -> "large"
+    }
+  val extended = bool("extended")
+  return Look(
+    container,
+    content,
+    if (extended) TypeRole.LabelLarge else null,
+    shape,
+    string("label")?.takeIf { extended },
+    "Button",
+  )
+}
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -595,6 +704,14 @@ internal fun RenderFab(ctx: NodeContext) {
   }
 }
 
+internal fun NodeContext.fabMenuLook() =
+  Look(
+    ColorRole.PrimaryContainer,
+    ColorRole.OnPrimaryContainer,
+    shape = "large",
+    a11yRole = "Button",
+  )
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderFabMenu(ctx: NodeContext) {
@@ -611,9 +728,19 @@ internal fun RenderFabMenu(ctx: NodeContext) {
       }
     },
   ) {
-    ctx.Children("children", 0, ChildHost(fillWidth = false, fabMenu = this))
+    ctx.Children("children", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, fabMenu = this))
   }
 }
+
+internal fun NodeContext.fabMenuItemLook() =
+  Look(
+    ColorRole.PrimaryContainer,
+    ColorRole.OnPrimaryContainer,
+    TypeRole.TitleMedium,
+    "full",
+    string("label"),
+    "Button",
+  )
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable

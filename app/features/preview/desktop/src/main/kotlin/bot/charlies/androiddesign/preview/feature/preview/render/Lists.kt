@@ -12,6 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import bot.charlies.androiddesign.preview.model.ColorRole
+import bot.charlies.androiddesign.preview.model.TypeRole
+
+internal fun NodeContext.listLook(ambient: Ambient): Look = layoutLook(ambient)
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -19,14 +22,42 @@ internal fun RenderList(ctx: NodeContext) {
   val segmented = ctx.enum("variant") == "segmented"
   ctx.StyledAmbient {
     Column(
-      modifier = ctx.modifier(fillWidth = true).then(ctx.styleBackground()),
+      modifier = ctx.modifier().then(ctx.styleBackground()),
       verticalArrangement =
         if (segmented) Arrangement.spacedBy(ListItemDefaults.SegmentedGap) else Arrangement.Top,
     ) {
-      ctx.Children("children", 0, ChildHost(fillWidth = true, column = this, segmented = segmented))
+      ctx.Children(
+        "children",
+        0,
+        ChildHost(fillWidth = ctx.def.stretchesChildren, column = this, segmented = segmented),
+      )
     }
   }
 }
+
+/**
+ * The container a list item is drawn on: secondary container when selected, else the surface the
+ * library gives (segmented items need a darker one, since the default vanishes on a surface).
+ */
+private fun NodeContext.listItemContainer(): ColorRole =
+  when {
+    bool("selected") -> ColorRole.SecondaryContainer
+    host.segmented -> ColorRole.SurfaceContainer
+    else -> ColorRole.Surface
+  }
+
+/** Only a selected segmented item sets its content color; the others keep the library's. */
+private fun NodeContext.listItemContent(): ColorRole =
+  if (bool("selected") && host.segmented) ColorRole.OnSecondaryContainer else ColorRole.OnSurface
+
+internal fun NodeContext.listItemLook() =
+  Look(
+    listItemContainer(),
+    listItemContent(),
+    TypeRole.BodyLarge,
+    text = string("headline"),
+    a11yRole = if (props.action("action") != null) "Button" else null,
+  )
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -36,7 +67,7 @@ internal fun RenderListItem(ctx: NodeContext) {
   val headline = ctx.string("headline").orEmpty()
   val overline = ctx.string("overline")
   val supporting = ctx.string("supporting")
-  val modifier = ctx.modifier(fillWidth = true)
+  val modifier = ctx.modifier()
   val overlineSlot: (@Composable () -> Unit)? = overline?.let { text ->
     { ctx.PartText(text, "overline", maxLines = 1) }
   }
@@ -55,12 +86,11 @@ internal fun RenderListItem(ctx: NodeContext) {
     val colors: ListItemColors =
       if (selected) {
         ListItemDefaults.segmentedColors(
-          containerColor = ctx.env.color(ColorRole.SecondaryContainer),
-          contentColor = ctx.env.color(ColorRole.OnSecondaryContainer),
+          containerColor = ctx.env.color(ctx.listItemContainer()),
+          contentColor = ctx.env.color(ctx.listItemContent()),
         )
       } else {
-        // The library default is the surface color, which vanishes on a surface background.
-        ListItemDefaults.segmentedColors(containerColor = ctx.env.color(ColorRole.SurfaceContainer))
+        ListItemDefaults.segmentedColors(containerColor = ctx.env.color(ctx.listItemContainer()))
       }
     SegmentedListItem(
       onClick = { ctx.env.act(action) },
@@ -84,7 +114,7 @@ internal fun RenderListItem(ctx: NodeContext) {
       trailingContent = trailing,
       colors =
         if (selected) {
-          ListItemDefaults.colors(containerColor = ctx.env.color(ColorRole.SecondaryContainer))
+          ListItemDefaults.colors(containerColor = ctx.env.color(ctx.listItemContainer()))
         } else {
           ListItemDefaults.colors()
         },

@@ -1,30 +1,23 @@
 package bot.charlies.androiddesign.preview.app.cli
 
 import bot.charlies.androiddesign.preview.data.ProposalReader
+import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessRenderer
 import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessResult
+import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PreviewJson
-import bot.charlies.androiddesign.preview.model.Proposal
-import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
-import bot.charlies.androiddesign.preview.model.firstLine
 import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.Path
 
-/** Draws one screen at one view; [HeadlessRenderer.render] in the app, a stub in tests. */
+/** Draws one screen at one view; [HeadlessRenderer.image] in the app, a stub in tests. */
 fun interface ScreenRenderer {
-  fun render(
-    proposal: Proposal,
-    design: DesignSystem,
-    proposalDir: Path?,
-    screen: String,
-    view: ViewSpec,
-  ): HeadlessResult
+  fun render(source: RenderSource, screen: String, view: ViewSpec): HeadlessResult
 }
 
 /**
@@ -38,7 +31,7 @@ fun interface ScreenRenderer {
  * failure and no files, and the rest are still drawn.
  */
 class RenderCommand(
-  private val renderer: ScreenRenderer = ScreenRenderer(HeadlessRenderer::render),
+  private val renderer: ScreenRenderer = ScreenRenderer(HeadlessRenderer::image),
 ) : Command {
   override val name = "render"
   override val usage =
@@ -79,7 +72,7 @@ class RenderCommand(
       return ExitCode.USAGE
     }
     val screens = options.screens ?: proposal.screens.keys.toList()
-    val entries = renderAll(proposal, design, proposalPath.parent, screens, options)
+    val entries = renderAll(RenderSource(proposal, design, proposalPath.parent), screens, options)
     val report = writeReport(options, proposalPath, designPath, design, emptyList(), entries)
     entries
       .filter { !it.pass }
@@ -90,9 +83,7 @@ class RenderCommand(
   }
 
   private fun renderAll(
-    proposal: Proposal,
-    design: DesignSystem,
-    proposalDir: Path?,
+    source: RenderSource,
     screens: List<String>,
     options: Options,
   ): List<RenderEntry> = screens.flatMap { screen ->
@@ -100,44 +91,18 @@ class RenderCommand(
       val base = "$screen-${view.name}"
       val result =
         try {
-          renderer.render(proposal, design, proposalDir, screen, view)
+          renderer.render(source, screen, view)
         } catch (e: Exception) {
-          return@map RenderEntry(
-            screen = screen,
-            view = view.name,
-            png = null,
-            tree = null,
-            pass = false,
-            failures = listOf("render-error: ${e.firstLine()}"),
-          )
+          return@map RenderEntry.of(screen, view.name, null, ViewCheck.renderError(e))
         }
       Files.write(options.out.resolve("$base.png"), result.png)
       Files.writeString(
         options.out.resolve("$base.tree.json"),
         PreviewJson.pretty.encodeToString(LayoutTree.serializer(), result.tree) + "\n",
       )
-      RenderEntry(
-        screen = screen,
-        view = view.name,
-        png = "$base.png",
-        tree = "$base.tree.json",
-        pass = result.tree.pass,
-        failures = failures(result.tree),
-      )
+      RenderEntry.of(screen, view.name, base, ViewCheck.of(source.proposal, result.tree))
     }
   }
-
-  private fun failures(tree: LayoutTree): List<String> =
-    tree.findings
-      .filter { it.severity == Severity.Error }
-      .map { finding ->
-        buildString {
-            append(finding.rule.wire)
-            append(": ")
-            append(listOfNotNull(finding.id, finding.detail).joinToString(" "))
-          }
-          .trimEnd(' ', ':')
-      }
 
   private fun writeReport(
     options: Options,

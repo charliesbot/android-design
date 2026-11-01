@@ -33,7 +33,7 @@ internal fun RenderText(ctx: NodeContext) {
   val color = ctx.colorRole()?.let(ctx.env::color) ?: Color.Unspecified
   Text(
     text = ctx.string("text").orEmpty(),
-    modifier = ctx.modifier(fillWidth = align != null).then(ctx.styleBackground()),
+    modifier = ctx.modifier().then(ctx.styleBackground()),
     color = color,
     style = ctx.textStyle(TypeRole.BodyLarge),
     textAlign = align,
@@ -43,6 +43,15 @@ internal fun RenderText(ctx: NodeContext) {
     onTextLayout = ctx.textReporter(),
   )
 }
+
+/** Text paints its style's container behind itself, so that is its backdrop. */
+internal fun NodeContext.textLook(ambient: Ambient) =
+  Look(
+    backdropRole(ambient),
+    colorRole() ?: ambient.content,
+    typeRole(TypeRole.BodyLarge),
+    text = string("text"),
+  )
 
 @Composable
 internal fun RenderIcon(ctx: NodeContext) {
@@ -57,12 +66,15 @@ internal fun RenderIcon(ctx: NodeContext) {
   )
 }
 
+internal fun NodeContext.iconLook(ambient: Ambient) =
+  Look(ambient.container, colorRole() ?: ambient.content, a11yRole = "Image")
+
 @Composable
 internal fun RenderImage(ctx: NodeContext) {
   val bitmap = ctx.string("src")?.let(ctx.env.assets::image)
   val shape = ctx.shapeName()?.let { shapeFor(it) }
   val aspectRatio = ctx.number("aspectRatio")
-  var modifier = ctx.modifier(fillWidth = aspectRatio != null)
+  var modifier = ctx.modifier()
   if (aspectRatio != null) modifier = modifier.aspectRatio(aspectRatio)
   if (shape != null) modifier = modifier.clip(shape)
   val description = ctx.string("contentDescription")
@@ -97,3 +109,6 @@ internal fun RenderImage(ctx: NodeContext) {
       },
   )
 }
+
+internal fun NodeContext.imageLook(ambient: Ambient) =
+  Look(ambient.container, ambient.content, a11yRole = "Image")

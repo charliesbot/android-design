@@ -3,6 +3,7 @@ package bot.charlies.androiddesign.preview.domain.layout
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.Proposal
 import kotlin.math.roundToInt
 import kotlinx.serialization.Serializable
@@ -38,8 +39,6 @@ object LayoutSummary {
    * The most regions listed for one screen, which keeps a view's summary to a few hundred bytes.
    */
   const val MAX_REGIONS = 8
-
-  private val navigationTypes = listOf("NavigationBar", "NavigationRail", "FloatingToolbar")
 
   fun of(proposal: Proposal, tree: LayoutTree): ViewLayout {
     val children = tree.nodes.groupBy { it.parent }
@@ -84,7 +83,10 @@ object LayoutSummary {
 
   private fun navigation(tree: LayoutTree): String {
     val shown = tree.nodes.map { it.type }.toSet()
-    return navigationTypes.filter { it in shown }.joinToString("+").ifEmpty { NO_NAV }
+    return M3ExpressiveCatalog.navigationNames
+      .filter { it in shown }
+      .joinToString("+")
+      .ifEmpty { NO_NAV }
   }
 
   private fun regions(pane: Pane): List<String> {

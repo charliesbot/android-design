@@ -13,18 +13,20 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 
 
-def case_items(case_name):
+def load_case(name):
     spec = json.loads((HERE / "evals.json").read_text())
-    case = next(c for c in spec["evals"] if c["name"] == case_name)
-    return [a for a in case["assertions"] if a["type"] == "rubric"]
+    return next(c for c in spec["evals"] if c["name"] == name)
+
+
+def case_items(case_name):
+    return [a for a in load_case(case_name)["assertions"] if a["type"] == "rubric"]
 
 
 def prompt_for(case_name, images, item_ids, *, case=None, rubric=None, labels=None):
     """`labels` maps an image path to its `screen/view`; an image without one is listed by its file name."""
     labels = labels or {}
     if case is None:
-        spec = json.loads((HERE / "evals.json").read_text())
-        case = next(c for c in spec["evals"] if c["name"] == case_name)
+        case = load_case(case_name)
     items = [a for a in case["assertions"] if a["id"] in item_ids]
     rubric = rubric if rubric is not None else (HERE / 'rubric.md').read_text()
     listed = "\n".join(
@@ -101,19 +103,19 @@ SCHEMA = {
 }
 
 
-def judge_once(case_name, images, item_ids, *, backend, model=None, rubric=None):
+def judge_once(case_name, images, item_ids, *, backend, model=None, prompt=None):
     if not images:
         raise ValueError("cannot judge without images")
-    prompt = rubric if rubric is not None else prompt_for(case_name, images, item_ids)
+    prompt = prompt if prompt is not None else prompt_for(case_name, images, item_ids)
     reply = execute(backend, prompt, Path(images[0]).resolve().parent, role="judge",
                     images=images, schema=SCHEMA, model=model, timeout=600)
     return parse(reply["message"], item_ids)
 
 
-def judge(case_name, images, item_ids=None, runs=1, *, backend, model=None, rubric=None):
+def judge(case_name, images, item_ids=None, runs=1, *, backend, model=None, prompt=None):
     validate_runs(runs)
     item_ids = item_ids if item_ids is not None else [a["id"] for a in case_items(case_name)]
-    ballots = [judge_once(case_name, images, item_ids, backend=backend, model=model, rubric=rubric)
+    ballots = [judge_once(case_name, images, item_ids, backend=backend, model=model, prompt=prompt)
                for _ in range(runs)]
     return aggregate(ballots, item_ids)
 

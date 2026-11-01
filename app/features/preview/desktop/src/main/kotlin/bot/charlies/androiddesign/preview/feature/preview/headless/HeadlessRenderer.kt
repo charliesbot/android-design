@@ -28,9 +28,18 @@ class HeadlessResult(val tree: LayoutTree, val png: ByteArray) {
 }
 
 /**
+ * What a render draws from: the [proposal], the [design] system it is styled with, and [dir], the
+ * folder its relative asset paths resolve against (null when it has none).
+ */
+data class RenderSource(val proposal: Proposal, val design: DesignSystem, val dir: Path?)
+
+/**
  * Draws a proposal screen without a window, with the same composables the window uses, and reads
  * the result back. It runs on Compose's own UI test harness (`runDesktopComposeUiTest`'s engine),
  * which is public API and needs no display.
+ *
+ * The engine owns global state, so renders never overlap: a call made while another is drawing
+ * waits for it, whichever thread it comes from. Callers need no lock of their own.
  */
 object HeadlessRenderer {
   /**
@@ -42,23 +51,24 @@ object HeadlessRenderer {
   /**
    * One font resolver for every render. Each test scene would otherwise build its own, and a new
    * resolver copies every font it draws with into native memory again: the 15 MB symbols font and
-   * the 4 MB Flex font, on every render. Renders run one at a time (the engine owns global state:
-   * the CLI is sequential and the app's `HeadlessTreeRenderer` holds a lock), so sharing is safe.
+   * the 4 MB Flex font, on every render. Renders run one at a time ([renderLock]), so sharing is
+   * safe.
    */
   private val fontResolver by lazy { createFontFamilyResolver() }
 
+  private val renderLock = Any()
+
   /**
-   * Renders [screen] at [view] with a PNG, for the CLI. The back stack is the shortest `navigate`
-   * path from the start screen, so a detail screen at an expanded width shows beside its list.
+   * Renders [screen] of [source] at [view] with a PNG, for the CLI. The back stack is the shortest
+   * `navigate` path from the start screen, so a detail screen at an expanded width shows beside its
+   * list.
    *
    * @param replay A running host whose back stack and local state (open overlays, toggles, typed
    *   text) are taken over before the tree is read, so the result shows what that host shows.
    */
   @OptIn(ExperimentalTestApi::class)
-  fun render(
-    proposal: Proposal,
-    design: DesignSystem,
-    proposalDir: Path?,
+  fun image(
+    source: RenderSource,
     screen: String,
     view: ViewSpec,
     afterLaunch: (ComposeUiTest.(ProposalHostState) -> Unit)? = null,
@@ -66,7 +76,7 @@ object HeadlessRenderer {
   ): HeadlessResult {
     var png: ByteArray? = null
     val tree =
-      draw(proposal, design, proposalDir, screen, view, afterLaunch, replay) { test ->
+      draw(source, screen, view, afterLaunch, replay) { test ->
         png = test.captureToImage().asSkiaBitmap().toPng()
       }
     return HeadlessResult(tree, checkNotNull(png))
@@ -76,69 +86,67 @@ object HeadlessRenderer {
    * Renders only the layout tree of [screen] at [view], for `get_tree` and for checking that a
    * proposal draws. No image is captured or encoded, and the clock advances only as far as the tree
    * needs: not at all for a fresh screen, and for a [replay] only the time its open overlays and
-   * its scene change take to come to rest. See [render] for the parameters.
+   * its scene change take to come to rest. See [image] for the parameters.
    */
   @OptIn(ExperimentalTestApi::class)
-  fun renderTree(
-    proposal: Proposal,
-    design: DesignSystem,
-    proposalDir: Path?,
+  fun tree(
+    source: RenderSource,
     screen: String,
     view: ViewSpec,
     replay: ProposalHostState? = null,
-  ): LayoutTree = draw(proposal, design, proposalDir, screen, view, null, replay, capture = null)
+  ): LayoutTree = draw(source, screen, view, null, replay, capture = null)
 
   /** Draws, and calls [capture] with the test when the caller wants the image as well. */
   @OptIn(ExperimentalTestApi::class)
   private fun draw(
-    proposal: Proposal,
-    design: DesignSystem,
-    proposalDir: Path?,
+    source: RenderSource,
     screen: String,
     view: ViewSpec,
     afterLaunch: (ComposeUiTest.(ProposalHostState) -> Unit)?,
     replay: ProposalHostState?,
     capture: ((SkikoComposeUiTest) -> Unit)?,
-  ): LayoutTree {
-    require(screen in proposal.screens) { "no screen '$screen' in this proposal" }
-    val density = Density(DENSITY)
-    val test =
-      DesktopComposeUiTest(
-        width = (view.width * DENSITY).toInt(),
-        height = (view.height * DENSITY).toInt(),
-        density = density,
-        useStandardTestDispatcherForComposition = false,
-      )
-    val host = ProposalHostState(proposal, proposalDir, screen)
-    val recorder = TreeRecorder()
-    val imageWanted = capture != null
-    lateinit var tree: LayoutTree
-    test.runTest {
-      setContent {
-        CompositionLocalProvider(LocalFontFamilyResolver provides fontResolver) {
-          ProposalPreview(host, design, view, recorder = recorder)
-        }
-      }
-      settle(if (imageWanted) SETTLE_MS else 0)
-      replay?.let {
-        val time = if (imageWanted) SETTLE_MS else host.timeToAdopt(it)
-        host.adoptStateOf(it)
-        settle(time)
-      }
-      afterLaunch?.let { hook ->
-        hook(this, host)
-        settle(SETTLE_MS)
-      }
-      val semantics =
-        SemanticsIndex.of(
-          mergedRoots = onAllNodes(isRoot(), useUnmergedTree = false).fetchSemanticsNodes(),
-          unmergedRoots = onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes(),
+  ): LayoutTree =
+    synchronized(renderLock) {
+      val (proposal, design, proposalDir) = source
+      require(screen in proposal.screens) { "no screen '$screen' in this proposal" }
+      val density = Density(DENSITY)
+      val test =
+        DesktopComposeUiTest(
+          width = (view.width * DENSITY).toInt(),
+          height = (view.height * DENSITY).toInt(),
+          density = density,
+          useStandardTestDispatcherForComposition = false,
         )
-      tree = recorder.snapshot(host.current, view, density.density, semantics)
-      capture?.invoke(this)
+      val host = ProposalHostState(proposal, proposalDir, screen)
+      val recorder = TreeRecorder()
+      val imageWanted = capture != null
+      lateinit var tree: LayoutTree
+      test.runTest {
+        setContent {
+          CompositionLocalProvider(LocalFontFamilyResolver provides fontResolver) {
+            ProposalPreview(host, design, view, recorder = recorder)
+          }
+        }
+        settle(if (imageWanted) SETTLE_MS else 0)
+        replay?.let {
+          val time = if (imageWanted) SETTLE_MS else host.timeToAdopt(it)
+          host.adoptStateOf(it)
+          settle(time)
+        }
+        afterLaunch?.let { hook ->
+          hook(this, host)
+          settle(SETTLE_MS)
+        }
+        val semantics =
+          SemanticsIndex.of(
+            mergedRoots = onAllNodes(isRoot(), useUnmergedTree = false).fetchSemanticsNodes(),
+            unmergedRoots = onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes(),
+          )
+        tree = recorder.snapshot(host.current, view, density.density, semantics)
+        capture?.invoke(this)
+      }
+      tree
     }
-    return tree
-  }
 
   /**
    * How long the clock must run after this host takes over the state of [other] for the tree to be

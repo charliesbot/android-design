@@ -1,9 +1,12 @@
 package bot.charlies.androiddesign.preview.mcp
 
+import bot.charlies.androiddesign.preview.domain.OpenedProposal
 import bot.charlies.androiddesign.preview.domain.PreviewController
 import bot.charlies.androiddesign.preview.domain.PreviewException
+import bot.charlies.androiddesign.preview.domain.PreviewStatus
 import bot.charlies.androiddesign.preview.domain.ProposalCheck
 import bot.charlies.androiddesign.preview.domain.ViewChange
+import bot.charlies.androiddesign.preview.domain.ViewState
 import bot.charlies.androiddesign.preview.model.Device
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PaletteVariant
@@ -77,7 +80,7 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
       readOnly = false,
     ) { args ->
       PreviewJson.compact.encodeToString(
-        bot.charlies.androiddesign.preview.domain.OpenedProposal.serializer(),
+        OpenedProposal.serializer(),
         controller.openProposal(args.requiredString("path")),
       )
     }
@@ -141,7 +144,7 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
             },
         )
       PreviewJson.compact.encodeToString(
-        bot.charlies.androiddesign.preview.domain.ViewState.serializer(),
+        ViewState.serializer(),
         controller.setView(change),
       )
     }
@@ -225,7 +228,7 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
       schema = schema(),
     ) {
       PreviewJson.compact.encodeToString(
-        bot.charlies.androiddesign.preview.domain.PreviewStatus.serializer(),
+        PreviewStatus.serializer(),
         controller.status(),
       )
     }
@@ -260,12 +263,12 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
     } catch (e: CancellationException) {
       throw e
     } catch (e: PreviewException) {
-      error(e.message ?: "failed")
+      toolError(e.message ?: "failed")
     } catch (e: Exception) {
-      error("${request.name} failed: ${e::class.simpleName}: ${e.message}")
+      toolError("${request.name} failed: ${e::class.simpleName}: ${e.message}")
     }
 
-  private fun error(message: String) =
+  private fun toolError(message: String) =
     CallToolResult(content = listOf(TextContent(message)), isError = true)
 
   companion object {

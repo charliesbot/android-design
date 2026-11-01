@@ -1,5 +1,6 @@
 package bot.charlies.androiddesign.preview.domain.export
 
+import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.navigation.NavigationGraph
 import bot.charlies.androiddesign.preview.model.ActionFunction
 import bot.charlies.androiddesign.preview.model.ComponentNode
@@ -47,6 +48,16 @@ internal data class Place(
   val scope: Scope? = null,
   /** The component type of the parent, which decides whether `weight` applies. */
   val parentType: String? = null,
+  /**
+   * True when the parent lets its children stretch to its width (the catalog's
+   * [bot.charlies.androiddesign.preview.model.ComponentDef.stretchesChildren]). The screen's root
+   * counts as stretched, as it does in the previewer.
+   */
+  val parentStretches: Boolean = true,
+  /**
+   * True when the component drawn here stretches to the parent's width: it gets `fillMaxWidth()`.
+   */
+  val fillWidth: Boolean = false,
   /** `Modifier`, or `modifier` for the screen's root. */
   val modifierBase: String = "Modifier",
   /** Modifier calls to put first, such as `padding(innerPadding)`. */
@@ -63,6 +74,8 @@ internal data class Place(
   fun forChild(parentType: String) =
     copy(
       parentType = parentType,
+      parentStretches = M3ExpressiveCatalog.find(parentType)?.stretchesChildren ?: false,
+      fillWidth = false,
       modifierBase = "Modifier",
       leading = emptyList(),
       listPosition = null,
@@ -92,7 +105,12 @@ internal class ScreenEmitter(
   val overlays: List<ComponentNode> =
     screen.components.filter { it.component in M3ExpressiveCatalog.overlayNames }
 
-  /** Overlays written beside their anchor instead of at the end of the screen. */
+  /** Which overlays are written beside a component and which at the end of the screen. */
+  val placement = OverlayPlacement(screen)
+
+  /**
+   * Menus already written beside a component, so one drawn from several variants is not doubled.
+   */
   val placedOverlays = mutableSetOf<String>()
 
   var usesSizeClass = false
@@ -120,7 +138,7 @@ internal class ScreenEmitter(
     val root = byId[ComponentNode.ROOT_ID]
     val rootStatements =
       if (root == null) emptyList() else emit(root.id, Place(modifierBase = "modifier"))
-    val tail = overlays.filter { it.id !in placedOverlays }.flatMap { overlayStatements(it) }
+    val tail = placement.screenLevel.flatMap { overlayStatements(it) }
     if (usesSizeClass) body += sizeClassState()
     body += rootStatements
     body += tail
@@ -297,9 +315,7 @@ internal class ScreenEmitter(
   /** A boolean prop of [component]: the stated literal, else its catalog default. */
   fun JsonObject.option(component: String, key: String): Boolean =
     flag(key)
-      ?: checkNotNull(
-        M3ExpressiveCatalog.find(component)?.defaultOf(key)?.content?.toBooleanStrictOrNull(),
-      ) {
+      ?: checkNotNull(catalogDefault(component, key)?.toBooleanStrictOrNull()) {
         "$component.$key has no default"
       }
 
@@ -429,8 +445,9 @@ internal class ScreenEmitter(
   // region modifiers
 
   /**
-   * The `modifier` argument: the place's leading calls, the weight inside a row or column, any
-   * [extra] calls, and the padding last. Null when there is nothing to say.
+   * The `modifier` argument: the place's leading calls, the weight inside a row or column, the
+   * stretch to the parent's width, any [extra] calls, and the padding last. Null when there is
+   * nothing to say.
    */
   fun modifier(place: Place, props: JsonObject, vararg extra: String?): Arg? {
     val parts = mutableListOf<String>()
@@ -438,6 +455,7 @@ internal class ScreenEmitter(
     if (place.parentType == "Row" || place.parentType == "Column") {
       props.floatExpr("weight", place)?.let { parts += "weight($it)" }
     }
+    if (place.fillWidth) parts += useModifier("fillMaxWidth()")
     parts += extra.filterNotNull().map(::useModifier)
     props.literal("padding")?.let { parts += "${useModifier("padding")}(${spacing(it)})" }
     return modifierArg(place, parts)

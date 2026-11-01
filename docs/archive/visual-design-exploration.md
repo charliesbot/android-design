@@ -70,7 +70,7 @@ Wear OS is outside this v1. Using an Android screenshot workflow does not widen 
 
 - [Agent-driven Refine loop](agent-refine-loop.md): the later investigation into letting the agent watch for saved refinement requests instead of waiting for the user to return to chat.
 - [Compose Multiplatform fidelity research](../research/compose-multiplatform-proposal-fidelity.md): evidence for the alternative considered, not the selected v1 renderer.
-- [Current exploration workflow](../../skills/android-design/references/exploration.md): temporary Compose workspaces, rendered proposals, and the explicit transition to implementation.
+- Current exploration workflow (`skills/android-design/references/exploration.md`, since removed): temporary Compose workspaces, rendered proposals, and the explicit transition to implementation.
 - [Current exploration checks](../../evals/exploration.md): existing workspace isolation and refinement checks, not evidence that the proposed gallery exists.
 - [Android design skill](../../skills/android-design/SKILL.md): design judgment, component guidance, and current platform scope.
 - [Compose AI Tools](https://github.com/yschimke/compose-ai-tools): the Compose Preview CLI used to render actual Android previews to PNG.

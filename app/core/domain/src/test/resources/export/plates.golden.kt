@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -85,7 +86,7 @@ import kotlinx.serialization.Serializable
 
 private val SeedColor = Color(0xFFB5523B)
 
-/** A variable font at each weight in [weights], with the same variation [axes] on all. */
+/** A variable font at each weight in [weights] with the variation [axes]; no `wght` among them. */
 private fun variableFontFamily(
   @FontRes font: Int,
   weights: List<Int>,
@@ -100,7 +101,6 @@ private fun variableFontFamily(
           FontVariation.Settings(
             FontWeight(weight),
             FontStyle.Normal,
-            FontVariation.weight(weight),
             *axes,
           ),
       )
@@ -322,6 +322,7 @@ fun PlatesScreen(
         SegmentedListItem(
           onClick = { onNavigateToPlateDetail() },
           shapes = ListItemDefaults.segmentedShapes(index, plates.size),
+          modifier = Modifier.fillMaxWidth(),
           colors = ListItemDefaults.segmentedColors(),
           supportingContent = { Text(plate.time) },
         ) {

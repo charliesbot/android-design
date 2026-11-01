@@ -33,7 +33,7 @@ internal val componentCases: List<ComponentCase> =
       expect =
         listOf(
           "Column(",
-          "modifier = modifier.verticalScroll(rememberScrollState()).padding(12.dp)",
+          "modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp)",
           "verticalArrangement = Arrangement.spacedBy(16.dp)",
           "horizontalAlignment = Alignment.CenterHorizontally",
           "Text(\"Hi\")",
@@ -65,7 +65,7 @@ internal val componentCases: List<ComponentCase> =
         ),
       expect =
         listOf(
-          "Box(modifier = modifier, contentAlignment = Alignment.BottomEnd) {",
+          "Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.BottomEnd) {",
           "Text(\"Hi\")",
         ),
     ),
@@ -173,7 +173,7 @@ internal val componentCases: List<ComponentCase> =
           "Image(",
           "painter = painterResource(R.drawable.hero_photo)",
           "contentDescription = \"Hero\"",
-          "Modifier.aspectRatio(1.5f).clip(MaterialTheme.shapes.large)",
+          "Modifier.fillMaxWidth().aspectRatio(1.5f).clip(MaterialTheme.shapes.large)",
           "contentScale = ContentScale.Fit",
         ),
     ),
@@ -344,7 +344,7 @@ internal val componentCases: List<ComponentCase> =
       expect =
         listOf(
           "ListItem(",
-          "modifier = Modifier.clickable { onBack() }",
+          "modifier = Modifier.fillMaxWidth().clickable { onBack() }",
           "supportingContent = { Text(\"Sup\") }",
           ") { Text(\"One\") }",
         ),
@@ -729,7 +729,7 @@ internal val componentCases: List<ComponentCase> =
         ),
       expect =
         listOf(
-          "LinearProgressIndicator(progress = { 0.4f })",
+          "LinearProgressIndicator(progress = { 0.4f }, modifier = Modifier.fillMaxWidth())",
           "CircularWavyProgressIndicator()",
           "CircularProgressIndicator(progress = { 0.5f })",
         ),

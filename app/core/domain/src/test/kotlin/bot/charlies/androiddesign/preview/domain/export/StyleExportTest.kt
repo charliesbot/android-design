@@ -76,7 +76,7 @@ class StyleExportTest {
       )
     assertTrue(
       source.contains(
-        "modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(72.dp)",
+        "modifier = modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(72.dp)",
       ),
       source,
     )

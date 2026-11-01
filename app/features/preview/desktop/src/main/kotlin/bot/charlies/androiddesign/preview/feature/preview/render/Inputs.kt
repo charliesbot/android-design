@@ -17,7 +17,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.TypeRole
+
+internal fun NodeContext.switchLook() =
+  if (bool("checked")) {
+    Look(ColorRole.Primary, ColorRole.OnPrimary, shape = "full", a11yRole = "Switch")
+  } else {
+    Look(ColorRole.SurfaceContainerHighest, ColorRole.Outline, shape = "full", a11yRole = "Switch")
+  }
 
 @Composable
 internal fun RenderSwitch(ctx: NodeContext) {
@@ -32,6 +40,15 @@ internal fun RenderSwitch(ctx: NodeContext) {
     enabled = ctx.enabled,
   )
 }
+
+internal fun NodeContext.checkboxLook(ambient: Ambient) =
+  Look(
+    ambient.container,
+    colorRole() ?: ColorRole.OnSurface,
+    TypeRole.BodyLarge,
+    text = string("label"),
+    a11yRole = "Checkbox",
+  )
 
 @Composable
 internal fun RenderCheckbox(ctx: NodeContext) {
@@ -70,6 +87,9 @@ private fun NodeContext.sliderRange(): ClosedFloatingPointRange<Float> {
   return if (min < max) min..max else 0f..1f
 }
 
+/** Slider and range slider share a look: the primary color on the ambient container. */
+internal fun NodeContext.sliderLook(ambient: Ambient) = Look(ambient.container, ColorRole.Primary)
+
 @Composable
 internal fun RenderSlider(ctx: NodeContext) {
   val range = ctx.sliderRange()
@@ -82,7 +102,7 @@ internal fun RenderSlider(ctx: NodeContext) {
     // The kept value may predate an edit that narrowed the range.
     value = value.value.coerceIn(range.start, range.endInclusive),
     onValueChange = { value.set(it) },
-    modifier = ctx.modifier(fillWidth = true).then(ctx.describedBy()),
+    modifier = ctx.modifier().then(ctx.describedBy()),
     enabled = ctx.enabled,
     valueRange = range,
     steps = ctx.wholeOrDefault("steps"),
@@ -107,12 +127,21 @@ internal fun RenderRangeSlider(ctx: NodeContext) {
   RangeSlider(
     value = low..high,
     onValueChange = { value.set(FloatSpan(it.start, it.endInclusive)) },
-    modifier = ctx.modifier(fillWidth = true).then(ctx.describedBy()),
+    modifier = ctx.modifier().then(ctx.describedBy()),
     enabled = ctx.enabled,
     valueRange = range,
     steps = ctx.wholeOrDefault("steps"),
   )
 }
+
+internal fun NodeContext.textFieldLook(ambient: Ambient) =
+  Look(
+    if (enum("variant") == "filled") ColorRole.SurfaceContainerHighest else ambient.container,
+    ColorRole.OnSurface,
+    TypeRole.BodyLarge,
+    "extraSmall",
+    string("value")?.takeIf { it.isNotEmpty() } ?: string("label"),
+  )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -127,7 +156,7 @@ internal fun RenderTextField(ctx: NodeContext) {
   val leading = ctx.string("leadingIcon")?.let { name -> @Composable { SymbolIcon(name) } }
   val trailing = ctx.string("trailingIcon")?.let { name -> @Composable { SymbolIcon(name) } }
   val prefix = ctx.string("prefix")?.let { value -> @Composable { Text(value) } }
-  val modifier = ctx.modifier(fillWidth = true).then(ctx.describedBy())
+  val modifier = ctx.modifier().then(ctx.describedBy())
   if (ctx.enum("variant") == "outlined") {
     OutlinedTextField(
       value = text.value,

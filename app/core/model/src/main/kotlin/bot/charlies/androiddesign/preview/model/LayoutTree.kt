@@ -123,11 +123,13 @@ object BoundsSerializer : KSerializer<Bounds> {
   override fun deserialize(decoder: Decoder): Bounds {
     val json = decoder as? JsonDecoder ?: throw SerializationException("JSON only")
     val array = json.decodeJsonElement() as? JsonArray
-    val numbers = array?.map { (it as? JsonPrimitive)?.doubleOrNull?.toFloat() }
-    if (numbers == null || numbers.size != 4 || numbers.any { it == null }) {
+    val numbers = array?.mapNotNull { (it as? JsonPrimitive)?.doubleOrNull?.toFloat() }
+    // A non-number element drops out of `numbers`, so four of them out of four elements is exact.
+    if (array == null || array.size != 4 || numbers?.size != 4) {
       throw SerializationException("Bounds must be [x, y, width, height]")
     }
-    return Bounds(numbers[0]!!, numbers[1]!!, numbers[2]!!, numbers[3]!!)
+    val (x, y, width, height) = numbers
+    return Bounds(x, y, width, height)
   }
 
   private fun Float.dp(): Number {

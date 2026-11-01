@@ -76,6 +76,15 @@ class ThemeExportTest {
   }
 
   @Test
+  fun `the font helper sets the wght axis once`() {
+    // FontVariation.Settings(weight, style, ...) already adds `wght` from the weight, so a second
+    // FontVariation.weight(...) makes Compose throw "'wght' must be unique" when the theme loads.
+    val source = export(null)
+    has(source, "FontVariation.Settings( FontWeight(weight), FontStyle.Normal, *axes, )")
+    lacks(source, "FontVariation.weight(")
+  }
+
+  @Test
   fun `a brand face with variation axes is its own family`() {
     val source =
       export(
