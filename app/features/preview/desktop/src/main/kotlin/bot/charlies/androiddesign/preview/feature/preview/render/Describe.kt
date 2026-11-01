@@ -18,7 +18,16 @@ internal class Look(
   val shape: String? = null,
   val text: String? = null,
   val a11yRole: String? = null,
-)
+) {
+  /** A look that takes both roles from [on]. */
+  constructor(
+    on: Ambient,
+    type: TypeRole? = null,
+    shape: String? = null,
+    text: String? = null,
+    a11yRole: String? = null,
+  ) : this(on.container, on.content, type, shape, text, a11yRole)
+}
 
 /**
  * What the tree says about [ctx]: the Material roles its colors come from (the family's `*Look`
@@ -85,7 +94,7 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look =
     "NavigationRailItem" -> ctx.navigationRailItemLook()
     "FloatingToolbar" -> ctx.floatingToolbarLook()
     "Card" -> ctx.cardLook()
-    "List" -> ctx.listLook(ambient)
+    "List" -> ctx.layoutLook(ambient)
     "ListItem" -> ctx.listItemLook()
     "Button" -> ctx.buttonLook(ambient)
     "ToggleButton" -> ctx.toggleButtonLook(ambient)

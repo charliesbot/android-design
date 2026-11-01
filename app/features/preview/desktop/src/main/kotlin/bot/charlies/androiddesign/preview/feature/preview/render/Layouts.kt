@@ -71,8 +71,7 @@ private fun alignmentOf(name: String?): Alignment =
  * The look of every layout component: a style's container and color over the ambient, as
  * `StyledAmbient` and `styleBackground` draw them.
  */
-internal fun NodeContext.layoutLook(ambient: Ambient): Look =
-  styledAmbient(ambient).let { Look(it.container, it.content) }
+internal fun NodeContext.layoutLook(ambient: Ambient): Look = Look(styledAmbient(ambient))
 
 /** The role a Shape paints behind its content, if any: its `color` prop, else its style's color. */
 private fun NodeContext.shapeFill(): ColorRole? = colorRole()

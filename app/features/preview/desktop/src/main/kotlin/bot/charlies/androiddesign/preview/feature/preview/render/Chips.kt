@@ -24,8 +24,7 @@ private fun NodeContext.chipSelected(): Boolean {
     // `connected` marks a multi-select group: each chip keeps its own state.
     checkedState("selected").value
   } else {
-    val picked = groupSelected(group)
-    if (picked != null) picked == host.groupIndex else bool("selected")
+    isPickedIn(group)
   }
 }
 
@@ -155,7 +154,7 @@ internal fun RenderInputChip(ctx: NodeContext) {
   )
 }
 
-internal fun NodeContext.chipGroupLook(ambient: Ambient) = Look(ambient.container, ambient.content)
+internal fun NodeContext.chipGroupLook(ambient: Ambient) = Look(ambient)
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable

@@ -212,8 +212,9 @@ internal val LocalRenderEnv =
 
 /**
  * What the parent offers its children. Compose scopes give `weight`, and the parent decides whether
- * a child stretches: columns, boxes and cards stretch a Column, Row or Card across their width; a
- * Row never does, because that would push its siblings out (use `weight` there).
+ * a child stretches across its width: the catalog says which parents do
+ * ([bot.charlies.androiddesign.preview.model.ComponentDef.stretchesChildren]). A Row never does,
+ * because that would push its siblings out (use `weight` there).
  *
  * @property flexItem The parent is a FlexBox, which measures its items with a finite stand-in for
  *   an unbounded height (see [restoreUnboundedHeight]).

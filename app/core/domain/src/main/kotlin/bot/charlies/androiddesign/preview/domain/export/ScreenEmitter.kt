@@ -328,6 +328,37 @@ internal class ScreenEmitter(
   fun JsonObject.number(key: String): Double? =
     (this[key] as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toDoubleOrNull()
 
+  /**
+   * The value prop [key] has in the sample data, as the previewer resolves it: a literal as is, a
+   * binding as its sample value (null when nothing is there), and the loop index as a number whose
+   * value no width rule reads. A template body is written once, so a binding inside it reads the
+   * sample of the first item.
+   */
+  fun JsonObject.sampleValue(key: String, place: Place): JsonElement? {
+    val element = this[key] ?: return null
+    if (isIndex(element)) return place.scope?.let { JsonPrimitive(0) }
+    val path = bindingPath(element) ?: return element
+    return resolve(path, place.scope).sample
+  }
+
+  /** A flag that picks the Compose call or the modifier: its [sampleValue] as a boolean. */
+  fun JsonObject.sampleFlag(key: String, place: Place): Boolean? =
+    (sampleValue(key, place) as? JsonPrimitive)?.content?.toBooleanStrictOrNull()
+
+  /**
+   * A number of [component] that picks the Compose call: its [sampleValue] as the previewer reads
+   * it, a finite `Float` moved into the catalog's bounds
+   * ([bot.charlies.androiddesign.preview.model.ComponentDef.coerceNumber]).
+   */
+  fun JsonObject.sampleNumber(component: String, key: String, place: Place): Double? {
+    val value =
+      (sampleValue(key, place) as? JsonPrimitive)?.content?.toDoubleOrNull()?.takeIf {
+        it.isFinite()
+      } ?: return null
+    val def = M3ExpressiveCatalog.find(component) ?: return value
+    return def.coerceNumber(key, value.toFloat().toDouble())
+  }
+
   /** A string prop as a Kotlin expression: a literal, a bound value, or the loop index. */
   fun JsonObject.text(key: String, place: Place): Expr? = textOf(this[key], place)
 

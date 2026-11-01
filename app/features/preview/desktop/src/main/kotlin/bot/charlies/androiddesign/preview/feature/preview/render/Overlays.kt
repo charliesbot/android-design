@@ -56,8 +56,7 @@ private val BottomSheetAmbient = Ambient(ColorRole.SurfaceContainerLow, ColorRol
 private val DialogAmbient = Ambient(ColorRole.SurfaceContainerHigh, ColorRole.OnSurface)
 private val MenuAmbient = Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurface)
 
-internal fun NodeContext.bottomSheetLook() =
-  Look(BottomSheetAmbient.container, BottomSheetAmbient.content, shape = "extraLarge")
+internal fun NodeContext.bottomSheetLook() = Look(BottomSheetAmbient, shape = "extraLarge")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,8 +76,7 @@ internal fun RenderBottomSheet(ctx: NodeContext) {
 
 internal fun NodeContext.dialogLook() =
   Look(
-    DialogAmbient.container,
-    DialogAmbient.content,
+    DialogAmbient,
     TypeRole.HeadlineSmall,
     "extraLarge",
     string("title"),
@@ -100,8 +98,7 @@ internal fun RenderDialog(ctx: NodeContext) {
   }
 }
 
-internal fun NodeContext.menuLook() =
-  Look(MenuAmbient.container, MenuAmbient.content, shape = "extraLarge")
+internal fun NodeContext.menuLook() = Look(MenuAmbient, shape = "extraLarge")
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -121,8 +118,7 @@ internal fun RenderMenu(ctx: NodeContext) {
 
 internal fun NodeContext.menuItemLook() =
   Look(
-    MenuAmbient.container,
-    MenuAmbient.content,
+    MenuAmbient,
     TypeRole.LabelLarge,
     text = string("label"),
     a11yRole = "Button",

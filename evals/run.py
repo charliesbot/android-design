@@ -219,7 +219,6 @@ def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1)
     (directory / 'judge-request.json').write_text(json.dumps(request, indent=2))
     # An imported ballot must always be explicitly rescored against the latest request.
     ids = request['item_ids']
-    verdict = pending(ids, 'awaiting visual judgment')
     if not render_complete(renders):
         verdict = pending(ids, 'render incomplete')
     elif judge_backend:
@@ -228,6 +227,8 @@ def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1)
                             backend=judge_backend, model=judge_model, prompt=request['prompt'])
         except (RuntimeError, ValueError) as error:
             verdict = pending(ids, f'judge error: {error}')
+    else:
+        verdict = pending(ids, 'awaiting visual judgment')
     (directory / 'judge.json').write_text(json.dumps(verdict, indent=2))
     agent_path = directory / 'agent.json'
     agent = json.loads(agent_path.read_text()) if agent_path.exists() else {

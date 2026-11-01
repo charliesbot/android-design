@@ -291,8 +291,7 @@ internal fun RenderToggleButton(ctx: NodeContext) {
   }
 }
 
-internal fun NodeContext.buttonGroupLook(ambient: Ambient) =
-  Look(ambient.container, ambient.content)
+internal fun NodeContext.buttonGroupLook(ambient: Ambient) = Look(ambient)
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable

@@ -14,8 +14,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.TypeRole
 
-internal fun NodeContext.listLook(ambient: Ambient): Look = layoutLook(ambient)
-
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderList(ctx: NodeContext) {

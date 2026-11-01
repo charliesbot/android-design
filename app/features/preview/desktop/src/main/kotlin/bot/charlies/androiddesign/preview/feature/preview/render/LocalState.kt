@@ -25,6 +25,13 @@ internal fun NodeContext.checkedState(key: String = "checked"): LocalValue<Boole
 internal fun NodeContext.groupSelected(group: String): Int? =
   env.host.interaction.get<Int>(env.stateKey("selection:$group"))
 
+/**
+ * Whether this item is the picked one of [group]: after a tap the tapped item, before it the one
+ * whose `selected` prop is set.
+ */
+internal fun NodeContext.isPickedIn(group: String): Boolean =
+  groupSelected(group)?.let { it == host.groupIndex } ?: bool("selected")
+
 /** Makes this item the picked one of [group]. */
 internal fun NodeContext.selectInGroup(group: String) {
   env.host.interaction[env.stateKey("selection:$group")] = host.groupIndex

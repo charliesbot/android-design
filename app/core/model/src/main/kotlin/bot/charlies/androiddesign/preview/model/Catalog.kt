@@ -155,6 +155,17 @@ data class ComponentDef(
     }
   }
 
+  /**
+   * A bound number is not validated, so the renderer and the exporter both move it into the bounds
+   * the catalog gives number prop [name] (a common prop included): a value outside them, or one
+   * that is not a finite number, would reach a Compose API that throws or hangs on it.
+   */
+  fun coerceNumber(name: String, value: Double): Double =
+    ((props + M3ExpressiveCatalog.commonProps).firstOrNull { it.name == name }?.kind
+        as? PropKind.Number)
+      ?.bounds
+      ?.coerce(value) ?: value
+
   /** The catalog default of prop [name], or null when it is not a prop or has no default. */
   fun defaultOf(name: String): JsonPrimitive? = prop(name)?.default
 }

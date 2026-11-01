@@ -281,7 +281,7 @@ Material says how components look; Android's own design guides say how an app be
 
 ## Screen check
 
-For a proposal, the `android-design-explore` skill's Check step replaces rendering: it answers these questions from the layout tree.
+For a proposal, use the `android-design-explore` skill's Check step instead of rendering.
 
 Look at the rendered screen, not the code. Use the `compose-preview` skill to render and inspect Compose previews; for a UI Builder design, use the builder skill's visual verification workflow and identify the output type. If you can't render it, report "visual quality unverified" instead of answering from code.
 

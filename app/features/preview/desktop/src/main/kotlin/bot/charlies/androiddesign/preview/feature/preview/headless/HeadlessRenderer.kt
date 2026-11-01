@@ -106,47 +106,58 @@ object HeadlessRenderer {
     replay: ProposalHostState?,
     capture: ((SkikoComposeUiTest) -> Unit)?,
   ): LayoutTree =
-    synchronized(renderLock) {
-      val (proposal, design, proposalDir) = source
-      require(screen in proposal.screens) { "no screen '$screen' in this proposal" }
-      val density = Density(DENSITY)
-      val test =
-        DesktopComposeUiTest(
-          width = (view.width * DENSITY).toInt(),
-          height = (view.height * DENSITY).toInt(),
-          density = density,
-          useStandardTestDispatcherForComposition = false,
-        )
-      val host = ProposalHostState(proposal, proposalDir, screen)
-      val recorder = TreeRecorder()
-      val imageWanted = capture != null
-      lateinit var tree: LayoutTree
-      test.runTest {
-        setContent {
-          CompositionLocalProvider(LocalFontFamilyResolver provides fontResolver) {
-            ProposalPreview(host, design, view, recorder = recorder)
-          }
+    synchronized(renderLock) { drawLocked(source, screen, view, afterLaunch, replay, capture) }
+
+  /** The work of [draw], done while holding [renderLock]. */
+  @OptIn(ExperimentalTestApi::class)
+  private fun drawLocked(
+    source: RenderSource,
+    screen: String,
+    view: ViewSpec,
+    afterLaunch: (ComposeUiTest.(ProposalHostState) -> Unit)?,
+    replay: ProposalHostState?,
+    capture: ((SkikoComposeUiTest) -> Unit)?,
+  ): LayoutTree {
+    val (proposal, design, proposalDir) = source
+    require(screen in proposal.screens) { "no screen '$screen' in this proposal" }
+    val density = Density(DENSITY)
+    val test =
+      DesktopComposeUiTest(
+        width = (view.width * DENSITY).toInt(),
+        height = (view.height * DENSITY).toInt(),
+        density = density,
+        useStandardTestDispatcherForComposition = false,
+      )
+    val host = ProposalHostState(proposal, proposalDir, screen)
+    val recorder = TreeRecorder()
+    val imageWanted = capture != null
+    lateinit var tree: LayoutTree
+    test.runTest {
+      setContent {
+        CompositionLocalProvider(LocalFontFamilyResolver provides fontResolver) {
+          ProposalPreview(host, design, view, recorder = recorder)
         }
-        settle(if (imageWanted) SETTLE_MS else 0)
-        replay?.let {
-          val time = if (imageWanted) SETTLE_MS else host.timeToAdopt(it)
-          host.adoptStateOf(it)
-          settle(time)
-        }
-        afterLaunch?.let { hook ->
-          hook(this, host)
-          settle(SETTLE_MS)
-        }
-        val semantics =
-          SemanticsIndex.of(
-            mergedRoots = onAllNodes(isRoot(), useUnmergedTree = false).fetchSemanticsNodes(),
-            unmergedRoots = onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes(),
-          )
-        tree = recorder.snapshot(host.current, view, density.density, semantics)
-        capture?.invoke(this)
       }
-      tree
+      settle(if (imageWanted) SETTLE_MS else 0)
+      replay?.let {
+        val time = if (imageWanted) SETTLE_MS else host.timeToAdopt(it)
+        host.adoptStateOf(it)
+        settle(time)
+      }
+      afterLaunch?.let { hook ->
+        hook(this, host)
+        settle(SETTLE_MS)
+      }
+      val semantics =
+        SemanticsIndex.of(
+          mergedRoots = onAllNodes(isRoot(), useUnmergedTree = false).fetchSemanticsNodes(),
+          unmergedRoots = onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes(),
+        )
+      tree = recorder.snapshot(host.current, view, density.density, semantics)
+      capture?.invoke(this)
     }
+    return tree
+  }
 
   /**
    * How long the clock must run after this host takes over the state of [other] for the tree to be

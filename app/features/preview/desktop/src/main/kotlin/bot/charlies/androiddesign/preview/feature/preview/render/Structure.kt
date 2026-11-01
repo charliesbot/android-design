@@ -41,7 +41,7 @@ import bot.charlies.androiddesign.preview.model.TypeRole
 
 private val ScaffoldAmbient = Ambient(ColorRole.Background, ColorRole.OnBackground)
 
-internal fun NodeContext.scaffoldLook() = Look(ScaffoldAmbient.container, ScaffoldAmbient.content)
+internal fun NodeContext.scaffoldLook() = Look(ScaffoldAmbient)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -147,8 +147,7 @@ internal fun RenderTopAppBar(ctx: NodeContext) {
 
 private val NavigationBarAmbient = Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurfaceVariant)
 
-internal fun NodeContext.navigationBarLook() =
-  Look(NavigationBarAmbient.container, NavigationBarAmbient.content)
+internal fun NodeContext.navigationBarLook() = Look(NavigationBarAmbient)
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -159,15 +158,18 @@ internal fun RenderNavigationBar(ctx: NodeContext) {
       modifier = ctx.modifier(),
       arrangement = ShortNavigationBarArrangement.EqualWeight,
     ) {
-      ctx.Children("children", 0, ChildHost(groupKey = ctx.id))
+      ctx.Children(
+        "children",
+        0,
+        ChildHost(fillWidth = ctx.def.stretchesChildren, groupKey = ctx.id),
+      )
     }
   }
 }
 
 internal fun NodeContext.navigationBarItemLook() =
   Look(
-    NavigationBarAmbient.container,
-    NavigationBarAmbient.content,
+    NavigationBarAmbient,
     TypeRole.LabelMedium,
     text = string("label"),
     a11yRole = "Tab",
@@ -188,8 +190,7 @@ internal fun RenderNavigationBarItem(ctx: NodeContext) {
 
 private val NavigationRailAmbient = Ambient(ColorRole.Surface, ColorRole.OnSurfaceVariant)
 
-internal fun NodeContext.navigationRailLook() =
-  Look(NavigationRailAmbient.container, NavigationRailAmbient.content)
+internal fun NodeContext.navigationRailLook() = Look(NavigationRailAmbient)
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -216,8 +217,7 @@ internal fun RenderNavigationRail(ctx: NodeContext) {
 
 internal fun NodeContext.navigationRailItemLook() =
   Look(
-    NavigationRailAmbient.container,
-    NavigationRailAmbient.content,
+    NavigationRailAmbient,
     TypeRole.LabelMedium,
     text = string("label"),
     a11yRole = "Tab",
@@ -247,8 +247,7 @@ private fun NodeContext.floatingToolbarAmbient() =
   if (vibrant) Ambient(ColorRole.PrimaryContainer, ColorRole.OnPrimaryContainer)
   else Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurface)
 
-internal fun NodeContext.floatingToolbarLook() =
-  floatingToolbarAmbient().let { Look(it.container, it.content, shape = "full") }
+internal fun NodeContext.floatingToolbarLook() = Look(floatingToolbarAmbient(), shape = "full")
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -293,7 +292,7 @@ internal fun RenderFloatingToolbar(ctx: NodeContext) {
 }
 
 /** The card's container and content roles: its style, else its variant's. */
-private fun NodeContext.cardRoles() =
+private fun NodeContext.cardAmbient() =
   Ambient(
     style.container
       ?: when (enum("variant")) {
@@ -304,26 +303,26 @@ private fun NodeContext.cardRoles() =
     style.color ?: ColorRole.OnSurface,
   )
 
-internal fun NodeContext.cardLook() =
-  cardRoles().let { Look(it.container, it.content, shape = shapeName() ?: "medium") }
+internal fun NodeContext.cardLook() = Look(cardAmbient(), shape = shapeName() ?: "medium")
 
 @Composable
 internal fun RenderCard(ctx: NodeContext) {
   val variant = ctx.enum("variant")
   val shape = ctx.shapeName()?.let { shapeFor(it) } ?: MaterialTheme.shapes.medium
-  val roles = ctx.cardRoles()
-  val containerRole = roles.container
-  val container = ctx.env.color(containerRole)
-  val contentRole = roles.content
+  val ambient = ctx.cardAmbient()
+  val container = ctx.env.color(ambient.container)
   val action = ctx.props.action("action")
   val modifier = ctx.modifier()
   val content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
-    CompositionLocalProvider(LocalAmbient provides Ambient(containerRole, contentRole)) {
+    CompositionLocalProvider(LocalAmbient provides ambient) {
       ctx.Children("content", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))
     }
   }
   val colors =
-    CardDefaults.cardColors(containerColor = container, contentColor = ctx.env.color(contentRole))
+    CardDefaults.cardColors(
+      containerColor = container,
+      contentColor = ctx.env.color(ambient.content),
+    )
   when {
     variant == "elevated" && action != null ->
       ElevatedCard(
@@ -333,7 +332,7 @@ internal fun RenderCard(ctx: NodeContext) {
         colors =
           CardDefaults.elevatedCardColors(
             containerColor = container,
-            contentColor = ctx.env.color(contentRole),
+            contentColor = ctx.env.color(ambient.content),
           ),
         content = content,
       )
@@ -344,7 +343,7 @@ internal fun RenderCard(ctx: NodeContext) {
         colors =
           CardDefaults.elevatedCardColors(
             containerColor = container,
-            contentColor = ctx.env.color(contentRole),
+            contentColor = ctx.env.color(ambient.content),
           ),
         content = content,
       )
@@ -356,7 +355,7 @@ internal fun RenderCard(ctx: NodeContext) {
         colors =
           CardDefaults.outlinedCardColors(
             containerColor = container,
-            contentColor = ctx.env.color(contentRole),
+            contentColor = ctx.env.color(ambient.content),
           ),
         content = content,
       )
@@ -367,7 +366,7 @@ internal fun RenderCard(ctx: NodeContext) {
         colors =
           CardDefaults.outlinedCardColors(
             containerColor = container,
-            contentColor = ctx.env.color(contentRole),
+            contentColor = ctx.env.color(ambient.content),
           ),
         content = content,
       )
@@ -387,9 +386,7 @@ internal fun RenderCard(ctx: NodeContext) {
 @Composable
 internal fun NodeContext.rememberSelection(): Boolean {
   val group = host.groupKey ?: return bool("selected")
-  val selected = groupSelected(group)
-  if (selected != null) return selected == host.groupIndex
-  return bool("selected")
+  return isPickedIn(group)
 }
 
 /** Makes this item the selected one of its group and runs its action. */

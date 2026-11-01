@@ -8,7 +8,7 @@ description: >
 
 # Visual design exploration
 
-Follow the `android-design` skill for every design decision: its section 0 answers, components, theming, layout, and the screen check's questions. This skill owns the workflow, and its Check step replaces the screen check's rendering. Each run is one shot: brief in, one proposal written, checked, shown, then stop. Phone, foldable, tablet, and desktop are in scope; Wear is not.
+Follow the `android-design` skill for every design decision: its section 0 answers, components, theming, layout, and the screen check's questions. This skill owns the workflow. Each run is one shot: brief in, one proposal written, checked, shown, then stop. Phone, foldable, tablet, and desktop are in scope; Wear is not.
 
 A proposal is a data file that the previewer app, a native macOS window, draws with real Compose Material 3 components and redraws on every save. You check it through the app's layout tree; the user judges taste in the window.
 
@@ -56,7 +56,7 @@ The proposal carries these design rules; `proposal-format.md` gives the syntax f
 
 ## Check
 
-This is `android-design`'s screen check for a proposal. Answer its questions from the `check_proposal` layout summaries and errors (and `get_tree` when they are not enough), never from a render or pixels. Screenshots stay out of this loop: never take one or ask for one.
+For a proposal, this step replaces the rendering in `android-design`'s screen check. Answer its questions from the `check_proposal` layout summaries and errors (and `get_tree` when they are not enough), never from a render or pixels. Screenshots stay out of this loop: never take one or ask for one.
 
 1. Call `open_proposal` with the proposal's absolute path. It loads the file, watches it, shows the window, and returns validation errors. Fix them and call `status` until it reports none.
 2. Call `check_proposal`. One call checks every screen at every view and returns each view's errors and `layout` summary; its tool description gives the format.

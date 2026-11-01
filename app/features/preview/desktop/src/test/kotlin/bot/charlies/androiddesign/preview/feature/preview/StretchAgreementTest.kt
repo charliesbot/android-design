@@ -75,17 +75,15 @@ class StretchAgreementTest {
 
   private fun ids(vararg ids: String) = JsonArray(ids.map(::JsonPrimitive))
 
-  private fun drawn(vararg nodes: JsonObject): Proposal = singleScreen(nodes.joinToString(","))
+  private fun screenWith(dataModel: String? = null, vararg nodes: JsonObject): Proposal =
+    singleScreen(nodes.joinToString(","), dataModel)
 
-  private fun widthOf(proposal: Proposal, id: String): Float =
+  private fun treeOf(proposal: Proposal) =
     HeadlessRenderer.tree(
-        RenderSource(proposal, designOf(proposal.theme), null),
-        "home",
-        Views.Light,
-      )
-      .node(id)
-      .bounds
-      .width
+      RenderSource(proposal, designOf(proposal.theme), null),
+      "home",
+      Views.Light,
+    )
 
   private fun fillMaxWidths(proposal: Proposal): Int {
     val source = KotlinExporter.export(proposal, designOf(proposal.theme), "home")
@@ -95,15 +93,28 @@ class StretchAgreementTest {
 
   /** A proposal whose Scaffold content is a Column `stage` holding [stageChild]. */
   private fun staged(stageChild: String, vararg rest: JsonObject): Proposal =
-    drawn(
-      node("root", "Scaffold", "content" to JsonPrimitive("stage")),
-      node("stage", "Column", "children" to ids(stageChild)),
-      *rest,
-      text,
+    screenWith(
+      nodes =
+        arrayOf(
+          node("root", "Scaffold", "content" to JsonPrimitive("stage")),
+          node("stage", "Column", "children" to ids(stageChild)),
+          *rest,
+          text,
+        ),
     )
 
-  private fun stretchesInRender(proposal: Proposal, id: String): Boolean =
-    abs(widthOf(proposal, id) - widthOf(proposal, "stage")) < 0.5f
+  /** The width of a node and of the `stage` column that holds it, from one render. */
+  private class Widths(val node: Float, val stage: Float) {
+    val stretches: Boolean
+      get() = abs(node - stage) < 0.5f
+
+    override fun toString() = "$node of $stage dp"
+  }
+
+  private fun widthsIn(proposal: Proposal, id: String): Widths {
+    val tree = treeOf(proposal)
+    return Widths(tree.node(id).bounds.width, tree.node("stage").bounds.width)
+  }
 
   @Test
   fun `a component stretches in the export exactly when it does in the previewer`() {
@@ -131,12 +142,13 @@ class StretchAgreementTest {
               subject,
               *extra.toTypedArray(),
             )
-          val rendered = stretchesInRender(inColumn, "subject")
+          val widths = widthsIn(inColumn, "subject")
+          val rendered = widths.stretches
           val exported = fillMaxWidths(inColumn) - fillMaxWidths(inShape) == 1
           if (rendered) stretching++ else wrapping++
           if (rendered != exported) {
             disagree +=
-              "${def.name} $stated: previewer stretches=$rendered (${widthOf(inColumn, "subject")} of ${widthOf(inColumn, "stage")} dp), export stretches=$exported"
+              "${def.name} $stated: previewer stretches=$rendered ($widths), export stretches=$exported"
           }
         }
       }
@@ -163,23 +175,52 @@ class StretchAgreementTest {
     val stretching = mutableListOf<String>()
     parents.forEach { def ->
       val parent = requiredNode(def, "parent", mutableListOf())
-      fun with(child: JsonObject) =
-        drawn(
-          node("root", "Scaffold", "content" to JsonPrimitive("stage")),
-          node("stage", "Column", "children" to ids("parent")),
-          parent,
-          child,
+      fun withChild(child: JsonObject) =
+        screenWith(
+          nodes =
+            arrayOf(
+              node("root", "Scaffold", "content" to JsonPrimitive("stage")),
+              node("stage", "Column", "children" to ids("parent")),
+              parent,
+              child,
+            ),
         )
-      val probed = with(bar)
-      val control = with(text)
-      val rendered = stretchesInRender(probed, "t1")
+      val probed = withChild(bar)
+      val control = withChild(text)
+      val widths = widthsIn(probed, "t1")
+      val rendered = widths.stretches
       val exported = fillMaxWidths(probed) - fillMaxWidths(control) == 1
       if (rendered) stretching += def.name
       if (rendered != exported) {
-        disagree += "${def.name}: previewer stretches=$rendered, export stretches=$exported"
+        disagree +=
+          "${def.name}: previewer stretches=$rendered ($widths), export stretches=$exported"
       }
     }
     assertEquals(emptyList(), disagree)
     assertTrue("Column" in stretching && "Row" !in stretching, "stretching=$stretching")
+  }
+
+  @Test
+  fun `a prop bound to the data model stretches in the export exactly when it does in the previewer`() {
+    // A vertical divider keeps its width; a horizontal one stretches.
+    listOf(true, false).forEach { vertical ->
+      val proposal =
+        screenWith(
+          dataModel = """{"vertical":$vertical}""",
+          node("root", "Scaffold", "content" to JsonPrimitive("stage")),
+          node("stage", "Column", "children" to ids("subject")),
+          node(
+            "subject",
+            "Divider",
+            "vertical" to JsonObject(mapOf("@path" to JsonPrimitive("/vertical"))),
+          ),
+        )
+      val rendered = widthsIn(proposal, "subject").stretches
+      // The stage Column fills the Scaffold's content with `fillMaxSize()`, so a
+      // `fillMaxWidth()` in the export is the divider's.
+      val exported = fillMaxWidths(proposal) == 1
+      assertEquals(!vertical, rendered, "previewer, vertical=$vertical")
+      assertEquals(rendered, exported, "export, vertical=$vertical")
+    }
   }
 }

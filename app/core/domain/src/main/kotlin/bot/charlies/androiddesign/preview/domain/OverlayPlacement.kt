@@ -15,8 +15,7 @@ class OverlayPlacement(screen: Screen) {
   private val anchored: Map<String, String> = buildMap {
     for (node in screen.components) {
       if (node.component != MENU) continue
-      val anchor = node.props["anchor"] as? JsonPrimitive
-      val anchorId = anchor?.takeIf { it.isString }?.content ?: continue
+      val anchorId = node.stringProp("anchor") ?: continue
       putIfAbsent(anchorId, node.id)
     }
   }
@@ -24,9 +23,7 @@ class OverlayPlacement(screen: Screen) {
   private val splitButtonMenus: Set<String> =
     screen.components
       .filter { it.component == SPLIT_BUTTON }
-      .mapNotNull {
-        (it.props["menu"] as? JsonPrimitive)?.takeIf { menu -> menu.isString }?.content
-      }
+      .mapNotNull { it.stringProp("menu") }
       .toSet()
 
   /** The overlays that draw at screen level, in document order. */
@@ -37,6 +34,10 @@ class OverlayPlacement(screen: Screen) {
 
   /** The id of the menu anchored to [componentId] by `Menu.anchor`, or null. */
   fun menuAt(componentId: String): String? = anchored[componentId]
+
+  /** The string prop [key], or null when it is absent or not a string. */
+  private fun ComponentNode.stringProp(key: String): String? =
+    (props[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
   private fun isBesideComponent(node: ComponentNode): Boolean =
     node.component == MENU && (node.id in anchored.values || node.id in splitButtonMenus)

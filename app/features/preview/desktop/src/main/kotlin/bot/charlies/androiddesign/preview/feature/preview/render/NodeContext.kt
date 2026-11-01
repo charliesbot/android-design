@@ -30,8 +30,6 @@ import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.MaterialShape
-import bot.charlies.androiddesign.preview.model.NumberBounds
-import bot.charlies.androiddesign.preview.model.PropKind
 import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.SizeClass
 import bot.charlies.androiddesign.preview.model.TypeRole
@@ -100,7 +98,7 @@ internal class NodeContext(
    */
   fun number(key: String): Float? {
     val value = props.float(key) ?: return null
-    return boundsOf(key)?.coerce(value.toDouble())?.toFloat() ?: value
+    return def.coerceNumber(key, value.toDouble()).toFloat()
   }
 
   /** A whole-number prop, moved into its bounds like [number]. */
@@ -111,11 +109,6 @@ internal class NodeContext(
 
   /** A whole-number prop with a catalog default: [whole], else the default. */
   fun wholeOrDefault(key: String): Int = numberOrDefault(key).toInt()
-
-  private fun boundsOf(key: String): NumberBounds? =
-    ((def.props + M3ExpressiveCatalog.commonProps).firstOrNull { it.name == key }?.kind
-        as? PropKind.Number)
-      ?.bounds
 
   /** The text style of the `type` prop, else the style's, else [default]. */
   fun textStyle(default: TypeRole): TextStyle = env.typeStyle(typeRole(default))

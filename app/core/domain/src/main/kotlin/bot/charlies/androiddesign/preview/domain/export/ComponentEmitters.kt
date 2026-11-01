@@ -33,10 +33,11 @@ internal fun ScreenEmitter.emitComponent(
   place: Place,
 ): List<Stmt> {
   val menu = placement.menuAt(node.id)?.let(byId::get)
-  // The same rule the previewer uses: the catalog says who stretches and who lets its children.
+  // The same rule the previewer uses: the catalog says who stretches and who lets its children,
+  // read from the props with their bindings resolved against the screen's sample data.
   val fillWidth =
     place.parentStretches &&
-      M3ExpressiveCatalog.find(node.component)?.fillsWidth(props::get) == true
+      M3ExpressiveCatalog.find(node.component)?.fillsWidth { props.sampleValue(it, place) } == true
   val placed = place.copy(fillWidth = fillWidth)
   val own = dispatch(node, props, if (menu != null) placed.copy(parentType = "Box") else placed)
   if (menu == null || menu.id in placedOverlays) return own
@@ -183,7 +184,9 @@ private fun ScreenEmitter.state(
 
 private fun ScreenEmitter.column(p: JsonObject, place: Place): List<Stmt> {
   val scroll =
-    if (p.flag("scroll") == true) "verticalScroll(${file.use(Sym.rememberScrollState)}())" else null
+    if (p.sampleFlag("scroll", place) == true)
+      "verticalScroll(${file.use(Sym.rememberScrollState)}())"
+    else null
   val alignment =
     when (p.literal("horizontalAlignment")) {
       "center" -> "${file.use(Sym.Alignment)}.CenterHorizontally"
@@ -259,8 +262,8 @@ private fun ScreenEmitter.grid(p: JsonObject, place: Place): List<Stmt> {
   file.optIn(Sym.ExperimentalGridApi)
   // `fr` is a member extension of the Grid configuration scope, so it needs no import.
   val config = mutableListOf<Stmt>()
-  val columns = p.number("columns")?.toInt()
-  val minWidth = p.number("minColumnWidth")
+  val columns = p.sampleNumber("Grid", "columns", place)?.toInt()
+  val minWidth = p.sampleNumber("Grid", "minColumnWidth", place)
   when {
     columns != null ->
       config += stmt(Call("repeat", listOf(pos("$columns")), lambda(stmt(Raw("column(1.fr)")))))
@@ -306,7 +309,7 @@ private fun ScreenEmitter.spacer(p: JsonObject, place: Place): List<Stmt> {
 
 private fun ScreenEmitter.divider(p: JsonObject, place: Place): List<Stmt> =
   one(
-    m3(if (p.flag("vertical") == true) "VerticalDivider" else "HorizontalDivider"),
+    m3(if (p.sampleFlag("vertical", place) == true) "VerticalDivider" else "HorizontalDivider"),
     listOf(modifier(place, p)),
   )
 
@@ -857,7 +860,7 @@ private fun ScreenEmitter.buttonGroup(p: JsonObject, place: Place): List<Stmt> {
 
 private fun ScreenEmitter.iconButton(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val defaults = m3("IconButtonDefaults")
-  val toggle = p.flag("toggle") == true
+  val toggle = p.sampleFlag("toggle", place) == true
   val variant = p.choice("IconButton", "variant")
   val callee =
     if (toggle)
@@ -1011,7 +1014,7 @@ private fun ScreenEmitter.floatingActionButton(
 ): List<Stmt> {
   val size = p.choice("FloatingActionButton", "size")
   val label = p.text("label", place)
-  val extended = p.flag("extended") == true && label != null
+  val extended = p.sampleFlag("extended", place) == true && label != null
   val prefix =
     when (size) {
       "small" -> ""
@@ -1166,7 +1169,7 @@ private fun ScreenEmitter.chip(node: ComponentNode, p: JsonObject, place: Place)
 }
 
 private fun ScreenEmitter.chipGroup(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
-  val multi = p.flag("multi") == true
+  val multi = p.sampleFlag("multi", place) == true
   val statements = mutableListOf<Stmt>()
   var inner = place
   if (!multi) {
@@ -1325,13 +1328,15 @@ private fun ScreenEmitter.textField(node: ComponentNode, p: JsonObject, place: P
 
 private fun ScreenEmitter.loadingIndicator(p: JsonObject, place: Place): List<Stmt> {
   expressive()
-  val callee = if (p.flag("contained") == true) "ContainedLoadingIndicator" else "LoadingIndicator"
+  val callee =
+    if (p.sampleFlag("contained", place) == true) "ContainedLoadingIndicator"
+    else "LoadingIndicator"
   return one(m3(callee), listOf(modifier(place, p)))
 }
 
 private fun ScreenEmitter.progressIndicator(p: JsonObject, place: Place): List<Stmt> {
   val circular = p.literal("shape") == "circular"
-  val wavy = p.flag("wavy") == true
+  val wavy = p.sampleFlag("wavy", place) == true
   if (wavy) expressive()
   val callee =
     when {

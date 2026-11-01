@@ -92,6 +92,21 @@ class StretchExportTest {
   }
 
   @Test
+  fun `a bound prop decides by its sample value, as the previewer resolves it`() {
+    fun count(data: String, vararg components: String) =
+      stretches(ExportFixtures.export(*components, dataModel = data))
+    val divider = """{"id":"d","component":"Divider","vertical":{"@path":"/vertical"}}"""
+    // The root column alone is 1; a horizontal divider adds its own.
+    assertEquals(1, count("""{"vertical":true}""", column("d"), divider))
+    assertEquals(2, count("""{"vertical":false}""", column("d"), divider))
+    // A binding that resolves to nothing falls back to the catalog default, a horizontal divider.
+    assertEquals(2, count("""{}""", column("d"), divider))
+    val aligned = """{"id":"t","component":"Text","text":"t","align":{"@path":"/align"}}"""
+    assertEquals(2, count("""{"align":"center"}""", column("t"), aligned))
+    assertEquals(1, count("""{"align":null}""", column("t"), aligned))
+  }
+
+  @Test
   fun `a scaffold stretches its content, but a layout there already fills the screen`() {
     val card =
       ExportFixtures.export(

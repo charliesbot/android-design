@@ -110,5 +110,4 @@ internal fun RenderImage(ctx: NodeContext) {
   )
 }
 
-internal fun NodeContext.imageLook(ambient: Ambient) =
-  Look(ambient.container, ambient.content, a11yRole = "Image")
+internal fun NodeContext.imageLook(ambient: Ambient) = Look(ambient, a11yRole = "Image")
