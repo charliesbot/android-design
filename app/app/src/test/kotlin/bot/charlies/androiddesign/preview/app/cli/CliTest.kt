@@ -215,15 +215,9 @@ class CliTest {
   }
 
   @Test
-  fun `version and catalog print to stdout`() {
+  fun `version prints to stdout`() {
     val version = run("--version")
     assertEquals(ExitCode.OK, version.code)
     assertEquals(AppInfo.VERSION, version.out.trim())
-
-    val catalog = run("catalog")
-    assertEquals(ExitCode.OK, catalog.code)
-    assertTrue("\"protocolVersion\"" in catalog.out)
-    assertTrue("\"Scaffold\"" in catalog.out)
-    assertEquals("", catalog.err)
   }
 }

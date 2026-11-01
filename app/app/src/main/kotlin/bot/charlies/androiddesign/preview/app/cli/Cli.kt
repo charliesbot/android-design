@@ -64,7 +64,7 @@ fun parseArgs(args: List<String>, flags: Set<String>, err: PrintStream): ParsedA
  * `Main.kt`), so it never reaches here; if it does, it prints the usage.
  */
 object Cli {
-  private val commands: List<Command> = listOf(RenderCommand(), ExportCommand, CatalogCommand)
+  private val commands: List<Command> = listOf(RenderCommand(), ExportCommand)
 
   fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
     val first = args.firstOrNull()

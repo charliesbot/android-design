@@ -1,11 +1,14 @@
 package bot.charlies.androiddesign.preview.feature.preview.headless
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.asSkiaBitmap
+import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SkikoComposeUiTest
 import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.text.font.createFontFamilyResolver
 import androidx.compose.ui.unit.Density
 import bot.charlies.androiddesign.preview.feature.preview.nav.ProposalPreview
 import bot.charlies.androiddesign.preview.feature.preview.record.SemanticsIndex
@@ -35,6 +38,14 @@ object HeadlessRenderer {
    * view's dp size in each direction.
    */
   const val DENSITY = 2f
+
+  /**
+   * One font resolver for every render. Each test scene would otherwise build its own, and a new
+   * resolver copies every font it draws with into native memory again: the 15 MB symbols font and
+   * the 4 MB Flex font, on every render. Renders run one at a time (the engine owns global state:
+   * the CLI is sequential and the app's `HeadlessTreeRenderer` holds a lock), so sharing is safe.
+   */
+  private val fontResolver by lazy { createFontFamilyResolver() }
 
   /**
    * Renders [screen] at [view] with a PNG, for the CLI. The back stack is the shortest `navigate`
@@ -103,7 +114,11 @@ object HeadlessRenderer {
     val imageWanted = capture != null
     lateinit var tree: LayoutTree
     test.runTest {
-      setContent { ProposalPreview(host, design, view, recorder = recorder) }
+      setContent {
+        CompositionLocalProvider(LocalFontFamilyResolver provides fontResolver) {
+          ProposalPreview(host, design, view, recorder = recorder)
+        }
+      }
       settle(if (imageWanted) SETTLE_MS else 0)
       replay?.let {
         val time = if (imageWanted) SETTLE_MS else host.timeToAdopt(it)

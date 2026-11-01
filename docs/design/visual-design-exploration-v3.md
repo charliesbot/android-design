@@ -25,15 +25,15 @@ Rejected alternatives:
 ### One iteration
 
 1. The agent edits `design/<slug>.proposal.json` with its normal file tools. Small edits are ordinary file edits, so no patch protocol is needed.
-2. The app watches the file, parses it, and updates Compose state. The window redraws in the next frame.
-3. The agent calls `check_proposal`, which checks every screen at all five views and returns only the errors. It reads a full tree with `get_tree` only where it needs geometry.
+2. The app notices the change, parses and validates it, runs a quick headless pre-check, and updates Compose state. The window then redraws in its next frame.
+3. The agent calls `check_proposal`, which checks every screen at all five views and returns only the errors and a layout summary. It reads a full tree with `get_tree` only where it needs geometry.
 4. The owner looks at the window and replies in chat.
 
 Measured on this Mac with Compose Multiplatform 1.13.0-beta01:
-- A state change reaches the next frame of a live window in 6 to 17 ms, which is one 60 Hz frame.
-- Headless, an update plus a fresh semantics tree takes about 1.5 ms. The first headless render takes 0.9 s.
+- From saving the file to the window adopting it takes about 130 ms warm (median of 10). About 70 ms of that is noticing the change: the watcher polls every 20 ms and waits 50 ms for the writes to settle. About 40 ms is the pre-check. Adopting the new state then reaches the screen in one 60 Hz frame (6 to 17 ms).
+- `check_proposal` takes about 0.2 s for one screen at five views, and `get_tree` about 40 to 100 ms.
 
-Model time writing the edit is the only wait left.
+The tools add about 2.5 s to a typical 160 s agent run; the rest is model time.
 
 ### The app
 
@@ -78,7 +78,7 @@ Proposals are tracked files in the app's repository:
 
 The v2 rule of git-ignoring proposals is gone. Derived data, such as the tree and findings, is never stored.
 
-**`DESIGN.md`** follows Google's format at `version: alpha`, linted with a pinned version of its CLI. The spec allows custom top-level keys, and its linter warns only on near misses of its own key names. Material settings that the spec cannot express go under one custom key, `material:`:
+**`DESIGN.md`** follows Google's format at `version: alpha`. The app parses and validates it itself; Google's lint CLI is not run, because it would bring back the Node tooling v3 removed. The spec allows custom top-level keys, and its linter warns only on near misses of its own key names, so the keys below stay clear of those. Material settings that the spec cannot express go under one custom key, `material:`:
 - **Seed color:** the seed is `colors.primary`, which the linter expects. `material.scheme` names the variant and contrast and refers to the seed as `{colors.primary}`. Explicit role colors in `colors` override generated ones.
 - **Type:** typography uses the spec's `fontVariation` string, for example `"'wght' 500, 'wdth' 100, 'ROND' 100"`. The app parses it into Compose `FontVariation.Settings`.
 - **Corners:** the corner scale uses `rounded`, with Material's names in px read as dp. Corner families and shape-library shapes, which `rounded` cannot hold, go under `material:`.
@@ -105,7 +105,7 @@ material:
 - `navigation`: the start screen, plus each screen's pane role
 - `screens`: one A2UI `createSurface` body per screen, with its components and its sample `dataModel`
 
-The app writes the file back with stable key order and pretty printing, so diffs stay readable.
+The app only reads the proposal; the agent owns the file and writes it one component per line, so diffs stay readable.
 
 ```json
 {
@@ -243,7 +243,11 @@ A view passes when it has no error findings. Intentional truncation is reported 
 
 Export walks the proposal and emits Kotlin with component parameters and modifiers, plus Navigation 3 entries and scene strategies for the graph. Named styles become parameters and modifiers, not the experimental Styles API, which material3 components do not accept yet and which would require an alpha foundation and an opt-in in the target app.
 
-The export is checked in two ways. Golden tests export a two-screen fixture and `evals/verify/verify.proposal.json`, which uses every catalog component, and compare the output byte for byte. Both goldens compile and assemble in a copy of `evals/compose-starter`, the Android sandbox pinned to material3 1.5.0-alpha29, which proves the exported names exist in the Android library and not only on desktop.
+The export is checked in two ways. Golden tests export a two-screen fixture and `evals/verify/verify.proposal.json`, which uses every catalog component, and compare the output byte for byte. Both goldens compile and assemble in a copy of `evals/compose-starter`, the Android sandbox pinned to material3 1.5.0-alpha29, which proves the exported names exist in the Android library and not only on desktop. That compile step is manual, run after changing the exporter.
+
+These checks prove the export is stable and compiles. They do not prove the exported screen looks like the preview: nothing compares the two automatically. Where a prop is omitted, the exporter and the renderer read the same catalog default, which removes one class of drift. The rest is the manual export check in `evals/README.md`, which compares an exported screen with its preview by eye.
+
+**Command line.** The same binary has two subcommands for scripts. `render <proposal.json> --out <dir>` writes headless PNGs, trees, and a `report.json` for the evals. `export <proposal.json>` prints the Kotlin for the export check.
 
 ### Distribution
 

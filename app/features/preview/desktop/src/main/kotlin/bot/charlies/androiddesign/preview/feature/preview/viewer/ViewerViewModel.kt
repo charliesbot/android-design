@@ -9,6 +9,7 @@ import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.firstLine
 import java.nio.file.Path
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -157,8 +158,7 @@ class ViewerViewModel : ViewerActions {
    */
   @Synchronized
   fun frameFailed(error: Throwable) {
-    val reason = error.message?.lineSequence()?.firstOrNull()?.takeIf { it.isNotBlank() }
-    val message = "the window failed to draw the proposal: ${reason ?: error::class.simpleName}"
+    val message = "the window failed to draw the proposal: ${error.firstLine()}"
     mutableState.value =
       mutableState.value.copy(errors = listOf(ValidationError(RENDER_ERROR_PATH, message)))
   }

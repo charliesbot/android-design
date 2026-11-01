@@ -1,5 +1,6 @@
 package bot.charlies.androiddesign.preview.feature.preview.theme
 
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontVariation
@@ -49,11 +50,6 @@ object ProposalFonts {
    * The bytes of a bundled font, read from the classpath once. A font given to Compose by resource
    * name is read and inflated again by every scene that uses it, which for the 15 MB symbols font
    * dominates a headless render; bytes in memory only need copying.
-   *
-   * The font's identity stays its resource name, as it was for a font loaded by name. Compose keys
-   * its typeface cache by identity, weight and style and not by variation settings, so fonts that
-   * differ only in their axes share one typeface. Giving each its own identity would be more exact
-   * and would change the drawn glyphs.
    */
   private fun bytesOf(resource: String): ByteArray =
     files.getOrPut(resource) {
@@ -73,19 +69,8 @@ object ProposalFonts {
     val clamped = weight.coerceIn(WEIGHTS)
     val usable = axes.filter { it.tag != "wght" && it.value.isFinite() }
     return cache.getOrPut(Key(face, clamped, usable)) {
-      FontFamily(
-        Font(
-          identity = face.resource,
-          data = bytesOf(face.resource),
-          weight = FontWeight(clamped),
-          style = FontStyle.Normal,
-          variationSettings =
-            FontVariation.Settings(
-              FontVariation.weight(clamped),
-              *usable.map { FontVariation.Setting(it.tag, it.value) }.toTypedArray(),
-            ),
-        ),
-      )
+      val settings = listOf("wght" to clamped.toFloat()) + usable.map { it.tag to it.value }
+      FontFamily(variableFont(face.resource, clamped, settings))
     }
   }
 
@@ -94,22 +79,42 @@ object ProposalFonts {
     val opticalSize = sizeDp.coerceIn(20, 48)
     return symbolCache.getOrPut(filled to opticalSize) {
       FontFamily(
-        Font(
-          identity = SYMBOLS_RESOURCE,
-          data = bytesOf(SYMBOLS_RESOURCE),
-          weight = FontWeight.Normal,
-          style = FontStyle.Normal,
-          variationSettings =
-            FontVariation.Settings(
-              FontVariation.Setting("FILL", if (filled) 1f else 0f),
-              FontVariation.Setting("GRAD", 0f),
-              FontVariation.Setting("opsz", opticalSize.toFloat()),
-              FontVariation.weight(400),
+        variableFont(
+          SYMBOLS_RESOURCE,
+          weight = 400,
+          settings =
+            listOf(
+              "FILL" to if (filled) 1f else 0f,
+              "GRAD" to 0f,
+              "opsz" to opticalSize.toFloat(),
+              "wght" to 400f,
             ),
         ),
       )
     }
   }
+
+  /**
+   * A font from [resource] with the axes in [settings]. Its identity names those axes: Compose keys
+   * its typeface cache by identity, weight and style and not by variation settings, so two fonts
+   * that differ only in their axes would otherwise share whichever typeface a resolver loaded
+   * first, and which one that is would depend on the order things were drawn in.
+   */
+  private fun variableFont(
+    resource: String,
+    weight: Int,
+    settings: List<Pair<String, Float>>,
+  ): Font =
+    Font(
+      identity = "$resource?" + settings.joinToString("&") { (tag, value) -> "$tag=$value" },
+      data = bytesOf(resource),
+      weight = FontWeight(weight),
+      style = FontStyle.Normal,
+      variationSettings =
+        FontVariation.Settings(
+          *settings.map { (tag, value) -> FontVariation.Setting(tag, value) }.toTypedArray(),
+        ),
+    )
 
   private val AXIS = Regex("""['"]([A-Za-z0-9]{4})['"]\s*(-?\d+(?:\.\d+)?)""")
 

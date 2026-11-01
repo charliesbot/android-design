@@ -42,7 +42,7 @@ Each agent session starts its own app process and window, and the process exits 
 
 ### Other commands
 
-The same binary renders headlessly for scripts and evals: `render <proposal.json> --out <dir>` writes PNGs, layout trees, and a `report.json`; `export <proposal.json>` prints Kotlin; `catalog` prints the component catalog. After changing the app, run `./gradlew build spotlessCheck` in `app/`.
+The same binary renders headlessly for scripts and evals: `render <proposal.json> --out <dir>` writes PNGs, layout trees, and a `report.json`; `export <proposal.json>` prints Kotlin. After changing the app, run `./gradlew build spotlessCheck` in `app/`.
 
 ## Implementing real Compose
 

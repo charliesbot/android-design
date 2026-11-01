@@ -2,11 +2,14 @@ package bot.charlies.androiddesign.preview.feature.preview.render
 
 import androidx.compose.runtime.Composable
 
+/** A float range kept as a concrete class: a generic range cannot be type-checked on read. */
+internal class FloatSpan(val start: Float, val end: Float)
+
 /** A value that lives in the [InteractionState] under this node, starting at the prop's value. */
 internal class LocalValue<T : Any>(val value: T, val set: (T) -> Unit)
 
 @Composable
-internal fun <T : Any> NodeContext.local(key: String, initial: T): LocalValue<T> {
+internal inline fun <reified T : Any> NodeContext.local(key: String, initial: T): LocalValue<T> {
   val stateKey = env.stateKey("$id:$key")
   val interaction = env.host.interaction
   val current: T = interaction.get<T>(stateKey) ?: initial

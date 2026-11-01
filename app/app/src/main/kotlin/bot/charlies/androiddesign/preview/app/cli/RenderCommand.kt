@@ -11,6 +11,7 @@ import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.firstLine
 import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -107,7 +108,7 @@ class RenderCommand(
             png = null,
             tree = null,
             pass = false,
-            failures = listOf("render-error: ${firstLine(e)}"),
+            failures = listOf("render-error: ${e.firstLine()}"),
           )
         }
       Files.write(options.out.resolve("$base.png"), result.png)
@@ -125,11 +126,6 @@ class RenderCommand(
       )
     }
   }
-
-  /** The first line of the message, which is what fits in `report.json` and on a terminal. */
-  private fun firstLine(error: Exception): String =
-    error.message?.lineSequence()?.firstOrNull()?.takeIf { it.isNotBlank() }
-      ?: error::class.simpleName.orEmpty()
 
   private fun failures(tree: LayoutTree): List<String> =
     tree.findings

@@ -96,17 +96,17 @@ internal fun RenderRangeSlider(ctx: NodeContext) {
   val value =
     ctx.local(
       "value",
-      start.coerceIn(range.start, range.endInclusive)..end.coerceIn(
-          range.start,
-          range.endInclusive,
-        ),
+      FloatSpan(
+        start.coerceIn(range.start, range.endInclusive),
+        end.coerceIn(range.start, range.endInclusive),
+      ),
     )
   val kept = value.value
   val low = kept.start.coerceIn(range.start, range.endInclusive)
-  val high = kept.endInclusive.coerceIn(low, range.endInclusive)
+  val high = kept.end.coerceIn(low, range.endInclusive)
   RangeSlider(
     value = low..high,
-    onValueChange = { value.set(it) },
+    onValueChange = { value.set(FloatSpan(it.start, it.endInclusive)) },
     modifier = ctx.modifier(fillWidth = true).then(ctx.describedBy()),
     enabled = ctx.enabled,
     valueRange = range,

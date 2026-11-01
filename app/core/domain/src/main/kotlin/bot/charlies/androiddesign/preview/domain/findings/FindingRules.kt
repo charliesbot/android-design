@@ -14,26 +14,27 @@ import bot.charlies.androiddesign.preview.model.TypeRole
 import kotlin.math.round
 
 /**
- * The checks a rendered view must pass, ported from v2's `runtime-src/checks.js` to the layout
- * tree. [tree] arrives with its nodes and no findings yet. Findings come out in rule order, then in
- * document order.
+ * The checks a rendered view must pass, run over its layout tree: touch targets, fonts, clipped or
+ * truncated text, contrast, a primary action at least as tall as its rivals, one FAB per pane, and
+ * content past the view's edges. [tree] arrives with its nodes and no findings yet. Findings come
+ * out in rule order, then in document order.
  *
  * A node with no area is not laid out (a closed overlay is never composed), so the rules that
  * measure geometry skip it. While a modal sheet or dialog is open, everything outside it is inert
  * behind the scrim: it is exempt from the touch target and contrast rules, and the primary action
- * check is skipped, as in v2.
+ * check is skipped.
  */
 object FindingRules {
-  /** Interactive controls are measured against this touch area (checks.js `MIN_TARGET`). */
+  /** Interactive controls are measured against this touch area. */
   const val MIN_TARGET_DP = 48f
 
-  /** Rounding slack for the touch target (`MIN_TARGET - 0.05`). */
+  /** Rounding slack for the touch target. */
   private const val TARGET_SLACK_DP = 0.05f
 
-  /** The primary may be this much shorter than the tallest action (`vh >= largest.vh - 1`). */
+  /** The primary may be this much shorter than the tallest action. */
   private const val PRIMARY_SLACK_DP = 1f
 
-  /** Slack on the view edges (`width + 1`, `left < -1`). */
+  /** Slack on the view edges. */
   private const val EDGE_SLACK_DP = 1f
 
   private const val MAX_OFFSCREEN = 5
@@ -128,7 +129,7 @@ object FindingRules {
 
   // endregion
 
-  // region touch-target (checks.js 337-357)
+  // region touch-target
 
   private fun touchTargets(view: View): List<Finding> =
     view.nodes
@@ -145,7 +146,7 @@ object FindingRules {
 
   // endregion
 
-  // region font (checks.js 17-24, 406)
+  // region font
 
   private fun fonts(view: View): List<Finding> =
     view.nodes.mapNotNull { node ->
@@ -174,7 +175,7 @@ object FindingRules {
 
   // endregion
 
-  // region text-clipped, text-truncated, label-truncated (checks.js 245-275, 421-426)
+  // region text-clipped, text-truncated, label-truncated
 
   /** Overflow that no ellipsis excuses: glyphs cut off with nothing to say so. */
   private fun clippedText(view: View): List<Finding> =
@@ -211,7 +212,7 @@ object FindingRules {
 
   // endregion
 
-  // region contrast (checks.js 428-435)
+  // region contrast
 
   private fun contrast(view: View): List<Finding> =
     view.nodes
@@ -239,7 +240,7 @@ object FindingRules {
 
   // endregion
 
-  // region primary-largest (checks.js 358-387), per pane
+  // region primary-largest, per pane
 
   private fun primaryLargest(view: View): List<Finding> {
     if (view.modalOpen) return emptyList()
@@ -276,7 +277,7 @@ object FindingRules {
 
   // endregion
 
-  // region one-fab (checks.js 389), per pane
+  // region one-fab, per pane
 
   private fun oneFab(view: View): List<Finding> =
     view.nodes
@@ -292,7 +293,7 @@ object FindingRules {
 
   // endregion
 
-  // region offscreen (checks.js 281-310)
+  // region offscreen
 
   /**
    * Content wider than the view: Android has no horizontal page scroll. A node is flagged when it

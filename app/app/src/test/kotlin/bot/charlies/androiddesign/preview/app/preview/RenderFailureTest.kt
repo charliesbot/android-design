@@ -45,6 +45,7 @@ class RenderFailureTest {
       live: ProposalHostState?,
     ): LayoutTree {
       check(proposal.name != BROKEN) { "cannot measure $screen" }
+      if (proposal.name == BLANK) throw IllegalStateException("")
       val tree = real.render(proposal, design, proposalDir, screen, view, live)
       // A bad value that only some states or sizes draw, as a slider with a reversed range does.
       check(tree.nodes.none { it.text?.value == BAD_TEXT }) {
@@ -130,6 +131,20 @@ class RenderFailureTest {
   }
 
   @Test
+  fun `a failure with a blank message is reported by its class`() = runBlocking {
+    val file = workspace()
+    Files.writeString(
+      file,
+      Files.readString(file).replace("\"name\": \"Tonight's plate\"", "\"name\": \"$BLANK\""),
+    )
+
+    val opened = controller.openProposal(file.toString())
+
+    assertFalse(opened.valid)
+    assertTrue("IllegalStateException" in opened.errors.single().message, opened.errors.toString())
+  }
+
+  @Test
   fun `a bad value inside an overlay the window has open is caught before it is shown`() =
     runBlocking {
       val file = workspace()
@@ -209,6 +224,7 @@ class RenderFailureTest {
 
   private companion object {
     const val BROKEN = "Crash test"
+    const val BLANK = "Blank failure"
     const val BAD_TEXT = "BOOM"
   }
 }

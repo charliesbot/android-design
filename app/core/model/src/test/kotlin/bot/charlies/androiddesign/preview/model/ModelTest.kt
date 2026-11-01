@@ -10,6 +10,14 @@ import kotlinx.serialization.json.doubleOrNull
 
 class ModelTest {
   @Test
+  fun `a failure reads as its first line, or as its class when that line is blank`() {
+    assertEquals("first", IllegalStateException("first\nsecond").firstLine())
+    assertEquals("IllegalStateException", IllegalStateException().firstLine())
+    assertEquals("IllegalStateException", IllegalStateException("").firstLine())
+    assertEquals("IllegalStateException", IllegalStateException("\nsecond").firstLine())
+  }
+
+  @Test
   fun `wire names are the Compose property names`() {
     assertEquals("surfaceContainerHigh", ColorRole.SurfaceContainerHigh.wire)
     assertEquals("displayLargeEmphasized", TypeRole.DisplayLargeEmphasized.wire)

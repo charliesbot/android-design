@@ -36,7 +36,10 @@ class InteractionState {
   private val values = mutableStateMapOf<String, Any>()
   private val overlays = mutableStateMapOf<String, String>()
 
-  @Suppress("UNCHECKED_CAST") operator fun <T : Any> get(key: String): T? = values[key] as T?
+  /** The value kept under [key] when it is a [T]; a value of another type reads as absent. */
+  inline operator fun <reified T : Any> get(key: String): T? = raw(key) as? T
+
+  @PublishedApi internal fun raw(key: String): Any? = values[key]
 
   operator fun set(key: String, value: Any) {
     values[key] = value

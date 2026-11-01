@@ -25,6 +25,7 @@ import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.firstLine
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.CancellationException
@@ -168,7 +169,7 @@ class AppPreviewController(
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        val reason = firstLine(e)
+        val reason = e.firstLine()
         return ViewCheck(pass = false, errors = listOf(CheckError("render-error", detail = reason)))
       }
     val errors =
@@ -284,7 +285,7 @@ class AppPreviewController(
       } catch (e: Exception) {
         ValidationError(
           ViewerViewModel.RENDER_ERROR_PATH,
-          "screen '$screen' failed to render at ${window.view.name}: ${firstLine(e)}",
+          "screen '$screen' failed to render at ${window.view.name}: ${e.firstLine()}",
         )
       }
     return if (failure == null) snapshot else snapshot.copy(errors = listOf(failure))
@@ -302,10 +303,6 @@ class AppPreviewController(
       ?: throw PreviewException(
         "no view '$name'; the views are ${Views.all.joinToString { it.name }}",
       )
-
-  /** The first line of what went wrong, which is enough to point at the failure. */
-  private fun firstLine(e: Exception): String? =
-    e.message?.lineSequence()?.firstOrNull() ?: e::class.simpleName
 
   private fun invalidMessage(errors: List<ValidationError>): String = buildString {
     append("the proposal is invalid; fix these and try again:")
