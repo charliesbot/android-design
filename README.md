@@ -11,52 +11,61 @@ With [Chai](https://github.com/charliesbot/chai), add this repo's `skills` folde
 local = ['~/projects/android-design/skills']
 ```
 
-Chai syncs the whole `skills/` folder, which installs two skills: `android-design` (design judgment for building, refining, and reviewing real Compose) and `android-design-explore` (HTML proposals before implementation, built on `android-design`). Any agent that reads skills can also load `skills/android-design/SKILL.md` and `skills/android-design-explore/SKILL.md` directly.
+Chai syncs the whole `skills/` folder, which installs two skills: `android-design` (design judgment for building, refining, and reviewing real Compose) and `android-design-explore` (proposals in the previewer app before implementation, built on `android-design`). Any agent that reads skills can also load `skills/android-design/SKILL.md` and `skills/android-design-explore/SKILL.md` directly.
 
-## Requirements
+## The previewer app
 
-1. Install Node.js 22+ and Google Chrome for design exploration. Proposals are HTML rendered headlessly by `cli.mjs render`, so no browser tool or server is needed. The installed skill needs no build or `npm install`: it uses the committed proposal runtime in `skills/android-design-explore/gallery/public/runtime/`. Python 3 runs the evals and the source scripts.
+Design exploration runs in a native macOS app in `app/`. The agent writes a proposal as a JSON file (`design/<slug>.proposal.json`, next to the app's `DESIGN.md`), and the app draws it with real Compose Material 3 components in a live window that redraws on every save. The agent checks its work through the app's layout tree over MCP; you judge the design in the window, switching device, light and dark, seed color, and palette style. When you approve a direction, the app exports it as Kotlin for the port.
 
-2. For implementing and reviewing real Compose code, running the evals, and Wear work, install the [Compose preview CLI](https://github.com/yschimke/compose-ai-tools) and the Android SDK:
+### Build and install
 
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/yschimke/skills/main/scripts/install.sh | bash -s -- --cli-only
-   ```
+Needs macOS and JDK 17.
 
-3. Install the [`compose-preview` and `compose-ui-builder` skills](https://github.com/yschimke/skills).
+```bash
+cd app
+./gradlew :app:installApp
+```
 
-4. Check the Compose setup:
+This installs `~/Applications/AndroidDesignPreview.app`. Its binary, `~/Applications/AndroidDesignPreview.app/Contents/MacOS/AndroidDesignPreview`, is what your agent harness runs.
 
-   ```bash
-   compose-preview doctor
-   ```
+To share the app, `./gradlew :app:packageDmg` builds a `.dmg`. It is unsigned and not notarized, so anyone who installs it from the DMG must clear the macOS quarantine flag on the app before its first launch; a quarantined copy started by an agent harness never responds.
 
-### Render and view
+### Register the MCP server
 
-One folder is one proposal. The agent copies `skills/android-design-explore/assets/proposal-starter/` to `<folder>/design-explorations/<slug>/` in the app's folder or any folder (no Git needed), and `node skills/android-design-explore/gallery/cli.mjs render <proposal-folder>` lints it, renders it headlessly in Chrome (no port), and writes `renders/`: screenshots for phone, foldable, tablet, and desktop, a `review.png` (every checked view on one image, for the agent's own review), a `checks.json`, and a self-contained `view.html`. Add `--open` to open `view.html` in your default browser when the render finishes (or double-click it) to switch devices, light and dark, seed colors, and palette. Iteration happens in chat: the agent shows `review.png`, you reply, and it edits and renders the same folder again.
+Register the binary as a stdio MCP server named `android_design_preview`, using its absolute path:
 
-Google Sans Flex is shared with the proposal runtime, including its local font license. The runtime also bundles the optional brand and data faces (Fraunces, Bricolage Grotesque, Big Shoulders Display, Doto, Google Sans Code).
+- **Claude Code:** `claude mcp add --scope user android_design_preview -- <binary>`
+- **Codex:** add a `[mcp_servers.android_design_preview]` table to `~/.codex/config.toml` with `command = "<binary>"` and `default_tools_approval_mode = "approve"`.
+- **Antigravity:** `agy mcp add android_design_preview <binary>`
 
-### Developing the proposal runtime
+Each agent session starts its own app process and window, and the process exits with the session. No port is opened.
 
-The runtime source is in `skills/android-design-explore/gallery/runtime-src/`, built into the committed `skills/android-design-explore/gallery/public/runtime/`. `npm install` is for developing the runtime and running the tests only.
+### Other commands
 
-1. Edit the runtime source.
-2. Run `npm run build` to rebuild the runtime, then `npm test`.
+The same binary renders headlessly for scripts and evals: `render <proposal.json> --out <dir>` writes PNGs, layout trees, and a `report.json`; `export <proposal.json>` prints Kotlin. After changing the app, run `./gradlew build spotlessCheck` in `app/`.
 
-What the runtime contains and how its rule checker works: [`docs/proposal-runtime.md`](docs/proposal-runtime.md).
+## Implementing real Compose
+
+For implementing and reviewing real Compose code, running the export check, and Wear work, install the [Compose preview CLI](https://github.com/yschimke/compose-ai-tools) and the Android SDK:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yschimke/skills/main/scripts/install.sh | bash -s -- --cli-only
+```
+
+Then install the [`compose-preview` and `compose-ui-builder` skills](https://github.com/yschimke/skills) and check the setup with `compose-preview doctor`. Python 3 runs the evals and the source scripts.
 
 ## What is here
 
 | Path | Job |
 | --- | --- |
 | `skills/android-design/` | The design judgment skill |
-| `skills/android-design-explore/` | The exploration skill: HTML proposals, render and view tooling, and the Compose porting table |
+| `skills/android-design-explore/` | The exploration skill: the proposal workflow, the proposal format, and the Compose porting table |
+| `app/` | The previewer app: live window, MCP server, headless renderer, and Kotlin export. `app/schemas/` holds the generated catalog and proposal schemas |
 | `docs/research/` | Distilled research from m3.material.io, developer.android.com/design/ui, and official videos and articles |
 | `docs/research/source-coverage.md` | Every official source page and whether its guidance reached the research |
-| `evals/` | Headless agents build four phone briefs, and the renders are checked against the skill's rules. `evals/compose-starter/` is the Compose sandbox and `evals/verify/` the component verify page for the manual port check |
+| `evals/` | Headless agents build four phone briefs, and the renders are checked against the skill's rules. `evals/compose-starter/` is the Compose sandbox for the manual export check, and `evals/verify/verify.proposal.json` uses every catalog component |
 | `sources/` | Every official source page as Markdown, fetched by `scripts/fetch.py` |
-| `scripts/` | `fetch.py` refreshes `sources/`; `check_coverage.py` checks it against the coverage ledger |
+| `scripts/` | `fetch.py` refreshes `sources/`; `check_coverage.py` checks it against the coverage ledger; `material3_inventory.py` lists the material3 names `compose-mapping.md` may use |
 
 ## History
 

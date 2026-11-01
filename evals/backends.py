@@ -1,22 +1,35 @@
-"""Optional CLI adapters. Evaluation artifacts do not depend on these launchers."""
+"""Optional CLI adapters. Evaluation artifacts do not depend on these launchers.
+
+A generator reaches the previewer app over MCP, registered as `android_design_preview` for that one run only. A judge
+never sees the app.
+"""
 import json
 from pathlib import Path
 import subprocess
 import tempfile
 
+from preview_app import SERVER_NAME
+
 BACKENDS = ('claude', 'codex')
 
 
-def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, timeout=3600):
+def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, timeout=3600, mcp_binary=None):
     if backend not in BACKENDS:
         raise ValueError(f'Unknown backend: {backend}')
     if role not in ('generator', 'judge'):
         raise ValueError(f'Unknown role: {role}')
+    if role == 'generator' and not mcp_binary:
+        raise ValueError('A generator needs mcp_binary, the previewer app it designs with')
     with tempfile.TemporaryDirectory(prefix='android-design-backend-') as temporary:
         temporary = Path(temporary)
         final = temporary / 'final.txt'
         if backend == 'claude':
             command = ['claude', '-p', '--output-format', 'json']
+            if role == 'generator':
+                config = temporary / 'mcp.json'
+                config.write_text(json.dumps({'mcpServers': {SERVER_NAME: {'command': str(mcp_binary), 'args': []}}}))
+                command += ['--mcp-config', str(config), '--strict-mcp-config',
+                            '--allowedTools', f'mcp__{SERVER_NAME}__*']
             if role == 'judge':
                 command += ['--tools', 'Read', '--allowedTools', 'Read']
                 for folder in sorted({str(Path(p).resolve().parent) for p in images}):
@@ -27,6 +40,10 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
             command = ['codex', 'exec', '--skip-git-repo-check',
                        '--sandbox', 'read-only' if role == 'judge' else 'workspace-write',
                        '--output-last-message', str(final)]
+            if role == 'generator':
+                command += ['-c', f'mcp_servers.{SERVER_NAME}.command={json.dumps(str(mcp_binary))}',
+                            '-c', f'mcp_servers.{SERVER_NAME}.args=[]',
+                            '-c', f'mcp_servers.{SERVER_NAME}.default_tools_approval_mode="approve"']
             for image in images:
                 command += ['--image', str(Path(image).resolve())]
             if schema:

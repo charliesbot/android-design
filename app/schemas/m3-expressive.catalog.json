@@ -1,0 +1,2504 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/charliesbot/android-design/main/app/schemas/m3-expressive.catalog.json",
+  "protocolVersion": "1.0",
+  "title": "Material 3 Expressive for Android",
+  "description": "Material 3 Expressive components that map one to one onto Jetpack Compose material3.",
+  "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+  "instructions": "Design guidelines for the m3-expressive catalog.\n\n1. Every prop that names a color, type, shape or spacing takes a token name, never a hex value or a raw dimension. Use a `style` from the design system's `material.styles` to bundle tokens.\n2. Components reference children by id. Named slots (`topBar`, `content`, `floatingActionButton`) take one id; lists (`children`, `actions`, `items`) take an array of ids.\n3. A screen is a flat component list with exactly one `root`. Overlays (`BottomSheet`, `Dialog`, `Menu`) stay closed until an `open` action names them.\n4. Interaction is renderer-only: `navigate`, `back`, `open` and `dismiss`. Event actions do not exist.\n5. Mark the screen's main action with `primary: true` on one component, and give every icon-only control a `contentDescription`.\n6. Use `showIn` and `sizeClass` to adapt a component at 600 dp (medium) and 840 dp (expanded).",
+  "components": {
+    "Column": {
+      "type": "object",
+      "description": "Arranges children vertically.",
+      "x-compose": "Column",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Column"
+        },
+        "children": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList"
+        },
+        "spacing": {
+          "type": "string",
+          "x-token": "spacing",
+          "description": "Gap between children (Arrangement.spacedBy). A name from the design system's spacing scale (default: none, xxs, xs, sm, md, lg, xl, xxl, xxxl)."
+        },
+        "horizontalAlignment": {
+          "type": "string",
+          "enum": [
+            "start",
+            "center",
+            "end"
+          ],
+          "default": "start"
+        },
+        "arrangement": {
+          "type": "string",
+          "enum": [
+            "start",
+            "center",
+            "end",
+            "spaceBetween",
+            "spaceAround",
+            "spaceEvenly"
+          ],
+          "default": "start"
+        },
+        "scroll": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Makes the column vertically scrollable.",
+          "default": false
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Row": {
+      "type": "object",
+      "description": "Arranges children horizontally.",
+      "x-compose": "Row",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Row"
+        },
+        "children": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList"
+        },
+        "spacing": {
+          "type": "string",
+          "x-token": "spacing",
+          "description": "Gap between children (Arrangement.spacedBy). A name from the design system's spacing scale (default: none, xxs, xs, sm, md, lg, xl, xxl, xxxl)."
+        },
+        "verticalAlignment": {
+          "type": "string",
+          "enum": [
+            "top",
+            "center",
+            "bottom"
+          ],
+          "default": "top"
+        },
+        "arrangement": {
+          "type": "string",
+          "enum": [
+            "start",
+            "center",
+            "end",
+            "spaceBetween",
+            "spaceAround",
+            "spaceEvenly"
+          ],
+          "default": "start"
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Box": {
+      "type": "object",
+      "description": "Stacks children on top of each other.",
+      "x-compose": "Box",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Box"
+        },
+        "children": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList"
+        },
+        "contentAlignment": {
+          "type": "string",
+          "enum": [
+            "topStart",
+            "topCenter",
+            "topEnd",
+            "centerStart",
+            "center",
+            "centerEnd",
+            "bottomStart",
+            "bottomCenter",
+            "bottomEnd"
+          ],
+          "default": "topStart"
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Grid": {
+      "type": "object",
+      "description": "Lays children out in a grid with a column count or a minimum column width.",
+      "x-compose": "Grid (experimental Compose Grid)",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Grid"
+        },
+        "children": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList"
+        },
+        "columns": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
+          "description": "Fixed column count. Must be a whole number from 1 to 24."
+        },
+        "minColumnWidth": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
+          "description": "Minimum column width in dp; columns fill the width. Must be a number from 1 to 1000."
+        },
+        "spacing": {
+          "type": "string",
+          "x-token": "spacing",
+          "description": "Gap between cells. A name from the design system's spacing scale (default: none, xxs, xs, sm, md, lg, xl, xxl, xxxl)."
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "FlexBox": {
+      "type": "object",
+      "description": "Lays children out in a row that wraps.",
+      "x-compose": "FlexBox (experimental Compose FlexBox)",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "FlexBox"
+        },
+        "children": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList"
+        },
+        "wrap": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        },
+        "gap": {
+          "type": "string",
+          "x-token": "spacing",
+          "description": "A name from the design system's spacing scale (default: none, xxs, xs, sm, md, lg, xl, xxl, xxxl)."
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Spacer": {
+      "type": "object",
+      "description": "Empty space.",
+      "x-compose": "Spacer",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Spacer"
+        },
+        "width": {
+          "type": "string",
+          "x-token": "spacing",
+          "description": "A name from the design system's spacing scale (default: none, xxs, xs, sm, md, lg, xl, xxl, xxxl)."
+        },
+        "height": {
+          "type": "string",
+          "x-token": "spacing",
+          "description": "A name from the design system's spacing scale (default: none, xxs, xs, sm, md, lg, xl, xxl, xxxl)."
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Divider": {
+      "type": "object",
+      "description": "A thin separating line.",
+      "x-compose": "HorizontalDivider, VerticalDivider",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Divider"
+        },
+        "vertical": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Shape": {
+      "type": "object",
+      "description": "Clips its child to a MaterialShapes polygon.",
+      "x-compose": "Modifier.clip(MaterialShapes.<Shape>.toShape())",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Shape"
+        },
+        "shape": {
+          "type": "string",
+          "enum": [
+            "circle",
+            "square",
+            "slanted",
+            "arch",
+            "fan",
+            "arrow",
+            "semiCircle",
+            "oval",
+            "pill",
+            "triangle",
+            "diamond",
+            "clamShell",
+            "pentagon",
+            "gem",
+            "sunny",
+            "verySunny",
+            "cookie4Sided",
+            "cookie6Sided",
+            "cookie7Sided",
+            "cookie9Sided",
+            "cookie12Sided",
+            "ghostish",
+            "clover4Leaf",
+            "clover8Leaf",
+            "burst",
+            "softBurst",
+            "boom",
+            "softBoom",
+            "flower",
+            "puffy",
+            "puffyDiamond",
+            "pixelCircle",
+            "pixelTriangle",
+            "bun",
+            "heart"
+          ]
+        },
+        "content": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child"
+        },
+        "color": {
+          "$ref": "#/$defs/ColorRole",
+          "description": "Fill behind the child."
+        }
+      },
+      "required": [
+        "component",
+        "shape",
+        "content"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Text": {
+      "type": "object",
+      "description": "A run of text in a type role.",
+      "x-compose": "Text",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Text"
+        },
+        "text": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "type": {
+          "$ref": "#/$defs/TypeRole"
+        },
+        "color": {
+          "$ref": "#/$defs/ColorRole",
+          "description": "Content color role."
+        },
+        "maxLines": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
+          "description": "Must be a whole number from 1 to 100."
+        },
+        "overflow": {
+          "type": "string",
+          "enum": [
+            "ellipsis",
+            "clip"
+          ],
+          "default": "clip"
+        },
+        "align": {
+          "type": "string",
+          "enum": [
+            "start",
+            "center",
+            "end"
+          ]
+        }
+      },
+      "required": [
+        "component",
+        "text"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Icon": {
+      "type": "object",
+      "description": "A Material Symbols icon (Rounded, weight 400, grade 0).",
+      "x-compose": "Icon",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Icon"
+        },
+        "name": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "size": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
+          "description": "Size in dp. Must be a number from 1 to 512.",
+          "default": 24
+        },
+        "color": {
+          "$ref": "#/$defs/ColorRole",
+          "description": "Content color role."
+        },
+        "filled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Fill 1 instead of Fill 0.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        }
+      },
+      "required": [
+        "component",
+        "name"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Image": {
+      "type": "object",
+      "description": "A bitmap from a file next to the proposal or a data URI.",
+      "x-compose": "Image",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Image"
+        },
+        "src": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Path relative to the proposal, or a data: URI."
+        },
+        "fit": {
+          "type": "string",
+          "enum": [
+            "crop",
+            "fit",
+            "fillBounds",
+            "fillWidth",
+            "fillHeight",
+            "inside"
+          ],
+          "default": "fit"
+        },
+        "shape": {
+          "$ref": "#/$defs/ShapeValue"
+        },
+        "aspectRatio": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
+          "description": "Width divided by height. Must be a number from 0.1 to 10."
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        }
+      },
+      "required": [
+        "component",
+        "src"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Scaffold": {
+      "type": "object",
+      "description": "The screen frame: bars, floating action button and content.",
+      "x-compose": "Scaffold",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Scaffold"
+        },
+        "topBar": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
+          "x-allowedComponents": [
+            "TopAppBar"
+          ]
+        },
+        "bottomBar": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
+          "x-allowedComponents": [
+            "NavigationBar",
+            "FloatingToolbar"
+          ]
+        },
+        "floatingActionButton": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
+          "x-allowedComponents": [
+            "FloatingActionButton",
+            "FabMenu"
+          ]
+        },
+        "content": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child"
+        },
+        "navigationRail": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
+          "x-allowedComponents": [
+            "NavigationRail"
+          ]
+        }
+      },
+      "required": [
+        "component",
+        "content"
+      ],
+      "unevaluatedProperties": false
+    },
+    "TopAppBar": {
+      "type": "object",
+      "description": "The screen's top bar.",
+      "x-compose": "TopAppBar, CenterAlignedTopAppBar, MediumFlexibleTopAppBar, LargeFlexibleTopAppBar",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "TopAppBar"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "small",
+            "center",
+            "medium",
+            "large"
+          ],
+          "default": "small"
+        },
+        "title": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "subtitle": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "navigationIcon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
+          "x-allowedComponents": [
+            "IconButton"
+          ]
+        },
+        "actions": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
+          "x-allowedComponents": [
+            "IconButton"
+          ]
+        }
+      },
+      "required": [
+        "component",
+        "title"
+      ],
+      "unevaluatedProperties": false
+    },
+    "NavigationBar": {
+      "type": "object",
+      "description": "Bottom navigation for compact windows.",
+      "x-compose": "ShortNavigationBar",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "NavigationBar"
+        },
+        "children": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
+          "x-allowedComponents": [
+            "NavigationBarItem"
+          ]
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "NavigationBarItem": {
+      "type": "object",
+      "description": "One destination of a NavigationBar.",
+      "x-compose": "ShortNavigationBarItem",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "NavigationBarItem"
+        },
+        "label": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "selectedIcon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "selected": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        }
+      },
+      "required": [
+        "component",
+        "label",
+        "icon"
+      ],
+      "unevaluatedProperties": false
+    },
+    "NavigationRail": {
+      "type": "object",
+      "description": "Side navigation for medium and expanded windows.",
+      "x-compose": "WideNavigationRail",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "NavigationRail"
+        },
+        "children": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
+          "x-allowedComponents": [
+            "NavigationRailItem"
+          ]
+        },
+        "expanded": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "NavigationRailItem": {
+      "type": "object",
+      "description": "One destination of a NavigationRail.",
+      "x-compose": "WideNavigationRailItem",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "NavigationRailItem"
+        },
+        "label": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "selectedIcon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "selected": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        }
+      },
+      "required": [
+        "component",
+        "label",
+        "icon"
+      ],
+      "unevaluatedProperties": false
+    },
+    "FloatingToolbar": {
+      "type": "object",
+      "description": "A floating toolbar of actions.",
+      "x-compose": "HorizontalFloatingToolbar, VerticalFloatingToolbar",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "FloatingToolbar"
+        },
+        "orientation": {
+          "type": "string",
+          "enum": [
+            "horizontal",
+            "vertical"
+          ],
+          "default": "horizontal"
+        },
+        "colors": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "vibrant"
+          ],
+          "default": "standard"
+        },
+        "children": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList"
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Card": {
+      "type": "object",
+      "description": "A container for related content.",
+      "x-compose": "Card, ElevatedCard, OutlinedCard",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Card"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "filled",
+            "elevated",
+            "outlined"
+          ],
+          "default": "filled"
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "shape": {
+          "$ref": "#/$defs/ShapeValue"
+        },
+        "content": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList"
+        }
+      },
+      "required": [
+        "component",
+        "content"
+      ],
+      "unevaluatedProperties": false
+    },
+    "List": {
+      "type": "object",
+      "description": "A list of ListItems.",
+      "x-compose": "Column of ListItem, or of SegmentedListItem for the segmented variant",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "List"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "segmented"
+          ],
+          "default": "standard"
+        },
+        "children": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
+          "x-allowedComponents": [
+            "ListItem"
+          ]
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "ListItem": {
+      "type": "object",
+      "description": "A row with a headline and optional supporting content.",
+      "x-compose": "ListItem, SegmentedListItem",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "ListItem"
+        },
+        "overline": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "headline": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "supporting": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "leading": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child"
+        },
+        "trailing": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child"
+        },
+        "selected": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        }
+      },
+      "required": [
+        "component",
+        "headline"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Button": {
+      "type": "object",
+      "description": "A button.",
+      "x-compose": "Button, FilledTonalButton, ElevatedButton, OutlinedButton, TextButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Button"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "filled",
+            "tonal",
+            "elevated",
+            "outlined",
+            "text"
+          ],
+          "default": "filled"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "extra-small",
+            "small",
+            "medium",
+            "large",
+            "extra-large"
+          ],
+          "default": "small"
+        },
+        "shape": {
+          "type": "string",
+          "enum": [
+            "round",
+            "square"
+          ],
+          "default": "round"
+        },
+        "label": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "ToggleButton": {
+      "type": "object",
+      "description": "A button with an on and off state.",
+      "x-compose": "ToggleButton, FilledTonalToggleButton, ElevatedToggleButton, OutlinedToggleButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "ToggleButton"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "filled",
+            "tonal",
+            "elevated",
+            "outlined"
+          ],
+          "default": "filled"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "extra-small",
+            "small",
+            "medium",
+            "large",
+            "extra-large"
+          ],
+          "default": "small"
+        },
+        "checked": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "label": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "ButtonGroup": {
+      "type": "object",
+      "description": "Buttons laid out as one group.",
+      "x-compose": "ButtonGroup, or a Row of toggle buttons with ButtonGroupDefaults.connected shapes",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "ButtonGroup"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "connected"
+          ],
+          "default": "standard"
+        },
+        "children": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
+          "x-allowedComponents": [
+            "Button",
+            "ToggleButton",
+            "IconButton"
+          ]
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "IconButton": {
+      "type": "object",
+      "description": "A button that shows only an icon.",
+      "x-compose": "IconButton, FilledIconButton, FilledTonalIconButton, OutlinedIconButton, IconToggleButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "IconButton"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "filled",
+            "tonal",
+            "outlined"
+          ],
+          "default": "standard"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "extra-small",
+            "small",
+            "medium",
+            "large",
+            "extra-large"
+          ],
+          "default": "small"
+        },
+        "width": {
+          "type": "string",
+          "enum": [
+            "narrow",
+            "uniform",
+            "wide"
+          ],
+          "default": "uniform"
+        },
+        "icon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "toggle": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Makes the button a toggle.",
+          "default": false
+        },
+        "checked": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "State of a toggle.",
+          "default": false
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "icon"
+      ],
+      "unevaluatedProperties": false
+    },
+    "SplitButton": {
+      "type": "object",
+      "description": "A button with a leading action and a trailing menu.",
+      "x-compose": "SplitButtonLayout with SplitButtonDefaults.LeadingButton and TrailingButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "SplitButton"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "filled",
+            "tonal",
+            "elevated",
+            "outlined"
+          ],
+          "default": "filled"
+        },
+        "label": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "menu": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
+          "x-allowedComponents": [
+            "Menu"
+          ]
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "FloatingActionButton": {
+      "type": "object",
+      "description": "The screen's floating action button.",
+      "x-compose": "FloatingActionButton, MediumFloatingActionButton, LargeFloatingActionButton, ExtendedFloatingActionButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "FloatingActionButton"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large"
+          ],
+          "default": "small"
+        },
+        "extended": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "color": {
+          "type": "string",
+          "enum": [
+            "primary-container",
+            "primary",
+            "secondary-container",
+            "secondary",
+            "tertiary-container",
+            "tertiary",
+            "surface"
+          ],
+          "default": "primary-container"
+        },
+        "icon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "label": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "icon"
+      ],
+      "unevaluatedProperties": false
+    },
+    "FabMenu": {
+      "type": "object",
+      "description": "A floating action button that expands into a menu of actions.",
+      "x-compose": "FloatingActionButtonMenu with ToggleFloatingActionButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "FabMenu"
+        },
+        "icon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "expanded": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Shows the menu open.",
+          "default": false
+        },
+        "children": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
+          "x-allowedComponents": [
+            "FabMenuItem"
+          ]
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "icon",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "FabMenuItem": {
+      "type": "object",
+      "description": "One action of a FabMenu.",
+      "x-compose": "FloatingActionButtonMenuItem",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "FabMenuItem"
+        },
+        "label": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        }
+      },
+      "required": [
+        "component",
+        "label",
+        "icon"
+      ],
+      "unevaluatedProperties": false
+    },
+    "AssistChip": {
+      "type": "object",
+      "description": "A chip that starts a smart or automated action.",
+      "x-compose": "AssistChip, ElevatedAssistChip",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "AssistChip"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "outlined",
+            "elevated"
+          ],
+          "default": "outlined"
+        },
+        "label": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "FilterChip": {
+      "type": "object",
+      "description": "A chip that toggles a filter.",
+      "x-compose": "FilterChip, ElevatedFilterChip",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "FilterChip"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "outlined",
+            "elevated"
+          ],
+          "default": "outlined"
+        },
+        "label": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "selected": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "InputChip": {
+      "type": "object",
+      "description": "A chip that represents user input.",
+      "x-compose": "InputChip",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "InputChip"
+        },
+        "label": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "selected": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "SuggestionChip": {
+      "type": "object",
+      "description": "A chip that offers a suggestion.",
+      "x-compose": "SuggestionChip, ElevatedSuggestionChip",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "SuggestionChip"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "outlined",
+            "elevated"
+          ],
+          "default": "outlined"
+        },
+        "label": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "ChipGroup": {
+      "type": "object",
+      "description": "Chips laid out as one group.",
+      "x-compose": "Row with FilterChipDefaults.horizontalArrangement",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "ChipGroup"
+        },
+        "children": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
+          "x-allowedComponents": [
+            "AssistChip",
+            "FilterChip",
+            "InputChip",
+            "SuggestionChip"
+          ]
+        },
+        "multi": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Allows more than one selected chip.",
+          "default": false
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Switch": {
+      "type": "object",
+      "description": "An on and off switch.",
+      "x-compose": "Switch",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Switch"
+        },
+        "checked": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Checkbox": {
+      "type": "object",
+      "description": "A checkbox with an optional label.",
+      "x-compose": "Checkbox",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Checkbox"
+        },
+        "checked": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "label": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Slider": {
+      "type": "object",
+      "description": "Picks one value from a range.",
+      "x-compose": "Slider",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Slider"
+        },
+        "value": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
+          "description": "Current value."
+        },
+        "range": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "[min, max]; [0, 1] by default."
+        },
+        "steps": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
+          "description": "Must be a whole number from 0 to 100.",
+          "default": 0
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "RangeSlider": {
+      "type": "object",
+      "description": "Picks a start and an end value from a range.",
+      "x-compose": "RangeSlider",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "RangeSlider"
+        },
+        "value": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "[start, end]."
+        },
+        "range": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "[min, max]; [0, 1] by default."
+        },
+        "steps": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
+          "description": "Must be a whole number from 0 to 100.",
+          "default": 0
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "TextField": {
+      "type": "object",
+      "description": "A text input.",
+      "x-compose": "TextField, OutlinedTextField",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "TextField"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "filled",
+            "outlined"
+          ],
+          "default": "filled"
+        },
+        "label": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "placeholder": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "value": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "supporting": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "error": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "leadingIcon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "trailingIcon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "prefix": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "lines": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
+          "description": "Must be a whole number from 1 to 20.",
+          "default": 1
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "LoadingIndicator": {
+      "type": "object",
+      "description": "An expressive indeterminate loading indicator.",
+      "x-compose": "LoadingIndicator, ContainedLoadingIndicator",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "LoadingIndicator"
+        },
+        "contained": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "ProgressIndicator": {
+      "type": "object",
+      "description": "A linear or circular progress indicator; indeterminate when progress is absent.",
+      "x-compose": "LinearProgressIndicator, CircularProgressIndicator, and the Wavy variants",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "ProgressIndicator"
+        },
+        "shape": {
+          "type": "string",
+          "enum": [
+            "linear",
+            "circular"
+          ],
+          "default": "linear"
+        },
+        "wavy": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "progress": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
+          "description": "Completed fraction. Must be a number from 0 to 1."
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "BottomSheet": {
+      "type": "object",
+      "description": "A modal sheet from the bottom edge, with a drag handle.",
+      "x-compose": "ModalBottomSheet with BottomSheetDefaults.DragHandle",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "BottomSheet"
+        },
+        "content": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList"
+        }
+      },
+      "required": [
+        "component",
+        "content"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Dialog": {
+      "type": "object",
+      "description": "A modal dialog.",
+      "x-compose": "AlertDialog",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Dialog"
+        },
+        "title": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "text": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "confirm": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
+          "x-allowedComponents": [
+            "Button"
+          ]
+        },
+        "dismiss": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
+          "x-allowedComponents": [
+            "Button"
+          ]
+        }
+      },
+      "required": [
+        "component",
+        "title"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Menu": {
+      "type": "object",
+      "description": "A popup menu anchored to a component.",
+      "x-compose": "DropdownMenuPopup with DropdownMenuGroup and DropdownMenuItem",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Menu"
+        },
+        "anchor": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child"
+        },
+        "items": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
+          "x-allowedComponents": [
+            "MenuItem"
+          ]
+        }
+      },
+      "required": [
+        "component",
+        "items"
+      ],
+      "unevaluatedProperties": false
+    },
+    "MenuItem": {
+      "type": "object",
+      "description": "One entry of a Menu.",
+      "x-compose": "DropdownMenuItem",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "MenuItem"
+        },
+        "label": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        }
+      },
+      "required": [
+        "component",
+        "label"
+      ],
+      "unevaluatedProperties": false
+    }
+  },
+  "functions": {
+    "navigate": {
+      "type": "object",
+      "description": "Opens the screen with this id.",
+      "returnType": "void",
+      "properties": {
+        "@call": {
+          "const": "navigate"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "screen": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "screen"
+          ],
+          "unevaluatedProperties": false
+        }
+      },
+      "required": [
+        "@call",
+        "args"
+      ]
+    },
+    "back": {
+      "type": "object",
+      "description": "Goes back one screen.",
+      "returnType": "void",
+      "properties": {
+        "@call": {
+          "const": "back"
+        }
+      },
+      "required": [
+        "@call"
+      ]
+    },
+    "open": {
+      "type": "object",
+      "description": "Opens a BottomSheet, Dialog or Menu of the same screen by id.",
+      "returnType": "void",
+      "properties": {
+        "@call": {
+          "const": "open"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "overlay": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "overlay"
+          ],
+          "unevaluatedProperties": false
+        }
+      },
+      "required": [
+        "@call",
+        "args"
+      ]
+    },
+    "dismiss": {
+      "type": "object",
+      "description": "Closes the open overlay.",
+      "returnType": "void",
+      "properties": {
+        "@call": {
+          "const": "dismiss"
+        }
+      },
+      "required": [
+        "@call"
+      ]
+    }
+  },
+  "$defs": {
+    "anyComponent": {
+      "oneOf": [
+        {
+          "$ref": "#/components/Column"
+        },
+        {
+          "$ref": "#/components/Row"
+        },
+        {
+          "$ref": "#/components/Box"
+        },
+        {
+          "$ref": "#/components/Grid"
+        },
+        {
+          "$ref": "#/components/FlexBox"
+        },
+        {
+          "$ref": "#/components/Spacer"
+        },
+        {
+          "$ref": "#/components/Divider"
+        },
+        {
+          "$ref": "#/components/Shape"
+        },
+        {
+          "$ref": "#/components/Text"
+        },
+        {
+          "$ref": "#/components/Icon"
+        },
+        {
+          "$ref": "#/components/Image"
+        },
+        {
+          "$ref": "#/components/Scaffold"
+        },
+        {
+          "$ref": "#/components/TopAppBar"
+        },
+        {
+          "$ref": "#/components/NavigationBar"
+        },
+        {
+          "$ref": "#/components/NavigationBarItem"
+        },
+        {
+          "$ref": "#/components/NavigationRail"
+        },
+        {
+          "$ref": "#/components/NavigationRailItem"
+        },
+        {
+          "$ref": "#/components/FloatingToolbar"
+        },
+        {
+          "$ref": "#/components/Card"
+        },
+        {
+          "$ref": "#/components/List"
+        },
+        {
+          "$ref": "#/components/ListItem"
+        },
+        {
+          "$ref": "#/components/Button"
+        },
+        {
+          "$ref": "#/components/ToggleButton"
+        },
+        {
+          "$ref": "#/components/ButtonGroup"
+        },
+        {
+          "$ref": "#/components/IconButton"
+        },
+        {
+          "$ref": "#/components/SplitButton"
+        },
+        {
+          "$ref": "#/components/FloatingActionButton"
+        },
+        {
+          "$ref": "#/components/FabMenu"
+        },
+        {
+          "$ref": "#/components/FabMenuItem"
+        },
+        {
+          "$ref": "#/components/AssistChip"
+        },
+        {
+          "$ref": "#/components/FilterChip"
+        },
+        {
+          "$ref": "#/components/InputChip"
+        },
+        {
+          "$ref": "#/components/SuggestionChip"
+        },
+        {
+          "$ref": "#/components/ChipGroup"
+        },
+        {
+          "$ref": "#/components/Switch"
+        },
+        {
+          "$ref": "#/components/Checkbox"
+        },
+        {
+          "$ref": "#/components/Slider"
+        },
+        {
+          "$ref": "#/components/RangeSlider"
+        },
+        {
+          "$ref": "#/components/TextField"
+        },
+        {
+          "$ref": "#/components/LoadingIndicator"
+        },
+        {
+          "$ref": "#/components/ProgressIndicator"
+        },
+        {
+          "$ref": "#/components/BottomSheet"
+        },
+        {
+          "$ref": "#/components/Dialog"
+        },
+        {
+          "$ref": "#/components/Menu"
+        },
+        {
+          "$ref": "#/components/MenuItem"
+        }
+      ],
+      "discriminator": {
+        "propertyName": "component"
+      }
+    },
+    "anyFunction": {
+      "oneOf": [
+        {
+          "$ref": "#/functions/navigate"
+        },
+        {
+          "$ref": "#/functions/back"
+        },
+        {
+          "$ref": "#/functions/open"
+        },
+        {
+          "$ref": "#/functions/dismiss"
+        }
+      ]
+    },
+    "Action": {
+      "description": "A renderer-side function call. Event actions are not supported.",
+      "type": "object",
+      "properties": {
+        "functionCall": {
+          "$ref": "#/$defs/anyFunction"
+        }
+      },
+      "required": [
+        "functionCall"
+      ],
+      "additionalProperties": false
+    },
+    "ComponentCommon": {
+      "type": "object",
+      "description": "Props every component accepts.",
+      "properties": {
+        "id": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ComponentId"
+        },
+        "showIn": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SizeClass"
+          },
+          "description": "Size classes the component shows in; all by default."
+        },
+        "sizeClass": {
+          "type": "object",
+          "description": "Prop overrides per size class (medium 600 to 839 dp, expanded 840 dp and up).",
+          "properties": {
+            "medium": {
+              "type": "object"
+            },
+            "expanded": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        },
+        "style": {
+          "type": "string",
+          "description": "A style name from material.styles."
+        },
+        "weight": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
+          "description": "Relative weight inside a Row or Column. Must be a number from 0.01 to 100."
+        },
+        "padding": {
+          "type": "string",
+          "x-token": "spacing",
+          "description": "Padding around the component. A name from the design system's spacing scale (default: none, xxs, xs, sm, md, lg, xl, xxl, xxxl)."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "ColorRole": {
+      "type": "string",
+      "description": "A ColorScheme role.",
+      "enum": [
+        "primary",
+        "onPrimary",
+        "primaryContainer",
+        "onPrimaryContainer",
+        "inversePrimary",
+        "secondary",
+        "onSecondary",
+        "secondaryContainer",
+        "onSecondaryContainer",
+        "tertiary",
+        "onTertiary",
+        "tertiaryContainer",
+        "onTertiaryContainer",
+        "background",
+        "onBackground",
+        "surface",
+        "onSurface",
+        "surfaceVariant",
+        "onSurfaceVariant",
+        "surfaceTint",
+        "inverseSurface",
+        "inverseOnSurface",
+        "error",
+        "onError",
+        "errorContainer",
+        "onErrorContainer",
+        "outline",
+        "outlineVariant",
+        "scrim",
+        "surfaceBright",
+        "surfaceDim",
+        "surfaceContainer",
+        "surfaceContainerHigh",
+        "surfaceContainerHighest",
+        "surfaceContainerLow",
+        "surfaceContainerLowest",
+        "primaryFixed",
+        "primaryFixedDim",
+        "onPrimaryFixed",
+        "onPrimaryFixedVariant",
+        "secondaryFixed",
+        "secondaryFixedDim",
+        "onSecondaryFixed",
+        "onSecondaryFixedVariant",
+        "tertiaryFixed",
+        "tertiaryFixedDim",
+        "onTertiaryFixed",
+        "onTertiaryFixedVariant"
+      ]
+    },
+    "TypeRole": {
+      "type": "string",
+      "description": "A Typography role.",
+      "enum": [
+        "displayLarge",
+        "displayMedium",
+        "displaySmall",
+        "headlineLarge",
+        "headlineMedium",
+        "headlineSmall",
+        "titleLarge",
+        "titleMedium",
+        "titleSmall",
+        "bodyLarge",
+        "bodyMedium",
+        "bodySmall",
+        "labelLarge",
+        "labelMedium",
+        "labelSmall",
+        "displayLargeEmphasized",
+        "displayMediumEmphasized",
+        "displaySmallEmphasized",
+        "headlineLargeEmphasized",
+        "headlineMediumEmphasized",
+        "headlineSmallEmphasized",
+        "titleLargeEmphasized",
+        "titleMediumEmphasized",
+        "titleSmallEmphasized",
+        "bodyLargeEmphasized",
+        "bodyMediumEmphasized",
+        "bodySmallEmphasized",
+        "labelLargeEmphasized",
+        "labelMediumEmphasized",
+        "labelSmallEmphasized"
+      ]
+    },
+    "ShapeToken": {
+      "type": "string",
+      "description": "A Material corner token.",
+      "enum": [
+        "none",
+        "extraSmall",
+        "small",
+        "medium",
+        "large",
+        "largeIncreased",
+        "extraLarge",
+        "extraLargeIncreased",
+        "extraExtraLarge",
+        "full"
+      ]
+    },
+    "MaterialShapeName": {
+      "type": "string",
+      "description": "A MaterialShapes polygon.",
+      "enum": [
+        "circle",
+        "square",
+        "slanted",
+        "arch",
+        "fan",
+        "arrow",
+        "semiCircle",
+        "oval",
+        "pill",
+        "triangle",
+        "diamond",
+        "clamShell",
+        "pentagon",
+        "gem",
+        "sunny",
+        "verySunny",
+        "cookie4Sided",
+        "cookie6Sided",
+        "cookie7Sided",
+        "cookie9Sided",
+        "cookie12Sided",
+        "ghostish",
+        "clover4Leaf",
+        "clover8Leaf",
+        "burst",
+        "softBurst",
+        "boom",
+        "softBoom",
+        "flower",
+        "puffy",
+        "puffyDiamond",
+        "pixelCircle",
+        "pixelTriangle",
+        "bun",
+        "heart"
+      ]
+    },
+    "ShapeValue": {
+      "description": "A corner token or a MaterialShapes polygon.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ShapeToken"
+        },
+        {
+          "$ref": "#/$defs/MaterialShapeName"
+        }
+      ]
+    },
+    "SizeClass": {
+      "type": "string",
+      "description": "A window width class.",
+      "enum": [
+        "compact",
+        "medium",
+        "expanded"
+      ]
+    }
+  }
+}

@@ -206,9 +206,10 @@ function renderCase() {
   );
   const grid = el("div", { class: "grid" });
   c.variants.forEach((v, i) => {
-    const file = `${view}.png`;
+    // Renders are named <screen>-<view>.png; the first match is the proposal's start screen.
+    const file = v.renders.find(name => name.endsWith(`-${view}.png`));
     let visual;
-    if (v.status === "ok" && v.renders.includes(file)) {
+    if (v.status === "ok" && file) {
       visual = el("img", { src: `/renders/${c.name}/${v.id}/${file}`, alt: `${c.name} ${v.id} ${view}`,
         onclick: e => { const lb = document.getElementById("lightbox"); lb.querySelector("img").src = e.target.src; lb.classList.add("open"); } });
     } else {

@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-Design exploration moves from HTML proposals to a native macOS previewer app built with Compose Multiplatform. The agent writes a proposal as an A2UI v1.0 file against our own Material 3 Expressive catalog. The app watches that file and draws it with real Compose Material 3 components in a live window, redrawing in one frame with no compile step. The agent checks its work from a layout tree it reads over a stdio MCP server, never from screenshots, while the owner judges taste in the live window. Speed and likeness to native Compose are the two goals, and every earlier version traded one for the other.
+Design exploration moves from HTML proposals to a native macOS previewer app built with Compose Multiplatform. The agent writes a proposal as an A2UI v1.0 file against our own Material 3 Expressive catalog. The app watches that file and draws it with real Compose Material 3 components in a live window, redrawing about 130 ms after a save with no compile step. The agent checks its work from a layout tree it reads over a stdio MCP server, never from screenshots, while the owner judges taste in the live window. Speed and likeness to native Compose are the two goals, and every earlier version traded one for the other.
 
 ## Design
 
@@ -25,15 +25,15 @@ Rejected alternatives:
 ### One iteration
 
 1. The agent edits `design/<slug>.proposal.json` with its normal file tools. Small edits are ordinary file edits, so no patch protocol is needed.
-2. The app watches the file, parses it, and updates Compose state. The window redraws in the next frame.
-3. The agent calls `get_tree` and reads a few hundred tokens of layout text.
+2. The app notices the change, parses and validates it, runs a quick headless pre-check, and updates Compose state. The window then redraws in its next frame.
+3. The agent calls `check_proposal`, which checks every screen at all five views and returns only the errors and a layout summary. It reads a full tree with `get_tree` only where it needs geometry.
 4. The owner looks at the window and replies in chat.
 
 Measured on this Mac with Compose Multiplatform 1.13.0-beta01:
-- A state change reaches the next frame of a live window in 6 to 17 ms, which is one 60 Hz frame.
-- Headless, an update plus a fresh semantics tree takes about 1.5 ms. The first headless render takes 0.9 s.
+- From saving the file to the window adopting it takes about 130 ms warm (median of 10). About 70 ms of that is noticing the change: the watcher polls every 20 ms and waits 50 ms for the writes to settle. About 40 ms is the pre-check. Adopting the new state then reaches the screen in one 60 Hz frame (6 to 17 ms).
+- `check_proposal` takes about 0.2 s for one screen at five views, and `get_tree` about 40 to 100 ms.
 
-Model time writing the edit is the only wait left.
+In a timed benchmark on 2026-11-01 (the `music` eval brief, the default Claude model, three runs, traced by event timestamps), the tools added about 2.5 s to a median 160 s agent run; the rest was model time. The same benchmark on the HTML version took a median 281 s. Three runs on one brief is a small sample.
 
 ### The app
 
@@ -78,7 +78,7 @@ Proposals are tracked files in the app's repository:
 
 The v2 rule of git-ignoring proposals is gone. Derived data, such as the tree and findings, is never stored.
 
-**`DESIGN.md`** follows Google's format at `version: alpha`, linted with a pinned version of its CLI. The spec allows custom top-level keys, and its linter warns only on near misses of its own key names. Material settings that the spec cannot express go under one custom key, `material:`:
+**`DESIGN.md`** follows Google's format at `version: alpha`. The app parses and validates it itself; Google's lint CLI is not run, because it would bring back the Node tooling v3 removed. The spec allows custom top-level keys, and its linter warns only on near misses of its own key names, so the keys below stay clear of those. Material settings that the spec cannot express go under one custom key, `material:`:
 - **Seed color:** the seed is `colors.primary`, which the linter expects. `material.scheme` names the variant and contrast and refers to the seed as `{colors.primary}`. Explicit role colors in `colors` override generated ones.
 - **Type:** typography uses the spec's `fontVariation` string, for example `"'wght' 500, 'wdth' 100, 'ROND' 100"`. The app parses it into Compose `FontVariation.Settings`.
 - **Corners:** the corner scale uses `rounded`, with Material's names in px read as dp. Corner families and shape-library shapes, which `rounded` cannot hold, go under `material:`.
@@ -105,7 +105,7 @@ material:
 - `navigation`: the start screen, plus each screen's pane role
 - `screens`: one A2UI `createSurface` body per screen, with its components and its sample `dataModel`
 
-The app writes the file back with stable key order and pretty printing, so diffs stay readable.
+The app only reads the proposal; the agent owns the file and writes it one component per line, so diffs stay readable.
 
 ```json
 {
@@ -154,7 +154,7 @@ The app is the catalog's single source of truth and serves it over MCP (`get_cat
 
 **Navigation.** A proposal is a navigation graph of screens. The app runs it with Navigation 3, using Material 3's `ListDetailSceneStrategy` and `SupportingPaneSceneStrategy`, so at expanded widths a list and its detail appear side by side. That is the same stack the `android-dev` skill uses for real apps.
 
-**Interaction.** Interaction stays inside the renderer. The catalog declares local functions (`navigate(screen)`, `openSheet(sheet)`, `dismiss()`), which components call through A2UI `functionCall`, never through events to the agent. Sheets, dialogs, and menus open over a screen, and selection and tabs switch locally. The navigation edges are exactly these `navigate` calls, which the app collects and checks against the declared screens, so the graph has one source of truth.
+**Interaction.** Interaction stays inside the renderer. The catalog declares local functions (`navigate(screen)`, `back()`, `open(overlay)`, `dismiss()`), which components call through A2UI `functionCall`, never through events to the agent. Sheets, dialogs, and menus open over a screen, and selection and tabs switch locally. The navigation edges are exactly these `navigate` calls, which the app collects and checks against the declared screens, so the graph has one source of truth.
 
 ### MCP
 
@@ -169,21 +169,35 @@ The app is the catalog's single source of truth and serves it over MCP (`get_cat
 
 **Tools:**
 - `open_proposal(path)`
-- `get_tree(screen?, view?)`
+- `check_proposal(screens?, views?)`: every screen at all five views by default, tree-only, returning pass or fail per view, each error grouped by rule with its node ids, and a `layout` summary per view (navigation shown, panes, and each pane's main regions as `Type id width`, under 300 bytes) so the agent confirms adaptation without full trees. About 0.2 s for one screen at five views.
+- `get_tree(screen?, view?)`: the full tree of one view
 - `set_view(device, brightness, seed, style)`
 - `show_preview()`
-- `get_catalog()`
+- `get_catalog(component?)`: a compact text catalog (about 11K characters, one line per component) by default, or the full JSON Schema of the named components. The full catalog exceeds MCP result limits, so it is never sent whole.
 - `export_kotlin(screen?)`
 - `status()`
 
+An earlier round of that benchmark showed why `check_proposal` exists: with one view per `get_tree`, agents made a median 13 check calls per run.
+
 The agent never edits proposals through MCP; the file on disk is the source of truth.
 
-**Closing the window** hides it and keeps the process serving. A hidden window stops laying out (measured: tree reads go stale), so while hidden, `get_tree` comes from the headless renderer. The Dock icon or `show_preview` brings the window back.
+**Closing the window** hides it and keeps the process serving. The Dock icon or `show_preview` brings the window back.
+
+**App Nap.** macOS throttles an idle background app about 30 s after its last activity, which slowed a check from about 0.2 s to 1 to 2.6 s. The `Info.plist` opt-out keys are ignored for a binary an MCP client launches directly, so at launch the app sets `NSAppSleepDisabled` in its own preferences domain whenever it is not already on. The timings in this document depend on it.
+
+**The device frame** is its own Compose scene (a `ComposePanel`), scaled by lowering its density. The proposal still lays out at the device's dp size, and sheets, dialogs, and menus open inside the frame instead of over the viewer.
+
+**A proposal that crashes while composing** cannot take the window down:
+- **Validation first.** Numeric props carry bounds in the catalog. The validator rejects literals outside them, and the renderer clamps bound data to the same bounds.
+- **A quick pre-check.** Before the window adopts a new version, the app renders what it is about to show headlessly, tree only: the current screen at the current view, with the window's back stack and open overlays replayed. If that throws, the last good version stays on screen.
+- **A backstop.** Anything that throws later, on another screen or after a device switch, is caught by the frame's own exception handler. The frame then drops to an error panel and rebuilds on the next good version.
+
+Every case is reported through the tool result and `status`, as validation errors are.
 
 **Harness setup:**
 - **Claude Code:** registered as a stdio server with the app binary as its command. Verified end to end.
 - **Codex:** registered under `mcp_servers.<name>` with `default_tools_approval_mode = "approve"`. Without that, `approval_policy = "never"` refuses the call. Verified end to end.
-- **Antigravity:** registered with `agy mcp add <name> <binary>`, or through its `mcp_config.json`. Not yet run end to end.
+- **Antigravity:** registered with `agy mcp add <name> <binary>`, or through its `mcp_config.json`. Verified end to end. Interactive sessions ask before each tool call. Headless runs (`agy -p`) cannot ask, so they need `mcp(<name>/<tool>)` allow rules in the global `settings.json`, because a project-level `.agents/settings.json` is not read for this.
 
 The skill checks that the server is connected before it starts and, if not, tells the user how to register it.
 
@@ -196,13 +210,11 @@ The agent reads a flat list of nodes plus findings. Each node carries:
 - the color, type, and shape roles it used
 - its accessibility role, label, and actions
 
-Everything comes from public APIs; no internal Compose APIs (`PlatformContext` and `ComposeScene` are `@InternalComposeUiApi`):
+Everything comes from public APIs; no internal Compose APIs (`PlatformContext` and `ComposeScene` are `@InternalComposeUiApi`). Every tree comes from a headless render with `runDesktopComposeUiTest`:
+- The renderer measures each proposal node itself with `onGloballyPositioned` and `onTextLayout`: ids, bounds, and text overflow and truncation.
+- Compose's semantics tree, keyed by the node ids as test tags, adds touch bounds (a 40 dp button reports a 48 dp touch area) and the accessibility role, label, and actions.
 
-| Source | Gives | Used for |
-|---|---|---|
-| The renderer measuring itself (`onGloballyPositioned`, `onTextLayout`) | Ids, bounds, touch bounds (a 40 dp button reports a 48 dp touch area), text overflow and truncation | The live window, the main source |
-| `javax.accessibility` on the live window | Role, label, states, and bounds, as a screen reader sees them. It updates after changes. | Accessibility facts, matched to nodes by bounds |
-| `runDesktopComposeUiTest` | The full Compose semantics tree with ids as test tags | Headless use: a hidden window, evals |
+For `get_tree` without arguments, the headless render replays the window's back stack and interaction state (open overlays, selections, typed text), so the tree describes exactly what the window shows, whether the window is visible or hidden. With arguments, it renders that screen and view fresh. In a list-detail scene, nodes from the other pane carry their screen as a prefix (`plates/new_plate`), and per-pane rules such as `primary-largest` judge each pane on its own.
 
 Color and type roles come from the proposal and theme, so the app computes contrast from resolved roles instead of sampling pixels.
 
@@ -216,21 +228,28 @@ Color and type roles come from the proposal and theme, so the app computes contr
   "findings": [ { "id": "desc", "rule": "text-truncated" } ] }
 ```
 
-The finding rules carry over from v2's runtime checks:
+The finding rules carry over from v2's runtime checks, with v2's thresholds:
 - touch targets of at least 48 dp
-- Google Sans Flex on every plain-text node
-- clipped or overflowing text
+- the bundled families per type role: Google Sans Flex for plain text, a brand face only on display and headline
+- clipped text, and truncated or wrapped labels on buttons, chips, and navigation items
 - contrast of each text and background pair
-- the primary action as the largest interactive element
-- at most one FAB
+- the primary action as the largest interactive element in its pane
+- at most one FAB per pane
+- nothing wider than the view
 
-**Screenshots** never enter the agent's loop. The owner judges hierarchy, character, and color balance in the window. Evals are the one exception: their grader gets the tree plus one headless PNG per view, because "distinctive design" cannot be judged from structure alone.
+A view passes when it has no error findings. Intentional truncation is reported as information, not an error.
+
+**Screenshots** never enter the agent's loop. The owner judges hierarchy, character, and color balance in the window. Evals are the one exception: their grader gets one headless PNG per screen and view, because "distinctive design" cannot be judged from structure alone, while the tree drives the deterministic checks.
 
 ### Export to Compose
 
 Export walks the proposal and emits Kotlin with component parameters and modifiers, plus Navigation 3 entries and scene strategies for the graph. Named styles become parameters and modifiers, not the experimental Styles API, which material3 components do not accept yet and which would require an alpha foundation and an opt-in in the target app.
 
-Fidelity is checked by rendering the exported code with `compose-preview` and comparing its semantics with the app's tree through `diff_semantics`. Pixels are not compared.
+The export is checked in two ways. Golden tests export a two-screen fixture and `evals/verify/verify.proposal.json`, which uses every catalog component, and compare the output byte for byte. Both goldens compile and assemble in a copy of `evals/compose-starter`, the Android sandbox pinned to material3 1.5.0-alpha29, which proves the exported names exist in the Android library and not only on desktop. That compile step is manual, run after changing the exporter.
+
+These checks prove the export is stable and compiles. They do not prove the exported screen looks like the preview: nothing compares the two automatically. Where a prop is omitted, the exporter and the renderer read the same catalog default, which removes one class of drift. The rest is the manual export check in `evals/README.md`, which compares an exported screen with its preview by eye.
+
+**Command line.** The same binary has two subcommands for scripts. `render <proposal.json> --out <dir>` writes headless PNGs, trees, and a `report.json` for the evals. `export <proposal.json>` prints the Kotlin for the export check.
 
 ### Distribution
 
@@ -243,13 +262,9 @@ v3 replaces the HTML proposal runtime: `@m3e/web`, `gallery/runtime-src/`, `gall
 
 `android-design` is unchanged: it still owns every design decision. `android-design-explore` becomes the workflow that connects to the app, writes proposals, reads trees, and hands an approved proposal to the export.
 
-## Open questions
-
-- Antigravity has not run the app end to end. Its registration format is known, but testing it means adding the server to Antigravity's global config.
-
 ## Links
 
-- [Visual design exploration v2](visual-design-exploration-v2.md), the HTML design this replaces
+- [Visual design exploration v2](../archive/visual-design-exploration-v2.md), the HTML design this replaces
 - [Compose Multiplatform proposal fidelity research](../research/compose-multiplatform-proposal-fidelity.md)
 - [A2UI specification v1.0](https://github.com/a2ui-project/a2ui/tree/main/specification/v1_0)
 - [AndroidX A2UI Compose releases](https://developer.android.com/jetpack/androidx/releases/a2ui-compose)

@@ -1,0 +1,38 @@
+# Pinned toolchain for the v3 previewer app. Change versions only on purpose.
+[versions]
+kotlin = "2.4.21"
+composeMultiplatform = "1.13.0-beta01"
+material3 = "1.13.0-beta01"
+navigation3 = "1.2.0"
+adaptiveNavigation3 = "1.3.0"
+materialKolor = "5.0.1"
+mcpSdk = "0.16.0"
+kotlinxSerialization = "1.12.0"
+coroutines = "1.11.0"
+kaml = "0.104.0"
+koin = "4.2.2"
+junit = "5.14.4"
+spotless = "8.10.4"
+
+[libraries]
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "material3" }
+compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "composeMultiplatform" }
+navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "navigation3" }
+adaptive-navigation3 = { module = "org.jetbrains.compose.material3.adaptive:adaptive-navigation3", version.ref = "adaptiveNavigation3" }
+material-kolor = { module = "com.materialkolor:material-kolor", version.ref = "materialKolor" }
+mcp-sdk = { module = "io.modelcontextprotocol:kotlin-sdk", version.ref = "mcpSdk" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+kaml = { module = "com.charleskorn.kaml:kaml", version.ref = "kaml" }
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+koin-compose = { module = "io.insert-koin:koin-compose", version.ref = "koin" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

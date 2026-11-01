@@ -6,7 +6,7 @@
 
 Compose Multiplatform can render real, shared Compose UI in a browser, including Material 3 Expressive. It is not an HTML imitation of an Android design. That fits this project's definition of fidelity: confidence that a proposal can transfer into the requesting app, rather than pixel-identical rendering. However, the published versions inspected do not match the starter's full AndroidX Material3 API surface. These findings establish a plausible alternative, not complete compatibility. The visual exploration design selects Android plus Compose Preview CLI for v1 to avoid added template, browser-hosting, and capture infrastructure; it does not reject multiplatform on fidelity grounds.
 
-This is dependency and documentation research, not a compiled or rendered comparison. It informed the [v1 exploration design](../archive/visual-design-exploration.md) and is the alternative recorded in [v2](../design/visual-design-exploration-v2.md); it does not change the skill, template, or evaluation framework. The decision remains one renderer for v1, not a hybrid fallback system.
+This is dependency and documentation research, not a compiled or rendered comparison. It informed the [v1 exploration design](../archive/visual-design-exploration.md) and is the alternative recorded in [v2](../archive/visual-design-exploration-v2.md); it does not change the skill, template, or evaluation framework. The decision remains one renderer for v1, not a hybrid fallback system.
 
 ## Verification 2026-10-10
 

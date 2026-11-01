@@ -13,8 +13,8 @@ import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
 
-// Mirrors the HTML runtime's <m3e-theme color variant scheme>: seed = color, style = variant,
-// darkTheme = scheme. Wallpaper-based dynamic color is opt-in; otherwise the scheme is generated
+// Mirrors a proposal's DESIGN.md scheme: seed = colors.primary, style = material.scheme.variant,
+// darkTheme = the dark view. Wallpaper-based dynamic color is opt-in; otherwise the scheme is generated
 // from the seed (Material 3 Expressive, needs material3 1.5.0-alpha or later).
 @Composable
 fun AppTheme(

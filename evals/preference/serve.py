@@ -66,7 +66,7 @@ def make_handler(root):
             self.wfile.write(body)
 
         def do_GET(self):
-            if self.path in ("/", "/index.html"):
+            if self.path == "/":
                 return self.send(200, (HERE / "picker.html").read_bytes(), "text/html; charset=utf-8")
             if self.path == "/saves.mjs":
                 return self.send(200, (HERE / "saves.mjs").read_bytes(), "text/javascript; charset=utf-8")

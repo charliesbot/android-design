@@ -11,10 +11,11 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from checks import run as run_checks
+from checks import read_report, run as run_checks
 from judge import judge, parse, aggregate, validate_runs, SCHEMA, prompt_for as judge_prompt
 from backends import BACKENDS, execute
-from report import write_report, write_summary
+from preview_app import app_binary
+from report import label, write_report, write_summary
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -22,12 +23,9 @@ SKILL_DIR = ROOT / "skills" / "android-design"
 EXPLORE_DIR = ROOT / "skills" / "android-design-explore"
 # Where prepare() copies both skills inside a case directory.
 CASE_SKILLS = "skills"
-CLI = EXPLORE_DIR / "gallery" / "cli.mjs"
-STARTER = EXPLORE_DIR / "assets" / "proposal-starter"
-# The views `cli.mjs render` writes, in its order. test_run.py keeps this in step with gallery/render.mjs.
-# These files are for the agent's own review, not for judging.
-REVIEW_ONLY_RENDERS = ("light-full.png", "review.png", "view.html")
-RENDER_NAMES = ("light", "dark", "foldable", "tablet", "desktop")
+# Names inside a case directory. The agent writes DESIGN.md and the proposal; `render` writes renders/.
+PROPOSAL = "design/proposal.proposal.json"
+DESIGN_MD = "DESIGN.md"
 GIT = ["git", "-c", "user.name=android-design-evals", "-c", "user.email=evals@example.invalid"]
 
 
@@ -43,26 +41,26 @@ def case_info(case_dir):
     return json.loads((case_dir / "case.json").read_text())
 
 
-def proposal_dir(case_dir):
-    return Path(case_info(case_dir)["proposal_dir"])
+def proposal_path(case_dir):
+    return Path(case_info(case_dir)["proposal"])
 
 
 def prepare(case, case_dir):
-    """A fresh fixture repository whose proposal folder is a copy of the starter plus the case assets."""
+    """A fresh fixture repository with design/ holding the brief's assets. The agent writes the proposal and DESIGN.md."""
     case_dir.mkdir(parents=True)
     # Give the agent copies, not repository paths. This is not a security sandbox.
     for skill in (SKILL_DIR, EXPLORE_DIR):
         shutil.copytree(skill, case_dir / CASE_SKILLS / skill.name)
     run_tool(["git", "init", "-q"], cwd=case_dir)
     run_tool([*GIT, "commit", "-q", "--allow-empty", "-m", "Initial commit"], cwd=case_dir)
-    proposal = case_dir / "design-explorations" / "proposal"
-    shutil.copytree(STARTER, proposal)
+    proposal = case_dir / PROPOSAL
     for f in case.get("files", []):
-        target = proposal / f["to"]
+        target = proposal.parent / f["to"]
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(HERE / f["from"], target)
+    proposal.parent.mkdir(exist_ok=True)
     (case_dir / "case.json").write_text(json.dumps(
-        {"proposal_dir": str(proposal), "title": case["name"]}, indent=2))
+        {"proposal": str(proposal), "title": case["name"]}, indent=2))
     return proposal
 
 
@@ -70,7 +68,8 @@ def prompt_for(case, case_dir):
     text = (HERE / "agent-prompt.md").read_text()
     return (text.replace("{{SKILL_DIR}}", str(case_dir / CASE_SKILLS / SKILL_DIR.name))
                 .replace("{{EXPLORE_DIR}}", str(case_dir / CASE_SKILLS / EXPLORE_DIR.name))
-                .replace("{{PROPOSAL_DIR}}", case_info(case_dir)["proposal_dir"])
+                .replace("{{PROPOSAL}}", case_info(case_dir)["proposal"])
+                .replace("{{DESIGN_MD}}", str(case_dir / DESIGN_MD))
                 .replace("{{BRIEF}}", case["prompt"]))
 
 
@@ -89,49 +88,55 @@ def prepare_run(cases, out):
 
 def generate(case_dir, backend, model=None):
     reply = execute(backend, (case_dir / 'prompt.md').read_text(), case_dir,
-                    role='generator', model=model)
+                    role='generator', model=model, mcp_binary=app_binary())
     (case_dir / 'agent.json').write_text(json.dumps(reply, indent=2))
     return reply
 
 
 def render(case_dir):
-    """Renders the proposal folder with the skill's `cli.mjs render` and copies the result into <case>/renders/.
+    """Renders the proposal headlessly with the previewer app into <case>/renders/ (PNGs, trees, report.json).
 
-    Stale renders are removed first. Returns (images, error). Lint errors (exit 2) are not an error here: they
-    leave no renders and checks.py reports them as C-lint from lint.json. Only an infrastructure failure
-    (Chrome, timeout) is an error.
+    Stale renders are removed first. Returns (images, error). An invalid proposal (exit 2) or failing findings
+    (exit 1) are not errors here: report.json records them and checks.py reports them. Only an infrastructure
+    failure (no report.json, timeout) is an error. A missing app raises RuntimeError.
     """
     renders = case_dir / 'renders'
     if renders.is_symlink():
         raise ValueError(f'Refusing symlink render directory: {renders}')
     if renders.exists():
         shutil.rmtree(renders)
-    for stale in ('lint.json', 'render.log'):
-        (case_dir / stale).unlink(missing_ok=True)
-    proposal = Path(case_info(case_dir)['proposal_dir'])
+    (case_dir / 'render.log').unlink(missing_ok=True)
+    command = [str(app_binary()), 'render', str(proposal_path(case_dir)), '--out', str(renders)]
+    design = case_dir / DESIGN_MD
+    if design.is_file():
+        command += ['--design', str(design)]
     try:
-        done = subprocess.run(['node', str(CLI), 'render', str(proposal)],
-                              cwd=ROOT, capture_output=True, text=True, timeout=900, stdin=subprocess.DEVNULL)
+        done = subprocess.run(command, cwd=case_dir, capture_output=True, text=True, timeout=900,
+                              stdin=subprocess.DEVNULL)
     except (OSError, subprocess.TimeoutExpired) as error:
         (case_dir / 'render.log').write_text(str(error))
         return [], f'render failed: {error}'
     log = done.stdout + done.stderr
     (case_dir / 'render.log').write_text(log)
-    if done.returncode == 2:
-        (case_dir / 'lint.json').write_text(json.dumps({'ok': False, 'output': log}, indent=2))
-        return [], None
-    if done.returncode:
-        return [], f'render exited {done.returncode}: {log[-1500:]}'
-    (case_dir / 'lint.json').write_text(json.dumps({'ok': True}, indent=2))
-    source = proposal / 'renders'
-    renders.mkdir()
-    # light-full.png (the phone view at full document height), review.png (every view on one image), and view.html are
-    # for the agent's own review, not for judging.
-    for path in [*sorted(source.glob('*.png')), source / 'checks.json']:
-        if path.name in REVIEW_ONLY_RENDERS:
-            continue
-        shutil.copy(path, renders / path.name)
-    return sorted(str(p.resolve()) for p in renders.glob('*.png')), None
+    if done.returncode not in (0, 1, 2) or not (renders / 'report.json').is_file():
+        return [], f'render exited {done.returncode} without report.json: {log[-1500:]}'
+    return [r['png_path'] for r in report_renders(case_dir)], None
+
+
+def report_renders(case_dir):
+    """The renders listed in renders/report.json whose PNG exists, each with its absolute `png_path`."""
+    listed = (read_report(case_dir) or {}).get('renders') or []
+    found = []
+    for entry in listed:
+        png = (case_dir / 'renders' / str(entry.get('png', ''))).resolve()
+        if png.is_file():
+            found.append({**entry, 'png_path': str(png)})
+    return found
+
+
+def image_labels(case_dir):
+    """Maps each rendered PNG's absolute path to `screen/view`, for the judge request."""
+    return {r['png_path']: label(r) for r in report_renders(case_dir)}
 
 
 def build(case, case_dir, backend, model=None):
@@ -157,7 +162,8 @@ def artifact_hashes(case_dir):
     """Bind imported grades to the exact rendered images and the proposal files."""
     files = rendered_images(case_dir)
     if (case_dir / 'case.json').is_file():
-        files += [p for p in proposal_dir(case_dir).rglob('*') if p.is_file()]
+        files += [p for p in (case_dir / 'design').rglob('*') if p.is_file()]
+        files += [p for p in [case_dir / DESIGN_MD] if p.is_file()]
     return {str(p.relative_to(case_dir)): hashlib.sha256(p.read_bytes()).hexdigest()
             for p in sorted(files)}
 
@@ -165,7 +171,7 @@ def artifact_hashes(case_dir):
 def make_request(case, case_dir, rubric):
     ids = [a['id'] for a in case['assertions'] if a['type'] == 'rubric']
     images = [str(p.resolve()) for p in rendered_images(case_dir)]
-    prompt = judge_prompt(case['name'], images, ids, case=case, rubric=rubric)
+    prompt = judge_prompt(case['name'], images, ids, case=case, rubric=rubric, labels=image_labels(case_dir))
     request = {'case': case['name'], 'item_ids': ids, 'images': images,
                'prompt': prompt, 'schema': SCHEMA, 'artifacts': artifact_hashes(case_dir)}
     request['request_id'] = hashlib.sha256(json.dumps(request, sort_keys=True).encode()).hexdigest()
@@ -182,8 +188,9 @@ def import_ballot(case_dir):
     return aggregate([parse(json.dumps(ballot), request['item_ids'])], request['item_ids'])
 
 
-def render_complete(images):
-    return {Path(p).stem for p in images} >= set(RENDER_NAMES)
+def render_complete(renders):
+    """Rendered at all: the report lists at least one render. Which screens and views exist is the app's business."""
+    return bool(renders)
 
 
 def overall_status(checks, verdict):
@@ -198,6 +205,7 @@ def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1)
     started = time.time()
     directory = out / case['name']
     images, render_error = render(directory)
+    renders = [{k: r.get(k) for k in ('screen', 'view', 'png', 'pass')} for r in report_renders(directory)]
     checks = run_checks(directory, case['surface'])
     if render_error:
         checks['C-review'] = {'pass': False, 'detail': render_error}
@@ -207,7 +215,7 @@ def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1)
     # An imported ballot must always be explicitly rescored against the latest request.
     verdict = {key: {'pass': None, 'votes': '0/0', 'reason': 'awaiting visual judgment'}
                for key in request['item_ids']}
-    if not render_complete(images):
+    if not render_complete(renders):
         verdict = {key: {'pass': None, 'votes': '0/0', 'reason': 'render incomplete'} for key in verdict}
     elif judge_backend:
         try:
@@ -222,7 +230,7 @@ def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1)
     return {'name': case['name'], 'surface': case['surface'],
             'minutes': round((time.time() - started) / 60, 1), 'agent': agent,
             'judge_backend': judge_backend, 'judge_model': judge_model,
-            'checks': checks, 'judge': verdict, 'renders': [Path(p).name for p in images],
+            'checks': checks, 'judge': verdict, 'renders': renders,
             'status': overall_status(checks, verdict), 'request_id': request['request_id']}
 
 
@@ -292,9 +300,9 @@ def main():
         if not cases or any(not re.fullmatch(r'[a-z0-9-]+', c['name']) for c in cases):
             raise ValueError('Invalid or empty case list')
         if args.command == 'prepare':
-            print(f'Prepared {len(cases)} cases in {out}. Read each <case>/prompt.md; edit only the proposal folder it names.')
+            print(f'Prepared {len(cases)} cases in {out}. Read each <case>/prompt.md; the agent writes only the DESIGN.md and design/ proposal it names.')
             for case in cases:
-                print(f"  {case['name']}: {proposal_dir(out / case['name'])}")
+                print(f"  {case['name']}: {proposal_path(out / case['name'])}")
             return 0
         if args.command == 'score':
             results = json.loads((out / 'results.json').read_text())['cases']

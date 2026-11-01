@@ -1,4 +1,4 @@
-"""Checks references/compose-mapping.md against the generated Material 3 inventory and the proposal runtime.
+"""Checks references/compose-mapping.md against the generated Material 3 inventory and the previewer app's catalog.
 
 Needs no JDK: it reads the committed scripts/material3-inventory.txt. Run: python3 -m unittest discover scripts
 """
@@ -11,8 +11,7 @@ import material3_inventory as inventory
 
 ROOT = Path(__file__).resolve().parent.parent
 MAPPING = ROOT / "skills/android-design-explore/references/compose-mapping.md"
-RUNTIME_SRC = ROOT / "skills/android-design-explore/gallery/runtime-src"
-RUNTIME_BUNDLE = ROOT / "skills/android-design-explore/gallery/public/runtime/m3e.js"
+CATALOG = ROOT / "app/schemas/m3-expressive.catalog.json"
 
 # Names the mapping uses that are not in the material3 artifact. A root listed here also allows its members
 # (Modifier.size, Alignment.BottomCenter, PaletteStyle.TonalSpot).
@@ -20,20 +19,14 @@ ALLOWED_ROOTS = {
     # androidx.compose.foundation and androidx.compose.ui, which the inventory does not cover.
     "Modifier", "Arrangement", "Alignment", "WindowInsets", "BoxWithConstraints", "Box", "Row", "Column", "Spacer", "BorderStroke",
     "RectangleShape", "CircleShape", "ZeroCornerSize", "Color", "TextStyle", "FontFamily", "Font", "FontVariation", "FontWeight",
-    "DialogProperties",
+    "DialogProperties", "Image", "ContentScale", "TextOverflow", "TextAlign", "Grid", "FlexBox", "FlowRow", "LazyVerticalGrid",
+    "GridCells",
+    # Navigation 3 and its Material 3 adaptive scenes.
+    "NavDisplay", "ListDetailSceneStrategy", "SupportingPaneSceneStrategy",
     # MaterialKolor, the Kotlin port of Google's color utilities.
     "PaletteStyle", "ColorSpec",
     # The app's generated resource class (R.font.google_sans_flex).
     "R",
-}
-
-# Registered by @m3e/web as building blocks of other components. Proposals never write them.
-INTERNAL_ELEMENTS = {
-    "m3e-collapsible", "m3e-elevation", "m3e-floating-panel", "m3e-focus-ring", "m3e-focus-trap", "m3e-list-item-button",
-    "m3e-pseudo-checkbox", "m3e-pseudo-radio", "m3e-ripple", "m3e-scroll-container", "m3e-selection-indicator",
-    "m3e-slide", "m3e-state-layer", "m3e-text-highlight", "m3e-text-overflow", "m3e-theme-icon",
-    # The bottom sheet's drag handle gestures.
-    "m3e-pan-gesture", "m3e-swipe-gesture", "m3e-tap-gesture",
 }
 
 # Theme containers whose members live in another inventory class.
@@ -115,40 +108,6 @@ class MappingTest(unittest.TestCase):
         self.assertEqual({row: status for row, status in statuses.items() if status not in ("verified", "unverified")}, {})
         self.assertIn("verified", statuses.values())
 
-    def test_every_registered_element_is_mapped(self):
-        bundle = RUNTIME_BUNDLE.read_text()
-        defined = set(re.findall(r'(?<![\w$.])[A-Za-z_$][\w$]*\("((?:m3e|p)-[a-z0-9-]+)"\)', bundle))
-        defined |= set(re.findall(r'customElements\.define\("((?:m3e|p)-[a-z0-9-]+)"', bundle))
-        authored = defined - INTERNAL_ELEMENTS
-        self.assertIn("p-icon", authored)
-        self.assertIn("m3e-button", authored)
-        mapped = " ".join(self.first_cells("Components", "Shims and layout"))
-        unmapped = [element for element in sorted(authored) if not re.search(rf"(?<![\w-]){element}(?![\w-])", mapped)]
-        self.assertEqual(unmapped, [])
-
-    def test_every_type_class_is_mapped(self):
-        css = (RUNTIME_SRC / "runtime.css").read_text()
-        classes = set(re.findall(r"^\.(t-[a-z-]+)\s*\{", css, re.M))
-        self.assertEqual(len(classes), 30)
-        mapped = set(re.findall(r"`\.(t-[a-z-]+)`", " ".join(self.first_cells("Type roles"))))
-        self.assertEqual(sorted(classes - mapped), [])
-        self.assertTrue(any(".voice-" in cell for cell in self.first_cells("Type roles")))
-
-    def test_type_values_match_the_generated_scale(self):
-        scale = json.loads((RUNTIME_SRC / "type-scale.json").read_text())["roles"]
-        for heading, cells in self.rows:
-            if heading == "Type roles" and cells[1].startswith("`MaterialTheme.typography."):
-                # A baseline role maps to the style itself. An emphasized class maps to the baseline role copied with the token weight and
-                # tracking, because the pinned Typography() gives every *Emphasized style the baseline values (see the section's text).
-                copy = re.fullmatch(r"`MaterialTheme\.typography\.(\w+)\.copy\(fontWeight = FontWeight\((\d+)\), letterSpacing = ([\d.]+)\.sp\)`", cells[1])
-                role = copy.group(1) + "Emphasized" if copy else cells[1].split(".")[-1].rstrip("`")
-                data = scale[role[0].upper() + role[1:]]
-                self.assertIn(f"{data['size']:g}sp / {data['lineheight']:g}sp, weight {data['weight']}", cells[2], role)
-                if copy:
-                    self.assertEqual((int(copy.group(2)), float(copy.group(3))), (data["weight"], data["tracking"]), role)
-                else:
-                    self.assertFalse(role.endswith("Emphasized"), f"{role}: use the baseline role copied with the token weight")
-
     def test_icons_port_as_symbol_drawables_not_the_legacy_icon_set(self):
         self.assertNotRegex(self.text, r"Icons\.(Auto)?(Mirrored\.)?Rounded\.[A-Z]")
         section = self.text.split("\n## Icons\n")[1].split("\n## ")[0]
@@ -156,20 +115,19 @@ class MappingTest(unittest.TestCase):
         self.assertIn('android:autoMirrored="true"', section)
         self.assertIn('android:tint="?attr/colorControlNormal"', section)
 
-    def test_all_53_theme_color_roles_are_mapped(self):
-        roles = [cells[0] for heading, cells in self.rows if heading == "Color" and cells[0].startswith("`--md-sys-color-")]
-        self.assertEqual(len(roles), 53)
-        self.assertEqual(len(set(roles)), 53)
+    def test_every_catalog_component_has_a_row(self):
+        catalog = json.loads(CATALOG.read_text())
+        mapped = {code_spans(cells[0])[0].split()[0] for heading, cells in self.rows
+                  if heading == "Components" and code_spans(cells[0])}
+        self.assertEqual(sorted(set(catalog["components"]) - mapped), [])
 
-    def test_no_color_role_marked_none_exists_in_compose(self):
-        wrong = []
-        for heading, cells in self.rows:
-            if heading == "Color" and cells[0].startswith("`--md-sys-color-") and cells[1] == "none":
-                role = cells[0].strip("`")[len("--md-sys-color-"):]
-                camel = re.sub(r"-(\w)", lambda m: m.group(1).upper(), role)
-                if f"ColorScheme.{camel}" in self.known:
-                    wrong.append(cells[0])
-        self.assertEqual(wrong, [])
+    def test_every_catalog_token_exists_in_compose(self):
+        tokens = json.loads(CATALOG.read_text())["$defs"]
+        names = [f"ColorScheme.{role}" for role in tokens["ColorRole"]["enum"]]
+        names += [f"Typography.{role}" for role in tokens["TypeRole"]["enum"]]
+        names += [f"MaterialShapes.{shape[0].upper()}{shape[1:]}" for shape in tokens["MaterialShapeName"]["enum"]]
+        names += [f"Shapes.{corner}" for corner in tokens["ShapeToken"]["enum"] if corner not in ("none", "full")]
+        self.assertEqual([name for name in names if name not in self.known], [])
 
     def test_prose_has_no_em_dash(self):
         self.assertNotIn(chr(0x2014), self.text)
@@ -203,12 +161,6 @@ class InventoryParsingTest(unittest.TestCase):
         for name, members in javap:
             entries |= inventory.entries_for_class(name.rsplit(".", 1)[-1], members, {"ExtraLargeContainerHeight"})
         self.assertEqual(entries, {"ButtonDefaults", "ButtonDefaults.ExtraLargeContainerHeight", "ButtonDefaults.shapesFor", "Button"})
-
-    def test_type_scale_instructions_decode(self):
-        self.assertEqual(inventory.decode("size", [["bipush", "57"], ["invokestatic", "#50", "Method", "androidx/compose/ui/unit/TextUnitKt.getSp:(I)J"]]), 57.0)
-        tracking = [["ldc2_w", "#79", "double", "0.2d"], ["invokestatic", "#45", "Method", "androidx/compose/ui/unit/TextUnitKt.getSp:(D)J"], ["fneg"]]
-        self.assertEqual(inventory.decode("tracking", tracking), -0.2)
-        self.assertEqual(inventory.decode("tracking", [["iconst_0"], ["invokestatic", "#50", "Method", "androidx/compose/ui/unit/TextUnitKt.getSp:(I)J"]]), 0.0)
 
 
 if __name__ == "__main__":
