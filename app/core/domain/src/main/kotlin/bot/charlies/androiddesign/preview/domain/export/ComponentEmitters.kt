@@ -102,17 +102,21 @@ private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Pl
 private fun ScreenEmitter.containerBackground(p: JsonObject): String? =
   p.literal(CONTAINER_KEY)?.let { "background(${colorRole(it)})" }
 
-private fun ScreenEmitter.painter(symbol: String, filled: Boolean = false): String =
-  "${file.use(Sym.painterResource)}(${drawable(symbol, filled)})"
+private fun ScreenEmitter.painter(name: IconName, filled: Boolean = false): String =
+  "${file.use(Sym.painterResource)}(${drawable(name, filled)})"
 
-private fun ScreenEmitter.drawable(symbol: String, filled: Boolean = false): String =
-  file.drawable(Naming.snake(symbol) + if (filled) "_filled" else "")
+/** The drawable [name] is: `R.drawable.star`, or a call of the lookup for a bound name. */
+private fun ScreenEmitter.drawable(name: IconName, filled: Boolean = false): String =
+  when (name) {
+    is IconName.Literal -> file.drawable(Naming.snake(name.name) + if (filled) "_filled" else "")
+    is IconName.Bound -> "${file.symbolLookup(name.names, filled)}(${name.expr})"
+  }
 
 /** `painterResource(if (cond) on else off)`; [on] is the `_filled` drawable when [onFilled]. */
 private fun ScreenEmitter.togglePainter(
   cond: String,
-  on: String,
-  off: String,
+  on: IconName,
+  off: IconName,
   onFilled: Boolean = false,
 ): String =
   "${file.use(Sym.painterResource)}(if ($cond) ${drawable(on, onFilled)} else ${drawable(off)})"
@@ -131,11 +135,10 @@ private fun ScreenEmitter.iconOf(
 
 /** `Icon(painterResource(R.drawable.name), contentDescription = ...)`. */
 private fun ScreenEmitter.icon(
-  symbol: String,
+  symbol: IconName,
   description: Expr? = null,
   vararg extra: Arg?,
-  filled: Boolean = false,
-): Expr = iconOf(painter(symbol, filled), description, *extra)
+): Expr = iconOf(painter(symbol), description, *extra)
 
 private fun ScreenEmitter.sizeModifier(size: String): Arg =
   arg("modifier", Chain(file.use(Sym.Modifier), listOf("${useModifier("size")}($size)")))
@@ -157,8 +160,25 @@ private fun ScreenEmitter.semantics(p: JsonObject): String? =
     "${useModifier("semantics")} { contentDescription = ${kotlinString(it)} }"
   }
 
+/**
+ * `argName = value` for a Boolean prop passed on as it is: a literal or the bound expression.
+ * Nothing when the prop is absent or a literal [omitted], the value Compose already has.
+ */
+private fun ScreenEmitter.boolArg(
+  p: JsonObject,
+  key: String,
+  place: Place,
+  argName: String,
+  omitted: Boolean,
+): Arg? =
+  when (val value = p.boolExpr(key, place)) {
+    null,
+    omitted.toString() -> null
+    else -> arg(argName, value)
+  }
+
 private fun ScreenEmitter.enabled(p: JsonObject, place: Place): Arg? =
-  if (p.boolExpr("enabled", place) == "false") arg("enabled", "false") else null
+  boolArg(p, "enabled", place, "enabled", omitted = true)
 
 private fun ScreenEmitter.alignmentName(wire: String): String =
   "${file.use(Sym.Alignment)}.${Naming.pascal(wire)}"
@@ -268,12 +288,13 @@ private fun ScreenEmitter.grid(p: JsonObject, place: Place): List<Stmt> {
     columns != null ->
       config += stmt(Call("repeat", listOf(pos("$columns")), lambda(stmt(Raw("column(1.fr)")))))
     minWidth != null -> {
-      config +=
-        Assign(
-          "val columns",
-          "=",
-          Raw("(constraints.maxWidth.toDp() / ${dp(minWidth.toFloat())}).toInt().coerceAtLeast(1)"),
-        )
+      // The previewer's count: the gap is added to the width and to each column's width.
+      val gap = p.literal("spacing")?.let(::spacing)
+      val fit =
+        if (gap == null) "constraints.maxWidth.toDp() / ${dp(minWidth.toFloat())}"
+        else "(constraints.maxWidth.toDp() + $gap) / (${dp(minWidth.toFloat())} + $gap)"
+      val most = M3ExpressiveCatalog.MAX_GRID_COLUMNS
+      config += Assign("val columns", "=", Raw("($fit).toInt().coerceIn(1, $most)"))
       config += stmt(Call("repeat", listOf(pos("columns")), lambda(stmt(Raw("column(1.fr)")))))
     }
     else -> config += stmt(Raw("column(1.fr)"))
@@ -352,7 +373,7 @@ private fun ScreenEmitter.textComponent(p: JsonObject, place: Place): List<Stmt>
         opt("color", p.literal("color")?.let(::colorRole)),
         opt("textAlign", align),
         opt("overflow", overflow),
-        opt("maxLines", p.number("maxLines")?.toInt()?.toString()),
+        opt("maxLines", p.sampleNumber("Text", "maxLines", place)?.toInt()?.toString()),
         opt("style", p.literal("type")?.let(::typeRole)),
       ),
     ),
@@ -360,26 +381,51 @@ private fun ScreenEmitter.textComponent(p: JsonObject, place: Place): List<Stmt>
 }
 
 private fun ScreenEmitter.iconComponent(p: JsonObject, place: Place): List<Stmt> {
-  val size = p.number("size")?.let { dp(it.toFloat()) }
+  val size = p.sampleNumber("Icon", "size", place)?.let { dp(it.toFloat()) }
   val parts = listOfNotNull(size?.let { "${useModifier("size")}($it)" })
   val description = p.text("contentDescription", place)
+  val name = p.iconName("name", place) ?: IconName.Literal("help")
+  val filled = p.boolExpr("filled", place)
+  val painter =
+    when {
+      filled == null || filled == "false" -> painter(name)
+      filled == "true" -> painter(name, filled = true)
+      else -> togglePainter(filled, name, name, onFilled = true)
+    }
   return listOf(
     stmt(
-      icon(
-        p.literal("name") ?: "help",
+      iconOf(
+        painter,
         description,
         modifier(place, p, *parts.toTypedArray()),
         opt("tint", p.literal("color")?.let(::colorRole)),
-        filled = p.flag("filled") == true,
       ),
     ),
   )
 }
 
-private fun ScreenEmitter.image(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
-  val src = p.literal("src").orEmpty()
-  val symbol =
+/**
+ * The drawable of an image: named after the file, or after the node for a `data:` URI. A bound
+ * `src` is a call of the lookup over every source the sample data gives it; when several distinct
+ * data URIs occur, the node's name is numbered in the order they first appear.
+ */
+private fun ScreenEmitter.imageDrawable(node: ComponentNode, p: JsonObject, place: Place): String {
+  fun symbol(src: String) =
     if (src.startsWith("data:")) node.id else src.substringAfterLast('/').substringBeforeLast('.')
+  val bound =
+    p.boundText("src", place)
+      ?: return file.drawable(Naming.snake(symbol(p.literal("src").orEmpty())))
+  val data = bound.values.filter { it.startsWith("data:") }
+  val symbols =
+    bound.values.associateWith { src ->
+      if (src.startsWith("data:") && data.size > 1) "${node.id}_${data.indexOf(src) + 1}"
+      else symbol(src)
+    }
+  return "${file.imageLookup(symbols)}(${bound.expr})"
+}
+
+private fun ScreenEmitter.image(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
+  val drawable = imageDrawable(node, p, place)
   val scale =
     when (p.choice("Image", "fit")) {
       "crop" -> "Crop"
@@ -394,7 +440,7 @@ private fun ScreenEmitter.image(node: ComponentNode, p: JsonObject, place: Place
   return one(
     file.use(Sym.Image),
     listOf(
-      arg("painter", "${file.use(Sym.painterResource)}(${drawable(symbol)})"),
+      arg("painter", "${file.use(Sym.painterResource)}($drawable)"),
       arg("contentDescription", p.text("contentDescription", place) ?: Raw("null")),
       modifier(place, p, aspect, shape),
       arg("contentScale", "${file.use(Sym.ContentScale)}.$scale"),
@@ -549,7 +595,7 @@ private fun ScreenEmitter.navigationBar(p: JsonObject, place: Place): List<Stmt>
 
 private fun ScreenEmitter.navigationRail(p: JsonObject, place: Place): List<Stmt> {
   expressive()
-  val expanded = p.flag("expanded") == true
+  val expanded = p.sampleFlag("expanded", place) == true
   val state =
     if (expanded)
       "${m3("rememberWideNavigationRailState")}(${m3("WideNavigationRailValue")}.Expanded)"
@@ -570,8 +616,8 @@ private fun ScreenEmitter.navigationItem(
 ): List<Stmt> {
   expressive()
   val selected = p.boolExpr("selected", place) ?: "false"
-  val symbol = p.literal("icon") ?: "help"
-  val selectedSymbol = p.literal("selectedIcon")
+  val symbol = p.iconName("icon", place) ?: IconName.Literal("help")
+  val selectedSymbol = p.iconName("selectedIcon", place)
   val label = p.text("label", place) ?: Raw("\"\"")
   val painter =
     when {
@@ -683,7 +729,7 @@ private fun ScreenEmitter.listItem(node: ComponentNode, p: JsonObject, place: Pl
     return one(
       m3("SegmentedListItem"),
       listOf(
-        if (p.boolExpr("selected", place) == "true") arg("selected", "true") else null,
+        boolArg(p, "selected", place, "selected", omitted = false),
         arg("onClick", actionLambda(p["action"], node.id)),
         arg("shapes", "$list.segmentedShapes(${position.index}, ${position.count})"),
         modifier(place, p),
@@ -742,7 +788,7 @@ private fun ScreenEmitter.buttonContent(
 ): List<Stmt> {
   val sized = m3("ButtonDefaults")
   val body = mutableListOf<Stmt>()
-  p.literal("icon")?.let { symbol ->
+  p.iconName("icon", place)?.let { symbol ->
     val size = if (heightRef == null) "$unsized.IconSize" else "$sized.iconSizeFor($heightRef)"
     val gap = if (heightRef == null) "$unsized.IconSpacing" else "$sized.iconSpacingFor($heightRef)"
     body += stmt(icon(symbol, null, sizeModifier(size)))
@@ -914,7 +960,7 @@ private fun ScreenEmitter.iconButton(node: ComponentNode, p: JsonObject, place: 
     }
   val iconSize = sizeName?.let { sizeModifier("$defaults.${it}IconSize") }
   val description = p.text("contentDescription", place)
-  val symbol = p.literal("icon") ?: "help"
+  val symbol = p.iconName("icon", place) ?: IconName.Literal("help")
   val statements = mutableListOf<Stmt>()
   val content: Expr
   val head: List<Arg?>
@@ -962,7 +1008,7 @@ private fun ScreenEmitter.splitButton(
   val menu = menuId?.let(byId::get)
   val expandedVar = menu?.let { overlayVar(it.id) }
   val leadingBody = mutableListOf<Stmt>()
-  p.literal("icon")?.let { symbol ->
+  p.iconName("icon", place)?.let { symbol ->
     leadingBody += stmt(icon(symbol, null, sizeModifier("$defaults.LeadingIconSize")))
     leadingBody +=
       stmt(
@@ -992,7 +1038,15 @@ private fun ScreenEmitter.splitButton(
     Call(
       "$defaults.${prefix}TrailingButton",
       listOf(arg("checked", checked), arg("onCheckedChange", change)),
-      lambda(stmt(icon("keyboard_arrow_down", null, sizeModifier("$defaults.TrailingIconSize")))),
+      lambda(
+        stmt(
+          icon(
+            IconName.Literal("keyboard_arrow_down"),
+            null,
+            sizeModifier("$defaults.TrailingIconSize"),
+          ),
+        ),
+      ),
     )
   val layoutCall =
     Call(
@@ -1031,7 +1085,7 @@ private fun ScreenEmitter.floatingActionButton(
       "medium" -> "${m3("FloatingActionButtonDefaults")}.MediumIconSize"
       else -> null
     }
-  val symbol = p.literal("icon") ?: "add"
+  val symbol = p.iconName("icon", place) ?: IconName.Literal("add")
   val description = p.text("contentDescription", place) ?: if (extended) null else label
   val glyph = icon(symbol, description, iconSize?.let(::sizeModifier))
   val common =
@@ -1074,7 +1128,14 @@ private fun ScreenEmitter.fabMenu(node: ComponentNode, p: JsonObject, place: Pla
         arg("checked", name),
         arg("onCheckedChange", assignIt(name)),
       ),
-      lambda(stmt(icon(p.literal("icon") ?: "add", p.text("contentDescription", place)))),
+      lambda(
+        stmt(
+          icon(
+            p.iconName("icon", place) ?: IconName.Literal("add"),
+            p.text("contentDescription", place),
+          ),
+        ),
+      ),
     )
   return listOf(declaration) +
     one(
@@ -1096,7 +1157,7 @@ private fun ScreenEmitter.fabMenuItem(
     listOf(
       arg("onClick", actionLambda(p["action"], node.id)),
       arg("text", lambdaOf(textOf(label))),
-      arg("icon", lambdaOf(icon(p.literal("icon") ?: "add"))),
+      arg("icon", lambdaOf(icon(p.iconName("icon", place) ?: IconName.Literal("add")))),
     ),
   )
 }
@@ -1147,12 +1208,12 @@ private fun ScreenEmitter.chip(node: ComponentNode, p: JsonObject, place: Place)
   head += arg("label", lambdaOf(textOf(label)))
   head += modifier(place, p)
   val iconSize = sizeModifier("${m3(defaultsName)}.IconSize")
-  val symbol = p.literal("icon")
+  val symbol = p.iconName("icon", place)
   val leading: Arg? =
     when {
       type == "SuggestionChip" -> symbol?.let { arg("icon", lambdaOf(icon(it, null, iconSize))) }
       type == "FilterChip" -> {
-        val check = "check"
+        val check = IconName.Literal("check")
         if (symbol != null) {
           arg(
             "leadingIcon",
@@ -1176,8 +1237,7 @@ private fun ScreenEmitter.chipGroup(node: ComponentNode, p: JsonObject, place: P
     val ids =
       (p["children"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty()
     val initial = ids.firstOrNull {
-      byId[it]?.let { chip -> (chip.props["selected"] as? JsonPrimitive)?.content == "true" } ==
-        true
+      byId[it]?.let { chip -> chip.props.sampleFlag("selected", place) == true } == true
     }
     val (name, declaration) = state(node, "Selected", kotlinString(initial.orEmpty()))
     statements += declaration
@@ -1248,11 +1308,17 @@ private fun ScreenEmitter.range(p: JsonObject): Pair<Double, Double> {
 }
 
 /** The `valueRange` (when the design sets one) and `steps` arguments of a slider. */
-private fun ScreenEmitter.rangeArgs(p: JsonObject, min: Double, max: Double): List<Arg?> =
+private fun ScreenEmitter.rangeArgs(
+  component: String,
+  p: JsonObject,
+  place: Place,
+  min: Double,
+  max: Double,
+): List<Arg?> =
   listOf(
     if (p["range"] != null) arg("valueRange", "${floatLiteral(min)}..${floatLiteral(max)}")
     else null,
-    p.number("steps")?.let { arg("steps", it.toInt().toString()) },
+    p.sampleNumber(component, "steps", place)?.let { arg("steps", it.toInt().toString()) },
   )
 
 private fun ScreenEmitter.slider(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
@@ -1267,7 +1333,7 @@ private fun ScreenEmitter.slider(node: ComponentNode, p: JsonObject, place: Plac
         arg("onValueChange", assignIt(name)),
         modifier(place, p),
         enabled(p, place),
-      ) + rangeArgs(p, min, max),
+      ) + rangeArgs("Slider", p, place, min, max),
     )
 }
 
@@ -1291,7 +1357,7 @@ private fun ScreenEmitter.rangeSlider(
         arg("onValueChange", assignIt(name)),
         modifier(place, p),
         enabled(p, place),
-      ) + rangeArgs(p, min, max),
+      ) + rangeArgs("RangeSlider", p, place, min, max),
     )
 }
 
@@ -1299,8 +1365,8 @@ private fun ScreenEmitter.textField(node: ComponentNode, p: JsonObject, place: P
   val initial = p.text("value", place) ?: Raw("\"\"")
   val (name, declaration) = state(node, "Value", initial.flat() ?: "\"\"")
   val callee = if (p.literal("variant") == "outlined") "OutlinedTextField" else "TextField"
-  val lines = p.number("lines")?.toInt()
-  fun iconSlot(key: String) = p.literal(key)?.let { arg(key, lambdaOf(icon(it))) }
+  val lines = p.sampleNumber("TextField", "lines", place)?.toInt()
+  fun iconSlot(key: String) = p.iconName(key, place)?.let { arg(key, lambdaOf(icon(it))) }
   return listOf(declaration) +
     one(
       m3(callee),
@@ -1315,7 +1381,7 @@ private fun ScreenEmitter.textField(node: ComponentNode, p: JsonObject, place: P
         iconSlot("trailingIcon"),
         textSlot(p, "prefix", place),
         textSlot(p, "supporting", place, "supportingText"),
-        if (p.flag("error") == true) arg("isError", "true") else null,
+        boolArg(p, "error", place, "isError", omitted = false),
         if (lines == null || lines <= 1) arg("singleLine", "true")
         else arg("minLines", lines.toString()),
       ),
@@ -1448,7 +1514,7 @@ private fun ScreenEmitter.menuItem(node: ComponentNode, p: JsonObject, place: Pl
       arg("text", lambdaOf(textOf(label))),
       arg("onClick", lambda(action)),
       position?.let { arg("shape", "$defaults.itemShape(${it.index}, ${it.count}).shape") },
-      p.literal("icon")?.let { arg("leadingIcon", lambdaOf(icon(it))) },
+      p.iconName("icon", place)?.let { arg("leadingIcon", lambdaOf(icon(it))) },
     ),
   )
 }
