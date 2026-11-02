@@ -140,6 +140,9 @@ behavior Material leaves out. The most useful additions for a design skill:
   gutter); cover screens stay focused, with hero art as the background and a
   big anchor control like play.
 - If content didn't scroll in portrait, don't make it scroll in landscape.
+- **Scrolling regions.** Content-structure: "You can present content in
+  scrolling rows or columns with lazy rows and lazy columns." In a pane, the
+  list is the part that scrolls.
 - **Scale content to the window.** Content-structure lists "Set the same scale
   on larger screens" as a don't, with the advice "take advantage of the space
   and consider distance from the screen." Content that must keep its aspect ratio should "constrain

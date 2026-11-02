@@ -216,7 +216,7 @@ private fun ScreenEmitter.column(p: JsonObject, place: Place): List<Stmt> {
   return one(
     file.use(Sym.Column),
     listOf(
-      modifier(place, p, containerBackground(p), scroll),
+      modifier(place, p, containerBackground(p), scroll, fillHeight = place.fillHeight),
       opt("verticalArrangement", arrangement(p, vertical = true)),
       opt("horizontalAlignment", alignment),
     ),
@@ -234,11 +234,14 @@ private fun ScreenEmitter.row(p: JsonObject, place: Place): List<Stmt> {
   return one(
     file.use(Sym.Row),
     listOf(
-      modifier(place, p, containerBackground(p)),
+      modifier(place, p, containerBackground(p), fillHeight = place.fillHeight),
       opt("horizontalArrangement", arrangement(p, vertical = false)),
       opt("verticalAlignment", alignment),
     ),
-    children(p, "children", place, "Row"),
+    // Stretch is the row's height offered to its Column and Box children, the full-height panes.
+    children(p, "children", place, "Row") { child, _, _ ->
+      child.copy(fillHeight = p.literal("verticalAlignment") == "stretch")
+    },
   )
 }
 
@@ -273,7 +276,10 @@ private fun ScreenEmitter.box(p: JsonObject, place: Place): List<Stmt> {
   val alignment = p.nonDefault("Box", "contentAlignment")?.let(::alignmentName)
   return one(
     file.use(Sym.Box),
-    listOf(modifier(place, p, containerBackground(p)), opt("contentAlignment", alignment)),
+    listOf(
+      modifier(place, p, containerBackground(p), fillHeight = place.fillHeight),
+      opt("contentAlignment", alignment),
+    ),
     children(p, "children", place, "Box"),
   )
 }

@@ -387,6 +387,11 @@ Corner radius scale (10 steps; the three marked Expressive were added May 2025):
   the leading rail holds the navigation rail and the trailing rail holds
   supporting controls. **Panes** hold all content, 1 to 3 of them, at least one
   flexible.
+- Panes fill the window. The breakpoint examples show "the body pane fills the
+  rest of the window" (expanded), "1 pane filling the rest of the window"
+  (large and extra large), and a split-pane layout where "A nav rail and a pane
+  fill 50% of the window. A second pane fills the remaining 50%." A pane spans
+  the body region's height; its content does not set the pane's height.
 - Panes display as **co-planar** (side by side), **floating** (dialog-like), or
   **docked** (bottom sheet). They adapt by **show and hide**, **levitate**
   (become floating or docked), or **reflow** (stack vertically).

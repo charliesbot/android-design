@@ -135,8 +135,8 @@ Neither the skill nor the research has rulers, pane drag handles or resize persi
 - [x] /foundations/layout/breakpoints/overview → material-3.md (Layout > Breakpoint-specific rules; one pane in portrait, resize to use the height)
 - [x] /foundations/layout/breakpoints/compact → material-3.md (Layout > Breakpoints table)
 - [x] /foundations/layout/breakpoints/medium → material-3.md (Layout > Breakpoint-specific rules)
-- [x] /foundations/layout/breakpoints/expanded → material-3.md (Layout > Breakpoint-specific rules)
-- [x] /foundations/layout/breakpoints/large-extra-large → material-3.md (Layout > Breakpoint-specific rules; Panes in depth)
+- [x] /foundations/layout/breakpoints/expanded → material-3.md (Layout > Breakpoint-specific rules; Scaffold: panes fill the window)
+- [x] /foundations/layout/breakpoints/large-extra-large → material-3.md (Layout > Breakpoint-specific rules; Panes in depth; Scaffold: panes fill the window)
 
 ### Canonical layout examples
 - [x] /foundations/layout/canonical-examples/overview → material-3.md (Layout > Canonical layouts: behavior rules)
@@ -703,7 +703,7 @@ Result: 48 routes checked. 25 are fully distilled, 17 are partly distilled, 6 ar
 - [x] /design/ui/mobile/guides/layout-and-content/app-anatomy → android-ui-design-guides.md (System bars and edge-to-edge)
 - [-] /design/ui/mobile/guides/layout-and-content/canonical-layouts; dead link (HTTP 404), not scraped
 - [x] /design/ui/mobile/guides/layout-and-content/common-layouts → android-ui-design-guides.md (Layout > Windows, orientation, and continuity: supporting sheets, WebView)
-- [x] /design/ui/mobile/guides/layout-and-content/content-structure → android-ui-design-guides.md (Layout; scale content to the window, balance empty space)
+- [x] /design/ui/mobile/guides/layout-and-content/content-structure → android-ui-design-guides.md (Layout; scrolling regions; scale content to the window, balance empty space)
 - [x] /design/ui/mobile/guides/layout-and-content/edge-to-edge → android-ui-design-guides.md (System bars and edge-to-edge)
 - [x] /design/ui/mobile/guides/layout-and-content/grids-and-units → android-ui-design-guides.md (Layout)
 - [x] /design/ui/mobile/guides/layout-and-content/images-graphics → android-ui-design-guides.md (Layout)

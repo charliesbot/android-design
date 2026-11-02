@@ -87,8 +87,10 @@
           "enum": [
             "top",
             "center",
-            "bottom"
+            "bottom",
+            "stretch"
           ],
+          "description": "stretch: Column, Row, and Box children fill the row's height, for full-height panes.",
           "default": "top"
         },
         "arrangement": {

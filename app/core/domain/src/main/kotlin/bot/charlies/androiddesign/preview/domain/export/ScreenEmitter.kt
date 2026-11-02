@@ -76,6 +76,11 @@ internal data class Place(
    * True when the component drawn here stretches to the parent's width: it gets `fillMaxWidth()`.
    */
   val fillWidth: Boolean = false,
+  /**
+   * True for a child of a row whose `verticalAlignment` is `stretch`. A Column, Row, or Box here
+   * gets `fillMaxHeight()`; every other component ignores it.
+   */
+  val fillHeight: Boolean = false,
   /** `Modifier`, or `modifier` for the screen's root. */
   val modifierBase: String = "Modifier",
   /** Modifier calls to put first, such as `padding(innerPadding)`. */
@@ -94,6 +99,7 @@ internal data class Place(
       parentType = parentType,
       parentStretches = M3ExpressiveCatalog.find(parentType)?.stretchesChildren ?: false,
       fillWidth = false,
+      fillHeight = false,
       modifierBase = "Modifier",
       leading = emptyList(),
       listPosition = null,
@@ -534,16 +540,22 @@ internal class ScreenEmitter(
 
   /**
    * The `modifier` argument: the place's leading calls, the weight inside a row or column, the
-   * stretch to the parent's width, any [extra] calls, and the padding last. Null when there is
-   * nothing to say.
+   * stretch to the parent's width, the stretch to its height when [fillHeight] says so, any [extra]
+   * calls, and the padding last. Null when there is nothing to say.
    */
-  fun modifier(place: Place, props: JsonObject, vararg extra: String?): Arg? {
+  fun modifier(
+    place: Place,
+    props: JsonObject,
+    vararg extra: String?,
+    fillHeight: Boolean = false,
+  ): Arg? {
     val parts = mutableListOf<String>()
     parts += place.leading.map(::useModifier)
     if (place.parentType == "Row" || place.parentType == "Column") {
       props.floatExpr("weight", place)?.let { parts += "weight($it)" }
     }
     if (place.fillWidth) parts += useModifier("fillMaxWidth()")
+    if (fillHeight) parts += useModifier("fillMaxHeight()")
     parts += extra.filterNotNull().map(::useModifier)
     props.literal("padding")?.let { parts += "${useModifier("padding")}(${spacing(it)})" }
     return modifierArg(place, parts)
@@ -776,6 +788,7 @@ internal class ScreenEmitter(
         "padding" to Sym.padding,
         "fillMaxSize" to Sym.fillMaxSize,
         "fillMaxWidth" to Sym.fillMaxWidth,
+        "fillMaxHeight" to Sym.fillMaxHeight,
         "width" to Sym.width,
         "height" to Sym.height,
         "size" to Sym.size,

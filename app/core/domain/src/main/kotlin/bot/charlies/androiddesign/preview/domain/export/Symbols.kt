@@ -40,6 +40,7 @@ internal object Sym {
   const val padding = "$LAYOUT.padding"
   const val fillMaxSize = "$LAYOUT.fillMaxSize"
   const val fillMaxWidth = "$LAYOUT.fillMaxWidth"
+  const val fillMaxHeight = "$LAYOUT.fillMaxHeight"
   const val width = "$LAYOUT.width"
   const val height = "$LAYOUT.height"
   const val size = "$LAYOUT.size"

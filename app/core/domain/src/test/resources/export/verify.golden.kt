@@ -70,6 +70,7 @@ import androidx.compose.foundation.layout.Grid
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -942,6 +943,17 @@ fun DetailScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {}) {
     ) {
       Text("Detail pane", style = MaterialTheme.typography.headlineSmall)
       Text("Beside the home list at expanded widths.", style = MaterialTheme.typography.bodyLarge)
+      Row(
+        modifier = Modifier.weight(1f).fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+      ) {
+        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+          Text("Left pane", style = MaterialTheme.typography.titleMedium)
+        }
+        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+          Text("Right pane", style = MaterialTheme.typography.titleMedium)
+        }
+      }
     }
   }
 }
