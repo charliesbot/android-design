@@ -74,9 +74,10 @@ class StyleExportTest {
         """{"id":"root","component":"Column","style":"hero","children":["card"]}""",
         """{"id":"card","component":"Card","style":"hero","content":[]}""",
       )
+    // The layout is clipped to the style's shape, as the previewer draws it.
     assertTrue(
       source.contains(
-        "modifier = modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(72.dp)",
+        "modifier = modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(72.dp)",
       ),
       source,
     )
@@ -87,6 +88,8 @@ class StyleExportTest {
       source,
     )
     has(source, "shape = MaterialTheme.shapes.large")
+    has(source, "import androidx.compose.ui.draw.clip")
+    has(source, "import androidx.compose.foundation.background")
   }
 
   @Test

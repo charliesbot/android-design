@@ -99,8 +99,15 @@ private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Pl
 
 // region shared pieces
 
-private fun ScreenEmitter.containerBackground(p: JsonObject): String? =
-  p.literal(CONTAINER_KEY)?.let { "background(${colorRole(it)})" }
+/**
+ * A style's container as modifier calls: a background, clipped first to the style's shape like the
+ * previewer draws it. Empty without a container.
+ */
+private fun ScreenEmitter.containerBackground(p: JsonObject): Array<String> {
+  val container = p.literal(CONTAINER_KEY) ?: return emptyArray()
+  val clip = p.literal(STYLE_SHAPE_KEY)?.let { "clip(${shapeToken(it)})" }
+  return listOfNotNull(clip, "background(${colorRole(container)})").toTypedArray()
+}
 
 private fun ScreenEmitter.painter(name: IconName, filled: Boolean = false): String =
   "${file.use(Sym.painterResource)}(${drawable(name, filled)})"
@@ -216,7 +223,7 @@ private fun ScreenEmitter.column(p: JsonObject, place: Place): List<Stmt> {
   return one(
     file.use(Sym.Column),
     listOf(
-      modifier(place, p, containerBackground(p), scroll, fillHeight = place.fillHeight),
+      modifier(place, p, *containerBackground(p), scroll, fillHeight = place.fillHeight),
       opt("verticalArrangement", arrangement(p, vertical = true)),
       opt("horizontalAlignment", alignment),
     ),
@@ -234,7 +241,7 @@ private fun ScreenEmitter.row(p: JsonObject, place: Place): List<Stmt> {
   return one(
     file.use(Sym.Row),
     listOf(
-      modifier(place, p, containerBackground(p), fillHeight = place.fillHeight),
+      modifier(place, p, *containerBackground(p), fillHeight = place.fillHeight),
       opt("horizontalArrangement", arrangement(p, vertical = false)),
       opt("verticalAlignment", alignment),
     ),
@@ -277,7 +284,7 @@ private fun ScreenEmitter.box(p: JsonObject, place: Place): List<Stmt> {
   return one(
     file.use(Sym.Box),
     listOf(
-      modifier(place, p, containerBackground(p), fillHeight = place.fillHeight),
+      modifier(place, p, *containerBackground(p), fillHeight = place.fillHeight),
       opt("contentAlignment", alignment),
     ),
     children(p, "children", place, "Box"),
@@ -308,7 +315,7 @@ private fun ScreenEmitter.grid(p: JsonObject, place: Place): List<Stmt> {
   p.literal("spacing")?.let { config += stmt(Raw("gap(${spacing(it)})")) }
   return one(
     file.use(Sym.Grid),
-    listOf(arg("config", lambda(config)), modifier(place, p, containerBackground(p))),
+    listOf(arg("config", lambda(config)), modifier(place, p, *containerBackground(p))),
     children(p, "children", place, "Grid"),
   )
 }
@@ -321,7 +328,7 @@ private fun ScreenEmitter.flexBox(p: JsonObject, place: Place): List<Stmt> {
     file.use(Sym.FlexBox),
     listOf(
       if (config.isEmpty()) null else arg("config", lambda(config)),
-      modifier(place, p, containerBackground(p)),
+      modifier(place, p, *containerBackground(p)),
     ),
     children(p, "children", place, "FlexBox"),
   )
@@ -709,7 +716,7 @@ private fun ScreenEmitter.list(p: JsonObject, place: Place): List<Stmt> {
     else null
   return one(
     file.use(Sym.Column),
-    listOf(modifier(place, p, containerBackground(p)), opt("verticalArrangement", gap)),
+    listOf(modifier(place, p, *containerBackground(p)), opt("verticalArrangement", gap)),
     children(p, "children", place, "List", indexed = segmented) { pl, i, n ->
       pl.copy(listPosition = ListPosition(segmented, i, n))
     },

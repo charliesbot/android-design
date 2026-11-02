@@ -14,7 +14,7 @@ import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
 
 // Mirrors a proposal's DESIGN.md scheme: seed = colors.primary, style = material.scheme.variant,
-// darkTheme = the dark view. Wallpaper-based dynamic color is opt-in; otherwise the scheme is generated
+// darkTheme = the dark view. Wallpaper-based dynamic color is opt-in; otherwise the scheme comes
 // from the seed (Material 3 Expressive, needs material3 1.5.0-alpha or later).
 @Composable
 fun AppTheme(
