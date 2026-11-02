@@ -21,6 +21,12 @@ import kotlinx.serialization.json.JsonPrimitive
 internal const val CONTAINER_KEY = "\u0000container"
 
 /**
+ * The key under which a named style's `shape` is kept for a component without a `shape` prop, such
+ * as a layout, whose container the previewer clips to it.
+ */
+internal const val STYLE_SHAPE_KEY = "\u0000shape"
+
+/**
  * A template loop variable: `plates.forEach { plate -> ... }` makes `plate` the scope. [items] are
  * the elements the loop runs over in the sample data, across every item of the enclosing loops.
  */
@@ -303,6 +309,8 @@ internal class ScreenEmitter(
       fill("shape", style.shape, PropKind.Shape)
       fill("padding", style.padding, null)
       style.container?.let { merged[CONTAINER_KEY] = JsonPrimitive(it) }
+      if (def.prop("shape") == null)
+        style.shape?.let { merged[STYLE_SHAPE_KEY] = JsonPrimitive(it) }
     }
     node.props.forEach { (key, value) ->
       if (
