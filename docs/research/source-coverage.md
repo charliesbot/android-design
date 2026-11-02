@@ -196,7 +196,7 @@ The Styles pages are mostly distilled. The biggest gap is the transition-pattern
 - [-] /whats-new-at-io26; announcement index. Its substance (layout scaffold, 8dp spacing system, expressive lists and menus, contained search, Compose-first) lives on linked pages audited in other batches or below
 
 ### Expressive articles
-- [x] /building-with-m3-expressive → material-3.md (What it is and why; The seven expressive tactics; Hero moments)
+- [x] /building-with-m3-expressive → material-3.md (What it is and why; The seven expressive tactics, color mixing for key components only; Hero moments)
 - [x] /m3-expressive-motion-theming → material-3.md (Motion: schemes, spatial vs effects, speeds, springs vs tween, custom `MotionScheme`, custom components using `MaterialTheme.motionScheme`)
 - [x] /material-is-compose-first → material-3.md (Versions and stability)
 

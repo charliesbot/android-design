@@ -912,7 +912,13 @@ Each tactic is one axis along which a screen can become more expressive.
    essential actions look less important.
 2. **Apply rich and nuanced colors.** Use contrast between primary, secondary,
    and tertiary roles and surface tones to prioritize. Caution: without
-   contrast, elements blend together.
+   contrast, elements blend together. The mixing is for a few elements:
+   "Mixing these colors for key components or visual elements can help
+   emphasize the main takeaway of a screen," and "Create visual hierarchy with
+   surface tones." Observed in this repo's eval renders, not stated by Google:
+   how strong a role looks depends on the scheme, and a container role in a
+   content-based or vibrant scheme can render near full strength, so emphasis
+   is judged on the rendered color, not the role's name.
 3. **Guide attention with typography.** Emphasized styles for headlines and
    actions; heavier weight, larger size, color, and spacing create
    "editorial-like moments."
