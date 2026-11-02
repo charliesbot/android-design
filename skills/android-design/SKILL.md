@@ -1,9 +1,12 @@
 ---
 name: android-design
 description: >
-  Material 3 Expressive design for Android. Use when designing, building, or reviewing Android phone, tablet,
-  or desktop screens in Jetpack Compose; choosing components; setting up a theme (color, type, shape, motion);
-  or when a Compose UI looks generic and needs hierarchy, emphasis, or polish.
+  Material 3 Expressive design judgment for Android apps in Jetpack Compose. Load it for any task that
+  decides how an Android screen looks, even when the request reads as plain Compose coding: building or
+  polishing a screen, reviewing UI code or screenshots, setting up a theme (color, typography, shape),
+  choosing components, adapting layouts to tablet, foldable, and desktop windows (list-detail, supporting
+  pane, what fills the space), and adding motion. It owns the design decisions: load it first, then any
+  skill that covers the APIs.
 ---
 
 # Android Design
