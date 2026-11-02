@@ -57,7 +57,8 @@ data class ViewSpec(
 object Views {
   val Light = ViewSpec("light", Device.Phone, 411, 923, dark = false, SizeClass.Compact)
   val Dark = ViewSpec("dark", Device.Phone, 411, 923, dark = true, SizeClass.Compact)
-  val Foldable = ViewSpec("foldable", Device.Foldable, 933, 704, dark = false, SizeClass.Expanded)
+  /** An open foldable held upright: the one view in the medium size class. */
+  val Foldable = ViewSpec("foldable", Device.Foldable, 704, 933, dark = false, SizeClass.Medium)
   val Tablet = ViewSpec("tablet", Device.Tablet, 1280, 800, dark = false, SizeClass.Expanded)
   val Desktop = ViewSpec("desktop", Device.Desktop, 1920, 1080, dark = false, SizeClass.Expanded)
 

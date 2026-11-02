@@ -81,8 +81,8 @@ class ViewerScreenTest {
       onNodeWithText("411×923", substring = true).assertExists()
       vm.setDevice(Device.Foldable)
       waitForIdle()
-      onNodeWithContentDescription("Foldable 933x704").assertIsOn()
-      onNodeWithText("933×704", substring = true).assertExists()
+      onNodeWithContentDescription("Foldable 704x933").assertIsOn()
+      onNodeWithText("704×933", substring = true).assertExists()
     }
 
   @Test

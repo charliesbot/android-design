@@ -26,7 +26,7 @@ python3 run.py evaluate --out /tmp/design-eval --no-open
 
 For each case this runs `<app> render <proposal> --out <case>/renders` (headless, no window; it passes `--design` when the agent wrote a `DESIGN.md`), reads `renders/report.json`, runs deterministic checks, and writes a report plus `<case>/judge-request.json`. No provider CLI is required for either command.
 
-Each screen of the proposal renders at five views: `light` and `dark` at phone size 411x923; `foldable` (933x704), `tablet` (1280x800), and `desktop` (1920x1080) in light. `render` writes one PNG and one layout tree per screen and view, named `<screen>-<view>`, and `report.json` lists them. The runner takes the renders from that list, so a proposal with more screens has more images.
+Each screen of the proposal renders at five views: `light` and `dark` at phone size 411x923; `foldable` (704x933), `tablet` (1280x800), and `desktop` (1920x1080) in light. `render` writes one PNG and one layout tree per screen and view, named `<screen>-<view>`, and `report.json` lists them. The runner takes the renders from that list, so a proposal with more screens has more images.
 
 The deterministic checks all read `report.json`:
 

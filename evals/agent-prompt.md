@@ -20,7 +20,7 @@ Design exactly ONE screen as a proposal, in two files:
 
 Write only those two files. The previewer app is connected to you over MCP as the server `android_design_preview`; its tools are your only way to check the proposal. Call `open_proposal` with the proposal's absolute path, edit the file, and call `check_proposal` after each change. Do not take screenshots and do not run `render` yourself: the runner renders the final files headlessly and checks them.
 
-The screen must work and adapt across phone (411x923), foldable (933x704), tablet (1280x800), and desktop (1920x1080) windows, in light and dark.
+The screen must work and adapt across phone (411x923), foldable (704x933), tablet (1280x800), and desktop (1920x1080) windows, in light and dark.
 
 ## Review (the android-design screen check)
 

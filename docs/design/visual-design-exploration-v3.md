@@ -68,7 +68,7 @@ Because finding rules and export are pure Kotlin, they test without Compose, and
 - A list of the proposal's screens, to jump to any of them.
 - A stage with Phone, Foldable, Tablet, and Desktop buttons, the proposal name with its size, and the framed preview.
 
-The device sizes stay 411×923, 933×704, 1280×800, and 1920×1080 dp. The viewer itself uses `FlexBox`, `Grid`, and `MediaQuery`, all present in Compose Multiplatform 1.13.0-beta01 as experimental APIs, so its panel reflows when the window narrows.
+The device sizes are 411×923, 704×933, 1280×800, and 1920×1080 dp, one view per size class: compact phone, medium foldable, and the expanded and larger tablet and desktop. The foldable is the open Fold8 held upright. v2 turned it to landscape (933×704, expanded), which left the medium layout unchecked. The viewer itself uses `FlexBox`, `Grid`, and `MediaQuery`, all present in Compose Multiplatform 1.13.0-beta01 as experimental APIs, so its panel reflows when the window narrows.
 
 ### Files
 

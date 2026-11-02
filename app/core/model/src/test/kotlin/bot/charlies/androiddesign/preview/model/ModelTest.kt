@@ -81,12 +81,19 @@ class ModelTest {
       Views.all.map { it.name },
     )
     assertEquals(
-      ViewSpec("foldable", Device.Foldable, 933, 704, false, SizeClass.Expanded),
+      ViewSpec("foldable", Device.Foldable, 704, 933, false, SizeClass.Medium),
       Views.Foldable,
     )
     assertTrue(Views.Dark.dark && Views.Dark.device == Device.Phone)
     assertEquals(Views.Dark, Views.of(Device.Phone, dark = true))
     assertEquals("tablet-dark", Views.of(Device.Tablet, dark = true).name)
+  }
+
+  /** A layout that adapts at 600 and 840 dp is checked in every size class it can take. */
+  @Test
+  fun `every size class has a view`() {
+    assertEquals(SizeClass.entries.toSet(), Views.all.map { it.sizeClass }.toSet())
+    Views.all.forEach { assertEquals(SizeClass.forWidth(it.width), it.sizeClass, it.name) }
   }
 
   @Test

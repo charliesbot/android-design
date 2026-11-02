@@ -1314,6 +1314,16 @@ fun ActionsScreen(
           ) {
             Icon(painterResource(R.drawable.edit), contentDescription = "Edit, outlined")
           }
+          FilledIconButton(
+            onClick = {},
+            shapes =
+              IconButtonDefaults.shapes(
+                IconButtonDefaults.smallSquareShape,
+                IconButtonDefaults.smallPressedShape,
+              ),
+          ) {
+            Icon(painterResource(R.drawable.edit), contentDescription = "Edit, filled square")
+          }
         }
         FlexBox(
           config = {

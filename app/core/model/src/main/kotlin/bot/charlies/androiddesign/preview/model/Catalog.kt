@@ -671,6 +671,7 @@ private fun actions(): List<ComponentDef> =
       listOf(
         oneOf("variant", "standard", "filled", "tonal", "outlined", default = "standard"),
         oneOf("size", *buttonSizes, default = "small"),
+        oneOf("shape", "round", "square", default = "round"),
         oneOf("width", "narrow", "uniform", "wide", default = "uniform"),
         icon(required = true),
         bool("toggle", "Makes the button a toggle."),

@@ -342,8 +342,29 @@ internal fun NodeContext.iconButtonLook(ambient: Ambient): Look {
         else ambient.container to ColorRole.OnSurfaceVariant
       else -> ambient.container to (if (checked) ColorRole.Primary else ColorRole.OnSurfaceVariant)
     }
-  return Look(container, content, shape = "full", a11yRole = if (toggle) "Checkbox" else "Button")
+  return Look(
+    container,
+    content,
+    shape = iconButtonShape(toggle && checked),
+    a11yRole = if (toggle) "Checkbox" else "Button",
+  )
 }
+
+/**
+ * The corner token of the button's resting shape. A round button is fully round. A square one takes
+ * its corner from its size, and a checked square toggle turns fully round (the selected shape).
+ */
+private fun NodeContext.iconButtonShape(checked: Boolean): String =
+  when {
+    enum("shape") != "square" || checked -> "full"
+    else ->
+      when (enum("size")) {
+        "medium" -> "large"
+        "large",
+        "extra-large" -> "extraLarge"
+        else -> "medium"
+      }
+  }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -376,6 +397,31 @@ internal fun RenderIconButton(ctx: NodeContext) {
       "extra-large" -> IconButtonDefaults.extraLargeIconSize
       else -> IconButtonDefaults.smallIconSize
     }
+  val square = ctx.enum("shape") == "square"
+  val squareShape =
+    when (size) {
+      "extra-small" -> IconButtonDefaults.extraSmallSquareShape
+      "medium" -> IconButtonDefaults.mediumSquareShape
+      "large" -> IconButtonDefaults.largeSquareShape
+      "extra-large" -> IconButtonDefaults.extraLargeSquareShape
+      else -> IconButtonDefaults.smallSquareShape
+    }
+  val pressedShape =
+    when (size) {
+      "extra-small" -> IconButtonDefaults.extraSmallPressedShape
+      "medium" -> IconButtonDefaults.mediumPressedShape
+      "large" -> IconButtonDefaults.largePressedShape
+      "extra-large" -> IconButtonDefaults.extraLargePressedShape
+      else -> IconButtonDefaults.smallPressedShape
+    }
+  val selectedSquareShape =
+    when (size) {
+      "extra-small" -> IconButtonDefaults.extraSmallSelectedSquareShape
+      "medium" -> IconButtonDefaults.mediumSelectedSquareShape
+      "large" -> IconButtonDefaults.largeSelectedSquareShape
+      "extra-large" -> IconButtonDefaults.extraLargeSelectedSquareShape
+      else -> IconButtonDefaults.smallSelectedSquareShape
+    }
   val modifier = ctx.modifier().size(container.width, container.height).then(ctx.describedBy())
   val enabled = ctx.enabled
   val variant = ctx.enum("variant")
@@ -389,7 +435,12 @@ internal fun RenderIconButton(ctx: NodeContext) {
       checked.set(it)
       env.act(action)
     }
-    val shapes = IconButtonDefaults.toggleableShapes()
+    val shapes =
+      if (square) {
+        IconButtonDefaults.toggleableShapes(squareShape, pressedShape, selectedSquareShape)
+      } else {
+        IconButtonDefaults.toggleableShapes()
+      }
     when (variant) {
       "filled" ->
         FilledIconToggleButton(
@@ -433,7 +484,9 @@ internal fun RenderIconButton(ctx: NodeContext) {
     }
   } else {
     val onClick = { env.act(action) }
-    val shapes = IconButtonDefaults.shapes()
+    val shapes =
+      if (square) IconButtonDefaults.shapes(squareShape, pressedShape)
+      else IconButtonDefaults.shapes()
     when (variant) {
       "filled" -> FilledIconButton(onClick, shapes, modifier, enabled, content = content)
       "tonal" -> FilledTonalIconButton(onClick, shapes, modifier, enabled, content = content)
