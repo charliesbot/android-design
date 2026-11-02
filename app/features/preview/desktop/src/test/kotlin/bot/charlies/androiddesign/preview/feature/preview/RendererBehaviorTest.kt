@@ -87,7 +87,8 @@ class RendererBehaviorTest {
           """{"id":"t","component":"Text","text":"compact","sizeClass":{"medium":{"text":"medium"},"expanded":{"text":"expanded"}}}""",
       )
     assertEquals("compact", render(proposal, view = Views.Light).tree.node("t").text?.value)
-    assertEquals("expanded", render(proposal, view = Views.Foldable).tree.node("t").text?.value)
+    assertEquals("medium", render(proposal, view = Views.Foldable).tree.node("t").text?.value)
+    assertEquals("expanded", render(proposal, view = Views.Tablet).tree.node("t").text?.value)
     assertEquals("expanded", render(proposal, view = Views.Desktop).tree.node("t").text?.value)
   }
 
@@ -203,6 +204,36 @@ class RendererBehaviorTest {
           """{"id":"b","component":"Button","label":"A label that is far too long to fit on one line of a phone"}""",
       )
     assertTrue(render(proposal).tree.node("b").text!!.lines > 1)
+  }
+
+  @Test
+  fun `a square icon button reports its square corner and a round one stays full`() {
+    fun shapeOf(props: String): String? =
+      render(
+          singleScreen(
+            """{"id":"root","component":"Scaffold","content":"col"},{"id":"col","component":"Column","children":["b"]},""" +
+              """{"id":"b","component":"IconButton","icon":"play_arrow",$props}""",
+          ),
+        )
+        .tree
+        .node("b")
+        .roles
+        ?.shape
+    assertEquals("full", shapeOf(""""variant":"filled""""))
+    assertEquals("full", shapeOf(""""variant":"filled","shape":"round""""))
+    assertEquals("medium", shapeOf(""""variant":"filled","shape":"square""""))
+    assertEquals("medium", shapeOf(""""variant":"filled","shape":"square","size":"extra-small""""))
+    assertEquals("large", shapeOf(""""variant":"filled","shape":"square","size":"medium""""))
+    assertEquals("extraLarge", shapeOf(""""variant":"filled","shape":"square","size":"large""""))
+    assertEquals(
+      "extraLarge",
+      shapeOf(""""variant":"filled","shape":"square","size":"extra-large""""),
+    )
+    assertEquals(
+      "full",
+      shapeOf(""""variant":"filled","shape":"square","toggle":true,"checked":true"""),
+    )
+    assertEquals("medium", shapeOf(""""variant":"filled","shape":"square","toggle":true"""))
   }
 
   @Test

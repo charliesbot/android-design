@@ -925,7 +925,8 @@ private fun ScreenEmitter.iconButton(node: ComponentNode, p: JsonObject, place: 
       }
   val size = p.nonDefault("IconButton", "size")
   val sizeName = size?.let { Naming.camel(it) }
-  if (toggle || size != null || p.nonDefault("IconButton", "width") != null) expressive()
+  val square = p.literal("shape") == "square"
+  if (toggle || square || size != null || p.nonDefault("IconButton", "width") != null) expressive()
   // The buttons take no width parameter: Narrow and Wide go through the container size.
   val width =
     p.literal("width")
@@ -948,8 +949,15 @@ private fun ScreenEmitter.iconButton(node: ComponentNode, p: JsonObject, place: 
         listOf(pos("1.${file.use(Sym.dp)}"), pos(colorRole("outlineVariant"))),
       )
     else null
+  // A square button takes the shapes of its size, which is small when the size is the default.
+  val shapeSize = sizeName ?: "small"
   val shapes =
     when {
+      square && toggle ->
+        "$defaults.toggleableShapes($defaults.${shapeSize}SquareShape, " +
+          "$defaults.${shapeSize}PressedShape, $defaults.${shapeSize}SelectedSquareShape)"
+      square ->
+        "$defaults.shapes($defaults.${shapeSize}SquareShape, $defaults.${shapeSize}PressedShape)"
       toggle -> "$defaults.toggleableShapes()"
       sizeName != null -> "$defaults.shapes($defaults.${sizeName}RoundShape)"
       else -> null

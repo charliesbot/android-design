@@ -376,10 +376,10 @@ class AppPreviewControllerTest {
     assertEquals("NavigationRail", layout("home", "tablet").nav)
     assertEquals("NavigationRail", layout("home", "desktop").nav)
     assertEquals("none", layout("fabs", "light").nav)
-    // The detail opens over the list on a phone and beside it from the foldable up.
+    // The detail opens over the list up to medium (the foldable) and beside it from expanded up.
     assertEquals(listOf("detail"), layout("detail", "light").panes.keys.toList())
+    assertEquals(listOf("detail"), layout("detail", "foldable").panes.keys.toList())
     assertEquals(listOf("home", "detail"), layout("detail", "tablet").panes.keys.toList())
-    assertEquals(listOf("home", "detail"), layout("detail", "foldable").panes.keys.toList())
     val region = Regex("""[A-Z]\w+ \S+ \d+|\+\d+ more""")
     for ((screen, views) in check.screens) {
       for ((view, result) in views) {

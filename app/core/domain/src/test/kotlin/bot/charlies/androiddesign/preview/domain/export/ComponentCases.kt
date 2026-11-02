@@ -461,6 +461,76 @@ internal val componentCases: List<ComponentCase> =
         ),
     ),
     case(
+      "IconButton",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"IconButton","variant":"filled","shape":"square","icon":"play_arrow","contentDescription":"Play"}""",
+        ),
+      expect =
+        listOf(
+          "FilledIconButton(",
+          "shapes = IconButtonDefaults.shapes(IconButtonDefaults.smallSquareShape, IconButtonDefaults.smallPressedShape)",
+        ),
+      reject = listOf("RoundShape", "toggleableShapes"),
+    ),
+    case(
+      "IconButton",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"IconButton","variant":"tonal","size":"large","shape":"square","icon":"skip_next","contentDescription":"Next"}""",
+        ),
+      expect =
+        listOf(
+          "FilledTonalIconButton(",
+          "shapes = IconButtonDefaults.shapes(IconButtonDefaults.largeSquareShape, IconButtonDefaults.largePressedShape)",
+          "Modifier.size(IconButtonDefaults.largeContainerSize())",
+        ),
+      reject = listOf("RoundShape"),
+    ),
+    case(
+      "IconButton",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"IconButton","variant":"filled","size":"extra-small","shape":"square","icon":"favorite","toggle":true,"checked":true}""",
+        ),
+      expect =
+        listOf(
+          "FilledIconToggleButton(",
+          "shapes = IconButtonDefaults.toggleableShapes(IconButtonDefaults.extraSmallSquareShape, IconButtonDefaults.extraSmallPressedShape, IconButtonDefaults.extraSmallSelectedSquareShape)",
+        ),
+      reject = listOf("RoundShape", "toggleableShapes()"),
+    ),
+    case(
+      "IconButton",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"IconButton","variant":"outlined","shape":"square","icon":"shuffle","toggle":true}""",
+        ),
+      expect =
+        listOf(
+          "OutlinedIconToggleButton(",
+          "shapes = IconButtonDefaults.toggleableShapes(IconButtonDefaults.smallSquareShape, IconButtonDefaults.smallPressedShape, IconButtonDefaults.smallSelectedSquareShape)",
+        ),
+    ),
+    case(
+      "IconButton",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"IconButton","variant":"filled","size":"medium","shape":"round","icon":"star"}""",
+        ),
+      expect =
+        listOf(
+          "FilledIconButton(",
+          "shapes = IconButtonDefaults.shapes(IconButtonDefaults.mediumRoundShape)",
+        ),
+      reject = listOf("SquareShape", "PressedShape"),
+    ),
+    case(
       "SplitButton",
       "Menu",
       "MenuItem",

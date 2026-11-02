@@ -34,7 +34,7 @@ The app starts Koin and has a single Navigation 3 destination. Previews call the
 | Pixel 11 | 411 x 923 dp | 420 dpi | Modeled density from Pixel 10, with Pixel 11's 1080 x 2424 physical panel. Not a verified factory density. |
 | Pixel Tablet | 1280 x 800 dp | 320 dpi | Android Studio `pixel_tablet` profile, landscape, xhdpi. |
 | Desktop 1080p | 1920 x 1080 dp | 160 dpi | Representative 1080p desktop display at 1x, chosen so the desktop canvas reaches the extra large window size class (1600dp and up) instead of sharing the tablet's large class. |
-| Z Fold8 non-Ultra | 933 x 704 dp | 420 dpi | Modeled density, landscape main-display orientation, based on the 2448 x 1848 retail specification. Landscape reads as an open foldable and reaches the expanded window size class. |
+| Z Fold8 non-Ultra | 704 x 933 dp | 420 dpi | Modeled density, main display held upright, based on the 2448 x 1848 retail specification. Portrait is the medium window size class, the only canvas here between the phone and the expanded tablet. |
 
 These are full content-only preview canvases, with no simulated system UI. Do not subtract guessed status-bar or taskbar heights. Insets, folds, input, and motion need separate device validation. Rounding to whole dp can shift output pixels slightly from panel resolution. Use explicit `dp` device specs: the verified Compose Preview CLI 2.33.0 render treated pixel-unit dimensions as the default 400 x 800 dp canvas instead of the requested dimensions.
 

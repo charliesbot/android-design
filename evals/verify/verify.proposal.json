@@ -1117,6 +1117,14 @@
           "contentDescription": "Edit, outlined"
         },
         {
+          "id": "icon_square",
+          "component": "IconButton",
+          "variant": "filled",
+          "shape": "square",
+          "icon": "edit",
+          "contentDescription": "Edit, filled square"
+        },
+        {
           "id": "icon_variants",
           "component": "Row",
           "spacing": "sm",
@@ -1124,7 +1132,8 @@
             "icon_standard",
             "icon_filled",
             "icon_tonal",
-            "icon_outlined"
+            "icon_outlined",
+            "icon_square"
           ]
         },
         {

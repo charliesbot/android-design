@@ -1878,6 +1878,14 @@
           ],
           "default": "small"
         },
+        "shape": {
+          "type": "string",
+          "enum": [
+            "round",
+            "square"
+          ],
+          "default": "round"
+        },
         "width": {
           "type": "string",
           "enum": [
