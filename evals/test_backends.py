@@ -55,6 +55,16 @@ class BackendTests(unittest.TestCase):
         self.assertIn('--strict-mcp-config', seen['cmd'])
         self.assertEqual(seen['cmd'][seen['cmd'].index('--allowedTools') + 1], 'mcp__android_design_preview__*')
 
+    def test_claude_generator_may_write_only_inside_its_case_folder(self):
+        # Like Codex's workspace-write: `claude -p` refuses file writes it was not allowed.
+        with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, '{"result": "ok"}', '')) as call:
+            backends.execute('claude', 'brief', Path('/tmp/case'), role='generator', mcp_binary=BINARY)
+        cmd = call.call_args.args[0]
+        allowed = cmd[cmd.index('--allowedTools') + 1:cmd.index('--allowedTools') + 3]
+        self.assertEqual(allowed[1], f'Edit(/{Path("/tmp/case").resolve()}/**)')
+        self.assertNotIn('--dangerously-skip-permissions', cmd)
+        self.assertNotIn('--permission-mode', cmd)
+
     def test_claude_judge_gets_no_mcp_server(self):
         with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, '{"result": "ok"}', '')) as call:
             backends.execute('claude', 'judge', Path('/tmp'), role='judge', images=['/tmp/a.png'])
