@@ -70,6 +70,76 @@ class BindingExportTest {
     assertHas(source, "Text(count.toString())", "var bChecked by remember { mutableStateOf(open) }")
   }
 
+  /**
+   * A prop that picks the Compose call, the scroll or the grid kind exports the same code when it
+   * is bound to a sample value as when it is written out: the previewer draws the sample.
+   */
+  @Test
+  fun `a bound prop that picks the call exports as its sample value`() {
+    class Case(val sample: String, val template: String)
+    val cases =
+      listOf(
+        Case("true", """{"id":"root","component":"Divider","vertical":%s}"""),
+        Case("true", """{"id":"root","component":"Column","scroll":%s,"children":["t"]}"""),
+        Case("3", """{"id":"root","component":"Grid","columns":%s,"children":["t"]}"""),
+        Case("true", """{"id":"root","component":"LoadingIndicator","contained":%s}"""),
+        Case("true", """{"id":"root","component":"ProgressIndicator","wavy":%s}"""),
+        Case(
+          "true",
+          """{"id":"root","component":"IconButton","icon":"star","toggle":%s,"checked":true}""",
+        ),
+        Case(
+          "true",
+          """{"id":"root","component":"FloatingActionButton","icon":"add","label":"New","extended":%s}""",
+        ),
+        Case("true", """{"id":"root","component":"ChipGroup","multi":%s,"children":["a","b"]}"""),
+      )
+    val rest =
+      arrayOf(
+        """{"id":"t","component":"Text","text":"t"}""",
+        """{"id":"a","component":"FilterChip","label":"A"}""",
+        """{"id":"b","component":"FilterChip","label":"B"}""",
+      )
+    cases.forEach { case ->
+      fun body(value: String, data: String? = null) =
+        ExportFixtures.body(
+          ExportFixtures.export(case.template.format(value), *rest, dataModel = data),
+        )
+      val written = body(case.sample)
+      val bound = body("""{"@path":"/v"}""", """{"v":${case.sample}}""")
+      assertTrue(written != body("false"), "${case.template} should change the export")
+      assertEquals(written, bound, case.template)
+    }
+  }
+
+  /**
+   * A bound number skips validation, so the export moves it into the catalog's bounds as the
+   * previewer does.
+   */
+  @Test
+  fun `a bound grid size is moved into its bounds like the previewer does`() {
+    fun body(prop: String, value: String, data: String? = null) =
+      ExportFixtures.body(
+        ExportFixtures.export(
+          """{"id":"root","component":"Grid","$prop":$value,"children":["t"]}""",
+          """{"id":"t","component":"Text","text":"t"}""",
+          dataModel = data,
+        ),
+      )
+    listOf(
+        Triple("columns", "0", "1"),
+        Triple("columns", "-1", "1"),
+        Triple("columns", "2.6", "3"),
+        Triple("columns", "30", "24"),
+        Triple("minColumnWidth", "0", "1"),
+        Triple("minColumnWidth", "5000", "1000"),
+      )
+      .forEach { (prop, sample, drawn) ->
+        val bound = body(prop, """{"@path":"/v"}""", """{"v":$sample}""")
+        assertEquals(body(prop, drawn), bound, "$prop bound to $sample")
+      }
+  }
+
   @Test
   fun `a binding with no sample value is an empty string`() {
     val source =
@@ -134,7 +204,7 @@ class BindingExportTest {
       )
     assertHas(
       source,
-      "groups.forEach { group -> Column { group.subs.forEach { sub -> Text(sub.label) } } }",
+      "groups.forEach { group -> Column(modifier = Modifier.fillMaxWidth()) { group.subs.forEach { sub -> Text(sub.label) } } }",
     )
   }
 

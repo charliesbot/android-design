@@ -17,9 +17,9 @@ class RenderCrashTest {
   private val plates = Path.of(System.getProperty("fixtures.dir")).resolve("plates.proposal.json")
 
   /** Draws like the real renderer, except that `plate_detail` in the dark view throws. */
-  private val flaky = ScreenRenderer { proposal, design, dir, screen, view ->
+  private val flaky = ScreenRenderer { source, screen, view ->
     if (screen == "plate_detail" && view.name == "dark") error("boom\nsecond line")
-    HeadlessRenderer.render(proposal, design, dir, screen, view)
+    HeadlessRenderer.image(source, screen, view)
   }
 
   @Test

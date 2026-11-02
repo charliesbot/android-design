@@ -1,5 +1,6 @@
 package bot.charlies.androiddesign.preview.domain.export
 
+import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.navigation.NavigationGraph
 import bot.charlies.androiddesign.preview.model.ActionFunction
 import bot.charlies.androiddesign.preview.model.ComponentNode
@@ -47,6 +48,16 @@ internal data class Place(
   val scope: Scope? = null,
   /** The component type of the parent, which decides whether `weight` applies. */
   val parentType: String? = null,
+  /**
+   * True when the parent lets its children stretch to its width (the catalog's
+   * [bot.charlies.androiddesign.preview.model.ComponentDef.stretchesChildren]). The screen's root
+   * counts as stretched, as it does in the previewer.
+   */
+  val parentStretches: Boolean = true,
+  /**
+   * True when the component drawn here stretches to the parent's width: it gets `fillMaxWidth()`.
+   */
+  val fillWidth: Boolean = false,
   /** `Modifier`, or `modifier` for the screen's root. */
   val modifierBase: String = "Modifier",
   /** Modifier calls to put first, such as `padding(innerPadding)`. */
@@ -63,6 +74,8 @@ internal data class Place(
   fun forChild(parentType: String) =
     copy(
       parentType = parentType,
+      parentStretches = M3ExpressiveCatalog.find(parentType)?.stretchesChildren ?: false,
+      fillWidth = false,
       modifierBase = "Modifier",
       leading = emptyList(),
       listPosition = null,
@@ -92,7 +105,12 @@ internal class ScreenEmitter(
   val overlays: List<ComponentNode> =
     screen.components.filter { it.component in M3ExpressiveCatalog.overlayNames }
 
-  /** Overlays written beside their anchor instead of at the end of the screen. */
+  /** Which overlays are written beside a component and which at the end of the screen. */
+  val placement = OverlayPlacement(screen)
+
+  /**
+   * Menus already written beside a component, so one drawn from several variants is not doubled.
+   */
   val placedOverlays = mutableSetOf<String>()
 
   var usesSizeClass = false
@@ -120,7 +138,7 @@ internal class ScreenEmitter(
     val root = byId[ComponentNode.ROOT_ID]
     val rootStatements =
       if (root == null) emptyList() else emit(root.id, Place(modifierBase = "modifier"))
-    val tail = overlays.filter { it.id !in placedOverlays }.flatMap { overlayStatements(it) }
+    val tail = placement.screenLevel.flatMap { overlayStatements(it) }
     if (usesSizeClass) body += sizeClassState()
     body += rootStatements
     body += tail
@@ -297,9 +315,7 @@ internal class ScreenEmitter(
   /** A boolean prop of [component]: the stated literal, else its catalog default. */
   fun JsonObject.option(component: String, key: String): Boolean =
     flag(key)
-      ?: checkNotNull(
-        M3ExpressiveCatalog.find(component)?.defaultOf(key)?.content?.toBooleanStrictOrNull(),
-      ) {
+      ?: checkNotNull(catalogDefault(component, key)?.toBooleanStrictOrNull()) {
         "$component.$key has no default"
       }
 
@@ -311,6 +327,37 @@ internal class ScreenEmitter(
 
   fun JsonObject.number(key: String): Double? =
     (this[key] as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toDoubleOrNull()
+
+  /**
+   * The value prop [key] has in the sample data, as the previewer resolves it: a literal as is, a
+   * binding as its sample value (null when nothing is there), and the loop index as a number whose
+   * value no width rule reads. A template body is written once, so a binding inside it reads the
+   * sample of the first item.
+   */
+  fun JsonObject.sampleValue(key: String, place: Place): JsonElement? {
+    val element = this[key] ?: return null
+    if (isIndex(element)) return place.scope?.let { JsonPrimitive(0) }
+    val path = bindingPath(element) ?: return element
+    return resolve(path, place.scope).sample
+  }
+
+  /** A flag that picks the Compose call or the modifier: its [sampleValue] as a boolean. */
+  fun JsonObject.sampleFlag(key: String, place: Place): Boolean? =
+    (sampleValue(key, place) as? JsonPrimitive)?.content?.toBooleanStrictOrNull()
+
+  /**
+   * A number of [component] that picks the Compose call: its [sampleValue] as the previewer reads
+   * it, a finite `Float` moved into the catalog's bounds
+   * ([bot.charlies.androiddesign.preview.model.ComponentDef.coerceNumber]).
+   */
+  fun JsonObject.sampleNumber(component: String, key: String, place: Place): Double? {
+    val value =
+      (sampleValue(key, place) as? JsonPrimitive)?.content?.toDoubleOrNull()?.takeIf {
+        it.isFinite()
+      } ?: return null
+    val def = M3ExpressiveCatalog.find(component) ?: return value
+    return def.coerceNumber(key, value.toFloat().toDouble())
+  }
 
   /** A string prop as a Kotlin expression: a literal, a bound value, or the loop index. */
   fun JsonObject.text(key: String, place: Place): Expr? = textOf(this[key], place)
@@ -429,8 +476,9 @@ internal class ScreenEmitter(
   // region modifiers
 
   /**
-   * The `modifier` argument: the place's leading calls, the weight inside a row or column, any
-   * [extra] calls, and the padding last. Null when there is nothing to say.
+   * The `modifier` argument: the place's leading calls, the weight inside a row or column, the
+   * stretch to the parent's width, any [extra] calls, and the padding last. Null when there is
+   * nothing to say.
    */
   fun modifier(place: Place, props: JsonObject, vararg extra: String?): Arg? {
     val parts = mutableListOf<String>()
@@ -438,6 +486,7 @@ internal class ScreenEmitter(
     if (place.parentType == "Row" || place.parentType == "Column") {
       props.floatExpr("weight", place)?.let { parts += "weight($it)" }
     }
+    if (place.fillWidth) parts += useModifier("fillMaxWidth()")
     parts += extra.filterNotNull().map(::useModifier)
     props.literal("padding")?.let { parts += "${useModifier("padding")}(${spacing(it)})" }
     return modifierArg(place, parts)

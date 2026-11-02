@@ -64,7 +64,7 @@ def check_palette(report):
     return result(not bad, f"theme variant {variant}" if bad else "")
 
 
-def run(case_dir: Path, surface: str = "phone"):
+def run(case_dir: Path):
     """The deterministic checks every case gets."""
     case_dir = Path(case_dir)
     report = read_report(case_dir)

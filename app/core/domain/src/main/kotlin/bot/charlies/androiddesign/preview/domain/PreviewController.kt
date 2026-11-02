@@ -1,6 +1,5 @@
 package bot.charlies.androiddesign.preview.domain
 
-import bot.charlies.androiddesign.preview.domain.layout.ViewLayout
 import bot.charlies.androiddesign.preview.model.Device
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PaletteVariant
@@ -85,32 +84,6 @@ data class ProposalCheck(
   val pass: Boolean,
   val ms: Long,
   val screens: Map<String, Map<String, ViewCheck>>,
-)
-
-/**
- * One screen at one view. Info findings are only counted; [errors] fail the view. [layout] says
- * what the view shows, so adaptation can be compared across views without reading a tree; a render
- * that threw has none.
- */
-@Serializable
-data class ViewCheck(
-  val pass: Boolean,
-  val info: Int = 0,
-  val errors: List<CheckError> = emptyList(),
-  val layout: ViewLayout? = null,
-)
-
-/**
- * The error findings of one view that share a [rule] and [detail], with the components they are
- * about in [ids] (empty when the finding concerns the whole view). A rule such as `one-fab` words
- * its detail once for all offenders, so grouping keeps the result small without dropping a node. A
- * render that threw is the rule `render-error`.
- */
-@Serializable
-data class CheckError(
-  val rule: String,
-  val ids: List<String> = emptyList(),
-  val detail: String? = null,
 )
 
 @Serializable

@@ -6,26 +6,18 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Whether the preview window is on screen. The window follows [visible]; closing it only hides it,
- * because the process has to keep serving the agent.
+ * because the process has to keep serving the agent. It starts hidden, until `open_proposal` or
+ * `show_preview` brings it up.
  */
-interface PreviewWindow {
-  val visible: StateFlow<Boolean>
-
-  fun show()
-
-  fun hide()
-}
-
-/** The window starts hidden, until `open_proposal` or `show_preview` brings it up. */
-class WindowVisibility(initiallyVisible: Boolean = false) : PreviewWindow {
+class PreviewWindow(initiallyVisible: Boolean = false) {
   private val state = MutableStateFlow(initiallyVisible)
-  override val visible: StateFlow<Boolean> = state.asStateFlow()
+  val visible: StateFlow<Boolean> = state.asStateFlow()
 
-  override fun show() {
+  fun show() {
     state.value = true
   }
 
-  override fun hide() {
+  fun hide() {
     state.value = false
   }
 }

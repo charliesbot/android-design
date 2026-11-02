@@ -22,7 +22,7 @@ Implementing or reviewing real Compose code needs the `compose-preview` CLI and 
 
 ## Exploration or implementation
 
-When the request cares about the design of a new app, a new screen, or a redesign (it asks for polish, a visual direction, or Material 3 Expressive, or names this skill), start with a proposal, even when it says "build": follow the `android-design-explore` skill, show its proposal in the previewer app, and wait for the user to approve a direction before writing any Compose. Skip the proposal when the user says to ("skip the proposal", "just code it") or an approved proposal already exists; port an approved proposal with that skill's mapping table.
+When the request cares about the design of a new app, a new screen, or a redesign (it asks for polish, a visual direction, or Material 3 Expressive, or names this skill), start with a proposal, even when it says "build": follow the `android-design-explore` skill, show its proposal in the previewer app, and wait for the user to approve a direction before writing any Compose. Skip the proposal when the user says to ("skip the proposal", "just code it") or an approved proposal already exists; port an approved proposal with that skill's "Approve and port" steps, which start with `export_kotlin`.
 
 A plain build that does not ask about design goes straight to code, applying the decisions and screen check below.
 
@@ -280,6 +280,8 @@ Material says how components look; Android's own design guides say how an app be
 - **Support landscape, window resizing, and both light and dark themes** on every screen; never lock orientation or theme.
 
 ## Screen check
+
+For a proposal, use the `android-design-explore` skill's Check step instead of rendering.
 
 Look at the rendered screen, not the code. Use the `compose-preview` skill to render and inspect Compose previews; for a UI Builder design, use the builder skill's visual verification workflow and identify the output type. If you can't render it, report "visual quality unverified" instead of answering from code.
 

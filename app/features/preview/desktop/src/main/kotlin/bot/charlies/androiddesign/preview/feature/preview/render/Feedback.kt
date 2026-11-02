@@ -8,6 +8,14 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
+import bot.charlies.androiddesign.preview.model.ColorRole
+
+internal fun NodeContext.loadingIndicatorLook(ambient: Ambient) =
+  if (bool("contained")) {
+    Look(ColorRole.SecondaryContainer, ColorRole.Primary, shape = "full")
+  } else {
+    Look(ambient.container, ColorRole.Primary)
+  }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -15,6 +23,9 @@ internal fun RenderLoadingIndicator(ctx: NodeContext) {
   if (ctx.bool("contained")) ContainedLoadingIndicator(ctx.modifier())
   else LoadingIndicator(ctx.modifier())
 }
+
+internal fun NodeContext.progressIndicatorLook(ambient: Ambient) =
+  Look(ambient.container, ColorRole.Primary)
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -30,7 +41,7 @@ internal fun RenderProgressIndicator(ctx: NodeContext) {
       else -> CircularProgressIndicator(modifier)
     }
   } else {
-    val modifier = ctx.modifier(fillWidth = true)
+    val modifier = ctx.modifier()
     when {
       wavy && progress != null -> LinearWavyProgressIndicator({ progress }, modifier)
       wavy -> LinearWavyProgressIndicator(modifier)

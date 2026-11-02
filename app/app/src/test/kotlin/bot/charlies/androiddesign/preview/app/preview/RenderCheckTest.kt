@@ -3,12 +3,11 @@ package bot.charlies.androiddesign.preview.app.preview
 import bot.charlies.androiddesign.preview.app.AppInfo
 import bot.charlies.androiddesign.preview.data.FileProposalRepository
 import bot.charlies.androiddesign.preview.domain.ViewChange
+import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
-import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.Device
 import bot.charlies.androiddesign.preview.model.LayoutTree
-import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import java.nio.file.Files
 import java.nio.file.Path
@@ -37,15 +36,13 @@ class RenderCheckTest {
     val calls = CopyOnWriteArrayList<Call>()
 
     override suspend fun render(
-      proposal: Proposal,
-      design: DesignSystem,
-      proposalDir: Path?,
+      source: RenderSource,
       screen: String,
       view: ViewSpec,
       live: ProposalHostState?,
     ): LayoutTree {
       calls += Call(screen, view, live)
-      return real.render(proposal, design, proposalDir, screen, view, live)
+      return real.render(source, screen, view, live)
     }
   }
 
@@ -57,7 +54,7 @@ class RenderCheckTest {
     AppPreviewController(
       repository = FileProposalRepository(),
       viewer = viewer,
-      window = WindowVisibility(),
+      window = PreviewWindow(),
       renderer = renderer,
       scope = scope,
       version = AppInfo.VERSION,

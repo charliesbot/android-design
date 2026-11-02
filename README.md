@@ -17,6 +17,8 @@ Chai syncs the whole `skills/` folder, which installs two skills: `android-desig
 
 Design exploration runs in a native macOS app in `app/`. The agent writes a proposal as a JSON file (`design/<slug>.proposal.json`, next to the app's `DESIGN.md`), and the app draws it with real Compose Material 3 components in a live window that redraws on every save. The agent checks its work through the app's layout tree over MCP; you judge the design in the window, switching device, light and dark, seed color, and palette style. When you approve a direction, the app exports it as Kotlin for the port.
 
+The names map one to one: the previewer app is the `AndroidDesignPreview.app` bundle, its window title is "Android Design Preview", and it registers as the MCP server `android_design_preview`.
+
 ### Build and install
 
 Needs macOS and JDK 17.
@@ -46,13 +48,15 @@ The same binary renders headlessly for scripts and evals: `render <proposal.json
 
 ## Implementing real Compose
 
-For implementing and reviewing real Compose code, running the export check, and Wear work, install the [Compose preview CLI](https://github.com/yschimke/compose-ai-tools) and the Android SDK:
+For implementing and reviewing real Compose code, and for Wear work, install the [Compose preview CLI](https://github.com/yschimke/compose-ai-tools) and the Android SDK:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yschimke/skills/main/scripts/install.sh | bash -s -- --cli-only
 ```
 
-Then install the [`compose-preview` and `compose-ui-builder` skills](https://github.com/yschimke/skills) and check the setup with `compose-preview doctor`. Python 3 runs the evals and the source scripts.
+Then install the [`compose-preview` and `compose-ui-builder` skills](https://github.com/yschimke/skills) and check the setup with `compose-preview doctor`.
+
+The manual export check in [`evals/README.md`](evals/README.md) needs only JDK 17 and the Android SDK: it renders `evals/compose-starter/` with Gradle's `updateDebugScreenshotTest`. Python 3 runs the evals and the source scripts.
 
 ## What is here
 

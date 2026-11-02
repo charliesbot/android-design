@@ -20,3 +20,19 @@ internal inline fun <reified T : Any> NodeContext.local(key: String, initial: T)
 @Composable
 internal fun NodeContext.checkedState(key: String = "checked"): LocalValue<Boolean> =
   local(key, bool(key))
+
+/** The index picked in [group] by a tap on one of its items, or null before the first tap. */
+internal fun NodeContext.groupSelected(group: String): Int? =
+  env.host.interaction.get<Int>(env.stateKey("selection:$group"))
+
+/**
+ * Whether this item is the picked one of [group]: after a tap the tapped item, before it the one
+ * whose `selected` prop is set.
+ */
+internal fun NodeContext.isPickedIn(group: String): Boolean =
+  groupSelected(group)?.let { it == host.groupIndex } ?: bool("selected")
+
+/** Makes this item the picked one of [group]. */
+internal fun NodeContext.selectInGroup(group: String) {
+  env.host.interaction[env.stateKey("selection:$group")] = host.groupIndex
+}

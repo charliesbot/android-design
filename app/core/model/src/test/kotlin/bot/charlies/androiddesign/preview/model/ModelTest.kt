@@ -2,9 +2,11 @@ package bot.charlies.androiddesign.preview.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 
@@ -152,5 +154,15 @@ class ModelTest {
         listOf(Finding("b", FindingRule.TouchTarget, Severity.Error)),
       )
     assertTrue(!tree.pass)
+  }
+
+  @Test
+  fun `bounds read four numbers and nothing else`() {
+    fun decode(json: String) = PreviewJson.compact.decodeFromString(Bounds.serializer(), json)
+    assertEquals(Bounds(1f, 2.5f, 3f, 4f), decode("[1, 2.5, 3, 4]"))
+    for (bad in listOf("[1,2,3]", "[1,2,3,4,5]", "[1,2,\"x\",4]", "[1,2,null,4]", "{}", "7")) {
+      val failure = assertFailsWith<SerializationException>(bad) { decode(bad) }
+      assertEquals("Bounds must be [x, y, width, height]", failure.message, bad)
+    }
   }
 }

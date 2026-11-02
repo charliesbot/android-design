@@ -7,20 +7,32 @@ import bot.charlies.androiddesign.preview.model.NodeColors
 import bot.charlies.androiddesign.preview.model.NodeRoles
 import bot.charlies.androiddesign.preview.model.TypeRole
 
-/** The roles and the text a component draws with, before they become hex and font names. */
-private class Look(
+/**
+ * The roles and the text a component draws with, before they become hex and font names. Each
+ * component family builds its own beside its renderer, from the same role decisions.
+ */
+internal class Look(
   val container: ColorRole,
   val content: ColorRole,
   val type: TypeRole? = null,
   val shape: String? = null,
   val text: String? = null,
   val a11yRole: String? = null,
-)
+) {
+  /** A look that takes both roles from [on]. */
+  constructor(
+    on: Ambient,
+    type: TypeRole? = null,
+    shape: String? = null,
+    text: String? = null,
+    a11yRole: String? = null,
+  ) : this(on.container, on.content, type, shape, text, a11yRole)
+}
 
 /**
- * What the tree says about [ctx]: the Material roles its colors come from (the same table the
- * renderer passes to the components, from `compose-mapping.md`), its text, and how a screen reader
- * would announce it. The measured parts (bounds, text layout) are added by the recorder.
+ * What the tree says about [ctx]: the Material roles its colors come from (the family's `*Look`
+ * beside its renderer), its text, and how a screen reader would announce it. The measured parts
+ * (bounds, text layout) are added by the recorder.
  */
 internal fun describe(ctx: NodeContext, ambient: Ambient): NodeMeta {
   val env = ctx.env
@@ -60,260 +72,53 @@ internal fun describe(ctx: NodeContext, ambient: Ambient): NodeMeta {
 
 private val ACTION_HOSTS = setOf("Card", "ListItem")
 
-private fun buttonType(size: String): TypeRole =
-  when (size) {
-    "medium" -> TypeRole.TitleMedium
-    "large" -> TypeRole.HeadlineSmall
-    "extra-large" -> TypeRole.HeadlineLarge
-    else -> TypeRole.LabelLarge
-  }
-
-private fun look(ctx: NodeContext, ambient: Ambient): Look {
-  val on = ambient.container
-  return when (ctx.component) {
-    "Text" ->
-      Look(
-        ambient.container,
-        ctx.colorRole() ?: ambient.content,
-        ctx.typeRole(TypeRole.BodyLarge),
-        text = ctx.string("text"),
-      )
-    "Icon" -> Look(on, ctx.colorRole() ?: ambient.content, a11yRole = "Image")
-    "Image" -> Look(on, ambient.content, a11yRole = "Image")
-    "Scaffold" -> Look(ColorRole.Background, ColorRole.OnBackground)
-    "TopAppBar" ->
-      Look(ColorRole.Surface, ColorRole.OnSurface, TypeRole.TitleLarge, text = ctx.string("title"))
-    "NavigationBar" -> Look(ColorRole.SurfaceContainer, ColorRole.OnSurfaceVariant)
-    "NavigationBarItem" ->
-      Look(
-        ColorRole.SurfaceContainer,
-        ColorRole.OnSurfaceVariant,
-        TypeRole.LabelMedium,
-        text = ctx.string("label"),
-        a11yRole = "Tab",
-      )
-    "NavigationRail" -> Look(ColorRole.Surface, ColorRole.OnSurfaceVariant)
-    "NavigationRailItem" ->
-      Look(
-        ColorRole.Surface,
-        ColorRole.OnSurfaceVariant,
-        TypeRole.LabelMedium,
-        text = ctx.string("label"),
-        a11yRole = "Tab",
-      )
-    "FloatingToolbar" ->
-      if (ctx.enum("colors") == "vibrant") {
-        Look(ColorRole.PrimaryContainer, ColorRole.OnPrimaryContainer, shape = "full")
-      } else {
-        Look(ColorRole.SurfaceContainer, ColorRole.OnSurface, shape = "full")
-      }
-    "Card" -> {
-      val container =
-        ctx.style.container
-          ?: when (ctx.enum("variant")) {
-            "elevated" -> ColorRole.SurfaceContainerLow
-            "outlined" -> ColorRole.Surface
-            else -> ColorRole.SurfaceContainerHighest
-          }
-      Look(container, ctx.style.color ?: ColorRole.OnSurface, shape = ctx.shapeName() ?: "medium")
-    }
-    "ListItem" ->
-      Look(
-        if (ctx.host.segmented) ColorRole.SurfaceContainer else ColorRole.Surface,
-        ColorRole.OnSurface,
-        TypeRole.BodyLarge,
-        text = ctx.string("headline"),
-        a11yRole = if (ctx.props.action("action") != null) "Button" else null,
-      )
-    "Button" -> {
-      val (container, content) =
-        when (ctx.enum("variant")) {
-          "tonal" -> ColorRole.SecondaryContainer to ColorRole.OnSecondaryContainer
-          "elevated" -> ColorRole.SurfaceContainerLow to ColorRole.Primary
-          "outlined",
-          "text" -> on to ColorRole.Primary
-          else -> ColorRole.Primary to ColorRole.OnPrimary
-        }
-      Look(
-        container,
-        content,
-        buttonType(ctx.enum("size")),
-        if (ctx.enum("shape") == "square") "large" else "full",
-        ctx.string("label"),
-        "Button",
-      )
-    }
-    "ToggleButton" -> {
-      val checked = ctx.bool("checked")
-      val (container, content) =
-        when (ctx.enum("variant")) {
-          "tonal" ->
-            if (checked) ColorRole.Secondary to ColorRole.OnSecondary
-            else ColorRole.SecondaryContainer to ColorRole.OnSecondaryContainer
-          "elevated" ->
-            if (checked) ColorRole.Primary to ColorRole.OnPrimary
-            else ColorRole.SurfaceContainerLow to ColorRole.Primary
-          "outlined" ->
-            if (checked) ColorRole.InverseSurface to ColorRole.InverseOnSurface
-            else on to ColorRole.OnSurfaceVariant
-          else ->
-            if (checked) ColorRole.Primary to ColorRole.OnPrimary
-            else ColorRole.SurfaceContainer to ColorRole.OnSurface
-        }
-      Look(
-        container,
-        content,
-        buttonType(ctx.enum("size")),
-        "full",
-        ctx.string("label"),
-        "Checkbox",
-      )
-    }
-    "ButtonGroup" -> Look(on, ambient.content)
-    "IconButton" -> {
-      val checked = ctx.bool("toggle") && ctx.bool("checked")
-      val toggle = ctx.bool("toggle")
-      val (container, content) =
-        when (ctx.enum("variant")) {
-          "filled" ->
-            if (toggle && !checked) ColorRole.SurfaceContainerHighest to ColorRole.Primary
-            else ColorRole.Primary to ColorRole.OnPrimary
-          "tonal" ->
-            if (toggle && !checked) ColorRole.SurfaceContainerHighest to ColorRole.OnSurfaceVariant
-            else ColorRole.SecondaryContainer to ColorRole.OnSecondaryContainer
-          "outlined" ->
-            if (checked) ColorRole.InverseSurface to ColorRole.InverseOnSurface
-            else on to ColorRole.OnSurfaceVariant
-          else -> on to (if (checked) ColorRole.Primary else ColorRole.OnSurfaceVariant)
-        }
-      Look(container, content, shape = "full", a11yRole = if (toggle) "Checkbox" else "Button")
-    }
-    "SplitButton" -> {
-      val (container, content) =
-        when (ctx.enum("variant")) {
-          "tonal" -> ColorRole.SecondaryContainer to ColorRole.OnSecondaryContainer
-          "elevated" -> ColorRole.SurfaceContainerLow to ColorRole.Primary
-          "outlined" -> on to ColorRole.Primary
-          else -> ColorRole.Primary to ColorRole.OnPrimary
-        }
-      Look(container, content, TypeRole.LabelLarge, "full", ctx.string("label"), "Button")
-    }
-    "FloatingActionButton" -> {
-      val (container, content) = fabColors(ctx.enum("color"))
-      val shape =
-        when (ctx.enum("size")) {
-          "medium" -> "largeIncreased"
-          "large" -> "extraLarge"
-          else -> "large"
-        }
-      Look(
-        container,
-        content,
-        if (ctx.bool("extended")) TypeRole.LabelLarge else null,
-        shape,
-        ctx.string("label")?.takeIf { ctx.bool("extended") },
-        "Button",
-      )
-    }
-    "FabMenu" ->
-      Look(
-        ColorRole.PrimaryContainer,
-        ColorRole.OnPrimaryContainer,
-        shape = "large",
-        a11yRole = "Button",
-      )
-    "FabMenuItem" ->
-      Look(
-        ColorRole.PrimaryContainer,
-        ColorRole.OnPrimaryContainer,
-        TypeRole.TitleMedium,
-        "full",
-        ctx.string("label"),
-        "Button",
-      )
+/** The look of [ctx] from its family, one branch per catalog component like `RenderComponent`. */
+private fun look(ctx: NodeContext, ambient: Ambient): Look =
+  when (ctx.component) {
+    "Column",
+    "Row",
+    "Box",
+    "Grid",
+    "FlexBox",
+    "Spacer",
+    "Divider" -> ctx.layoutLook(ambient)
+    "Shape" -> ctx.shapeLook(ambient)
+    "Text" -> ctx.textLook(ambient)
+    "Icon" -> ctx.iconLook(ambient)
+    "Image" -> ctx.imageLook(ambient)
+    "Scaffold" -> ctx.scaffoldLook()
+    "TopAppBar" -> ctx.topAppBarLook()
+    "NavigationBar" -> ctx.navigationBarLook()
+    "NavigationBarItem" -> ctx.navigationBarItemLook()
+    "NavigationRail" -> ctx.navigationRailLook()
+    "NavigationRailItem" -> ctx.navigationRailItemLook()
+    "FloatingToolbar" -> ctx.floatingToolbarLook()
+    "Card" -> ctx.cardLook()
+    "List" -> ctx.layoutLook(ambient)
+    "ListItem" -> ctx.listItemLook()
+    "Button" -> ctx.buttonLook(ambient)
+    "ToggleButton" -> ctx.toggleButtonLook(ambient)
+    "ButtonGroup" -> ctx.buttonGroupLook(ambient)
+    "IconButton" -> ctx.iconButtonLook(ambient)
+    "SplitButton" -> ctx.splitButtonLook(ambient)
+    "FloatingActionButton" -> ctx.fabLook()
+    "FabMenu" -> ctx.fabMenuLook()
+    "FabMenuItem" -> ctx.fabMenuItemLook()
     "AssistChip",
-    "SuggestionChip" ->
-      Look(
-        if (ctx.enum("variant") == "elevated") ColorRole.SurfaceContainerLow else on,
-        ColorRole.OnSurface,
-        TypeRole.LabelLarge,
-        "small",
-        ctx.string("label"),
-        "Button",
-      )
+    "SuggestionChip" -> ctx.actionChipLook(ambient)
     "FilterChip",
-    "InputChip" -> {
-      val selected = ctx.bool("selected")
-      val container =
-        when {
-          selected -> ColorRole.SecondaryContainer
-          // InputChip has no variant prop, so this is read without a catalog default.
-          ctx.string("variant") == "elevated" -> ColorRole.SurfaceContainerLow
-          else -> on
-        }
-      Look(
-        container,
-        if (selected) ColorRole.OnSecondaryContainer else ColorRole.OnSurfaceVariant,
-        TypeRole.LabelLarge,
-        "small",
-        ctx.string("label"),
-        "Checkbox",
-      )
-    }
-    "ChipGroup" -> Look(on, ambient.content)
-    "Switch" ->
-      if (ctx.bool("checked"))
-        Look(ColorRole.Primary, ColorRole.OnPrimary, shape = "full", a11yRole = "Switch")
-      else
-        Look(
-          ColorRole.SurfaceContainerHighest,
-          ColorRole.Outline,
-          shape = "full",
-          a11yRole = "Switch",
-        )
-    "Checkbox" ->
-      Look(
-        on,
-        ctx.colorRole() ?: ColorRole.OnSurface,
-        TypeRole.BodyLarge,
-        text = ctx.string("label"),
-        a11yRole = "Checkbox",
-      )
+    "InputChip" -> ctx.selectableChipLook(ambient)
+    "ChipGroup" -> ctx.chipGroupLook(ambient)
+    "Switch" -> ctx.switchLook()
+    "Checkbox" -> ctx.checkboxLook(ambient)
     "Slider",
-    "RangeSlider" -> Look(on, ColorRole.Primary)
-    "TextField" -> {
-      val filled = ctx.enum("variant") == "filled"
-      Look(
-        if (filled) ColorRole.SurfaceContainerHighest else on,
-        ColorRole.OnSurface,
-        TypeRole.BodyLarge,
-        "extraSmall",
-        ctx.string("value")?.takeIf { it.isNotEmpty() } ?: ctx.string("label"),
-      )
-    }
-    "LoadingIndicator" ->
-      if (ctx.bool("contained"))
-        Look(ColorRole.SecondaryContainer, ColorRole.Primary, shape = "full")
-      else Look(on, ColorRole.Primary)
-    "ProgressIndicator" -> Look(on, ColorRole.Primary)
-    "BottomSheet" -> Look(ColorRole.SurfaceContainerLow, ColorRole.OnSurface, shape = "extraLarge")
-    "Dialog" ->
-      Look(
-        ColorRole.SurfaceContainerHigh,
-        ColorRole.OnSurface,
-        TypeRole.HeadlineSmall,
-        "extraLarge",
-        ctx.string("title"),
-      )
-    "Menu" -> Look(ColorRole.SurfaceContainer, ColorRole.OnSurface, shape = "extraLarge")
-    "MenuItem" ->
-      Look(
-        ColorRole.SurfaceContainer,
-        ColorRole.OnSurface,
-        TypeRole.LabelLarge,
-        text = ctx.string("label"),
-        a11yRole = "Button",
-      )
-    else -> Look(ctx.style.container ?: on, ctx.style.color ?: ambient.content)
+    "RangeSlider" -> ctx.sliderLook(ambient)
+    "TextField" -> ctx.textFieldLook(ambient)
+    "LoadingIndicator" -> ctx.loadingIndicatorLook(ambient)
+    "ProgressIndicator" -> ctx.progressIndicatorLook(ambient)
+    "BottomSheet" -> ctx.bottomSheetLook()
+    "Dialog" -> ctx.dialogLook()
+    "Menu" -> ctx.menuLook()
+    "MenuItem" -> ctx.menuItemLook()
+    else -> error("no look for ${ctx.component}")
   }
-}

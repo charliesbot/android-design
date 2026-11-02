@@ -124,6 +124,7 @@ Size classes are measured on the preview frame: `compact` below 600 dp, `medium`
 
 - Every component accepts `weight` (its share of a `Row` or `Column`) and `padding` (a spacing name), besides `showIn`, `sizeClass`, and `style`.
 - Interactive components accept `primary`, `contentDescription`, and `enabled`. Set `"primary": true` on the screen's one primary action. Give every icon-only control a `contentDescription` that states its purpose.
+- `Text` truncates with `maxLines` and `"overflow": "ellipsis"`; without `overflow` it clips.
 
 ## Example
 

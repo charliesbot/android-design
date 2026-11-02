@@ -1,5 +1,6 @@
 package bot.charlies.androiddesign.preview.app.cli
 
+import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.model.ValidationError
 import kotlinx.serialization.Serializable
 
@@ -18,7 +19,35 @@ data class RenderEntry(
   val tree: String?,
   val pass: Boolean,
   val failures: List<String>,
-)
+) {
+  companion object {
+    /**
+     * The entry for [check]; [files] is the base name of the files the render wrote, null when it
+     * threw.
+     */
+    fun of(screen: String, view: String, files: String?, check: ViewCheck) =
+      RenderEntry(
+        screen = screen,
+        view = view,
+        png = files?.let { "$it.png" },
+        tree = files?.let { "$it.tree.json" },
+        pass = check.pass,
+        failures = check.failures(),
+      )
+  }
+}
+
+/**
+ * One `rule: id detail` line per component in each error, or `rule: detail` for one about the whole
+ * view, which is what `evals/checks.py` reads the rule from.
+ */
+private fun ViewCheck.failures(): List<String> = errors.flatMap { error ->
+  error.ids
+    .ifEmpty { listOf(null) }
+    .map { id ->
+      "${error.rule}: ${listOfNotNull(id, error.detail).joinToString(" ")}".trimEnd(' ', ':')
+    }
+}
 
 /** `report.json`, which the `render` command writes next to the images. */
 @Serializable

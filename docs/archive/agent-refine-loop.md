@@ -131,6 +131,6 @@ For the later implementation, not this document:
 ## Links
 
 - [Visual design exploration v2](visual-design-exploration-v2.md): the gallery design this loop extends.
-- [Exploration reference](../../skills/android-design/references/exploration.md): the agent steps the session repeats.
+- Exploration reference (`skills/android-design/references/exploration.md`, since removed): the agent steps the session repeats.
 - [Exploration checks](../../evals/exploration.md): where the smoke and routing checks will be added.
 - [Issue #9](https://github.com/charliesbot/android-design/issues/9): the investigation this document answers.

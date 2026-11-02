@@ -13,9 +13,9 @@ This is the Compose sandbox for the manual export check in `evals/README.md`. Co
 | `darkTheme: Boolean` | none (the `dark` view) | Default follows the system. |
 | `dynamic: Boolean` | none | Default `false`. When true on API 31+, uses wallpaper colors instead of the seed. |
 
-`theme/Typography.kt` also has `voiceFont(R.font.<file>, weight, axes...)` for a `DESIGN.md` typography entry's font: pass every axis its `fontVariation` names (`opsz`, `SOFT`, `WONK`, `wdth`), because Compose sets only the axes it is given. Its `*Emphasized` styles equal the baseline roles in this material3 version, so copy a baseline role with the emphasized token weight instead (see `references/compose-mapping.md`, type roles).
+`theme/Typography.kt` also has `voiceFont(R.font.<file>, weight, axes...)` for a `DESIGN.md` typography entry's font: pass every axis its `fontVariation` names (`opsz`, `SOFT`, `WONK`, `wdth`), because Compose sets only the axes it is given. Its `*Emphasized` styles equal the baseline roles in this material3 version, so copy a baseline role with the emphasized token weight instead (see `skills/android-design-explore/references/compose-mapping.md`, type roles).
 
-The scheme comes from MaterialKolor (`rememberDynamicColorScheme`, spec 2025) with Material 3 Expressive motion and the bundled Google Sans Flex typography. Icons are Material Symbols vector drawables in `app/src/main/res/drawable/`, drawn with `Icon(painterResource(...))`; see the Icons section of `references/compose-mapping.md` for how to import them.
+The scheme comes from MaterialKolor (`rememberDynamicColorScheme`, spec 2025) with Material 3 Expressive motion and the bundled Google Sans Flex typography. The starter ships no icons: a port imports each Material Symbol it uses as a vector drawable into `app/src/main/res/drawable/` and draws it with `Icon(painterResource(...))`, as the Icons section of `skills/android-design-explore/references/compose-mapping.md` describes.
 ## Entry points
 
 - `app/src/main/kotlin/com/example/designsandbox/ProposalScreen.kt`: phone/tablet proposal with sample state.
@@ -42,22 +42,23 @@ Device evidence: [Pixel 11 specs](https://store.google.com/product/pixel_11_spec
 
 ## Starter maintenance checks
 
-Requires Node.js 22+, JDK 17+, Android SDK platform 37, and initial network access to resolve pinned dependencies. Set `ANDROID_HOME` or `ANDROID_SDK_ROOT` if the SDK is not in the standard macOS location. Dependencies and Gradle caches are machine-level tooling, not bundled in the skill.
+Requires JDK 17+, Android SDK platform 37, and initial network access to resolve pinned dependencies. Gradle finds the SDK through `ANDROID_HOME` or `sdk.dir` in `local.properties`; on macOS it is usually `~/Library/Android/sdk`. Dependencies and Gradle caches are machine-level tooling, not bundled in the skill.
 
 ```bash
 ./gradlew projects
 ./gradlew :app:assembleDebug
-node render.mjs app
+rm -rf app/src/screenshotTestDebug/reference
+./gradlew --console=plain :app:updateDebugScreenshotTest
 ./gradlew spotlessApply spotlessCheck
 ```
 
-The maintenance renderer clears the previous generated screenshots before running Gradle, then prints absolute PNG paths under `renders/<surface>/`. Open them to inspect the result. Add matched light/dark, smaller-window, and large-font previews when evaluating designs. Device behavior and integration still need testing in the real project.
+`updateDebugScreenshotTest` renders the `@PreviewTest` entry points without an emulator and writes one PNG per preview under `app/src/screenshotTestDebug/reference/`. Delete that folder first, as above, so a failed run cannot leave the previous render in place. Open the PNGs to inspect the result. Add matched light/dark, smaller-window, and large-font previews when evaluating designs. Device behavior and integration still need testing in the real project.
 
 ## Provenance and maintenance
 
-Generated once using `android create empty-activity` and `android-dev`'s `bootstrap.sh` and `generate.sh app`. Catalog aliases were merged, themes/fonts and navigation completed, and the existing eval screenshot approach adapted. Consumers copy the result without invoking those generators.
+Generated once using `android create empty-activity` and `android-dev`'s `bootstrap.sh` and `generate.sh app`. Catalog aliases were merged, themes/fonts and navigation completed, and the existing eval screenshot approach adapted. The export check copies the result without invoking those generators.
 
-Keep this starter's dependencies explicitly pinned. When updating it, build the app, render its screenshot entry point, inspect the PNGs, and run Spotless in a disposable copy. Keep build outputs, local SDK paths, caches, and exploration results out of the installed template.
+Keep this starter's dependencies explicitly pinned. When updating it, build the app, render its screenshot entry point, inspect the PNGs, and run Spotless in a disposable copy. Keep build outputs, local SDK paths, caches, and renders out of this sandbox's committed files.
 
 Unmodified fonts come from the official [Google Fonts repository](https://github.com/google/fonts) (`main` branch). Their redistribution licenses are in `licenses/`. Google Sans Flex is the default typography; the other faces are a curated set an exploration may use for a direction (brand faces on Display and Headline only, Doto at Display sizes only, Google Sans Code for numbers and data), and are not referenced by the starter's `Typography`.
 
@@ -70,4 +71,4 @@ Unmodified fonts come from the official [Google Fonts repository](https://github
 | `doto.ttf` | `doto/Doto[ROND,wght].ttf` | `doto-OFL.txt` (`doto/OFL.txt`) |
 | `google_sans_code.ttf` | `googlesanscode/GoogleSansCode[wght].ttf` | `google-sans-code-OFL.txt` (`googlesanscode/OFL.txt`) |
 
-The previewer app bundles identical copies of these TTFs in `app/features/preview/desktop/src/main/resources/fonts/`. Nothing checks that the two copies match, so update both together.
+The previewer app bundles identical copies of these TTFs in `app/features/preview/desktop/src/main/resources/fonts/`. `scripts/test_font_copies.py` fails when the two copies differ, so update both together.

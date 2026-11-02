@@ -53,8 +53,6 @@ class AssetLoader(private val proposalDir: Path?) {
     try {
       val bytes = bytes(src)
       bytes?.let { Image.makeFromEncoded(it).toComposeImageBitmap() }
-    } catch (_: IllegalArgumentException) {
-      null
     } catch (_: java.io.IOException) {
       null
     } catch (_: RuntimeException) {

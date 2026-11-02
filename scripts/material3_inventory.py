@@ -134,13 +134,13 @@ def top_level_entries(members, metadata_names):
     for name, params, is_static, is_field in members:
         if is_field or not is_static:
             continue
-        member = member_name(name, params, metadata_names, top_level=True)
+        member = member_name(name, params, metadata_names)
         if member:
             entries.add(member)
     return entries
 
 
-def member_name(name, params, metadata_names, top_level=False):
+def member_name(name, params, metadata_names):
     name = strip_mangling(name)
     if "$" in name or "." in name or name in NOISE or re.match(r"component\d+$", name):
         return None  # "." is a constructor, which javap prints under the class's full name
@@ -148,8 +148,6 @@ def member_name(name, params, metadata_names, top_level=False):
         return None
     if re.match(r"get[A-Z]", name) and params in ("", COMPOSER_PARAMS):
         return property_name(name, metadata_names)
-    if top_level and name.startswith("is") and params == "" and name[2:3].isupper():
-        return name
     return name
 
 
@@ -209,7 +207,7 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         jar = extract_classes_jar(aar, tmp / "material3")
-        wanted = list(material3_class_names(jar))
+        wanted = material3_class_names(jar)
         with jar:
             jar.extractall(tmp / "material3" / "classes", [n.replace(".", "/") + ".class" for n in wanted])
         classes = tmp / "material3" / "classes"

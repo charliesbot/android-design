@@ -109,12 +109,12 @@ The evals judge proposals rendered by the previewer app, so they cannot show whe
 
 1. Take one approved proposal from an eval run that passed, with its `DESIGN.md` and `renders/<screen>-<view>.tree.json` files. To verify a `compose-mapping.md` row, take `evals/verify/verify.proposal.json` instead: it uses every catalog component.
 2. Run `<app> export <proposal> --design <DESIGN.md> --screen <screen>` and copy the Kotlin it prints into a scratch copy of `evals/compose-starter/`. It is the Android sandbox the export lands in.
-3. Render the sandbox with `node render.mjs app` (this step needs Node.js 22+, JDK 17+, and the Android SDK; see the starter's README).
+3. Render the sandbox from its folder with `rm -rf app/src/screenshotTestDebug/reference && ./gradlew :app:updateDebugScreenshotTest`, which writes the PNGs under `app/src/screenshotTestDebug/reference/` (this step needs JDK 17+ and the Android SDK; see the starter's README).
 4. Compare the Compose render with the app's phone render of the same screen, and the exported layout with the proposal's tree. Differences the proposal determined (layout, hierarchy, color roles, type roles, component choice) are exporter bugs or mapping bugs to fix in `compose-mapping.md`. Small style choices the proposal left open are expected.
 
 ## Verification and files
 
-Run `python3 -m unittest discover evals` from the repository root to test adapters, artifact contracts, ballot validation, binary resolution, and preference persistence without model calls. Also run the [exploration workflow checks](exploration.md). Those separate rendering and isolation checks from agent routing behavior.
+Run `python3 -m unittest discover evals` from the repository root to test adapters, artifact contracts, ballot validation, and binary resolution without model calls. Also run the [exploration workflow checks](exploration.md). Those separate rendering and isolation checks from agent routing behavior.
 
 | Path | Responsibility |
 | --- | --- |
@@ -123,6 +123,5 @@ Run `python3 -m unittest discover evals` from the repository root to test adapte
 | `checks.py`, `judge.py`, `rubric.md` | Deterministic checks on `report.json` and provider-independent rubric judgments |
 | `calibration/`, `baseline/` | Labeled renders and explicitly accepted baselines |
 | `compose-starter/` | The Android sandbox the export check lands in |
-| `preference/` | Owner preference rounds |
 
 Renders come from the previewer app's headless renderer, the same composables as its window. They do not verify motion or the export; check device behavior in the exported app when it matters. The app's layout checks come from its own tree, not from pixels, so contrast and truncation findings are exact; hierarchy and character are what the judge sees in the PNGs.

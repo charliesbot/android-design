@@ -71,6 +71,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
@@ -218,7 +219,7 @@ import kotlinx.serialization.Serializable
 
 private val SeedColor = Color(0xFF6750A4)
 
-/** A variable font at each weight in [weights], with the same variation [axes] on all. */
+/** A variable font at each weight in [weights] with the variation [axes]; no `wght` among them. */
 private fun variableFontFamily(
   @FontRes font: Int,
   weights: List<Int>,
@@ -233,7 +234,6 @@ private fun variableFontFamily(
           FontVariation.Settings(
             FontWeight(weight),
             FontStyle.Normal,
-            FontVariation.weight(weight),
             *axes,
           ),
       )
@@ -632,7 +632,10 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
         Text("Material 3 Expressive")
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(
+          modifier = Modifier.fillMaxWidth(),
+          verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
           Text(
             "Headline medium",
             color = MaterialTheme.colorScheme.primary,
@@ -648,6 +651,7 @@ fun HomeScreen(
           )
           Text(
             "LABEL SMALL",
+            modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelSmall,
           )
@@ -659,6 +663,7 @@ fun HomeScreen(
           )
         }
         Row(
+          modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(12.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -694,7 +699,7 @@ fun HomeScreen(
             )
           }
         }
-        Box(contentAlignment = Alignment.BottomEnd) {
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomEnd) {
           Card(shape = MaterialTheme.shapes.extraLarge) { Spacer(Modifier.height(48.dp)) }
           Text(
             "Box, bottom end",
@@ -702,15 +707,20 @@ fun HomeScreen(
             style = MaterialTheme.typography.labelLarge,
           )
         }
-        HorizontalDivider()
+        HorizontalDivider(modifier = Modifier.fillMaxWidth())
         if (!atLeastMedium) {
           Grid(
             config = {
               repeat(1) { column(1.fr) }
               gap(12.dp)
             },
+            modifier = Modifier.fillMaxWidth(),
           ) {
-            Card(onClick = { onNavigateToDetail() }, shape = MaterialTheme.shapes.large) {
+            Card(
+              onClick = { onNavigateToDetail() },
+              modifier = Modifier.fillMaxWidth(),
+              shape = MaterialTheme.shapes.large,
+            ) {
               Text(
                 "Filled card",
                 modifier = Modifier.padding(16.dp),
@@ -723,14 +733,14 @@ fun HomeScreen(
                 style = MaterialTheme.typography.bodyMedium,
               )
             }
-            ElevatedCard {
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
               Text(
                 "Elevated card",
                 modifier = Modifier.padding(16.dp),
                 style = MaterialTheme.typography.titleMedium,
               )
             }
-            OutlinedCard {
+            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
               Text(
                 "Outlined card",
                 modifier = Modifier.padding(16.dp),
@@ -744,8 +754,13 @@ fun HomeScreen(
               repeat(2) { column(1.fr) }
               gap(12.dp)
             },
+            modifier = Modifier.fillMaxWidth(),
           ) {
-            Card(onClick = { onNavigateToDetail() }, shape = MaterialTheme.shapes.large) {
+            Card(
+              onClick = { onNavigateToDetail() },
+              modifier = Modifier.fillMaxWidth(),
+              shape = MaterialTheme.shapes.large,
+            ) {
               Text(
                 "Filled card",
                 modifier = Modifier.padding(16.dp),
@@ -758,14 +773,14 @@ fun HomeScreen(
                 style = MaterialTheme.typography.bodyMedium,
               )
             }
-            ElevatedCard {
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
               Text(
                 "Elevated card",
                 modifier = Modifier.padding(16.dp),
                 style = MaterialTheme.typography.titleMedium,
               )
             }
-            OutlinedCard {
+            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
               Text(
                 "Outlined card",
                 modifier = Modifier.padding(16.dp),
@@ -779,8 +794,13 @@ fun HomeScreen(
               repeat(3) { column(1.fr) }
               gap(12.dp)
             },
+            modifier = Modifier.fillMaxWidth(),
           ) {
-            Card(onClick = { onNavigateToDetail() }, shape = MaterialTheme.shapes.large) {
+            Card(
+              onClick = { onNavigateToDetail() },
+              modifier = Modifier.fillMaxWidth(),
+              shape = MaterialTheme.shapes.large,
+            ) {
               Text(
                 "Filled card",
                 modifier = Modifier.padding(16.dp),
@@ -793,14 +813,14 @@ fun HomeScreen(
                 style = MaterialTheme.typography.bodyMedium,
               )
             }
-            ElevatedCard {
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
               Text(
                 "Elevated card",
                 modifier = Modifier.padding(16.dp),
                 style = MaterialTheme.typography.titleMedium,
               )
             }
-            OutlinedCard {
+            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
               Text(
                 "Outlined card",
                 modifier = Modifier.padding(16.dp),
@@ -814,6 +834,7 @@ fun HomeScreen(
             wrap(FlexWrap.Wrap)
             gap(8.dp)
           },
+          modifier = Modifier.fillMaxWidth(),
         ) {
           SuggestionChip(onClick = {}, label = { Text("Layout") })
           SuggestionChip(onClick = {}, label = { Text("Content") })
@@ -821,10 +842,10 @@ fun HomeScreen(
           VerticalDivider()
           ElevatedSuggestionChip(onClick = {}, label = { Text("Lists") })
         }
-        Column {
+        Column(modifier = Modifier.fillMaxWidth()) {
           rows.forEach { row ->
             ListItem(
-              modifier = Modifier.clickable { onNavigateToDetail() },
+              modifier = Modifier.fillMaxWidth().clickable { onNavigateToDetail() },
               overlineContent = { Text(row.kind) },
               supportingContent = { Text(row.detail) },
               leadingContent = {
@@ -836,11 +857,15 @@ fun HomeScreen(
             }
           }
         }
-        Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+        Column(
+          modifier = Modifier.fillMaxWidth(),
+          verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+        ) {
           SegmentedListItem(
             selected = true,
             onClick = {},
             shapes = ListItemDefaults.segmentedShapes(0, 3),
+            modifier = Modifier.fillMaxWidth(),
             colors = ListItemDefaults.segmentedColors(),
             supportingContent = { Text("selected is true") },
           ) {
@@ -849,6 +874,7 @@ fun HomeScreen(
           SegmentedListItem(
             onClick = { onNavigateToDetail() },
             shapes = ListItemDefaults.segmentedShapes(1, 3),
+            modifier = Modifier.fillMaxWidth(),
             colors = ListItemDefaults.segmentedColors(),
             supportingContent = { Text("Opens the detail pane") },
           ) {
@@ -857,6 +883,7 @@ fun HomeScreen(
           SegmentedListItem(
             onClick = {},
             shapes = ListItemDefaults.segmentedShapes(2, 3),
+            modifier = Modifier.fillMaxWidth(),
             colors = ListItemDefaults.segmentedColors(),
             trailingContent = {
               var segSwitchChecked by remember { mutableStateOf(true) }
@@ -1055,6 +1082,7 @@ fun ActionsScreen(
             wrap(FlexWrap.Wrap)
             gap(8.dp)
           },
+          modifier = Modifier.fillMaxWidth(),
         ) {
           Button(onClick = {}) {
             Icon(
@@ -1070,7 +1098,10 @@ fun ActionsScreen(
           OutlinedButton(onClick = {}) { Text("Outlined") }
           TextButton(onClick = {}) { Text("Text") }
         }
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+          modifier = Modifier.fillMaxWidth(),
+          verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
           Button(
             onClick = {},
             modifier = Modifier.heightIn(min = ButtonDefaults.ExtraSmallContainerHeight),
@@ -1175,6 +1206,7 @@ fun ActionsScreen(
             wrap(FlexWrap.Wrap)
             gap(8.dp)
           },
+          modifier = Modifier.fillMaxWidth(),
         ) {
           var toggleFilledChecked by remember { mutableStateOf(true) }
           ToggleButton(
@@ -1253,7 +1285,10 @@ fun ActionsScreen(
             Text("Month", style = ButtonDefaults.textStyleFor(ButtonDefaults.MediumContainerHeight))
           }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
           IconButton(
             onClick = {},
             colors =
@@ -1285,6 +1320,7 @@ fun ActionsScreen(
             wrap(FlexWrap.Wrap)
             gap(8.dp)
           },
+          modifier = Modifier.fillMaxWidth(),
         ) {
           FilledTonalIconButton(
             onClick = {},
@@ -1334,7 +1370,10 @@ fun ActionsScreen(
             )
           }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
           FilledIconButton(
             onClick = {},
             modifier =
@@ -1358,6 +1397,7 @@ fun ActionsScreen(
             wrap(FlexWrap.Wrap)
             gap(8.dp)
           },
+          modifier = Modifier.fillMaxWidth(),
         ) {
           var iconToggleStandardOffChecked by remember { mutableStateOf(false) }
           IconToggleButton(
@@ -1473,6 +1513,7 @@ fun ActionsScreen(
             wrap(FlexWrap.Wrap)
             gap(8.dp)
           },
+          modifier = Modifier.fillMaxWidth(),
         ) {
           Box {
             SplitButtonLayout(
@@ -1771,6 +1812,7 @@ fun InputsScreen(
               wrap(FlexWrap.Wrap)
               gap(8.dp)
             },
+            modifier = Modifier.fillMaxWidth(),
           ) {
             AssistChip(
               onClick = {},
@@ -1831,7 +1873,10 @@ fun InputsScreen(
             SuggestionChip(onClick = {}, label = { Text("Suggestion") })
             ElevatedSuggestionChip(onClick = {}, label = { Text("Suggestion elevated") })
           }
-          Row(horizontalArrangement = FilterChipDefaults.horizontalArrangement()) {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = FilterChipDefaults.horizontalArrangement(),
+          ) {
             var groupQuickSelected by remember { mutableStateOf(true) }
             FilterChip(
               selected = groupQuickSelected,
@@ -1882,6 +1927,7 @@ fun InputsScreen(
             )
           }
           Row(
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
           ) {
@@ -1909,19 +1955,29 @@ fun InputsScreen(
             }
           }
           var sliderValue by remember { mutableFloatStateOf(40f) }
-          Slider(value = sliderValue, onValueChange = { sliderValue = it }, valueRange = 0f..100f)
+          Slider(
+            value = sliderValue,
+            onValueChange = { sliderValue = it },
+            modifier = Modifier.fillMaxWidth(),
+            valueRange = 0f..100f,
+          )
           var rangeSliderValue by remember { mutableStateOf(20f..60f) }
           RangeSlider(
             value = rangeSliderValue,
             onValueChange = { rangeSliderValue = it },
+            modifier = Modifier.fillMaxWidth(),
             valueRange = 0f..100f,
             steps = 9,
           )
-          Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+          Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
             var fieldFilledValue by remember { mutableStateOf("Value") }
             TextField(
               value = fieldFilledValue,
               onValueChange = { fieldFilledValue = it },
+              modifier = Modifier.fillMaxWidth(),
               label = { Text("Filled") },
               singleLine = true,
             )
@@ -1929,6 +1985,7 @@ fun InputsScreen(
             OutlinedTextField(
               value = fieldOutlinedValue,
               onValueChange = { fieldOutlinedValue = it },
+              modifier = Modifier.fillMaxWidth(),
               label = { Text("Outlined") },
               singleLine = true,
             )
@@ -1936,6 +1993,7 @@ fun InputsScreen(
             TextField(
               value = fieldSupportingValue,
               onValueChange = { fieldSupportingValue = it },
+              modifier = Modifier.fillMaxWidth(),
               label = { Text("With supporting") },
               supportingText = { Text("Supporting text") },
               singleLine = true,
@@ -1944,6 +2002,7 @@ fun InputsScreen(
             OutlinedTextField(
               value = fieldErrorValue,
               onValueChange = { fieldErrorValue = it },
+              modifier = Modifier.fillMaxWidth(),
               label = { Text("With error") },
               supportingText = { Text("Error text") },
               isError = true,
@@ -1953,6 +2012,7 @@ fun InputsScreen(
             TextField(
               value = fieldIconsValue,
               onValueChange = { fieldIconsValue = it },
+              modifier = Modifier.fillMaxWidth(),
               label = { Text("Search") },
               leadingIcon = { Icon(painterResource(R.drawable.search), contentDescription = null) },
               trailingIcon = { Icon(painterResource(R.drawable.close), contentDescription = null) },
@@ -1962,6 +2022,7 @@ fun InputsScreen(
             OutlinedTextField(
               value = fieldPrefixValue,
               onValueChange = { fieldPrefixValue = it },
+              modifier = Modifier.fillMaxWidth(),
               label = { Text("Amount") },
               prefix = { Text("\$") },
               singleLine = true,
@@ -1970,6 +2031,7 @@ fun InputsScreen(
             TextField(
               value = fieldPlaceholderValue,
               onValueChange = { fieldPlaceholderValue = it },
+              modifier = Modifier.fillMaxWidth(),
               placeholder = { Text("Placeholder only") },
               singleLine = true,
             )
@@ -1977,6 +2039,7 @@ fun InputsScreen(
             TextField(
               value = fieldMultilineValue,
               onValueChange = { fieldMultilineValue = it },
+              modifier = Modifier.fillMaxWidth(),
               label = { Text("Notes") },
               minLines = 3,
             )
@@ -1986,6 +2049,7 @@ fun InputsScreen(
               wrap(FlexWrap.Wrap)
               gap(12.dp)
             },
+            modifier = Modifier.fillMaxWidth(),
           ) {
             LoadingIndicator()
             ContainedLoadingIndicator()
@@ -2344,6 +2408,7 @@ fun FabsScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {}) {
       verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
       Row(
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
       ) {
@@ -2374,7 +2439,10 @@ fun FabsScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {}) {
           )
         }
       }
-      Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+      Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+      ) {
         ExtendedFloatingActionButton(
           onClick = {},
           icon = { Icon(painterResource(R.drawable.edit), contentDescription = null) },
@@ -2408,6 +2476,7 @@ fun FabsScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {}) {
           wrap(FlexWrap.Wrap)
           gap(12.dp)
         },
+        modifier = Modifier.fillMaxWidth(),
       ) {
         FloatingActionButton(
           onClick = {},

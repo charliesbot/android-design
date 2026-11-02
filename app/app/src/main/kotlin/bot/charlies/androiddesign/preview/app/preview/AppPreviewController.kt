@@ -1,6 +1,5 @@
 package bot.charlies.androiddesign.preview.app.preview
 
-import bot.charlies.androiddesign.preview.domain.CheckError
 import bot.charlies.androiddesign.preview.domain.OpenedProposal
 import bot.charlies.androiddesign.preview.domain.PreviewController
 import bot.charlies.androiddesign.preview.domain.PreviewException
@@ -15,13 +14,13 @@ import bot.charlies.androiddesign.preview.domain.catalog.CatalogJson
 import bot.charlies.androiddesign.preview.domain.catalog.CatalogSummary
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.domain.export.KotlinExporter
-import bot.charlies.androiddesign.preview.domain.layout.LayoutSummary
+import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
+import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.Proposal
-import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
@@ -87,14 +86,11 @@ class AppPreviewController(
     val snapshot = validSnapshot()
     val proposal = checkNotNull(snapshot.proposal)
     val state = viewer.state.value
-    val dir = snapshot.path.parent
     // No arguments: what the window shows, with its open overlays and selections replayed.
     if (screen == null && view == null) {
       val host = state.host
       return renderer.render(
-        proposal,
-        state.effectiveDesign ?: snapshot.designSystem,
-        dir,
+        sourceOf(proposal, snapshot, state.effectiveDesign ?: snapshot.designSystem),
         viewer.currentScreen ?: proposal.navigation.start,
         state.view,
         live = host,
@@ -110,7 +106,7 @@ class AppPreviewController(
     // The window's color choices go with the window's view; a named view is the proposal's own.
     val design =
       if (view == null) state.effectiveDesign ?: snapshot.designSystem else snapshot.designSystem
-    return renderer.render(proposal, design, dir, screenId, spec)
+    return renderer.render(sourceOf(proposal, snapshot, design), screenId, spec)
   }
 
   override suspend fun setView(change: ViewChange): ViewState {
@@ -165,25 +161,21 @@ class AppPreviewController(
   ): ViewCheck {
     val tree =
       try {
-        renderer.render(proposal, snapshot.designSystem, snapshot.path.parent, screen, view)
+        renderer.render(sourceOf(proposal, snapshot), screen, view)
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        val reason = e.firstLine()
-        return ViewCheck(pass = false, errors = listOf(CheckError("render-error", detail = reason)))
+        return ViewCheck.renderError(e)
       }
-    val errors =
-      tree.findings
-        .filter { it.severity == Severity.Error }
-        .groupBy({ it.rule.wire to it.detail }, { it.id })
-        .map { (key, ids) -> CheckError(key.first, ids.filterNotNull(), key.second) }
-    return ViewCheck(
-      pass = errors.isEmpty(),
-      info = tree.findings.count { it.severity == Severity.Info },
-      errors = errors,
-      layout = LayoutSummary.of(proposal, tree),
-    )
+    return ViewCheck.of(proposal, tree)
   }
+
+  /** What to draw [proposal] from: [snapshot]'s folder, and its design unless [design] is given. */
+  private fun sourceOf(
+    proposal: Proposal,
+    snapshot: ProposalSnapshot,
+    design: DesignSystem = snapshot.designSystem,
+  ) = RenderSource(proposal, design, snapshot.path.parent)
 
   override fun getCatalog(components: List<String>?): String =
     if (components.isNullOrEmpty()) {
@@ -272,9 +264,7 @@ class AppPreviewController(
     val failure =
       try {
         renderer.render(
-          proposal,
-          snapshot.designSystem,
-          snapshot.path.parent,
+          sourceOf(proposal, snapshot),
           screen,
           window.view,
           live = window.host,

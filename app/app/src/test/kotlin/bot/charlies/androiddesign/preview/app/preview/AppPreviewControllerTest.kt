@@ -40,7 +40,7 @@ class AppPreviewControllerTest {
   private val fixtures = Path.of(System.getProperty("fixtures.dir"))
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   private val viewer = ViewerViewModel()
-  private val window = WindowVisibility()
+  private val window = PreviewWindow()
   private val controller =
     AppPreviewController(
       repository = FileProposalRepository(),

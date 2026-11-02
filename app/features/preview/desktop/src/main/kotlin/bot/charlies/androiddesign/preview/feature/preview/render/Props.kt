@@ -90,8 +90,6 @@ internal class Props(private val json: JsonObject, private val scope: DataScope)
   fun float(key: String): Float? =
     (value(key) as? JsonPrimitive)?.doubleOrNull?.takeIf { it.isFinite() }?.toFloat()
 
-  fun int(key: String): Int? = float(key)?.toInt()
-
   /** A `[min, max]` pair. */
   fun range(key: String): Pair<Float, Float>? {
     val array = value(key) as? JsonArray ?: return null
