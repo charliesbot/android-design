@@ -95,13 +95,15 @@ Agents vary across runs. A failure is a signal; inspect repeated results before 
 
 ## Trigger evals
 
-`triggers/android-design.json` and `triggers/android-design-explore.json` hold realistic prompts with `should_trigger`, for checking that each skill's description reaches its own requests and stays quiet on near-misses. Run them after changing a skill's `description`, with the skill-creator skill's runner (it calls `claude -p`, so it needs a signed-in Claude Code CLI and measures Claude Code only):
+`triggers/android-design.json` and `triggers/android-design-explore.json` hold realistic prompts with `should_trigger`, for checking that each skill's description reaches its own requests and stays quiet on near-misses. Run them after changing a skill's `description` (it calls `claude -p`, so it needs a signed-in Claude Code CLI and measures Claude Code only):
 
 ```bash
-python3 <skill-creator>/scripts/run_eval.py --eval-set evals/triggers/android-design.json --skill-path skills/android-design --runs-per-query 3
+python3 evals/trigger_eval.py --eval-set evals/triggers/android-design.json
 ```
 
-The runner counts a trigger only when Claude reads its temporary copy of the skill, so uninstall the same-named skill first (or count the installed one too); with both present, every query reads as a miss. Pass bar: every `should_trigger: true` query triggers in at least two of three runs, and every near-miss in at most one.
+Each run happens in a temporary project holding this repo's two skills plus every other skill installed in `~/.claude/skills`. So installed copies of this repo's skills never compete with the repo copies, while their real neighbors (`adaptive`, `compose-animations`, and the rest) still do. The project sits in a neutral temp folder because Claude sees its working directory, and a path naming the skill skews the runs. Claude gets three read-only turns, so loading the skill after a look around still counts. `--description` tests a candidate without editing `SKILL.md`. Pass bar: every `should_trigger: true` query triggers in at least two of three runs, and every near-miss in at most one.
+
+skill-creator's stock `run_eval.py` under-reports here: it registers a temporary copy beside the installed one, and it scores a miss whenever Claude calls any other tool first.
 
 ## Export check
 

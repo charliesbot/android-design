@@ -9,9 +9,11 @@
   {"query": "my android list screen uses dividers and chevrons everywhere, make it look like a modern android app", "should_trigger": true},
   {"query": "add expressive motion to the FAB and the card transitions in my compose app", "should_trigger": true},
   {"query": "do a design review of the screenshots in docs/screens/ for my android banking app", "should_trigger": true},
+  {"query": "my compose email app shows one list on every window size, give it a list-detail layout on foldables and desktop windows", "should_trigger": true},
   {"query": "my swiftui onboarding flow on iPhone feels flat, help me add more personality", "should_trigger": false},
   {"query": "build a marketing landing page for my startup with tailwind and react", "should_trigger": false},
   {"query": "gradle sync fails with AGP 9.1 and kotlin 2.4 in my android project, fix the build", "should_trigger": false},
   {"query": "write unit tests for the repository layer of my android app using fakes", "should_trigger": false},
-  {"query": "my room database migration crashes on upgrade from version 3 to 4", "should_trigger": false}
+  {"query": "my room database migration crashes on upgrade from version 3 to 4", "should_trigger": false},
+  {"query": "keep the scroll position and selected item of my compose list when the user rotates or folds the device", "should_trigger": false}
 ]
