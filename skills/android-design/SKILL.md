@@ -201,7 +201,7 @@ val tint by animateColorAsState(if (selected) colors.primary else colors.surface
 - Use an 8dp scale (4, 8, 12, 16, 24, 32, 48). Put padding and gaps on parents, not margins on children. Compact screens use 16dp side margins; medium and up 24dp.
 - **Group with gaps and containers instead of dividers.** Expressive lists, menus, and search results separate groups with gaps between filled items; dividers are for uncontained lists only.
 - Keep reading text at 40 to 60 characters per line.
-- **Adapt by breakpoint:** compact (under 600dp) one pane with a navigation bar; medium (600 to 839dp) one pane (two only for low-density content); expanded and up two panes with a navigation rail. Moving up a breakpoint, *reveal* more: "Additional space doesn't just mean making the same thing bigger." Build what your section 0 adaptation answer says each size class reveals. Read [references/layout.md](references/layout.md) when adapting to tablets, foldables, landscape, or desktop windows, or supporting mouse and keyboard.
+- **Adapt by breakpoint:** compact (under 600dp) one pane with a navigation bar; medium (600 to 839dp) one pane (two only for low-density content); expanded and up two panes with a navigation rail. Moving up a breakpoint, *reveal* more: "Additional space doesn't just mean making the same thing bigger." Build what your section 0 adaptation answer says each size class reveals. A tall medium window (a foldable or tablet held upright) usually keeps one pane and grows it into the height; a side-by-side composition there leaves the bottom empty. Read [references/layout.md](references/layout.md) when adapting to tablets, foldables, landscape, or desktop windows, or supporting mouse and keyboard.
 
 ### Composing the screen
 

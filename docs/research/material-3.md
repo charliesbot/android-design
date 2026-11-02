@@ -369,6 +369,12 @@ Corner radius scale (10 steps; the three marked Expressive were added May 2025):
   components; "Additional space doesn't just mean making the same thing
   bigger."
 - Medium two-pane layouts: only for low-density content, 50/50 widths.
+- Orientation changes the pane count: "A layout can have two panes in landscape
+  orientation, and one pane in portrait." A medium window in portrait (an open
+  foldable or a tablet held upright) is usually one pane (two still suit
+  low-density content), and its height is the space to use: "UI elements that are small on compact screens can grow as
+  breakpoints increase. Panes can also expand to rearrange elements and make
+  better use of space," and "Resizing can highlight imagery."
 - Fixed-and-flexible layouts: fixed pane 360dp (expanded) or 412dp (large and
   up). Split-pane keeps the spacer visually centered even with a rail.
 - Reachability on tablets in landscape: avoid interactions in the top 25%.

@@ -22,6 +22,8 @@ Moving up a breakpoint, ask five questions. For control-based layouts like media
 4. **Reposition:** move actions from the bottom to the leading edge, add negative space, keep controls reachable (avoid the top 25% of a tablet held in landscape).
 5. **Swap:** nav bar to rail, bottom sheet to menu, full-screen dialog to basic dialog, FAB to extended FAB. Only swap functionally equivalent components.
 
+**Use the height of a tall window.** A medium window in portrait (an open foldable or a tablet held upright) is usually one pane (two only for low-density content, as at any medium width): "A layout can have two panes in landscape orientation, and one pane in portrait." Keep the compact layout's vertical order and grow it into the height: "UI elements that are small on compact screens can grow as breakpoints increase," and "Resizing can highlight imagery." Enlarge the hero art or cards, show more list rows, and place supporting content (a supporting pane, up next, details) below the primary content. A side-by-side composition made for landscape leaves the lower part of a portrait window empty. Google's guides list "Set the same scale on larger screens" as a don't: "take advantage of the space and consider distance from the screen." Content that must keep its aspect ratio should "constrain aspect and balance empty space," sharing the leftover space around it rather than leaving one empty block below. Check every larger view for a void: a large empty region is a layout that did not adapt.
+
 ## Scaffold
 
 - **Bars** frame the page: the app bar at the top, the navigation bar at the bottom, next to system safety regions (status and gesture bars). Content never goes in safety regions (handle insets; see the `edge-to-edge` skill).

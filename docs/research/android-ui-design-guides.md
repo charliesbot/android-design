@@ -140,6 +140,11 @@ behavior Material leaves out. The most useful additions for a design skill:
   gutter); cover screens stay focused, with hero art as the background and a
   big anchor control like play.
 - If content didn't scroll in portrait, don't make it scroll in landscape.
+- **Scale content to the window.** Content-structure lists "Set the same scale
+  on larger screens" as a don't, with the advice "take advantage of the space
+  and consider distance from the screen." Content that must keep its aspect ratio should "constrain
+  aspect and balance empty space," so leftover space is shared around it rather
+  than left as one empty block.
 
 - **Units:** give every spec in dp, and every font size in sp ("Always specify font sizes in sp units"). sp follows the user's font size setting. Never declare measurements in px, because the same pixel size looks larger on low-density screens and smaller on high-density ones. dp = (width in px × 160) / screen density, where 1dp ≈ 1px at 160dpi.
 - **Density buckets:** mdpi x1, hdpi x1.5, xhdpi x2, xxhdpi x3, xxxhdpi x4. nodpi and anydpi do not scale and are typically used for vector drawables. Export raster assets for every bucket. Vectors need only one version.
