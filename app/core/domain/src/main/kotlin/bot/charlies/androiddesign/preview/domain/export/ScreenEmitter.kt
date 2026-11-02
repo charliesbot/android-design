@@ -20,13 +20,20 @@ import kotlinx.serialization.json.JsonPrimitive
 /** The key under which a named style's `container` role is kept among a component's props. */
 internal const val CONTAINER_KEY = "\u0000container"
 
-/** A template loop variable: `plates.forEach { plate -> ... }` makes `plate` the scope. */
+/**
+ * A template loop variable: `plates.forEach { plate -> ... }` makes `plate` the scope. [items] are
+ * the elements the loop runs over in the sample data, across every item of the enclosing loops.
+ */
 internal class Scope(
   val parent: Scope?,
   val variable: String,
   val index: String?,
-  val sample: JsonElement?,
+  val items: List<JsonElement>,
 ) {
+  /** The first item, which a template body's bindings are written against. */
+  val sample: JsonElement?
+    get() = items.firstOrNull()
+
   fun names(): Set<String> =
     generateSequence(this) { it.parent }
       .flatMap { sequenceOf(it.variable, it.index.orEmpty()) }
@@ -42,6 +49,17 @@ internal class ListPosition(val segmented: Boolean, val index: String, val count
 
 /** A `ChipGroup` with single selection: one state variable holds the selected chip id. */
 internal class ChipSelection(val state: String)
+
+/**
+ * A Material Symbol name: written in the proposal, or bound to data. A bound name is a Kotlin
+ * [expr] and every name it takes across the sample data, which the file's `symbolDrawable` helper
+ * maps to drawables.
+ */
+internal sealed interface IconName {
+  class Literal(val name: String) : IconName
+
+  class Bound(val expr: String, val names: Set<String>) : IconName
+}
 
 /** What a component needs to know about where it is emitted. */
 internal data class Place(
@@ -367,14 +385,32 @@ internal class ScreenEmitter(
       element == null || element is JsonNull -> null
       element is JsonPrimitive -> Raw(kotlinString(element.content))
       isIndex(element) -> Raw(place.scope?.index?.let { "$it.toString()" } ?: "\"0\"")
-      else ->
-        bindingPath(element)?.let { path ->
-          val bound = resolve(path, place.scope)
-          Raw(
-            if (bound.sample == null || bound.isString) bound.expr else "${bound.expr}.toString()",
-          )
-        }
+      else -> bindingPath(element)?.let { Raw(boundString(it, place.scope)) }
     }
+
+  /** A bound value as a `String` expression: a number or flag gets `.toString()`. */
+  private fun boundString(path: String, scope: Scope?): String {
+    val bound = resolve(path, scope)
+    return if (bound.sample == null || bound.isString) bound.expr else "${bound.expr}.toString()"
+  }
+
+  /** A string prop bound to data: the Kotlin [expr] and every non-blank value it takes. */
+  class BoundText(val expr: String, val values: Set<String>)
+
+  /** [key] as a [BoundText] with the values it takes across the sample data, or null if unbound. */
+  fun JsonObject.boundText(key: String, place: Place): BoundText? {
+    val path = this[key]?.let(::bindingPath) ?: return null
+    val values =
+      resolveAll(path, place.scope).mapNotNullTo(linkedSetOf()) {
+        (it as? JsonPrimitive)?.content?.takeIf(String::isNotBlank)
+      }
+    return BoundText(boundString(path, place.scope), values)
+  }
+
+  /** The Material Symbol name of [key]: a binding, else its literal, or null when it is absent. */
+  fun JsonObject.iconName(key: String, place: Place): IconName? =
+    boundText(key, place)?.let { IconName.Bound(it.expr, it.values) }
+      ?: literal(key)?.let { IconName.Literal(it) }
 
   /** A boolean prop: its literal, or the bound value. */
   fun JsonObject.boolExpr(key: String, place: Place): String? {
@@ -424,6 +460,27 @@ internal class ScreenEmitter(
     }
     return walk(scope.variable, scope.sample, segments)
   }
+
+  /**
+   * Every value [path] takes in the sample data: one for an absolute path or a path outside a
+   * template, else one per item of the innermost template that has something at [path].
+   */
+  fun resolveAll(path: String, scope: Scope?): List<JsonElement> {
+    val segments = path.trim('/').split('/').filter { it.isNotEmpty() }
+    if (segments.isEmpty()) return emptyList()
+    if (path.startsWith("/") || scope == null) {
+      val root = data.root?.get(segments.first()) ?: return emptyList()
+      return listOfNotNull(valueAt(root, segments.drop(1)))
+    }
+    return scope.items.mapNotNull { valueAt(it, segments) }
+  }
+
+  private fun valueAt(start: JsonElement, segments: List<String>): JsonElement? =
+    segments.fold<String, JsonElement?>(start) { current, segment ->
+      val index = segment.toIntOrNull()
+      if (index != null && current is JsonArray) current.getOrNull(index)
+      else (current as? JsonObject)?.get(segment)
+    }
 
   private fun walk(start: String, sample: JsonElement?, segments: List<String>): Bound {
     var expr = start
@@ -670,7 +727,7 @@ internal class ScreenEmitter(
     shape: (Place, String, String) -> Place,
   ): Stmt {
     val list = resolve(path, place.scope)
-    val sample = (list.sample as? JsonArray)?.firstOrNull()
+    val items = resolveAll(path, place.scope).flatMap { (it as? JsonArray).orEmpty() }
     val taken = place.scope?.names().orEmpty() + data.params.map { it.name }
     val base = Naming.camel(Naming.singular(path.trim('/').substringAfterLast('/'))).trim('`')
     val variable =
@@ -680,7 +737,7 @@ internal class ScreenEmitter(
     val withIndex = indexed || usesIndex(componentId)
     val depth = (place.scope?.depth() ?: 0) + 1
     val index = if (withIndex) (if (depth == 1) "index" else "index$depth") else null
-    val scope = Scope(place.scope, variable, index, sample)
+    val scope = Scope(place.scope, variable, index, items)
     val body =
       emit(
         componentId,

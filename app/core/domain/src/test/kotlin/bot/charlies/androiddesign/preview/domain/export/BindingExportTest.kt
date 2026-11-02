@@ -93,12 +93,22 @@ class BindingExportTest {
           """{"id":"root","component":"FloatingActionButton","icon":"add","label":"New","extended":%s}""",
         ),
         Case("true", """{"id":"root","component":"ChipGroup","multi":%s,"children":["a","b"]}"""),
+        Case("2", """{"id":"root","component":"Text","text":"t","maxLines":%s}"""),
+        Case("32", """{"id":"root","component":"Icon","name":"star","size":%s}"""),
+        Case("4", """{"id":"root","component":"Slider","steps":%s}"""),
+        Case("4", """{"id":"root","component":"RangeSlider","steps":%s}"""),
+        Case("3", """{"id":"root","component":"TextField","lines":%s}"""),
+        Case(
+          "true",
+          """{"id":"root","component":"NavigationRail","expanded":%s,"children":["rail"]}""",
+        ),
       )
     val rest =
       arrayOf(
         """{"id":"t","component":"Text","text":"t"}""",
         """{"id":"a","component":"FilterChip","label":"A"}""",
         """{"id":"b","component":"FilterChip","label":"B"}""",
+        """{"id":"rail","component":"NavigationRailItem","label":"Home","icon":"home"}""",
       )
     cases.forEach { case ->
       fun body(value: String, data: String? = null) =
@@ -138,6 +148,278 @@ class BindingExportTest {
         val bound = body(prop, """{"@path":"/v"}""", """{"v":$sample}""")
         assertEquals(body(prop, drawn), bound, "$prop bound to $sample")
       }
+  }
+
+  private val templateColumn =
+    arrayOf(
+      """{"id":"root","component":"Column","children":{"componentId":"mark","path":"/plates"}}""",
+    )
+
+  private fun plates(vararg fields: String) =
+    """{"plates":[${fields.joinToString(",") { "{$it}" }}]}"""
+
+  @Test
+  fun `a bound icon name calls a helper that lists every name across the items`() {
+    val source =
+      ExportFixtures.export(
+        *templateColumn,
+        """{"id":"mark","component":"Icon","name":{"@path":"icon"}}""",
+        dataModel = plates(""""icon":"skillet"""", """"icon":"restaurant""""),
+      )
+    assertHas(source, "Icon(painterResource(symbolDrawable(plate.icon)), contentDescription = null")
+    assertTrue(
+      source.contains(
+        """
+        |private fun symbolDrawable(name: String): Int =
+        |  when (name) {
+        |    "restaurant" -> R.drawable.restaurant
+        |    "skillet" -> R.drawable.skillet
+        |    else -> R.drawable.help
+        |  }
+        """
+          .trimMargin()
+          .trim(),
+      ),
+      source,
+    )
+    assertHas(
+      source,
+      "//   R.drawable.help",
+      "//   R.drawable.restaurant",
+      "//   R.drawable.skillet",
+    )
+    assertEquals(false, source.contains("filledSymbolDrawable"))
+    assertEquals(false, source.contains("R.drawable.help_filled"))
+  }
+
+  @Test
+  fun `a bound icon in a list item slot and in a nested template reads every parent's items`() {
+    val source =
+      ExportFixtures.export(
+        """{"id":"root","component":"Column","children":{"componentId":"group","path":"/groups"}}""",
+        """{"id":"group","component":"List","children":{"componentId":"row","path":"subs"}}""",
+        """{"id":"row","component":"ListItem","headline":"h","leading":"mark"}""",
+        """{"id":"mark","component":"Icon","name":{"@path":"icon"}}""",
+        dataModel = """{"groups":[{"subs":[{"icon":"b"}]},{"subs":[{"icon":"a"},{"icon":"c"}]}]}""",
+      )
+    assertHas(
+      source,
+      "leadingContent = { Icon(painterResource(symbolDrawable(sub.icon)), contentDescription = null) }",
+      "\"a\" -> R.drawable.a \"b\" -> R.drawable.b \"c\" -> R.drawable.c else -> R.drawable.help",
+    )
+  }
+
+  @Test
+  fun `a bound icon name on a button, chip, field, menu item and nav item uses the helper`() {
+    val source =
+      ExportFixtures.export(
+        """{"id":"root","component":"Column","children":["b","c","t","m","n"]}""",
+        """{"id":"b","component":"Button","label":"x","icon":{"@path":"/i"}}""",
+        """{"id":"c","component":"SuggestionChip","label":"x","icon":{"@path":"/i"}}""",
+        """{"id":"t","component":"TextField","leadingIcon":{"@path":"/i"}}""",
+        """{"id":"m","component":"MenuItem","label":"x","icon":{"@path":"/i"}}""",
+        """{"id":"n","component":"NavigationBarItem","label":"x","icon":{"@path":"/i"},"selectedIcon":{"@path":"/j"},"selected":{"@path":"/on"}}""",
+        dataModel = """{"i":"home","j":"star","on":true}""",
+      )
+    assertEquals(4, Regex("painterResource\\(symbolDrawable\\(i\\)\\)").findAll(source).count())
+    assertHas(
+      source,
+      "leadingIcon = { Icon(painterResource(symbolDrawable(i)), contentDescription = null) }",
+      "painterResource(if (on) symbolDrawable(j) else symbolDrawable(i))",
+    )
+  }
+
+  @Test
+  fun `a bound icon that is filled calls the filled helper`() {
+    val named =
+      ExportFixtures.export(
+        *templateColumn,
+        """{"id":"mark","component":"Icon","name":{"@path":"icon"},"filled":true}""",
+        dataModel = plates(""""icon":"star"""", """"icon":"home""""),
+      )
+    assertHas(named, "painterResource(filledSymbolDrawable(plate.icon))")
+    assertTrue(
+      named.contains(
+        """
+        |private fun filledSymbolDrawable(name: String): Int =
+        |  when (name) {
+        |    "home" -> R.drawable.home_filled
+        |    "star" -> R.drawable.star_filled
+        |    else -> R.drawable.help_filled
+        |  }
+        """
+          .trimMargin()
+          .trim(),
+      ),
+      named,
+    )
+    assertEquals(false, named.contains("private fun symbolDrawable"))
+
+    val toggled =
+      ExportFixtures.export(
+        """{"id":"root","component":"IconButton","icon":{"@path":"/icon"},"toggle":true,"checked":true}""",
+        dataModel = """{"icon":"star"}""",
+      )
+    assertHas(
+      toggled,
+      "painterResource(if (rootChecked) filledSymbolDrawable(icon) else symbolDrawable(icon))",
+    )
+  }
+
+  @Test
+  fun `a bound filled flag picks between the filled and plain drawable`() {
+    val literalName =
+      ExportFixtures.export(
+        """{"id":"root","component":"Icon","name":"star","filled":{"@path":"/on"}}""",
+        dataModel = """{"on":true}""",
+      )
+    assertHas(
+      literalName,
+      "painterResource(if (on) R.drawable.star_filled else R.drawable.star)",
+    )
+    val boundName =
+      ExportFixtures.export(
+        """{"id":"root","component":"Icon","name":{"@path":"/icon"},"filled":{"@path":"/on"}}""",
+        dataModel = """{"icon":"star","on":true}""",
+      )
+    assertHas(
+      boundName,
+      "painterResource(if (on) filledSymbolDrawable(icon) else symbolDrawable(icon))",
+    )
+  }
+
+  /** Each row keeps its own fill, as in the previewer, not the first row's. */
+  @Test
+  fun `a bound name and filled flag in a template are both read per item`() {
+    val source =
+      ExportFixtures.export(
+        """{"id":"root","component":"Column","children":{"componentId":"mark","path":"/tasks"}}""",
+        """{"id":"mark","component":"Icon","name":{"@path":"icon"},"filled":{"@path":"done"}}""",
+        dataModel = """{"tasks":[{"icon":"eco","done":true},{"icon":"call","done":false}]}""",
+      )
+    assertHas(
+      source,
+      "painterResource(if (task.done) filledSymbolDrawable(task.icon) else symbolDrawable(task.icon))",
+    )
+  }
+
+  @Test
+  fun `a bound image source calls a helper that lists every file across the items`() {
+    val source =
+      ExportFixtures.export(
+        *templateColumn,
+        """{"id":"mark","component":"Image","src":{"@path":"photo"},"contentDescription":"d"}""",
+        dataModel = plates(""""photo":"images/ramen.jpg"""", """"photo":"images/dumpling.png""""),
+      )
+    assertHas(source, "Image(painter = painterResource(imageDrawable(plate.photo))")
+    assertTrue(
+      source.contains(
+        """
+        |private fun imageDrawable(src: String): Int =
+        |  when (src) {
+        |    "images/dumpling.png" -> R.drawable.dumpling
+        |    "images/ramen.jpg" -> R.drawable.ramen
+        |    else -> error("No drawable for image ${'$'}src")
+        |  }
+        """
+          .trimMargin()
+          .trim(),
+      ),
+      source,
+    )
+    assertHas(source, "//   R.drawable.dumpling", "//   R.drawable.ramen")
+  }
+
+  @Test
+  fun `bound data URIs are named after the node and numbered when there are several`() {
+    val one =
+      ExportFixtures.export(
+        *templateColumn,
+        """{"id":"mark","component":"Image","src":{"@path":"photo"},"contentDescription":"d"}""",
+        dataModel =
+          plates(
+            """"photo":"data:image/png;base64,AAA="""",
+            """"photo":"data:image/png;base64,AAA="""",
+          ),
+      )
+    assertHas(one, """"data:image/png;base64,AAA=" -> R.drawable.mark""")
+    val several =
+      ExportFixtures.export(
+        *templateColumn,
+        """{"id":"mark","component":"Image","src":{"@path":"photo"},"contentDescription":"d"}""",
+        dataModel =
+          plates(
+            """"photo":"data:image/png;base64,BBB="""",
+            """"photo":"data:image/png;base64,AAA="""",
+            """"photo":"data:image/png;base64,BBB="""",
+          ),
+      )
+    assertHas(
+      several,
+      """"data:image/png;base64,AAA=" -> R.drawable.mark_2""",
+      """"data:image/png;base64,BBB=" -> R.drawable.mark_1""",
+    )
+  }
+
+  @Test
+  fun `a bound error, enabled and selected flag is passed through`() {
+    val source =
+      ExportFixtures.export(
+        """{"id":"root","component":"List","variant":"segmented","children":["row","field","sw"]}""",
+        """{"id":"row","component":"ListItem","headline":"h","selected":{"@path":"/on"}}""",
+        """{"id":"field","component":"TextField","error":{"@path":"/bad"},"enabled":{"@path":"/on"}}""",
+        """{"id":"sw","component":"Switch","enabled":{"@path":"/on"}}""",
+        dataModel = """{"on":true,"bad":false}""",
+      )
+    assertHas(source, "selected = on,", "isError = bad,", "enabled = on,")
+    assertEquals(2, Regex("enabled = on").findAll(source).count())
+  }
+
+  @Test
+  fun `a literal error, enabled and selected flag keeps its shape`() {
+    val source =
+      ExportFixtures.export(
+        """{"id":"root","component":"List","variant":"segmented","children":["row","field","sw"]}""",
+        """{"id":"row","component":"ListItem","headline":"h","selected":true}""",
+        """{"id":"field","component":"TextField","error":true,"enabled":false}""",
+        """{"id":"sw","component":"Switch","enabled":true}""",
+      )
+    assertHas(source, "selected = true,", "isError = true,", "enabled = false,")
+    assertEquals(false, source.contains("enabled = true"))
+  }
+
+  @Test
+  fun `a chip group starts on the chip whose bound selected flag is true`() {
+    fun body(selected: String, data: String? = null) =
+      ExportFixtures.body(
+        ExportFixtures.export(
+          """{"id":"root","component":"ChipGroup","children":["a","b"]}""",
+          """{"id":"a","component":"FilterChip","label":"A"}""",
+          """{"id":"b","component":"FilterChip","label":"B","selected":$selected}""",
+          dataModel = data,
+        ),
+      )
+    val bound = body("""{"@path":"/on"}""", """{"on":true}""")
+    assertHas(bound, """rootSelected by remember { mutableStateOf("b") }""")
+    assertEquals(body("true"), bound)
+  }
+
+  @Test
+  fun `a grid with a minimum column width counts the gap like the previewer does`() {
+    fun source(vararg extra: String) =
+      ExportFixtures.export(
+        """{"id":"root","component":"Grid","minColumnWidth":160,${extra.joinToString("")}"children":["t"]}""",
+        """{"id":"t","component":"Text","text":"t"}""",
+      )
+    assertHas(
+      source(""""spacing":"sm","""),
+      "val columns = ((constraints.maxWidth.toDp() + 8.dp) / (160.dp + 8.dp)).toInt().coerceIn(1, 24)",
+      "gap(8.dp)",
+    )
+    assertHas(
+      source(),
+      "val columns = (constraints.maxWidth.toDp() / 160.dp).toInt().coerceIn(1, 24)",
+    )
   }
 
   @Test

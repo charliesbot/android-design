@@ -11,8 +11,9 @@ import bot.charlies.androiddesign.preview.model.Proposal
  *
  * Structure of the file: the theme (`MaterialExpressiveTheme` over a MaterialKolor scheme, with the
  * design system's typography and shapes), the navigation host for a full export, one `@Composable`
- * per screen with a `@Preview`, and the sample data as public data classes and `private` objects.
- * Named styles and tokens become plain parameters and modifiers, never the Styles API.
+ * per screen with a `@Preview`, the `private` drawable lookups that icon names and image sources
+ * bound to data need, and the sample data as public data classes and `private` objects. Named
+ * styles and tokens become plain parameters and modifiers, never the Styles API.
  */
 object KotlinExporter {
   private const val PACKAGE = "com.example.app"
@@ -73,6 +74,7 @@ object KotlinExporter {
       decls += NavigationEmitter(file, proposal, emitters, themeName, "${base}App").declarations()
     }
     emitters.values.forEach { decls += it.declarations() }
+    decls += file.lookupDecls()
     decls += samples.classDecls()
     emitters.values.forEach { emitter -> emitter.sampleDeclaration()?.let { decls += it } }
 

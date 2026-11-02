@@ -1,6 +1,31 @@
 package bot.charlies.androiddesign.preview.domain.export
 
+import java.util.SortedMap
 import java.util.SortedSet
+
+/**
+ * A `private fun name(param: String): Int` that turns a value bound to data into a drawable. Each
+ * entry of [cases] maps one value the sample data gives to its `R.drawable` reference; [fallback]
+ * is the `else` branch.
+ */
+internal class DrawableLookup(
+  val name: String,
+  private val param: String,
+  private val fallback: String,
+) {
+  val cases: SortedMap<String, String> = sortedMapOf()
+
+  fun decl(): Decl =
+    RawDecl(
+      buildList {
+        add("private fun $name($param: String): Int =")
+        add("  when ($param) {")
+        cases.forEach { (value, drawable) -> add("    ${kotlinString(value)} -> $drawable") }
+        add("    else -> $fallback")
+        add("  }")
+      },
+    )
+}
 
 /** What one exported file collects while it is written: imports, opt-ins, drawables, fonts. */
 internal class FileContext {
@@ -12,6 +37,9 @@ internal class FileContext {
 
   /** Font resource names (`R.font.<name>`) the code refers to. */
   val fonts: SortedSet<String> = sortedSetOf()
+
+  /** The drawable lookup functions the code calls, by name: only those it uses are written. */
+  private val lookups: SortedMap<String, DrawableLookup> = sortedMapOf()
 
   /** Simple names of everything imported so far. */
   fun importedNames(): Set<String> = imports.mapTo(mutableSetOf()) { it.substringAfterLast('.') }
@@ -33,6 +61,38 @@ internal class FileContext {
     drawables += name
     return "R.drawable.$name"
   }
+
+  /**
+   * `symbolDrawable` (or `filledSymbolDrawable`), the function that maps each of [names] to its
+   * Material Symbol drawable, and the name to call. Any other name gets the `help` drawable.
+   */
+  fun symbolLookup(names: Set<String>, filled: Boolean): String {
+    val suffix = if (filled) "_filled" else ""
+    val name = if (filled) "filledSymbolDrawable" else "symbolDrawable"
+    val lookup = lookups.getOrPut(name) { DrawableLookup(name, "name", drawable("help$suffix")) }
+    names.forEach { lookup.cases[it] = drawable(Naming.snake(it) + suffix) }
+    return name
+  }
+
+  /**
+   * `imageDrawable`, the function that maps each of [sources] (a source to its file name or node
+   * id) to its image drawable, and the name to call. Any other source is an error: no image stands
+   * in.
+   */
+  fun imageLookup(sources: Map<String, String>): String {
+    val name = "imageDrawable"
+    val lookup =
+      lookups.getOrPut(name) {
+        DrawableLookup(name, "src", "error(\"No drawable for image ${'$'}src\")")
+      }
+    sources.forEach { (source, symbol) ->
+      lookup.cases[source] = drawable(Naming.snake(symbol))
+    }
+    return name
+  }
+
+  /** The lookup functions to write, in name order. */
+  fun lookupDecls(): List<Decl> = lookups.values.map { it.decl() }
 
   fun font(name: String): String {
     fonts += name
