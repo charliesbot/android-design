@@ -353,7 +353,16 @@ private fun layout(): List<ComponentDef> =
       listOf(
         children("children", required = true),
         spacing("spacing", "Gap between children (Arrangement.spacedBy)."),
-        oneOf("verticalAlignment", "top", "center", "bottom", default = "top"),
+        oneOf(
+          "verticalAlignment",
+          "top",
+          "center",
+          "bottom",
+          "stretch",
+          default = "top",
+          description =
+            "stretch: Column, Row, and Box children fill the row's height, for full-height panes.",
+        ),
         oneOf("arrangement", *arrangements, default = "start"),
       ),
       width = WidthFill.Always,

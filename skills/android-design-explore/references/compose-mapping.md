@@ -15,7 +15,7 @@ The first cell is the catalog component and the prop values that select the patt
 | Catalog | Compose | Status | Notes |
 | --- | --- | --- | --- |
 | `Column` | `Column(verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally)` | unverified | `spacing` is the `spacedBy` gap, at the step's dp value; `scroll` is `Modifier.verticalScroll(rememberScrollState())`. |
-| `Row` | `Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically)` | unverified | `arrangement` values other than `spacing` map to `Arrangement.SpaceBetween` and its siblings. |
+| `Row` | `Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically)` | unverified | `arrangement` values other than `spacing` map to `Arrangement.SpaceBetween` and its siblings. `verticalAlignment="stretch"` writes no alignment and adds `Modifier.fillMaxHeight()` to its `Column`, `Row`, and `Box` children, the full-height panes; it fills the height the row is given (a Scaffold's content, or `weight` inside a `Column`). `stretch` alone was rendered on Android against the app's tablet view: three weighted panes filled the height in both. |
 | `Box` | `Box(contentAlignment = Alignment.TopStart)` | unverified | |
 | `Grid` | `Grid` | unverified | Compose's experimental grid layout. `columns` is a fixed count, `minColumnWidth` an adaptive column size. An app whose foundation version lacks it uses `LazyVerticalGrid(columns = GridCells.Fixed(n))` or `GridCells.Adaptive(minSize)`. |
 | `FlexBox` | `FlexBox` | unverified | Compose's experimental flex layout. An app whose foundation version lacks it uses `FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp))`. |

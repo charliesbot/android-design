@@ -8,6 +8,7 @@ import bot.charlies.androiddesign.preview.feature.preview.theme.ThemeResolver
 import bot.charlies.androiddesign.preview.feature.preview.theme.toHex
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.FindingRule
+import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.Views
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -472,6 +473,61 @@ class RendererBehaviorTest {
         "pixel ${below}px under the fab is background, not shadow",
       )
     }
+  }
+
+  /** A Scaffold whose content is a Row of two short Columns, aligned as [alignment] says. */
+  private fun panes(alignment: String?): Proposal {
+    val stated = if (alignment == null) "" else ""","verticalAlignment":"$alignment""""
+    return singleScreen(
+      """{"id":"root","component":"Scaffold","content":"row"},""" +
+        """{"id":"row","component":"Row"$stated,"children":["left","right"]},""" +
+        """{"id":"left","component":"Column","children":["a"]},""" +
+        """{"id":"right","component":"Column","children":["b"]},""" +
+        """{"id":"a","component":"Text","text":"Left"},{"id":"b","component":"Text","text":"Right"}""",
+    )
+  }
+
+  @Test
+  fun `a row as the content of a scaffold fills the content height`() {
+    val tree = render(panes(null), view = Views.Tablet).tree
+    assertEquals(tree.node("root").bounds.height, tree.node("row").bounds.height)
+  }
+
+  @Test
+  fun `stretch gives the columns of a row the height of the row`() {
+    val tree = render(panes("stretch"), view = Views.Tablet).tree
+    val height = tree.node("root").bounds.height
+    assertEquals(height, tree.node("row").bounds.height, "row")
+    assertEquals(height, tree.node("left").bounds.height, "left")
+    assertEquals(height, tree.node("right").bounds.height, "right")
+    assertEquals(0f, tree.node("a").bounds.y, "other children stay at the top")
+  }
+
+  /** A divider between the panes must not shrink them: the export fills the height either way. */
+  @Test
+  fun `a stretched row with a vertical divider still fills the content height`() {
+    val tree =
+      render(
+          singleScreen(
+            """{"id":"root","component":"Scaffold","content":"row"},""" +
+              """{"id":"row","component":"Row","verticalAlignment":"stretch","children":["left","line","right"]},""" +
+              """{"id":"left","component":"Column","children":["a"]},""" +
+              """{"id":"line","component":"Divider","vertical":true},""" +
+              """{"id":"right","component":"Column","children":["b"]},""" +
+              """{"id":"a","component":"Text","text":"Left"},{"id":"b","component":"Text","text":"Right"}""",
+          ),
+          view = Views.Tablet,
+        )
+        .tree
+    val height = tree.node("root").bounds.height
+    assertEquals(height, tree.node("row").bounds.height, "row")
+    assertEquals(height, tree.node("left").bounds.height, "left")
+  }
+
+  @Test
+  fun `a row without stretch keeps its columns as tall as their content`() {
+    val tree = render(panes(null), view = Views.Tablet).tree
+    assertTrue(tree.node("left").bounds.height < tree.node("root").bounds.height / 2)
   }
 
   private fun androidx.compose.ui.test.ComposeUiTest.settleForTest() {

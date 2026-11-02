@@ -668,7 +668,8 @@
           "spacing": "md",
           "children": [
             "detail_title",
-            "detail_text"
+            "detail_text",
+            "detail_panes"
           ]
         },
         {
@@ -682,6 +683,45 @@
           "component": "Text",
           "text": "Beside the home list at expanded widths.",
           "type": "bodyLarge"
+        },
+        {
+          "id": "detail_panes",
+          "component": "Row",
+          "spacing": "md",
+          "verticalAlignment": "stretch",
+          "weight": 1,
+          "children": [
+            "pane_left",
+            "pane_right"
+          ]
+        },
+        {
+          "id": "pane_left",
+          "component": "Column",
+          "weight": 1,
+          "children": [
+            "pane_left_text"
+          ]
+        },
+        {
+          "id": "pane_left_text",
+          "component": "Text",
+          "text": "Left pane",
+          "type": "titleMedium"
+        },
+        {
+          "id": "pane_right",
+          "component": "Box",
+          "weight": 1,
+          "children": [
+            "pane_right_text"
+          ]
+        },
+        {
+          "id": "pane_right_text",
+          "component": "Text",
+          "text": "Right pane",
+          "type": "titleMedium"
         }
       ]
     },

@@ -116,6 +116,10 @@ Size classes are measured on the preview frame: `compact` below 600 dp, `medium`
 - **`showIn`**: the size classes a component appears in, all by default. `"showIn": ["compact"]` on a `NavigationBar` and `"showIn": ["medium", "expanded"]` on a `NavigationRail` swap the two.
 - **`sizeClass`**: prop overrides for `medium` or `expanded`: `"sizeClass": {"expanded": {"columns": 3}}`. An override holds ordinary props of that component.
 
+## Full-height panes
+
+Panes fill the window's height (`android-design`, layout reference). In a proposal, side-by-side panes are a `Row` with `"verticalAlignment": "stretch"`: its `Column`, `Row`, and `Box` children fill the row's height. The row needs height to fill, so make it the `Scaffold`'s `content`, or give it `"weight": 1` inside a `Column`. Give each pane `weight` for its share of the width, and `"scroll": true` on the pane `Column` that holds a list, so the list scrolls inside its pane. Use `showIn` or `sizeClass` so the stretched row appears only where the panes sit side by side.
+
 ## Styles
 
 `"style": "hero_title"` applies a named style from `material.styles` (DESIGN.md merged with the proposal's `theme`). A style's keys are `type` (type role), `color` (content color role), `container` (container color role), `shape` (corner or polygon), and `padding` (spacing name). A prop written on the component wins over its style.

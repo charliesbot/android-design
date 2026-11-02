@@ -103,8 +103,9 @@ internal fun RenderColumn(ctx: NodeContext) {
 
 @Composable
 internal fun RenderRow(ctx: NodeContext) {
+  val verticalAlignment = ctx.string("verticalAlignment")
   val alignment =
-    when (ctx.string("verticalAlignment")) {
+    when (verticalAlignment) {
       "center" -> Alignment.CenterVertically
       "bottom" -> Alignment.Bottom
       else -> Alignment.Top
@@ -114,7 +115,9 @@ internal fun RenderRow(ctx: NodeContext) {
       val child = ctx.env.nodes[it.id]
       child?.component == "Divider" && child.props["vertical"].toString() == "true"
     }
-  var modifier = ctx.modifier().then(ctx.styleBackground())
+  // A row with a vertical divider is as tall as its tallest child so the divider can span it. When
+  // the row is offered a height, that intrinsic height is coerced to the filled one.
+  var modifier = ctx.modifier(fillHeight = true).then(ctx.styleBackground())
   if (hasVerticalDivider) modifier = modifier.height(IntrinsicSize.Min)
   ctx.StyledAmbient {
     Row(
@@ -123,7 +126,16 @@ internal fun RenderRow(ctx: NodeContext) {
         horizontalArrangement(ctx.string("arrangement"), ctx.spacing("spacing")),
       verticalAlignment = alignment,
     ) {
-      ctx.Children("children", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, row = this))
+      // Stretch offers the row's height to its Column and Box children, the full-height panes.
+      ctx.Children(
+        "children",
+        0,
+        ChildHost(
+          fillWidth = ctx.def.stretchesChildren,
+          fillHeight = verticalAlignment == "stretch",
+          row = this,
+        ),
+      )
     }
   }
 }
