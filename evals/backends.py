@@ -28,8 +28,10 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
             if role == 'generator':
                 config = temporary / 'mcp.json'
                 config.write_text(json.dumps({'mcpServers': {SERVER_NAME: {'command': str(mcp_binary), 'args': []}}}))
+                # `claude -p` refuses writes nobody allowed, so the generator may edit its case folder only,
+                # like Codex's workspace-write. `//` makes the rule's path absolute.
                 command += ['--mcp-config', str(config), '--strict-mcp-config',
-                            '--allowedTools', f'mcp__{SERVER_NAME}__*']
+                            '--allowedTools', f'mcp__{SERVER_NAME}__*', f'Edit(/{Path(cwd).resolve()}/**)']
             if role == 'judge':
                 command += ['--tools', 'Read', '--allowedTools', 'Read']
                 for folder in sorted({str(Path(p).resolve().parent) for p in images}):
