@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.feature.preview.viewer
 
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -12,6 +13,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposePanel
 import androidx.compose.ui.awt.SwingPanel
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -26,6 +28,7 @@ private data class FrameParams(
   val host: ProposalHostState,
   val design: DesignSystem,
   val view: ViewSpec,
+  val cover: Color,
 )
 
 /**
@@ -52,9 +55,11 @@ fun ConfinedFrame(
     ProposalPreview(h, d, v)
   },
 ) {
-  var params by remember { mutableStateOf(FrameParams(host, design, view)) }
+  // The stage's theme is the proposal's, so its background is what the screen fades in from.
+  val cover = MaterialTheme.colorScheme.background
+  var params by remember { mutableStateOf(FrameParams(host, design, view, cover)) }
   var frameScale by remember { mutableStateOf(scale) }
-  params = FrameParams(host, design, view)
+  params = FrameParams(host, design, view, cover)
   frameScale = scale
   val failed by rememberUpdatedState(onFailure)
   SwingPanel(
@@ -91,7 +96,8 @@ private fun newFramePanel(
       CompositionLocalProvider(
         LocalDensity provides Density(base.density * scaleOf(), base.fontScale),
       ) {
-        content(p.host, p.design, p.view)
+        // A new panel is made each time the stage settles on a device, so its screen fades in.
+        FadeIn(p.cover) { content(p.host, p.design, p.view) }
       }
     }
   }
