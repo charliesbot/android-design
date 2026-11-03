@@ -31,6 +31,8 @@ compose.desktop {
     jvmArgs += "-XX:+DisplayVMOutputToStderr"
     // Read by AppNap.BUNDLE_ID_PROPERTY: only the packaged app has a preferences domain.
     jvmArgs += "-Dapp.bundleId=$appBundleId"
+    // The title bar follows macOS light or dark mode instead of staying light.
+    jvmArgs += "-Dapple.awt.application.appearance=system"
     nativeDistributions {
       targetFormats(TargetFormat.Dmg)
       packageName = "AndroidDesignPreview"

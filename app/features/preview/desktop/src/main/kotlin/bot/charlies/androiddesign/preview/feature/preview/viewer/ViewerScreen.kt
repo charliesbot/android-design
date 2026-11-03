@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,11 +21,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.FilledTonalIconToggleButton
-import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -219,22 +221,33 @@ internal fun fitScale(
     .coerceAtLeast(0.05f)
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun DeviceRow(state: ViewerState, actions: ViewerActions) {
   Row(
-    Modifier.height(DeviceRowHeight).padding(bottom = 8.dp),
-    horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+    Modifier.fillMaxWidth().height(DeviceRowHeight).padding(bottom = 8.dp),
+    horizontalArrangement =
+      Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween, Alignment.CenterHorizontally),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    DeviceChoices.forEach { choice ->
+    DeviceChoices.forEachIndexed { index, choice ->
       val description = "${choice.label} ${deviceSize(choice.device)}"
-      FilledTonalIconToggleButton(
-        checked = state.device == choice.device,
+      val checked = state.device == choice.device
+      val shapes =
+        when (index) {
+          0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+          DeviceChoices.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+          else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+        }
+      ToggleButton(
+        checked = checked,
         onCheckedChange = { actions.setDevice(choice.device) },
         modifier = Modifier.semantics { contentDescription = description },
-        shapes = IconButtonDefaults.toggleableShapes(),
+        shapes = shapes,
       ) {
-        SymbolIcon(choice.icon, filled = state.device == choice.device)
+        SymbolIcon(choice.icon, filled = checked)
+        Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
+        Text(choice.label)
       }
     }
   }
