@@ -166,6 +166,10 @@ class ViewerViewModelTest {
     val error = failed.errors.single()
     assertEquals("render", error.path)
     assertTrue("boom" in error.message && "second line" !in error.message, error.message)
+    assertTrue(
+      "at ViewerViewModelTest." in error.message,
+      "names where it was thrown: ${error.message}",
+    )
 
     viewModel.show(load(path))
     assertTrue(viewModel.state.value.valid)

@@ -3,7 +3,9 @@ package bot.charlies.androiddesign.preview.feature.preview
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -15,6 +17,18 @@ import kotlin.test.Test
 /** The window keeps one host while the view changes, so every screen must follow the new size. */
 @OptIn(ExperimentalTestApi::class)
 class ViewChangeTest {
+  // A view change or a back step can land a frame after waitForIdle returns, so each check waits
+  // for the text to appear or go, and fails only when it never does.
+  private fun ComposeUiTest.shows(text: String) =
+    waitUntil(timeoutMillis = TIMEOUT_MS) {
+      onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+    }
+
+  private fun ComposeUiTest.hides(text: String) =
+    waitUntil(timeoutMillis = TIMEOUT_MS) {
+      onAllNodesWithText(text).fetchSemanticsNodes().isEmpty()
+    }
+
   private val sized =
     """{"id":"root","component":"Scaffold","content":"col"},{"id":"col","component":"Column","children":["wide","narrow"]},""" +
       """{"id":"wide","component":"Text","text":"wide","showIn":["expanded"]},{"id":"narrow","component":"Text","text":"narrow","showIn":["compact","medium"]}"""
@@ -26,17 +40,15 @@ class ViewChangeTest {
       val host = ProposalHostState(proposal)
       var view by mutableStateOf(Views.Light)
       setContent { ProposalPreview(host, designOf(), view) }
-      onNodeWithText("narrow").assertExists()
+      shows("narrow")
 
       view = Views.Tablet
-      waitForIdle()
-      onNodeWithText("wide").assertExists()
-      onNodeWithText("narrow").assertDoesNotExist()
+      shows("wide")
+      hides("narrow")
 
       view = Views.Light
-      waitForIdle()
-      onNodeWithText("narrow").assertExists()
-      onNodeWithText("wide").assertDoesNotExist()
+      shows("narrow")
+      hides("wide")
     }
 
   @Test
@@ -66,28 +78,29 @@ class ViewChangeTest {
       val host = ProposalHostState(proposal)
       var view by mutableStateOf(Views.Tablet)
       setContent { ProposalPreview(host, designOf(), view) }
-      onNodeWithText("wide").assertExists()
+      shows("wide")
 
       view = Views.Light
-      waitForIdle()
-      onNodeWithText("narrow").assertExists()
-      onNodeWithText("wide").assertDoesNotExist()
+      shows("narrow")
+      hides("wide")
 
       view = Views.Tablet
-      waitForIdle()
       host.navigate("detail")
-      waitForIdle()
-      onNodeWithText("detail body").assertExists()
+      shows("detail body")
+      shows("wide")
       view = Views.Light
-      waitForIdle()
-      onNodeWithText("detail body").assertExists()
+      hides("wide")
+      shows("detail body")
 
       // At foldable size the pair shows one pane, and opening the detail replaces the list.
       host.back()
       view = Views.Foldable
-      waitForIdle()
+      hides("detail body")
+      shows("Open")
       onNodeWithText("Open").performClick()
-      waitForIdle()
-      onNodeWithText("detail body").assertExists()
+      shows("detail body")
+      hides("Open")
     }
 }
+
+private const val TIMEOUT_MS = 5_000L

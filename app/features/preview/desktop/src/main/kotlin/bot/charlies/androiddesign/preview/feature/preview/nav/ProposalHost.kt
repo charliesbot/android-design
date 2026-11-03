@@ -15,10 +15,10 @@ import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneSt
 import androidx.compose.material3.adaptive.navigation3.rememberSupportingPaneSceneStrategy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -57,9 +57,9 @@ fun ProposalHost(
   recorder: TreeRecorder? = null,
   primaryScreen: String = host.current,
 ) {
-  // NavDisplay keeps each screen's entry content across recompositions, so the entries read the
-  // size class through state: a captured value would stay at the size the screen was first drawn.
-  val sizeClass by rememberUpdatedState(SizeClass.forWidth(frameSize.width.value.toInt()))
+  val sizeClass = SizeClass.forWidth(frameSize.width.value.toInt())
+  // NavDisplay keeps each screen's entry content across recompositions, so the entries read these
+  // through state: a captured value would stay at what the screen was first drawn with.
   val currentRecorder by rememberUpdatedState(recorder)
   val currentPrimary by rememberUpdatedState(primaryScreen)
   val directive = rememberDirective(frameSize)
@@ -67,10 +67,12 @@ fun ProposalHost(
   val supportingLayout = PaneRole.Supporting in panes.values
   val listDetail = rememberListDetailSceneStrategy<String>(directive = directive)
   val supporting = rememberSupportingPaneSceneStrategy<String>(directive = directive)
-  // The pane scaffold measures its panes in a lookahead pass, and NavDisplay moves a screen's
-  // content between scenes. Without an outer scope, a screen moved out of the pane scaffold keeps a
-  // stale lookahead state, and Material 3's clickable ListItem then throws a NullPointerException.
-  LookaheadScope {
+  // A new frame size starts a new NavDisplay. Keeping one would move a screen's content from the
+  // pane scaffold, which measures in a lookahead pass, into a one-pane scene, and the moved content
+  // keeps a stale lookahead state: Material 3's clickable ListItem then throws a
+  // NullPointerException, and an outer LookaheadScope instead leaves the list blank. The back stack
+  // lives in the host, so the window stays on its screen.
+  key(frameSize) {
     NavDisplay(
       backStack = host.backStack,
       modifier = modifier.fillMaxSize(),

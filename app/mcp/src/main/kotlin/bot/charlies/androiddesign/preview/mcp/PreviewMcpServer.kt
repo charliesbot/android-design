@@ -112,15 +112,16 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
       name = "set_view",
       title = "Change the window's view",
       description =
-        "Changes what the window shows: device, brightness, seed color, palette variant. Omitted " +
-          "values stay as they are. These choices only affect the window and get_tree without " +
-          "arguments; they are never written to the proposal.",
+        "Changes what the window shows: screen, device, brightness, seed color, palette " +
+          "variant. Omitted values stay as they are. These choices only affect the window and " +
+          "get_tree without arguments; they are never written to the proposal.",
       schema =
         schema(
           enum("device", "Device frame.", Device.entries.map { it.wire }),
           bool("dark", "True for dark brightness, false for light."),
           string("seed", "Seed color as #RRGGBB."),
           enum("variant", "Palette variant.", PaletteVariant.entries.map { it.wire }),
+          string("screen", "Screen id to show, as the side panel's screen list does."),
         ),
       readOnly = false,
     ) { args ->
@@ -135,6 +136,7 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
             },
           dark = args.bool("dark"),
           seed = args.string("seed"),
+          screen = args.string("screen"),
           variant =
             args.string("variant")?.let {
               PaletteVariant.fromWire(it)

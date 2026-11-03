@@ -20,6 +20,37 @@ class ModelTest {
   }
 
   @Test
+  fun `a located failure names the frames it was thrown from`() {
+    val error = NullPointerException()
+    error.stackTrace =
+      arrayOf(
+        StackTraceElement(
+          "androidx.compose.ui.node.LookaheadDelegate",
+          "owner",
+          "LookaheadDelegate.kt",
+          629,
+        ),
+        StackTraceElement(
+          "androidx.compose.material3.ListItemPolicy",
+          "measure",
+          "ListItem.kt",
+          1744,
+        ),
+        StackTraceElement("a.B", "c", null, -1),
+        StackTraceElement("a.D", "e", "D.kt", 1),
+      )
+    assertEquals(
+      "NullPointerException at LookaheadDelegate.owner(LookaheadDelegate.kt:629) < " +
+        "ListItemPolicy.measure(ListItem.kt:1744) < B.c",
+      error.located(frames = 3),
+    )
+    assertEquals(
+      "boom",
+      IllegalStateException("boom").apply { stackTrace = emptyArray() }.located(),
+    )
+  }
+
+  @Test
   fun `wire names are the Compose property names`() {
     assertEquals("surfaceContainerHigh", ColorRole.SurfaceContainerHigh.wire)
     assertEquals("displayLargeEmphasized", TypeRole.DisplayLargeEmphasized.wire)

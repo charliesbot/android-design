@@ -24,7 +24,7 @@ import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
-import bot.charlies.androiddesign.preview.model.firstLine
+import bot.charlies.androiddesign.preview.model.located
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.CancellationException
@@ -115,10 +115,19 @@ class AppPreviewController(
         DesignSystemResolver.parseHex(it)
           ?: throw PreviewException("seed must be #RRGGBB, got '$it'")
       }
+    change.screen?.let { screen ->
+      val proposal = checkNotNull(validSnapshot().proposal)
+      if (screen !in proposal.screens) {
+        throw PreviewException(
+          "no screen '$screen'; the screens are ${proposal.screens.keys.joinToString()}",
+        )
+      }
+    }
     change.device?.let(viewer::setDevice)
     change.dark?.let(viewer::setDark)
     seed?.let(viewer::setSeed)
     change.variant?.let(viewer::setVariant)
+    change.screen?.let(viewer::selectScreen)
     return viewState()
   }
 
@@ -275,7 +284,7 @@ class AppPreviewController(
       } catch (e: Exception) {
         ValidationError(
           ViewerViewModel.RENDER_ERROR_PATH,
-          "screen '$screen' failed to render at ${window.view.name}: ${e.firstLine()}",
+          "screen '$screen' failed to render at ${window.view.name}: ${e.located()}",
         )
       }
     return if (failure == null) snapshot else snapshot.copy(errors = listOf(failure))

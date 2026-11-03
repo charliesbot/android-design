@@ -260,6 +260,20 @@ class AppPreviewControllerTest {
   }
 
   @Test
+  fun `set_view moves the window to a screen`() = runBlocking {
+    controller.openProposal(workspace().toString())
+
+    controller.setView(ViewChange(screen = "plate_detail", device = Device.Tablet))
+
+    assertEquals("plate_detail", controller.getTree().screen)
+    assertEquals(Device.Tablet, controller.status().view?.device)
+    val error =
+      assertFailsWith<PreviewException> { controller.setView(ViewChange(screen = "nope")) }
+    assertTrue("plate_detail" in error.message.orEmpty(), error.message)
+    assertEquals("plate_detail", controller.getTree().screen, "a bad screen changes nothing")
+  }
+
+  @Test
   fun `status reports the app, the proposal and the window`() = runBlocking {
     val before = controller.status()
     assertEquals(AppInfo.VERSION, before.version)

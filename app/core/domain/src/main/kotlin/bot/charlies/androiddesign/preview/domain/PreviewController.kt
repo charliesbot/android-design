@@ -27,7 +27,10 @@ interface PreviewController {
    */
   suspend fun getTree(screen: String? = null, view: String? = null): LayoutTree
 
-  /** `set_view`: changes the window's device, brightness, seed or variant; null keeps the value. */
+  /**
+   * `set_view`: changes the window's screen, device, brightness, seed or variant; null keeps the
+   * value. An unknown screen changes nothing.
+   */
   suspend fun setView(change: ViewChange): ViewState
 
   /** `show_preview`: shows the window if it is hidden. */
@@ -63,6 +66,8 @@ data class ViewChange(
   /** `#RRGGBB`. */
   val seed: String? = null,
   val variant: PaletteVariant? = null,
+  /** A screen id of the open proposal; moves the window there, as the side panel does. */
+  val screen: String? = null,
 )
 
 @Serializable
