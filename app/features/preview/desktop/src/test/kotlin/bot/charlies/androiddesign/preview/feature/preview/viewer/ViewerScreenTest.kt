@@ -86,6 +86,65 @@ class ViewerScreenTest {
     }
 
   @Test
+  fun `a device switch morphs the frame, then shows the screen at the new size`() =
+    runDesktopComposeUiTest(1800, 1400) {
+      val vm = loaded()
+      setContent { ViewerScreen(vm, frame = InlineFrame) }
+      waitForIdle()
+      fun frameWidth() = onNodeWithTag(DEVICE_FRAME_TAG).fetchSemanticsNode().boundsInRoot.width
+      val phoneWidth = frameWidth()
+      onNodeWithTag("root", useUnmergedTree = true).assertExists()
+
+      mainClock.autoAdvance = false
+      vm.setDevice(Device.Tablet)
+      mainClock.advanceTimeByFrame()
+      mainClock.advanceTimeBy(80)
+      val midWidth = frameWidth()
+      onNodeWithTag("root", useUnmergedTree = true).assertDoesNotExist()
+
+      mainClock.advanceTimeBy(3_000)
+      val tabletWidth = frameWidth()
+      assertTrue(
+        midWidth > phoneWidth && midWidth < tabletWidth,
+        "$phoneWidth < $midWidth < $tabletWidth",
+      )
+      onNodeWithTag("root", useUnmergedTree = true).assertExists()
+    }
+
+  @Test
+  fun `a switch back during the morph keeps the screen out until the frame settles`() =
+    runDesktopComposeUiTest(1800, 1400) {
+      val vm = loaded()
+      setContent { ViewerScreen(vm, frame = InlineFrame) }
+      waitForIdle()
+      mainClock.autoAdvance = false
+      val start = vm.state.value.device
+      vm.setDevice(Device.Tablet)
+      mainClock.advanceTimeByFrame()
+      mainClock.advanceTimeBy(80)
+      vm.setDevice(start)
+      mainClock.advanceTimeByFrame()
+      mainClock.advanceTimeBy(32)
+      onNodeWithTag("root", useUnmergedTree = true).assertDoesNotExist()
+
+      mainClock.advanceTimeBy(3_000)
+      onNodeWithTag("root", useUnmergedTree = true).assertExists()
+    }
+
+  @Test
+  fun `a brightness change keeps the screen without a morph`() =
+    runDesktopComposeUiTest(1800, 1400) {
+      val vm = loaded()
+      setContent { ViewerScreen(vm, frame = InlineFrame) }
+      waitForIdle()
+      mainClock.autoAdvance = false
+      vm.setDark(true)
+      mainClock.advanceTimeByFrame()
+      mainClock.advanceTimeByFrame()
+      onNodeWithTag("root", useUnmergedTree = true).assertExists()
+    }
+
+  @Test
   fun `a narrow window keeps every section and moves the panel above the stage`() {
     var wideDeviceTop = 0f
     var narrowDeviceTop = 0f
