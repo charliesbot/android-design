@@ -9,7 +9,7 @@ import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
-import bot.charlies.androiddesign.preview.model.firstLine
+import bot.charlies.androiddesign.preview.model.located
 import java.nio.file.Path
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -158,7 +158,9 @@ class ViewerViewModel : ViewerActions {
    */
   @Synchronized
   fun frameFailed(error: Throwable) {
-    val message = "the window failed to draw the proposal: ${error.firstLine()}"
+    // The full stack goes to stderr, which MCP leaves free; the error names the top frames.
+    error.printStackTrace()
+    val message = "the window failed to draw the proposal: ${error.located()}"
     mutableState.value =
       mutableState.value.copy(errors = listOf(ValidationError(RENDER_ERROR_PATH, message)))
   }

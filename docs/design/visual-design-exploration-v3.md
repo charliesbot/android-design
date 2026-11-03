@@ -171,7 +171,7 @@ The app is the catalog's single source of truth and serves it over MCP (`get_cat
 - `open_proposal(path)`
 - `check_proposal(screens?, views?)`: every screen at all five views by default, tree-only, returning pass or fail per view, each error grouped by rule with its node ids, and a `layout` summary per view (navigation shown, panes, and each pane's main regions as `Type id width`, under 300 bytes) so the agent confirms adaptation without full trees. About 0.2 s for one screen at five views.
 - `get_tree(screen?, view?)`: the full tree of one view
-- `set_view(device, dark, seed, variant)`
+- `set_view(device?, dark?, seed?, variant?, screen?)`: changes the window only; `screen` moves it to a screen as the side panel does
 - `show_preview()`
 - `get_catalog(component?)`: a compact text catalog (about 11K characters, one line per component) by default, or the full JSON Schema of the named components. The full catalog exceeds MCP result limits, so it is never sent whole.
 - `export_kotlin(screen?)`

@@ -128,7 +128,7 @@ class McpIntegrationTest {
     assertEquals(listOf("path"), byName.getValue("open_proposal").inputSchema.required)
     val view = byName.getValue("set_view").inputSchema.properties
     assertNotNull(view)
-    assertEquals(setOf("device", "dark", "seed", "variant"), view.keys)
+    assertEquals(setOf("device", "dark", "seed", "variant", "screen"), view.keys)
     assertEquals(
       listOf("phone", "foldable", "tablet", "desktop"),
       view.getValue("device").jsonObject.getValue("enum").jsonArray.map {
