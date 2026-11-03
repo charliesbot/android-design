@@ -14,8 +14,11 @@ import androidx.compose.material3.adaptive.navigation3.SupportingPaneSceneStrate
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberSupportingPaneSceneStrategy
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -54,29 +57,38 @@ fun ProposalHost(
   recorder: TreeRecorder? = null,
   primaryScreen: String = host.current,
 ) {
-  val sizeClass = SizeClass.forWidth(frameSize.width.value.toInt())
+  // NavDisplay keeps each screen's entry content across recompositions, so the entries read the
+  // size class through state: a captured value would stay at the size the screen was first drawn.
+  val sizeClass by rememberUpdatedState(SizeClass.forWidth(frameSize.width.value.toInt()))
+  val currentRecorder by rememberUpdatedState(recorder)
+  val currentPrimary by rememberUpdatedState(primaryScreen)
   val directive = rememberDirective(frameSize)
   val panes = host.proposal.navigation.panes
   val supportingLayout = PaneRole.Supporting in panes.values
   val listDetail = rememberListDetailSceneStrategy<String>(directive = directive)
   val supporting = rememberSupportingPaneSceneStrategy<String>(directive = directive)
-  NavDisplay(
-    backStack = host.backStack,
-    modifier = modifier.fillMaxSize(),
-    sceneStrategies = listOf(if (supportingLayout) supporting else listDetail),
-    onBack = { host.back() },
-    entryProvider = { screenId ->
-      NavEntry(screenId, metadata = paneMetadata(panes[screenId], supportingLayout)) {
-        ProposalRenderer(
-          host = host,
-          screenId = screenId,
-          sizeClass = sizeClass,
-          recorder = recorder,
-          idPrefix = if (screenId == primaryScreen) "" else "$screenId/",
-        )
-      }
-    },
-  )
+  // The pane scaffold measures its panes in a lookahead pass, and NavDisplay moves a screen's
+  // content between scenes. Without an outer scope, a screen moved out of the pane scaffold keeps a
+  // stale lookahead state, and Material 3's clickable ListItem then throws a NullPointerException.
+  LookaheadScope {
+    NavDisplay(
+      backStack = host.backStack,
+      modifier = modifier.fillMaxSize(),
+      sceneStrategies = listOf(if (supportingLayout) supporting else listDetail),
+      onBack = { host.back() },
+      entryProvider = { screenId ->
+        NavEntry(screenId, metadata = paneMetadata(panes[screenId], supportingLayout)) {
+          ProposalRenderer(
+            host = host,
+            screenId = screenId,
+            sizeClass = sizeClass,
+            recorder = currentRecorder,
+            idPrefix = if (screenId == currentPrimary) "" else "$screenId/",
+          )
+        }
+      },
+    )
+  }
 }
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
