@@ -67,12 +67,13 @@ fun ProposalHost(
   val supportingLayout = PaneRole.Supporting in panes.values
   val listDetail = rememberListDetailSceneStrategy<String>(directive = directive)
   val supporting = rememberSupportingPaneSceneStrategy<String>(directive = directive)
-  // A new frame size starts a new NavDisplay. Keeping one would move a screen's content from the
-  // pane scaffold, which measures in a lookahead pass, into a one-pane scene, and the moved content
-  // keeps a stale lookahead state: Material 3's clickable ListItem then throws a
-  // NullPointerException, and an outer LookaheadScope instead leaves the list blank. The back stack
-  // lives in the host, so the window stays on its screen.
-  key(frameSize) {
+  // A new size class starts a new NavDisplay: the nav is rebuilt only when the pane count can
+  // change. Keeping one would move a screen's content from the pane scaffold, which measures in a
+  // lookahead pass, into a one-pane scene, and the moved content keeps a stale lookahead state:
+  // Material 3's clickable ListItem then throws a NullPointerException, and an outer
+  // LookaheadScope instead leaves the list blank. Within one class the pane scaffold follows the
+  // size itself. The back stack lives in the host, so the window stays on its screen.
+  key(sizeClass) {
     NavDisplay(
       backStack = host.backStack,
       modifier = modifier.fillMaxSize(),
@@ -129,7 +130,8 @@ private fun paneMetadata(role: PaneRole?, supportingLayout: Boolean): Map<String
   }
 
 /**
- * The whole preview: theme, frame, and host, drawn at the size of [view]. The window and the
+ * The whole preview: theme, frame, and host, drawn at [frame], which defaults to the size of
+ * [view]; the window passes the moving size while a device switch animates. The window and the
  * headless renderer both draw this.
  */
 @Composable
@@ -137,15 +139,16 @@ fun ProposalPreview(
   host: ProposalHostState,
   design: DesignSystem,
   view: ViewSpec,
+  frame: DpSize = DpSize(view.width.dp, view.height.dp),
   modifier: Modifier = Modifier,
   recorder: TreeRecorder? = null,
 ) {
   ProposalTheme(design, view.dark) {
-    PreviewFrame(recorder, modifier.size(view.width.dp, view.height.dp)) {
+    PreviewFrame(recorder, modifier.size(frame.width, frame.height)) {
       Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         ProposalHost(
           host = host,
-          frameSize = DpSize(view.width.dp, view.height.dp),
+          frameSize = frame,
           recorder = recorder,
         )
       }

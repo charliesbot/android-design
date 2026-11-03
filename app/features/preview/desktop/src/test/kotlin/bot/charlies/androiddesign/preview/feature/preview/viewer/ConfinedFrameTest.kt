@@ -1,9 +1,11 @@
 package bot.charlies.androiddesign.preview.feature.preview.viewer
 
 import androidx.compose.ui.awt.ComposePanel
+import androidx.compose.ui.graphics.toArgb
 import bot.charlies.androiddesign.preview.feature.preview.designOf
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState
 import bot.charlies.androiddesign.preview.feature.preview.singleScreen
+import bot.charlies.androiddesign.preview.feature.preview.theme.ThemeResolver
 import bot.charlies.androiddesign.preview.model.Device
 import java.awt.Component
 import java.awt.Container
@@ -87,7 +89,7 @@ class ConfinedFrameTest {
     SwingUtilities.invokeAndWait {
       outer = ComposePanel()
       outer.setContent {
-        ViewerContent(state, NoActions, { h, d, v, s -> ConfinedFrame(h, d, v, s) })
+        ViewerContent(state, NoActions, { h, d, v, f, s -> ConfinedFrame(h, d, v, f, s) })
       }
       window = JFrame("confinement")
       window.contentPane.add(outer)
@@ -103,6 +105,9 @@ class ConfinedFrameTest {
         "viewer drawn",
       )
       val frame = assertNotNull(inner())
+      // The panel's own background is what shows while it resizes, so it must be the screen's.
+      val background = ThemeResolver.resolve(designOf(), dark = false).colorScheme.background
+      assertEquals(java.awt.Color(background.toArgb(), true), onEdt { frame.background })
       val frameBounds = onEdt { Rectangle(frame.locationOnScreen, frame.size) }
       val sidePanel = seen().first { it.name == "Brightness" }.screen
       assertTrue(!frameBounds.intersects(sidePanel), "the side panel is not under the frame")

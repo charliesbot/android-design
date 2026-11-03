@@ -12,7 +12,9 @@ import bot.charlies.androiddesign.preview.data.FileProposalRepository
 import bot.charlies.androiddesign.preview.model.Device
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.ValidationError
+import bot.charlies.androiddesign.preview.model.Views
 import java.nio.file.Path
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -86,49 +88,40 @@ class ViewerScreenTest {
     }
 
   @Test
-  fun `a device switch morphs the frame, then shows the screen at the new size`() =
+  fun `a device switch morphs the frame with the screen inside it`() =
     runDesktopComposeUiTest(1800, 1400) {
       val vm = loaded()
       setContent { ViewerScreen(vm, frame = InlineFrame) }
       waitForIdle()
       fun frameWidth() = onNodeWithTag(DEVICE_FRAME_TAG).fetchSemanticsNode().boundsInRoot.width
-      val phoneWidth = frameWidth()
-      onNodeWithTag("root", useUnmergedTree = true).assertExists()
+      fun screenWidth() =
+        onNodeWithTag("root", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.width
+      val phoneFrame = frameWidth()
+      val phoneScreen = screenWidth()
 
       mainClock.autoAdvance = false
       vm.setDevice(Device.Tablet)
       mainClock.advanceTimeByFrame()
       mainClock.advanceTimeBy(80)
-      val midWidth = frameWidth()
-      onNodeWithTag("root", useUnmergedTree = true).assertDoesNotExist()
+      onNodeWithTag("root", useUnmergedTree = true).assertExists()
+      val midFrame = frameWidth()
+      val midScreen = screenWidth()
 
       mainClock.advanceTimeBy(3_000)
-      val tabletWidth = frameWidth()
+      val tabletFrame = frameWidth()
       assertTrue(
-        midWidth > phoneWidth && midWidth < tabletWidth,
-        "$phoneWidth < $midWidth < $tabletWidth",
+        midFrame > phoneFrame && midFrame < tabletFrame,
+        "$phoneFrame < $midFrame < $tabletFrame",
+      )
+      // The tablet lays the screen out beside a detail pane, so its root is narrower than the
+      // frame: compare against the frame it is in, not the tablet's own root.
+      assertTrue(
+        midScreen > phoneScreen && midScreen <= midFrame,
+        "$phoneScreen < $midScreen <= $midFrame",
       )
       onNodeWithTag("root", useUnmergedTree = true).assertExists()
-    }
-
-  @Test
-  fun `a switch back during the morph keeps the screen out until the frame settles`() =
-    runDesktopComposeUiTest(1800, 1400) {
-      val vm = loaded()
-      setContent { ViewerScreen(vm, frame = InlineFrame) }
-      waitForIdle()
-      mainClock.autoAdvance = false
-      val start = vm.state.value.device
-      vm.setDevice(Device.Tablet)
-      mainClock.advanceTimeByFrame()
-      mainClock.advanceTimeBy(80)
-      vm.setDevice(start)
-      mainClock.advanceTimeByFrame()
-      mainClock.advanceTimeBy(32)
-      onNodeWithTag("root", useUnmergedTree = true).assertDoesNotExist()
-
-      mainClock.advanceTimeBy(3_000)
-      onNodeWithTag("root", useUnmergedTree = true).assertExists()
+      val expected = (Views.Tablet.width + 20) * density.density
+      assertTrue(abs(tabletFrame - expected) <= 1f, "$tabletFrame vs $expected")
     }
 
   @Test
