@@ -87,7 +87,7 @@ class ConfinedFrameTest {
     SwingUtilities.invokeAndWait {
       outer = ComposePanel()
       outer.setContent {
-        ViewerContent(state, NoActions, { h, d, v, s -> ConfinedFrame(h, d, v, s) })
+        ViewerContent(state, NoActions, { h, d, v, f, s -> ConfinedFrame(h, d, v, f, s) })
       }
       window = JFrame("confinement")
       window.contentPane.add(outer)

@@ -1,7 +1,6 @@
 package bot.charlies.androiddesign.preview.feature.preview.viewer
 
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -13,10 +12,9 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposePanel
 import androidx.compose.ui.awt.SwingPanel
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.window.WindowExceptionHandler
 import bot.charlies.androiddesign.preview.feature.preview.nav.ProposalPreview
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState
@@ -28,7 +26,7 @@ private data class FrameParams(
   val host: ProposalHostState,
   val design: DesignSystem,
   val view: ViewSpec,
-  val cover: Color,
+  val frame: DpSize,
 )
 
 /**
@@ -40,26 +38,26 @@ private data class FrameParams(
  * overlay stays inside the frame.
  *
  * The panel is [scale] times the frame's size in window units, and its density is scaled by the
- * same factor, so the proposal still lays out at the dp size of [view] and everything, overlays
- * included, shrinks with it.
+ * same factor, so the proposal still lays out at the dp size of [frame] and everything, overlays
+ * included, shrinks with it. The panel resizes with the frame while a device switch animates, so
+ * the screen reflows live instead of being replaced.
  */
 @Composable
 fun ConfinedFrame(
   host: ProposalHostState,
   design: DesignSystem,
   view: ViewSpec,
+  frame: DpSize,
   scale: Float,
   modifier: Modifier = Modifier,
   onFailure: (Throwable) -> Unit = {},
-  content: @Composable (ProposalHostState, DesignSystem, ViewSpec) -> Unit = { h, d, v ->
-    ProposalPreview(h, d, v)
+  content: @Composable (ProposalHostState, DesignSystem, ViewSpec, DpSize) -> Unit = { h, d, v, f ->
+    ProposalPreview(h, d, v, f)
   },
 ) {
-  // The stage's theme is the proposal's, so its background is what the screen fades in from.
-  val cover = MaterialTheme.colorScheme.background
-  var params by remember { mutableStateOf(FrameParams(host, design, view, cover)) }
+  var params by remember { mutableStateOf(FrameParams(host, design, view, frame)) }
   var frameScale by remember { mutableStateOf(scale) }
-  params = FrameParams(host, design, view, cover)
+  params = FrameParams(host, design, view, frame)
   frameScale = scale
   val failed by rememberUpdatedState(onFailure)
   SwingPanel(
@@ -71,7 +69,7 @@ fun ConfinedFrame(
         content = content,
       )
     },
-    modifier = modifier.size(view.width.dp * scale, view.height.dp * scale),
+    modifier = modifier.size(frame.width * scale, frame.height * scale),
   )
 }
 
@@ -84,7 +82,7 @@ private fun newFramePanel(
   paramsOf: () -> FrameParams,
   scaleOf: () -> Float,
   onFailure: (Throwable) -> Unit,
-  content: @Composable (ProposalHostState, DesignSystem, ViewSpec) -> Unit,
+  content: @Composable (ProposalHostState, DesignSystem, ViewSpec, DpSize) -> Unit,
 ): ComposePanel =
   ComposePanel().apply {
     // Without a handler, a throw while composing ends the panel's composition on the EDT, and the
@@ -96,8 +94,7 @@ private fun newFramePanel(
       CompositionLocalProvider(
         LocalDensity provides Density(base.density * scaleOf(), base.fontScale),
       ) {
-        // A new panel is made each time the stage settles on a device, so its screen fades in.
-        FadeIn(p.cover) { content(p.host, p.design, p.view) }
+        content(p.host, p.design, p.view, p.frame)
       }
     }
   }

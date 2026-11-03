@@ -54,14 +54,15 @@ class FrameFailureTest {
       outer.setContent {
         ViewerScreen(
           viewModel,
-          frame = { host, design, view, scale ->
+          frame = { host, design, view, size, scale ->
             ConfinedFrame(
               host,
               design,
               view,
+              size,
               scale,
               onFailure = viewModel::frameFailed,
-              content = { _, _, _ ->
+              content = { _, _, _, _ ->
                 check(!explode.value) { "boom in the frame" }
                 Text("frame is alive")
               },
