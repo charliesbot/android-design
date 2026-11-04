@@ -27,7 +27,7 @@ import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
  * weight 400, grade 0, fill 0 or 1, optical size matching [size].
  */
 @Composable
-internal fun SymbolIcon(
+fun SymbolIcon(
   name: String,
   modifier: Modifier = Modifier,
   size: Dp = 24.dp,

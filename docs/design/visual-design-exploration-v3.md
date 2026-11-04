@@ -158,14 +158,13 @@ The app is the catalog's single source of truth and serves it over MCP (`get_cat
 
 ### MCP
 
-**One process per session.** The harness launches the app as its MCP server over stdio, so each session gets its own process and window. Verified on this Mac:
-- Two instances answered independently, and `lsof` showed neither listening on any port.
-- When the client exits or its stdin closes, the app exits within about 45 ms and leaves no orphan process.
-- Launching the packaged app's binary directly, the server answers `initialize` in 180 to 190 ms warm and about 0.9 s cold. The window appears 0.6 to 1.4 s after launch.
+**One instance, many sessions.** Agents never run the instance, because a harness stops its MCP child when it exits and that would end every other agent's session. The harness still launches the app as a stdio MCP server, but that process is always a relay: it runs headless (no Dock icon), connects to the Unix domain socket at `~/Library/Application Support/AndroidDesignPreview/mcp.sock`, copies stdin to the socket and the socket to stdout, and exits when either side ends. When nothing answers on the socket, the first agent's process spawns the instance detached with the `--instance` argument (through `open -a` for the packaged app, which hands the process to launchd; as a relaunched JVM when run from Gradle), polls the socket every 50 ms for up to 10 s, then relays. The instance owns the window and opens one session per connection, each with its own viewer, controller and MCP server, so agents never see each other's proposal, device or view. The proposal repository, the headless renderer and the window are shared. A stale socket file left by a crash is replaced on the next start.
+
+The owner can also launch the app from Finder or `open`. Those start from launchd (parent pid 1) and run the instance directly: the app shows the window at once and stays up with no session. A second launch of the same bundle is routed by macOS to the running app.
 
 **Protocol rules the app must keep:**
 - stdout carries only JSON-RPC. The app keeps the real stdout for the transport, redirects `System.out` to stderr, and runs with `-XX:+DisplayVMOutputToStderr`, because HotSpot prints warnings to stdout by default.
-- It exits on transport close (`transport.onClose`). `Server.onClose` only fires on an explicit server close, so it can't be used for this.
+- A session ends on its transport's close (`transport.onClose`). `Server.onClose` only fires on an explicit server close, so it can't be used for this.
 
 **Tools:**
 - `open_proposal(path)`
@@ -181,7 +180,7 @@ An earlier round of that benchmark showed why `check_proposal` exists: with one 
 
 The agent never edits proposals through MCP; the file on disk is the source of truth.
 
-**Closing the window** hides it and keeps the process serving. The Dock icon or `show_preview` brings the window back.
+**Exit rule and closing the window.** A session is removed when its transport closes. A spawned instance exits when its last session closes, within about 45 ms of the client going away, and removes the socket file; an instance the owner started stays up. Closing the window hides it while any agent is connected and quits otherwise. The Dock icon or `show_preview` brings the window back, and a tool call that shows the window also selects the session that made it.
 
 **App Nap.** macOS throttles an idle background app about 30 s after its last activity, which slowed a check from about 0.2 s to 1 to 2.6 s. The `Info.plist` opt-out keys are ignored for a binary an MCP client launches directly, so at launch the app sets `NSAppSleepDisabled` in its own preferences domain whenever it is not already on. The timings in this document depend on it.
 

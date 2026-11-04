@@ -14,9 +14,11 @@ dependencies {
   implementation(project(":features:preview:desktop"))
   implementation(project(":mcp"))
   implementation(compose.desktop.currentOs)
+  implementation(libs.compose.material3)
   implementation(libs.koin.core)
   implementation(libs.koin.compose)
   implementation(libs.kotlinx.coroutines.swing)
+  testImplementation(libs.compose.ui.test)
   testImplementation(libs.mcp.sdk)
   testImplementation(libs.kotlinx.coroutines.test)
 }

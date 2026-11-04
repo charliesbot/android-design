@@ -8,9 +8,14 @@ object AppInfo {
 }
 
 fun main(args: Array<String>) {
-  // No arguments: the MCP server and the window.
+  // No arguments: an agent's relay, or the instance when the owner launched the app.
   if (args.isEmpty()) {
     runPreviewApp()
+    return
+  }
+  // The detached instance an agent's relay spawned.
+  if (args.toList() == listOf(InstanceLauncher.INSTANCE_ARG)) {
+    runInstance(launchedByUser = false)
     return
   }
   // Commands draw without a window and must not need a display.
