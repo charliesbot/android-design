@@ -109,6 +109,16 @@ private fun windowWidth(): Dp {
   return if (reported.isSpecified) reported else fallback
 }
 
+/** Themes the window's own chrome after the open proposal's design, else the picked seed. */
+@Composable
+fun ViewerTheme(state: ViewerState, content: @Composable () -> Unit) {
+  val chrome =
+    remember(state.effectiveDesign, state.seed, state.variant) {
+      state.effectiveDesign ?: defaultDesign(state.seed, state.variant)
+    }
+  ProposalTheme(chrome, state.dark, content)
+}
+
 @Composable
 fun ViewerContent(
   state: ViewerState,
@@ -116,11 +126,7 @@ fun ViewerContent(
   frame: PreviewFrameSlot,
   modifier: Modifier = Modifier,
 ) {
-  val chrome =
-    remember(state.effectiveDesign, state.seed, state.variant) {
-      state.effectiveDesign ?: defaultDesign(state.seed, state.variant)
-    }
-  ProposalTheme(chrome, state.dark) {
+  ViewerTheme(state) {
     Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
       val narrow = windowWidth() < NarrowWindow
       if (narrow) {
@@ -370,7 +376,7 @@ private fun sampleState(
 }
 
 /** Draws the frame inline, scaled, for previews and tests. */
-internal val InlineFrame: PreviewFrameSlot = { host, design, view, frame, scale ->
+val InlineFrame: PreviewFrameSlot = { host, design, view, frame, scale ->
   Box(Modifier.size(frame.width * scale, frame.height * scale)) {
     androidx.compose.ui.layout.Layout(
       content = { ProposalPreview(host, design, view, frame) },

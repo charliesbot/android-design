@@ -44,6 +44,7 @@ import kotlinx.serialization.json.JsonObject
  * old version, whatever the watcher's timing.
  *
  * @param scope Runs the file watcher.
+ * @param onShown Called whenever a tool brings the window up, so the session can take the focus.
  */
 class AppPreviewController(
   private val repository: ProposalRepository,
@@ -52,6 +53,7 @@ class AppPreviewController(
   private val renderer: TreeRenderer,
   private val scope: CoroutineScope,
   private val version: String,
+  private val onShown: () -> Unit = {},
 ) : PreviewController {
   private val applying = Mutex()
   private var watcher: Job? = null
@@ -78,7 +80,7 @@ class AppPreviewController(
         first.complete(apply(snapshot))
       }
     }
-    window.show()
+    show()
     return opened(first.await())
   }
 
@@ -132,7 +134,12 @@ class AppPreviewController(
   }
 
   override suspend fun showPreview() {
+    show()
+  }
+
+  private fun show() {
     window.show()
+    onShown()
   }
 
   override suspend fun checkProposal(screens: List<String>?, views: List<String>?): ProposalCheck {
