@@ -2,7 +2,7 @@
 Source: https://developer.android.com/design/ui/mobile/guides/layout-and-content/edge-to-edge
 
 An edge-to-edge app takes advantage of the entire screen by drawing UI under the system bars.
-**Figure 1.** Left. An app that isn't edge-to-edge. Right. An app that is edge-to-edge.
+**Figure 1.** Left. An app that isn't edge-to-edge. Right. An app that is edge-to-edge.  **Important:** We released an agent skill to help you migrate your Jetpack Compose app to add adaptive edge-to-edge support. Try out the skill from the Android skills repository.
 
 ## Takeaways
 - Draw background and scrolling content underneath system bars for an edge-to-edge experience.
@@ -27,7 +27,7 @@ See the Android System Bars for fundamental system bar design guidance. The foll
 
 #### Scrolling content
 
-Top app bars should collapse while scrolling. Learn how to collapse the Material 3 TopAppBar. In Material 3, small top app bars can collapse to status bar height or scroll offscreen. Medium and large top app bars can collapse to a smaller app bar. See the Material guidance.
+Top app bars should collapse while scrolling. Learn how to collapse the Material 3 TopAppBar. In Material 3, small top app bars can collapse to status bar height or scroll offscreen. Medium and large top app bars can collapse to a smaller app bar. See the [Material guidance][10].
 
 check_circle
 
@@ -68,7 +68,7 @@ See the Android System Bars for fundamental navigation bar design guidance. The 
 
 #### Scrolling content
 
-Bottom app bars should collapse while scrolling.
+[`BottomAppBar`][10] should collapse while scrolling using the `scrollBehavior` parameter.
 
 check_circle
 
@@ -79,6 +79,8 @@ check_circle
 
 ###### Do
 Keep gesture navigation transparent and don't add an additional scrim.
+
+However, keep [`NavigationBar`]11 visible while scrolling because it doesn't have a `scrollBehavior` parameter.
 
 ### Display cutouts
 
@@ -100,7 +102,7 @@ However, solid app bar backgrounds should draw into the display cutout as shown 
 Ensure horizontal carousels draw into the display cutout.
 **Figure 6.** An edge-to-edge horizontal display, where the carousel scrolls through the display cutout.
 
-Read about how to support display cutouts in Compose and Views.
+Read about how to support display cutouts in Compose.
 
 ### Other guidance
 

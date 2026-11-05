@@ -57,14 +57,196 @@ You can also incorporate text labels and descriptions, enriching your image grid
 ## Code samples
 
 The following table maps each canonical layout to its corresponding Jetpack Glance implementation in the Android Platform Samples GitHub repository.
-| Canonical Layout  | Layout Category  | Sample Implementation File
-| **Text only**  | Text  | LongTextAppWidget.kt
-| **Text and image**  | Text  | TextWithImageAppWidget.kt
-| **Search toolbar**  | Toolbars  | SearchToolBarAppWidget.kt
-| **Toolbar** (Standard)  | Toolbars  | ToolBarAppWidget.kt
-| **Text and image list**  | Lists  | ImageTextListAppWidget.kt
-| **Checklist**  | Lists  | CheckListAppWidget.kt
-| **Action list**  | Lists  | ActionListAppWidget.kt
-| **Full bleed snap scroll**  | Lists  | FullBleedImageAppWidget.kt
-| **Image only**  | Grid  | ImageGridAppWidget.kt
-| **Image and text**  | Grid  | ImageGridAppWidget.kt
+| Canonical layout  | Reference files  | Guidance
+| **Action List Layout**  |
+- ActionListAppWidget.kt
+- ActionListLayout.kt
+- ListItem.kt
+- RoundedScrollingLazyColumn.kt
+- RoundedScrollingLazyVerticalGrid.kt
+- EmptyListContent.kt
+- NoDataContent.kt
+- FakeActionListDataRepository.kt
+- sample_action_list_widget_info.xml
+- dimens.xml
+- strings.xml
+- sample_home_icon.xml
+- sample_power_settings_icon.xml
+- sample_bulb_icon.xml
+- sample_thermostat_icon.xml
+- sample_ac_icon.xml
+- sample_door_icon.xml
+- sample_arrow_right_icon.xml
+- sample_no_data_icon.xml
+- sample_add_icon.xml
+|
+- Handle list item actions with Glance action callbacks and ensure proper state updates.
+
+| **Check List Layout**  |
+- CheckListAppWidget.kt
+- CheckListLayout.kt
+- ListItem.kt
+- RoundedScrollingLazyColumn.kt
+- EmptyListContent.kt
+- NoDataContent.kt
+- FakeCheckListDataRepository.kt
+- sample_check_list_widget_info.xml
+- dimens.xml
+- strings.xml
+- sample_pin_icon.xml
+- sample_checked_circle_icon.xml
+- sample_circle_icon.xml
+- sample_delete_icon.xml
+- sample_edit_icon.xml
+- sample_snooze_icon.xml
+- sample_no_data_icon.xml
+- sample_add_icon.xml
+|
+- Implement checkbox state toggling using action parameters or callbacks to update collection items.
+- Use Glance action callbacks, such as `actionRunCallback`, `ActionCallback(actionParametersOf(...))`, or `actionStartActivity(...)`, for widget `onClick` parameters to handle click events like tapping a checkbox.
+
+| **Expressive Toolbar Layout**  |
+- ExpressiveToolbarAppWidget.kt
+- ExpressiveToolbarLayout.kt
+- sample_expressive_toolbar_widget_info.xml
+- Buttons.kt
+- LayoutComponents.kt
+- dimens.xml
+- strings.xml
+- four_side_cookie_background.xml
+- sample_edit_icon.xml
+- sample_share_icon.xml
+- sample_delete_icon.xml
+- sample_info_icon.xml
+- sample_add_icon.xml
+- sample_file_upload_icon.xml
+- sample_mic_icon.xml
+- sample_camera_icon.xml
+|
+- Avoid `ColorProvider` import errors: import `androidx.glance.unit.ColorProvider` and use `androidx.glance.color.ColorProvider(dayColor, nightColor)`.
+- Use `GlanceModifier.background(Color)` directly for solid background colors rather than `ColorProvider`.
+
+| **Image Grid Layout**  |
+- ImageGridAppWidget.kt
+- ImageGridLayout.kt
+- RoundedScrollingLazyVerticalGrid.kt
+- EmptyListContent.kt
+- NoDataContent.kt
+- FakeImageGridDataRepository.kt
+- sample_image_grid_widget_info.xml
+- ImageUtils.kt
+- dimens.xml
+- strings.xml
+- sample_placeholder_image.png
+- sample_grid_icon.xml
+- sample_refresh_icon.xml
+- sample_no_data_icon.xml
+- sample_add_icon.xml
+|
+- Use solid colors (`GlanceModifier.background`) or local drawables for image items unless an image loading library is configured or requested.
+
+| **Image Text List Layout**  |
+- ImageTextListAppWidget.kt
+- ImageTextListLayout.kt
+- ListItem.kt
+- RoundedScrollingLazyColumn.kt
+- EmptyListContent.kt
+- NoDataContent.kt
+- FakeImageTextListDataRepository.kt
+- sample_image_text_list_widget_info.xml
+- ImageUtils.kt
+- dimens.xml
+- strings.xml
+- sample_placeholder_image.png
+- sample_image_icon.xml
+- sample_heart_icon.xml
+- sample_refresh_icon.xml
+- sample_no_data_icon.xml
+- sample_add_icon.xml
+|
+- Common use cases: news feeds, article lists, workout histories, message feeds, and vertical thumbnail lists.
+- Balance list row height and text clipping when combining thumbnail images with primary/secondary text.
+
+| **Long Text Layout**  |
+- LongTextAppWidget.kt
+- LongTextLayout.kt
+- FakeLongTextRepository.kt
+- sample_long_text_widget_info.xml
+- FontUtils.kt
+- dimens.xml
+- strings.xml
+- sample_text_icon.xml
+- sample_refresh_icon.xml
+|
+- If you multiply `Dp` values, such as `2 * padding`, import `androidx.compose.ui.unit.times`.
+- Follow sizing rules: ensure dimensions from `dimens.xml` are used for padding and typography scaling.
+
+| **Search Toolbar Layout**  |
+- SearchToolBarAppWidget.kt
+- SearchToolBarLayout.kt
+- sample_search_toolbar_widget_info.xml
+- Buttons.kt
+- LayoutComponents.kt
+- dimens.xml
+- strings.xml
+- sample_search_icon.xml
+- sample_mic_icon.xml
+- sample_camera_icon.xml
+- sample_videocam_icon.xml
+- sample_share_icon.xml
+|
+- Avoid `ColorProvider` import errors: import `androidx.glance.unit.ColorProvider` and use `androidx.glance.color.ColorProvider(dayColor, nightColor)`.
+- Use `GlanceModifier.background(Color)` directly for solid background colors rather than ColorProvider.
+
+| **Full-Bleed Image Layout / Snap Scrolling**  |
+- FullBleedImageAppWidget.kt
+- FullBleedImageLayout.kt
+- sample_full_bleed_image_widget_info.xml
+- FontUtils.kt
+- dimens.xml
+- strings.xml
+- sample_scrim_gradient.xml
+- sample_placeholder_image.png
+- sample_app_logo.xml
+- sample_info_icon.xml
+- sample_no_data_icon.xml
+|
+- Set `verticalScrollMode = VerticalScrollMode.SnapScrollMatchHeight(size.height)` on LazyColumn for Snap Scrolling.
+- If you implement snap scrolling, Glance 1.3.0-alpha02 or higher, compile SDK 37 (Baklava) or higher, and Android Gradle Plugin (AGP) 9.1.0 or higher are required.
+- Set `override val sizeMode: SizeMode = SizeMode.Exact` in the widget provider class.
+
+| **Standard Toolbar Layout**  |
+- ToolBarAppWidget.kt
+- ToolBarLayout.kt
+- sample_toolbar_widget_info.xml
+- Buttons.kt
+- LayoutComponents.kt
+- dimens.xml
+- strings.xml
+- sample_app_logo.xml
+- sample_search_icon.xml
+- sample_add_icon.xml
+- sample_edit_icon.xml
+- sample_share_icon.xml
+- sample_mic_icon.xml
+- sample_camera_icon.xml
+- sample_videocam_icon.xml
+|
+- See Troubleshooting to avoid `ColorProvider` import errors: use `androidx.glance.color.ColorProvider(dayColor, nightColor)`.
+- Use `GlanceModifier.background(Color)` directly for solid background colors rather than `ColorProvider`.
+
+| **Text with Image Layout**  |
+- TextWithImageAppWidget.kt
+- TextWithImageLayout.kt
+- FakeTextWithImageRepository.kt
+- sample_text_with_image_widget_info.xml
+- FontUtils.kt
+- dimens.xml
+- strings.xml
+- sample_text_icon.xml
+- sample_refresh_icon.xml
+- sample_placeholder_image.png
+- sample_info_icon.xml
+- sample_no_data_icon.xml
+|
+- Follow responsive layout sizing rules to accommodate text and image side-by-side or stacked based on available widget dimensions.

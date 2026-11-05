@@ -9,7 +9,7 @@ Users discover and add your widget through the widget picker, as shown from the 
 
 Imagine the widget picker as a shopping window. Your widget's default size is its initial display, making a first impression that can greatly influence selection. Use a size that effectively showcases your widget's functionality without cluttering the view.
 
-For more information on choosing an appropriate default size for your widget, see Sizing. **Tip:** Specify the `targetCellWidth` and `targetCellHeight` to one of the sizes discussed in the sizing guidance. Ensure that the minimum sizes specified meets the target cell size across most devices in portrait and landscape orientation.
+For more information on choosing an appropriate default size for your widget, see Sizing. **Tip:** Set `targetCellWidth` and `targetCellHeight` to match your widget's default grid span. See Determine a size for your widget. Make sure that the minimum sizes you specify meet the target cell size across most devices in portrait and landscape orientations.
 
 When designing for the default size, consider different form factors such as phones, tablets and foldables.
 
@@ -57,5 +57,9 @@ You can proactively surface the option to pin relevant widgets at contextually a
 - Present the pin widget option when it makes the most sense based on the user's actions within the app. For example, after a user successfully completes a task that has a corresponding widget or When a user repeatedly accesses a feature that could be streamlined with a widget.
 - Use subtle visual hints such as an icon or a brief animation to draw attention to the option to pin a widget.
 - The widget pinning suggestion should never block or hinder the user's primary actions within your app.
+
+[IMAGE] Widget onboarding leading to widget pinning
+
+Widget onboarding opening up the widget picker
 
 For more information, see Let users pin a widget to configure widget pinning from within your app.

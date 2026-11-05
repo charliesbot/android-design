@@ -5,6 +5,8 @@ Source: https://m3.material.io/foundations/glossary
 
 ## Tab 1
 
+#### Glossary
+
 ##### Adaptive design
 
 A design approach in which the interface changes based on known user, device, or environmental conditions. Adaptive design in Material includes layout and component adaptations.
