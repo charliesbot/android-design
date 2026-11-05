@@ -1,5 +1,5 @@
-# Builds the previewer app's DMG on a version tag and attaches it to a GitHub release.
-# The DMG keeps a fixed name so the README can link to releases/latest/download.
+# Builds the previewer app's DMG and MSI on a version tag and attaches both to a GitHub release.
+# The installers keep fixed names so the README can link to releases/latest/download.
 name: Release previewer app
 
 on:
@@ -10,22 +10,21 @@ permissions:
   contents: write
 
 jobs:
-  dmg:
-    # Apple Silicon runner: the bundled JDK, and so the app, is arm64 only.
-    runs-on: macos-14
+  build:
+    # The same build that runs on pull requests, signed when the signing secrets are set.
+    uses: ./.github/workflows/build-previewer.yml
+    secrets: inherit
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/download-artifact@v4
         with:
-          distribution: temurin
-          java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
-      - name: Build DMG
-        working-directory: app
-        run: ./gradlew :app:packageDmg
+          merge-multiple: true
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          cp app/app/build/compose/binaries/main/dmg/*.dmg AndroidDesignPreview.dmg
-          gh release create "$GITHUB_REF_NAME" AndroidDesignPreview.dmg --generate-notes
+        run: >
+          gh release create "$GITHUB_REF_NAME" AndroidDesignPreview.dmg AndroidDesignPreview.msi
+          --repo "$GITHUB_REPOSITORY" --generate-notes

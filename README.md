@@ -33,3 +33,18 @@ Only `android-design-explore` needs it. It runs on Apple Silicon Macs.
 Other agents take the same binary path as a stdio MCP command. All agents share one window, one tab per session. You can also open the app yourself and load a proposal with File > Open Proposal.
 
 To build from source instead (JDK 17), run `./gradlew :app:installApp` in `app/`. It installs to `~/Applications`, needs no quarantine step, and the binary path changes to match.
+
+### Windows
+
+Windows 10 (1803 or later) and 11, x64.
+
+1. Download `AndroidDesignPreview.msi` from the [latest release](https://github.com/charliesbot/android-design/releases/latest) and run it. It installs for your user only, with no admin prompt. The installer is not signed, so SmartScreen may ask you to confirm (More info > Run anyway).
+2. Register the binary. For Claude Code:
+
+   ```powershell
+   claude mcp add --scope user android_design_preview -- "$env:LOCALAPPDATA\AndroidDesignPreview\AndroidDesignPreview.exe"
+   ```
+
+To build from source, run `.\gradlew.bat :app:installApp` in `app\`. It installs to the same folder, so the path above stays the same. Quit a running instance first, because Windows locks its files.
+
+GitHub Actions builds both installers for pull requests that change the app. To sign them, see [docs/previewer-signing.md](docs/previewer-signing.md).

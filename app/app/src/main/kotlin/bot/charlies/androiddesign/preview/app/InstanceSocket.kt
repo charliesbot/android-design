@@ -19,15 +19,22 @@ import kotlin.concurrent.thread
  * window; agent processes connect and only relay stdio to it.
  */
 object InstanceSocket {
-  /** `~/Library/Application Support/AndroidDesignPreview/mcp.sock`. */
+  /**
+   * `~/Library/Application Support/AndroidDesignPreview/mcp.sock` on macOS, and
+   * `%USERPROFILE%\.android-design-preview\mcp.sock` on Windows, which has Unix domain sockets
+   * since Windows 10 1803. Not under AppData: a harness packaged as MSIX (the Claude desktop app)
+   * sees a private copy of AppData, where a Unix socket cannot be connected, and agents outside the
+   * package would never find it.
+   */
   fun defaultPath(): Path =
-    Path.of(
-      System.getProperty("user.home"),
-      "Library",
-      "Application Support",
-      "AndroidDesignPreview",
-      "mcp.sock",
-    )
+    defaultPath(System.getProperty("os.name"), System.getProperty("user.home"))
+
+  fun defaultPath(osName: String, home: String): Path =
+    if (Os.isWindows(osName)) {
+      Path.of(home, ".android-design-preview", "mcp.sock")
+    } else {
+      Path.of(home, "Library", "Application Support", "AndroidDesignPreview", "mcp.sock")
+    }
 
   /** Connects to the instance listening on [path], or returns null when there is none. */
   fun connect(path: Path): SocketChannel? =

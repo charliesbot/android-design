@@ -1,0 +1,140 @@
+# Builds the previewer app's DMG and MSI and uploads both as workflow artifacts.
+# Runs on its own for pull requests, pushes to main and manual runs, and is reused by
+# release-previewer.yml. Signing is optional: each signing step runs only when its secrets are
+# set, so forks and repositories without secrets still get unsigned builds.
+# Setup: docs/previewer-signing.md.
+name: Build previewer app
+
+on:
+  workflow_call:
+    secrets:
+      MACOS_CERTIFICATE_P12:
+        required: false
+      MACOS_CERTIFICATE_PASSWORD:
+        required: false
+      MACOS_NOTARIZATION_APPLE_ID:
+        required: false
+      MACOS_NOTARIZATION_PASSWORD:
+        required: false
+      MACOS_NOTARIZATION_TEAM_ID:
+        required: false
+      WINDOWS_CERTIFICATE_PFX:
+        required: false
+      WINDOWS_CERTIFICATE_PASSWORD:
+        required: false
+  pull_request:
+    paths:
+      - "app/**"
+      - ".github/workflows/build-previewer.yml"
+      - ".github/workflows/release-previewer.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/build-previewer.yml"
+      - ".github/workflows/release-previewer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dmg:
+    # Apple Silicon runner: the bundled JDK, and so the app, is arm64 only. GitHub retired the
+    # macos-14 image; macos-latest is arm64 and follows the current image.
+    runs-on: macos-latest
+    env:
+      MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      # app/app/build.gradle.kts reads these three for the notarizeDmg task.
+      MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
+      MACOS_NOTARIZATION_PASSWORD: ${{ secrets.MACOS_NOTARIZATION_PASSWORD }}
+      MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.MACOS_NOTARIZATION_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Import signing certificate
+        if: env.MACOS_CERTIFICATE_P12 != ''
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          echo "$MACOS_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -f pkcs12 \
+            -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -k "$keychain_password" "$keychain" > /dev/null
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          # The certificate's own name, e.g. "Developer ID Application: Jane Doe (AB12CD34EF)".
+          identity="$(security find-identity -v -p codesigning "$keychain" \
+            | sed -n 's/.*"\(Developer ID Application: .*\)"$/\1/p' | head -1)"
+          if [ -z "$identity" ]; then
+            echo "::error::MACOS_CERTIFICATE_P12 holds no Developer ID Application certificate."
+            exit 1
+          fi
+          # app/app/build.gradle.kts signs the app when these are set.
+          echo "MACOS_SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "MACOS_SIGNING_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+      - name: Build DMG
+        working-directory: app
+        run: ./gradlew :app:packageDmg
+      - name: Notarize DMG
+        if: >-
+          env.MACOS_SIGNING_IDENTITY != '' && env.MACOS_NOTARIZATION_APPLE_ID != '' &&
+          env.MACOS_NOTARIZATION_PASSWORD != '' && env.MACOS_NOTARIZATION_TEAM_ID != ''
+        working-directory: app
+        # Uploads the DMG to Apple, waits for approval and staples the ticket to the DMG.
+        run: ./gradlew :app:notarizeDmg
+      - run: cp app/app/build/compose/binaries/main/dmg/*.dmg AndroidDesignPreview.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dmg
+          path: AndroidDesignPreview.dmg
+      - name: Remove signing keychain
+        if: always() && env.MACOS_SIGNING_KEYCHAIN != ''
+        run: security delete-keychain "$MACOS_SIGNING_KEYCHAIN"
+
+  msi:
+    runs-on: windows-latest
+    env:
+      WINDOWS_CERTIFICATE_PFX: ${{ secrets.WINDOWS_CERTIFICATE_PFX }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build MSI
+        working-directory: app
+        run: ./gradlew.bat :app:packageMsi
+      - run: Copy-Item app/app/build/compose/binaries/main/msi/*.msi AndroidDesignPreview.msi
+      - name: Sign MSI
+        if: env.WINDOWS_CERTIFICATE_PFX != ''
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP certificate.pfx
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_PFX))
+          try {
+            # signtool is not on PATH; take the newest Windows SDK copy.
+            $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+              Sort-Object FullName | Select-Object -Last 1
+            & $signtool.FullName sign /f $pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD `
+              /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `
+              /d "Android Design Preview" AndroidDesignPreview.msi
+            if ($LASTEXITCODE -ne 0) { throw "signtool failed with exit code $LASTEXITCODE" }
+          } finally {
+            Remove-Item $pfx -ErrorAction SilentlyContinue
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: msi
+          path: AndroidDesignPreview.msi

@@ -1,0 +1,4 @@
+# Keep LF on Windows checkouts: tests compare fixtures and goldens byte for byte.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf

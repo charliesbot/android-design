@@ -45,8 +45,16 @@ class AssetLoader(private val proposalDir: Path?) {
 
   /** The file a relative path names inside the proposal folder, or null for anything else. */
   private fun fileOf(src: String): Path? {
-    if (src.startsWith("data:") || src.startsWith("/")) return null
-    return proposalDir?.resolve(src)?.normalize()
+    if (src.startsWith("data:") || src.startsWith("/") || src.startsWith("\\")) return null
+    // `C:\...` is absolute on Windows; a string that is no path at all names no file.
+    val path =
+      try {
+        Path.of(src)
+      } catch (_: java.nio.file.InvalidPathException) {
+        return null
+      }
+    if (path.isAbsolute) return null
+    return proposalDir?.resolve(path)?.normalize()
   }
 
   private fun decode(src: String): ImageBitmap? =

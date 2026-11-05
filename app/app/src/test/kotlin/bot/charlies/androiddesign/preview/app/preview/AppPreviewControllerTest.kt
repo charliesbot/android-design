@@ -108,7 +108,9 @@ class AppPreviewControllerTest {
       assertFailsWith<PreviewException> {
         runBlocking { controller.openProposal("/no/such/plates.proposal.json") }
       }
-    assertTrue("/no/such/plates.proposal.json" in error.message.orEmpty())
+    // Path.of gives the separator the message uses: `\no\such\...` on Windows.
+    val path = java.nio.file.Path.of("/no/such/plates.proposal.json").toString()
+    assertTrue(path in error.message.orEmpty(), error.message)
   }
 
   @Test
