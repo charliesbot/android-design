@@ -3,8 +3,11 @@ package bot.charlies.androiddesign.preview.feature.preview.viewer
 import bot.charlies.androiddesign.preview.domain.ProposalSnapshot
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState
+import bot.charlies.androiddesign.preview.model.Catalog
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.Device
+import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
@@ -63,16 +66,33 @@ data class ViewerState(
   val errors: List<ValidationError> = emptyList(),
   val device: Device = Device.Phone,
   val dark: Boolean = false,
+  /** Which watch view the window shows while [device] is a watch: the large one, or the small. */
+  val watchLarge: Boolean = false,
   /** `#RRGGBB` the viewer overrides the proposal's seed with, or null. */
   val seed: String? = null,
   val variant: PaletteVariant? = null,
 ) {
+  /** The catalog of the open proposal, whose views the window offers; the phone's before one. */
+  val catalog: Catalog
+    get() = host?.proposal?.let(Catalogs::of) ?: M3ExpressiveCatalog
+
   val view: ViewSpec
-    get() = Views.of(device, dark)
+    get() =
+      when {
+        device != Device.Watch -> Views.of(device, dark)
+        watchLarge -> Views.WatchLarge
+        else -> Views.Watch
+      }
 
   /** The design system the viewer draws with: the proposal's, with the viewer's color choices. */
   val effectiveDesign: DesignSystem?
-    get() = design?.copy(seed = seed ?: design.seed, variant = variant ?: design.variant)
+    get() =
+      design?.copy(
+        seed = seed ?: design.seed,
+        // A seed the viewer picks themes a Wear proposal that had none.
+        seeded = design.seeded || seed != null,
+        variant = variant ?: design.variant,
+      )
 
   /** The variant the viewer shows: its own choice, else the proposal's, else the default. */
   val effectiveVariant: PaletteVariant
@@ -94,6 +114,9 @@ internal fun defaultDesign(seed: String?, variant: PaletteVariant?): DesignSyste
 /** What the viewer's controls can do. [ViewerViewModel] is the implementation. */
 interface ViewerActions {
   fun setDevice(device: Device)
+
+  /** Shows [view], one of the views of the open proposal's catalog. */
+  fun setView(view: ViewSpec)
 
   fun setDark(dark: Boolean)
 
@@ -140,8 +163,13 @@ class ViewerViewModel : ViewerActions {
     }
     val dir = snapshot.path.parent
     val host = base.host?.also { it.update(proposal, dir) } ?: ProposalHostState(proposal, dir)
+    // A proposal draws in the views of its own catalog, so a phone proposal never lands on the
+    // watch the previous one was on, nor the reverse.
+    val views = Catalogs.of(proposal).views
+    val device = if (views.any { it.device == base.device }) base.device else views.first().device
     mutableState.value =
       base.copy(
+        device = device,
         path = snapshot.path,
         name = proposal.name ?: snapshot.designSystem.name,
         screens = proposal.screens.keys.toList(),
@@ -165,7 +193,18 @@ class ViewerViewModel : ViewerActions {
       mutableState.value.copy(errors = listOf(ValidationError(RENDER_ERROR_PATH, message)))
   }
 
-  override fun setDevice(device: Device) = change { it.copy(device = device) }
+  override fun setDevice(device: Device) = change { state ->
+    if (state.catalog.views.any { it.device == device }) state.copy(device = device) else state
+  }
+
+  override fun setView(view: ViewSpec) = change { state ->
+    when {
+      state.catalog.views.none { it.name == view.name } -> state
+      view.device == Device.Watch ->
+        state.copy(device = view.device, watchLarge = view.name == Views.WatchLarge.name)
+      else -> state.copy(device = view.device)
+    }
+  }
 
   override fun setDark(dark: Boolean) = change { it.copy(dark = dark) }
 

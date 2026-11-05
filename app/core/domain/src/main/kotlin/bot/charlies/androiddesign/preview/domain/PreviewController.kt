@@ -22,8 +22,9 @@ interface PreviewController {
 
   /**
    * `get_tree`: with no arguments, the window's current screen and view; otherwise a headless
-   * render of [screen] at the view named [view] (light, dark, foldable, tablet, desktop). While the
-   * window is hidden it is always headless.
+   * render of [screen] at the view named [view] (a phone proposal's light, dark, foldable, tablet
+   * or desktop; a Wear proposal's watch or watch-large). While the window is hidden it is always
+   * headless.
    */
   suspend fun getTree(screen: String? = null, view: String? = null): LayoutTree
 
@@ -38,7 +39,8 @@ interface PreviewController {
 
   /**
    * `check_proposal`: renders each of [screens] (every screen when null or empty) at each of
-   * [views] (every named view when null or empty) headlessly, tree only, and reports which pass.
+   * [views] (every view of the proposal's catalog when null or empty) headlessly, tree only, and
+   * reports which pass.
    */
   suspend fun checkProposal(
     screens: List<String>? = null,
@@ -48,9 +50,10 @@ interface PreviewController {
   /**
    * `get_catalog`: with no [components], a compact summary of the catalog (every component, its
    * props, the token vocabularies and the action functions); otherwise the full JSON Schema entries
-   * of the named components.
+   * of the named components. [catalog] is a catalog key (`m3-expressive`, the default when null, or
+   * `wear`); an unknown key is a [PreviewException].
    */
-  fun getCatalog(components: List<String>? = null): String
+  fun getCatalog(components: List<String>? = null, catalog: String? = null): String
 
   /** `export_kotlin`: Kotlin source for [screen], or for every screen when null. */
   suspend fun exportKotlin(screen: String? = null): String
@@ -68,6 +71,11 @@ data class ViewChange(
   val variant: PaletteVariant? = null,
   /** A screen id of the open proposal; moves the window there, as the side panel does. */
   val screen: String? = null,
+  /**
+   * The name of a watch view (`watch` or `watch-large`) of the open Wear proposal; it also sets the
+   * device. A phone view is chosen with [device] and [dark].
+   */
+  val view: String? = null,
 )
 
 @Serializable
@@ -78,6 +86,8 @@ data class ViewState(
   val seed: String? = null,
   /** The viewer's variant override as a wire name, or null for the proposal's. */
   val variant: String? = null,
+  /** The name of the view the window shows: `light`, `dark`, `foldable`, `watch-large`, ... */
+  val view: String = "",
 )
 
 /**

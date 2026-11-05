@@ -1,6 +1,8 @@
 package bot.charlies.androiddesign.preview.domain.validation
 
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
+import bot.charlies.androiddesign.preview.model.Catalog
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.ThemeOverride
 import bot.charlies.androiddesign.preview.model.ValidationError
@@ -14,23 +16,33 @@ import bot.charlies.androiddesign.preview.model.ValidationError
 class ProposalValidator {
   fun validate(proposal: Proposal, designMd: ThemeOverride? = null): List<ValidationError> {
     val sink = ErrorSink()
-    val design = DesignSystemResolver.resolve(designMd, proposal.theme)
+    val catalog = Catalogs.of(proposal)
+    val design = DesignSystemResolver.resolve(designMd, proposal.theme, catalog)
 
     if (proposal.format != Proposal.FORMAT) {
       sink.add("/format", "format must be ${Proposal.FORMAT}, got ${proposal.format}")
     }
-    val themes = ThemeValidator(sink, design)
+    val themes = ThemeValidator(sink, design, catalog)
     themes.validate(designMd, "/designMd", strict = false)
     themes.validate(proposal.theme, "/theme", strict = true)
-    validateNavigation(sink, proposal)
+    validateNavigation(sink, proposal, catalog)
     for ((screenId, screen) in proposal.screens) {
-      ScreenValidator(sink, proposal, design, screenId, screen).validate()
+      // A screen is checked against the catalog it names, so a stray screen of another catalog
+      // reports its mismatch once and not a wrong-component error per component.
+      val own = Catalogs.byId(screen.catalogId) ?: catalog
+      ScreenValidator(sink, proposal, design, screenId, screen, own, catalog).validate()
     }
     return sink.errors
   }
 
-  private fun validateNavigation(sink: ErrorSink, proposal: Proposal) {
+  private fun validateNavigation(sink: ErrorSink, proposal: Proposal, catalog: Catalog) {
     val navigation = proposal.navigation
+    if (!catalog.supportsPanes && navigation.panes.isNotEmpty()) {
+      sink.add(
+        "/navigation/panes",
+        "${catalog.title} proposals have no panes: a watch shows one screen at a time; remove panes",
+      )
+    }
     if (navigation.start !in proposal.screens) {
       sink.add("/navigation/start", "start screen '${navigation.start}' does not exist")
     }

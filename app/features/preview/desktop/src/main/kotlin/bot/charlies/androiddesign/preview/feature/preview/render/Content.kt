@@ -18,7 +18,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.TypeRole
 
 @Composable
@@ -87,7 +86,7 @@ internal fun RenderImage(ctx: NodeContext) {
     Box(
       modifier
         .then(semantics)
-        .background(ctx.env.color(ColorRole.SurfaceVariant))
+        .background(ctx.env.neutralFill())
         .then(
           if (aspectRatio == null) Modifier.aspectRatio(1f).fillMaxWidth(0.5f) else Modifier,
         ),

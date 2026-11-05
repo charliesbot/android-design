@@ -95,6 +95,7 @@ class TreeRecorder {
   private val metas = HashMap<String, NodeMeta>()
   private val positions = HashMap<String, Rect>()
   private val texts = HashMap<String, MutableMap<String, TextReport>>()
+  private val designHeights = HashMap<String, Float>()
   private var frame: LayoutCoordinates? = null
 
   /** Called by the preview frame: bounds are measured relative to this. */
@@ -113,6 +114,17 @@ class TreeRecorder {
     metas.remove(id)
     positions.remove(id)
     texts.remove(id)
+    designHeights.remove(id)
+  }
+
+  /**
+   * A component the display scales (a Wear list item at the edge) reports the height it measured
+   * at, in pixels. Its touch bounds are at least that tall, since the scaling is a transient look
+   * and not the size the component was given.
+   */
+  @Synchronized
+  fun reportDesignHeight(id: String, heightPx: Float) {
+    designHeights[id] = heightPx
   }
 
   @Synchronized
@@ -167,7 +179,7 @@ class TreeRecorder {
         !meta.interactive -> null
         unmerged != null -> unmerged.touchBoundsInRoot.union(layout)
         else -> expandToMinimumTouch(bounds, density)
-      }
+      }?.growTo(designHeights[meta.id])
     return LayoutNode(
       id = meta.id,
       type = meta.type,
@@ -236,6 +248,10 @@ class TreeRecorder {
       if (taller) box.bottom else bottom,
     )
   }
+
+  /** This rectangle made at least [height] tall, growing down. */
+  private fun Rect.growTo(height: Float?): Rect =
+    if (height == null || this.height >= height) this else Rect(left, top, right, top + height)
 
   /**
    * Material components wrap themselves in `minimumInteractiveComponentSize()`, which pads the

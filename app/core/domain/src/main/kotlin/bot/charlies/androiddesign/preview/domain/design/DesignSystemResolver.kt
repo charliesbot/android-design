@@ -1,13 +1,14 @@
 package bot.charlies.androiddesign.preview.domain.design
 
-import bot.charlies.androiddesign.preview.model.ColorRole
+import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.DesignSystem
+import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.StyleDef
 import bot.charlies.androiddesign.preview.model.ThemeOverride
-import bot.charlies.androiddesign.preview.model.TypeRole
 import bot.charlies.androiddesign.preview.model.TypographyOverride
+import bot.charlies.androiddesign.preview.model.camelToKebab
 
 /**
  * Merges DESIGN.md with a proposal's `theme` (the proposal wins per key) and fills defaults. Values
@@ -61,30 +62,43 @@ object DesignSystemResolver {
   fun parseDimension(value: String): Float? =
     DIMENSION.matchEntire(value.trim())?.groupValues?.get(1)?.toFloatOrNull()
 
-  fun resolve(designMd: ThemeOverride?, proposalTheme: ThemeOverride?): DesignSystem {
+  /**
+   * Resolves the layers under the roles of [catalog]: the phone's by default. A role the catalog
+   * does not have is dropped.
+   */
+  fun resolve(
+    designMd: ThemeOverride?,
+    proposalTheme: ThemeOverride?,
+    catalog: Catalog = M3ExpressiveCatalog,
+  ): DesignSystem {
+    val colorRoles = catalog.colorRoles.associateBy { it.camelToKebab() }
+    val typeRoles = catalog.typeRoles.keys.associateBy { it.camelToKebab() }
     val layers = listOfNotNull(designMd, proposalTheme)
     val colors = layers.fold(emptyMap<String, String>()) { acc, layer -> acc + layer.colors }
 
-    val seed =
+    val declaredSeed =
       listOfNotNull(proposalTheme, designMd).firstNotNullOfOrNull { layerSeed(it, colors) }
-        ?: DEFAULT_SEED
+    val seed = declaredSeed ?: DEFAULT_SEED
     val scheme = layers.mapNotNull { it.material?.scheme }
     val variant =
       scheme.mapNotNull { it.variant }.lastOrNull()?.let(PaletteVariant::fromWire)
         ?: PaletteVariant.TonalSpot
     val contrast = scheme.mapNotNull { it.contrast }.lastOrNull()?.coerceIn(-1.0, 1.0) ?: 0.0
 
-    val colorOverrides = linkedMapOf<ColorRole, String>()
+    val colorOverrides = linkedMapOf<String, String>()
     for ((key, value) in colors) {
       if (key == "primary") continue // the seed generates the primary role
-      val role = ColorRole.fromKebab(key) ?: continue
+      val role = colorRoles[key] ?: continue
       parseHex(value)?.let { colorOverrides[role] = it }
     }
 
-    val typography = linkedMapOf<TypeRole, TypographyOverride>()
-    for (layer in layers) {
+    val typography = linkedMapOf<String, TypographyOverride>()
+    // A catalog with a platform typeface ignores DESIGN.md's typography, written for another one.
+    val typographyLayers =
+      if (catalog.platformFontFamilies.isEmpty()) layers else listOfNotNull(proposalTheme)
+    for (layer in typographyLayers) {
       for ((key, value) in layer.typography) {
-        val role = TypeRole.fromKebab(key) ?: continue
+        val role = typeRoles[key] ?: continue
         typography[role] = typography[role]?.mergedWith(value) ?: value
       }
     }
@@ -115,6 +129,7 @@ object DesignSystemResolver {
     return DesignSystem(
       name = layers.mapNotNull { it.name }.lastOrNull(),
       seed = seed,
+      seeded = declaredSeed != null,
       variant = variant,
       contrast = contrast,
       colorOverrides = colorOverrides,

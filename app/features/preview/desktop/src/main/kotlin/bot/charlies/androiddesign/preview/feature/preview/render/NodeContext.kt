@@ -24,7 +24,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import bot.charlies.androiddesign.preview.feature.preview.record.NodeMeta
 import bot.charlies.androiddesign.preview.feature.preview.record.TextReport
+import bot.charlies.androiddesign.preview.feature.preview.render.wear.LocalWearAmbient
+import bot.charlies.androiddesign.preview.feature.preview.render.wear.WearStyledAmbient
+import bot.charlies.androiddesign.preview.feature.preview.render.wear.describeWear
+import bot.charlies.androiddesign.preview.feature.preview.render.wear.wearStyleBackground
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.ComponentNode
@@ -32,6 +37,7 @@ import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.MaterialShape
 import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.SizeClass
+import bot.charlies.androiddesign.preview.model.StyleDef
 import bot.charlies.androiddesign.preview.model.TypeRole
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -46,6 +52,8 @@ internal class ResolvedStyle(
   val container: ColorRole?,
   val shape: String?,
   val padding: String?,
+  /** The style as declared, whose role names the Wear renderers read as they are. */
+  val def: StyleDef? = null,
 ) {
   companion object {
     val None = ResolvedStyle(null, null, null, null, null)
@@ -151,9 +159,9 @@ internal class NodeContext(
   }
 }
 
-/** The props of [node] at [sizeClass], with its size class overrides applied. */
-private fun effectiveProps(node: ComponentNode, sizeClass: SizeClass): JsonObject {
-  val overrides = node.sizeOverridesAt(sizeClass)
+/** The props of [node] in the frame of [env], with its size class overrides applied. */
+private fun effectiveProps(node: ComponentNode, env: RenderEnv): JsonObject {
+  val overrides = node.sizeOverridesAt(env.catalog.sizeBreakpoints, env.widthDp)
   if (overrides.isEmpty()) return node.props
   return JsonObject(LinkedHashMap(node.props).apply { putAll(overrides) })
 }
@@ -166,12 +174,15 @@ private fun visibleAt(node: ComponentNode, sizeClass: SizeClass): Boolean {
 private fun resolveStyle(env: RenderEnv, node: ComponentNode): ResolvedStyle {
   val name = (node.props[M3ExpressiveCatalog.STYLE] as? JsonPrimitive)?.content
   val def = env.style(name) ?: return ResolvedStyle.None
+  // A Wear style names Wear roles, which the phone's role enums do not know: it is read from def.
+  if (env.isWear) return ResolvedStyle(null, null, null, def.shape, def.padding, def)
   return ResolvedStyle(
     type = def.type?.let(TypeRole::fromWire),
     color = def.color?.let(ColorRole::fromWire),
     container = def.container?.let(ColorRole::fromWire),
     shape = def.shape,
     padding = def.padding,
+    def = def,
   )
 }
 
@@ -188,7 +199,7 @@ internal fun RenderNode(
   host: ChildHost,
 ) {
   val node = env.nodes[ref.id] ?: return
-  val def = M3ExpressiveCatalog.find(node.component) ?: return
+  val def = env.catalog.find(node.component) ?: return
   if (!visibleAt(node, env.sizeClass)) return
   val ctx =
     NodeContext(
@@ -198,15 +209,23 @@ internal fun RenderNode(
       id = env.idPrefix + node.id + ref.scope.instanceSuffix,
       parentId = parentId,
       order = order,
-      props = Props(effectiveProps(node, env.sizeClass), ref.scope),
+      props = Props(effectiveProps(node, env), ref.scope),
       scope = ref.scope,
       style = resolveStyle(env, node),
       host = host,
     )
-  val ambient = LocalAmbient.current
   val recorder = env.recorder
   if (recorder != null) {
-    SideEffect { recorder.register(describe(ctx, ambient)) }
+    // The ambient is read here, while composing: registering runs later, as a side effect.
+    val meta: () -> NodeMeta =
+      if (env.isWear) {
+        val ambient = LocalWearAmbient.current
+        { describeWear(ctx, ambient) }
+      } else {
+        val ambient = LocalAmbient.current
+        { describe(ctx, ambient) }
+      }
+    SideEffect { recorder.register(meta()) }
     DisposableEffect(ctx.id) { onDispose { recorder.unregister(ctx.id) } }
   }
   val menuId = env.placement.menuAt(node.id)
@@ -233,6 +252,7 @@ internal fun NodeContext.modifier(fillHeight: Boolean = false): Modifier {
     host.column?.let { modifier = modifier.then(with(it) { Modifier.weight(weight) }) }
     host.row?.let { modifier = modifier.then(with(it) { Modifier.weight(weight) }) }
   }
+  modifier = modifier.then(host.scopeModifier)
   if (host.fillWidth && def.fillsWidth(props::value)) modifier = modifier.fillMaxWidth()
   if (fillHeight && host.fillHeight) modifier = modifier.fillMaxHeight()
   padding?.let { modifier = modifier.padding(it) }
@@ -287,6 +307,7 @@ internal fun NodeContext.styledAmbient(ambient: Ambient): Ambient =
  */
 @Composable
 internal fun NodeContext.styleBackground(): Modifier {
+  if (env.isWear) return wearStyleBackground()
   val container = style.container ?: return Modifier
   val shape = shapeName()?.let { shapeFor(it) } ?: RectangleShape
   return Modifier.clip(shape).background(env.color(container), shape)
@@ -295,7 +316,9 @@ internal fun NodeContext.styleBackground(): Modifier {
 /** Draws [content] with the style's container and content colors as the ambient ones. */
 @Composable
 internal fun NodeContext.StyledAmbient(content: @Composable () -> Unit) {
-  if (style.container == null && style.color == null) {
+  if (env.isWear) {
+    WearStyledAmbient(content)
+  } else if (style.container == null && style.color == null) {
     content()
   } else {
     val styled = styledAmbient(LocalAmbient.current)

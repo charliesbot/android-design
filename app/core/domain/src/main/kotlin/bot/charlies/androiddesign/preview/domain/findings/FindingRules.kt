@@ -2,6 +2,8 @@ package bot.charlies.androiddesign.preview.domain.findings
 
 import bot.charlies.androiddesign.preview.domain.design.TypeScale
 import bot.charlies.androiddesign.preview.model.BundledFont
+import bot.charlies.androiddesign.preview.model.Catalog
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.ComponentGroup
 import bot.charlies.androiddesign.preview.model.Finding
 import bot.charlies.androiddesign.preview.model.FindingRule
@@ -10,7 +12,6 @@ import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.TypeGroup
-import bot.charlies.androiddesign.preview.model.TypeRole
 import kotlin.math.round
 
 /**
@@ -25,7 +26,7 @@ import kotlin.math.round
  * check is skipped.
  */
 object FindingRules {
-  /** Interactive controls are measured against this touch area. */
+  /** Interactive controls are measured against this touch area, unless the catalog sets another. */
   const val MIN_TARGET_DP = 48f
 
   /** Rounding slack for the touch target. */
@@ -39,40 +40,49 @@ object FindingRules {
 
   private const val MAX_OFFSCREEN = 5
 
-  internal val fabTypes = setOf("FloatingActionButton", "FabMenu")
-  internal val modalTypes = setOf("BottomSheet", "Dialog")
+  internal val fabTypes = M3ExpressiveCatalog.fabNames
+  internal val modalTypes = M3ExpressiveCatalog.modalNames
 
-  /**
-   * Components that compete with the primary: buttons, icon buttons, FABs, split buttons, chips.
-   */
-  private val actionTypes: Set<String> by lazy {
-    M3ExpressiveCatalog.components
-      .filter { it.interactive && it.group in setOf(ComponentGroup.Actions, ComponentGroup.Chips) }
-      .map { it.name }
-      .toSet() - "FabMenuItem"
+  /** The component sets the rules read, derived once per catalog. */
+  private class Facets(val catalog: Catalog) {
+    /**
+     * Components that compete with the primary: buttons, icon buttons, FABs, split buttons, chips.
+     */
+    val actionTypes: Set<String> =
+      catalog.components
+        .filter {
+          it.interactive && it.group in setOf(ComponentGroup.Actions, ComponentGroup.Chips)
+        }
+        .map { it.name }
+        .toSet() - "FabMenuItem"
+
+    val interactiveTypes: Set<String> =
+      catalog.components.filter { it.interactive }.map { it.name }.toSet()
+
+    /**
+     * Controls whose label must stay on one line (Google: "Don't truncate or wrap label text"):
+     * interactive components with a `label` in the action, chip, navigation and overlay groups.
+     * Text fields and checkboxes keep ordinary text behavior.
+     */
+    val labelTypes: Set<String> =
+      catalog.components
+        .filter {
+          it.interactive &&
+            it.group in
+              setOf(
+                ComponentGroup.Actions,
+                ComponentGroup.Chips,
+                ComponentGroup.Structure,
+                ComponentGroup.Overlays,
+              ) &&
+            it.prop("label") != null
+        }
+        .map { it.name }
+        .toSet()
   }
 
-  private val interactiveTypes: Set<String> by lazy {
-    M3ExpressiveCatalog.components.filter { it.interactive }.map { it.name }.toSet()
-  }
-
-  /**
-   * Controls whose label must stay on one line (Google: "Don't truncate or wrap label text"):
-   * interactive components with a `label` in the action, chip, navigation and overlay groups. Text
-   * fields and checkboxes keep ordinary text behavior.
-   */
-  private val labelTypes: Set<String> by lazy {
-    val groups =
-      setOf(
-        ComponentGroup.Actions,
-        ComponentGroup.Chips,
-        ComponentGroup.Structure,
-        ComponentGroup.Overlays,
-      )
-    M3ExpressiveCatalog.components
-      .filter { it.interactive && it.group in groups && it.prop("label") != null }
-      .map { it.name }
-      .toSet()
+  private val facets: Map<String, Facets> by lazy {
+    Catalogs.all.associate { it.id to Facets(it) }
   }
 
   private val allGroups = TypeGroup.entries.toSet()
@@ -81,8 +91,9 @@ object FindingRules {
   private val fontGroups: Map<String, Set<TypeGroup>> =
     BundledFont.entries.associate { it.family.lowercase() to it.groups }
 
-  fun evaluate(tree: LayoutTree): List<Finding> {
-    val view = View(tree)
+  /** The findings of [tree], under the rules of [catalog], which is its view's by default. */
+  fun evaluate(tree: LayoutTree, catalog: Catalog = Catalogs.forView(tree.view)): List<Finding> {
+    val view = View(tree, checkNotNull(facets[catalog.id]) { "unknown catalog ${catalog.id}" })
     return touchTargets(view) +
       fonts(view) +
       clippedText(view) +
@@ -96,7 +107,8 @@ object FindingRules {
 
   // region the view
 
-  private class View(val tree: LayoutTree) {
+  private class View(val tree: LayoutTree, val facets: Facets) {
+    val catalog: Catalog = facets.catalog
     val nodes: List<LayoutNode> = tree.nodes
     private val byId: Map<String, LayoutNode> = buildMap {
       nodes.forEach { putIfAbsent(it.id, it) }
@@ -104,7 +116,7 @@ object FindingRules {
 
     /** Open modal surfaces: a sheet or dialog node that takes up space. */
     private val modals: Set<String> =
-      nodes.filter { it.type in modalTypes && it.isLaidOut }.map { it.id }.toSet()
+      nodes.filter { it.type in catalog.modalNames && it.isLaidOut }.map { it.id }.toSet()
 
     val modalOpen: Boolean
       get() = modals.isNotEmpty()
@@ -130,15 +142,16 @@ object FindingRules {
 
   private fun touchTargets(view: View): List<Finding> =
     view.nodes
-      .filter { it.type in interactiveTypes && it.isLaidOut && !view.isBehindModal(it) }
+      .filter { it.type in view.facets.interactiveTypes && it.isLaidOut && !view.isBehindModal(it) }
       .mapNotNull { node ->
         val width = maxOf(node.bounds.width, node.touch?.width ?: 0f)
         val height = maxOf(node.bounds.height, node.touch?.height ?: 0f)
-        if (width < MIN_TARGET_DP - TARGET_SLACK_DP || height < MIN_TARGET_DP - TARGET_SLACK_DP) {
+        val min = view.catalog.minTouchTargetDp
+        if (width < min - TARGET_SLACK_DP || height < min - TARGET_SLACK_DP) {
           errorFinding(
             node,
             FindingRule.TouchTarget,
-            "${dp(width)} x ${dp(height)} dp, needs 48 x 48",
+            "${dp(width)} x ${dp(height)} dp, needs ${dp(min)} x ${dp(min)}",
           )
         } else {
           null
@@ -154,8 +167,10 @@ object FindingRules {
       val family = node.text?.font ?: return@mapNotNull null
       val name = displayName(family).lowercase()
       val role = node.roles?.type
-      val group = role?.let(TypeRole::fromWire)?.group
-      val allowed = fontGroups[name]
+      val group = role?.let(view.catalog.typeRoles::get)
+      val allowed =
+        fontGroups[name]
+          ?: allGroups.takeIf { view.catalog.platformFontFamilies.any { it.lowercase() == name } }
       val detail =
         when {
           allowed == null -> "${displayName(family)} is not a bundled font"
@@ -186,7 +201,7 @@ object FindingRules {
 
   private fun truncatedText(view: View): List<Finding> =
     view.nodes
-      .filter { it.text?.truncated == true && it.type !in labelTypes }
+      .filter { it.text?.truncated == true && it.type !in view.facets.labelTypes }
       .map { node ->
         val lines = node.text?.lines ?: 1
         Finding(
@@ -199,7 +214,7 @@ object FindingRules {
 
   private fun truncatedLabels(view: View): List<Finding> =
     view.nodes
-      .filter { it.type in labelTypes }
+      .filter { it.type in view.facets.labelTypes }
       .mapNotNull { node ->
         val text = node.text ?: return@mapNotNull null
         val detail =
@@ -225,8 +240,7 @@ object FindingRules {
             ?: view.ancestors(node).firstNotNullOfOrNull { it.colors?.container }
             ?: return@mapNotNull null
         val ratio = Contrast.ratio(content, backdrop) ?: return@mapNotNull null
-        val role = node.roles?.type?.let(TypeRole::fromWire)
-        val spec = role?.let(TypeScale::of)
+        val spec = node.roles?.type?.let { TypeScale.of(view.catalog, it) }
         val need =
           if (spec == null) Contrast.NORMAL_RATIO
           else Contrast.requiredRatio(spec.sizeSp, spec.weight >= BOLD_WEIGHT)
@@ -247,10 +261,10 @@ object FindingRules {
     if (view.modalOpen) return emptyList()
     val actions =
       view.nodes.filter { node ->
-        node.type in actionTypes &&
+        node.type in view.facets.actionTypes &&
           node.isLaidOut &&
           // Navigation chrome is not compared with the primary action.
-          view.ancestors(node).none { it.type in M3ExpressiveCatalog.navigationNames }
+          view.ancestors(node).none { it.type in view.catalog.navigationNames }
       }
     val largestByPane =
       actions.groupBy(::pane).mapValues { (_, group) -> group.maxBy { it.bounds.height } }
@@ -283,7 +297,7 @@ object FindingRules {
 
   private fun oneFab(view: View): List<Finding> =
     view.nodes
-      .filter { it.type in fabTypes && it.isLaidOut }
+      .filter { it.type in view.catalog.fabNames && it.isLaidOut }
       .groupBy(::pane)
       .values
       .filter { it.size > 1 }

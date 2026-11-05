@@ -16,6 +16,8 @@ import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.domain.export.KotlinExporter
 import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
+import bot.charlies.androiddesign.preview.model.Catalog
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
@@ -23,7 +25,6 @@ import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
-import bot.charlies.androiddesign.preview.model.Views
 import bot.charlies.androiddesign.preview.model.located
 import java.nio.file.Files
 import java.nio.file.Path
@@ -104,7 +105,7 @@ class AppPreviewController(
         "no screen '$screenId'; the proposal has ${proposal.screens.keys.joinToString()}",
       )
     }
-    val spec: ViewSpec = if (view == null) state.view else viewNamed(view)
+    val spec: ViewSpec = if (view == null) state.view else viewNamed(view, Catalogs.of(proposal))
     // The window's color choices go with the window's view; a named view is the proposal's own.
     val design =
       if (view == null) state.effectiveDesign ?: snapshot.designSystem else snapshot.designSystem
@@ -125,7 +126,20 @@ class AppPreviewController(
         )
       }
     }
+    // A proposal draws only in the views of its own catalog, so a phone device cannot be chosen
+    // for a Wear proposal nor a watch for a phone one.
+    val catalog = viewer.state.value.catalog
+    change.device?.let { device ->
+      if (catalog.views.none { it.device == device }) {
+        throw PreviewException(
+          "device '${device.wire}' is not a view of the ${catalog.key} catalog; its views are " +
+            catalog.views.joinToString { it.name },
+        )
+      }
+    }
+    val watch = change.view?.let { viewNamed(it, catalog) }
     change.device?.let(viewer::setDevice)
+    watch?.let(viewer::setView)
     change.dark?.let(viewer::setDark)
     seed?.let(viewer::setSeed)
     change.variant?.let(viewer::setVariant)
@@ -154,7 +168,8 @@ class AppPreviewController(
           "no screen ${unknown.joinToString { "'$it'" }}; the proposal has ${proposal.screens.keys.joinToString()}",
         )
       }
-    val specs = views.orEmpty().distinct().ifEmpty { Views.all.map { it.name } }.map(::viewNamed)
+    val catalog = Catalogs.of(proposal)
+    val specs = views.orEmpty().distinct().map { viewNamed(it, catalog) }.ifEmpty { catalog.views }
     val started = System.nanoTime()
     val results = screenIds.associateWith { screen ->
       specs.associate { view ->
@@ -193,15 +208,25 @@ class AppPreviewController(
     design: DesignSystem = snapshot.designSystem,
   ) = RenderSource(proposal, design, snapshot.path.parent)
 
-  override fun getCatalog(components: List<String>?): String =
-    if (components.isNullOrEmpty()) {
-      CatalogSummary.render()
+  override fun getCatalog(components: List<String>?, catalog: String?): String {
+    val chosen =
+      if (catalog == null) {
+        M3ExpressiveCatalog
+      } else {
+        Catalogs.byKey(catalog)
+          ?: throw PreviewException(
+            "no catalog '$catalog'; the catalogs are ${Catalogs.all.joinToString { it.key }}",
+          )
+      }
+    return if (components.isNullOrEmpty()) {
+      CatalogSummary.render(chosen)
     } else {
       PreviewJson.compact.encodeToString(
         JsonObject.serializer(),
-        CatalogJson.components(components),
+        CatalogJson.components(components, chosen),
       )
     }
+  }
 
   override suspend fun exportKotlin(screen: String?): String {
     val snapshot = validSnapshot()
@@ -213,7 +238,7 @@ class AppPreviewController(
     val snapshot = current?.let { reload(it) }
     return PreviewStatus(
       version = version,
-      catalogId = M3ExpressiveCatalog.ID,
+      catalogId = snapshot?.proposal?.let { Catalogs.of(it).id } ?: M3ExpressiveCatalog.ID,
       proposal = current?.toString(),
       windowVisible = window.visible.value,
       screen = viewer.currentScreen,
@@ -225,7 +250,7 @@ class AppPreviewController(
 
   private fun viewState(): ViewState {
     val state = viewer.state.value
-    return ViewState(state.device, state.dark, state.seed, state.variant?.wire)
+    return ViewState(state.device, state.dark, state.seed, state.variant?.wire, state.view.name)
   }
 
   private fun opened(snapshot: ProposalSnapshot): OpenedProposal {
@@ -277,12 +302,15 @@ class AppPreviewController(
     val window = viewer.state.value
     val screen =
       viewer.currentScreen?.takeIf { it in proposal.screens } ?: proposal.navigation.start
+    // The window may still be on the previous proposal's device, which belongs to another catalog.
+    val catalog = Catalogs.of(proposal)
+    val view = window.view.takeIf { Catalogs.forView(it) === catalog } ?: catalog.views.first()
     val failure =
       try {
         renderer.render(
           sourceOf(proposal, snapshot),
           screen,
-          window.view,
+          view,
           live = window.host,
         )
         null
@@ -291,7 +319,7 @@ class AppPreviewController(
       } catch (e: Exception) {
         ValidationError(
           ViewerViewModel.RENDER_ERROR_PATH,
-          "screen '$screen' failed to render at ${window.view.name}: ${e.located()}",
+          "screen '$screen' failed to render at ${view.name}: ${e.located()}",
         )
       }
     return if (failure == null) snapshot else snapshot.copy(errors = listOf(failure))
@@ -304,10 +332,11 @@ class AppPreviewController(
     return snapshot
   }
 
-  private fun viewNamed(name: String): ViewSpec =
-    Views.byName(name)
+  /** The view [name] of [catalog]: a phone view cannot draw a Wear proposal and the reverse. */
+  private fun viewNamed(name: String, catalog: Catalog): ViewSpec =
+    catalog.views.firstOrNull { it.name == name }
       ?: throw PreviewException(
-        "no view '$name'; the views are ${Views.all.joinToString { it.name }}",
+        "no view '$name'; the ${catalog.key} views are ${catalog.views.joinToString { it.name }}",
       )
 
   private fun invalidMessage(errors: List<ValidationError>): String = buildString {

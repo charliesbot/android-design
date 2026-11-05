@@ -59,7 +59,14 @@ fun ConfinedFrame(
 ) {
   // The stage's theme is the proposal's, so its background is the screen's. The panel paints it
   // wherever the screen has not drawn yet, which shows while a device switch resizes the panel.
-  val background = java.awt.Color(MaterialTheme.colorScheme.background.toArgb(), true)
+  // A round view leaves the panel's corners to the bezel, which is the colour around the screen.
+  val background =
+    java.awt.Color(
+      (if (view.round) MaterialTheme.colorScheme.surfaceContainerHighest
+        else MaterialTheme.colorScheme.background)
+        .toArgb(),
+      true,
+    )
   var params by remember { mutableStateOf(FrameParams(host, design, view, frame)) }
   var frameScale by remember { mutableStateOf(scale) }
   params = FrameParams(host, design, view, frame)

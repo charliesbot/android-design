@@ -60,7 +60,7 @@ internal fun describe(ctx: NodeContext, ambient: Ambient): NodeMeta {
         content = env.color(look.content).toHex(),
       ),
     text = look.text?.takeIf { it.isNotEmpty() },
-    font = look.type?.takeIf { look.text != null }?.let { env.theme.fontFamilies[it] },
+    font = look.type?.takeIf { look.text != null }?.let { env.phone.fontFamilies[it] },
     a11yRole = look.a11yRole,
     a11yLabel = label,
     actions =

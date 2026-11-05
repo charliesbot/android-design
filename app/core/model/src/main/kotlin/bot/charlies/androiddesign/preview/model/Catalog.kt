@@ -161,8 +161,7 @@ data class ComponentDef(
    * that is not a finite number, would reach a Compose API that throws or hangs on it.
    */
   fun coerceNumber(name: String, value: Double): Double =
-    ((props + M3ExpressiveCatalog.commonProps).firstOrNull { it.name == name }?.kind
-        as? PropKind.Number)
+    ((props + COMMON_PROPS).firstOrNull { it.name == name }?.kind as? PropKind.Number)
       ?.bounds
       ?.coerce(value) ?: value
 
@@ -182,52 +181,187 @@ enum class ActionFunction(val wire: String, val argument: String?, val descripti
   }
 }
 
+/** The width at which a `sizeClass` override [key] starts to apply, in dp. */
+data class SizeBreakpoint(val key: String, val minWidthDp: Int)
+
+/** Props every component of every catalog accepts besides the ones in [Catalog]'s constants. */
+internal val COMMON_PROPS: List<PropDef> =
+  listOf(
+    PropDef(
+      "weight",
+      PropKind.Number(NumberBounds(0.01, 100.0)),
+      description = "Relative weight inside a Row or Column.",
+    ),
+    PropDef("padding", PropKind.Spacing, description = "Padding around the component."),
+  )
+
 /**
- * The component registry: the single source of truth for the A2UI catalog JSON, the proposal
- * schema, the validator, the renderer and the exporter.
+ * A component registry: the single source of truth, per surface, for the A2UI catalog JSON, the
+ * proposal schema, the validator, the renderer and the exporter. A proposal draws from one catalog:
+ * every screen names the same [id]. [Catalogs] finds one by id or key.
  */
-object M3ExpressiveCatalog {
-  const val ID = "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1"
-  const val PROTOCOL_VERSION = "1.0"
-  const val TITLE = "Material 3 Expressive for Android"
+interface Catalog {
+  val id: String
+
+  /** The short name an agent asks for (`get_catalog`) and the catalog file is named after. */
+  val key: String
+  val title: String
+
+  /** One sentence for the catalog JSON. */
+  val description: String
+  val components: List<ComponentDef>
 
   /** Props every component accepts besides `id`, `component`, `showIn`, `sizeClass` and `style`. */
-  val commonProps: List<PropDef> =
-    listOf(
-      PropDef(
-        "weight",
-        PropKind.Number(NumberBounds(0.01, 100.0)),
-        description = "Relative weight inside a Row or Column.",
-      ),
-      PropDef("padding", PropKind.Spacing, description = "Padding around the component."),
-    )
+  val commonProps: List<PropDef>
+
+  /** The views a proposal of this catalog is checked and rendered in. */
+  val views: List<ViewSpec>
+
+  /**
+   * The keys of the `sizeClass` override prop, each with the view width it starts at. Empty when
+   * the catalog has no overrides.
+   */
+  val sizeBreakpoints: List<SizeBreakpoint>
+
+  /** The size classes `showIn` accepts. Empty when the catalog has no `showIn`. */
+  val showInSizes: List<SizeClass>
+
+  /** [ColorRole]-kind props, theme `colors` and styles take these wire names. */
+  val colorRoles: List<String>
+
+  /** [TypeRole]-kind props and theme `typography` take these wire names, each in a type group. */
+  val typeRoles: Map<String, TypeGroup>
+
+  /** Interactive components are measured against this touch area, in dp. */
+  val minTouchTargetDp: Float
+
+  /** Whether `navigation.panes` may name pane roles (list-detail layouts). */
+  val supportsPanes: Boolean
+
+  /** Names of the components that open as overlays. */
+  val overlayNames: Set<String>
+
+  /** Overlays that dim and disable the screen behind them while open. */
+  val modalNames: Set<String>
+
+  /** Names of the floating action button components; a pane may hold only one. */
+  val fabNames: Set<String>
+
+  /** Names of the navigation components, in the order a view lists them. */
+  val navigationNames: List<String>
+
+  /**
+   * Typefaces the platform's own components are set in, which the font rule accepts for every type
+   * role besides the bundled ones. Empty when the catalog uses the bundled fonts only.
+   */
+  val platformFontFamilies: Set<String>
+    get() = emptySet()
+
+  fun find(name: String): ComponentDef?
+
+  companion object {
+    const val PROTOCOL_VERSION = "1.0"
+    const val SHOW_IN = "showIn"
+    const val SIZE_CLASS = "sizeClass"
+    const val STYLE = "style"
+  }
+}
+
+/** The catalogs a proposal can name, found by id or key. */
+object Catalogs {
+  val all: List<Catalog> by lazy { listOf(M3ExpressiveCatalog, WearCatalog) }
+
+  fun byId(id: String): Catalog? = all.firstOrNull { it.id == id }
+
+  fun byKey(key: String): Catalog? = all.firstOrNull { it.key == key }
+
+  /** The catalog of [screen]; the phone catalog when it names none we know. */
+  fun of(screen: Screen): Catalog = byId(screen.catalogId) ?: M3ExpressiveCatalog
+
+  /**
+   * The catalog of [proposal]: its start screen's, else its first screen's. The validator makes
+   * every screen name the same one, so any screen of a valid proposal gives the answer.
+   */
+  fun of(proposal: Proposal): Catalog =
+    (proposal.screens[proposal.navigation.start] ?: proposal.screens.values.firstOrNull())?.let(
+      ::of,
+    ) ?: M3ExpressiveCatalog
+
+  /** The catalog whose views include [device]: a watch is Wear, everything else the phone's. */
+  fun forDevice(device: Device): Catalog =
+    if (device == Device.Watch) WearCatalog else M3ExpressiveCatalog
+
+  /** The catalog [view] belongs to. */
+  fun forView(view: ViewSpec): Catalog = forDevice(view.device)
+}
+
+object M3ExpressiveCatalog : Catalog {
+  const val ID = "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1"
+  override val id = ID
+  const val PROTOCOL_VERSION = Catalog.PROTOCOL_VERSION
+  const val TITLE = "Material 3 Expressive for Android"
+  const val KEY = "m3-expressive"
+
+  override val key = KEY
+  override val title = TITLE
+  override val description =
+    "Material 3 Expressive components that map one to one onto Jetpack Compose material3."
+
+  override val commonProps: List<PropDef> = COMMON_PROPS
 
   /** The most columns a `Grid` has. */
   const val MAX_GRID_COLUMNS = 24
 
-  const val SHOW_IN = "showIn"
-  const val SIZE_CLASS = "sizeClass"
-  const val STYLE = "style"
+  const val SHOW_IN = Catalog.SHOW_IN
+  const val SIZE_CLASS = Catalog.SIZE_CLASS
+  const val STYLE = Catalog.STYLE
 
-  val components: List<ComponentDef> by lazy { buildComponents() }
+  override val components: List<ComponentDef> by lazy { buildComponents() }
 
   private val byName: Map<String, ComponentDef> by lazy { components.associateBy { it.name } }
 
-  fun find(name: String): ComponentDef? = byName[name]
+  override fun find(name: String): ComponentDef? = byName[name]
+
+  override val views: List<ViewSpec>
+    get() = Views.all
+
+  override val sizeBreakpoints =
+    listOf(
+      SizeBreakpoint(SizeClass.Medium.wire, SizeClass.MEDIUM_MIN_DP),
+      SizeBreakpoint(SizeClass.Expanded.wire, SizeClass.EXPANDED_MIN_DP),
+    )
+
+  override val showInSizes: List<SizeClass> = SizeClass.entries
+
+  override val colorRoles: List<String> = ColorRole.entries.map { it.wire }
+
+  override val typeRoles: Map<String, TypeGroup> =
+    TypeRole.entries.associate { it.wire to it.group }
+
+  override val minTouchTargetDp = 48f
+
+  override val supportsPanes = true
 
   /** Names of the components that open as overlays. */
-  val overlayNames: Set<String> by lazy { components.filter { it.overlay }.map { it.name }.toSet() }
+  override val overlayNames: Set<String> by lazy {
+    components.filter { it.overlay }.map { it.name }.toSet()
+  }
+
+  override val modalNames: Set<String> = setOf("BottomSheet", "Dialog")
+
+  override val fabNames: Set<String> = setOf("FloatingActionButton", "FabMenu")
 
   /** Names of the navigation components, in the order a view lists them. */
-  val navigationNames: List<String> = listOf("NavigationBar", "NavigationRail", "FloatingToolbar")
+  override val navigationNames: List<String> =
+    listOf("NavigationBar", "NavigationRail", "FloatingToolbar")
 }
 
 // region registry definitions
 
-private fun text(name: String, required: Boolean = false, description: String = "") =
+internal fun text(name: String, required: Boolean = false, description: String = "") =
   PropDef(name, PropKind.Text, required, description)
 
-private fun bool(name: String, description: String = "", default: Boolean? = false) =
+internal fun bool(name: String, description: String = "", default: Boolean? = false) =
   PropDef(
     name,
     PropKind.Bool,
@@ -235,7 +369,7 @@ private fun bool(name: String, description: String = "", default: Boolean? = fal
     default = default?.let(::JsonPrimitive),
   )
 
-private fun num(
+internal fun num(
   name: String,
   description: String = "",
   bounds: NumberBounds? = null,
@@ -248,10 +382,10 @@ private fun num(
     default = default?.let(::JsonPrimitive),
   )
 
-private fun range(name: String, description: String = "") =
+internal fun range(name: String, description: String = "") =
   PropDef(name, PropKind.NumberRange, description = description)
 
-private fun oneOf(
+internal fun oneOf(
   name: String,
   vararg values: String,
   description: String = "",
@@ -264,43 +398,43 @@ private fun oneOf(
     default = default?.let(::JsonPrimitive),
   )
 
-private fun child(
+internal fun child(
   name: String,
   vararg allowed: String,
   required: Boolean = false,
   description: String = "",
 ) = PropDef(name, PropKind.Child, required, description, allowed.toSet().ifEmpty { null })
 
-private fun children(
+internal fun children(
   name: String,
   vararg allowed: String,
   required: Boolean = false,
   description: String = "",
 ) = PropDef(name, PropKind.ChildList, required, description, allowed.toSet().ifEmpty { null })
 
-private fun color(name: String, description: String = "") =
+internal fun color(name: String, description: String = "") =
   PropDef(name, PropKind.ColorRole, description = description)
 
-private fun type(name: String = "type") = PropDef(name, PropKind.TypeRole)
+internal fun type(name: String = "type") = PropDef(name, PropKind.TypeRole)
 
-private fun shape(name: String = "shape") = PropDef(name, PropKind.Shape)
+internal fun shape(name: String = "shape") = PropDef(name, PropKind.Shape)
 
-private fun spacing(name: String, description: String = "") =
+internal fun spacing(name: String, description: String = "") =
   PropDef(name, PropKind.Spacing, description = description)
 
-private fun icon(name: String = "icon", required: Boolean = false) =
+internal fun icon(name: String = "icon", required: Boolean = false) =
   PropDef(name, PropKind.Icon, required, "Material Symbols name, such as \"home\".")
 
-private fun action() = PropDef("action", PropKind.Action, description = "What a tap does.")
+internal fun action() = PropDef("action", PropKind.Action, description = "What a tap does.")
 
-private val interactiveProps =
+internal val interactiveProps =
   listOf(
     bool("primary", "Marks the screen's primary action. Exactly one is expected per screen."),
     text("contentDescription", description = "Accessibility label when it differs from the label."),
     bool("enabled", default = true),
   )
 
-private val buttonSizes = arrayOf("extra-small", "small", "medium", "large", "extra-large")
+internal val buttonSizes = arrayOf("extra-small", "small", "medium", "large", "extra-large")
 private val alignments =
   arrayOf(
     "topStart",
@@ -328,7 +462,7 @@ private fun buildComponents(): List<ComponentDef> =
     feedback() +
     overlays()
 
-private fun layout(): List<ComponentDef> =
+internal fun layout(): List<ComponentDef> =
   listOf(
     ComponentDef(
       "Column",

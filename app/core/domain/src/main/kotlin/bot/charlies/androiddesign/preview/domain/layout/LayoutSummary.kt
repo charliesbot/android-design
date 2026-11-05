@@ -1,9 +1,10 @@
 package bot.charlies.androiddesign.preview.domain.layout
 
+import bot.charlies.androiddesign.preview.model.Catalog
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
-import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.Proposal
 import kotlin.math.roundToInt
 import kotlinx.serialization.Serializable
@@ -60,7 +61,7 @@ object LayoutSummary {
         }
         .sortedBy { it.x }
     return ViewLayout(
-      nav = navigation(tree),
+      nav = navigation(tree, Catalogs.of(proposal)),
       panes = panes.associate { it.screen to regions(it) },
     )
   }
@@ -81,12 +82,9 @@ object LayoutSummary {
     return (root.props["content"] as? JsonPrimitive)?.takeIf { it.isString }?.content
   }
 
-  private fun navigation(tree: LayoutTree): String {
+  private fun navigation(tree: LayoutTree, catalog: Catalog): String {
     val shown = tree.nodes.map { it.type }.toSet()
-    return M3ExpressiveCatalog.navigationNames
-      .filter { it in shown }
-      .joinToString("+")
-      .ifEmpty { NO_NAV }
+    return catalog.navigationNames.filter { it in shown }.joinToString("+").ifEmpty { NO_NAV }
   }
 
   private fun regions(pane: Pane): List<String> {

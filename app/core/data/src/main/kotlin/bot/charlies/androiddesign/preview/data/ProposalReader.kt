@@ -3,6 +3,8 @@ package bot.charlies.androiddesign.preview.data
 import bot.charlies.androiddesign.preview.domain.ProposalSnapshot
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.domain.validation.ProposalValidator
+import bot.charlies.androiddesign.preview.model.Catalogs
+import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.ThemeOverride
 import bot.charlies.androiddesign.preview.model.ValidationError
@@ -49,7 +51,11 @@ class ProposalReader(private val validator: ProposalValidator = ProposalValidato
       proposalPath,
       designMdPath,
       proposal,
-      DesignSystemResolver.resolve(designTheme, proposal?.theme),
+      DesignSystemResolver.resolve(
+        designTheme,
+        proposal?.theme,
+        proposal?.let(Catalogs::of) ?: M3ExpressiveCatalog,
+      ),
       errors,
     )
   }

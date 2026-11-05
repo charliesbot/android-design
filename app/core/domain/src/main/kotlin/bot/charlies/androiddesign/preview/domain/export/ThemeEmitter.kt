@@ -43,7 +43,7 @@ internal class ThemeEmitter(
 
   private fun resolveFamilies() {
     for (role in TypeRole.entries) {
-      val override = design.typography[role]
+      val override = design.typography[role.wire]
       val family = override?.fontFamily ?: DEFAULT_FAMILY
       val axes = parseAxes(override?.fontVariation)
       val explicitWeight = override?.fontWeight ?: axes.weight
@@ -139,7 +139,7 @@ internal class ThemeEmitter(
     val sp = ctx.use(Sym.sp)
     val args =
       TypeRole.entries.map { role ->
-        val override = design.typography[role]
+        val override = design.typography[role.wire]
         val token = TypeScale.of(role)
         val copy = mutableListOf(arg("fontFamily", roleSpecs.getValue(role).valName))
         val weight =
@@ -215,7 +215,7 @@ internal class ThemeEmitter(
           "=",
           Call(
             "dynamicScheme.copy",
-            design.colorOverrides.map { (role, hex) -> arg(role.wire, colorLiteral(hex, color)) },
+            design.colorOverrides.map { (role, hex) -> arg(role, colorLiteral(hex, color)) },
           ),
         )
       colorScheme = Raw("colorScheme")

@@ -1,12 +1,13 @@
 package bot.charlies.androiddesign.preview.domain.navigation
 
 import bot.charlies.androiddesign.preview.model.ActionFunction
+import bot.charlies.androiddesign.preview.model.Catalog
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.NavigationEdge
 import bot.charlies.androiddesign.preview.model.PropKind
 import bot.charlies.androiddesign.preview.model.Proposal
-import bot.charlies.androiddesign.preview.model.SizeClass
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -28,7 +29,8 @@ class NavigationGraph(private val proposal: Proposal) {
     val found = mutableListOf<NavigationEdge>()
     for ((screenId, screen) in proposal.screens) {
       for (node in screen.components) {
-        for (target in navigateTargets(node)) found += NavigationEdge(screenId, target, node.id)
+        for (target in navigateTargets(node, Catalogs.of(screen))) found +=
+          NavigationEdge(screenId, target, node.id)
       }
     }
     return found.distinct()
@@ -61,16 +63,22 @@ class NavigationGraph(private val proposal: Proposal) {
   }
 
   companion object {
-    /** The screens a component navigates to, from its props and its size class overrides. */
-    fun navigateTargets(node: ComponentNode): List<String> {
-      val def = M3ExpressiveCatalog.find(node.component) ?: return emptyList()
+    /**
+     * The screens a component navigates to, from its props and its size class overrides, under
+     * [catalog].
+     */
+    fun navigateTargets(
+      node: ComponentNode,
+      catalog: Catalog = M3ExpressiveCatalog,
+    ): List<String> {
+      val def = catalog.find(node.component) ?: return emptyList()
       val actionProps = def.props.filter { it.kind == PropKind.Action }.map { it.name }
       val sources =
         buildList<JsonObject> {
           add(node.props)
-          val overrides = node.props[M3ExpressiveCatalog.SIZE_CLASS] as? JsonObject
-          SizeClass.entries.forEach { size ->
-            (overrides?.get(size.wire) as? JsonObject)?.let(::add)
+          val overrides = node.props[Catalog.SIZE_CLASS] as? JsonObject
+          catalog.sizeBreakpoints.forEach { breakpoint ->
+            (overrides?.get(breakpoint.key) as? JsonObject)?.let(::add)
           }
         }
       return sources.flatMap { source ->

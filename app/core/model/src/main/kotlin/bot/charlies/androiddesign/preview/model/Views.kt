@@ -8,7 +8,8 @@ enum class Device {
   @SerialName("phone") Phone,
   @SerialName("foldable") Foldable,
   @SerialName("tablet") Tablet,
-  @SerialName("desktop") Desktop;
+  @SerialName("desktop") Desktop,
+  @SerialName("watch") Watch;
 
   val wire: String
     get() = lowerCamelName()
@@ -28,6 +29,15 @@ enum class SizeClass {
   val wire: String
     get() = lowerCamelName()
 
+  /** The narrowest window width in this class, in dp. */
+  val minWidthDp: Int
+    get() =
+      when (this) {
+        Compact -> 0
+        Medium -> MEDIUM_MIN_DP
+        Expanded -> EXPANDED_MIN_DP
+      }
+
   companion object {
     const val MEDIUM_MIN_DP = 600
     const val EXPANDED_MIN_DP = 840
@@ -43,7 +53,7 @@ enum class SizeClass {
   }
 }
 
-/** A named frame a screen is rendered in. Sizes are dp. */
+/** A named frame a screen is rendered in. Sizes are dp. A [round] frame is a circular display. */
 @Serializable
 data class ViewSpec(
   val name: String,
@@ -52,6 +62,7 @@ data class ViewSpec(
   val height: Int,
   val dark: Boolean,
   val sizeClass: SizeClass,
+  val round: Boolean = false,
 )
 
 object Views {
@@ -62,15 +73,37 @@ object Views {
   val Tablet = ViewSpec("tablet", Device.Tablet, 1280, 800, dark = false, SizeClass.Expanded)
   val Desktop = ViewSpec("desktop", Device.Desktop, 1920, 1080, dark = false, SizeClass.Expanded)
 
+  /** The small Wear OS display: a dark, round 204 dp frame. */
+  val Watch =
+    ViewSpec("watch", Device.Watch, 204, 204, dark = true, SizeClass.Compact, round = true)
+
+  /** The large Wear OS display, from the 225 dp breakpoint up: a dark, round 227 dp frame. */
+  val WatchLarge =
+    ViewSpec("watch-large", Device.Watch, 227, 227, dark = true, SizeClass.Compact, round = true)
+
+  /** The views of the phone catalog ([M3ExpressiveCatalog.views]). */
   val all: List<ViewSpec> = listOf(Light, Dark, Foldable, Tablet, Desktop)
 
-  fun byName(name: String): ViewSpec? = all.firstOrNull { it.name == name }
+  /** The views of the Wear catalog ([WearCatalog.views]). */
+  val wear: List<ViewSpec> = listOf(Watch, WatchLarge)
 
-  /** The view for a device and brightness. Only the phone has a named dark view. */
+  /** Every view of every catalog. A proposal is checked in its own catalog's views, not these. */
+  val every: List<ViewSpec> = all + wear
+
+  fun byName(name: String): ViewSpec? = every.firstOrNull { it.name == name }
+
+  /**
+   * The view for a device and brightness. Only the phone has a named dark view; a watch only has
+   * dark views, so brightness does not choose between its two.
+   */
   fun of(device: Device, dark: Boolean): ViewSpec {
-    val light = all.first { it.device == device && !it.dark }
-    if (!dark) return light
-    return all.firstOrNull { it.device == device && it.dark }
-      ?: light.copy(name = "${light.name}-dark", dark = true)
+    val onDevice = every.filter { it.device == device }
+    onDevice
+      .firstOrNull { it.dark == dark }
+      ?.let {
+        return it
+      }
+    val first = onDevice.first()
+    return if (dark) first.copy(name = "${first.name}-dark", dark = true) else first
   }
 }

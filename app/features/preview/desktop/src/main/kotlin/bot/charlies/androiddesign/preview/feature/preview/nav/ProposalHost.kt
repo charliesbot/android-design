@@ -32,11 +32,13 @@ import bot.charlies.androiddesign.preview.feature.preview.record.TreeRecorder
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalRenderer
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalTheme
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.PaneRole
 import bot.charlies.androiddesign.preview.model.SizeClass
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.WearCatalog
 
 /**
  * Runs a proposal as a Navigation 3 back stack of screen ids. Screens with a pane role in
@@ -143,6 +145,12 @@ fun ProposalPreview(
   modifier: Modifier = Modifier,
   recorder: TreeRecorder? = null,
 ) {
+  // The one place the catalog splits the preview: a watch view is drawn by the Wear host, in the
+  // Wear theme and inside a device, and everything else by the phone's.
+  if (Catalogs.forView(view) === WearCatalog) {
+    WearProposalPreview(host, design, view, frame, modifier, recorder)
+    return
+  }
   ProposalTheme(design, view.dark) {
     PreviewFrame(recorder, modifier.size(frame.width, frame.height)) {
       Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
