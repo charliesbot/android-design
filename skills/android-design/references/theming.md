@@ -202,10 +202,14 @@ private val soft = arrayOf(FontVariation.Setting("SOFT", 100f), FontVariation.Se
 val AppTypography = base.copy(
     // Display and Headline: one brand face (Fraunces here) or a Google Sans Flex voice,
     // such as base.displayLarge.voice(R.font.google_sans_flex, 850, FontVariation.Setting("ROND", 100f)).
+    // Set all six, plus their *Emphasized styles: components read them internally
+    // (a large app bar's title is displaySmall), so a skipped one falls back to the default face.
     displayLarge = base.displayLarge.voice(R.font.fraunces, 600, *soft),
     displayMedium = base.displayMedium.voice(R.font.fraunces, 600, *soft),
+    displaySmall = base.displaySmall.voice(R.font.fraunces, 600, *soft),
     headlineLarge = base.headlineLarge.voice(R.font.fraunces, 600, *soft),
     headlineMedium = base.headlineMedium.voice(R.font.fraunces, 600, *soft),
+    headlineSmall = base.headlineSmall.voice(R.font.fraunces, 600, *soft),
     // Title, Body, and Label: always Google Sans Flex at default axes.
     titleLarge = base.titleLarge.voice(R.font.google_sans_flex, 500),
     bodyLarge = base.bodyLarge.voice(R.font.google_sans_flex, 400),
