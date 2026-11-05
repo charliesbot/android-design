@@ -142,7 +142,7 @@ The brand and content-based snippets above already pass it. For a static Theme B
 
 Open source on [Google Fonts](https://fonts.google.com/specimen/Google+Sans+Flex) (since November 2025) and this skill's default family: plain text always uses it, and so does every Display and Headline unless you choose a brand face (below). Axes: `wght` 1 to 1000, `wdth` 25 to 151, `opsz` 6 to 144, `slnt` -10 to 0, `GRAD` 0 to 100, `ROND` 0 to 100.
 
-Bundle the variable TTF in `res/font/` (downloadable Google Fonts don't carry variation settings). Build it with the `voice` helper below.
+Bundle the variable TTF in `res/font/` (downloadable Google Fonts don't carry variation settings).
 
 Voice starting points (tune them to the screen's direction; they are not presets to copy):
 
@@ -158,7 +158,7 @@ Voice starting points (tune them to the screen's direction; they are not presets
 
 ### Brand faces (Display and Headline only)
 
-Optional: one face from the set below on Display and Headline styles, with everything else on Google Sans Flex. The face set, one face per proposal, Doto's display-only limit, and keeping Title on Google Sans Flex are this skill's choices, not Google's. All are OFL and bundled as variable TTFs with the previewer app that `android-design-explore` drives (`app/features/preview/desktop/src/main/resources/fonts/` in this skill's repository; copy them into the app's `res/font/`), so an exploration never fetches fonts. Material calls this the brand typeface (larger styles, "to focus on expression") against the plain typeface (smaller styles, "to focus on readability"); do not use a brand face on Body or Label. Build each style with the `voice` helper below, and keep the scale's sizes (change line height and tracking).
+Optional: one face from the set below on Display and Headline styles, with everything else on Google Sans Flex. The face set, one face per proposal, Doto's display-only limit, and keeping Title on Google Sans Flex are this skill's choices, not Google's. All are OFL and bundled as variable TTFs with the previewer app that `android-design-explore` drives (`app/features/preview/desktop/src/main/resources/fonts/` in this skill's repository; copy them into the app's `res/font/`), so an exploration never fetches fonts. Material calls this the brand typeface (larger styles, "to focus on expression") against the plain typeface (smaller styles, "to focus on readability"); do not use a brand face on Body or Label.
 
 | Face | File | Axes | Use for | Starting point |
 | --- | --- | --- | --- | --- |
@@ -167,19 +167,20 @@ Optional: one face from the set below on Display and Headline styles, with every
 | Big Shoulders Display | `big_shoulders_display` | `wght` 100-900 | Tall condensed poster type: sport, transit, energy | `wght` 800 to 900, tight tracking, line height 1.2x |
 | Doto | `doto` | `ROND` 0-100, `wght` 100-900 | Dot-matrix: timers, music, retro-tech. Display sizes only (36sp and up) | `wght` 700 to 900, `ROND` 100 for round dots |
 
-Measured line boxes (Pixel_10_Pro_XL emulator, M3 `bodyLarge` base style with the token size and line height): Fraunces, Bricolage Grotesque, and Big Shoulders Display match the token line height at 36/44 and 32/40 (Fraunces 44.7dp at 36/44 from pixel rounding), so no extra vertical room is needed. Doto at 45/52 renders 54dp tall, so leave about 2dp of room around a Doto line. Google Sans Flex, by comparison, renders 52.7dp at 36/44 and 46.7dp at 32/40. The `voice` helper sets optical size from each style's size. That matters most for Fraunces and Bricolage Grotesque: Compose never sets the optical size axis by itself, and the default optical size changes their width.
+Measured line boxes (Pixel_10_Pro_XL emulator, M3 `bodyLarge` base style with the token size and line height): Fraunces, Bricolage Grotesque, and Big Shoulders Display match the token line height at 36/44 and 32/40 (Fraunces 44.7dp at 36/44 from pixel rounding), so no extra vertical room is needed. Doto at 45/52 renders 54dp tall, so leave about 2dp of room around a Doto line. Google Sans Flex, by comparison, renders 52.7dp at 36/44 and 46.7dp at 32/40.
 
 Google Sans Code (`google_sans_code`, `wght` 300-800) is the mono face for numbers and data (timers, tabular values, codes, metadata) at any size, in any proposal.
 
 ### Building the type scale
 
-Every bundled face is a variable TTF, so one helper builds every style. A plain `FontFamily(Font(R.font.google_sans_flex))` draws every weight at 400: each voice needs its own `Font` with `FontVariation.weight`. Variation settings apply on API 26+.
+Build every style from a bundled face with `voice`. A plain `FontFamily(Font(R.font.google_sans_flex))` draws every weight at 400, because a variable font needs `FontVariation.weight` set per `Font`. Variation settings apply on API 26+.
 
 ```kotlin
 /**
- * A voice: one bundled variable face at fixed axes. Optical size follows this style's font size,
- * because Compose never sets it; faces without an `opsz` axis ignore it. `axes` adds the other
- * axes: never pass weight or optical size there, because Compose rejects a repeated axis.
+ * A voice: one bundled variable face at fixed axes. Sets weight and optical size itself (Compose
+ * never sets optical size, and Fraunces and Bricolage Grotesque change width without it; faces with
+ * no `opsz` axis ignore it). `axes` holds only the face's other axes, such as width, SOFT, or ROND:
+ * Compose rejects a repeated axis.
  */
 fun TextStyle.voice(@FontRes font: Int, weight: Int, vararg axes: FontVariation.Setting) = copy(
     fontFamily = FontFamily(
@@ -215,7 +216,7 @@ val AppTypography = base.copy(
     bodyLarge = base.bodyLarge.voice(R.font.google_sans_flex, 400),
     bodyMedium = base.bodyMedium.voice(R.font.google_sans_flex, 400),
     labelLarge = base.labelLarge.voice(R.font.google_sans_flex, 500),
-    // ...every style you use, including the *Emphasized ones with a heavier weight
+    // ...the remaining Title, Body, and Label styles, and every *Emphasized style one weight step heavier
 )
 
 // Voices outside the type scale: tall numerals with state, and numbers and data.
