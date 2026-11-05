@@ -46,3 +46,5 @@ Windows 10 (1803 or later) and 11, x64.
    ```
 
 To build from source, run `.\gradlew.bat :app:installApp` in `app\`. It installs to the same folder, so the path above stays the same. Quit a running instance first, because Windows locks its files.
+
+GitHub Actions builds both installers for pull requests that change the app. To sign them, see [docs/previewer-signing.md](docs/previewer-signing.md).

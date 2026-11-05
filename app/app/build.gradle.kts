@@ -40,7 +40,24 @@ compose.desktop {
       packageName = "AndroidDesignPreview"
       packageVersion = "1.0.0"
       includeAllModules = true
-      macOS { bundleID = appBundleId }
+      macOS {
+        bundleID = appBundleId
+        // Signing and notarization are off unless the build workflow sets these from its
+        // secrets (docs/previewer-signing.md). Blank counts as unset, as GitHub passes missing
+        // secrets as empty strings.
+        fun env(name: String) = providers.environmentVariable(name).filter { it.isNotBlank() }
+        val identity = env("MACOS_SIGNING_IDENTITY")
+        signing {
+          sign.set(identity.map { true }.orElse(false))
+          this.identity.set(identity)
+          keychain.set(env("MACOS_SIGNING_KEYCHAIN"))
+        }
+        notarization {
+          appleID.set(env("MACOS_NOTARIZATION_APPLE_ID"))
+          password.set(env("MACOS_NOTARIZATION_PASSWORD"))
+          teamID.set(env("MACOS_NOTARIZATION_TEAM_ID"))
+        }
+      }
       windows {
         // Installs to %LOCALAPPDATA%\AndroidDesignPreview with no admin prompt, so the MCP
         // binary path is the same for every user.
