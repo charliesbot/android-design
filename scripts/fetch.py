@@ -27,7 +27,7 @@ M3 = "https://m3.material.io"
 ANDROID = "https://developer.android.com"
 # developer.android.com/design/ui platforms outside the skill's scope (see docs/research/source-coverage.md).
 OUT_OF_SCOPE = ("/design/ui/ai-glasses", "/design/ui/cars", "/design/ui/tv", "/design/ui/xr")
-EXTRA_ANDROID_ROUTES = ["/docs/quality-guidelines/widget-quality"]
+EXTRA_ANDROID_ROUTES = ["/docs/quality-guidelines/widget-quality", "/develop/ui/views/appwidgets/layouts"]
 ARTICLES = [
     "https://design.google/library/google-sans-flex-font",
     "https://design.google/library/expressive-material-design-google-research",

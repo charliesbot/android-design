@@ -9,7 +9,7 @@ Home screen widget design from developer.android.com/design/ui/mobile/guides/wid
 
 ## Canonical layouts
 
-Pick one before designing; Google publishes a Glance sample for each: text only, text and image, search toolbar, toolbar, text and image list, checklist, action list, full-bleed image (snap-scrolling on Android 17+), image grid, image and text grid.
+Pick one before designing; Google publishes a Glance sample for each: text only, text and image, search toolbar, toolbar, expressive toolbar, text and image list, checklist, action list, full-bleed image (snap-scrolling on Android 17+), image grid, image and text grid.
 
 ## Fill the bounds
 
@@ -29,18 +29,11 @@ Misaligned widgets are a main reason people remove them.
 
 ## Sizes
 
-Declare `targetCellWidth`/`targetCellHeight` plus min and max sizes, then serve layouts per size with `SizeMode.Responsive(setOf(...))` and read `LocalSize.current`. Adding a column should reveal content (a second list column, a forecast row), not enlarge the same content.
+Cell sizes vary by device and orientation, so design for several size classes, not one fixed size. Set `targetCellWidth`/`targetCellHeight` (separately for handheld and tablet) to the default grid span, plus min and max sizes, then serve layouts per size with `SizeMode.Responsive(setOf(...))` and read `LocalSize.current`. Adding a column should reveal content (a second list column, a forecast row), not enlarge the same content. Rearrange the layout as the widget grows; never scale text and icons linearly.
 
-| Handheld grid | Width (dp) | Height (dp) |
-| --- | --- | --- |
-| 2x1 | 109 to 306 | 56 to 130 |
-| 2x2 | 109 to 306 | 115 to 276 |
-| 2x3 | 109 to 306 | 185 to 422 |
-| 4x1 | 245 to 624 | 56 to 130 |
-| 4x2 | 245 to 624 | 115 to 276 |
-| 4x3 | 245 to 624 | 185 to 422 |
+Cell estimate on a typical 5x4 handset (Pixel 4, dp, width by height): n x m cells is (73n - 16) x (118m - 16) in portrait and (142n - 15) x (66m - 15) in landscape. For example 2x1 is 130x102 portrait and 269x51 landscape; 4x2 is 276x220 portrait and 554x117 landscape. Portrait widths set `minWidth`, `minResizeWidth`, `maxResizeWidth`; landscape heights set the height attributes.
 
-The minimum size must still be useful with 48dp targets. Differentiated widgets resize to at least 2x2, 4x1, or 4x2.
+The minimum size must show a clear use case with 48dp targets. Set a maximum only when a larger size just adds blank space; when it shows more content (a taller scrolling list), leave resizing unrestricted. Differentiated widgets resize to 2x1 and at least two of 1x1, 2x2, 4x2, 4x4.
 
 ## Configuration and picker
 
@@ -51,15 +44,15 @@ The minimum size must still be useful with 48dp targets. Differentiated widgets 
 
 ## States
 
-Design each: loading (a placeholder layout), empty (a clear call to action), signed out, error, and stale data. Update after in-app actions; add manual refresh when data changes faster than the widget updates.
+Design each: loading (a placeholder layout), empty (a clear call to action that still fills larger bounds without sparse areas), signed out, error (shown on the widget itself), and stale data. Update after in-app actions; add manual refresh when data changes faster than the widget updates.
 
 ## Quality tiers
 
 | Tier | Meets |
 | --- | --- |
 | Low quality (fails) | Doesn't fill bounds, poor contrast, no name or preview, stale or cropped content, doesn't update after actions |
-| Standard | Aligned; sensible min and max sizes; accurate previews; intentional empty and signed-out states; manual refresh when needed |
-| Differentiated (aim here) | Fills all four edges; resizes to 2x2, 4x1, or 4x2; consistent header; dynamic or app theming in light and dark; previews with the user's content or system theme; unique name and description; system corner radius; loading state; system configuration; system launch transition |
+| Standard | Aligned; sensible min and max sizes; rearranges instead of scaling; accurate previews; intentional empty and signed-out states; manual refresh when needed |
+| Differentiated (aim here) | Fills all four edges; resizes to 2x1 and at least two of 1x1, 2x2, 4x2, 4x4; consistent header; collection and feed widgets scroll vertically and show more items and detail at 4x2 and 4x4; dynamic or app theming in light and dark; previews at the target form factor's proportions with the user's content or system theme; unique name and description; system corner radius; loading state, with errors shown on the widget; system configuration; system launch transition |
 
 ## Glance skeleton
 

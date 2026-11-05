@@ -33,7 +33,7 @@ Source: https://m3.material.io/blog
 
 #### 2026
 
-[IMAGE DO] May 19, 2026
+[IMAGE DO]
 
 **DO:** _Start migrating to Compose to get the latest from Material_
 

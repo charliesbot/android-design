@@ -101,7 +101,7 @@ behavior Material leaves out. The most useful additions for a design skill:
 - **Small top app bar:** if the bar is sticky, collapse it to status bar height. If it is not sticky, "add a matching background color gradient" behind the status bar. Medium and large bars collapse to a smaller app bar.
 - **Scrolling protection:** use the built-in protection of Material 3 `TopAppBar`, or a custom gradient composable (`GradientProtection` in Views).
 - **Navigation drawer:** "navigation drawers should also have a separate protection from the rest of the app." The drawer's status bar area gets its own translucent protection.
-- **Bottom app bars:** "Bottom app bars should collapse while scrolling." When the bar animates away, add a system bar scrim for three-button navigation. Gesture navigation stays transparent with no added scrim.
+- **Bottom app bars:** `BottomAppBar` should collapse while scrolling through its `scrollBehavior` parameter. When the bar animates away, add a system bar scrim for three-button navigation. Gesture navigation stays transparent with no added scrim. `NavigationBar` has no `scrollBehavior` parameter, so keep it visible while scrolling.
 - **Display cutouts:** solid app bar backgrounds draw into the cutout, while important UI is inset. Never place critical UI at the very edge of the screen.
 
 ## Layout
@@ -309,9 +309,12 @@ Secondary navigation (overflow, bottom of a drawer, settings). Standard labels
 - One primary use case per widget; separate widgets for distinct jobs
   (a steps widget and a streak widget), not one widget per color variant.
 - **Canonical layouts** (Jetpack Glance samples exist for each): text only,
-  text and image, search toolbar, toolbar, text and image list, checklist,
-  action list, full-bleed image (snap scroll, Android 17+), image grid, image
-  and text grid.
+  text and image, search toolbar, toolbar, expressive toolbar (sample list
+  only), text and image list, checklist, action list, full-bleed image (snap
+  scroll, Android 17+), image grid, image and text grid. Snap scrolling needs
+  `verticalScrollMode = VerticalScrollMode.SnapScrollMatchHeight(size.height)`
+  on the `LazyColumn`, `SizeMode.Exact`, Glance 1.3.0-alpha02 or higher,
+  compile SDK 37, and AGP 9.1.0 or higher.
 - **Fill the bounds:** misalignment is a main reason users remove widgets.
   Rectangular widgets touch all four grid edges; custom shapes touch at least
   two opposing edges (all four for differentiated quality). No custom padding.
@@ -320,10 +323,9 @@ Secondary navigation (overflow, bottom of a drawer, settings). Standard labels
   (photo, weather, now playing) can take a whole expressive shape; data-heavy
   widgets use expressive shapes for hierarchy or the call to action. "Get
   bolder with headlines, labels, and data" through dramatic type scales.
-- **Sizes (handheld, dp):** 2x1 109-306 by 56-130; 2x2 109-306 by 115-276; 2x3
-  109-306 by 185-422; 4x1 245-624 by 56-130; 4x2 245-624 by 115-276; 4x3
-  245-624 by 185-422. Tablets have their own table. Use breakpoints to add or
-  remove content as the widget resizes; add 48dp buttons when room allows.
+- **Sizes:** "Because cell sizes vary by device and screen orientation, design adaptive widgets instead of fixed-size widgets": optimize for multiple size classes or breakpoints. Use breakpoints to add or remove content as the widget resizes; add 48dp buttons when room allows.
+  - Cell estimate on a typical 5x4 handset (Pixel 4, from `/develop/ui/views/appwidgets/layouts`, dp, width by height, portrait then landscape): 1x1 57x102, 127x51; 2x1 130x102, 269x51; 3x1 203x102, 412x51; 4x1 276x102, 554x51; 5x1 349x102, 697x51; 5x2 349x220, 697x117; 5x3 349x337, 697x184; 5x4 349x455, 697x250. For n x m cells, portrait is (73n - 16) x (118m - 16) and landscape is (142n - 15) x (66m - 15).
+  - Portrait cell widths inform `minWidth`, `minResizeWidth`, and `maxResizeWidth`; landscape cell heights inform `minHeight`, `minResizeHeight`, and `maxResizeHeight`. For a widget resizable to one Pixel 4 cell, `minResizeWidth` is at most 56dp and `minResizeHeight` at most 50dp. A widget can still be placed larger than `maxResizeWidth` by `maxResizeHeight`.
 - **Configuration:** open it on placement only if the widget is empty without
   it; otherwise ship a good default and configure later. One or two screens,
   preview the result, progressive disclosure, no dead ends.
@@ -333,32 +335,42 @@ Secondary navigation (overflow, bottom of a drawer, settings). Standard labels
 - **Quality tiers** (`/docs/quality-guidelines/widget-quality`):
   - Low quality: doesn't fill bounds, poor contrast, no name in the design, no
     preview, stale content, doesn't update after actions, cropped content.
-  - Standard: aligned, sensible min and max sizes (min still useful with 48dp
-    targets), accurate previews, intentional empty and signed-out states,
-    manual refresh when data outpaces the UI.
-  - Differentiated: fills all four edges, resizes to 2x2, 4x1, or 4x2, a
-    consistent header (icon always, title when space allows), device or app
-    color theming, light and dark, previews with user content or system theme,
-    unique name and description, system corner radius, loading state spec,
-    system configuration entry, system launch transition.
+  - Standard: aligned, sensible min and max sizes (min shows a clear use case
+    with 48dp targets), layouts that rearrange instead of scaling text and
+    icons, accurate previews, empty and signed-out states that scale to larger
+    bounds, manual refresh when data outpaces the UI.
+  - Differentiated: fills all four edges, resizes to 2x1 and at least two of
+    1x1, 2x2, 4x2, 4x4, a consistent header (icon always, title when space
+    allows), scrolling containers for collection and feed widgets, device or
+    app color theming, light and dark, previews with the target form factor's
+    proportions plus user content or a system theme, unique name and
+    description, system corner radius, loading state spec with errors shown on
+    the widget, system configuration entry, system launch transition.
 
 - **Unfinished configuration:** "If configuration is not completed, don't cancel adding the widget. Provide a state to allow for restoring or configuring within the widget."
   - Tapping a choice should finish configuration and add the widget. Don't treat this step like in-app settings, and don't make it unclear that closing adds the widget.
   - "Include an empty state if there is no other preset available", showing an onboarding or authentication reminder.
   - For widgets with limited customization, show popular variants directly in the picker instead of a configuration screen. Offer extra variants through a confirmation screen, not more picker entries.
 - **Default size:**
-  - Set `targetCellWidth` and `targetCellHeight` to a recommended size, with minimums that meet that target cell on most devices in portrait and landscape.
+  - Set `targetCellWidth` and `targetCellHeight` to match the widget's default grid span, with minimums that meet that target cell on most devices in portrait and landscape.
   - Set them for handheld and tablet separately. Don't use one default size for all form factors.
   - "Don't change the widget's shape or size when the user initially drops it onto the home screen."
   - With no preview, the picker shows only the app icon. Use `android:previewLayout` for accurate previews.
   - Don't publish several same-purpose widgets that differ only in color or shape. Use a configuration activity instead.
-- **Tablet sizes (dp, min-max width by min-max height):** 2x1 180-304 by 64-120; 2x2 180-304 by 184-304; 2x3 180-304 by 304-488; 3x1 328-488 by 64-120; 3x2 298-488 by 184-304; 3x3 298-488 by 304-488; 3x4 298-488 by 424-672. Both tables are based on Pixel devices and include landscape.
-- **Shape:** "Don't use fixed square shapes. Instead, use responsive rectangular containers that adapt to various grid dimensions." A non-rectangular shape must touch the grid on one axis. On Auto, widgets scale up and 2x2 works best.
+- **Shape:** "Don't use fixed square shapes. Instead, use responsive rectangular containers that adapt to various grid dimensions." A non-rectangular shape must touch the grid on one axis.
 - **Quality details:**
   - Header (WL-3): recommended for scrolling content, or when it adds useful context such as a list name. Optional for full-bleed widgets (photos), tight space, or redundant content. When used, the icon is always present, the title appears when space allows, and actions come from the widget's context.
-  - Max size (WL-4.1): "Max size should be set if resizing the widget only adds blank space."
+  - Resizing (WL-4): a resizable widget defines minimum and maximum sizes, rearranges the layout to show more content as it grows, and does not scale text and icons linearly.
+  - Max size (WL-4.1): set a maximum width or height when a larger size only adds blank space. When growth shows more content, such as a taller scrolling list, allow unrestricted resizing (WL-4.2).
+  - Minimum size: large enough to show a clear use case and meet the 48x48 dp touch target. The system can scale touch targets for desktop or car screens.
+  - Empty states (WT-1): zero and empty states scale to larger bounds without sparse areas. Before login, show a distinct use case or a call to action.
+  - Collections (WL-5, differentiated): collection and feed widgets use vertical scrolling containers, and at 4x2 and 4x4 show more items and more detail per item.
+  - States (WS-3): use the loading state specification and show errors directly on the widget UI.
   - Search bar exception (WL-1.1, differentiated): a 4x1 widget containing a search bar may touch only 2 edges.
   - Updates (WT-3.2): the widget must update after related actions the user completes inside the app, not only after actions taken on the widget (WT-3.1).
+- **Other form factors** (`/design/ui/mobile/guides/widgets/adapt`): tablets and desktops share phone widget principles with different input expectations. Cars start with Android Auto, then cars with Google built-in; high-quality mobile widgets mostly carry over.
+  - Build with Jetpack Glance, make widgets responsive (car grids vary), include light and dark themes, use dynamic theming, and fill the grid bounds (WL-1).
+  - Car widgets don't support manual scrolling, so design for glanceability. If the widget uses a scrollable `LazyColumn`, offer a version that puts all necessary information on one surface, because the car shows only the first few items. In a scrollable segmented list for auto, put the most valuable, personalized content first.
 
 ### Notifications
 

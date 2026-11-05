@@ -18,12 +18,12 @@ History: the first audit found 266 distilled, 133 partial, and 13 missing routes
 | m3.material.io: Components (A to L) | 69 | 0 | 0 | 0 |
 | m3.material.io: Components (L to T) | 76 | 0 | 0 | 0 |
 | m3.material.io blog, videos, and articles | 22 | 0 | 0 | 98 |
-| developer.android.com/design/ui: Mobile, desktop, large screens, widgets | 39 | 0 | 0 | 10 |
+| developer.android.com/design/ui: Mobile, desktop, large screens, widgets | 41 | 0 | 0 | 10 |
 | developer.android.com/design/ui: Gallery | 33 | 0 | 0 | 9 |
 | developer.android.com/design/ui: Wear OS (current guides) | 46 | 0 | 0 | 4 |
 | developer.android.com/design/ui: Wear OS (components and M2.5 guides) | 37 | 0 | 0 | 17 |
 | Out of scope: developer.android.com/design/ui platforms | 0 | 0 | 0 | 144 |
-| **Total** | **411** | **0** | **0** | **311** |
+| **Total** | **413** | **0** | **0** | **311** |
 
 ## m3.material.io: Foundations (excluding Layout)
 
@@ -729,13 +729,15 @@ Result: 48 routes checked. 25 are fully distilled, 17 are partly distilled, 6 ar
 - [x] /design/ui/mobile/guides/widgets → android-ui-design-guides.md (Widgets)
 - [x] /design/ui/mobile/guides/widgets/configuration → android-ui-design-guides.md (Widgets)
 - [x] /design/ui/mobile/guides/widgets/discovery-promotion → android-ui-design-guides.md (Widgets)
-- [x] /design/ui/mobile/guides/widgets/layouts → android-ui-design-guides.md (Widgets: Canonical layouts); small miss: Auto widget lists don't scroll
-- [x] /design/ui/mobile/guides/widgets/sizing → android-ui-design-guides.md (Widgets)
+- [x] /design/ui/mobile/guides/widgets/layouts → android-ui-design-guides.md (Widgets: Canonical layouts)
+- [x] /design/ui/mobile/guides/widgets/sizing → android-ui-design-guides.md (Widgets); the handheld and tablet size tables and the Auto section are gone from the page, so those numbers are no longer in the docs
+- [x] /design/ui/mobile/guides/widgets/adapt → android-ui-design-guides.md (Widgets: Other form factors); car widgets don't scroll manually, so offer a one-surface version of scrolling widgets
 - [x] /design/ui/mobile/guides/widgets/style → android-ui-design-guides.md (Widgets: Style)
 
 ### Widget hub and quality
 - [-] /design/ui/widget; hub page with links only
 - [x] /docs/quality-guidelines/widget-quality → android-ui-design-guides.md (Widgets)
+- [x] /develop/ui/views/appwidgets/layouts → android-ui-design-guides.md (Widgets: Sizes); fetched through `EXTRA_ANDROID_ROUTES` for its "Determine a size for your widget" cell table, which the design sizing page now points to; the rest of this Views page (RemoteViews sizing APIs, Android 12 attributes) is code mechanics, not design guidance
 
 ### Gaps worth distilling
 1. /design/ui/desktop/guides/foundations/get-started: "Consider any content density optional and always allow for text scaling within the layout, don't hard set type sizes." Why: agents building dense desktop UI tend to hard-code small fixed text sizes.
@@ -743,14 +745,14 @@ Result: 48 routes checked. 25 are fully distilled, 17 are partly distilled, 6 ar
 3. /design/ui/mobile/guides/foundations/system-bars: "Use transparent three-button navigation bars when there is a bottom app bar or bottom app navigation bar," via setNavigationBarContrastEnforced(false) with bottom bars padded to draw underneath. Why: this is the one case where the default scrim is wrong, and a Compose NavigationBar sits right in it.
 4. /design/ui/desktop/guides/interaction/keyboard: keep focus inside modal dialogs; "when keyboard focus lands on a slider, users expect the Left and Right arrow keys to adjust the value"; arrow keys move focus as a 2D grid. Why: these are the keyboard behaviors most often broken in Compose on tablets, ChromeOS and desktop.
 5. /design/ui/mobile/guides/layout-and-content/images-graphics: "Avoid including immutable text in assets," "Use vector formats first," "Provide sufficient scrim between background images and text," and blur "can affect performance and [is] only available on devices running Android 12 and higher." Why: this governs image choice, text-over-image legibility and Modifier.blur use.
-6. /docs/quality-guidelines/widget-quality (WL-3): header rules (recommended for scrolling content or useful context; optional for full-bleed or tight space; icon always, title when space allows; actions from widget context) and WL-4.1 "Max size should be set if resizing the widget only adds blank space." Why: these are differentiated-tier criteria that directly change Glance layout code.
+6. /docs/quality-guidelines/widget-quality (WL-3): header rules (recommended for scrolling content or useful context; optional for full-bleed or tight space; icon always, title when space allows; actions from widget context) and WL-4.1 (set a maximum size only if a larger size just adds blank space). Why: these are differentiated-tier criteria that directly change Glance layout code.
 7. /design/ui/mobile/guides/foundations/translate-designs: "Your primary navigation should always be present on parent views"; child views keep it unless modal; parent views without a drawer or rail show no navigation icon. Why: it settles when a Compose screen shows the nav bar and the leading app bar icon.
 8. /design/ui/mobile/guides/patterns/passkeys: offer passkey creation at account creation, after a password reset, after a password sign-in and in settings; lead with benefits; always confirm creation; the management list shows the password manager name and icon, created and last-used times, and "delete." Why: agents building sign-in or account screens otherwise invent their own flow.
 9. /design/ui/mobile/guides/widgets/configuration: "If configuration is not completed, don't cancel adding the widget. Provide a state to allow for restoring or configuring within the widget," plus an empty state with an onboarding or sign-in reminder. Why: it prevents widgets that silently vanish or stay blank.
 10. /design/ui/mobile/guides/layout-and-content/edge-to-edge: "navigation drawers should also have a separate protection from the rest of the app"; "Bottom app bars should collapse while scrolling," with a three-button scrim when the bar animates away. Why: agents wiring ModalNavigationDrawer or BottomAppBar edge-to-edge get these wrong.
 11. /design/ui/desktop/guides/interaction/cursors: set system cursor icons to match the interaction (hand for clickable, grab or grabbing for drag, zoom in for zoomable content, text); custom icons only for actions Android does not provide. Why: in Compose this maps to Modifier.pointerHoverIcon, which agents rarely set.
 12. /design/ui/mobile/guides/layout-and-content/common-layouts: "In most cases, we recommend using a standard web browser, like Chrome, to deliver content." Why: it keeps agents from embedding WebViews for links or help content.
-13. /design/ui/mobile/guides/widgets/sizing: the tablet table (2x1 180-304 by 64-120; 2x2 180-304 by 184-304; 2x3 180-304 by 304-488; 3x1 328-488 by 64-120; 3x2 298-488 by 184-304; 3x3 298-488 by 304-488; 3x4 298-488 by 424-672) and "Don't use fixed square shapes." Why: needed to set widget breakpoints and targetCell values on tablets.
+13. /design/ui/mobile/guides/widgets/sizing: "Don't use fixed square shapes" (the handheld and tablet size tables on this page were removed upstream). Why: it keeps widget shapes responsive across grids.
 14. /design/ui/desktop/guides/system/multi-task: "Media playback should continue when users minimize the app or move it to the background," with PiP controls for play, pause, previous and next. Why: it changes lifecycle and playback choices for media apps in desktop windows.
 15. /design/ui/mobile/guides/patterns/onboarding: first check whether a walkthrough is needed at all, since "complex features can be introduced more naturally through subtle motion cues or in-context tooltips"; offer biometrics and autofill; never pre-fill passwords, mask sensitive input. Why: it stops agents from generating onboarding carousels by default.
 

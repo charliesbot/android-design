@@ -35,7 +35,7 @@ If your widget can be described by any of the following, it is considered low qu
 | Category  | ID  | Description
 | Layout  | WL-1  |
 
-Widget doesn't fill the bounds set by the launcher grid when dropped on the homescreen.
+When a user places the widget on the host surface, the widget does not fill the bounds of the host grid.
 | WL-1.1  |
 
 Widget doesn't touch at least 2 opposing edges of the grid. In other words, widgets don't need to all be rectangular, they can have custom shapes, so long as the edges of the shape touch at least 2 edges of the grid.
@@ -71,25 +71,25 @@ Widgets that meet this baseline quality bar are considered standard, but aren't 
 | Category  | ID  | Description
 | Layout  | WL-1  |
 
-Widget aligns properly to other home screen elements on the vertical or horizontal axis, and doesn't occupy unnecessary space.
+The widget aligns with other host elements on the vertical or horizontal axis and does not occupy extra space.
 | WL-1.2  |
 
 All shapes should hit at least 2 opposing edges of the bounds of the grid.
 | WL-4  |
 
-If resizable, widgets must have an appropriate minimum and maximum size.
+If a widget is resizable, define a minimum and maximum size. Rearrange the layout to show more content as the widget grows. Don't scale text and icons linearly.
 | WL-4.1  |
 
-Max size should be set if resizing the widget only adds blank space.
+If a larger widget size only adds blank space, set a maximum width or height. When a larger widget shows more content, such as a taller scrolling list, allow unrestricted resizing.
 | WL-4.2  |
 
-The minimum size of your widget should still offer value and meet touch target requirements (48x48).
+The minimum widget size must be large enough to show a clear use case and meet the 48x48 dp touch target requirement. The system can scale touch targets for desktop or car screens.
 | Discovery  | WD-4  |
 
 Widget should have accurate previews in the widget picker (static asset).
 | Content  | WT-1  |
 
-Zero and empty states are intentional and show the value of the widget and/or provide a call to action when the widget is installed but the user isn't yet logged in.
+Zero and empty states must scale to larger widget bounds without sparse areas. When a user installs the widget before logging in, the widget must show a distinct use case or a call to action.
 | WT-2  |
 
 Widget allows users to manually refresh content if there is an expectation that the data refreshes more frequently than the UI.
@@ -126,13 +126,13 @@ These widgets support premium homescreen customizations and will be recommended 
 | Category  | ID  | Description
 | Layout  | WL-1  |
 
-Widget aligns properly to other home screen elements on the vertical or horizontal axis, and does not occupy unnecessary space.
+The widget aligns with other host elements on the vertical or horizontal axis and does not occupy extra space.
 | WL-1.1  |
 
 All rectangular widgets MUST hit all four edges of the bounds of the grid. All custom shaped widgets MUST hit all 4 edges of the bounds of a square grid. If the size is 4x1, and contains a search bar, it is permitted to hit only 2 edges.
 | WL-2  |
 
-Widget can be resized to at least one of the following sizes: 2x2, 4x1, 4x2.
+Users can resize the widget to 2x1 and at least two of these sizes: 1x1, 2x2, 4x2, 4x4.
 | WL-3  |
 
 Widget header is used and applied consistently.
@@ -150,6 +150,9 @@ Widget header is used and applied consistently.
   - Title appears when there is sufficient space
   - Actions are based on widget context.
 
+| WL-5  |
+
+Collection and feed widgets support vertical scrolling containers. At larger sizes such as 4x2 and 4x4, these widgets show more items and more detail per item.
 | Color  | WC-1  |
 
 Widget supports color theming based on a device or app context.
@@ -158,7 +161,7 @@ Widget supports color theming based on a device or app context.
 Widget supports light theme and dark theme palettes.
 | Discovery  | WD-1  |
 
-Preview includes user content and/or applies a system theme.
+The preview shows the layout proportions for the target form factor and includes user content, applies a system theme, or both.
 | WD-4.4  |
 
 Widget has a description that helps users understand the value of the widget.
@@ -170,7 +173,7 @@ Widget name is descriptive and unique from the app's other widgets.
 Rectangular widgets must use the corner radius provided by system (OEM specific).
 | WS-3  |
 
-Widget uses loading state spec.
+The widget uses the loading state specification and shows errors directly on the widget UI.
 | WS-4  |
 
 Widget uses system configuration instead of a custom widget settings entry point.
