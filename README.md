@@ -15,21 +15,24 @@ Or copy the folders in `skills/` into your agent's skills directory (for Claude 
 
 ## Install the previewer app
 
-Only `android-design-explore` needs it. Requires macOS and JDK 17.
+Only `android-design-explore` needs it. It runs on Apple Silicon Macs.
 
-```bash
-git clone https://github.com/charliesbot/android-design
-cd android-design/app
-./gradlew :app:installApp
-```
+1. Download `AndroidDesignPreview.dmg` from the [latest release](https://github.com/charliesbot/android-design/releases/latest) and drag the app into Applications.
+2. Clear the quarantine flag. The app is not signed, and a quarantined copy started by an agent never responds.
 
-This installs `~/Applications/AndroidDesignPreview.app`. Register its binary as a stdio MCP server named `android_design_preview`. For Claude Code:
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/AndroidDesignPreview.app
+   ```
 
-```bash
-claude mcp add --scope user android_design_preview -- ~/Applications/AndroidDesignPreview.app/Contents/MacOS/AndroidDesignPreview
-```
+3. Register its binary as a stdio MCP server named `android_design_preview`. For Claude Code:
+
+   ```bash
+   claude mcp add --scope user android_design_preview -- /Applications/AndroidDesignPreview.app/Contents/MacOS/AndroidDesignPreview
+   ```
 
 Other agents take the same binary path as a stdio MCP command. All agents share one window, one tab per session. You can also open the app yourself and load a proposal with File > Open Proposal.
+
+To build from source instead (JDK 17), run `./gradlew :app:installApp` in `app/`. It installs to `~/Applications`, needs no quarantine step, and the binary path changes to match.
 
 ## Repository
 
