@@ -33,13 +33,3 @@ Only `android-design-explore` needs it. It runs on Apple Silicon Macs.
 Other agents take the same binary path as a stdio MCP command. All agents share one window, one tab per session. You can also open the app yourself and load a proposal with File > Open Proposal.
 
 To build from source instead (JDK 17), run `./gradlew :app:installApp` in `app/`. It installs to `~/Applications`, needs no quarantine step, and the binary path changes to match.
-
-## Repository
-
-| Path | What it holds |
-| --- | --- |
-| `skills/` | The two skills |
-| `app/` | The previewer app: live window, MCP server, headless renderer, Kotlin export |
-| `docs/research/` | Research distilled from Google's design sources |
-| `sources/` | Every official source page as Markdown, fetched by `scripts/fetch.py` |
-| `evals/` | Checks that agents following the skills still produce screens that meet their rules. See [`evals/README.md`](evals/README.md) |
