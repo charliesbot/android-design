@@ -40,8 +40,9 @@ permissions:
 
 jobs:
   dmg:
-    # Apple Silicon runner: the bundled JDK, and so the app, is arm64 only.
-    runs-on: macos-14
+    # Apple Silicon runner: the bundled JDK, and so the app, is arm64 only. GitHub retired the
+    # macos-14 image; macos-latest is arm64 and follows the current image.
+    runs-on: macos-latest
     env:
       MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
       MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
