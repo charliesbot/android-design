@@ -10,14 +10,14 @@ description: >
 
 Follow the `android-design` skill for every design decision: its section 0 answers, components, theming, layout, and the screen check's questions. This skill owns the workflow. Each run is one shot: brief in, one proposal written, checked, shown, then stop. Phone, foldable, tablet, and desktop are in scope; Wear is not.
 
-A proposal is a data file that the previewer app, a native macOS window, draws with real Compose Material 3 components and redraws on every save. You check it through the app's layout tree; the user judges taste in the window.
+A proposal is a data file that the previewer app, a native desktop window, draws with real Compose Material 3 components and redraws on every save. You check it through the app's layout tree; the user judges taste in the window.
 
 ## Requirements
 
-macOS, with the previewer app installed and registered as an MCP server named `android_design_preview`. Call its `status` tool first. When its tools are unavailable, stop and tell the user the two steps, then wait:
+macOS or Windows, with the previewer app installed and registered as an MCP server named `android_design_preview`. Call its `status` tool first. When its tools are unavailable, stop and tell the user the two steps, then wait:
 
-1. Build and install the app from a checkout of the android-design repository: `cd app && ./gradlew :app:installApp`, which installs `~/Applications/AndroidDesignPreview.app`.
-2. Register it for their harness, then restart the session (`<binary>` is `~/Applications/AndroidDesignPreview.app/Contents/MacOS/AndroidDesignPreview`, written as an absolute path where the harness does not expand `~`):
+1. Build and install the app from a checkout of the android-design repository: `cd app && ./gradlew :app:installApp`, which installs `~/Applications/AndroidDesignPreview.app` (on Windows, `.\gradlew.bat :app:installApp` installs `%LOCALAPPDATA%\AndroidDesignPreview`).
+2. Register it for their harness, then restart the session (`<binary>` is `~/Applications/AndroidDesignPreview.app/Contents/MacOS/AndroidDesignPreview`, or `%LOCALAPPDATA%\AndroidDesignPreview\AndroidDesignPreview.exe` on Windows, written as an absolute path where the harness does not expand `~` or `%LOCALAPPDATA%`):
    - Claude Code: `claude mcp add --scope user android_design_preview -- <binary>`
    - Codex: a `[mcp_servers.android_design_preview]` table in `~/.codex/config.toml` with `command = "<binary>"` and `default_tools_approval_mode = "approve"`
    - Antigravity: `agy mcp add android_design_preview <binary>`

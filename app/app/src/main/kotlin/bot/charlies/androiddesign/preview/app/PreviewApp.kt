@@ -43,11 +43,16 @@ import org.koin.core.context.startKoin
  * Runs with no arguments. No process an agent starts ever becomes the instance, because a harness
  * stops its MCP child when it exits and that would end every other agent's session. An agent's
  * process only relays its stdio to the instance socket, spawning the instance detached when none
- * answers. The owner launching the app from Finder runs the instance directly.
+ * answers. The owner launching the app from Finder or Explorer runs the instance directly.
  */
 fun runPreviewApp() {
-  // Finder and `open` start the process from launchd, whose pid is 1; an agent is its own parent.
-  val launchedByUser = ProcessHandle.current().parent().map { it.pid() == 1L }.orElse(true)
+  val parent = ProcessHandle.current().parent().orElse(null)
+  val launchedByUser =
+    InstanceLauncher.launchedByUser(
+      windows = Os.isWindows,
+      parentPid = parent?.pid(),
+      parentCommand = parent?.info()?.command()?.orElse(null),
+    )
   if (launchedByUser) runInstance(launchedByUser = true) else relayThroughInstance()
 }
 
@@ -119,7 +124,7 @@ fun runInstance(launchedByUser: Boolean) {
     ) {
       MenuBar {
         Menu("File") {
-          Item("Open Proposal…", shortcut = KeyShortcut(Key.O, meta = true)) {
+          Item("Open Proposal…", shortcut = KeyShortcut(Key.O, meta = Os.isMac, ctrl = !Os.isMac)) {
             chooseProposal(this@Window.window)?.let { path ->
               scope.launch { openLocal(sessions, path) }
             }

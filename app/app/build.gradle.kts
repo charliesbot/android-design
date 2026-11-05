@@ -36,11 +36,21 @@ compose.desktop {
     // The title bar follows macOS light or dark mode instead of staying light.
     jvmArgs += "-Dapple.awt.application.appearance=system"
     nativeDistributions {
-      targetFormats(TargetFormat.Dmg)
+      targetFormats(TargetFormat.Dmg, TargetFormat.Msi)
       packageName = "AndroidDesignPreview"
       packageVersion = "1.0.0"
       includeAllModules = true
       macOS { bundleID = appBundleId }
+      windows {
+        // Installs to %LOCALAPPDATA%\AndroidDesignPreview with no admin prompt, so the MCP
+        // binary path is the same for every user.
+        perUserInstall = true
+        menu = true
+        menuGroup = "Android Design Preview"
+        shortcut = true
+        // Fixed so a newer MSI upgrades the installed app instead of installing beside it.
+        upgradeUuid = "5f0c9a52-7c1e-4d0b-9b8e-3a6f2d1c4e71"
+      }
     }
   }
 }
@@ -79,17 +89,35 @@ tasks.register<Test>("saveToAdopt") {
   outputs.upToDateWhen { false }
 }
 
-// Builds the macOS app and copies it into ~/Applications, replacing any old copy. `ditto` keeps
-// the bundle's symlinks, permissions and code signature intact, which a Gradle copy would not.
-tasks.register<Exec>("installApp") {
-  group = "distribution"
-  description = "Builds AndroidDesignPreview.app and copies it to ~/Applications."
-  dependsOn("createDistributable")
-  val built = layout.buildDirectory.dir("compose/binaries/main/app/AndroidDesignPreview.app")
-  val installed = File(System.getProperty("user.home"), "Applications/AndroidDesignPreview.app")
-  doFirst {
-    installed.deleteRecursively()
-    installed.parentFile.mkdirs()
+if (System.getProperty("os.name").startsWith("Windows")) {
+  // Builds the Windows app and copies it to %LOCALAPPDATA%\AndroidDesignPreview, where the MSI
+  // installs it too, replacing any old copy. Quit a running instance first: Windows keeps its
+  // files locked.
+  tasks.register<Sync>("installApp") {
+    group = "distribution"
+    description = "Builds AndroidDesignPreview.exe and copies it to %LOCALAPPDATA%."
+    dependsOn("createDistributable")
+    from(layout.buildDirectory.dir("compose/binaries/main/app/AndroidDesignPreview"))
+    into(
+      File(
+        System.getenv("LOCALAPPDATA") ?: "${System.getProperty("user.home")}\\AppData\\Local",
+        "AndroidDesignPreview",
+      ),
+    )
   }
-  commandLine("ditto", built.get().asFile.path, installed.path)
+} else {
+  // Builds the macOS app and copies it into ~/Applications, replacing any old copy. `ditto` keeps
+  // the bundle's symlinks, permissions and code signature intact, which a Gradle copy would not.
+  tasks.register<Exec>("installApp") {
+    group = "distribution"
+    description = "Builds AndroidDesignPreview.app and copies it to ~/Applications."
+    dependsOn("createDistributable")
+    val built = layout.buildDirectory.dir("compose/binaries/main/app/AndroidDesignPreview.app")
+    val installed = File(System.getProperty("user.home"), "Applications/AndroidDesignPreview.app")
+    doFirst {
+      installed.deleteRecursively()
+      installed.parentFile.mkdirs()
+    }
+    commandLine("ditto", built.get().asFile.path, installed.path)
+  }
 }
