@@ -1,0 +1,55 @@
+{
+  "format": 1,
+  "name": "Wear timer",
+  "navigation": { "start": "home" },
+  "screens": {
+    "home": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "edgeButton": "start", "children": ["header", "ring", "gear"] },
+        { "id": "header", "component": "ListHeader", "text": "Timer" },
+        { "id": "ring", "component": "Text", "text": "05:00", "type": "numeralLarge", "color": "primaryDim", "align": "center", "sizeClass": {"large": {"type": "numeralExtraLarge"}} },
+        { "id": "gear", "component": "Button", "variant": "child", "label": "Settings", "icon": "settings", "action": {"functionCall": {"@call": "navigate", "args": {"screen": "settings"}}} },
+        { "id": "start", "component": "EdgeButton", "label": "Start", "icon": "play_arrow", "action": {"functionCall": {"@call": "navigate", "args": {"screen": "adjust"}}} }
+      ]
+    },
+    "settings": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "edgeButton": "done", "children": ["header", "mode", "more", "filled", "variant", "outlined", "child", "goal", "add"] },
+        { "id": "header", "component": "ListHeader", "text": "Settings" },
+        { "id": "mode", "component": "SwitchButton", "label": "Vibrate", "secondaryLabel": "On finish", "checked": true },
+        { "id": "more", "component": "Button", "variant": "filledTonal", "label": "Reset", "icon": "restart_alt", "action": {"functionCall": {"@call": "open", "args": {"overlay": "sure"}}} },
+        { "id": "filled", "component": "Button", "label": "Filled", "secondaryLabel": "Primary", "icon": "timer" },
+        { "id": "variant", "component": "Button", "variant": "filledVariant", "label": "Variant" },
+        { "id": "outlined", "component": "Button", "variant": "outlined", "label": "Outlined" },
+        { "id": "child", "component": "Button", "variant": "child", "label": "Progress", "action": {"functionCall": {"@call": "navigate", "args": {"screen": "progress"}}} },
+        { "id": "goal", "component": "TitleCard", "title": "Weekly goal", "time": "Now", "body": "3 of 5 timers done", "action": {"functionCall": {"@call": "navigate", "args": {"screen": "adjust"}}} },
+        { "id": "add", "component": "ButtonGroup", "children": ["minus", "plus"] },
+        { "id": "minus", "component": "IconButton", "variant": "filledTonal", "icon": "remove" },
+        { "id": "plus", "component": "IconButton", "variant": "filled", "icon": "add" },
+        { "id": "done", "component": "EdgeButton", "label": "Done", "action": {"functionCall": {"@call": "back"}} },
+        { "id": "sure", "component": "AlertDialog", "title": "Reset timer?", "text": "The countdown starts over.", "confirm": "yes", "dismiss": "no" },
+        { "id": "yes", "component": "IconButton", "variant": "filled", "icon": "check", "action": {"functionCall": {"@call": "dismiss"}} },
+        { "id": "no", "component": "IconButton", "variant": "filledTonal", "icon": "close", "action": {"functionCall": {"@call": "dismiss"}} }
+      ]
+    },
+    "adjust": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "scroll": false, "timeText": false, "children": ["stepper"] },
+        { "id": "stepper", "component": "Stepper", "value": 5, "range": [1, 30], "steps": 28, "content": "minutes" },
+        { "id": "minutes", "component": "Text", "text": "5 min", "type": "numeralSmall" }
+      ]
+    },
+    "progress": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "scroll": false, "children": ["ring", "center"] },
+        { "id": "ring", "component": "CircularProgressIndicator", "progress": 0.6 },
+        { "id": "center", "component": "Box", "contentAlignment": "center", "children": ["pct"] },
+        { "id": "pct", "component": "Text", "text": "60%", "type": "numeralMedium" }
+      ]
+    }
+  }
+}

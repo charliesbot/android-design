@@ -10,10 +10,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.feature.preview.record.TreeRecorder
 import bot.charlies.androiddesign.preview.feature.preview.theme.LocalResolvedTheme
+import bot.charlies.androiddesign.preview.feature.preview.theme.PreviewTheme
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalTheme
+import bot.charlies.androiddesign.preview.feature.preview.theme.wear.LocalWearTheme
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.SizeClass
+import bot.charlies.androiddesign.preview.model.WearCatalog
 import kotlinx.serialization.json.Json
 
 /**
@@ -24,6 +28,8 @@ import kotlinx.serialization.json.Json
  *   and `sizeClass` overrides.
  * @param recorder Collects the layout tree while drawing.
  * @param idPrefix Prepended to the tree ids of this screen; empty for the screen being asked about.
+ * @param widthDp The width of the preview frame, which a Wear screen reads its `sizeClass`
+ *   overrides at; a phone screen reads them at [sizeClass].
  */
 @Composable
 fun ProposalRenderer(
@@ -33,13 +39,15 @@ fun ProposalRenderer(
   modifier: Modifier = Modifier,
   recorder: TreeRecorder? = null,
   idPrefix: String = "",
+  widthDp: Int = sizeClass.minWidthDp,
 ) {
   val screen = host.proposal.screens[screenId] ?: return
-  val theme = LocalResolvedTheme.current
+  val theme: PreviewTheme =
+    if (Catalogs.of(screen) === WearCatalog) LocalWearTheme.current else LocalResolvedTheme.current
   val assets = remember(host.proposalDir) { AssetLoader(host.proposalDir) }
   val env =
-    remember(screen, screenId, host, theme, sizeClass, recorder, idPrefix, assets) {
-      RenderEnv(screenId, screen, host, theme, sizeClass, recorder, idPrefix, assets)
+    remember(screen, screenId, host, theme, sizeClass, recorder, idPrefix, assets, widthDp) {
+      RenderEnv(screenId, screen, host, theme, sizeClass, recorder, idPrefix, assets, widthDp)
     }
   CompositionLocalProvider(LocalRenderEnv provides env) {
     Box(modifier.fillMaxSize()) {

@@ -128,9 +128,9 @@ class McpIntegrationTest {
     assertEquals(listOf("path"), byName.getValue("open_proposal").inputSchema.required)
     val view = byName.getValue("set_view").inputSchema.properties
     assertNotNull(view)
-    assertEquals(setOf("device", "dark", "seed", "variant", "screen"), view.keys)
+    assertEquals(setOf("device", "view", "dark", "seed", "variant", "screen"), view.keys)
     assertEquals(
-      listOf("phone", "foldable", "tablet", "desktop"),
+      listOf("phone", "foldable", "tablet", "desktop", "watch"),
       view.getValue("device").jsonObject.getValue("enum").jsonArray.map {
         it.jsonPrimitive.content
       },
@@ -140,7 +140,7 @@ class McpIntegrationTest {
     assertNotNull(check)
     assertEquals(setOf("screens", "views"), check.keys)
     assertEquals(
-      listOf("light", "dark", "foldable", "tablet", "desktop"),
+      listOf("light", "dark", "foldable", "tablet", "desktop", "watch", "watch-large"),
       check
         .getValue("views")
         .jsonObject
@@ -150,7 +150,54 @@ class McpIntegrationTest {
         .jsonArray
         .map { it.jsonPrimitive.content },
     )
-    assertEquals(setOf("component"), byName.getValue("get_catalog").inputSchema.properties?.keys)
+    assertEquals(
+      setOf("component", "catalog"),
+      byName.getValue("get_catalog").inputSchema.properties?.keys,
+    )
+  }
+
+  @Test
+  fun `a wear proposal opens, checks at the watch views and switches between them`() {
+    connect()
+    // Alone in its folder: the fixtures folder's DESIGN.md is the phone one.
+    val path =
+      Files.createTempDirectory("mcp-wear").resolve("wear.proposal.json").also {
+        Files.copy(fixtures.resolve("wear.proposal.json"), it)
+      }
+    val opened = call("open_proposal", mapOf("path" to path.toString())).json()
+    assertTrue(opened.getValue("valid").jsonPrimitive.boolean, opened.toString())
+
+    val check = call("check_proposal").json()
+    assertTrue(check.getValue("pass").jsonPrimitive.boolean, check.toString())
+    val screens = check.getValue("screens").jsonObject
+    assertEquals(listOf("home", "settings", "adjust", "progress"), screens.keys.toList())
+    for ((screen, views) in screens) {
+      assertEquals(
+        listOf("watch", "watch-large"),
+        views.jsonObject.keys.toList(),
+        "views of $screen",
+      )
+    }
+    assertEquals(true, call("check_proposal", mapOf("views" to listOf("tablet"))).isError)
+
+    val tree = call("get_tree", mapOf("screen" to "settings", "view" to "watch-large")).json()
+    assertEquals(
+      "watch-large",
+      tree.getValue("view").jsonObject.getValue("name").jsonPrimitive.content,
+    )
+    assertTrue(
+      tree.getValue("nodes").jsonArray.any {
+        it.jsonObject.getValue("id").jsonPrimitive.content == "mode"
+      },
+    )
+
+    val large = call("set_view", mapOf("view" to "watch-large")).json()
+    assertEquals("watch", large.getValue("device").jsonPrimitive.content)
+    assertEquals("watch-large", large.getValue("view").jsonPrimitive.content)
+    assertEquals(true, call("set_view", mapOf("device" to "tablet")).isError)
+    assertEquals(true, call("set_view", mapOf("view" to "tablet")).isError)
+
+    assertTrue("EdgeButton" in call("get_catalog", mapOf("catalog" to "wear")).text())
   }
 
   @Test
@@ -293,7 +340,7 @@ class McpIntegrationTest {
 
     assertEquals(true, call("check_proposal", mapOf("screens" to listOf("nope"))).isError)
     assertEquals(true, call("get_catalog", mapOf("component" to "Nope")).isError)
-    assertEquals(true, call("set_view", mapOf("device" to "watch")).isError)
+    assertEquals(true, call("set_view", mapOf("device" to "toaster")).isError)
     assertEquals(true, call("set_view", mapOf("seed" to "blue")).isError)
     assertEquals(true, call("open_proposal").isError, "path is required")
     assertEquals(true, call("open_proposal", mapOf("path" to "/no/such/file.json")).isError)

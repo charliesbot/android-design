@@ -208,4 +208,26 @@ class ViewerScreenTest {
       )
     assertEquals(1f, roomy)
   }
+
+  @Test
+  fun `a wear proposal gets the watch views in the row and no brightness`() =
+    runDesktopComposeUiTest(1280, 1400) {
+      val dir = java.nio.file.Files.createTempDirectory("viewer-wear")
+      val wear = dir.resolve("wear.proposal.json")
+      java.nio.file.Files.copy(plates.resolveSibling("wear.proposal.json"), wear)
+      val vm = ViewerViewModel()
+      vm.show(runBlocking { FileProposalRepository().load(wear) })
+      setContent { ViewerScreen(vm, frame = InlineFrame) }
+      waitForIdle()
+
+      onNodeWithContentDescription("Watch 204x204").assertIsOn()
+      onNodeWithContentDescription("Large watch 227x227").assertExists()
+      onNodeWithText("Brightness").assertDoesNotExist()
+      onNodeWithText("Phone").assertDoesNotExist()
+
+      onNodeWithContentDescription("Large watch 227x227").performClick()
+      waitForIdle()
+      assertEquals(Views.WatchLarge, vm.state.value.view)
+      onNodeWithContentDescription("Large watch 227x227").assertIsOn()
+    }
 }

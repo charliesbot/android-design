@@ -7,6 +7,7 @@ import bot.charlies.androiddesign.preview.domain.PreviewStatus
 import bot.charlies.androiddesign.preview.domain.ProposalCheck
 import bot.charlies.androiddesign.preview.domain.ViewChange
 import bot.charlies.androiddesign.preview.domain.ViewState
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.Device
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PaletteVariant
@@ -94,14 +95,15 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
           "labels, one FAB, primary action). A view passes when no finding has severity error. " +
           "With no arguments it describes what the window shows: its screen, device, brightness, " +
           "color overrides, open overlays and selections. With screen or view it renders that " +
-          "screen at that view without a window. Read this instead of looking at screenshots.",
+          "screen at that view without a window. A Wear list is lazy: only the items on screen at " +
+          "the current scroll are in the tree. Read this instead of looking at screenshots.",
       schema =
         schema(
           string("screen", "Screen id to render. Defaults to the screen the window is on."),
           enum(
             "view",
-            "A named view. Defaults to the view the window shows.",
-            Views.all.map { it.name },
+            "A named view of the proposal's catalog. Defaults to the view the window shows.",
+            Views.every.map { it.name },
           ),
         ),
     ) { args ->
@@ -112,12 +114,22 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
       name = "set_view",
       title = "Change the window's view",
       description =
-        "Changes what the window shows: screen, device, brightness, seed color, palette " +
-          "variant. Omitted values stay as they are. These choices only affect the window and " +
+        "Changes what the window shows: screen, device, watch view, brightness, seed color, " +
+          "palette variant. Omitted values stay as they are. These choices only affect the window and " +
           "get_tree without arguments; they are never written to the proposal.",
       schema =
         schema(
-          enum("device", "Device frame.", Device.entries.map { it.wire }),
+          enum(
+            "device",
+            "Device frame: phone, foldable, tablet or desktop for a phone proposal, watch for a " +
+              "Wear proposal.",
+            Device.entries.map { it.wire },
+          ),
+          enum(
+            "view",
+            "The watch view of a Wear proposal: watch (204 dp) or watch-large (227 dp).",
+            Views.wear.map { it.name },
+          ),
           bool("dark", "True for dark brightness, false for light."),
           string("seed", "Seed color as #RRGGBB."),
           enum("variant", "Palette variant.", PaletteVariant.entries.map { it.wire }),
@@ -137,6 +149,7 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
           dark = args.bool("dark"),
           seed = args.string("seed"),
           screen = args.string("screen"),
+          view = args.string("view"),
           variant =
             args.string("variant")?.let {
               PaletteVariant.fromWire(it)
@@ -173,15 +186,17 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
           "left to right, each with the direct children of its content root as \"Type id width\" " +
           "(dp). Compare the layout of two views to see that a wider one reveals more, with no " +
           "need for get_tree. No other geometry; call get_tree for a failing view's bounds. With " +
-          "no arguments it checks every screen at light, dark, foldable, tablet and desktop. Call " +
-          "this after each edit instead of get_tree per view.",
+          "no arguments it checks every screen at every view of the proposal's catalog: light, " +
+          "dark, foldable, tablet and desktop for a phone proposal, watch and watch-large for a " +
+          "Wear proposal. A Wear list is lazy, so its findings cover only the items on screen at " +
+          "the top of the list. Call this after each edit instead of get_tree per view.",
       schema =
         schema(
           stringList("screens", "Screen ids to check. Defaults to every screen."),
           enumList(
             "views",
-            "Views to check. Defaults to all five.",
-            Views.all.map { it.name },
+            "Views to check. Defaults to every view of the proposal's catalog.",
+            Views.every.map { it.name },
           ),
         ),
     ) { args ->
@@ -198,7 +213,7 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
           "props as name: kind (enum values inline, child slots and required props marked), then " +
           "the color, type, shape and spacing tokens and the action functions. With component, " +
           "returns the full JSON Schema entries of those components. A proposal may only use " +
-          "what the catalog declares.",
+          "what its catalog declares.",
       schema =
         schema(
           stringOrList(
@@ -206,9 +221,15 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
             "A component name or a list of names, for their full JSON Schema entries. Omit for " +
               "the compact catalog.",
           ),
+          enum(
+            "catalog",
+            "The catalog: m3-expressive for phone, tablet and desktop proposals (the default), " +
+              "wear for Wear OS proposals.",
+            Catalogs.all.map { it.key },
+          ),
         ),
     ) { args ->
-      controller.getCatalog(args.strings("component"))
+      controller.getCatalog(args.strings("component"), args.string("catalog"))
     }
     tool(
       name = "export_kotlin",
@@ -277,10 +298,11 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
     const val SERVER_NAME = "android-design-preview"
 
     private const val INSTRUCTIONS =
-      "Live previewer for Material 3 Expressive design proposals. open_proposal once, then edit " +
-        "the proposal file and call check_proposal after each edit; use get_tree for the geometry " +
-        "of a failing view. The file on disk is the source of truth; there is no tool that edits " +
-        "it."
+      "Live previewer for Material 3 Expressive design proposals, for phone, tablet and desktop " +
+        "(get_catalog m3-expressive) and for Wear OS, drawn in the watch and watch-large views " +
+        "(get_catalog wear). open_proposal once, then edit the proposal file and call " +
+        "check_proposal after each edit; use get_tree for the geometry of a failing view. The " +
+        "file on disk is the source of truth; there is no tool that edits it."
   }
 }
 

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -35,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalMediaQueryApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.derivedMediaQuery
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
@@ -55,11 +57,14 @@ import bot.charlies.androiddesign.preview.feature.preview.render.SymbolIcon
 import bot.charlies.androiddesign.preview.feature.preview.theme.FontFace
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalTheme
+import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.Device
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
+import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.WearCatalog
 import kotlin.math.min
 import kotlinx.serialization.json.Json
 
@@ -150,15 +155,24 @@ private val DeviceRowHeight = 56.dp
 private val FooterHeight = 36.dp
 private val StagePadding = 24.dp
 
-private data class DeviceChoice(val device: Device, val icon: String, val label: String)
+/** A button of the row above the stage that shows [view]: a device, or a watch size. */
+private data class ViewChoice(val view: ViewSpec, val icon: String, val label: String)
 
-private val DeviceChoices =
-  listOf(
-    DeviceChoice(Device.Phone, "smartphone", "Phone"),
-    DeviceChoice(Device.Foldable, "devices_fold", "Foldable"),
-    DeviceChoice(Device.Tablet, "tablet", "Tablet"),
-    DeviceChoice(Device.Desktop, "desktop_windows", "Desktop"),
-  )
+/** The views of each catalog the row offers, as the catalog lists them. */
+private fun choicesOf(catalog: Catalog): List<ViewChoice> =
+  if (catalog === WearCatalog) {
+    listOf(
+      ViewChoice(Views.Watch, "watch", "Watch"),
+      ViewChoice(Views.WatchLarge, "watch", "Large watch"),
+    )
+  } else {
+    listOf(
+      ViewChoice(Views.of(Device.Phone, dark = false), "smartphone", "Phone"),
+      ViewChoice(Views.of(Device.Foldable, dark = false), "devices_fold", "Foldable"),
+      ViewChoice(Views.of(Device.Tablet, dark = false), "tablet", "Tablet"),
+      ViewChoice(Views.of(Device.Desktop, dark = false), "desktop_windows", "Desktop"),
+    )
+  }
 
 @Composable
 private fun Stage(
@@ -187,12 +201,14 @@ private fun Stage(
         )
       val host = state.host
       val design = state.effectiveDesign
+      // A watch is a round display, so its bezel is a circle.
+      val bezel = if (view.round) CircleShape else RectangleShape
       Column(horizontalAlignment = Alignment.Start) {
         Box(
           Modifier.testTag(DEVICE_FRAME_TAG)
             .size((width + FrameRing * 2) * scale, (height + FrameRing * 2) * scale)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, bezel)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest, bezel)
             .padding(FrameRing * scale),
           contentAlignment = Alignment.Center,
         ) {
@@ -236,18 +252,22 @@ private fun DeviceRow(state: ViewerState, actions: ViewerActions) {
       Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween, Alignment.CenterHorizontally),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    DeviceChoices.forEachIndexed { index, choice ->
-      val description = "${choice.label} ${deviceSize(choice.device)}"
-      val checked = state.device == choice.device
+    val choices = choicesOf(state.catalog)
+    choices.forEachIndexed { index, choice ->
+      val description = "${choice.label} ${choice.view.width}x${choice.view.height}"
+      // Two watch sizes share a device, so they are told apart by name; a phone view by device.
+      val checked =
+        state.device == choice.view.device &&
+          (choice.view.device != Device.Watch || state.view.name == choice.view.name)
       val shapes =
         when (index) {
           0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-          DeviceChoices.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+          choices.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
           else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
         }
       ToggleButton(
         checked = checked,
-        onCheckedChange = { actions.setDevice(choice.device) },
+        onCheckedChange = { actions.setView(choice.view) },
         modifier = Modifier.semantics { contentDescription = description },
         shapes = shapes,
       ) {
@@ -258,11 +278,6 @@ private fun DeviceRow(state: ViewerState, actions: ViewerActions) {
     }
   }
 }
-
-private fun deviceSize(device: Device): String =
-  bot.charlies.androiddesign.preview.model.Views.of(device, dark = false).let {
-    "${it.width}x${it.height}"
-  }
 
 @Composable
 private fun Footer(state: ViewerState, view: ViewSpec) {
@@ -399,6 +414,8 @@ val InlineFrame: PreviewFrameSlot = { host, design, view, frame, scale ->
 
 internal object NoActions : ViewerActions {
   override fun setDevice(device: Device) = Unit
+
+  override fun setView(view: ViewSpec) = Unit
 
   override fun setDark(dark: Boolean) = Unit
 

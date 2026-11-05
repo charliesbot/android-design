@@ -6,6 +6,7 @@ plugins {
 
 dependencies {
   api(project(":core:domain"))
+  implementation(project(":wear:compose"))
   implementation(compose.desktop.currentOs)
   implementation(compose.components.uiToolingPreview)
   implementation(libs.compose.material3)

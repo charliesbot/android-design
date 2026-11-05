@@ -11,21 +11,27 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.navigation.NavigationGraph
 import bot.charlies.androiddesign.preview.feature.preview.record.TreeRecorder
+import bot.charlies.androiddesign.preview.feature.preview.theme.PreviewTheme
 import bot.charlies.androiddesign.preview.feature.preview.theme.ResolvedTheme
+import bot.charlies.androiddesign.preview.feature.preview.theme.wear.WearTheme
+import bot.charlies.androiddesign.preview.model.Catalog
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.ComponentNode
-import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.PaneRole
 import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.Screen
 import bot.charlies.androiddesign.preview.model.SizeClass
 import bot.charlies.androiddesign.preview.model.StyleDef
 import bot.charlies.androiddesign.preview.model.TypeRole
+import bot.charlies.androiddesign.preview.model.WearCatalog
 import java.nio.file.Path
 
 /**
@@ -162,13 +168,29 @@ internal class RenderEnv(
   val screenId: String,
   val screen: Screen,
   val host: ProposalHostState,
-  val theme: ResolvedTheme,
+  val theme: PreviewTheme,
   val sizeClass: SizeClass,
   val recorder: TreeRecorder?,
   /** Prepended to every node id: empty for the screen the render asks about. */
   val idPrefix: String,
   val assets: AssetLoader,
+  /** The width the `sizeClass` overrides are read at: the frame's, in dp. */
+  val widthDp: Int = sizeClass.minWidthDp,
 ) {
+  /** The catalog the screen draws from, which decides how every component is drawn. */
+  val catalog: Catalog = Catalogs.of(screen)
+
+  val isWear: Boolean
+    get() = catalog === WearCatalog
+
+  /** The phone theme; the phone's renderers are the only ones that ask for it. */
+  val phone: ResolvedTheme
+    get() = theme as ResolvedTheme
+
+  /** The Wear theme; the Wear renderers are the only ones that ask for it. */
+  val wear: WearTheme
+    get() = theme as WearTheme
+
   val nodes: Map<String, ComponentNode> = screen.components.associateBy { it.id }
 
   val design = theme.design
@@ -186,11 +208,15 @@ internal class RenderEnv(
 
   fun stateKey(instanceId: String) = "$screenId::$instanceId"
 
-  fun color(role: ColorRole) = theme.color(role)
+  fun color(role: ColorRole) = phone.color(role)
+
+  /** The neutral block that stands in for a picture that cannot be read. */
+  fun neutralFill(): Color =
+    if (isWear) wear.color("surfaceContainer") else color(ColorRole.SurfaceVariant)
 
   fun spacing(name: String?): Dp? = name?.let { design.spacing[it]?.dp }
 
-  fun typeStyle(role: TypeRole) = theme.style(role)
+  fun typeStyle(role: TypeRole) = phone.style(role)
 
   fun style(name: String?): StyleDef? = name?.let { design.styles[it] }
 
@@ -204,7 +230,7 @@ internal class RenderEnv(
     }
   }
 
-  fun isOverlay(node: ComponentNode) = node.component in M3ExpressiveCatalog.overlayNames
+  fun isOverlay(node: ComponentNode) = node.component in catalog.overlayNames
 }
 
 internal val LocalRenderEnv =
@@ -234,6 +260,10 @@ internal data class ChildHost(
   val connected: Boolean = false,
   val segmented: Boolean = false,
   val railExpanded: Boolean = false,
+  /**
+   * What the parent's own scope adds to a child's modifier, such as a Wear `ButtonGroup` weight.
+   */
+  val scopeModifier: Modifier = Modifier,
 ) {
   fun at(index: Int, count: Int) = copy(groupIndex = index, groupCount = count)
 

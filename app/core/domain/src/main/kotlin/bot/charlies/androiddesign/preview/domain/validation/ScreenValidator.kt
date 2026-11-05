@@ -7,28 +7,33 @@ import bot.charlies.androiddesign.preview.domain.validation.Dynamic.isNumber
 import bot.charlies.androiddesign.preview.domain.validation.Dynamic.number
 import bot.charlies.androiddesign.preview.domain.validation.Dynamic.string
 import bot.charlies.androiddesign.preview.model.ActionFunction
-import bot.charlies.androiddesign.preview.model.ColorRole
+import bot.charlies.androiddesign.preview.model.Catalog
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.DesignSystem
-import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.PropDef
 import bot.charlies.androiddesign.preview.model.PropKind
 import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.Screen
 import bot.charlies.androiddesign.preview.model.SizeClass
-import bot.charlies.androiddesign.preview.model.TypeRole
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-/** Validates one screen of a proposal against the catalog and the merged design system. */
+/**
+ * Validates one screen of a proposal against [catalog], the one it names, and the merged design
+ * system. [proposalCatalog] is the one the proposal as a whole draws from: a screen that names
+ * another is reported.
+ */
 internal class ScreenValidator(
   private val sink: ErrorSink,
   private val proposal: Proposal,
   private val design: DesignSystem,
   private val screenId: String,
   private val screen: Screen,
+  private val catalog: Catalog,
+  private val proposalCatalog: Catalog,
 ) {
   private val root = "/screens".child(screenId)
   private val componentsPath = root.child("components")
@@ -39,19 +44,31 @@ internal class ScreenValidator(
     if (!IDENTIFIER.matches(screenId)) {
       sink.add(root, "screen id '$screenId' must match ${IDENTIFIER.pattern}")
     }
-    if (screen.catalogId != M3ExpressiveCatalog.ID) {
-      sink.add(
-        root.child("catalogId"),
-        "catalogId must be the m3-expressive catalog: ${M3ExpressiveCatalog.ID}",
-      )
-    }
+    validateCatalogId()
     validateIdentity()
     screen.components.forEachIndexed { index, node ->
-      val def = M3ExpressiveCatalog.find(node.component) ?: return@forEachIndexed
+      val def = catalog.find(node.component) ?: return@forEachIndexed
       val path = componentsPath.child(index)
       validateProps(path, def, node.props, overrides = false)
     }
     detectCycles()
+  }
+
+  private fun validateCatalogId() {
+    val path = root.child("catalogId")
+    when {
+      Catalogs.byId(screen.catalogId) == null ->
+        sink.add(
+          path,
+          "catalogId must be a catalog: ${Catalogs.all.joinToString(" or ") { "${it.key} (${it.id})" }}",
+        )
+      screen.catalogId != proposalCatalog.id ->
+        sink.add(
+          path,
+          "a proposal draws from one catalog: this screen uses the ${catalog.key} catalog, " +
+            "but the rest of the proposal uses ${proposalCatalog.key} (${proposalCatalog.id})",
+        )
+    }
   }
 
   private fun validateIdentity() {
@@ -70,7 +87,7 @@ internal class ScreenValidator(
       when {
         node.component.isEmpty() ->
           sink.add(path.child("component"), "component is missing its type")
-        M3ExpressiveCatalog.find(node.component) == null ->
+        catalog.find(node.component) == null ->
           sink.add(path.child("component"), "unknown component '${node.component}'")
       }
     }
@@ -85,21 +102,22 @@ internal class ScreenValidator(
     props: JsonObject,
     overrides: Boolean,
   ) {
-    val declared = (def.props + M3ExpressiveCatalog.commonProps).associateBy { it.name }
+    val declared = (def.props + catalog.commonProps).associateBy { it.name }
+    val showIn = catalog.showInSizes.isNotEmpty()
     for ((key, value) in props) {
       when {
-        key == M3ExpressiveCatalog.SHOW_IN && !overrides -> validateShowIn(path.child(key), value)
-        key == M3ExpressiveCatalog.SIZE_CLASS && !overrides ->
+        key == Catalog.SHOW_IN && showIn && !overrides -> validateShowIn(path.child(key), value)
+        key == Catalog.SIZE_CLASS && !overrides ->
           validateSizeClass(path.child(key), def, value, props)
-        key == M3ExpressiveCatalog.STYLE -> validateStyleName(path.child(key), value)
+        key == Catalog.STYLE -> validateStyleName(path.child(key), value)
         else -> {
           val prop = declared[key]
           if (prop == null) {
             val known =
               (declared.keys +
-                  M3ExpressiveCatalog.SHOW_IN +
-                  M3ExpressiveCatalog.SIZE_CLASS +
-                  M3ExpressiveCatalog.STYLE)
+                  listOfNotNull(Catalog.SHOW_IN.takeIf { showIn }) +
+                  Catalog.SIZE_CLASS +
+                  Catalog.STYLE)
                 .sorted()
                 .joinToString()
             sink.add(path.child(key), "unknown prop '$key' on ${def.name} (known: $known)")
@@ -134,13 +152,13 @@ internal class ScreenValidator(
     fun touched(vararg keys: String) = changed == null || keys.any { it in changed }
     /** Where to report a problem between [first] and the range: the first if it is set here. */
     fun at(first: String) = path.child(if (touched(first)) first else "range")
-    if (def.name != "Slider" && def.name != "RangeSlider") return
+    if (def.name !in RANGE_COMPONENTS) return
     val (min, max) = rangeOf(props) ?: return
     if (min >= max) {
       if (touched("range")) sink.add(path.child("range"), rangeOrderMessage(min, max))
       return
     }
-    if (def.name == "Slider") {
+    if (def.name != "RangeSlider") {
       val value = props["value"]?.number() ?: return
       if (value !in min..max && touched("value", "range")) {
         sink.add(
@@ -206,14 +224,18 @@ internal class ScreenValidator(
     base: JsonObject,
   ) {
     val obj = value as? JsonObject
+    val keys = catalog.sizeBreakpoints.map { it.key }
     if (obj == null) {
-      sink.add(path, "sizeClass must be an object keyed by size class")
+      sink.add(path, "sizeClass must be an object keyed by ${keys.joinToString(" or ")}")
       return
     }
     for ((key, overrides) in obj) {
-      val size = SizeClass.fromWire(key)
-      if (size == null || size == SizeClass.Compact) {
-        sink.add(path.child(key), "'$key' is not an overridable size class (medium, expanded)")
+      val breakpoint = catalog.sizeBreakpoints.firstOrNull { it.key == key }
+      if (breakpoint == null) {
+        sink.add(
+          path.child(key),
+          "'$key' is not an overridable size class (${keys.joinToString(", ")})",
+        )
         continue
       }
       val props = overrides as? JsonObject
@@ -225,7 +247,10 @@ internal class ScreenValidator(
       // The props at this size are the base ones with the overrides up to it laid on top.
       val effective =
         LinkedHashMap(base).apply {
-          putAll(ComponentNode("", def.name, base).sizeOverridesAt(size))
+          putAll(
+            ComponentNode("", def.name, base)
+              .sizeOverridesAt(catalog.sizeBreakpoints, breakpoint.minWidthDp),
+          )
         }
       validateRelations(path.child(key), def, JsonObject(effective), changed = props.keys)
     }
@@ -233,8 +258,25 @@ internal class ScreenValidator(
 
   private fun validateStyleName(path: String, value: JsonElement) {
     val name = value.asString()
-    if (name == null || name !in design.styles) {
+    val style = name?.let(design.styles::get)
+    if (name == null || style == null) {
       sink.add(path, "style '${name ?: value}' is not defined in material.styles")
+      return
+    }
+    // A style may come from a DESIGN.md shared with another surface: its roles must exist here.
+    for ((kind, role, known) in
+      listOf(
+        Triple("type", style.type, catalog.typeRoles.keys),
+        Triple("color", style.color, catalog.colorRoles.toSet()),
+        Triple("container", style.container, catalog.colorRoles.toSet()),
+      )) {
+      if (role != null && role !in known) {
+        sink.add(
+          path,
+          "style '$name' sets $kind '$role', which is not a ${catalog.key} role; " +
+            "use a style written for this catalog",
+        )
+      }
     }
   }
 
@@ -257,14 +299,14 @@ internal class ScreenValidator(
           )
         }
       PropKind.ColorRole ->
-        if (value.asString()?.let(ColorRole::fromWire) == null) {
+        if (value.asString() !in catalog.colorRoles) {
           sink.add(
             path,
             "'${value.asString() ?: value}' is not a color role (such as primaryContainer)",
           )
         }
       PropKind.TypeRole ->
-        if (value.asString()?.let(TypeRole::fromWire) == null) {
+        if (value.asString() !in catalog.typeRoles) {
           sink.add(path, "'${value.asString() ?: value}' is not a type role (such as bodyLarge)")
         }
       PropKind.Shape ->
@@ -402,10 +444,11 @@ internal class ScreenValidator(
         when {
           target == null ->
             sink.add(argsPath, "overlay '$argValue' is not a component of this screen")
-          target.component !in M3ExpressiveCatalog.overlayNames ->
+          target.component !in catalog.overlayNames ->
             sink.add(
               argsPath,
-              "'$argValue' is a ${target.component}; an overlay must be a BottomSheet, Dialog or Menu",
+              "'$argValue' is a ${target.component}; an overlay must be a " +
+                catalog.overlayNames.joinToString(", "),
             )
         }
       }
@@ -443,10 +486,10 @@ internal class ScreenValidator(
   }
 
   private fun referencedIds(node: ComponentNode): List<String> {
-    val def = M3ExpressiveCatalog.find(node.component) ?: return emptyList()
+    val def = catalog.find(node.component) ?: return emptyList()
     val sources = buildList {
       add(node.props)
-      (node.props[M3ExpressiveCatalog.SIZE_CLASS] as? JsonObject)?.values?.forEach {
+      (node.props[Catalog.SIZE_CLASS] as? JsonObject)?.values?.forEach {
         (it as? JsonObject)?.let(::add)
       }
     }
@@ -473,6 +516,8 @@ internal class ScreenValidator(
   companion object {
     val IDENTIFIER = Regex("^[A-Za-z_][A-Za-z0-9_]*$")
     private val ICON_NAME = Regex("^[a-z0-9_]+$")
+    /** Components whose `value` and `range` props must agree. */
+    private val RANGE_COMPONENTS = setOf("Slider", "RangeSlider", "Stepper")
     private const val MENU = "Menu"
     private const val ANCHOR = "anchor"
   }

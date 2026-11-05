@@ -5,12 +5,13 @@ import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessRenderer
 import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessResult
 import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
+import bot.charlies.androiddesign.preview.model.Catalog
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
-import bot.charlies.androiddesign.preview.model.Views
 import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -41,7 +42,8 @@ class RenderCommand(
     val proposal: Path,
     val out: Path,
     val design: Path?,
-    val views: List<ViewSpec>,
+    /** The view names asked for, or null for every view of the proposal's catalog. */
+    val views: List<String>?,
     val screens: List<String>?,
   )
 
@@ -71,8 +73,11 @@ class RenderCommand(
       )
       return ExitCode.USAGE
     }
+    val catalog = Catalogs.of(proposal)
+    val views = views(options, catalog, err) ?: return ExitCode.USAGE
     val screens = options.screens ?: proposal.screens.keys.toList()
-    val entries = renderAll(RenderSource(proposal, design, proposalPath.parent), screens, options)
+    val entries =
+      renderAll(RenderSource(proposal, design, proposalPath.parent), screens, views, options)
     val report = writeReport(options, proposalPath, designPath, design, emptyList(), entries)
     entries
       .filter { !it.pass }
@@ -82,12 +87,25 @@ class RenderCommand(
     return if (report.pass) ExitCode.OK else ExitCode.FINDINGS_FAILED
   }
 
+  /** The views to draw: those named, which must belong to [catalog], or all of its views. */
+  private fun views(options: Options, catalog: Catalog, err: PrintStream): List<ViewSpec>? =
+    options.views?.map { name ->
+      catalog.views.firstOrNull { it.name == name }
+        ?: run {
+          err.println(
+            "unknown view '$name' (the ${catalog.key} views: ${catalog.views.joinToString { it.name }})",
+          )
+          return null
+        }
+    } ?: catalog.views
+
   private fun renderAll(
     source: RenderSource,
     screens: List<String>,
+    views: List<ViewSpec>,
     options: Options,
   ): List<RenderEntry> = screens.flatMap { screen ->
-    options.views.map { view ->
+    views.map { view ->
       val base = "$screen-${view.name}"
       val result =
         try {
@@ -142,19 +160,11 @@ class RenderCommand(
       err.println("usage: $usage")
       return null
     }
-    val viewSpecs =
-      views?.split(',')?.map { name ->
-        Views.byName(name.trim())
-          ?: run {
-            err.println("unknown view '$name' (views: ${Views.all.joinToString { it.name }})")
-            return null
-          }
-      } ?: Views.all
     return Options(
       proposal = Path.of(proposal),
       out = Path.of(out),
       design = design?.let(Path::of),
-      views = viewSpecs,
+      views = views?.split(',')?.map { it.trim() },
       screens = screens?.split(',')?.map { it.trim() },
     )
   }

@@ -1,7 +1,7 @@
 package bot.charlies.androiddesign.preview.domain
 
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.ComponentNode
-import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.Screen
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -12,6 +12,8 @@ import kotlinx.serialization.json.JsonPrimitive
  * the preview and the exported code place overlays the same way.
  */
 class OverlayPlacement(screen: Screen) {
+  private val overlayNames: Set<String> = Catalogs.of(screen).overlayNames
+
   private val anchored: Map<String, String> = buildMap {
     for (node in screen.components) {
       if (node.component != MENU) continue
@@ -29,7 +31,7 @@ class OverlayPlacement(screen: Screen) {
   /** The overlays that draw at screen level, in document order. */
   val screenLevel: List<ComponentNode> =
     screen.components.filter { node ->
-      node.component in M3ExpressiveCatalog.overlayNames && !isBesideComponent(node)
+      node.component in overlayNames && !isBesideComponent(node)
     }
 
   /** The id of the menu anchored to [componentId] by `Menu.anchor`, or null. */

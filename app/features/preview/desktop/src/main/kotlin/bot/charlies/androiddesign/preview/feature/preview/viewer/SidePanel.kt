@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.feature.preview.render.SymbolIcon
 import bot.charlies.androiddesign.preview.feature.preview.theme.ThemeResolver
+import bot.charlies.androiddesign.preview.model.Device
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -52,7 +53,8 @@ internal fun SidePanel(
   modifier: Modifier = Modifier,
 ) {
   val sections: @Composable (Modifier) -> Unit = { sectionModifier ->
-    BrightnessSection(state, actions, sectionModifier)
+    // A watch is always dark, so brightness only means something to a phone proposal.
+    if (state.view.device != Device.Watch) BrightnessSection(state, actions, sectionModifier)
     ColorSection(state, actions, sectionModifier)
     StyleSection(state, actions, sectionModifier)
     ScreensSection(state, actions, sectionModifier)

@@ -1,10 +1,8 @@
 package bot.charlies.androiddesign.preview.domain.design
 
-import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.ThemeOverride
-import bot.charlies.androiddesign.preview.model.TypeRole
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -62,8 +60,8 @@ class DesignSystemResolverTest {
     assertEquals("Plates", ds.name)
     assertEquals("#006A6A", ds.seed)
     assertEquals(PaletteVariant.Vibrant, ds.variant)
-    assertEquals("#FFF8F5", ds.colorOverrides[ColorRole.Surface])
-    val display = ds.typography.getValue(TypeRole.DisplayLarge)
+    assertEquals("#FFF8F5", ds.colorOverrides["surface"])
+    val display = ds.typography.getValue("displayLarge")
     assertEquals("Fraunces", display.fontFamily)
     assertEquals(600, display.fontWeight)
     assertEquals(32f, ds.rounded[ShapeToken.ExtraLarge])

@@ -38,8 +38,8 @@ import com.materialkolor.dynamiccolor.ColorSpec
 
 /** The Compose values a [DesignSystem] resolves to for one brightness. */
 class ResolvedTheme(
-  val design: DesignSystem,
-  val dark: Boolean,
+  override val design: DesignSystem,
+  override val dark: Boolean,
   val colorScheme: ColorScheme,
   val typography: Typography,
   /** The style of every type role, including the emphasized ones. */
@@ -47,7 +47,7 @@ class ResolvedTheme(
   /** The family name each role is set in, such as `Google Sans Flex`. */
   val fontFamilies: Map<TypeRole, String>,
   val shapes: Shapes,
-) {
+) : PreviewTheme {
   fun style(role: TypeRole): TextStyle = textStyles.getValue(role)
 
   fun color(role: ColorRole) = colorScheme.color(role)
@@ -78,8 +78,8 @@ object ThemeResolver {
         contrastLevel = design.contrast,
         specVersion = ColorSpec.SpecVersion.SPEC_2025,
       )
-    return design.colorOverrides.entries.fold(generated) { scheme, (role, hex) ->
-      scheme.withColor(role, parseHexColor(hex))
+    return design.colorOverrides.entries.fold(generated) { scheme, (wire, hex) ->
+      ColorRole.fromWire(wire)?.let { scheme.withColor(it, parseHexColor(hex)) } ?: scheme
     }
   }
 
@@ -157,7 +157,7 @@ object ProposalTypography {
     val styles = linkedMapOf<TypeRole, TextStyle>()
     val families = linkedMapOf<TypeRole, String>()
     for (role in TypeRole.entries) {
-      val override = design.typography[role]
+      val override = design.typography[role.wire]
       val emphasis = emphasis(role)
       var style = base.style(role.baseline())
       if (emphasis != null) {
@@ -181,7 +181,7 @@ object ProposalTypography {
     return Built(typography(styles), styles, families)
   }
 
-  private class FontAxisSet(override: TypographyOverride?, styleWeight: Int) {
+  internal class FontAxisSet(override: TypographyOverride?, styleWeight: Int) {
     private val declared = ProposalFonts.parseVariation(override?.fontVariation)
     val weight: Int =
       declared.firstOrNull { it.tag == "wght" }?.value?.toInt()
@@ -190,7 +190,7 @@ object ProposalTypography {
     val others = declared.filter { it.tag != "wght" }
   }
 
-  private fun parseTracking(value: String) =
+  internal fun parseTracking(value: String) =
     Regex("""^(-?\d+(?:\.\d+)?)""").find(value.trim())?.groupValues?.get(1)?.toFloatOrNull()?.sp
 
   private fun typography(styles: Map<TypeRole, TextStyle>): Typography =

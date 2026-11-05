@@ -95,9 +95,18 @@ data class DesignSystem(
   val seed: String,
   val variant: PaletteVariant,
   val contrast: Double,
-  /** Explicit role colors (`#RRGGBB`) that replace generated ones. The seed is not listed. */
-  val colorOverrides: Map<ColorRole, String>,
-  val typography: Map<TypeRole, TypographyOverride>,
+  /**
+   * Whether a layer set the seed. A Wear theme without one keeps the Wear default scheme; the
+   * phone's [seed] has a default of its own.
+   */
+  val seeded: Boolean = true,
+  /**
+   * Explicit role colors (`#RRGGBB`) that replace generated ones, by the wire name of the role in
+   * the proposal's catalog ([Catalog.colorRoles]). The seed is not listed.
+   */
+  val colorOverrides: Map<String, String>,
+  /** Type role overrides by wire name ([Catalog.typeRoles]). */
+  val typography: Map<String, TypographyOverride>,
   /** Corner scale in dp. */
   val rounded: Map<ShapeToken, Float>,
   /** Spacing scale in dp. */

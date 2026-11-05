@@ -1,7 +1,9 @@
 package bot.charlies.androiddesign.preview.domain.design
 
+import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.TypeGroup
 import bot.charlies.androiddesign.preview.model.TypeRole
+import bot.charlies.androiddesign.preview.model.WearCatalog
 
 /** Size, weight and tracking of one type role. */
 internal data class TypeSpec(val sizeSp: Float, val weight: Int, val trackingSp: Float)
@@ -12,6 +14,40 @@ internal data class TypeSpec(val sizeSp: Float, val weight: Int, val trackingSp:
  * library does not apply yet, so the exporter writes them out.
  */
 internal object TypeScale {
+  /**
+   * The size and weight of the type role named [wire] in [catalog], or null if it has no such role.
+   */
+  fun of(catalog: Catalog, wire: String): TypeSpec? =
+    if (catalog === WearCatalog) wear[wire] else TypeRole.fromWire(wire)?.let(::of)
+
+  /**
+   * The Wear Material 3 type scale, read from `TypeScaleTokens` of the Wear Compose sources
+   * (`app/wear/compose/upstream/material3/.../tokens/TypeScaleTokens.kt`); a test compares it with
+   * the library's `Typography()`. The weights are variable font weights, so none reaches the bold
+   * weight (700) that makes a smaller text count as large.
+   */
+  private val wear: Map<String, TypeSpec> =
+    mapOf(
+      "displayLarge" to TypeSpec(40f, 500, 0f),
+      "displayMedium" to TypeSpec(30f, 520, 0f),
+      "displaySmall" to TypeSpec(24f, 550, 0f),
+      "titleLarge" to TypeSpec(18f, 500, 0f),
+      "titleMedium" to TypeSpec(16f, 550, 0f),
+      "titleSmall" to TypeSpec(14f, 550, 0f),
+      "labelLarge" to TypeSpec(20f, 500, 0f),
+      "labelMedium" to TypeSpec(15f, 500, 0f),
+      "labelSmall" to TypeSpec(13f, 500, 0f),
+      "bodyLarge" to TypeSpec(16f, 450, 0f),
+      "bodyMedium" to TypeSpec(14f, 450, 0f),
+      "bodySmall" to TypeSpec(12f, 500, 0f),
+      "bodyExtraSmall" to TypeSpec(10f, 500, 0f),
+      "numeralExtraLarge" to TypeSpec(60f, 560, 0f),
+      "numeralLarge" to TypeSpec(50f, 580, 0f),
+      "numeralMedium" to TypeSpec(40f, 580, 0f),
+      "numeralSmall" to TypeSpec(30f, 550, 0f),
+      "numeralExtraSmall" to TypeSpec(24f, 550, 0f),
+    )
+
   fun of(role: TypeRole): TypeSpec {
     val base = baseline(role)
     return if (role.isEmphasized)

@@ -8,7 +8,9 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.put
 
 class ModelTest {
   @Test
@@ -202,5 +204,42 @@ class ModelTest {
       val failure = assertFailsWith<SerializationException>(bad) { decode(bad) }
       assertEquals("Bounds must be [x, y, width, height]", failure.message, bad)
     }
+  }
+
+  @Test
+  fun `wear large overrides apply from 225 dp, so at 227 and not at 204`() {
+    val node =
+      ComponentNode(
+        "t",
+        "Text",
+        buildJsonObject {
+          put("sizeClass", buildJsonObject { put("large", buildJsonObject { put("type", "big") }) })
+        },
+      )
+    val breakpoints = WearCatalog.sizeBreakpoints
+    assertEquals(emptyMap(), node.sizeOverridesAt(breakpoints, Views.Watch.width))
+    assertEquals(setOf("type"), node.sizeOverridesAt(breakpoints, Views.WatchLarge.width).keys)
+    assertTrue(WearCatalog.views.all { it.round && it.dark && it.sizeClass == SizeClass.Compact })
+  }
+
+  @Test
+  fun `phone size overrides are unchanged`() {
+    val node =
+      ComponentNode(
+        "t",
+        "Text",
+        buildJsonObject {
+          put(
+            "sizeClass",
+            buildJsonObject {
+              put("medium", buildJsonObject { put("a", 1) })
+              put("expanded", buildJsonObject { put("b", 2) })
+            },
+          )
+        },
+      )
+    assertEquals(emptyMap(), node.sizeOverridesAt(SizeClass.Compact))
+    assertEquals(setOf("a"), node.sizeOverridesAt(SizeClass.Medium).keys)
+    assertEquals(setOf("a", "b"), node.sizeOverridesAt(SizeClass.Expanded).keys)
   }
 }

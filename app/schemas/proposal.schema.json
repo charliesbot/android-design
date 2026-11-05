@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/charliesbot/android-design/main/app/schemas/proposal.schema.json",
   "title": "Android design proposal",
-  "description": "A proposal file: a navigation graph of screens, each an A2UI v1.0 createSurface body against the m3-expressive catalog. The component definitions below are generated from the same registry as m3-expressive.catalog.json.",
+  "description": "A proposal file: a navigation graph of screens, each an A2UI v1.0 createSurface body against one catalog (m3-expressive or wear); every screen of a proposal uses the same one. The component definitions below are generated from the same registries as the catalog files (m3-expressive.catalog.json, wear.catalog.json).",
   "type": "object",
   "properties": {
     "$schema": {
@@ -99,7 +99,11 @@
               "tertiary-fixed",
               "tertiary-fixed-dim",
               "on-tertiary-fixed",
-              "on-tertiary-fixed-variant"
+              "on-tertiary-fixed-variant",
+              "primary-dim",
+              "secondary-dim",
+              "tertiary-dim",
+              "error-dim"
             ]
           },
           "additionalProperties": {
@@ -140,7 +144,13 @@
               "body-small-emphasized",
               "label-large-emphasized",
               "label-medium-emphasized",
-              "label-small-emphasized"
+              "label-small-emphasized",
+              "body-extra-small",
+              "numeral-extra-large",
+              "numeral-large",
+              "numeral-medium",
+              "numeral-small",
+              "numeral-extra-small"
             ]
           },
           "additionalProperties": {
@@ -249,7 +259,7 @@
     },
     "Screen": {
       "type": "object",
-      "description": "The body of an A2UI createSurface message.",
+      "description": "The body of an A2UI createSurface message, against the m3-expressive catalog.",
       "properties": {
         "catalogId": {
           "const": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1"
@@ -271,6 +281,284 @@
         "components"
       ],
       "additionalProperties": false
+    },
+    "Action": {
+      "description": "A renderer-side function call. Event actions are not supported.",
+      "type": "object",
+      "properties": {
+        "functionCall": {
+          "$ref": "#/$defs/anyFunction"
+        }
+      },
+      "required": [
+        "functionCall"
+      ],
+      "additionalProperties": false
+    },
+    "anyFunction": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/function.navigate"
+        },
+        {
+          "$ref": "#/$defs/function.back"
+        },
+        {
+          "$ref": "#/$defs/function.open"
+        },
+        {
+          "$ref": "#/$defs/function.dismiss"
+        }
+      ]
+    },
+    "AnyColorRole": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ColorRole"
+        },
+        {
+          "$ref": "#/$defs/wear.ColorRole"
+        }
+      ]
+    },
+    "AnyTypeRole": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TypeRole"
+        },
+        {
+          "$ref": "#/$defs/wear.TypeRole"
+        }
+      ]
+    },
+    "ComponentId": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "description": "A component id, unique within its screen."
+    },
+    "Child": {
+      "$ref": "#/$defs/ComponentId",
+      "description": "A reference to one component by id."
+    },
+    "ChildList": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ComponentId"
+          }
+        },
+        {
+          "type": "object",
+          "description": "A template repeated for each item of a data model list.",
+          "properties": {
+            "componentId": {
+              "$ref": "#/$defs/ComponentId"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "componentId",
+            "path"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "DataBinding": {
+      "type": "object",
+      "properties": {
+        "@path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "@path"
+      ],
+      "additionalProperties": false
+    },
+    "IndexCall": {
+      "type": "object",
+      "properties": {
+        "@call": {
+          "const": "@index"
+        },
+        "args": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "@call"
+      ]
+    },
+    "DynamicString": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/DataBinding"
+        },
+        {
+          "$ref": "#/$defs/IndexCall"
+        }
+      ]
+    },
+    "DynamicNumber": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/DataBinding"
+        },
+        {
+          "$ref": "#/$defs/IndexCall"
+        }
+      ]
+    },
+    "DynamicBoolean": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "$ref": "#/$defs/DataBinding"
+        },
+        {
+          "$ref": "#/$defs/IndexCall"
+        }
+      ]
+    },
+    "Typography": {
+      "type": "object",
+      "properties": {
+        "fontFamily": {
+          "enum": [
+            "Google Sans Flex",
+            "Google Sans Code",
+            "Fraunces",
+            "Bricolage Grotesque",
+            "Big Shoulders Display",
+            "Doto"
+          ]
+        },
+        "fontVariation": {
+          "type": "string"
+        },
+        "fontWeight": {
+          "type": "integer"
+        },
+        "letterSpacing": {
+          "type": [
+            "string",
+            "number"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Style": {
+      "type": "object",
+      "description": "Token names only.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/AnyTypeRole"
+        },
+        "color": {
+          "$ref": "#/$defs/AnyColorRole"
+        },
+        "container": {
+          "$ref": "#/$defs/AnyColorRole"
+        },
+        "shape": {
+          "$ref": "#/$defs/ShapeValue"
+        },
+        "padding": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "function.navigate": {
+      "type": "object",
+      "description": "Opens the screen with this id.",
+      "returnType": "void",
+      "properties": {
+        "@call": {
+          "const": "navigate"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "screen": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "screen"
+          ],
+          "unevaluatedProperties": false
+        }
+      },
+      "required": [
+        "@call",
+        "args"
+      ]
+    },
+    "function.back": {
+      "type": "object",
+      "description": "Goes back one screen.",
+      "returnType": "void",
+      "properties": {
+        "@call": {
+          "const": "back"
+        }
+      },
+      "required": [
+        "@call"
+      ]
+    },
+    "function.open": {
+      "type": "object",
+      "description": "Opens a BottomSheet, Dialog or Menu of the same screen by id.",
+      "returnType": "void",
+      "properties": {
+        "@call": {
+          "const": "open"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "overlay": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "overlay"
+          ],
+          "unevaluatedProperties": false
+        }
+      },
+      "required": [
+        "@call",
+        "args"
+      ]
+    },
+    "function.dismiss": {
+      "type": "object",
+      "description": "Closes the open overlay.",
+      "returnType": "void",
+      "properties": {
+        "@call": {
+          "const": "dismiss"
+        }
+      },
+      "required": [
+        "@call"
+      ]
     },
     "anyComponent": {
       "oneOf": [
@@ -414,35 +702,6 @@
         "propertyName": "component"
       }
     },
-    "anyFunction": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/function.navigate"
-        },
-        {
-          "$ref": "#/$defs/function.back"
-        },
-        {
-          "$ref": "#/$defs/function.open"
-        },
-        {
-          "$ref": "#/$defs/function.dismiss"
-        }
-      ]
-    },
-    "Action": {
-      "description": "A renderer-side function call. Event actions are not supported.",
-      "type": "object",
-      "properties": {
-        "functionCall": {
-          "$ref": "#/$defs/anyFunction"
-        }
-      },
-      "required": [
-        "functionCall"
-      ],
-      "additionalProperties": false
-    },
     "ComponentCommon": {
       "type": "object",
       "description": "Props every component accepts.",
@@ -486,107 +745,6 @@
       },
       "required": [
         "id"
-      ]
-    },
-    "ComponentId": {
-      "type": "string",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-      "description": "A component id, unique within its screen."
-    },
-    "Child": {
-      "$ref": "#/$defs/ComponentId",
-      "description": "A reference to one component by id."
-    },
-    "ChildList": {
-      "oneOf": [
-        {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ComponentId"
-          }
-        },
-        {
-          "type": "object",
-          "description": "A template repeated for each item of a data model list.",
-          "properties": {
-            "componentId": {
-              "$ref": "#/$defs/ComponentId"
-            },
-            "path": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "componentId",
-            "path"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
-    "DataBinding": {
-      "type": "object",
-      "properties": {
-        "@path": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "@path"
-      ],
-      "additionalProperties": false
-    },
-    "IndexCall": {
-      "type": "object",
-      "properties": {
-        "@call": {
-          "const": "@index"
-        },
-        "args": {
-          "type": "object"
-        }
-      },
-      "required": [
-        "@call"
-      ]
-    },
-    "DynamicString": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "$ref": "#/$defs/DataBinding"
-        },
-        {
-          "$ref": "#/$defs/IndexCall"
-        }
-      ]
-    },
-    "DynamicNumber": {
-      "oneOf": [
-        {
-          "type": "number"
-        },
-        {
-          "$ref": "#/$defs/DataBinding"
-        },
-        {
-          "$ref": "#/$defs/IndexCall"
-        }
-      ]
-    },
-    "DynamicBoolean": {
-      "oneOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "$ref": "#/$defs/DataBinding"
-        },
-        {
-          "$ref": "#/$defs/IndexCall"
-        }
       ]
     },
     "ColorRole": {
@@ -755,56 +913,6 @@
         "medium",
         "expanded"
       ]
-    },
-    "Typography": {
-      "type": "object",
-      "properties": {
-        "fontFamily": {
-          "enum": [
-            "Google Sans Flex",
-            "Google Sans Code",
-            "Fraunces",
-            "Bricolage Grotesque",
-            "Big Shoulders Display",
-            "Doto"
-          ]
-        },
-        "fontVariation": {
-          "type": "string"
-        },
-        "fontWeight": {
-          "type": "integer"
-        },
-        "letterSpacing": {
-          "type": [
-            "string",
-            "number"
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
-    "Style": {
-      "type": "object",
-      "description": "Token names only.",
-      "properties": {
-        "type": {
-          "$ref": "#/$defs/TypeRole"
-        },
-        "color": {
-          "$ref": "#/$defs/ColorRole"
-        },
-        "container": {
-          "$ref": "#/$defs/ColorRole"
-        },
-        "shape": {
-          "$ref": "#/$defs/ShapeValue"
-        },
-        "padding": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
     },
     "component.Column": {
       "type": "object",
@@ -2844,83 +2952,1533 @@
       ],
       "unevaluatedProperties": false
     },
-    "function.navigate": {
+    "wear.Screen": {
       "type": "object",
-      "description": "Opens the screen with this id.",
-      "returnType": "void",
+      "description": "The body of an A2UI createSurface message, against the wear catalog.",
       "properties": {
-        "@call": {
-          "const": "navigate"
+        "catalogId": {
+          "const": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1"
         },
-        "args": {
+        "dataModel": {
+          "description": "Sample data that bindings read."
+        },
+        "components": {
+          "type": "array",
+          "description": "A flat list with exactly one component whose id is root.",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/wear.anyComponent"
+          }
+        }
+      },
+      "required": [
+        "catalogId",
+        "components"
+      ],
+      "additionalProperties": false
+    },
+    "wear.anyComponent": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/wear.component.Column"
+        },
+        {
+          "$ref": "#/$defs/wear.component.Row"
+        },
+        {
+          "$ref": "#/$defs/wear.component.Box"
+        },
+        {
+          "$ref": "#/$defs/wear.component.Spacer"
+        },
+        {
+          "$ref": "#/$defs/wear.component.Screen"
+        },
+        {
+          "$ref": "#/$defs/wear.component.ListHeader"
+        },
+        {
+          "$ref": "#/$defs/wear.component.ListSubHeader"
+        },
+        {
+          "$ref": "#/$defs/wear.component.Button"
+        },
+        {
+          "$ref": "#/$defs/wear.component.CompactButton"
+        },
+        {
+          "$ref": "#/$defs/wear.component.IconButton"
+        },
+        {
+          "$ref": "#/$defs/wear.component.TextButton"
+        },
+        {
+          "$ref": "#/$defs/wear.component.EdgeButton"
+        },
+        {
+          "$ref": "#/$defs/wear.component.ButtonGroup"
+        },
+        {
+          "$ref": "#/$defs/wear.component.IconToggleButton"
+        },
+        {
+          "$ref": "#/$defs/wear.component.TextToggleButton"
+        },
+        {
+          "$ref": "#/$defs/wear.component.SwitchButton"
+        },
+        {
+          "$ref": "#/$defs/wear.component.CheckboxButton"
+        },
+        {
+          "$ref": "#/$defs/wear.component.RadioButton"
+        },
+        {
+          "$ref": "#/$defs/wear.component.Text"
+        },
+        {
+          "$ref": "#/$defs/wear.component.Icon"
+        },
+        {
+          "$ref": "#/$defs/wear.component.Image"
+        },
+        {
+          "$ref": "#/$defs/wear.component.Card"
+        },
+        {
+          "$ref": "#/$defs/wear.component.TitleCard"
+        },
+        {
+          "$ref": "#/$defs/wear.component.AppCard"
+        },
+        {
+          "$ref": "#/$defs/wear.component.Slider"
+        },
+        {
+          "$ref": "#/$defs/wear.component.Stepper"
+        },
+        {
+          "$ref": "#/$defs/wear.component.CircularProgressIndicator"
+        },
+        {
+          "$ref": "#/$defs/wear.component.LinearProgressIndicator"
+        },
+        {
+          "$ref": "#/$defs/wear.component.SegmentedCircularProgressIndicator"
+        },
+        {
+          "$ref": "#/$defs/wear.component.AlertDialog"
+        },
+        {
+          "$ref": "#/$defs/wear.component.ConfirmationDialog"
+        }
+      ],
+      "discriminator": {
+        "propertyName": "component"
+      }
+    },
+    "wear.ComponentCommon": {
+      "type": "object",
+      "description": "Props every component accepts.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ComponentId"
+        },
+        "sizeClass": {
           "type": "object",
+          "description": "Prop overrides per size class (large 225 dp and up).",
           "properties": {
-            "screen": {
-              "type": "string"
+            "large": {
+              "type": "object"
             }
           },
-          "required": [
-            "screen"
-          ],
-          "unevaluatedProperties": false
-        }
-      },
-      "required": [
-        "@call",
-        "args"
-      ]
-    },
-    "function.back": {
-      "type": "object",
-      "description": "Goes back one screen.",
-      "returnType": "void",
-      "properties": {
-        "@call": {
-          "const": "back"
-        }
-      },
-      "required": [
-        "@call"
-      ]
-    },
-    "function.open": {
-      "type": "object",
-      "description": "Opens a BottomSheet, Dialog or Menu of the same screen by id.",
-      "returnType": "void",
-      "properties": {
-        "@call": {
-          "const": "open"
+          "additionalProperties": false
         },
-        "args": {
-          "type": "object",
-          "properties": {
-            "overlay": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "overlay"
-          ],
-          "unevaluatedProperties": false
+        "style": {
+          "type": "string",
+          "description": "A style name from material.styles."
+        },
+        "weight": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "Relative weight inside a Row or Column. Must be a number from 0.01 to 100."
+        },
+        "padding": {
+          "type": "string",
+          "x-token": "spacing",
+          "description": "Padding around the component. A name from the design system's spacing scale (default: none, xxs, xs, sm, md, lg, xl, xxl, xxxl)."
         }
       },
       "required": [
-        "@call",
-        "args"
+        "id"
       ]
     },
-    "function.dismiss": {
+    "wear.ColorRole": {
+      "type": "string",
+      "description": "A ColorScheme role.",
+      "enum": [
+        "primary",
+        "primaryDim",
+        "primaryContainer",
+        "onPrimary",
+        "onPrimaryContainer",
+        "secondary",
+        "secondaryDim",
+        "secondaryContainer",
+        "onSecondary",
+        "onSecondaryContainer",
+        "tertiary",
+        "tertiaryDim",
+        "tertiaryContainer",
+        "onTertiary",
+        "onTertiaryContainer",
+        "surfaceContainerLow",
+        "surfaceContainer",
+        "surfaceContainerHigh",
+        "onSurface",
+        "onSurfaceVariant",
+        "outline",
+        "outlineVariant",
+        "background",
+        "onBackground",
+        "error",
+        "errorDim",
+        "errorContainer",
+        "onError",
+        "onErrorContainer"
+      ]
+    },
+    "wear.TypeRole": {
+      "type": "string",
+      "description": "A Typography role.",
+      "enum": [
+        "displayLarge",
+        "displayMedium",
+        "displaySmall",
+        "titleLarge",
+        "titleMedium",
+        "titleSmall",
+        "labelLarge",
+        "labelMedium",
+        "labelSmall",
+        "bodyLarge",
+        "bodyMedium",
+        "bodySmall",
+        "bodyExtraSmall",
+        "numeralExtraLarge",
+        "numeralLarge",
+        "numeralMedium",
+        "numeralSmall",
+        "numeralExtraSmall"
+      ]
+    },
+    "wear.component.Column": {
       "type": "object",
-      "description": "Closes the open overlay.",
-      "returnType": "void",
+      "description": "Arranges children vertically.",
+      "x-compose": "Column",
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
       "properties": {
-        "@call": {
-          "const": "dismiss"
+        "component": {
+          "const": "Column"
+        },
+        "children": {
+          "$ref": "#/$defs/ChildList"
+        },
+        "spacing": {
+          "type": "string",
+          "x-token": "spacing",
+          "description": "Gap between children (Arrangement.spacedBy). A name from the design system's spacing scale (default: none, xxs, xs, sm, md, lg, xl, xxl, xxxl)."
+        },
+        "horizontalAlignment": {
+          "type": "string",
+          "enum": [
+            "start",
+            "center",
+            "end"
+          ],
+          "default": "start"
+        },
+        "arrangement": {
+          "type": "string",
+          "enum": [
+            "start",
+            "center",
+            "end",
+            "spaceBetween",
+            "spaceAround",
+            "spaceEvenly"
+          ],
+          "default": "start"
+        },
+        "scroll": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Makes the column vertically scrollable.",
+          "default": false
         }
       },
       "required": [
-        "@call"
-      ]
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.Row": {
+      "type": "object",
+      "description": "Arranges children horizontally.",
+      "x-compose": "Row",
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Row"
+        },
+        "children": {
+          "$ref": "#/$defs/ChildList"
+        },
+        "spacing": {
+          "type": "string",
+          "x-token": "spacing",
+          "description": "Gap between children (Arrangement.spacedBy). A name from the design system's spacing scale (default: none, xxs, xs, sm, md, lg, xl, xxl, xxxl)."
+        },
+        "verticalAlignment": {
+          "type": "string",
+          "enum": [
+            "top",
+            "center",
+            "bottom",
+            "stretch"
+          ],
+          "description": "stretch: Column, Row, and Box children fill the row's height, for full-height panes.",
+          "default": "top"
+        },
+        "arrangement": {
+          "type": "string",
+          "enum": [
+            "start",
+            "center",
+            "end",
+            "spaceBetween",
+            "spaceAround",
+            "spaceEvenly"
+          ],
+          "default": "start"
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.Box": {
+      "type": "object",
+      "description": "Stacks children on top of each other.",
+      "x-compose": "Box",
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Box"
+        },
+        "children": {
+          "$ref": "#/$defs/ChildList"
+        },
+        "contentAlignment": {
+          "type": "string",
+          "enum": [
+            "topStart",
+            "topCenter",
+            "topEnd",
+            "centerStart",
+            "center",
+            "centerEnd",
+            "bottomStart",
+            "bottomCenter",
+            "bottomEnd"
+          ],
+          "default": "topStart"
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.Spacer": {
+      "type": "object",
+      "description": "Empty space.",
+      "x-compose": "Spacer",
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Spacer"
+        },
+        "width": {
+          "type": "string",
+          "x-token": "spacing",
+          "description": "A name from the design system's spacing scale (default: none, xxs, xs, sm, md, lg, xl, xxl, xxxl)."
+        },
+        "height": {
+          "type": "string",
+          "x-token": "spacing",
+          "description": "A name from the design system's spacing scale (default: none, xxs, xs, sm, md, lg, xl, xxl, xxxl)."
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.Screen": {
+      "type": "object",
+      "description": "The screen frame: an optional time text and edge button around a scrolling list or a fixed body.",
+      "x-compose": "AppScaffold and ScreenScaffold, with TransformingLazyColumn for the list",
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Screen"
+        },
+        "scroll": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "True lays children out as the rows of a scrolling TransformingLazyColumn, whose rows scale and fade at the round display's edge. False stacks them in a fixed Box.",
+          "default": true
+        },
+        "timeText": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Shows the clock at the top of the display.",
+          "default": true
+        },
+        "edgeButton": {
+          "$ref": "#/$defs/Child",
+          "x-allowedComponents": [
+            "EdgeButton"
+          ]
+        },
+        "children": {
+          "$ref": "#/$defs/ChildList"
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.ListHeader": {
+      "type": "object",
+      "description": "The heading of a section of a list.",
+      "x-compose": "ListHeader",
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "ListHeader"
+        },
+        "text": {
+          "$ref": "#/$defs/DynamicString"
+        }
+      },
+      "required": [
+        "component",
+        "text"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.ListSubHeader": {
+      "type": "object",
+      "description": "A smaller heading inside a section, with an optional icon.",
+      "x-compose": "ListSubHeader",
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "ListSubHeader"
+        },
+        "text": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        }
+      },
+      "required": [
+        "component",
+        "text"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.Button": {
+      "type": "object",
+      "description": "A full-width button with a label, an optional secondary label and an icon.",
+      "x-compose": "Button, FilledTonalButton, OutlinedButton, ChildButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Button"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "filled",
+            "filledTonal",
+            "filledVariant",
+            "outlined",
+            "child"
+          ],
+          "description": "filledVariant is Button with ButtonDefaults.filledVariantButtonColors.",
+          "default": "filled"
+        },
+        "label": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "secondaryLabel": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.CompactButton": {
+      "type": "object",
+      "description": "A short button for a tight row; give it a label, an icon or both.",
+      "x-compose": "CompactButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "CompactButton"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "filled",
+            "filledTonal",
+            "filledVariant",
+            "outlined",
+            "child"
+          ],
+          "default": "filled"
+        },
+        "label": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.IconButton": {
+      "type": "object",
+      "description": "A round button that shows only an icon.",
+      "x-compose": "IconButton, FilledIconButton, FilledTonalIconButton, OutlinedIconButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "IconButton"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "filled",
+            "filledTonal",
+            "outlined"
+          ],
+          "default": "standard"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "extra-small",
+            "small",
+            "default",
+            "large"
+          ],
+          "default": "default"
+        },
+        "icon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "icon"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.TextButton": {
+      "type": "object",
+      "description": "A round button that shows a short text, such as a number or two letters.",
+      "x-compose": "TextButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "TextButton"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "filled",
+            "filledTonal",
+            "outlined"
+          ],
+          "default": "standard"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "small",
+            "default",
+            "large"
+          ],
+          "default": "default"
+        },
+        "label": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.EdgeButton": {
+      "type": "object",
+      "description": "A button that hugs the bottom edge of the round display, the screen's main action.",
+      "x-compose": "EdgeButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "EdgeButton"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "extra-small",
+            "small",
+            "medium",
+            "large"
+          ],
+          "default": "small"
+        },
+        "label": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.ButtonGroup": {
+      "type": "object",
+      "description": "Buttons side by side that share the width.",
+      "x-compose": "ButtonGroup",
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "ButtonGroup"
+        },
+        "children": {
+          "$ref": "#/$defs/ChildList",
+          "x-allowedComponents": [
+            "Button",
+            "CompactButton",
+            "IconButton",
+            "TextButton",
+            "IconToggleButton",
+            "TextToggleButton"
+          ]
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.IconToggleButton": {
+      "type": "object",
+      "description": "A round icon button with an on and off state.",
+      "x-compose": "IconToggleButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "IconToggleButton"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "extra-small",
+            "small",
+            "default",
+            "large"
+          ],
+          "default": "default"
+        },
+        "icon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "checked": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "icon"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.TextToggleButton": {
+      "type": "object",
+      "description": "A round text button with an on and off state.",
+      "x-compose": "TextToggleButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "TextToggleButton"
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "small",
+            "default",
+            "large"
+          ],
+          "default": "default"
+        },
+        "label": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "checked": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.SwitchButton": {
+      "type": "object",
+      "description": "A full-width row with a label and a switch.",
+      "x-compose": "SwitchButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "SwitchButton"
+        },
+        "label": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "secondaryLabel": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "checked": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.CheckboxButton": {
+      "type": "object",
+      "description": "A full-width row with a label and a checkbox.",
+      "x-compose": "CheckboxButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "CheckboxButton"
+        },
+        "label": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "secondaryLabel": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "checked": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.RadioButton": {
+      "type": "object",
+      "description": "A full-width row with a label and a radio control, one of a group.",
+      "x-compose": "RadioButton",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "RadioButton"
+        },
+        "label": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "secondaryLabel": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "selected": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.Text": {
+      "type": "object",
+      "description": "A run of text in a type role.",
+      "x-compose": "Text",
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Text"
+        },
+        "text": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "type": {
+          "$ref": "#/$defs/wear.TypeRole"
+        },
+        "color": {
+          "$ref": "#/$defs/wear.ColorRole",
+          "description": "Content color role."
+        },
+        "maxLines": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "Must be a whole number from 1 to 100."
+        },
+        "overflow": {
+          "type": "string",
+          "enum": [
+            "ellipsis",
+            "clip"
+          ],
+          "default": "clip"
+        },
+        "align": {
+          "type": "string",
+          "enum": [
+            "start",
+            "center",
+            "end"
+          ]
+        }
+      },
+      "required": [
+        "component",
+        "text"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.Icon": {
+      "type": "object",
+      "description": "A Material Symbols icon (Rounded, weight 400, grade 0).",
+      "x-compose": "Icon",
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Icon"
+        },
+        "name": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "size": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "Size in dp. Must be a number from 1 to 512.",
+          "default": 24
+        },
+        "color": {
+          "$ref": "#/$defs/wear.ColorRole",
+          "description": "Content color role."
+        },
+        "filled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Fill 1 instead of Fill 0.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString"
+        }
+      },
+      "required": [
+        "component",
+        "name"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.Image": {
+      "type": "object",
+      "description": "A bitmap from a file next to the proposal or a data URI.",
+      "x-compose": "Image",
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Image"
+        },
+        "src": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Path relative to the proposal, or a data: URI."
+        },
+        "fit": {
+          "type": "string",
+          "enum": [
+            "crop",
+            "fit",
+            "fillBounds",
+            "fillWidth",
+            "fillHeight",
+            "inside"
+          ],
+          "default": "fit"
+        },
+        "aspectRatio": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "Width divided by height. Must be a number from 0.1 to 10."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString"
+        }
+      },
+      "required": [
+        "component",
+        "src"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.Card": {
+      "type": "object",
+      "description": "A card around any content, tappable when it has an action.",
+      "x-compose": "Card",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Card"
+        },
+        "children": {
+          "$ref": "#/$defs/ChildList"
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.TitleCard": {
+      "type": "object",
+      "description": "A card with a title, an optional time and subtitle, and a body.",
+      "x-compose": "TitleCard",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "TitleCard"
+        },
+        "title": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "time": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "subtitle": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "body": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "title"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.AppCard": {
+      "type": "object",
+      "description": "A card from an app: the app's name and icon, a title, an optional time and a body.",
+      "x-compose": "AppCard",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "AppCard"
+        },
+        "appName": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "appIcon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "title": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "time": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "body": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "appName",
+        "title"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.Slider": {
+      "type": "object",
+      "description": "Picks one value from a range with decrease and increase buttons.",
+      "x-compose": "Slider",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Slider"
+        },
+        "value": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "Current value."
+        },
+        "range": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "[min, max]; [0, 1] by default."
+        },
+        "steps": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "Must be a whole number from 0 to 100.",
+          "default": 0
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.Stepper": {
+      "type": "object",
+      "description": "Picks one value from a range with decrease and increase buttons around a value shown in its content.",
+      "x-compose": "Stepper",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Stepper"
+        },
+        "value": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "Current value."
+        },
+        "range": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "[min, max]; [0, 1] by default."
+        },
+        "steps": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "Must be a whole number from 0 to 100.",
+          "default": 0
+        },
+        "content": {
+          "$ref": "#/$defs/Child",
+          "description": "What sits between the buttons, such as the value's Text."
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.CircularProgressIndicator": {
+      "type": "object",
+      "description": "A ring around the display's edge; indeterminate when progress is absent.",
+      "x-compose": "CircularProgressIndicator",
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "CircularProgressIndicator"
+        },
+        "progress": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "Completed fraction. Must be a number from 0 to 1."
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.LinearProgressIndicator": {
+      "type": "object",
+      "description": "A bar showing a completed fraction.",
+      "x-compose": "LinearProgressIndicator",
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "LinearProgressIndicator"
+        },
+        "progress": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "Completed fraction. Must be a number from 0 to 1."
+        }
+      },
+      "required": [
+        "component",
+        "progress"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.SegmentedCircularProgressIndicator": {
+      "type": "object",
+      "description": "A ring of separate segments filled in order.",
+      "x-compose": "SegmentedCircularProgressIndicator",
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "SegmentedCircularProgressIndicator"
+        },
+        "segmentCount": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "Must be a whole number from 1 to 24."
+        },
+        "progress": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "Completed fraction. Must be a number from 0 to 1."
+        }
+      },
+      "required": [
+        "component",
+        "segmentCount",
+        "progress"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.AlertDialog": {
+      "type": "object",
+      "description": "A full-screen dialog with an icon, a title, a message and two buttons.",
+      "x-compose": "AlertDialog",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "AlertDialog"
+        },
+        "icon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "title": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "text": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "confirm": {
+          "$ref": "#/$defs/Child",
+          "x-allowedComponents": [
+            "Button",
+            "IconButton"
+          ]
+        },
+        "dismiss": {
+          "$ref": "#/$defs/Child",
+          "x-allowedComponents": [
+            "Button",
+            "IconButton"
+          ]
+        }
+      },
+      "required": [
+        "component",
+        "title"
+      ],
+      "unevaluatedProperties": false
+    },
+    "wear.component.ConfirmationDialog": {
+      "type": "object",
+      "description": "A brief full-screen confirmation with an icon and curved text.",
+      "x-compose": "ConfirmationDialog",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/wear.ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "ConfirmationDialog"
+        },
+        "icon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "text": {
+          "$ref": "#/$defs/DynamicString"
+        }
+      },
+      "required": [
+        "component",
+        "icon"
+      ],
+      "unevaluatedProperties": false
     }
   }
 }

@@ -1,10 +1,15 @@
 package bot.charlies.androiddesign.preview.feature.preview.render
 
 import androidx.compose.runtime.Composable
+import bot.charlies.androiddesign.preview.feature.preview.render.wear.RenderWearComponent
 
 /** One composable per catalog component; the registry in `M3ExpressiveCatalog` names them. */
 @Composable
 internal fun RenderComponent(ctx: NodeContext) {
+  if (ctx.env.isWear) {
+    RenderWearComponent(ctx)
+    return
+  }
   when (ctx.component) {
     "Column" -> RenderColumn(ctx)
     "Row" -> RenderRow(ctx)

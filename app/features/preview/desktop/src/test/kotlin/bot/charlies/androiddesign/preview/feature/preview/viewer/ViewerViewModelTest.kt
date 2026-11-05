@@ -5,6 +5,7 @@ import bot.charlies.androiddesign.preview.domain.ProposalSnapshot
 import bot.charlies.androiddesign.preview.model.Device
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.WearCatalog
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
@@ -174,5 +175,55 @@ class ViewerViewModelTest {
     viewModel.show(load(path))
     assertTrue(viewModel.state.value.valid)
     assertSame(host, viewModel.state.value.host)
+  }
+
+  /** The Wear fixture alone in a temp folder: the fixtures folder's DESIGN.md is a phone one. */
+  private fun wearCopy(): Path {
+    val dir = Files.createTempDirectory("viewer-wear")
+    return dir.resolve("wear.proposal.json").also {
+      Files.copy(fixtures.resolve("wear.proposal.json"), it)
+    }
+  }
+
+  @Test
+  fun `a wear proposal moves the window to the watch and a phone one back`() {
+    viewModel.setDevice(Device.Tablet)
+    viewModel.show(load(wearCopy()))
+    assertEquals(Device.Watch, viewModel.state.value.device)
+    assertEquals(Views.Watch, viewModel.state.value.view)
+    assertEquals(WearCatalog, viewModel.state.value.catalog)
+
+    viewModel.show(load(tempCopy()))
+    assertEquals(Device.Phone, viewModel.state.value.device)
+    assertEquals(Views.Light, viewModel.state.value.view)
+  }
+
+  @Test
+  fun `a wear proposal offers only its own views`() {
+    viewModel.show(load(wearCopy()))
+    viewModel.setView(Views.WatchLarge)
+    assertEquals(Views.WatchLarge, viewModel.state.value.view)
+    viewModel.setView(Views.Watch)
+    assertEquals(Views.Watch, viewModel.state.value.view)
+
+    viewModel.setDevice(Device.Desktop)
+    viewModel.setView(Views.Dark)
+    assertEquals(Views.Watch, viewModel.state.value.view, "a phone view is ignored")
+  }
+
+  @Test
+  fun `a phone proposal ignores a watch view`() {
+    viewModel.show(load(plates))
+    viewModel.setView(Views.WatchLarge)
+    viewModel.setDevice(Device.Watch)
+    assertEquals(Views.Light, viewModel.state.value.view)
+  }
+
+  @Test
+  fun `a seed picked in the window themes a wear proposal that had none`() {
+    viewModel.show(load(wearCopy()))
+    assertFalse(viewModel.state.value.effectiveDesign!!.seeded)
+    viewModel.setSeed("#0061A4")
+    assertTrue(viewModel.state.value.effectiveDesign!!.seeded)
   }
 }

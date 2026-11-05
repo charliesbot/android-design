@@ -60,16 +60,25 @@ data class Screen(
 @Serializable(with = ComponentNodeSerializer::class)
 data class ComponentNode(val id: String, val component: String, val props: JsonObject) {
   /**
-   * The `sizeClass` overrides that hold at [size]. They apply from medium up: medium's first, then
-   * expanded's on top, so an override carries on to wider classes until a wider one replaces it.
-   * The renderer and the exporter both read overrides through this, so they cannot disagree.
+   * The `sizeClass` overrides that hold at [size] in the phone catalog. They apply from medium up:
+   * medium's first, then expanded's on top, so an override carries on to wider classes until a
+   * wider one replaces it. The renderer and the exporter both read overrides through this, so they
+   * cannot disagree.
    */
-  fun sizeOverridesAt(size: SizeClass): Map<String, JsonElement> {
+  fun sizeOverridesAt(size: SizeClass): Map<String, JsonElement> =
+    sizeOverridesAt(M3ExpressiveCatalog.sizeBreakpoints, size.minWidthDp)
+
+  /**
+   * The `sizeClass` overrides that hold in a view [widthDp] wide, under a catalog whose override
+   * keys are [breakpoints]. A key applies from its breakpoint's width up, in ascending order, so an
+   * override carries on to wider views until a wider key replaces it.
+   */
+  fun sizeOverridesAt(breakpoints: List<SizeBreakpoint>, widthDp: Int): Map<String, JsonElement> {
     val overrides = props[M3ExpressiveCatalog.SIZE_CLASS] as? JsonObject ?: return emptyMap()
     val merged = LinkedHashMap<String, JsonElement>()
-    for (applied in SizeClass.entries) {
-      if (applied == SizeClass.Compact || applied.ordinal > size.ordinal) continue
-      (overrides[applied.wire] as? JsonObject)?.let { merged.putAll(it) }
+    for (breakpoint in breakpoints.sortedBy { it.minWidthDp }) {
+      if (widthDp < breakpoint.minWidthDp) continue
+      (overrides[breakpoint.key] as? JsonObject)?.let { merged.putAll(it) }
     }
     return merged
   }

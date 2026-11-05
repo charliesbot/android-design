@@ -2,21 +2,34 @@ package bot.charlies.androiddesign.preview.domain.validation
 
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.model.BundledFont
-import bot.charlies.androiddesign.preview.model.ColorRole
+import bot.charlies.androiddesign.preview.model.Catalog
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.MaterialShape
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.StyleDef
 import bot.charlies.androiddesign.preview.model.ThemeOverride
-import bot.charlies.androiddesign.preview.model.TypeRole
+import bot.charlies.androiddesign.preview.model.TypeGroup
+import bot.charlies.androiddesign.preview.model.camelToKebab
 
 /**
  * Checks one theme layer: DESIGN.md front matter or a proposal's `theme`. A strict layer rejects
  * names it does not know; DESIGN.md may carry names for other tools, so it only has the values it
  * shares with us checked.
  */
-internal class ThemeValidator(private val sink: ErrorSink, private val design: DesignSystem) {
+internal class ThemeValidator(
+  private val sink: ErrorSink,
+  private val design: DesignSystem,
+  private val catalog: Catalog,
+) {
+  private val colorKebabs: Set<String> = catalog.colorRoles.map { it.camelToKebab() }.toSet()
+  private val typeKebabs: Map<String, TypeGroup> =
+    catalog.typeRoles.mapKeys { (wire, _) -> wire.camelToKebab() }
+
+  private val allTypeRoles: Set<String> = Catalogs.all.flatMap { it.typeRoles.keys }.toSet()
+  private val allColorRoles: Set<String> = Catalogs.all.flatMap { it.colorRoles }.toSet()
+
   fun validate(layer: ThemeOverride?, root: String, strict: Boolean) {
     if (layer == null) return
     validateColors(layer, root, strict)
@@ -35,13 +48,13 @@ internal class ThemeValidator(private val sink: ErrorSink, private val design: D
     }
     validateScheme(layer, root)
     layer.material?.styles?.forEach { (name, style) ->
-      validateStyle(style, root.child("material").child("styles").child(name))
+      validateStyle(style, root.child("material").child("styles").child(name), strict)
     }
   }
 
   private fun validateColors(layer: ThemeOverride, root: String, strict: Boolean) {
     for ((key, value) in layer.colors) {
-      val known = key == "primary" || ColorRole.fromKebab(key) != null
+      val known = key == "primary" || key in colorKebabs
       val path = root.child("colors").child(key)
       if (!known) {
         if (strict)
@@ -55,10 +68,16 @@ internal class ThemeValidator(private val sink: ErrorSink, private val design: D
   }
 
   private fun validateTypography(layer: ThemeOverride, root: String, strict: Boolean) {
+    // A catalog with a platform typeface sets all its text in it: DESIGN.md typography, written
+    // for another surface, does not apply, and a proposal may only name that typeface.
+    if (catalog.platformFontFamilies.isNotEmpty()) {
+      if (strict) validatePlatformTypography(layer, root)
+      return
+    }
     for ((key, spec) in layer.typography) {
       val path = root.child("typography").child(key)
-      val role = TypeRole.fromKebab(key)
-      if (role == null) {
+      val group = typeKebabs[key]
+      if (group == null) {
         if (strict) sink.add(path, "'$key' is not a type role (kebab case, such as display-large)")
         continue
       }
@@ -69,10 +88,34 @@ internal class ThemeValidator(private val sink: ErrorSink, private val design: D
       }
       spec.fontVariation?.let { validateVariation(it, path.child("fontVariation")) }
       val family = spec.fontFamily ?: continue
-      if (!familyAllowed(role, family)) {
+      if (!familyAllowed(group, family)) {
         sink.add(
           path.child("fontFamily"),
-          "'$family' is not allowed for $key: ${allowedFamilies(role)}",
+          "'$family' is not allowed for $key: ${allowedFamilies(group)}",
+        )
+      }
+    }
+  }
+
+  private fun validatePlatformTypography(layer: ThemeOverride, root: String) {
+    for ((key, spec) in layer.typography) {
+      val path = root.child("typography").child(key)
+      if (key !in typeKebabs) {
+        sink.add(path, "'$key' is not a type role (kebab case, such as display-large)")
+        continue
+      }
+      spec.fontWeight?.let {
+        if (it !in 1..1000) {
+          sink.add(path.child("fontWeight"), "fontWeight must be a whole number from 1 to 1000")
+        }
+      }
+      spec.fontVariation?.let { validateVariation(it, path.child("fontVariation")) }
+      val family = spec.fontFamily ?: continue
+      if (catalog.platformFontFamilies.none { it.equals(family.trim(), ignoreCase = true) }) {
+        sink.add(
+          path.child("fontFamily"),
+          "'$family' is not allowed for $key: ${catalog.key} text is set in " +
+            catalog.platformFontFamilies.joinToString(),
         )
       }
     }
@@ -142,16 +185,21 @@ internal class ThemeValidator(private val sink: ErrorSink, private val design: D
     }
   }
 
-  private fun validateStyle(style: StyleDef, path: String) {
+  /**
+   * DESIGN.md is shared by every surface of an app, so its styles (`strict` is false) may use the
+   * roles of any catalog; a proposal's own `theme` is held to its catalog's roles.
+   */
+  private fun validateStyle(style: StyleDef, path: String, strict: Boolean) {
+    val typeRoles = if (strict) catalog.typeRoles.keys else allTypeRoles
+    val colorRoles = if (strict) catalog.colorRoles.toSet() else allColorRoles
     style.type?.let {
-      if (TypeRole.fromWire(it) == null) sink.add(path.child("type"), "'$it' is not a type role")
+      if (it !in typeRoles) sink.add(path.child("type"), "'$it' is not a type role")
     }
     style.color?.let {
-      if (ColorRole.fromWire(it) == null) sink.add(path.child("color"), "'$it' is not a color role")
+      if (it !in colorRoles) sink.add(path.child("color"), "'$it' is not a color role")
     }
     style.container?.let {
-      if (ColorRole.fromWire(it) == null)
-        sink.add(path.child("container"), "'$it' is not a color role")
+      if (it !in colorRoles) sink.add(path.child("container"), "'$it' is not a color role")
     }
     style.shape?.let {
       if (!isShape(it))
@@ -170,12 +218,10 @@ internal class ThemeValidator(private val sink: ErrorSink, private val design: D
     fun isShape(value: String): Boolean =
       ShapeToken.fromWire(value) != null || MaterialShape.fromWire(value) != null
 
-    fun familyAllowed(role: TypeRole, family: String): Boolean =
-      BundledFont.byFamily(family)?.let { role.group in it.groups } ?: false
+    fun familyAllowed(group: TypeGroup, family: String): Boolean =
+      BundledFont.byFamily(family)?.let { group in it.groups } ?: false
 
-    private fun allowedFamilies(role: TypeRole): String =
-      BundledFont.entries
-        .filter { role.group in it.groups }
-        .joinToString(prefix = "use ") { it.family }
+    private fun allowedFamilies(group: TypeGroup): String =
+      BundledFont.entries.filter { group in it.groups }.joinToString(prefix = "use ") { it.family }
   }
 }

@@ -1,7 +1,9 @@
 package bot.charlies.androiddesign.preview.domain.export
 
 import bot.charlies.androiddesign.preview.domain.PreviewException
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.DesignSystem
+import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.Proposal
 
 /**
@@ -19,6 +21,10 @@ object KotlinExporter {
   private const val PACKAGE = "com.example.app"
 
   fun export(proposal: Proposal, design: DesignSystem, screen: String? = null): String {
+    val catalog = Catalogs.of(proposal)
+    if (catalog !== M3ExpressiveCatalog) {
+      throw PreviewException("exporting a ${catalog.key} proposal to Compose is not supported yet")
+    }
     val first = build(proposal, design, screen, reserved = emptySet())
     // A sample class named like an imported symbol (`Row`) would shadow the import, so the names
     // the first pass imported are kept free and the file is built again.

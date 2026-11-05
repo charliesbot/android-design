@@ -11,7 +11,12 @@ plugins {
 spotless {
   kotlin {
     target("**/*.kt")
-    targetExclude("**/build/**", ".gradle/**")
+    targetExclude(
+      "**/build/**",
+      ".gradle/**",
+      "wear/compose/upstream/**",
+      "wear/compose/src/generated/**",
+    )
     ktfmt().googleStyle()
   }
   kotlinGradle {

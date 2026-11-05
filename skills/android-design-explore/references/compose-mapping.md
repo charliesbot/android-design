@@ -137,6 +137,54 @@ The first cell is the catalog component and the prop values that select the patt
 | `navigation.panes` | `ListDetailSceneStrategy` or `SupportingPaneSceneStrategy` with each entry's pane metadata | `list`, `detail`, `extra` belong to the list-detail scene; `supporting` to the supporting-pane scene. |
 | `open`, `dismiss` | The `onClick` that sets the sheet, dialog, or menu visible, and the `onDismissRequest` that hides it | The overlay itself is its Components row. |
 
+## Wear OS components
+
+The rows for the `wear` catalog (`get_catalog` with `catalog: "wear"`). Each names the Wear Compose API from `androidx.wear.compose.material3` or `androidx.wear.compose.foundation.lazy`, written in full because the Material 3 inventory above does not list them. All rows are unverified: nobody has rendered them against the app yet. Interactive Wear components need a 48dp touch target.
+
+| Catalog | Compose | Status | Notes |
+| --- | --- | --- | --- |
+| `Screen` | `androidx.wear.compose.material3.AppScaffold` around `androidx.wear.compose.material3.ScreenScaffold(scrollState, timeText, edgeButton)` | unverified | `scroll=true` (the default) fills a `androidx.wear.compose.foundation.lazy.TransformingLazyColumn` with the `children` as items, using `androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState`, and passes its `contentPadding` through; `scroll=false` puts the `children` in a `Box`. `timeText` is `androidx.wear.compose.material3.TimeText`, `edgeButton` is the `edgeButton` slot of the scaffold. |
+| `Column / Row / Box / Spacer` | The foundation layouts of the Components table | unverified | Same mapping as on phone. On a round display keep a fixed layout inside the circle. |
+| `ListHeader` | `androidx.wear.compose.material3.ListHeader` | unverified | `text` is the header's `Text`. |
+| `ListSubHeader` | `androidx.wear.compose.material3.ListSubHeader` | unverified | `text` is the label slot, `icon` the icon slot. |
+| `Button variant="filled"` | `androidx.wear.compose.material3.Button` | unverified | `label`, `secondaryLabel`, `icon` are the `label`, `secondaryLabel` and `icon` slots. Full width in a list. |
+| `Button variant="filledTonal"` | `androidx.wear.compose.material3.FilledTonalButton` | unverified |  |
+| `Button variant="filledVariant"` | `androidx.wear.compose.material3.Button` with `androidx.wear.compose.material3.ButtonDefaults.filledVariantButtonColors()` | unverified |  |
+| `Button variant="outlined"` | `androidx.wear.compose.material3.OutlinedButton` | unverified |  |
+| `Button variant="child"` | `androidx.wear.compose.material3.ChildButton` | unverified | The low-emphasis button for a child action of a card or list. |
+| `CompactButton` | `androidx.wear.compose.material3.CompactButton` | unverified | `variant` selects the `colors` as for Button. `label` and `icon` are its slots. |
+| `IconButton variant="standard"` | `androidx.wear.compose.material3.IconButton` | unverified | `filled` is `FilledIconButton`, `filledTonal` is `FilledTonalIconButton`, `outlined` is `OutlinedIconButton`. `size` is the matching `IconButtonDefaults` button size (extra small, small, default, large). |
+| `TextButton` | `androidx.wear.compose.material3.TextButton` | unverified | `variant` other than `standard` uses the matching colors of the button defaults; `size` is its small, default or large button size. |
+| `EdgeButton` | `androidx.wear.compose.material3.EdgeButton(buttonSize = androidx.wear.compose.material3.EdgeButtonSize.Small)` | unverified | `size` is the edge button size of the same name (extra small to large). Pass it as the edge button slot of the scaffold, not inside the list. |
+| `ButtonGroup` | `androidx.wear.compose.material3.ButtonGroup` | unverified | Children share the width. |
+| `IconToggleButton` | `androidx.wear.compose.material3.IconToggleButton(checked, onCheckedChange)` | unverified | `action` is the state change. |
+| `TextToggleButton` | `androidx.wear.compose.material3.TextToggleButton(checked, onCheckedChange)` | unverified |  |
+| `SwitchButton` | `androidx.wear.compose.material3.SwitchButton(checked, onCheckedChange)` | unverified | `label`, `secondaryLabel` and `icon` are its slots. |
+| `CheckboxButton` | `androidx.wear.compose.material3.CheckboxButton(checked, onCheckedChange)` | unverified |  |
+| `RadioButton` | `androidx.wear.compose.material3.RadioButton(selected, onSelect)` | unverified |  |
+| `Text` | `androidx.wear.compose.material3.Text(text, style = androidx.wear.compose.material3.MaterialTheme.typography.numeralLarge, color = androidx.wear.compose.material3.MaterialTheme.colorScheme.onSurface)` | unverified | `type` and `color` are Wear roles; see the Wear tokens below. |
+| `Icon` | `androidx.wear.compose.material3.Icon` | unverified | Same icon handling as the Icons section. |
+| `Image` | `androidx.compose.foundation.Image` | unverified | As the Components row. |
+| `Card` | `androidx.wear.compose.material3.Card(onClick)` | unverified | The `children` are the card's content. |
+| `TitleCard` | `androidx.wear.compose.material3.TitleCard(onClick, title, time, subtitle, content)` | unverified | `body` is `content`. |
+| `AppCard` | `androidx.wear.compose.material3.AppCard(onClick, appName, appImage, title, time, content)` | unverified | `appIcon` is `appImage`, `body` is `content`. |
+| `Slider` | `androidx.wear.compose.material3.Slider(value, onValueChange, steps)` | unverified | `range` is `valueRange`. |
+| `Stepper` | `androidx.wear.compose.material3.Stepper(value, onValueChange, steps)` | unverified | `content` is the `content` slot. |
+| `CircularProgressIndicator` | `androidx.wear.compose.material3.CircularProgressIndicator(progress = { p })` | unverified | Without `progress`, the indeterminate overload. |
+| `LinearProgressIndicator` | `androidx.wear.compose.material3.LinearProgressIndicator(progress = { p })` | unverified |  |
+| `SegmentedCircularProgressIndicator` | `androidx.wear.compose.material3.SegmentedCircularProgressIndicator(segmentCount, progress = { p })` | unverified |  |
+| `AlertDialog` | `androidx.wear.compose.material3.AlertDialog(visible, onDismissRequest, confirmButton, dismissButton, title, icon, text)` | unverified | Opened by `open`, closed by `dismiss`; `visible` is the state. |
+| `ConfirmationDialog` | `androidx.wear.compose.material3.ConfirmationDialog(visible, onDismissRequest, curvedText)` | unverified | `text` is the `curvedText`, `icon` the content. |
+
+### Wear tokens
+
+| Catalog | Compose | Notes |
+| --- | --- | --- |
+| Color role `primaryDim` | `androidx.wear.compose.material3.MaterialTheme.colorScheme.primaryDim` | Every Wear color role is the `androidx.wear.compose.material3.ColorScheme` property of the same name. Wear has no `surface`. |
+| Type role `numeralLarge` | `androidx.wear.compose.material3.MaterialTheme.typography.numeralLarge` | Display, title, label, body and numeral roles are the `androidx.wear.compose.material3.Typography` property of the same name. |
+| `sizeClass` key `large` | A check that the screen width is at least 225dp | Wear's large-display breakpoint. |
+| `navigation.panes` | Not used | A watch shows one screen at a time. |
+
 ## Tokens
 
 | Catalog | Compose | Notes |
