@@ -4,7 +4,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.CircularProgressIndicatorDefaults
@@ -18,6 +21,9 @@ import bot.charlies.androiddesign.preview.feature.preview.render.NodeContext
 import bot.charlies.androiddesign.preview.feature.preview.render.describedBy
 import bot.charlies.androiddesign.preview.feature.preview.render.local
 import bot.charlies.androiddesign.preview.feature.preview.render.modifier
+import bot.charlies.androiddesign.preview.model.RingInset
+
+private val StepperAmbient = WearAmbient("background", "onSurface")
 
 internal fun NodeContext.sliderLook() = WearLook("surfaceContainer", "primary", a11yRole = "Slider")
 
@@ -60,7 +66,10 @@ internal fun RenderWearStepper(ctx: NodeContext) {
     enabled = ctx.enabled,
     valueRange = range,
   ) {
-    ctx.Child("content", 0, ChildHost.Wrap)
+    // Wear's Stepper draws its content in onSurface, not in the screen's onBackground.
+    CompositionLocalProvider(LocalWearAmbient provides StepperAmbient) {
+      ctx.Child("content", 0, ChildHost.Wrap)
+    }
   }
 }
 
@@ -83,13 +92,37 @@ private fun NodeContext.ringModifier(): Modifier =
 
 private const val RING_FALLBACK_DP = 48
 
+/**
+ * Tells the tree what a ring that fills the display takes at its edge: the padding it is drawn with
+ * and the [stroke] it is passed, both Wear's own, so a finding reads the band the ring really
+ * draws. A spinner has no band.
+ */
+@Composable
+private fun NodeContext.RecordRingBand(stroke: Dp) {
+  val recorder = env.recorder ?: return
+  val tagId = id
+  val band =
+    if (host.fillHeight)
+      RingInset(CircularProgressIndicatorDefaults.FullScreenPadding.value, stroke.value)
+    else null
+  SideEffect { recorder.reportRing(tagId, band) }
+}
+
 @Composable
 internal fun RenderWearCircularProgress(ctx: NodeContext) {
   val progress = ctx.number("progress")
   if (progress == null) {
-    CircularProgressIndicator(modifier = ctx.ringModifier())
+    val stroke = CircularProgressIndicatorDefaults.IndeterminateStrokeWidth
+    ctx.RecordRingBand(stroke)
+    CircularProgressIndicator(modifier = ctx.ringModifier(), strokeWidth = stroke)
   } else {
-    CircularProgressIndicator(progress = { progress }, modifier = ctx.ringModifier())
+    val stroke = CircularProgressIndicatorDefaults.largeStrokeWidth
+    ctx.RecordRingBand(stroke)
+    CircularProgressIndicator(
+      progress = { progress },
+      modifier = ctx.ringModifier(),
+      strokeWidth = stroke,
+    )
   }
 }
 
@@ -104,10 +137,13 @@ internal fun RenderWearLinearProgress(ctx: NodeContext) {
 
 @Composable
 internal fun RenderWearSegmentedProgress(ctx: NodeContext) {
+  val stroke = CircularProgressIndicatorDefaults.largeStrokeWidth
+  ctx.RecordRingBand(stroke)
   SegmentedCircularProgressIndicator(
     segmentCount = ctx.whole("segmentCount") ?: 1,
     progress = { ctx.number("progress") ?: 0f },
     modifier = ctx.ringModifier(),
+    strokeWidth = stroke,
   )
 }
 

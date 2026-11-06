@@ -17,6 +17,7 @@ import bot.charlies.androiddesign.preview.feature.preview.theme.PreviewTheme
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalTypography
 import bot.charlies.androiddesign.preview.feature.preview.theme.parseHexColor
+import bot.charlies.androiddesign.preview.feature.preview.theme.toHex
 import bot.charlies.androiddesign.preview.feature.preview.theme.toPaletteStyle
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.WearCatalog
@@ -52,6 +53,17 @@ object WearThemeResolver {
   fun resolve(design: DesignSystem): WearTheme {
     val (typography, families) = typography(design)
     return WearTheme(design, colorScheme(design), typography, families)
+  }
+
+  /**
+   * The color scheme [design] resolves to as `#RRGGBB` per role of [WearCatalog.colorRoles]: the
+   * values the previewer draws, which the Kotlin export writes into the exported theme.
+   */
+  fun roleColors(design: DesignSystem): Map<String, String> {
+    val scheme = colorScheme(design)
+    return WearCatalog.colorRoles.associateWith { role ->
+      checkNotNull(scheme.color(role)) { "'$role' is not a Wear color role" }.toHex()
+    }
   }
 
   /**

@@ -1,10 +1,12 @@
 package bot.charlies.androiddesign.preview.domain.export
 
 import bot.charlies.androiddesign.preview.domain.PreviewException
+import bot.charlies.androiddesign.preview.domain.export.wear.WearExporter
 import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.Proposal
+import bot.charlies.androiddesign.preview.model.WearCatalog
 
 /**
  * Turns a proposal into Compose source for an Android app on AndroidX material3 1.5.0-alpha. Null
@@ -16,12 +18,25 @@ import bot.charlies.androiddesign.preview.model.Proposal
  * per screen with a `@Preview`, the `private` drawable lookups that icon names and image sources
  * bound to data need, and the sample data as public data classes and `private` objects. Named
  * styles and tokens become plain parameters and modifiers, never the Styles API.
+ *
+ * A Wear proposal goes to [WearExporter] (`export/wear/`), which writes Wear Compose Material 3.
  */
 object KotlinExporter {
   private const val PACKAGE = "com.example.app"
 
-  fun export(proposal: Proposal, design: DesignSystem, screen: String? = null): String {
+  /**
+   * [wearColors] is the Wear color scheme the previewer drew a Wear proposal with: `#RRGGBB` per
+   * role of [WearCatalog.colorRoles]. The scheme is computed where Compose is available, so the
+   * caller that has it passes it in; a phone proposal ignores it.
+   */
+  fun export(
+    proposal: Proposal,
+    design: DesignSystem,
+    screen: String? = null,
+    wearColors: Map<String, String>? = null,
+  ): String {
     val catalog = Catalogs.of(proposal)
+    if (catalog === WearCatalog) return WearExporter.export(proposal, design, screen, wearColors)
     if (catalog !== M3ExpressiveCatalog) {
       throw PreviewException("exporting a ${catalog.key} proposal to Compose is not supported yet")
     }

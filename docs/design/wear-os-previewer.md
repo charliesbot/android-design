@@ -6,7 +6,7 @@
 
 The previewer draws Wear OS proposals with Google's real Wear Compose components. Wear Compose ships only as Android libraries, so the app compiles Google's own source code for Compose Multiplatform desktop, with small stand-ins (shims) for the Android-only parts. Upstream stays byte-identical to Google's release, so an upgrade replaces it wholesale with a script. A second catalog, two round watch views and a Wear theme sit on top, and every existing path (live window, headless renders, `check_proposal`, `get_tree`) handles both surfaces. `app/wear/README.md` is the operational reference: every shim, every excluded file, and the known fidelity gaps.
 
-This is the first of three Wear deliveries. Kotlin export and promoting Wear in the skills and evals come next.
+Kotlin export for Wear proposals is described under Kotlin export below.
 
 ## Why port the source
 
@@ -35,7 +35,7 @@ Rejected alternatives:
 
 - **One surface per proposal.** Every screen of a proposal uses the same catalog, the way a real project keeps its Wear app in its own module. Mixing is a validation error.
 - **Views:** `watch` (204 dp) and `watch-large` (227 dp), both round and dark. Google asks to design for the smallest round screen first and adds a breakpoint at 225 dp, so Wear size overrides use one key, `large`, applied from 225 dp.
-- **Rules:** no panes, Wear color and type roles, a 48 dp touch target, a `primary` marker on the Wear buttons (Button, CompactButton, IconButton, TextButton, EdgeButton) for the one-primary-action rule, and the `round-edge-clipped` finding. That finding flags a control or text whose bounds reach past the circle inscribed in a round view. It skips anything inside a scrolling `Screen` (the tree marks it with `scrolls`), anything behind a modal, and the components in `WearCatalog.roundEdgeNames` (EdgeButton, TimeText, the progress rings). A text is judged by the box its drawn lines cover (`text.ink` in the tree), so a centered title in a full-width box passes when its glyphs fit; a control is judged by its bounds.
+- **Rules:** no panes, Wear color and type roles, a 48 dp touch target, a `primary` marker on the Wear buttons (Button, CompactButton, IconButton, TextButton, EdgeButton) for the one-primary-action rule, and the `round-edge-clipped` finding. That finding flags a control or text whose bounds reach past the circle inscribed in a round view. It skips anything inside a scrolling `Screen` (the tree marks it with `scrolls`), anything behind a modal, and the components in `WearCatalog.roundEdgeNames` (EdgeButton, TimeText, the progress rings). A text is judged by the box its drawn lines cover (`text.ink` in the tree), so a centered title in a full-width box passes when its glyphs fit; a control is judged by its bounds. A progress ring that fills the view takes a band at the edge, so the circle every other node must stay inside shrinks by it: the ring records `ring: {padding, stroke}` in the tree (Wear's `CircularProgressIndicatorDefaults.FullScreenPadding` and the stroke width the renderer passes, in dp), and the finding says a node "reaches N dp into the progress ring" when it fits the display but not the band. The finding reads the recorded values, not constants of its own.
 
 ### Rendering
 
@@ -47,14 +47,23 @@ The shared host (back stack, local state, actions, layout tree recording, the he
 - **Type:** Roboto Flex everywhere, bundled, as Google specifies for Wear. The owner's Google Sans Flex standard covers phone, tablet and desktop only.
 - **A shared DESIGN.md:** one project has one DESIGN.md for its phone and Wear apps. Its seed and the color roles Wear has apply to Wear. Its typography does not, and a style that uses a phone-only role is unavailable to Wear screens.
 
+## Kotlin export
+
+`export_kotlin` and the `export` command write Wear Compose Material 3 for a Wear proposal, in `core/domain/.../export/wear/` next to the phone exporter, with the same layout: the theme, the Navigation 3 host for a full export, one `@Composable` per screen with a `@Preview`, then the helpers the screens call. The code targets the release in `app/wear/compose/upstream/VERSION` (`WearExporter.WEAR_COMPOSE_VERSION` repeats it in the file header).
+
+- **Frame:** `AppScaffold` sits once at the app root with `TimeText`; each screen is a `ScreenScaffold`. `scroll` on writes a `TransformingLazyColumn` with `rememberTransformingLazyColumnState` and `rememberTransformationSpec`, each child an `item` with the `transformedHeight` modifier and, where the component takes one, `SurfaceTransformation`, exactly as the renderer applies them. `scroll` off writes a `Box` that ends above the edge button, with a small `FixedScrollInfoProvider` object so the scaffold gives the button its full height. The edge button goes in the scaffold's slot. A screen with `timeText` off passes an empty `timeText` to its scaffold.
+- **Navigation:** a route key per screen and a `NavDisplay` with Wear's swipe-to-dismiss scene, built like the phone host. Opening a dialog is state in the screen (`showX`), not navigation.
+- **Theme:** `WearAppTheme` lists every Wear color role as a literal `Color(0xFF......)`, the values the previewer drew for the proposal's seed, role overrides and DESIGN.md colors. The scheme is computed in the desktop renderer (`WearThemeResolver.roleColors`), which `core:domain` cannot depend on, so the app's export path (`KotlinExport` in `:app`, used by MCP and the CLI) resolves it and passes it to `KotlinExporter.export(..., wearColors)`. Typography is Wear's default, so no font files.
+- **Size overrides:** a `large` override writes an `if (isLarge)` over the two variants; `isLargeDisplay()` tests the screen width against 225 dp.
+- **Not exported yet:** data models, bindings and templates (a Wear screen that uses them is refused), and DESIGN.md typography overrides.
+
 ## Upgrades
 
-Because upstream stays byte-identical, an upgrade replaces it wholesale with `scripts/sync_wear_compose.py` and then fixes the shims. The steps, including the version-alignment check that comes first, are in `app/wear/README.md` (Upgrading). A new Android-only API usually needs one more shim; a new component that depends on Android graphics or windows is excluded until a desktop replacement is worth writing.
+Because upstream stays byte-identical, an upgrade replaces it wholesale with `scripts/sync_wear_compose.py` and then fixes the shims. Change `WearExporter.WEAR_COMPOSE_VERSION` to the new version, and check the exporter's calls against the new API. The steps, including the version-alignment check that comes first, are in `app/wear/README.md` (Upgrading). A new Android-only API usually needs one more shim; a new component that depends on Android graphics or windows is excluded until a desktop replacement is worth writing.
 
 ## Known gaps
 
 - Crown (rotary) input is not simulated: sending a rotary event on desktop needs Compose internals by reflection, which this project rules out. The mouse wheel scrolls lists.
-- Kotlin export rejects Wear proposals until the export delivery.
 - Rendering fidelity gaps (curved text, API-gated branches, excluded components, lazy lists in the layout tree) are listed in `app/wear/README.md`.
 
 ## Links

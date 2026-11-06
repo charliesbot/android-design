@@ -1,0 +1,137 @@
+{
+  "format": 1,
+  "name": "Wear verify",
+  "navigation": { "start": "home" },
+  "screens": {
+    "home": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "edgeButton": "start", "children": ["header", "sub", "filled", "child", "go_controls", "go_ring", "go_toggles"] },
+        { "id": "header", "component": "ListHeader", "text": "Verify" },
+        { "id": "sub", "component": "ListSubHeader", "text": "Buttons", "icon": "touch_app" },
+        { "id": "filled", "component": "Button", "label": "Filled", "secondaryLabel": "Secondary label", "icon": "timer" },
+        { "id": "child", "component": "Button", "variant": "child", "label": "Child", "action": {"functionCall": {"@call": "open", "args": {"overlay": "sure"}}} },
+        { "id": "go_controls", "component": "Button", "variant": "child", "label": "Controls", "action": {"functionCall": {"@call": "navigate", "args": {"screen": "slider"}}} },
+        { "id": "go_ring", "component": "Button", "variant": "child", "label": "Ring", "action": {"functionCall": {"@call": "navigate", "args": {"screen": "ring"}}} },
+        { "id": "go_toggles", "component": "Button", "variant": "child", "label": "Toggles", "action": {"functionCall": {"@call": "navigate", "args": {"screen": "toggles"}}} },
+        { "id": "start", "component": "EdgeButton", "label": "Start", "icon": "play_arrow", "primary": true, "action": {"functionCall": {"@call": "open", "args": {"overlay": "done"}}} },
+        { "id": "sure", "component": "AlertDialog", "icon": "restart_alt", "title": "Reset timer?", "text": "The countdown starts over.", "confirm": "yes", "dismiss": "no" },
+        { "id": "yes", "component": "IconButton", "variant": "filled", "icon": "check", "contentDescription": "Reset", "primary": true, "action": {"functionCall": {"@call": "dismiss"}} },
+        { "id": "no", "component": "IconButton", "variant": "filledTonal", "icon": "close", "contentDescription": "Cancel", "action": {"functionCall": {"@call": "dismiss"}} },
+        { "id": "done", "component": "ConfirmationDialog", "icon": "check", "text": "Started" }
+      ]
+    },
+    "toggles": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "edgeButton": "back", "children": ["header", "vibrate"] },
+        { "id": "header", "component": "ListHeader", "text": "Toggles" },
+        { "id": "vibrate", "component": "SwitchButton", "label": "Vibrate", "secondaryLabel": "On finish", "icon": "vibration", "checked": true },
+        { "id": "back", "component": "EdgeButton", "label": "Back", "primary": true, "action": {"functionCall": {"@call": "back"}} }
+      ]
+    },
+    "checks": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "children": ["sound"] },
+        { "id": "sound", "component": "CheckboxButton", "label": "Sound", "checked": true }
+      ]
+    },
+    "buttons_b": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "children": ["tonal", "variant", "outlined"] },
+        { "id": "tonal", "component": "Button", "variant": "filledTonal", "label": "Tonal" },
+        { "id": "variant", "component": "Button", "variant": "filledVariant", "label": "Variant" },
+        { "id": "outlined", "component": "Button", "variant": "outlined", "label": "Outlined" }
+      ]
+    },
+    "buttons_c": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "children": ["plain_child", "compact", "group"] },
+        { "id": "plain_child", "component": "Button", "variant": "child", "label": "Child" },
+        { "id": "compact", "component": "CompactButton", "variant": "filledTonal", "label": "Compact", "icon": "add" },
+        { "id": "group", "component": "ButtonGroup", "children": ["minus", "digit"] },
+        { "id": "minus", "component": "IconButton", "variant": "filledTonal", "icon": "remove", "contentDescription": "Less" },
+        { "id": "digit", "component": "TextButton", "variant": "filled", "label": "5" }
+      ]
+    },
+    "cards_a": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "children": ["app", "title"] },
+        { "id": "app", "component": "AppCard", "appName": "Timer", "appIcon": "timer", "title": "Tea is ready", "time": "Now", "body": "Steeped for four minutes" },
+        { "id": "title", "component": "TitleCard", "title": "Weekly goal", "time": "Mon", "subtitle": "Streak", "body": "3 of 5 timers done" }
+      ]
+    },
+    "cards_b": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "children": ["card", "pic"] },
+        { "id": "card", "component": "Card", "children": ["card_col"] },
+        { "id": "card_col", "component": "Column", "spacing": "xs", "children": ["card_icon", "card_text"] },
+        { "id": "card_icon", "component": "Icon", "name": "favorite", "filled": true, "color": "primary", "size": 20, "contentDescription": "Favorite" },
+        { "id": "card_text", "component": "Text", "text": "Custom card content", "type": "bodySmall" },
+        { "id": "pic", "component": "Image", "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "aspectRatio": 2, "fit": "crop", "contentDescription": "Sample image" }
+      ]
+    },
+    "choices": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "children": ["radio_a", "radio_b", "round_row"] },
+        { "id": "radio_a", "component": "RadioButton", "label": "Soft chime", "selected": true },
+        { "id": "radio_b", "component": "RadioButton", "label": "Bell", "secondaryLabel": "Louder" },
+        { "id": "round_row", "component": "Row", "spacing": "sm", "arrangement": "center", "children": ["icon_toggle", "text_toggle"] },
+        { "id": "icon_toggle", "component": "IconToggleButton", "icon": "notifications", "checked": true, "contentDescription": "Notifications" },
+        { "id": "text_toggle", "component": "TextToggleButton", "label": "Aa", "checked": false }
+      ]
+    },
+    "meter": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "children": ["bar", "gap", "badge"] },
+        { "id": "bar", "component": "LinearProgressIndicator", "progress": 0.4 },
+        { "id": "gap", "component": "Spacer", "height": "md" },
+        { "id": "badge", "component": "Box", "contentAlignment": "center", "children": ["badge_text"] },
+        { "id": "badge_text", "component": "Text", "text": "Saved locally", "type": "labelSmall", "color": "onSurfaceVariant", "align": "center", "maxLines": 1, "overflow": "ellipsis" }
+      ]
+    },
+    "ring": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "scroll": false, "edgeButton": "pause", "children": ["ring", "center"] },
+        { "id": "ring", "component": "CircularProgressIndicator", "progress": 0.6 },
+        { "id": "center", "component": "Box", "contentAlignment": "center", "children": ["time"] },
+        { "id": "time", "component": "Text", "text": "03:00", "type": "numeralLarge", "color": "primaryDim", "align": "center", "sizeClass": {"large": {"type": "numeralExtraLarge"}} },
+        { "id": "pause", "component": "EdgeButton", "size": "small", "label": "Pause", "icon": "pause", "primary": true, "action": {"functionCall": {"@call": "navigate", "args": {"screen": "segments"}}} }
+      ]
+    },
+    "segments": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "scroll": false, "edgeButton": "back", "children": ["ring", "center"] },
+        { "id": "ring", "component": "SegmentedCircularProgressIndicator", "segmentCount": 5, "progress": 0.6 },
+        { "id": "center", "component": "Box", "contentAlignment": "center", "children": ["count"] },
+        { "id": "count", "component": "Text", "text": "3/5", "type": "numeralMedium", "align": "center" },
+        { "id": "back", "component": "EdgeButton", "size": "small", "label": "Back", "primary": true, "action": {"functionCall": {"@call": "back"}} }
+      ]
+    },
+    "slider": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "scroll": false, "timeText": false, "edgeButton": "next", "children": ["slider"] },
+        { "id": "slider", "component": "Slider", "value": 6, "range": [0, 10], "steps": 9, "contentDescription": "Volume" },
+        { "id": "next", "component": "EdgeButton", "size": "small", "label": "Stepper", "primary": true, "action": {"functionCall": {"@call": "navigate", "args": {"screen": "stepper"}}} }
+      ]
+    },
+    "stepper": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "scroll": false, "timeText": false, "children": ["stepper"] },
+        { "id": "stepper", "component": "Stepper", "value": 5, "range": [1, 30], "steps": 28, "content": "minutes", "contentDescription": "Minutes" },
+        { "id": "minutes", "component": "Text", "text": "5 min", "type": "numeralSmall" }
+      ]
+    }
+  }
+}

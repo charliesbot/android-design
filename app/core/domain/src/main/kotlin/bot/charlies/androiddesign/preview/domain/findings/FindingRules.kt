@@ -351,9 +351,13 @@ object FindingRules {
   /**
    * On a round view, a control or a text whose bounds reach past the circle inscribed in the view:
    * the display cuts off what sticks out. A scrolling list is exempt (its items scroll clear, and
-   * Wear's list transforms them at the edge), found by a `scrolls` ancestor. So are the components
-   * the catalog makes for the edge, and anything behind an open modal. The worst corner is
-   * reported.
+   * Wear's list transforms them at the edge). So are the components the catalog makes for the edge,
+   * and anything behind an open modal. The worst corner is reported.
+   *
+   * A progress ring that fills the view takes a band at the edge, so the circle every other node
+   * must stay inside shrinks by the band the ring recorded (its padding plus its stroke, from
+   * Wear's defaults at render time). A node that fits the display but reaches into that band is
+   * reported as reaching into the ring.
    */
   private fun roundEdgeClipped(view: View): List<Finding> {
     if (!view.tree.view.round) return emptyList()
@@ -362,6 +366,7 @@ object FindingRules {
     val centerX = width / 2
     val centerY = height / 2
     val radius = minOf(width, height) / 2
+    val band = ringBand(view, width, height)
     return view.nodes
       .filter { node ->
         node.isLaidOut &&
@@ -380,17 +385,43 @@ object FindingRules {
             hypot(x - centerX, y - centerY)
           }
         val outside = reach - radius
-        if (outside > EDGE_SLACK_DP) {
-          errorFinding(
-            node,
-            FindingRule.RoundEdgeClipped,
-            "reaches ${dp(outside)} dp outside the round edge",
-          )
-        } else {
-          null
+        val intoRing = reach - (radius - band)
+        when {
+          outside > EDGE_SLACK_DP ->
+            errorFinding(
+              node,
+              FindingRule.RoundEdgeClipped,
+              "reaches ${dp(outside)} dp outside the round edge",
+            )
+          band > 0f && intoRing > EDGE_SLACK_DP ->
+            errorFinding(
+              node,
+              FindingRule.RoundEdgeClipped,
+              "reaches ${dp(intoRing)} dp into the progress ring",
+            )
+          else -> null
         }
       }
   }
+
+  /**
+   * How far in from the edge the widest progress ring that fills the view reaches, or 0. A ring
+   * counts when it recorded its band, was laid out over the whole view, and is not behind an open
+   * modal (a dialog is drawn over the ring, not inside it).
+   */
+  private fun ringBand(view: View, width: Float, height: Float): Float =
+    view.nodes
+      .filter { node ->
+        val b = node.bounds
+        node.ring != null &&
+          node.isLaidOut &&
+          !view.isBehindModal(node) &&
+          b.x <= EDGE_SLACK_DP &&
+          b.y <= EDGE_SLACK_DP &&
+          b.x + b.width >= width - EDGE_SLACK_DP &&
+          b.y + b.height >= height - EDGE_SLACK_DP
+      }
+      .maxOfOrNull { checkNotNull(it.ring).inset } ?: 0f
 
   // endregion
 

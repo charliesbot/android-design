@@ -236,8 +236,10 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
       title = "Export to Jetpack Compose",
       description =
         "Returns Kotlin source for one screen, or for every screen with the Navigation 3 host when " +
-          "screen is omitted: Material 3 components, the theme, sample data and previews. The " +
-          "proposal must be valid.",
+          "screen is omitted: Material 3 components, the theme, sample data and previews. A Wear " +
+          "proposal exports as Wear Compose Material 3: the scaffolds, the scrolling list, the " +
+          "theme with the exact colors the previewer draws, and previews. The proposal must be " +
+          "valid.",
       schema = schema(string("screen", "Screen id. Omit to export every screen.")),
     ) { args ->
       controller.exportKotlin(args.string("screen"))

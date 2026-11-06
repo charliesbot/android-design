@@ -46,6 +46,11 @@ data class LayoutNode(
   /** The touch area, which is at least 48 x 48 dp for interactive components. */
   val touch: Bounds? = null,
   val text: TextInfo? = null,
+  /**
+   * What a ring that fills the display takes from the edge, when this node is one. Omitted for
+   * every other node.
+   */
+  val ring: RingInset? = null,
   val roles: NodeRoles? = null,
   val colors: NodeColors? = null,
   val a11y: A11yInfo? = null,
@@ -72,6 +77,18 @@ data class TextInfo(
    */
   val ink: Bounds? = null,
 )
+
+/**
+ * The band a progress ring that fills a round display takes at its edge, from Wear's public
+ * defaults at render time: the [padding] between the ring and the edge, and its [stroke] width, in
+ * dp. Content inside the circle but within [inset] of the edge reaches into the ring.
+ */
+@Serializable
+data class RingInset(val padding: Float, val stroke: Float) {
+  /** How far in from the display's edge the ring reaches. */
+  val inset: Float
+    get() = padding + stroke
+}
 
 @Serializable
 data class NodeRoles(

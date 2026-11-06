@@ -1,7 +1,7 @@
 package bot.charlies.androiddesign.preview.app.cli
 
+import bot.charlies.androiddesign.preview.app.export.KotlinExport
 import bot.charlies.androiddesign.preview.data.ProposalReader
-import bot.charlies.androiddesign.preview.domain.export.KotlinExporter
 import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -9,9 +9,9 @@ import java.nio.file.Path
 /**
  * `export <proposal.json> [--design <DESIGN.md>] [--screen id]`
  *
- * Prints Jetpack Compose source for one screen, or for every screen with the navigation host, to
- * stdout. Exit 0 on success, 2 when the proposal is invalid (the errors go to stderr, stdout stays
- * empty), 64 for usage mistakes.
+ * Prints Jetpack Compose source (Wear Compose for a Wear proposal) for one screen, or for every
+ * screen with the navigation host, to stdout. Exit 0 on success, 2 when the proposal is invalid
+ * (the errors go to stderr, stdout stays empty), 64 for usage mistakes.
  */
 object ExportCommand : Command {
   override val name = "export"
@@ -42,7 +42,7 @@ object ExportCommand : Command {
       err.println("no such screen: $screen (screens: ${parsed.screens.keys.joinToString()})")
       return ExitCode.USAGE
     }
-    out.print(KotlinExporter.export(parsed, loaded.designSystem, screen))
+    out.print(KotlinExport.of(parsed, loaded.designSystem, screen))
     out.flush()
     return ExitCode.OK
   }

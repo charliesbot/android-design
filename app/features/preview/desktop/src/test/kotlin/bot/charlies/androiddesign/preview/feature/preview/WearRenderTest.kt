@@ -4,6 +4,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.ScrollWheel
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performMouseInput
+import androidx.wear.compose.material3.CircularProgressIndicatorDefaults
 import androidx.wear.compose.material3.Typography
 import bot.charlies.androiddesign.preview.data.ProposalCodec
 import bot.charlies.androiddesign.preview.data.ProposalParse
@@ -35,6 +36,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorType
@@ -143,6 +145,73 @@ class WearRenderTest {
         proposal.screens.keys.flatMap { draw(it, view).tree.findings }
       }
     assertEquals(emptyList(), shipped.filter { it.rule == FindingRule.RoundEdgeClipped })
+  }
+
+  /** A fixed run screen: a full-screen ring and a Column of text lines inside it. */
+  private fun runScreen(topPadding: String): Proposal {
+    val json =
+      """
+      {"format":1,"navigation":{"start":"home"},
+       "screens":{"home":{"catalogId":"${WearCatalog.ID}","components":[
+        {"id":"root","component":"Screen","scroll":false,"timeText":false,"children":["ring","col"]},
+        {"id":"ring","component":"CircularProgressIndicator","progress":0.62},
+        {"id":"col","component":"Column","horizontalAlignment":"center","children":["gap","dist","time","stats"]},
+        {"id":"gap","component":"Spacer","height":"$topPadding"},
+        {"id":"dist","component":"Text","text":"3.1 / 5 km \u00b7 1.9 left","type":"labelMedium","align":"center"},
+        {"id":"time","component":"Text","text":"24:18","type":"numeralLarge","align":"center"},
+        {"id":"stats","component":"Text","text":"5:12 /km \u00b7 148 bpm","type":"bodySmall","align":"center"}]}}}
+      """
+        .trimIndent()
+    return assertIs<ProposalParse.Parsed>(ProposalCodec.parse(json)).proposal
+  }
+
+  @Test
+  fun `a full-screen ring records the band it takes from Wear's defaults`() {
+    val parsed = runScreen("none")
+    val tree = draw("home", Views.WatchLarge, RenderSource(parsed, design(parsed.theme), null)).tree
+    val ring = assertNotNull(tree.node("ring").ring)
+    assertEquals(CircularProgressIndicatorDefaults.FullScreenPadding.value, ring.padding)
+    assertTrue(ring.stroke > 0f, "a stroke width: $ring")
+    assertEquals(null, tree.node("col").ring, "only a ring records a band")
+  }
+
+  @Test
+  fun `a line inside a full-screen ring's band reports round-edge-clipped`() {
+    // The distance line sits inside the circle but reaches into the ring; the numeral and the
+    // stats below it are clear.
+    val parsed = runScreen("xl")
+    val tree = draw("home", Views.WatchLarge, RenderSource(parsed, design(parsed.theme), null)).tree
+    val hits = tree.findings.filter { it.rule == FindingRule.RoundEdgeClipped }
+    assertEquals(listOf("dist"), hits.map { it.id }, "${tree.findings}")
+    assertTrue("into the progress ring" in hits.single().detail.orEmpty(), "${hits.single()}")
+    // Without the recorded band the round edge alone lets the line through.
+    val unaware = tree.copy(nodes = tree.nodes.map { it.copy(ring = null) }, findings = emptyList())
+    assertEquals(
+      emptyList(),
+      FindingRules.evaluate(unaware).filter { it.rule == FindingRule.RoundEdgeClipped },
+    )
+  }
+
+  @Test
+  fun `the same line further in from the ring passes`() {
+    val parsed = runScreen("xxxl")
+    val tree = draw("home", Views.WatchLarge, RenderSource(parsed, design(parsed.theme), null)).tree
+    assertEquals(
+      emptyList(),
+      tree.findings.filter { it.rule == FindingRule.RoundEdgeClipped },
+      "${tree.nodes.map { it.id + it.text?.ink }}",
+    )
+  }
+
+  @Test
+  fun `a stepper's content is drawn in onSurface, Wear's default for it`() {
+    val tree = draw("adjust", Views.Watch).tree
+    assertEquals(
+      design().let { WearThemeResolver.resolve(it).color("onSurface").toHex() },
+      tree.node("minutes").colors?.content,
+      "${tree.node("minutes").roles}",
+    )
+    assertEquals("onSurface", tree.node("minutes").roles?.content)
   }
 
   @Test

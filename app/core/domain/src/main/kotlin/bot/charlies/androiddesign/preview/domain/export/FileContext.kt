@@ -35,6 +35,9 @@ internal class FileContext {
   /** Material Symbol drawable names (`R.drawable.<name>`) the code refers to. */
   val drawables: SortedSet<String> = sortedSetOf()
 
+  /** Image drawable names (`R.drawable.<name>`) for the bitmaps the code refers to. */
+  val images: SortedSet<String> = sortedSetOf()
+
   /** Font resource names (`R.font.<name>`) the code refers to. */
   val fonts: SortedSet<String> = sortedSetOf()
 
@@ -55,6 +58,11 @@ internal class FileContext {
     val name = use(fqn)
     optIns += name
     return name
+  }
+
+  fun image(name: String): String {
+    images += name
+    return "R.drawable.$name"
   }
 
   fun drawable(name: String): String {
