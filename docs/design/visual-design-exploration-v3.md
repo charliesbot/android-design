@@ -48,7 +48,7 @@ The app lives in `app/` at the root of this repository, never under `skills/`, w
 | Agent connection | Official Kotlin MCP SDK `io.modelcontextprotocol:kotlin-sdk` 0.16.0, `StdioServerTransport` |
 | Parsing | kotlinx.serialization for proposals, and a Kotlin YAML library for `DESIGN.md` front matter |
 
-The desktop material3 covers the skill's component guidance. Every name that `skills/android-design-explore/references/compose-mapping.md` relies on exists in the desktop jar. The only miss is `isDark`, a false match, because the mapping uses `isDark` as a MaterialKolor parameter. The 16 names the desktop jar lacks are Android-only APIs: wallpaper dynamic color, secure window flags, and carousel keyline internals.
+The desktop material3 covers the skill's component guidance; [component-coverage.md](component-coverage.md) tracks which of its components the catalog draws so far. Every name that `skills/android-design-explore/references/compose-mapping.md` relies on exists in the desktop jar. The only miss is `isDark`, a false match, because the mapping uses `isDark` as a MaterialKolor parameter. The 16 names the desktop jar lacks are Android-only APIs: wallpaper dynamic color, secure window flags, and carousel keyline internals.
 
 **Architecture.** The app follows the `android-dev` skill's layering and conventions, adapted for a desktop platform, for consistency with the owner's apps. Its Android bootstrap scripts do not apply.
 
