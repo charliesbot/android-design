@@ -31,6 +31,7 @@ import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.VerticalFloatingToolbar
 import androidx.compose.material3.WideNavigationRail
 import androidx.compose.material3.WideNavigationRailItem
@@ -38,25 +39,46 @@ import androidx.compose.material3.WideNavigationRailValue
 import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
+import bot.charlies.androiddesign.preview.domain.CollapsingAppBars
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.TypeRole
+
+/** The scroll behavior of the Scaffold whose top bar this is, if its bar collapses. */
+@OptIn(ExperimentalMaterial3Api::class)
+private val LocalTopBarScroll = compositionLocalOf<TopAppBarScrollBehavior?> { null }
 
 private val ScaffoldAmbient = Ambient(ColorRole.Background, ColorRole.OnBackground)
 
 internal fun NodeContext.scaffoldLook() = Look(ScaffoldAmbient)
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderScaffold(ctx: NodeContext) {
   val env = ctx.env
   val rail = ctx.props.childId("navigationRail")
+  val topBar = ctx.props.childId("topBar")?.let(env.nodes::get)
+  // Like the export, a medium or large bar collapses as the content scrolls. At rest it is
+  // expanded.
+  val collapsing =
+    topBar != null &&
+      CollapsingAppBars.collapsesAt(topBar, env.sizeClass, effectiveProps(topBar, env))
+  val scrollBehavior =
+    if (collapsing) TopAppBarDefaults.exitUntilCollapsedScrollBehavior() else null
   val scaffold: @Composable (Modifier) -> Unit = { modifier ->
     Scaffold(
-      modifier = modifier,
-      topBar = { ctx.Child("topBar", 1, ChildHost.Wrap) },
+      modifier =
+        if (scrollBehavior != null) modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        else modifier,
+      topBar = {
+        CompositionLocalProvider(LocalTopBarScroll provides scrollBehavior) {
+          ctx.Child("topBar", 1, ChildHost.Wrap)
+        }
+      },
       bottomBar = { ctx.Child("bottomBar", 3, ChildHost.Flow) },
       floatingActionButton = { ctx.Child("floatingActionButton", 4, ChildHost.Wrap) },
       snackbarHost = {
@@ -115,8 +137,7 @@ internal fun RenderTopAppBar(ctx: NodeContext) {
   }
   val modifier = ctx.modifier()
   val insets = WindowInsets(0, 0, 0, 0)
-  // Medium and large bars draw expanded; the behavior is only here so they are not collapsed.
-  val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+  val scroll = LocalTopBarScroll.current
   when (ctx.enum("size")) {
     "center" ->
       CenterAlignedTopAppBar(titleSlot, modifier, navigation, actions, windowInsets = insets)

@@ -6,6 +6,8 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import bot.charlies.androiddesign.preview.feature.preview.theme.ThemeResolver
 import bot.charlies.androiddesign.preview.feature.preview.theme.toHex
 import bot.charlies.androiddesign.preview.model.ColorRole
@@ -550,6 +552,51 @@ class RendererBehaviorTest {
   fun `a row without stretch keeps its columns as tall as their content`() {
     val tree = render(panes(null), view = Views.Tablet).tree
     assertTrue(tree.node("left").bounds.height < tree.node("root").bounds.height / 2)
+  }
+
+  private fun collapsingScreen(size: String, extra: String = "") =
+    singleScreen(
+      """{"id":"root","component":"Scaffold","topBar":"bar","content":"col"},""" +
+        """{"id":"bar","component":"TopAppBar","size":"$size","title":"Title"$extra},""" +
+        """{"id":"col","component":"Column","scroll":true,"children":[${(0 until 60).joinToString(",") { "\"t$it\"" }}]},""" +
+        (0 until 60).joinToString(",") { """{"id":"t$it","component":"Text","text":"Row $it"}""" },
+    )
+
+  @Test
+  fun `medium and large bars draw expanded at rest and collapse as the content scrolls`() {
+    for ((size, expanded) in listOf("medium" to 112f, "large" to 120f)) {
+      val proposal = collapsingScreen(size)
+      val atRest = render(proposal).tree.node("bar").bounds.height
+      assertEquals(expanded, atRest, "$size at rest")
+      val scrolled =
+        render(proposal) {
+            settleForTest()
+            onNodeWithTag("col", useUnmergedTree = true).performTouchInput { swipeUp() }
+            settleForTest()
+          }
+          .tree
+          .node("bar")
+          .bounds
+          .height
+      assertEquals(64f, scrolled, "$size after scrolling")
+    }
+  }
+
+  @Test
+  fun `a collapsing bar hidden at the window size does not hold back the content scroll`() {
+    val proposal = collapsingScreen("large", ""","showIn":["compact"]""")
+    val before = render(proposal, view = Views.Tablet).tree.node("t10").bounds.y
+    val after =
+      render(proposal, view = Views.Tablet) {
+          settleForTest()
+          onNodeWithTag("col", useUnmergedTree = true).performTouchInput { swipeUp() }
+          settleForTest()
+        }
+        .tree
+        .node("t10")
+        .bounds
+        .y
+    assertTrue(after < before, "scrolled: $before to $after")
   }
 
   private fun androidx.compose.ui.test.ComposeUiTest.settleForTest() {
