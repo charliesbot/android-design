@@ -7,9 +7,10 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Where each overlay of a screen draws. A menu opens beside a component: the one named by its
- * `anchor`, or the SplitButton that names it as its `menu`. Every other overlay (a sheet, a dialog,
- * a menu nobody holds) draws at screen level. The renderer and the exporter both follow this, so
- * the preview and the exported code place overlays the same way.
+ * `anchor`, or the SplitButton that names it as its `menu`. A snackbar draws in the snackbar slot
+ * of the screen's [snackbarScaffold], above its FAB and navigation bar. Every other overlay (a
+ * sheet, a dialog, a menu nobody holds) draws at screen level. The renderer and the exporter both
+ * follow this, so the preview and the exported code place overlays the same way.
  */
 class OverlayPlacement(screen: Screen) {
   private val overlayNames: Set<String> = Catalogs.of(screen).overlayNames
@@ -28,10 +29,23 @@ class OverlayPlacement(screen: Screen) {
       .mapNotNull { it.stringProp("menu") }
       .toSet()
 
+  /**
+   * The id of the Scaffold whose snackbar slot holds the screen's snackbars: the root when it is a
+   * Scaffold, else the first Scaffold in document order. Null when the screen has none.
+   */
+  val snackbarScaffold: String? =
+    screen.components.firstOrNull { it.id == ComponentNode.ROOT_ID && it.component == SCAFFOLD }?.id
+      ?: screen.components.firstOrNull { it.component == SCAFFOLD }?.id
+
+  /** The snackbars of the screen, in document order. They draw in [snackbarScaffold]. */
+  val snackbars: List<ComponentNode> =
+    if (snackbarScaffold == null) emptyList()
+    else screen.components.filter { it.component == SNACKBAR }
+
   /** The overlays that draw at screen level, in document order. */
   val screenLevel: List<ComponentNode> =
     screen.components.filter { node ->
-      node.component in overlayNames && !isBesideComponent(node)
+      node.component in overlayNames && !isBesideComponent(node) && !isSnackbarInScaffold(node)
     }
 
   /** The id of the menu anchored to [componentId] by `Menu.anchor`, or null. */
@@ -41,11 +55,16 @@ class OverlayPlacement(screen: Screen) {
   private fun ComponentNode.stringProp(key: String): String? =
     (props[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
+  private fun isSnackbarInScaffold(node: ComponentNode): Boolean =
+    node.component == SNACKBAR && snackbarScaffold != null
+
   private fun isBesideComponent(node: ComponentNode): Boolean =
     node.component == MENU && (node.id in anchored.values || node.id in splitButtonMenus)
 
   private companion object {
     const val MENU = "Menu"
     const val SPLIT_BUTTON = "SplitButton"
+    const val SCAFFOLD = "Scaffold"
+    const val SNACKBAR = "Snackbar"
   }
 }

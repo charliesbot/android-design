@@ -15,6 +15,7 @@ internal object Sym {
   const val mutableFloatStateOf = "$RUNTIME.mutableFloatStateOf"
   const val getValue = "$RUNTIME.getValue"
   const val setValue = "$RUNTIME.setValue"
+  const val LaunchedEffect = "$RUNTIME.LaunchedEffect"
 
   // foundation
   const val Image = "androidx.compose.foundation.Image"
@@ -47,6 +48,7 @@ internal object Sym {
   const val height = "$LAYOUT.height"
   const val size = "$LAYOUT.size"
   const val heightIn = "$LAYOUT.heightIn"
+  const val widthIn = "$LAYOUT.widthIn"
   const val offset = "$LAYOUT.offset"
   const val aspectRatio = "$LAYOUT.aspectRatio"
 
@@ -59,6 +61,8 @@ internal object Sym {
   const val contentDescription = "$UI.semantics.contentDescription"
   const val ContentScale = "$UI.layout.ContentScale"
   const val painterResource = "$UI.res.painterResource"
+  const val Dialog = "$UI.window.Dialog"
+  const val DialogProperties = "$UI.window.DialogProperties"
   const val Color = "$UI.graphics.Color"
   const val RectangleShape = "$UI.graphics.RectangleShape"
   const val Preview = "$UI.tooling.preview.Preview"

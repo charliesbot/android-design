@@ -59,6 +59,9 @@ internal fun RenderScaffold(ctx: NodeContext) {
       topBar = { ctx.Child("topBar", 1, ChildHost.Wrap) },
       bottomBar = { ctx.Child("bottomBar", 3, ChildHost.Flow) },
       floatingActionButton = { ctx.Child("floatingActionButton", 4, ChildHost.Wrap) },
+      snackbarHost = {
+        if (ctx.node.id == env.placement.snackbarScaffold) SnackbarSlot(env)
+      },
       containerColor = env.color(ColorRole.Background),
       contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
@@ -187,7 +190,7 @@ internal fun RenderNavigationBarItem(ctx: NodeContext) {
   ShortNavigationBarItem(
     selected = selected,
     onClick = { ctx.select() },
-    icon = { IconSlot(selectedIcon(ctx, selected), filled = selected) },
+    icon = { ctx.WithBadge { IconSlot(selectedIcon(ctx, selected), filled = selected) } },
     label = { ctx.PartText(ctx.string("label").orEmpty(), maxLines = 1) },
     modifier = ctx.modifier(),
   )
@@ -268,8 +271,14 @@ internal fun RenderTab(ctx: NodeContext) {
     selected = selected,
     onClick = { ctx.select() },
     modifier = ctx.modifier(),
-    text = { ctx.PartText(ctx.string("label").orEmpty(), maxLines = 1) },
-    icon = icon?.let { name -> { IconSlot(name) } },
+    // The badge sits on the icon, else on the label.
+    text = {
+      val label: @Composable () -> Unit = {
+        ctx.PartText(ctx.string("label").orEmpty(), maxLines = 1)
+      }
+      if (icon == null) ctx.WithBadge(label) else label()
+    },
+    icon = icon?.let { name -> { ctx.WithBadge { IconSlot(name) } } },
     unselectedContentColor = ctx.env.color(ColorRole.OnSurfaceVariant),
   )
 }
@@ -316,7 +325,7 @@ internal fun RenderNavigationRailItem(ctx: NodeContext) {
   WideNavigationRailItem(
     selected = selected,
     onClick = { ctx.select() },
-    icon = { IconSlot(selectedIcon(ctx, selected), filled = selected) },
+    icon = { ctx.WithBadge { IconSlot(selectedIcon(ctx, selected), filled = selected) } },
     label = { ctx.PartText(ctx.string("label").orEmpty(), maxLines = 1) },
     railExpanded = ctx.host.railExpanded,
     modifier = ctx.modifier(),

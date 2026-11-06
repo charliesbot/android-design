@@ -47,6 +47,17 @@ sealed interface PropKind {
 
   /** `{"@path": "..."}` only. */
   data object Binding : PropKind
+
+  /**
+   * A badge on an icon: `true` draws a small badge, a number or a string of at most
+   * [BADGE_MAX_CHARACTERS] characters draws a large badge with that text, `false` draws none.
+   */
+  data object Badge : PropKind
+
+  companion object {
+    /** The most characters a large badge's label holds, a `+` included. */
+    const val BADGE_MAX_CHARACTERS = 4
+  }
 }
 
 /**
@@ -173,7 +184,11 @@ data class ComponentDef(
 enum class ActionFunction(val wire: String, val argument: String?, val description: String) {
   Navigate("navigate", "screen", "Opens the screen with this id."),
   Back("back", null, "Goes back one screen."),
-  Open("open", "overlay", "Opens a BottomSheet, Dialog or Menu of the same screen by id."),
+  Open(
+    "open",
+    "overlay",
+    "Opens a BottomSheet, Dialog, Menu, SideSheet or Snackbar of the same screen by id.",
+  ),
   Dismiss("dismiss", null, "Closes the open overlay.");
 
   companion object {
@@ -354,7 +369,7 @@ object M3ExpressiveCatalog : Catalog {
     components.filter { it.overlay }.map { it.name }.toSet()
   }
 
-  override val modalNames: Set<String> = setOf("BottomSheet", "Dialog")
+  override val modalNames: Set<String> = setOf("BottomSheet", "Dialog", "SideSheet")
 
   override val fabNames: Set<String> = setOf("FloatingActionButton", "FabMenu")
 
@@ -433,6 +448,16 @@ internal fun icon(name: String = "icon", required: Boolean = false) =
   PropDef(name, PropKind.Icon, required, "Material Symbols name, such as \"home\".")
 
 internal fun action() = PropDef("action", PropKind.Action, description = "What a tap does.")
+
+internal fun badge() =
+  PropDef(
+    "badge",
+    PropKind.Badge,
+    description =
+      "A badge on the icon's upper trailing corner: true draws a small one, a number or a " +
+        "string of at most ${PropKind.BADGE_MAX_CHARACTERS} characters (such as \"99+\") " +
+        "draws a large one with that text.",
+  )
 
 internal val interactiveProps =
   listOf(
@@ -718,6 +743,7 @@ private fun structure(): List<ComponentDef> =
         icon(required = true),
         icon("selectedIcon"),
         bool("selected"),
+        badge(),
         action(),
       ),
       interactive = true,
@@ -739,7 +765,7 @@ private fun structure(): List<ComponentDef> =
       ComponentGroup.Structure,
       "One tab of a Tabs row. Its content is the screen its action navigates to.",
       "Tab",
-      listOf(text("label", required = true), icon(), bool("selected"), action()),
+      listOf(text("label", required = true), icon(), bool("selected"), badge(), action()),
       interactive = true,
     ),
     ComponentDef(
@@ -759,6 +785,7 @@ private fun structure(): List<ComponentDef> =
         icon(required = true),
         icon("selectedIcon"),
         bool("selected"),
+        badge(),
         action(),
       ),
       interactive = true,
@@ -875,6 +902,7 @@ private fun actions(): List<ComponentDef> =
         oneOf("shape", "round", "square", default = "round"),
         oneOf("width", "narrow", "uniform", "wide", default = "uniform"),
         icon(required = true),
+        badge(),
         bool("toggle", "Makes the button a toggle."),
         bool("checked", "State of a toggle."),
         action(),
@@ -1130,6 +1158,40 @@ private fun overlays(): List<ComponentDef> =
       "DropdownMenuItem",
       listOf(text("label", required = true), icon(), action()),
       interactive = true,
+    ),
+    ComponentDef(
+      "SideSheet",
+      ComponentGroup.Overlays,
+      "A modal side sheet on the trailing edge, with a header (title, close icon button) over " +
+        "its content. Optional content beside the main content is a standard side sheet: a " +
+        "screen with pane role supporting.",
+      "Dialog (full window) holding a scrim and a Surface, composed; no side sheet composable",
+      listOf(
+        text("title", required = true),
+        PropDef(
+          "back",
+          PropKind.Action,
+          description =
+            "Shows a back icon button at the header's leading side and runs this on a tap.",
+        ),
+        children("content", required = true),
+      ),
+      overlay = true,
+      stretchesChildren = true,
+    ),
+    ComponentDef(
+      "Snackbar",
+      ComponentGroup.Overlays,
+      "A brief message at the bottom of the screen, in the Scaffold's snackbar slot above the " +
+        "FAB and the navigation bar.",
+      "SnackbarHost in Scaffold(snackbarHost), Snackbar via SnackbarHostState.showSnackbar",
+      listOf(
+        text("message", required = true),
+        text("actionLabel", description = "The label of the one action a snackbar may have."),
+        PropDef("action", PropKind.Action, description = "What a tap on the action label does."),
+        bool("dismiss", "Shows a close icon that dismisses the snackbar."),
+      ),
+      overlay = true,
     ),
   )
 

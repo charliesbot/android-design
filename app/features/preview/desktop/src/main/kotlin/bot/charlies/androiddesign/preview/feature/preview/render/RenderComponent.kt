@@ -59,5 +59,7 @@ internal fun RenderComponent(ctx: NodeContext) {
     "Dialog" -> RenderDialog(ctx)
     "Menu" -> RenderMenu(ctx)
     "MenuItem" -> RenderMenuItem(ctx)
+    "SideSheet" -> RenderSideSheet(ctx)
+    "Snackbar" -> RenderSnackbar(ctx)
   }
 }

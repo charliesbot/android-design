@@ -1007,4 +1007,126 @@ internal val componentCases: List<ComponentCase> =
           "Text(\"Edit\")",
         ),
     ),
+    case(
+      "SideSheet",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"Filters","action":{"functionCall":{"@call":"open","args":{"overlay":"filters"}}}}""",
+          """{"id":"filters","component":"SideSheet","title":"Filters","back":{"functionCall":{"@call":"open","args":{"overlay":"more"}}},"content":["t"]}""",
+          """{"id":"t","component":"Text","text":"Sort by"}""",
+          """{"id":"more","component":"SideSheet","title":"More","content":[]}""",
+        ),
+      expect =
+        listOf(
+          "var showFilters by remember { mutableStateOf(false) }",
+          "onClick = { showFilters = true }",
+          "if (showFilters) {",
+          "Dialog(",
+          "onDismissRequest = { showFilters = false }",
+          "properties = DialogProperties(usePlatformDefaultWidth = false)",
+          "clickable(interactionSource = null, indication = null) { showFilters = false }",
+          "Modifier.align(Alignment.CenterEnd).widthIn(max = 400.dp).fillMaxWidth().fillMaxHeight()",
+          "shape = RoundedCornerShape(topStart = 16.dp, topEnd = 0.dp, bottomEnd = 0.dp, bottomStart = 16.dp)",
+          "color = MaterialTheme.colorScheme.surfaceContainerLow",
+          "Modifier.fillMaxSize().padding(vertical = 24.dp)",
+          "horizontalArrangement = Arrangement.spacedBy(12.dp)",
+          "Modifier.fillMaxWidth().padding(start = 16.dp, end = 24.dp)",
+          "contentDescription = \"Back\"",
+          "onClick = { showMore = true\n showFilters = false }",
+          "Text(\"Filters\", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge",
+          "contentDescription = \"Close\"",
+          "Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)",
+          "Text(\"Sort by\")",
+          "Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp)",
+        ),
+    ),
+    case(
+      "Snackbar",
+      components =
+        listOf(
+          """{"id":"root","component":"Scaffold","content":"body","floatingActionButton":"fab"}""",
+          """{"id":"body","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"Delete","action":{"functionCall":{"@call":"open","args":{"overlay":"undo"}}}}""",
+          """{"id":"fab","component":"FloatingActionButton","icon":"add"}""",
+          """{"id":"undo","component":"Snackbar","message":"Plate deleted","actionLabel":"Undo","dismiss":true,"action":{"functionCall":{"@call":"open","args":{"overlay":"restored"}}}}""",
+          """{"id":"restored","component":"Snackbar","message":"Restored"}""",
+        ),
+      expect =
+        listOf(
+          "val snackbarHostState = remember { SnackbarHostState() }",
+          "var showUndo by remember { mutableStateOf(false) }",
+          "snackbarHost = { SnackbarHost(snackbarHostState) }",
+          "LaunchedEffect(showUndo) {",
+          "if (showUndo) {",
+          "val result = snackbarHostState.showSnackbar(message = \"Plate deleted\", actionLabel = \"Undo\", withDismissAction = true)",
+          "showUndo = false",
+          "if (result == SnackbarResult.ActionPerformed) {",
+          "showRestored = true",
+          "LaunchedEffect(showRestored) {",
+          "snackbarHostState.showSnackbar(message = \"Restored\")",
+        ),
+    ),
+    case(
+      "NavigationBarItem",
+      components =
+        listOf(
+          """{"id":"root","component":"Scaffold","content":"body","bottomBar":"bar"}""",
+          """{"id":"body","component":"Column","children":[]}""",
+          """{"id":"bar","component":"NavigationBar","children":["a","b","c"]}""",
+          """{"id":"a","component":"NavigationBarItem","label":"Inbox","icon":"mail","badge":true}""",
+          """{"id":"b","component":"NavigationBarItem","label":"Chat","icon":"chat","badge":12}""",
+          """{"id":"c","component":"NavigationBarItem","label":"Saved","icon":"bookmark","badge":false}""",
+        ),
+      expect =
+        listOf(
+          "BadgedBox(badge = { Badge() }) { Icon(painterResource(R.drawable.mail), contentDescription = null) }",
+          "BadgedBox(badge = { Badge { Text(\"12\") } }) { Icon(painterResource(R.drawable.chat), contentDescription = null) }",
+        ),
+      reject = listOf("BadgedBox(badge = { Badge() }) { Icon(painterResource(R.drawable.bookmark)"),
+    ),
+    case(
+      "NavigationRailItem",
+      components =
+        listOf(
+          """{"id":"root","component":"Scaffold","content":"body","navigationRail":"rail"}""",
+          """{"id":"body","component":"Column","children":[]}""",
+          """{"id":"rail","component":"NavigationRail","children":["a"]}""",
+          """{"id":"a","component":"NavigationRailItem","label":"Inbox","icon":"mail","badge":"99+"}""",
+        ),
+      expect =
+        listOf(
+          "BadgedBox(badge = { Badge { Text(\"99+\") } }) { Icon(painterResource(R.drawable.mail)",
+        ),
+    ),
+    case(
+      "Tab",
+      components =
+        listOf(
+          """{"id":"root","component":"Tabs","children":["a","b"]}""",
+          """{"id":"a","component":"Tab","label":"Plates","icon":"restaurant","badge":true,"selected":true}""",
+          """{"id":"b","component":"Tab","label":"Menus","badge":3}""",
+        ),
+      expect =
+        listOf(
+          "icon = { BadgedBox(badge = { Badge() }) { Icon(painterResource(R.drawable.restaurant)",
+          "text = { BadgedBox(badge = { Badge { Text(\"3\") } }) { Text(\"Menus\") } }",
+          "text = { Text(\"Plates\") }",
+        ),
+    ),
+    case(
+      "IconButton",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["a","b"]}""",
+          """{"id":"a","component":"IconButton","icon":"notifications","badge":true}""",
+          """{"id":"b","component":"IconButton","icon":"mail","toggle":true,"badge":"new"}""",
+        ),
+      expect =
+        listOf(
+          "IconButton(onClick = {}",
+          "BadgedBox(badge = { Badge() }) { Icon(painterResource(R.drawable.notifications)",
+          "BadgedBox(badge = { Badge { Text(\"new\") } }) { Icon(",
+        ),
+    ),
   )

@@ -261,6 +261,17 @@ object CatalogJson {
       PropKind.Icon,
       PropKind.Image -> fields["\$ref"] = JsonPrimitive(refs.common + "DynamicString")
       PropKind.Bool -> fields["\$ref"] = JsonPrimitive(refs.common + "DynamicBoolean")
+      PropKind.Badge ->
+        fields["oneOf"] =
+          JsonArray(
+            listOf(
+              obj("type" to "boolean"),
+              obj("type" to "number"),
+              obj("type" to "string", "maxLength" to PropKind.BADGE_MAX_CHARACTERS),
+              ref(refs.common + "DataBinding"),
+              ref("#/\$defs/IndexCall"),
+            ),
+          )
       is PropKind.Number -> fields["\$ref"] = JsonPrimitive(refs.common + "DynamicNumber")
       PropKind.NumberRange -> {
         fields["type"] = JsonPrimitive("array")

@@ -63,4 +63,37 @@ class OverlayPlacementTest {
     assertEquals("first", placement.menuAt("more"))
     assertEquals(listOf("second"), placement.screenLevel.map { it.id })
   }
+
+  @Test
+  fun `snackbars draw in the root scaffold's snackbar slot and not at screen level`() {
+    val placement =
+      placement(
+        node("root", "Scaffold"),
+        node("saved", "Snackbar"),
+        node("undo", "Snackbar"),
+        node("sheet", "SideSheet"),
+      )
+
+    assertEquals("root", placement.snackbarScaffold)
+    assertEquals(listOf("saved", "undo"), placement.snackbars.map { it.id })
+    assertEquals(listOf("sheet"), placement.screenLevel.map { it.id })
+  }
+
+  @Test
+  fun `without a root scaffold the first scaffold holds the snackbars`() {
+    val placement =
+      placement(node("root", "Box"), node("inner", "Scaffold"), node("saved", "Snackbar"))
+
+    assertEquals("inner", placement.snackbarScaffold)
+    assertEquals(listOf("saved"), placement.snackbars.map { it.id })
+  }
+
+  @Test
+  fun `a screen with no scaffold has nowhere to draw a snackbar`() {
+    val placement = placement(node("root", "Column"), node("saved", "Snackbar"))
+
+    assertNull(placement.snackbarScaffold)
+    assertEquals(emptyList(), placement.snackbars.map { it.id })
+    assertEquals(listOf("saved"), placement.screenLevel.map { it.id })
+  }
 }

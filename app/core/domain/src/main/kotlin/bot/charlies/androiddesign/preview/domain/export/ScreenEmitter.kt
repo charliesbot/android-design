@@ -150,7 +150,7 @@ internal class ScreenEmitter(
 ) {
   val byId: Map<String, ComponentNode> = screen.components.associateBy { it.id }
 
-  /** BottomSheet, Dialog and Menu components, in document order. */
+  /** The overlay components (sheets, dialogs, menus, snackbars), in document order. */
   val overlays: List<ComponentNode> =
     screen.components.filter { it.component in M3ExpressiveCatalog.overlayNames }
 
@@ -184,10 +184,13 @@ internal class ScreenEmitter(
   fun declarations(): List<Decl> {
     val body = mutableListOf<Stmt>()
     body += overlays.map { overlayState(it) }
+    if (placement.snackbars.isNotEmpty()) body += snackbarHostState()
     val root = byId[ComponentNode.ROOT_ID]
     val rootStatements =
       if (root == null) emptyList() else emit(root.id, Place(modifierBase = "modifier"))
-    val tail = placement.screenLevel.flatMap { overlayStatements(it) }
+    val tail =
+      placement.screenLevel.flatMap { overlayStatements(it) } +
+        placement.snackbars.flatMap { snackbarStatements(it) }
     if (usesSizeClass) body += sizeClassState()
     body += rootStatements
     body += tail
@@ -234,6 +237,17 @@ internal class ScreenEmitter(
         ),
     )
   }
+
+  /** The `SnackbarHostState` the Scaffold's `SnackbarHost` shows and each snackbar posts to. */
+  private fun snackbarHostState(): Stmt =
+    Assign(
+      "val $SNACKBAR_HOST_STATE",
+      "=",
+      Call(
+        file.use(Sym.remember),
+        lambda = lambda(stmt(Call(file.use(Sym.m3("SnackbarHostState"))))),
+      ),
+    )
 
   private fun sizeClassState(): List<Stmt> {
     file.optIn(Sym.ExperimentalMaterial3AdaptiveApi)
@@ -876,8 +890,11 @@ internal class ScreenEmitter(
 
   // endregion
 
-  private companion object {
-    val MODIFIER_IMPORTS =
+  companion object {
+    /** The name of the `SnackbarHostState` variable the Scaffold and the snackbars share. */
+    const val SNACKBAR_HOST_STATE = "snackbarHostState"
+
+    private val MODIFIER_IMPORTS =
       mapOf(
         "padding" to Sym.padding,
         "fillMaxSize" to Sym.fillMaxSize,
@@ -887,6 +904,7 @@ internal class ScreenEmitter(
         "height" to Sym.height,
         "size" to Sym.size,
         "heightIn" to Sym.heightIn,
+        "widthIn" to Sym.widthIn,
         "offset" to Sym.offset,
         "aspectRatio" to Sym.aspectRatio,
         "background" to Sym.background,

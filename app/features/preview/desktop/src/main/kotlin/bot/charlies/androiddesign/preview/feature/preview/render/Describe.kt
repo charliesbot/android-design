@@ -123,5 +123,7 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look =
     "Dialog" -> ctx.dialogLook()
     "Menu" -> ctx.menuLook()
     "MenuItem" -> ctx.menuItemLook()
+    "SideSheet" -> ctx.sideSheetLook()
+    "Snackbar" -> ctx.snackbarLook()
     else -> error("no look for ${ctx.component}")
   }
