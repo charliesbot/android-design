@@ -187,7 +187,8 @@ enum class ActionFunction(val wire: String, val argument: String?, val descripti
   Open(
     "open",
     "overlay",
-    "Opens a BottomSheet, Dialog, Menu, SideSheet or Snackbar of the same screen by id.",
+    "Opens a BottomSheet, Dialog, Menu, SideSheet, SearchView, Snackbar or Tooltip of the same " +
+      "screen by id.",
   ),
   Dismiss("dismiss", null, "Closes the open overlay.");
 
@@ -369,7 +370,7 @@ object M3ExpressiveCatalog : Catalog {
     components.filter { it.overlay }.map { it.name }.toSet()
   }
 
-  override val modalNames: Set<String> = setOf("BottomSheet", "Dialog", "SideSheet")
+  override val modalNames: Set<String> = setOf("BottomSheet", "Dialog", "SideSheet", "SearchView")
 
   override val fabNames: Set<String> = setOf("FloatingActionButton", "FabMenu")
 
@@ -718,11 +719,36 @@ private fun structure(): List<ComponentDef> =
       "The screen's top bar.",
       "TopAppBar, CenterAlignedTopAppBar, MediumFlexibleTopAppBar, LargeFlexibleTopAppBar",
       listOf(
-        oneOf("size", "small", "center", "medium", "large", default = "small"),
-        text("title", required = true),
+        oneOf("size", "small", "center", "medium", "large", "search", default = "small"),
+        text(
+          "title",
+          required = true,
+          description =
+            "The heading. In a search app bar it is the search field's hint, which includes the " +
+              "word Search (such as \"Search inbox\").",
+        ),
         text("subtitle"),
         child("navigationIcon", "IconButton"),
-        children("actions", "IconButton"),
+        children(
+          "actions",
+          "IconButton",
+          description =
+            "The trailing icon buttons. A search app bar has at most two beside an avatar, and " +
+              "at most four without one, on large screens.",
+        ),
+        PropDef(
+          "avatar",
+          PropKind.Image,
+          description =
+            "Search size only: a profile picture, drawn as a 30dp circle after the actions. " +
+              "Path relative to the proposal, or a data: URI.",
+        ),
+        child(
+          "expanded",
+          "SearchView",
+          description =
+            "Search size only: the SearchView that opens when the search field is tapped.",
+        ),
       ),
       width = WidthFill.Always,
     ),
@@ -1093,6 +1119,45 @@ private fun inputs(): List<ComponentDef> =
       interactive = true,
       width = WidthFill.Always,
     ),
+    ComponentDef(
+      "SearchBar",
+      ComponentGroup.Inputs,
+      "A search field. Tapping it opens the SearchView named by `expanded`.",
+      "SearchBar with SearchBarDefaults.InputField and rememberSearchBarState",
+      listOf(
+        text(
+          "placeholder",
+          required = true,
+          description = "The hint, a short description of what can be searched (\"Search mail\").",
+        ),
+        PropDef(
+          "leadingIcon",
+          PropKind.Icon,
+          description = "A non-functional icon at the start. Material Symbols name.",
+          default = JsonPrimitive("search"),
+        ),
+        child(
+          "navigationIcon",
+          "IconButton",
+          description = "A navigational icon button (menu, arrow) that replaces the leading icon.",
+        ),
+        children(
+          "trailing",
+          "IconButton",
+          description = "Trailing icon buttons. At most two, an avatar counting as one.",
+        ),
+        PropDef(
+          "avatar",
+          PropKind.Image,
+          description =
+            "A profile picture, drawn as a 30dp circle after the trailing icon buttons. Path " +
+              "relative to the proposal, or a data: URI.",
+        ),
+        child("expanded", "SearchView"),
+      ) + interactiveProps,
+      interactive = true,
+      width = WidthFill.Always,
+    ),
   )
 
 private fun feedback(): List<ComponentDef> =
@@ -1178,6 +1243,40 @@ private fun overlays(): List<ComponentDef> =
       ),
       overlay = true,
       stretchesChildren = true,
+    ),
+    ComponentDef(
+      "SearchView",
+      ComponentGroup.Overlays,
+      "The focused state of a SearchBar or search app bar: its input field over a list of " +
+        "suggestions or results, in the contained style. Full-screen fills the window; docked " +
+        "opens a dropdown below the bar.",
+      "ExpandedFullScreenContainedSearchBar or ExpandedDockedSearchBarWithGap, sharing the " +
+        "bar's SearchBarState",
+      listOf(
+        oneOf("layout", "docked", "full-screen", default = "full-screen"),
+        children("content"),
+      ),
+      overlay = true,
+      stretchesChildren = true,
+    ),
+    ComponentDef(
+      "Tooltip",
+      ComponentGroup.Overlays,
+      "A tooltip anchored to a component. Plain describes an icon-only control; rich adds a " +
+        "subhead and up to two text buttons.",
+      "TooltipBox with PlainTooltip or RichTooltip",
+      listOf(
+        child("anchor", required = true),
+        oneOf("variant", "plain", "rich", default = "plain"),
+        text("text", required = true),
+        text("title", description = "Rich only: a one-line subhead."),
+        children(
+          "actions",
+          "Button",
+          description = "Rich only: up to two text buttons, side by side.",
+        ),
+      ),
+      overlay = true,
     ),
     ComponentDef(
       "Snackbar",

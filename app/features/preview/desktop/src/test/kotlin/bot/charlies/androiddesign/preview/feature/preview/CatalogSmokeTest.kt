@@ -510,6 +510,27 @@ class CatalogSmokeTest {
         open = "subject",
       ),
       Case(
+        "SearchBar",
+        inStage(
+          """{"id":"subject","component":"SearchBar","placeholder":"Search mail","trailing":["mic"],"expanded":"results"},{"id":"mic","component":"IconButton","icon":"mic","contentDescription":"Voice search"},{"id":"results","component":"SearchView","content":["t1"]}""",
+        ),
+      ),
+      Case(
+        "SearchView",
+        """{"id":"root","component":"Scaffold","content":"bar"},""" +
+          """{"id":"bar","component":"SearchBar","placeholder":"Search mail","expanded":"subject"},""" +
+          """{"id":"subject","component":"SearchView","layout":"docked","content":["t2"]},$text2""",
+        open = "subject",
+      ),
+      Case(
+        "Tooltip",
+        """{"id":"root","component":"Scaffold","content":"anchor"},""" +
+          """{"id":"anchor","component":"IconButton","icon":"info","contentDescription":"Info"},""" +
+          """{"id":"subject","component":"Tooltip","anchor":"anchor","variant":"rich","title":"Why","text":"Because.","actions":["ok"]},""" +
+          """{"id":"ok","component":"Button","variant":"text","label":"Got it"}""",
+        open = "subject",
+      ),
+      Case(
         "Snackbar",
         inStage(
           """{"id":"opener","component":"Button","label":"Open","action":{"functionCall":{"@call":"open","args":{"overlay":"subject"}}}},{"id":"subject","component":"Snackbar","message":"Saved","actionLabel":"Undo","dismiss":true}""",

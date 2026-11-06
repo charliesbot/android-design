@@ -81,17 +81,26 @@ internal fun RenderScaffold(ctx: NodeContext) {
   }
 }
 
+/** A search app bar's text is its field's hint, in body large on the field's container. */
 internal fun NodeContext.topAppBarLook() =
-  Look(
-    ColorRole.Surface,
-    ColorRole.OnSurface,
-    TypeRole.TitleLarge,
-    text = string("title"),
-  )
+  if (enum("size") == "search") {
+    searchBarLook(string("title"))
+  } else {
+    Look(
+      ColorRole.Surface,
+      ColorRole.OnSurface,
+      TypeRole.TitleLarge,
+      text = string("title"),
+    )
+  }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderTopAppBar(ctx: NodeContext) {
+  if (ctx.enum("size") == "search") {
+    RenderSearchAppBar(ctx)
+    return
+  }
   val title = ctx.string("title").orEmpty()
   val subtitle = ctx.string("subtitle")
   val titleSlot: @Composable () -> Unit = {

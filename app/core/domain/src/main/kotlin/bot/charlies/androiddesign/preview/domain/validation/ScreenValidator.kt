@@ -2,6 +2,10 @@ package bot.charlies.androiddesign.preview.domain.validation
 
 import bot.charlies.androiddesign.preview.domain.BadgeContent
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
+import bot.charlies.androiddesign.preview.domain.SearchSpec
+import bot.charlies.androiddesign.preview.domain.TooltipSpec
+import bot.charlies.androiddesign.preview.domain.export.ChildItems
+import bot.charlies.androiddesign.preview.domain.export.childItems
 import bot.charlies.androiddesign.preview.domain.validation.Dynamic.asString
 import bot.charlies.androiddesign.preview.domain.validation.Dynamic.isBoolean
 import bot.charlies.androiddesign.preview.domain.validation.Dynamic.isDynamic
@@ -55,7 +59,103 @@ internal class ScreenValidator(
       validateProps(path, def, node.props, overrides = false)
     }
     validateSnackbarHost()
+    validateSearch()
+    validateTooltips()
     detectCycles()
+  }
+
+  /** How many components a listed `ChildList` prop holds; null for a template or no value. */
+  private fun listedCount(props: JsonObject, key: String): Int? =
+    (props[key].childItems() as? ChildItems.Listed)?.ids?.size
+
+  /**
+   * Material's search rules. A search bar has "one or two trailing icons or icon buttons", and an
+   * avatar combines "with up to one other trailing icon button". A search app bar has up to two
+   * trailing icons beside an avatar, "up to four trailing icons on larger screens" without one.
+   * `avatar` and `expanded` belong to the search app bar, and a search view opens from the one bar
+   * that names it.
+   */
+  private fun validateSearch() {
+    val holders = mutableMapOf<String, MutableList<String>>()
+    screen.components.forEachIndexed { index, node ->
+      val path = componentsPath.child(index)
+      val props = node.props
+      when (node.component) {
+        "SearchBar" -> {
+          val trailing = (listedCount(props, "trailing") ?: 0) + if ("avatar" in props) 1 else 0
+          if (trailing > SearchSpec.MAX_BAR_TRAILING) {
+            sink.add(
+              path.child("trailing"),
+              "a search bar has at most ${SearchSpec.MAX_BAR_TRAILING} trailing elements, " +
+                "an avatar counting as one, got $trailing",
+            )
+          }
+        }
+        "TopAppBar" -> {
+          val search = props.string("size") == "search"
+          if (!search) {
+            for (key in listOf("avatar", "expanded")) {
+              if (key in props) sink.add(path.child(key), "$key is for a TopAppBar of size search")
+            }
+          } else {
+            val actions = listedCount(props, "actions") ?: 0
+            val limit =
+              if ("avatar" in props) SearchSpec.MAX_APP_BAR_ACTIONS_WITH_AVATAR
+              else SearchSpec.MAX_APP_BAR_ACTIONS
+            if (actions > limit) {
+              sink.add(
+                path.child("actions"),
+                "a search app bar has at most $limit trailing icon buttons " +
+                  (if ("avatar" in props) "beside an avatar" else "(four only on large screens)") +
+                  ", got $actions",
+              )
+            }
+          }
+        }
+      }
+      if (node.component == "SearchBar" || node.component == "TopAppBar") {
+        props.string("expanded")?.let { holders.getOrPut(it) { mutableListOf() }.add(node.id) }
+      }
+    }
+    screen.components.forEachIndexed { index, node ->
+      if (node.component != "SearchView") return@forEachIndexed
+      val bars = holders[node.id].orEmpty()
+      val path = componentsPath.child(index).child("component")
+      when {
+        bars.isEmpty() ->
+          sink.add(
+            path,
+            "a SearchView opens from the expanded prop of a SearchBar or a search app bar, " +
+              "and nothing names '${node.id}'",
+          )
+        bars.size > 1 ->
+          sink.add(path, "'${node.id}' is the expanded view of ${bars.joinToString(" and ")}")
+      }
+    }
+  }
+
+  /**
+   * Material's tooltip rules: only a rich tooltip has a subhead and text buttons, and it has "up to
+   * two text buttons".
+   */
+  private fun validateTooltips() {
+    screen.components.forEachIndexed { index, node ->
+      if (node.component != "Tooltip") return@forEachIndexed
+      val path = componentsPath.child(index)
+      val rich = node.props.string("variant") == "rich"
+      if (!rich) {
+        for (key in listOf("title", "actions")) {
+          if (key in node.props) sink.add(path.child(key), "$key is for a rich tooltip")
+        }
+      }
+      val actions = listedCount(node.props, "actions") ?: 0
+      if (actions > TooltipSpec.MAX_ACTIONS) {
+        sink.add(
+          path.child("actions"),
+          "a rich tooltip has at most ${TooltipSpec.MAX_ACTIONS} text buttons, got $actions",
+        )
+      }
+    }
   }
 
   /** A snackbar draws in a Scaffold's snackbar slot, so the screen needs a Scaffold to hold it. */
@@ -533,7 +633,9 @@ internal class ScreenValidator(
     return sources
       .flatMap { props ->
         def.props.flatMap { prop ->
-          if (node.component == MENU && prop.name == ANCHOR) return@flatMap emptyList()
+          if ((node.component == MENU || node.component == TOOLTIP) && prop.name == ANCHOR) {
+            return@flatMap emptyList()
+          }
           val value = props[prop.name] ?: return@flatMap emptyList()
           when (prop.kind) {
             PropKind.Child -> listOfNotNull(value.asString())
@@ -556,6 +658,7 @@ internal class ScreenValidator(
     /** Components whose `value` and `range` props must agree. */
     private val RANGE_COMPONENTS = setOf("Slider", "RangeSlider", "Stepper")
     private const val MENU = "Menu"
+    private const val TOOLTIP = "Tooltip"
     private const val ANCHOR = "anchor"
   }
 }

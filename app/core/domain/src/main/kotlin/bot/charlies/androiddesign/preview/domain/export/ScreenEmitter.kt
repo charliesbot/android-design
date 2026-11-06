@@ -154,6 +154,16 @@ internal class ScreenEmitter(
   val overlays: List<ComponentNode> =
     screen.components.filter { it.component in M3ExpressiveCatalog.overlayNames }
 
+  /** The search bars and search app bars: each holds the `SearchBarState` its view shares. */
+  val searchBars: List<ComponentNode> =
+    screen.components.filter {
+      it.component == "SearchBar" ||
+        (it.component == "TopAppBar" && it.props.literal("size") == "search")
+    }
+
+  /** The tooltips, each with the `TooltipState` its `TooltipBox` shares. */
+  val tooltips: List<ComponentNode> = screen.components.filter { it.component == "Tooltip" }
+
   /** Which overlays are written beside a component and which at the end of the screen. */
   val placement = OverlayPlacement(screen)
 
@@ -183,8 +193,11 @@ internal class ScreenEmitter(
   /** The screen function and its `@Preview`. */
   fun declarations(): List<Decl> {
     val body = mutableListOf<Stmt>()
-    body += overlays.map { overlayState(it) }
+    body += overlays.filter { it.component !in STATE_OVERLAYS }.map { overlayState(it) }
     if (placement.snackbars.isNotEmpty()) body += snackbarHostState()
+    if (searchBars.isNotEmpty() || tooltips.isNotEmpty()) body += coroutineScopeDecl()
+    body += searchBars.map { searchStateDecl(it) }
+    body += tooltips.map { tooltipStateDecl(it) }
     val root = byId[ComponentNode.ROOT_ID]
     val rootStatements =
       if (root == null) emptyList() else emit(root.id, Place(modifierBase = "modifier"))
@@ -236,6 +249,71 @@ internal class ScreenEmitter(
           stmt(Call(themeName, lambda = lambda(stmt(Call(functionName))))),
         ),
     )
+  }
+
+  private fun coroutineScopeDecl(): Stmt =
+    Assign("val $COROUTINE_SCOPE", "=", Call(file.use(Sym.rememberCoroutineScope)))
+
+  fun searchState(barId: String) = stateName(barId, "SearchState")
+
+  fun tooltipState(id: String) = stateName(id, "TooltipState")
+
+  /** The `layout` of the search view [barId] opens: docked, else full-screen. */
+  fun searchDocked(barId: String): Boolean {
+    val view = placement.expandedViewOf(barId)?.let(byId::get) ?: return false
+    val layout =
+      effectiveProps(view, SizeClass.Compact).literal("layout")
+        ?: M3ExpressiveCatalog.find("SearchView")?.defaultOf("layout")?.content
+    return layout == "docked"
+  }
+
+  /** The state a search bar shares with its view: the factory Compose pairs with the layout. */
+  private fun searchStateDecl(bar: ComponentNode): Stmt {
+    val factory =
+      if (searchDocked(bar.id)) "rememberSearchBarWithGapState"
+      else "rememberContainedSearchBarState"
+    return Assign("val ${searchState(bar.id)}", "=", Call(file.use(Sym.m3(factory))))
+  }
+
+  private fun tooltipStateDecl(tooltip: ComponentNode): Stmt {
+    experimentalApi()
+    val rich = tooltip.props.literal("variant") == "rich"
+    return Assign(
+      "val ${tooltipState(tooltip.id)}",
+      "=",
+      Call(
+        file.use(Sym.m3("rememberTooltipState")),
+        if (rich) listOf(arg("isPersistent", "true")) else emptyList(),
+      ),
+    )
+  }
+
+  private fun experimentalApi() = file.optIn(Sym.ExperimentalMaterial3Api)
+
+  /** `coroutineScope.launch { [call] }`: a suspend call on a state, from an action. */
+  private fun launching(call: String): Stmt =
+    stmt(Call("$COROUTINE_SCOPE.${file.use(Sym.launch)}", lambda = lambdaOf(Raw(call))))
+
+  /** What `open(id)` does: raise the overlay's flag, expand a search view, show a tooltip. */
+  private fun openOverlay(id: String): Stmt {
+    val node = byId[id]
+    return when (node?.component) {
+      "SearchView" ->
+        placement.barOf(id)?.let { launching("${searchState(it)}.animateToExpanded()") }
+      "Tooltip" -> launching("${tooltipState(id)}.show()")
+      else -> null
+    } ?: Assign(overlayVar(id), "=", Raw("true"))
+  }
+
+  /** What `dismiss()` does to overlay [id]. */
+  private fun closeOverlay(id: String): Stmt {
+    val node = byId[id]
+    return when (node?.component) {
+      "SearchView" ->
+        placement.barOf(id)?.let { launching("${searchState(it)}.animateToCollapsed()") }
+      "Tooltip" -> launching("${tooltipState(id)}.dismiss()")
+      else -> null
+    } ?: Assign(overlayVar(id), "=", Raw("false"))
   }
 
   /** The `SnackbarHostState` the Scaffold's `SnackbarHost` shows and each snackbar posts to. */
@@ -664,12 +742,12 @@ internal class ScreenEmitter(
       ActionFunction.Back -> listOf(stmt(Call("onBack")))
       ActionFunction.Open -> {
         val overlay = (call.args?.get("overlay") as? JsonPrimitive)?.content ?: return emptyList()
-        listOf(Assign(overlayVar(overlay), "=", Raw("true")))
+        listOf(openOverlay(overlay))
       }
       ActionFunction.Dismiss -> {
         val enclosing = overlayOf[componentId]
         val targets = if (enclosing != null) listOf(enclosing) else overlays.map { it.id }
-        targets.map { Assign(overlayVar(it), "=", Raw("false")) }
+        targets.map(::closeOverlay)
       }
       null -> emptyList()
     }
@@ -893,6 +971,12 @@ internal class ScreenEmitter(
   companion object {
     /** The name of the `SnackbarHostState` variable the Scaffold and the snackbars share. */
     const val SNACKBAR_HOST_STATE = "snackbarHostState"
+
+    /** The scope that runs the suspend calls on search and tooltip states. */
+    const val COROUTINE_SCOPE = "coroutineScope"
+
+    /** Overlays whose open state is a Compose state object, not a flag. */
+    private val STATE_OVERLAYS = setOf("SearchView", "Tooltip")
 
     private val MODIFIER_IMPORTS =
       mapOf(

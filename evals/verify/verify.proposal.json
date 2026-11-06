@@ -1611,7 +1611,10 @@
             "range_slider",
             "fields",
             "feedback",
-            "vertical_toolbar"
+            "vertical_toolbar",
+            "search_bar",
+            "search_docked",
+            "to_search"
           ]
         },
         {
@@ -1909,6 +1912,124 @@
             "vt_undo",
             "vt_redo"
           ]
+        },
+        {
+          "id": "search_bar",
+          "component": "SearchBar",
+          "placeholder": "Search recipes",
+          "navigationIcon": "search_menu",
+          "trailing": [
+            "search_mic"
+          ],
+          "avatar": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "expanded": "search_view"
+        },
+        {
+          "id": "search_menu",
+          "component": "IconButton",
+          "icon": "menu",
+          "contentDescription": "Menu"
+        },
+        {
+          "id": "search_mic",
+          "component": "IconButton",
+          "icon": "mic",
+          "contentDescription": "Voice search"
+        },
+        {
+          "id": "search_view",
+          "component": "SearchView",
+          "layout": "full-screen",
+          "content": [
+            "search_r1",
+            "search_r2"
+          ]
+        },
+        {
+          "id": "search_r1",
+          "component": "ListItem",
+          "headline": "Mexican dishes"
+        },
+        {
+          "id": "search_r2",
+          "component": "ListItem",
+          "headline": "Quick dinners"
+        },
+        {
+          "id": "search_docked",
+          "component": "SearchBar",
+          "placeholder": "Search your messages",
+          "trailing": [
+            "search_more"
+          ],
+          "expanded": "search_docked_view"
+        },
+        {
+          "id": "search_more",
+          "component": "IconButton",
+          "icon": "more_vert",
+          "contentDescription": "More options"
+        },
+        {
+          "id": "search_docked_view",
+          "component": "SearchView",
+          "layout": "docked",
+          "content": [
+            "search_d1"
+          ]
+        },
+        {
+          "id": "search_d1",
+          "component": "ListItem",
+          "headline": "Recent: invoices"
+        },
+        {
+          "id": "to_search",
+          "component": "Button",
+          "label": "Search app bar",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "search"
+              }
+            }
+          }
+        },
+        {
+          "id": "tip_plain",
+          "component": "Tooltip",
+          "anchor": "vt_undo",
+          "text": "Undo"
+        },
+        {
+          "id": "tip_rich",
+          "component": "Tooltip",
+          "anchor": "check_on",
+          "variant": "rich",
+          "title": "Why this matters",
+          "text": "Checked items stay in your plan.",
+          "actions": [
+            "tip_ok",
+            "tip_more"
+          ]
+        },
+        {
+          "id": "tip_ok",
+          "component": "Button",
+          "variant": "text",
+          "label": "Got it",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "tip_more",
+          "component": "Button",
+          "variant": "text",
+          "label": "Learn more"
         }
       ]
     },
@@ -3151,6 +3272,85 @@
           "label": "Chat",
           "icon": "chat",
           "badge": "9+"
+        }
+      ]
+    },
+    "search": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "topBar": "top",
+          "content": "body"
+        },
+        {
+          "id": "top",
+          "component": "TopAppBar",
+          "size": "search",
+          "title": "Search inbox",
+          "navigationIcon": "top_menu",
+          "actions": [
+            "top_cast"
+          ],
+          "avatar": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "expanded": "top_view"
+        },
+        {
+          "id": "top_menu",
+          "component": "IconButton",
+          "icon": "menu",
+          "contentDescription": "Menu"
+        },
+        {
+          "id": "top_cast",
+          "component": "IconButton",
+          "icon": "cast",
+          "contentDescription": "Cast"
+        },
+        {
+          "id": "top_view",
+          "component": "SearchView",
+          "layout": "docked",
+          "content": [
+            "top_r1",
+            "top_r2"
+          ]
+        },
+        {
+          "id": "top_r1",
+          "component": "ListItem",
+          "headline": "Recent: tickets"
+        },
+        {
+          "id": "top_r2",
+          "component": "ListItem",
+          "headline": "Recent: receipts"
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "padding": "lg",
+          "spacing": "md",
+          "children": [
+            "search_note",
+            "back_inputs"
+          ]
+        },
+        {
+          "id": "search_note",
+          "component": "Text",
+          "text": "Messages appear here."
+        },
+        {
+          "id": "back_inputs",
+          "component": "Button",
+          "label": "Back",
+          "action": {
+            "functionCall": {
+              "@call": "back"
+            }
+          }
         }
       ]
     }

@@ -117,6 +117,7 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look =
     "Slider",
     "RangeSlider" -> ctx.sliderLook(ambient)
     "TextField" -> ctx.textFieldLook(ambient)
+    "SearchBar" -> ctx.searchBarLook()
     "LoadingIndicator" -> ctx.loadingIndicatorLook(ambient)
     "ProgressIndicator" -> ctx.progressIndicatorLook(ambient)
     "BottomSheet" -> ctx.bottomSheetLook()
@@ -124,6 +125,8 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look =
     "Menu" -> ctx.menuLook()
     "MenuItem" -> ctx.menuItemLook()
     "SideSheet" -> ctx.sideSheetLook()
+    "SearchView" -> ctx.searchViewLook()
+    "Tooltip" -> ctx.tooltipLook()
     "Snackbar" -> ctx.snackbarLook()
     else -> error("no look for ${ctx.component}")
   }

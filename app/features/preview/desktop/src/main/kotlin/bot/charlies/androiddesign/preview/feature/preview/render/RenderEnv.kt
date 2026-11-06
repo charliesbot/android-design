@@ -231,6 +231,13 @@ internal class RenderEnv(
   }
 
   fun isOverlay(node: ComponentNode) = node.component in catalog.overlayNames
+
+  /**
+   * This screen drawn without recording. A second copy of a component (a search field in its bar
+   * and again in its view) draws and acts the same but must not register its nodes twice.
+   */
+  fun unrecorded() =
+    RenderEnv(screenId, screen, host, theme, sizeClass, null, idPrefix, assets, widthDp)
 }
 
 internal val LocalRenderEnv =
