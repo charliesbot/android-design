@@ -523,7 +523,7 @@
     },
     "function.open": {
       "type": "object",
-      "description": "Opens a BottomSheet, Dialog or Menu of the same screen by id.",
+      "description": "Opens a BottomSheet, Dialog, Menu, SideSheet, SearchView, Snackbar or Tooltip of the same screen by id.",
       "returnType": "void",
       "properties": {
         "@call": {
@@ -596,6 +596,9 @@
           "$ref": "#/$defs/component.Image"
         },
         {
+          "$ref": "#/$defs/component.Carousel"
+        },
+        {
           "$ref": "#/$defs/component.Scaffold"
         },
         {
@@ -606,6 +609,12 @@
         },
         {
           "$ref": "#/$defs/component.NavigationBarItem"
+        },
+        {
+          "$ref": "#/$defs/component.Tabs"
+        },
+        {
+          "$ref": "#/$defs/component.Tab"
         },
         {
           "$ref": "#/$defs/component.NavigationRail"
@@ -680,6 +689,9 @@
           "$ref": "#/$defs/component.TextField"
         },
         {
+          "$ref": "#/$defs/component.SearchBar"
+        },
+        {
           "$ref": "#/$defs/component.LoadingIndicator"
         },
         {
@@ -696,6 +708,18 @@
         },
         {
           "$ref": "#/$defs/component.MenuItem"
+        },
+        {
+          "$ref": "#/$defs/component.SideSheet"
+        },
+        {
+          "$ref": "#/$defs/component.SearchView"
+        },
+        {
+          "$ref": "#/$defs/component.Tooltip"
+        },
+        {
+          "$ref": "#/$defs/component.Snackbar"
         }
       ],
       "discriminator": {
@@ -1382,6 +1406,46 @@
       ],
       "unevaluatedProperties": false
     },
+    "component.Carousel": {
+      "type": "object",
+      "description": "A horizontally scrolling collection of visual items, clipped to the carousel's item shape.",
+      "x-compose": "HorizontalMultiBrowseCarousel, HorizontalCenteredHeroCarousel, HorizontalUncontainedCarousel",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Carousel"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "multi-browse",
+            "hero",
+            "centered-hero",
+            "uncontained",
+            "full-screen"
+          ],
+          "description": "hero and full-screen have no composable of their own: they size the items of a multi-browse and an uncontained carousel.",
+          "default": "multi-browse"
+        },
+        "itemWidth": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "Item width in dp: the preferred width of multi-browse, the width of uncontained. The other variants size their items themselves. Must be a number from 40 to 1000.",
+          "default": 186
+        },
+        "children": {
+          "$ref": "#/$defs/ChildList"
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
     "component.Scaffold": {
       "type": "object",
       "description": "The screen frame: bars, floating action button and content.",
@@ -1450,12 +1514,14 @@
             "small",
             "center",
             "medium",
-            "large"
+            "large",
+            "search"
           ],
           "default": "small"
         },
         "title": {
-          "$ref": "#/$defs/DynamicString"
+          "$ref": "#/$defs/DynamicString",
+          "description": "The heading. In a search app bar it is the search field's hint, which includes the word Search (such as \"Search inbox\")."
         },
         "subtitle": {
           "$ref": "#/$defs/DynamicString"
@@ -1470,7 +1536,19 @@
           "$ref": "#/$defs/ChildList",
           "x-allowedComponents": [
             "IconButton"
-          ]
+          ],
+          "description": "The trailing icon buttons. A search app bar has at most two at compact widths, an avatar coming in addition, and up to four from medium widths up (override `actions` in `sizeClass`)."
+        },
+        "avatar": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Search size only: a profile picture, drawn as a 30dp circle after the actions. Path relative to the proposal, or a data: URI."
+        },
+        "expanded": {
+          "$ref": "#/$defs/Child",
+          "x-allowedComponents": [
+            "SearchView"
+          ],
+          "description": "Search size only: the SearchView that opens when the search field is tapped."
         }
       },
       "required": [
@@ -1534,6 +1612,28 @@
           "$ref": "#/$defs/DynamicBoolean",
           "default": false
         },
+        "badge": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number",
+              "maximum": 9999
+            },
+            {
+              "type": "string",
+              "maxLength": 4
+            },
+            {
+              "$ref": "#/$defs/DataBinding"
+            },
+            {
+              "$ref": "#/$defs/IndexCall"
+            }
+          ],
+          "description": "A badge on the icon's upper trailing corner: true draws a small one, a number or a string of at most 4 characters (such as \"99+\") draws a large one with that text."
+        },
         "action": {
           "$ref": "#/$defs/Action",
           "description": "What a tap does."
@@ -1543,6 +1643,103 @@
         "component",
         "label",
         "icon"
+      ],
+      "unevaluatedProperties": false
+    },
+    "component.Tabs": {
+      "type": "object",
+      "description": "A row of tabs that switches between sibling views at the same level of hierarchy.",
+      "x-compose": "PrimaryTabRow, SecondaryTabRow, PrimaryScrollableTabRow, SecondaryScrollableTabRow",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Tabs"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary"
+          ],
+          "default": "primary"
+        },
+        "scrollable": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Lets the tabs scroll when they do not fit.",
+          "default": false
+        },
+        "children": {
+          "$ref": "#/$defs/ChildList",
+          "x-allowedComponents": [
+            "Tab"
+          ]
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "component.Tab": {
+      "type": "object",
+      "description": "One tab of a Tabs row. Its content is the screen its action navigates to.",
+      "x-compose": "Tab",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Tab"
+        },
+        "label": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "selected": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "badge": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number",
+              "maximum": 9999
+            },
+            {
+              "type": "string",
+              "maxLength": 4
+            },
+            {
+              "$ref": "#/$defs/DataBinding"
+            },
+            {
+              "$ref": "#/$defs/IndexCall"
+            }
+          ],
+          "description": "A badge on the icon's upper trailing corner: true draws a small one, a number or a string of at most 4 characters (such as \"99+\") draws a large one with that text."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        }
+      },
+      "required": [
+        "component",
+        "label"
       ],
       "unevaluatedProperties": false
     },
@@ -1604,6 +1801,28 @@
         "selected": {
           "$ref": "#/$defs/DynamicBoolean",
           "default": false
+        },
+        "badge": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number",
+              "maximum": 9999
+            },
+            {
+              "type": "string",
+              "maxLength": 4
+            },
+            {
+              "$ref": "#/$defs/DataBinding"
+            },
+            {
+              "$ref": "#/$defs/IndexCall"
+            }
+          ],
+          "description": "A badge on the icon's upper trailing corner: true draws a small one, a number or a string of at most 4 characters (such as \"99+\") draws a large one with that text."
         },
         "action": {
           "$ref": "#/$defs/Action",
@@ -2008,6 +2227,28 @@
         "icon": {
           "$ref": "#/$defs/DynamicString",
           "description": "Material Symbols name, such as \"home\"."
+        },
+        "badge": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number",
+              "maximum": 9999
+            },
+            {
+              "type": "string",
+              "maxLength": 4
+            },
+            {
+              "$ref": "#/$defs/DataBinding"
+            },
+            {
+              "$ref": "#/$defs/IndexCall"
+            }
+          ],
+          "description": "A badge on the icon's upper trailing corner: true draws a small one, a number or a string of at most 4 characters (such as \"99+\") draws a large one with that text."
         },
         "toggle": {
           "$ref": "#/$defs/DynamicBoolean",
@@ -2769,6 +3010,73 @@
       ],
       "unevaluatedProperties": false
     },
+    "component.SearchBar": {
+      "type": "object",
+      "description": "A search field. Tapping it opens the SearchView named by `expanded`.",
+      "x-compose": "SearchBar with SearchBarDefaults.InputField and rememberSearchBarState",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "SearchBar"
+        },
+        "placeholder": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "The hint, a short description of what can be searched (\"Search mail\")."
+        },
+        "leadingIcon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "A non-functional icon at the start. Material Symbols name.",
+          "default": "search"
+        },
+        "navigationIcon": {
+          "$ref": "#/$defs/Child",
+          "x-allowedComponents": [
+            "IconButton"
+          ],
+          "description": "A navigational icon button (menu, arrow) that replaces the leading icon."
+        },
+        "trailing": {
+          "$ref": "#/$defs/ChildList",
+          "x-allowedComponents": [
+            "IconButton"
+          ],
+          "description": "Trailing icon buttons. At most two, an avatar counting as one."
+        },
+        "avatar": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "A profile picture, drawn as a 30dp circle after the trailing icon buttons. Path relative to the proposal, or a data: URI."
+        },
+        "expanded": {
+          "$ref": "#/$defs/Child",
+          "x-allowedComponents": [
+            "SearchView"
+          ]
+        },
+        "primary": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "placeholder"
+      ],
+      "unevaluatedProperties": false
+    },
     "component.LoadingIndicator": {
       "type": "object",
       "description": "An expressive indeterminate loading indicator.",
@@ -2949,6 +3257,153 @@
       "required": [
         "component",
         "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "component.SideSheet": {
+      "type": "object",
+      "description": "A modal side sheet on the trailing edge, with a header (title, close icon button) over its content. Optional content beside the main content is a standard side sheet: a screen with pane role supporting.",
+      "x-compose": "Dialog (full window) holding a scrim and a Surface, composed; no side sheet composable",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "SideSheet"
+        },
+        "title": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "back": {
+          "$ref": "#/$defs/Action",
+          "description": "Shows a back icon button at the header's leading side and runs this on a tap."
+        },
+        "content": {
+          "$ref": "#/$defs/ChildList"
+        }
+      },
+      "required": [
+        "component",
+        "title",
+        "content"
+      ],
+      "unevaluatedProperties": false
+    },
+    "component.SearchView": {
+      "type": "object",
+      "description": "The focused state of a SearchBar or search app bar: its input field over a list of suggestions or results, in the contained style. Full-screen fills the window; docked opens a dropdown below the bar.",
+      "x-compose": "ExpandedFullScreenContainedSearchBar or ExpandedDockedSearchBarWithGap, sharing the bar's SearchBarState",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "SearchView"
+        },
+        "layout": {
+          "type": "string",
+          "enum": [
+            "docked",
+            "full-screen"
+          ],
+          "default": "full-screen"
+        },
+        "content": {
+          "$ref": "#/$defs/ChildList"
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "component.Tooltip": {
+      "type": "object",
+      "description": "A tooltip anchored to a component. Plain describes an icon-only control; rich adds a subhead and up to two text buttons.",
+      "x-compose": "TooltipBox with PlainTooltip or RichTooltip",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Tooltip"
+        },
+        "anchor": {
+          "$ref": "#/$defs/Child"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "plain",
+            "rich"
+          ],
+          "default": "plain"
+        },
+        "text": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "title": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Rich only: a one-line subhead."
+        },
+        "actions": {
+          "$ref": "#/$defs/ChildList",
+          "x-allowedComponents": [
+            "Button"
+          ],
+          "description": "Rich only: up to two text buttons, side by side."
+        }
+      },
+      "required": [
+        "component",
+        "anchor",
+        "text"
+      ],
+      "unevaluatedProperties": false
+    },
+    "component.Snackbar": {
+      "type": "object",
+      "description": "A brief message at the bottom of the screen, in the Scaffold's snackbar slot above the FAB and the navigation bar.",
+      "x-compose": "SnackbarHost in Scaffold(snackbarHost), Snackbar via SnackbarHostState.showSnackbar",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Snackbar"
+        },
+        "message": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "actionLabel": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "The label of the one action a snackbar may have."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap on the action label does."
+        },
+        "dismiss": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Shows a close icon that dismisses the snackbar.",
+          "default": false
+        }
+      },
+      "required": [
+        "component",
+        "message"
       ],
       "unevaluatedProperties": false
     },

@@ -106,8 +106,14 @@ An `action` prop calls a renderer function; the renderer never calls the agent, 
 
 - `navigate` with `screen`: pushes that screen.
 - `back`: pops one screen.
-- `open` with `overlay`: opens a `BottomSheet`, `Dialog`, or `Menu` of the same screen by id. Overlays are closed until opened.
+- `open` with `overlay`: opens a `BottomSheet`, `Dialog`, `Menu`, `SideSheet`, `SearchView`, `Tooltip`, or `Snackbar` of the same screen by id. Overlays are closed until opened, and one is open at a time: opening another replaces it.
 - `dismiss`: closes the open overlay.
+
+`Tabs` holds `Tab` children and has no content of its own: each `Tab`'s `action` is a `navigate` to the screen that shows that tab, which repeats the `Tabs` with its own tab `selected`. A `Carousel` takes `children` like a list, usually a template, and clips each item to the carousel shape.
+
+A `SideSheet` takes a `title`, `content`, and an optional `back` action that adds a back icon button (a close icon button is always there). A `Snackbar` takes a `message`, an optional `actionLabel` with its `action`, and `dismiss` for a close icon; it draws in the screen's `Scaffold`, so the screen needs one. `badge` on `NavigationBarItem`, `NavigationRailItem`, `Tab`, and `IconButton` is `true`, a number, or a text of at most four characters.
+
+A `SearchBar`, or a `TopAppBar` of size `search` (its `title` is the field's hint), names the `SearchView` it opens in `expanded`; tapping the field opens it, and a view nothing names is rejected. The view's `layout` is `full-screen` (the default, for compact windows) or `docked`. A search bar has at most two trailing elements, an `avatar` counting as one; a search app bar has at most two `actions` at compact widths, with an `avatar` in addition, and up to four from medium widths up (override `actions` in `sizeClass`). A `Tooltip` names the component it hangs off in `anchor`; `plain` is one line of `text` for an icon-only control, and `rich` adds a `title` and up to two text `Button`s in `actions`. It opens on hover or long press on a device, and by `open` in the previewer.
 
 A `Menu` opened by `open` names the component it hangs from in `anchor`. A `Menu` held by a `SplitButton`'s `menu` slot leaves `anchor` out: the split's trailing button opens it, and an `anchor` back to the split is rejected as a cycle.
 

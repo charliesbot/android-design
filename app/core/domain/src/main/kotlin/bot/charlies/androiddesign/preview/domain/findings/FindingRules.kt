@@ -11,15 +11,17 @@ import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.Severity
+import bot.charlies.androiddesign.preview.model.SizeClass
 import bot.charlies.androiddesign.preview.model.TypeGroup
 import kotlin.math.hypot
 import kotlin.math.round
 
 /**
  * The checks a rendered view must pass, run over its layout tree: touch targets, fonts, clipped or
- * truncated text, contrast, a primary action at least as tall as its rivals, one FAB per pane, and
- * content past the view's edges. [tree] arrives with its nodes and no findings yet. Findings come
- * out in rule order, then in document order.
+ * truncated text, contrast, a primary action at least as tall as its rivals, one FAB per pane,
+ * content past the view's edges, a compact carousel with too many text items, and a navigation bar
+ * with fewer than three destinations. [tree] arrives with its nodes and no findings yet. Findings
+ * come out in rule order, then in document order.
  *
  * A node with no area is not laid out (a closed overlay is never composed), so the rules that
  * measure geometry skip it. While a modal sheet or dialog is open, everything outside it is inert
@@ -104,7 +106,9 @@ object FindingRules {
       primaryLargest(view) +
       oneFab(view) +
       offscreen(view) +
-      roundEdgeClipped(view)
+      roundEdgeClipped(view) +
+      carouselItems(view) +
+      navDestinations(view)
   }
 
   // region the view
@@ -422,6 +426,93 @@ object FindingRules {
           b.y + b.height >= height - EDGE_SLACK_DP
       }
       .maxOfOrNull { checkNotNull(it.ring).inset } ?: 0f
+
+  // endregion
+
+  // region carousel-items
+
+  /**
+   * Material: "At compact breakpoints, only show more than three items if the items are easy to
+   * understand and recognize." A carousel at a compact view is flagged when more than three of its
+   * items that hold text show inside the view. That is a caution in Material, so it is info.
+   *
+   * The carousel keeps every item it composes laid out, and the ones past the last visible item sit
+   * inside that item's bounds, so an item that lies within an earlier item's bounds is hidden and
+   * not counted. A centered hero shows one more small item than this counts, which cannot reach
+   * four.
+   */
+  private fun carouselItems(view: View): List<Finding> {
+    val width = view.tree.view.width.toFloat()
+    if (width >= SizeClass.MEDIUM_MIN_DP) return emptyList()
+    val children = view.nodes.filter { it.parent != null }.groupBy { it.parent }
+    return view.nodes
+      .filter { it.type == CAROUSEL && it.isLaidOut }
+      .mapNotNull { carousel ->
+        val inView =
+          children[carousel.id].orEmpty().filter { item ->
+            item.isLaidOut && item.bounds.x < width - EDGE_SLACK_DP && item.right() > EDGE_SLACK_DP
+          }
+        val shown = inView.filterIndexed { i, item ->
+          holdsText(item, children) && inView.take(i).none { it.contains(item) }
+        }
+        if (shown.size > MAX_COMPACT_CAROUSEL_ITEMS) {
+          Finding(
+            id = carousel.id,
+            rule = FindingRule.CarouselItems,
+            severity = Severity.Info,
+            detail =
+              "${shown.size} items with text show at ${dp(width)} dp; Material shows at most " +
+                "$MAX_COMPACT_CAROUSEL_ITEMS at compact widths unless they are easy to recognize",
+          )
+        } else {
+          null
+        }
+      }
+  }
+
+  /** Whether [other] lies inside this node's bounds. */
+  private fun LayoutNode.contains(other: LayoutNode): Boolean =
+    other.bounds.x >= bounds.x - EDGE_SLACK_DP &&
+      other.right() <= right() + EDGE_SLACK_DP &&
+      other.bounds.y >= bounds.y - EDGE_SLACK_DP &&
+      other.bounds.y + other.bounds.height <= bounds.y + bounds.height + EDGE_SLACK_DP
+
+  /** Whether [node] or anything under it draws text. */
+  private fun holdsText(node: LayoutNode, children: Map<String?, List<LayoutNode>>): Boolean =
+    node.text != null || children[node.id].orEmpty().any { holdsText(it, children) }
+
+  private const val CAROUSEL = "Carousel"
+  private const val MAX_COMPACT_CAROUSEL_ITEMS = 3
+
+  // endregion
+
+  // region nav-destinations
+
+  /**
+   * Material: "Don't use a navigation bar for fewer than three destinations. Instead, use tabs."
+   */
+  private fun navDestinations(view: View): List<Finding> {
+    val children = view.nodes.filter { it.parent != null }.groupBy { it.parent }
+    return view.nodes
+      .filter { it.type == NAVIGATION_BAR && it.isLaidOut }
+      .mapNotNull { bar ->
+        val destinations = children[bar.id].orEmpty().count { it.type == NAVIGATION_BAR_ITEM }
+        if (destinations < MIN_DESTINATIONS) {
+          errorFinding(
+            bar,
+            FindingRule.NavDestinations,
+            "$destinations ${if (destinations == 1) "destination" else "destinations"}; " +
+              "a navigation bar needs at least $MIN_DESTINATIONS, use tabs for fewer",
+          )
+        } else {
+          null
+        }
+      }
+  }
+
+  private const val NAVIGATION_BAR = "NavigationBar"
+  private const val NAVIGATION_BAR_ITEM = "NavigationBarItem"
+  private const val MIN_DESTINATIONS = 3
 
   // endregion
 

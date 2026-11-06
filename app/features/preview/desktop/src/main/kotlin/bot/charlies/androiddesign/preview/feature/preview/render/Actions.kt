@@ -428,7 +428,7 @@ internal fun RenderIconButton(ctx: NodeContext) {
   val onSurfaceVariant = env.color(ColorRole.OnSurfaceVariant)
   val outline = BorderStroke(1.dp, env.color(ColorRole.OutlineVariant))
   val content: @Composable () -> Unit = {
-    SymbolIcon(icon, size = iconSize, filled = toggle && checked.value)
+    ctx.WithBadge { SymbolIcon(icon, size = iconSize, filled = toggle && checked.value) }
   }
   if (toggle) {
     val onChange: (Boolean) -> Unit = {

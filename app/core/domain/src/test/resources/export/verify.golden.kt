@@ -9,6 +9,8 @@
 //   R.drawable.bolt
 //   R.drawable.bookmark
 //   R.drawable.bookmark_filled
+//   R.drawable.cast
+//   R.drawable.chat
 //   R.drawable.check
 //   R.drawable.close
 //   R.drawable.delete
@@ -19,25 +21,37 @@
 //   R.drawable.favorite_filled
 //   R.drawable.home
 //   R.drawable.image
+//   R.drawable.inbox
 //   R.drawable.ink_eraser
+//   R.drawable.item_centered_image
+//   R.drawable.item_full_image
+//   R.drawable.item_hero_image
+//   R.drawable.item_multi_image
+//   R.drawable.item_uncontained_image
 //   R.drawable.keyboard_arrow_down
 //   R.drawable.layers
+//   R.drawable.mail
 //   R.drawable.menu
+//   R.drawable.menu_book
 //   R.drawable.mic
 //   R.drawable.more_horiz
 //   R.drawable.more_vert
 //   R.drawable.note
+//   R.drawable.notifications
 //   R.drawable.palette
 //   R.drawable.person
 //   R.drawable.photo_camera
 //   R.drawable.play_arrow
 //   R.drawable.redo
+//   R.drawable.restaurant
 //   R.drawable.schedule
 //   R.drawable.search
+//   R.drawable.search_bar
 //   R.drawable.select
 //   R.drawable.send
 //   R.drawable.share
 //   R.drawable.star
+//   R.drawable.top
 //   R.drawable.touch_app
 //   R.drawable.tune
 //   R.drawable.undo
@@ -62,11 +76,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalGridApi
 import androidx.compose.foundation.layout.FlexBox
 import androidx.compose.foundation.layout.FlexWrap
 import androidx.compose.foundation.layout.Grid
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -79,12 +95,18 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AppBarWithSearch
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
@@ -103,6 +125,8 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ElevatedFilterChip
 import androidx.compose.material3.ElevatedSuggestionChip
 import androidx.compose.material3.ElevatedToggleButton
+import androidx.compose.material3.ExpandedDockedSearchBarWithGap
+import androidx.compose.material3.ExpandedFullScreenContainedSearchBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -151,24 +175,39 @@ import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedIconToggleButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedToggleButton
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SearchBar
+import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.SearchBarValue
+import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.ShortNavigationBar
 import androidx.compose.material3.ShortNavigationBarArrangement
 import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.ToggleFloatingActionButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Typography
@@ -181,13 +220,23 @@ import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
+import androidx.compose.material3.carousel.CarouselDefaults
+import androidx.compose.material3.carousel.HorizontalCenteredHeroCarousel
+import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
+import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
+import androidx.compose.material3.carousel.rememberCarouselState
+import androidx.compose.material3.rememberContainedSearchBarState
+import androidx.compose.material3.rememberSearchBarWithGapState
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -208,6 +257,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -216,6 +267,7 @@ import androidx.window.core.layout.WindowSizeClass
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 private val SeedColor = Color(0xFF6750A4)
@@ -396,6 +448,12 @@ fun VerifyTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable
 
 @Serializable private data object FabsRoute : NavKey
 
+@Serializable private data object CollectionsRoute : NavKey
+
+@Serializable private data object FeedbackRoute : NavKey
+
+@Serializable private data object SearchRoute : NavKey
+
 @Composable
 fun VerifyApp() {
   VerifyTheme {
@@ -433,6 +491,7 @@ fun VerifyApp() {
               onNavigateToActions = { backStack.add(ActionsRoute) },
               onNavigateToInputs = { backStack.add(InputsRoute) },
               onNavigateToOverlays = { backStack.add(OverlaysRoute) },
+              onNavigateToSearch = { backStack.add(SearchRoute) },
             )
           }
           entry<OverlaysRoute> {
@@ -442,9 +501,21 @@ fun VerifyApp() {
               onNavigateToInputs = { backStack.add(InputsRoute) },
               onNavigateToOverlays = { backStack.add(OverlaysRoute) },
               onNavigateToFabs = { backStack.add(FabsRoute) },
+              onNavigateToCollections = { backStack.add(CollectionsRoute) },
+              onNavigateToFeedback = { backStack.add(FeedbackRoute) },
             )
           }
           entry<FabsRoute> { FabsScreen(onBack = { backStack.removeLastOrNull() }) }
+          entry<CollectionsRoute> {
+            CollectionsScreen(
+              onBack = { backStack.removeLastOrNull() },
+              onNavigateToCollections = { backStack.add(CollectionsRoute) },
+              onNavigateToHome = { backStack.add(HomeRoute) },
+              onNavigateToDetail = { backStack.add(DetailRoute) },
+            )
+          }
+          entry<FeedbackRoute> { FeedbackScreen(onBack = { backStack.removeLastOrNull() }) }
+          entry<SearchRoute> { SearchScreen(onBack = { backStack.removeLastOrNull() }) }
         },
     )
   }
@@ -1748,12 +1819,18 @@ fun InputsScreen(
   onNavigateToActions: () -> Unit = {},
   onNavigateToInputs: () -> Unit = {},
   onNavigateToOverlays: () -> Unit = {},
+  onNavigateToSearch: () -> Unit = {},
 ) {
+  val coroutineScope = rememberCoroutineScope()
   val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
   val atLeastMedium =
     windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
   val atLeastExpanded =
     windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
+  val searchBarSearchState = rememberContainedSearchBarState()
+  val searchDockedSearchState = rememberSearchBarWithGapState()
+  val tipPlainTooltipState = rememberTooltipState()
+  val tipRichTooltipState = rememberTooltipState(isPersistent = true)
   Row(modifier = modifier) {
     if (atLeastMedium && !atLeastExpanded) {
       WideNavigationRail(state = rememberWideNavigationRailState()) {
@@ -1965,10 +2042,34 @@ fun InputsScreen(
               onCheckedChange = { switchOffChecked = it },
               modifier = Modifier.semantics { contentDescription = "Bluetooth" },
             )
-            var checkOnChecked by remember { mutableStateOf(true) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-              Checkbox(checked = checkOnChecked, onCheckedChange = { checkOnChecked = it })
-              Text("Checked")
+            TooltipBox(
+              positionProvider =
+                TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below),
+              tooltip = {
+                RichTooltip(
+                  title = { Text("Why this matters") },
+                  action = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                      TextButton(
+                        onClick = { coroutineScope.launch { tipRichTooltipState.dismiss() } },
+                      ) {
+                        Text("Got it")
+                      }
+                      TextButton(onClick = {}) { Text("Learn more") }
+                    }
+                  },
+                ) {
+                  Text("Checked items stay in your plan.")
+                }
+              },
+              state = tipRichTooltipState,
+              hasAction = true,
+            ) {
+              var checkOnChecked by remember { mutableStateOf(true) }
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = checkOnChecked, onCheckedChange = { checkOnChecked = it })
+                Text("Checked")
+              }
             }
             var checkOffChecked by remember { mutableStateOf(false) }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2084,14 +2185,21 @@ fun InputsScreen(
             expanded = true,
             colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
           ) {
-            IconButton(
-              onClick = {},
-              colors =
-                IconButtonDefaults.iconButtonColors(
-                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
+            TooltipBox(
+              positionProvider =
+                TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+              tooltip = { PlainTooltip { Text("Undo") } },
+              state = tipPlainTooltipState,
             ) {
-              Icon(painterResource(R.drawable.undo), contentDescription = "Undo")
+              IconButton(
+                onClick = {},
+                colors =
+                  IconButtonDefaults.iconButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                  ),
+              ) {
+                Icon(painterResource(R.drawable.undo), contentDescription = "Undo")
+              }
             }
             IconButton(
               onClick = {},
@@ -2103,6 +2211,137 @@ fun InputsScreen(
               Icon(painterResource(R.drawable.redo), contentDescription = "Redo")
             }
           }
+          Box {
+            val searchBarQuery = rememberTextFieldState()
+            val searchBarSearchColors =
+              SearchBarDefaults.containedColors(state = searchBarSearchState)
+            val searchBarInput =
+              @Composable {
+                SearchBarDefaults.InputField(
+                  textFieldState = searchBarQuery,
+                  searchBarState = searchBarSearchState,
+                  onSearch = {
+                    coroutineScope.launch { searchBarSearchState.animateToCollapsed() }
+                  },
+                  colors = searchBarSearchColors.inputFieldColors,
+                  placeholder = { Text("Search recipes") },
+                  leadingIcon = {
+                    if (searchBarSearchState.currentValue == SearchBarValue.Expanded) {
+                      IconButton(
+                        onClick = {
+                          coroutineScope.launch { searchBarSearchState.animateToCollapsed() }
+                        },
+                      ) {
+                        Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+                      }
+                    } else {
+                      IconButton(
+                        onClick = {},
+                        colors =
+                          IconButtonDefaults.iconButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                          ),
+                      ) {
+                        Icon(painterResource(R.drawable.menu), contentDescription = "Menu")
+                      }
+                    }
+                  },
+                  trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                      IconButton(
+                        onClick = {},
+                        colors =
+                          IconButtonDefaults.iconButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                          ),
+                      ) {
+                        Icon(painterResource(R.drawable.mic), contentDescription = "Voice search")
+                      }
+                      Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                        Image(
+                          painter = painterResource(R.drawable.search_bar),
+                          contentDescription = null,
+                          modifier = Modifier.size(30.dp).clip(CircleShape),
+                          contentScale = ContentScale.Crop,
+                        )
+                      }
+                    }
+                  },
+                )
+              }
+            SearchBar(
+              state = searchBarSearchState,
+              inputField = searchBarInput,
+              modifier = Modifier.fillMaxWidth(),
+              colors = searchBarSearchColors,
+            )
+            ExpandedFullScreenContainedSearchBar(
+              state = searchBarSearchState,
+              inputField = searchBarInput,
+              colors = searchBarSearchColors,
+            ) {
+              ListItem(modifier = Modifier.fillMaxWidth()) { Text("Mexican dishes") }
+              ListItem(modifier = Modifier.fillMaxWidth()) { Text("Quick dinners") }
+            }
+          }
+          Box {
+            val searchDockedQuery = rememberTextFieldState()
+            val searchDockedSearchColors = SearchBarDefaults.colors()
+            val searchDockedInput =
+              @Composable {
+                SearchBarDefaults.InputField(
+                  textFieldState = searchDockedQuery,
+                  searchBarState = searchDockedSearchState,
+                  onSearch = {
+                    coroutineScope.launch { searchDockedSearchState.animateToCollapsed() }
+                  },
+                  colors = searchDockedSearchColors.inputFieldColors,
+                  placeholder = { Text("Search your messages") },
+                  leadingIcon = {
+                    if (searchDockedSearchState.currentValue == SearchBarValue.Expanded) {
+                      IconButton(
+                        onClick = {
+                          coroutineScope.launch { searchDockedSearchState.animateToCollapsed() }
+                        },
+                      ) {
+                        Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+                      }
+                    } else {
+                      Icon(painterResource(R.drawable.search), contentDescription = null)
+                    }
+                  },
+                  trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                      IconButton(
+                        onClick = {},
+                        colors =
+                          IconButtonDefaults.iconButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                          ),
+                      ) {
+                        Icon(
+                          painterResource(R.drawable.more_vert),
+                          contentDescription = "More options",
+                        )
+                      }
+                    }
+                  },
+                )
+              }
+            SearchBar(
+              state = searchDockedSearchState,
+              inputField = searchDockedInput,
+              modifier = Modifier.fillMaxWidth(),
+              colors = searchDockedSearchColors,
+            )
+            ExpandedDockedSearchBarWithGap(
+              state = searchDockedSearchState,
+              inputField = searchDockedInput,
+            ) {
+              ListItem(modifier = Modifier.fillMaxWidth()) { Text("Recent: invoices") }
+            }
+          }
+          Button(onClick = { onNavigateToSearch() }) { Text("Search app bar") }
         }
         HorizontalFloatingToolbar(
           expanded = true,
@@ -2172,6 +2411,8 @@ fun OverlaysScreen(
   onNavigateToInputs: () -> Unit = {},
   onNavigateToOverlays: () -> Unit = {},
   onNavigateToFabs: () -> Unit = {},
+  onNavigateToCollections: () -> Unit = {},
+  onNavigateToFeedback: () -> Unit = {},
 ) {
   var showSheet by remember { mutableStateOf(false) }
   var showDialog by remember { mutableStateOf(false) }
@@ -2367,6 +2608,8 @@ fun OverlaysScreen(
         FilledTonalButton(onClick = { showSheet = true }) { Text("Open bottom sheet") }
         OutlinedButton(onClick = { showDialog = true }) { Text("Open dialog") }
         TextButton(onClick = { onNavigateToFabs() }) { Text("All floating action buttons") }
+        TextButton(onClick = { onNavigateToCollections() }) { Text("Tabs and carousels") }
+        TextButton(onClick = { onNavigateToFeedback() }) { Text("Side sheet, snackbar, badges") }
       }
     }
   }
@@ -2565,7 +2808,688 @@ private fun FabsScreenPreview() {
   VerifyTheme { FabsScreen() }
 }
 
+@Composable
+fun CollectionsScreen(
+  modifier: Modifier = Modifier,
+  items: List<Item> = CollectionsSample.items,
+  onBack: () -> Unit = {},
+  onNavigateToCollections: () -> Unit = {},
+  onNavigateToHome: () -> Unit = {},
+  onNavigateToDetail: () -> Unit = {},
+) {
+  val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+  Scaffold(
+    modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+    topBar = {
+      MediumFlexibleTopAppBar(
+        title = { Text("Tabs and carousels") },
+        navigationIcon = {
+          IconButton(
+            onClick = { onBack() },
+            colors =
+              IconButtonDefaults.iconButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+              ),
+          ) {
+            Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+          }
+        },
+        scrollBehavior = scrollBehavior,
+      )
+    },
+  ) { innerPadding ->
+    Column(
+      modifier = Modifier.fillMaxSize().padding(innerPadding).verticalScroll(rememberScrollState()),
+      verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+      PrimaryTabRow(selectedTabIndex = 0, modifier = Modifier.fillMaxWidth()) {
+        Tab(
+          selected = true,
+          onClick = { onNavigateToCollections() },
+          text = { Text("Plates") },
+          icon = { Icon(painterResource(R.drawable.restaurant), contentDescription = null) },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Tab(
+          selected = false,
+          onClick = { onNavigateToHome() },
+          text = { Text("Menus") },
+          icon = { Icon(painterResource(R.drawable.menu_book), contentDescription = null) },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Tab(
+          selected = false,
+          onClick = { onNavigateToDetail() },
+          text = { Text("Chefs") },
+          icon = { Icon(painterResource(R.drawable.person), contentDescription = null) },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+      SecondaryScrollableTabRow(selectedTabIndex = 0, modifier = Modifier.fillMaxWidth()) {
+        Tab(
+          selected = true,
+          onClick = { onNavigateToCollections() },
+          text = { Text("All") },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Tab(
+          selected = false,
+          onClick = { onNavigateToHome() },
+          text = { Text("Soups") },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Tab(
+          selected = false,
+          onClick = { onNavigateToHome() },
+          text = { Text("Salads") },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Tab(
+          selected = false,
+          onClick = { onNavigateToHome() },
+          text = { Text("Mains") },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Tab(
+          selected = false,
+          onClick = { onNavigateToHome() },
+          text = { Text("Desserts") },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Tab(
+          selected = false,
+          onClick = { onNavigateToHome() },
+          text = { Text("Drinks") },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+      val carouselMultiState = rememberCarouselState { items.size }
+      HorizontalMultiBrowseCarousel(
+        state = carouselMultiState,
+        modifier = Modifier.fillMaxWidth(),
+        preferredItemWidth = 186.dp,
+        itemSpacing = 8.dp,
+        flingBehavior = CarouselDefaults.multiBrowseFlingBehavior(carouselMultiState),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+      ) { index ->
+        val item = items[index]
+        Card(modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge).fillMaxWidth()) {
+          Image(
+            painter = painterResource(R.drawable.item_multi_image),
+            contentDescription = item.name,
+            modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
+            contentScale = ContentScale.Crop,
+          )
+          Text(
+            item.name,
+            modifier = Modifier.padding(12.dp),
+            overflow = TextOverflow.Ellipsis,
+            maxLines = 1,
+            style = MaterialTheme.typography.titleSmall,
+          )
+        }
+      }
+      val carouselHeroState = rememberCarouselState { items.size }
+      BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        HorizontalMultiBrowseCarousel(
+          state = carouselHeroState,
+          preferredItemWidth = maxWidth - 96.dp,
+          itemSpacing = 8.dp,
+          flingBehavior = CarouselDefaults.multiBrowseFlingBehavior(carouselHeroState),
+          contentPadding = PaddingValues(horizontal = 16.dp),
+        ) { index ->
+          val item = items[index]
+          Card(modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge).fillMaxWidth()) {
+            Image(
+              painter = painterResource(R.drawable.item_hero_image),
+              contentDescription = item.name,
+              modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
+              contentScale = ContentScale.Crop,
+            )
+            Text(
+              item.name,
+              modifier = Modifier.padding(12.dp),
+              overflow = TextOverflow.Ellipsis,
+              maxLines = 1,
+              style = MaterialTheme.typography.titleSmall,
+            )
+          }
+        }
+      }
+      val carouselCenteredState = rememberCarouselState { items.size }
+      HorizontalCenteredHeroCarousel(
+        state = carouselCenteredState,
+        modifier = Modifier.fillMaxWidth(),
+        itemSpacing = 8.dp,
+        contentPadding = PaddingValues(horizontal = 16.dp),
+      ) { index ->
+        val item = items[index]
+        Card(modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge).fillMaxWidth()) {
+          Image(
+            painter = painterResource(R.drawable.item_centered_image),
+            contentDescription = item.name,
+            modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
+            contentScale = ContentScale.Crop,
+          )
+          Text(
+            item.name,
+            modifier = Modifier.padding(12.dp),
+            overflow = TextOverflow.Ellipsis,
+            maxLines = 1,
+            style = MaterialTheme.typography.titleSmall,
+          )
+        }
+      }
+      val carouselUncontainedState = rememberCarouselState { items.size }
+      HorizontalUncontainedCarousel(
+        state = carouselUncontainedState,
+        modifier = Modifier.fillMaxWidth(),
+        itemWidth = 140.dp,
+        itemSpacing = 8.dp,
+        flingBehavior = CarouselDefaults.noSnapFlingBehavior(),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+      ) { index ->
+        val item = items[index]
+        Card(modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge).fillMaxWidth()) {
+          Image(
+            painter = painterResource(R.drawable.item_uncontained_image),
+            contentDescription = item.name,
+            modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
+            contentScale = ContentScale.Crop,
+          )
+          Text(
+            item.name,
+            modifier = Modifier.padding(12.dp),
+            overflow = TextOverflow.Ellipsis,
+            maxLines = 1,
+            style = MaterialTheme.typography.titleSmall,
+          )
+        }
+      }
+      val carouselFullState = rememberCarouselState { items.size }
+      BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        HorizontalUncontainedCarousel(
+          state = carouselFullState,
+          itemWidth = maxWidth,
+          itemSpacing = 16.dp,
+          flingBehavior = CarouselDefaults.singleAdvanceFlingBehavior(carouselFullState),
+          contentPadding = PaddingValues(0.dp),
+        ) { index ->
+          val item = items[index]
+          Card(modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge).fillMaxWidth()) {
+            Image(
+              painter = painterResource(R.drawable.item_full_image),
+              contentDescription = item.name,
+              modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
+              contentScale = ContentScale.Crop,
+            )
+            Text(
+              item.name,
+              modifier = Modifier.padding(12.dp),
+              overflow = TextOverflow.Ellipsis,
+              maxLines = 1,
+              style = MaterialTheme.typography.titleSmall,
+            )
+          }
+        }
+      }
+    }
+  }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun CollectionsScreenPreview() {
+  VerifyTheme { CollectionsScreen() }
+}
+
+@Composable
+fun FeedbackScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {}) {
+  var showFilters by remember { mutableStateOf(false) }
+  var showMoreFilters by remember { mutableStateOf(false) }
+  var showDeleted by remember { mutableStateOf(false) }
+  var showRestored by remember { mutableStateOf(false) }
+  val snackbarHostState = remember { SnackbarHostState() }
+  val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
+  val atLeastMedium =
+    windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
+  val atLeastExpanded =
+    windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
+  Row(modifier = modifier) {
+    if (atLeastMedium) {
+      WideNavigationRail(state = rememberWideNavigationRailState()) {
+        WideNavigationRailItem(
+          railExpanded = false,
+          selected = true,
+          onClick = {},
+          icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
+          label = { Text("Home") },
+        )
+        WideNavigationRailItem(
+          railExpanded = false,
+          selected = false,
+          onClick = {},
+          icon = {
+            BadgedBox(badge = { Badge { Text("9+") } }) {
+              Icon(painterResource(R.drawable.chat), contentDescription = null)
+            }
+          },
+          label = { Text("Chat") },
+        )
+      }
+    }
+    Scaffold(
+      modifier = Modifier.weight(1f),
+      topBar = {
+        TopAppBar(
+          title = { Text("Side sheet, snackbar, badges") },
+          navigationIcon = {
+            IconButton(
+              onClick = { onBack() },
+              colors =
+                IconButtonDefaults.iconButtonColors(
+                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+              Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+            }
+          },
+          actions = {
+            IconButton(
+              onClick = {},
+              colors =
+                IconButtonDefaults.iconButtonColors(
+                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+              BadgedBox(badge = { Badge() }) {
+                Icon(painterResource(R.drawable.notifications), contentDescription = "Alerts")
+              }
+            }
+            IconButton(
+              onClick = {},
+              colors =
+                IconButtonDefaults.iconButtonColors(
+                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+              BadgedBox(badge = { Badge { Text("99+") } }) {
+                Icon(painterResource(R.drawable.mail), contentDescription = "Mail")
+              }
+            }
+          },
+        )
+      },
+      bottomBar = {
+        ShortNavigationBar(arrangement = ShortNavigationBarArrangement.EqualWeight) {
+          ShortNavigationBarItem(
+            selected = true,
+            onClick = {},
+            icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
+            label = { Text("Home") },
+          )
+          ShortNavigationBarItem(
+            selected = false,
+            onClick = {},
+            icon = {
+              BadgedBox(badge = { Badge { Text("12") } }) {
+                Icon(painterResource(R.drawable.chat), contentDescription = null)
+              }
+            },
+            label = { Text("Chat") },
+          )
+          ShortNavigationBarItem(
+            selected = false,
+            onClick = {},
+            icon = {
+              BadgedBox(badge = { Badge() }) {
+                Icon(painterResource(R.drawable.favorite), contentDescription = null)
+              }
+            },
+            label = { Text("Saved") },
+          )
+        }
+      },
+      snackbarHost = { SnackbarHost(snackbarHostState) },
+      floatingActionButton = {
+        FloatingActionButton(
+          onClick = {},
+          modifier = Modifier.semantics { contentDescription = "New plate" },
+        ) {
+          Icon(painterResource(R.drawable.add), contentDescription = "New plate")
+        }
+      },
+    ) { innerPadding ->
+      Column(
+        modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+      ) {
+        PrimaryTabRow(selectedTabIndex = 0, modifier = Modifier.fillMaxWidth()) {
+          Tab(
+            selected = true,
+            onClick = {},
+            text = { Text("All") },
+            icon = {
+              BadgedBox(badge = { Badge { Text("3") } }) {
+                Icon(painterResource(R.drawable.inbox), contentDescription = null)
+              }
+            },
+            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+          Tab(
+            selected = false,
+            onClick = {},
+            text = { BadgedBox(badge = { Badge() }) { Text("Unread") } },
+            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        Button(onClick = { showFilters = true }) { Text("Open side sheet") }
+        FilledTonalButton(onClick = { showDeleted = true }) { Text("Delete plate") }
+      }
+    }
+  }
+  if (showFilters) {
+    Dialog(
+      onDismissRequest = { showFilters = false },
+      properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+      Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+          modifier =
+            Modifier.matchParentSize().clickable(interactionSource = null, indication = null) {
+              showFilters = false
+            },
+        )
+        Surface(
+          modifier =
+            Modifier.align(Alignment.CenterEnd)
+              .widthIn(max = 400.dp)
+              .fillMaxWidth()
+              .fillMaxHeight(),
+          shape =
+            RoundedCornerShape(
+              topStart = 16.dp,
+              topEnd = 0.dp,
+              bottomEnd = 0.dp,
+              bottomStart = 16.dp,
+            ),
+          color = MaterialTheme.colorScheme.surfaceContainerLow,
+          contentColor = MaterialTheme.colorScheme.onSurface,
+        ) {
+          Column(modifier = Modifier.fillMaxSize().padding(vertical = 24.dp)) {
+            Row(
+              modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 24.dp),
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              IconButton(
+                onClick = {
+                  showMoreFilters = true
+                  showFilters = false
+                },
+                colors =
+                  IconButtonDefaults.iconButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                  ),
+              ) {
+                Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+              }
+              Text(
+                "Filters",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+              IconButton(
+                onClick = { showFilters = false },
+                colors =
+                  IconButtonDefaults.iconButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                  ),
+              ) {
+                Icon(painterResource(R.drawable.close), contentDescription = "Close")
+              }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Column(
+              modifier =
+                Modifier.weight(1f)
+                  .fillMaxWidth()
+                  .verticalScroll(rememberScrollState())
+                  .padding(horizontal = 24.dp),
+            ) {
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = FilterChipDefaults.horizontalArrangement(),
+              ) {
+                var chipVeganSelected by remember { mutableStateOf(true) }
+                FilterChip(
+                  selected = chipVeganSelected,
+                  onClick = { chipVeganSelected = !chipVeganSelected },
+                  label = { Text("Vegan") },
+                  leadingIcon =
+                    if (chipVeganSelected) {
+                      {
+                        Icon(
+                          painterResource(R.drawable.check),
+                          contentDescription = null,
+                          modifier = Modifier.size(FilterChipDefaults.IconSize),
+                        )
+                      }
+                    } else null,
+                )
+                var chipSpicySelected by remember { mutableStateOf(false) }
+                FilterChip(
+                  selected = chipSpicySelected,
+                  onClick = { chipSpicySelected = !chipSpicySelected },
+                  label = { Text("Spicy") },
+                  leadingIcon =
+                    if (chipSpicySelected) {
+                      {
+                        Icon(
+                          painterResource(R.drawable.check),
+                          contentDescription = null,
+                          modifier = Modifier.size(FilterChipDefaults.IconSize),
+                        )
+                      }
+                    } else null,
+                )
+              }
+              Button(onClick = { showFilters = false }) { Text("Apply") }
+            }
+          }
+        }
+      }
+    }
+  }
+  if (showMoreFilters) {
+    Dialog(
+      onDismissRequest = { showMoreFilters = false },
+      properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+      Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+          modifier =
+            Modifier.matchParentSize().clickable(interactionSource = null, indication = null) {
+              showMoreFilters = false
+            },
+        )
+        Surface(
+          modifier =
+            Modifier.align(Alignment.CenterEnd)
+              .widthIn(max = 400.dp)
+              .fillMaxWidth()
+              .fillMaxHeight(),
+          shape =
+            RoundedCornerShape(
+              topStart = 16.dp,
+              topEnd = 0.dp,
+              bottomEnd = 0.dp,
+              bottomStart = 16.dp,
+            ),
+          color = MaterialTheme.colorScheme.surfaceContainerLow,
+          contentColor = MaterialTheme.colorScheme.onSurface,
+        ) {
+          Column(modifier = Modifier.fillMaxSize().padding(vertical = 24.dp)) {
+            Row(
+              modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp),
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Text(
+                "More filters",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+              IconButton(
+                onClick = { showMoreFilters = false },
+                colors =
+                  IconButtonDefaults.iconButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                  ),
+              ) {
+                Icon(painterResource(R.drawable.close), contentDescription = "Close")
+              }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Column(
+              modifier =
+                Modifier.weight(1f)
+                  .fillMaxWidth()
+                  .verticalScroll(rememberScrollState())
+                  .padding(horizontal = 24.dp),
+            ) {
+              Text(
+                "Fewer, broader filters work better in a side sheet.",
+                style = MaterialTheme.typography.bodyMedium,
+              )
+            }
+          }
+        }
+      }
+    }
+  }
+  LaunchedEffect(showDeleted) {
+    if (showDeleted) {
+      val result =
+        snackbarHostState.showSnackbar(
+          message = "Plate deleted",
+          actionLabel = "Undo",
+          withDismissAction = true,
+        )
+      showDeleted = false
+      if (result == SnackbarResult.ActionPerformed) {
+        showRestored = true
+      }
+    }
+  }
+  LaunchedEffect(showRestored) {
+    if (showRestored) {
+      snackbarHostState.showSnackbar(message = "Plate restored")
+      showRestored = false
+    }
+  }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun FeedbackScreenPreview() {
+  VerifyTheme { FeedbackScreen() }
+}
+
+@Composable
+fun SearchScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {}) {
+  val coroutineScope = rememberCoroutineScope()
+  val topSearchState = rememberSearchBarWithGapState()
+  Scaffold(
+    modifier = modifier,
+    topBar = {
+      Box {
+        val topQuery = rememberTextFieldState()
+        val topSearchColors = SearchBarDefaults.colors()
+        val topInput =
+          @Composable {
+            SearchBarDefaults.InputField(
+              textFieldState = topQuery,
+              searchBarState = topSearchState,
+              onSearch = { coroutineScope.launch { topSearchState.animateToCollapsed() } },
+              colors = topSearchColors.inputFieldColors,
+              placeholder = { Text("Search inbox") },
+              leadingIcon = {
+                if (topSearchState.currentValue == SearchBarValue.Expanded) {
+                  IconButton(
+                    onClick = { coroutineScope.launch { topSearchState.animateToCollapsed() } },
+                  ) {
+                    Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+                  }
+                } else {
+                  Icon(painterResource(R.drawable.search), contentDescription = null)
+                }
+              },
+            )
+          }
+        AppBarWithSearch(
+          state = topSearchState,
+          inputField = topInput,
+          navigationIcon = {
+            IconButton(
+              onClick = {},
+              colors =
+                IconButtonDefaults.iconButtonColors(
+                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+              Icon(painterResource(R.drawable.menu), contentDescription = "Menu")
+            }
+          },
+          actions = {
+            IconButton(
+              onClick = {},
+              colors =
+                IconButtonDefaults.iconButtonColors(
+                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+              Icon(painterResource(R.drawable.cast), contentDescription = "Cast")
+            }
+            Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+              Image(
+                painter = painterResource(R.drawable.top),
+                contentDescription = null,
+                modifier = Modifier.size(30.dp).clip(CircleShape),
+                contentScale = ContentScale.Crop,
+              )
+            }
+          },
+          colors = SearchBarDefaults.appBarWithSearchColors(searchBarColors = topSearchColors),
+        )
+        ExpandedDockedSearchBarWithGap(state = topSearchState, inputField = topInput) {
+          ListItem(modifier = Modifier.fillMaxWidth()) { Text("Recent: tickets") }
+          ListItem(modifier = Modifier.fillMaxWidth()) { Text("Recent: receipts") }
+        }
+      }
+    },
+  ) { innerPadding ->
+    Column(
+      modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+      Text("Messages appear here.")
+      Button(onClick = { onBack() }) { Text("Back") }
+    }
+  }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SearchScreenPreview() {
+  VerifyTheme { SearchScreen() }
+}
+
 data class HomeRow(val kind: String, val name: String, val detail: String, val meta: String)
+
+data class Item(val name: String)
 
 private object HomeSample {
   val rows =
@@ -2582,5 +3506,16 @@ private object HomeSample {
         detail = "Second row of the template",
         meta = "Now",
       ),
+    )
+}
+
+private object CollectionsSample {
+  val items =
+    listOf(
+      Item(name = "Tomato soup"),
+      Item(name = "Caesar salad"),
+      Item(name = "Mushroom risotto"),
+      Item(name = "Lemon tart"),
+      Item(name = "Iced tea"),
     )
 }

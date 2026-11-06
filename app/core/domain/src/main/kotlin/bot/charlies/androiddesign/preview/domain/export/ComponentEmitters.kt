@@ -1,11 +1,21 @@
 package bot.charlies.androiddesign.preview.domain.export
 
+import bot.charlies.androiddesign.preview.domain.BadgeContent
+import bot.charlies.androiddesign.preview.domain.CarouselSpec
+import bot.charlies.androiddesign.preview.domain.CollapsingAppBars
+import bot.charlies.androiddesign.preview.domain.SearchBars
+import bot.charlies.androiddesign.preview.domain.SearchSpec
+import bot.charlies.androiddesign.preview.domain.SideSheetSpec
+import bot.charlies.androiddesign.preview.domain.TooltipSpec
+import bot.charlies.androiddesign.preview.model.ActionFunction
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.SizeClass
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 
 // The Compose call for each catalog component, from compose-mapping.md. Each function returns the
 // statements that draw one component; a component with state declares it first.
@@ -33,15 +43,92 @@ internal fun ScreenEmitter.emitComponent(
   place: Place,
 ): List<Stmt> {
   val menu = placement.menuAt(node.id)?.let(byId::get)
+  val tooltip = placement.tooltipAt(node.id)?.let(byId::get)
   // The same rule the previewer uses: the catalog says who stretches and who lets its children,
   // read from the props with their bindings resolved against the screen's sample data.
   val fillWidth =
     place.parentStretches &&
       M3ExpressiveCatalog.find(node.component)?.fillsWidth { props.sampleValue(it, place) } == true
   val placed = place.copy(fillWidth = fillWidth)
-  val own = dispatch(node, props, if (menu != null) placed.copy(parentType = "Box") else placed)
-  if (menu == null || menu.id in placedOverlays) return own
-  return besideMenu(menu, own)
+  val wrapped = menu != null || tooltip != null
+  val own = dispatch(node, props, if (wrapped) placed.copy(parentType = "Box") else placed)
+  val anchored = if (tooltip == null) own else aroundAnchor(tooltip, own)
+  if (menu == null || menu.id in placedOverlays) return anchored
+  return besideMenu(menu, anchored)
+}
+
+/**
+ * [anchor] inside the `TooltipBox` of [tooltip], which hangs off it. A tooltip whose props change
+ * with the window width class gets one box per distinct set, chosen by the width class.
+ */
+private fun ScreenEmitter.aroundAnchor(tooltip: ComponentNode, anchor: List<Stmt>): List<Stmt> {
+  val variants = linkedMapOf<JsonObject, MutableSet<SizeClass>>()
+  for (size in SizeClass.entries) {
+    variants.getOrPut(effectiveProps(tooltip, size)) { linkedSetOf() } += size
+  }
+  variants.entries.singleOrNull()?.let {
+    return tooltipBox(tooltip, it.key, anchor)
+  }
+  usesSizeClass = true
+  return listOf(
+    IfStmt(variants.map { (p, sizes) -> condition(sizes) to tooltipBox(tooltip, p, anchor) }, null),
+  )
+}
+
+private fun ScreenEmitter.tooltipBox(
+  tooltip: ComponentNode,
+  p: JsonObject,
+  anchor: List<Stmt>,
+): List<Stmt> {
+  experimental()
+  val rich = p.choice("Tooltip", "variant") == "rich"
+  val place = Place()
+  val text = textOf(p.text("text", place) ?: Raw("\"\""))
+  val side = checkNotNull(placement.tooltipSide(tooltip.id, rich)).compose
+  val title = if (rich) textSlot(p, "title", place) else null
+  val actions = if (rich) children(p, "actions", place, "Tooltip") else emptyList()
+  val body =
+    if (!rich) {
+      Call(m3("PlainTooltip"), emptyList(), lambdaOf(text))
+    } else {
+      Call(
+        m3("RichTooltip"),
+        listOfNotNull(
+          title,
+          if (actions.isEmpty()) null
+          else
+            arg(
+              "action",
+              lambdaOf(
+                Call(
+                  file.use(Sym.Row),
+                  listOf(
+                    arg(
+                      "horizontalArrangement",
+                      "${file.use(Sym.Arrangement)}.spacedBy(${dp(TooltipSpec.ACTION_GAP_DP)})",
+                    ),
+                  ),
+                  lambda(actions),
+                ),
+              ),
+            ),
+        ),
+        lambdaOf(text),
+      )
+    }
+  return one(
+    m3("TooltipBox"),
+    listOf(
+      arg(
+        "positionProvider",
+        "${m3("TooltipDefaults")}.rememberTooltipPositionProvider(${m3("TooltipAnchorPosition")}.$side)",
+      ),
+      arg("tooltip", lambdaOf(body)),
+      arg("state", tooltipState(tooltip.id)),
+      if (actions.isEmpty()) null else arg("hasAction", "true"),
+    ),
+    anchor,
+  )
 }
 
 /** [own] and the [menu] anchored to it, wrapped in a `Box` so the menu opens beside them. */
@@ -63,10 +150,13 @@ private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Pl
     "Text" -> textComponent(p, place)
     "Icon" -> iconComponent(p, place)
     "Image" -> image(node, p, place)
-    "Scaffold" -> scaffold(p, place)
-    "TopAppBar" -> topAppBar(p, place)
+    "Carousel" -> carousel(node, p, place)
+    "Scaffold" -> scaffold(node, p, place)
+    "TopAppBar" -> topAppBar(node, p, place)
     "NavigationBar" -> navigationBar(p, place)
     "NavigationBarItem" -> navigationItem(node, p, place, "ShortNavigationBarItem", false)
+    "Tabs" -> tabs(p, place)
+    "Tab" -> tab(node, p, place)
     "NavigationRail" -> navigationRail(p, place)
     "NavigationRailItem" -> navigationItem(node, p, place, "WideNavigationRailItem", true)
     "FloatingToolbar" -> floatingToolbar(p, place)
@@ -91,10 +181,13 @@ private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Pl
     "Slider" -> slider(node, p, place)
     "RangeSlider" -> rangeSlider(node, p, place)
     "TextField" -> textField(node, p, place)
+    "SearchBar" -> searchBar(node, p, place)
     "LoadingIndicator" -> loadingIndicator(p, place)
     "ProgressIndicator" -> progressIndicator(p, place)
     "MenuItem" -> menuItem(node, p, place)
-    else -> emptyList() // BottomSheet, Dialog and Menu are written at the end of the screen.
+    "SearchView" -> searchView(node, p)
+    // Sheets, dialogs, menus and snackbars are written at the end of the screen.
+    else -> emptyList()
   }
 
 // region shared pieces
@@ -203,6 +296,41 @@ private fun ScreenEmitter.state(
 ): Pair<String, Stmt> {
   val name = stateName(node.id, suffix)
   return name to stateVar(name, initial, factory)
+}
+
+/**
+ * [content] in a `BadgedBox` when [p]'s `badge` draws one, else [content] alone. A literal gives
+ * `Badge()` or `Badge { Text("3") }`; a bound value gives a badge that follows the data: a Boolean
+ * shows the dot when true, any other value shows its text (as the sample data gives it).
+ */
+private fun ScreenEmitter.badged(p: JsonObject, place: Place, content: Expr): Expr {
+  val badge = badgeLambda(p, place) ?: return content
+  return Call(m3("BadgedBox"), listOf(arg("badge", badge)), lambdaOf(content))
+}
+
+private fun ScreenEmitter.badgeLambda(p: JsonObject, place: Place): Lambda? {
+  val element = p["badge"] ?: return null
+  val sample = p.sampleValue("badge", place) as? JsonPrimitive
+  val bound = element !is JsonPrimitive
+  val isFlag =
+    sample != null && sample !is JsonNull && !sample.isString && sample.booleanOrNull != null
+  if (bound && isFlag) {
+    val dot =
+      IfStmt(
+        listOf(checkNotNull(p.boolExpr("badge", place)) to listOf(stmt(Call(m3("Badge"))))),
+        null,
+      )
+    return lambda(dot)
+  }
+  return when (val content = BadgeContent.of(sample)) {
+    null -> null
+    BadgeContent.Small -> lambdaOf(Call(m3("Badge")))
+    is BadgeContent.Large -> {
+      val label =
+        if (bound) checkNotNull(p.text("badge", place)) else Raw(kotlinString(content.label))
+      lambdaOf(Call(m3("Badge"), emptyList(), lambdaOf(textOf(label))))
+    }
+  }
 }
 
 // endregion
@@ -422,12 +550,16 @@ private fun ScreenEmitter.iconComponent(p: JsonObject, place: Place): List<Stmt>
  * `src` is a call of the lookup over every source the sample data gives it; when several distinct
  * data URIs occur, the node's name is numbered in the order they first appear.
  */
-private fun ScreenEmitter.imageDrawable(node: ComponentNode, p: JsonObject, place: Place): String {
+private fun ScreenEmitter.imageDrawable(
+  node: ComponentNode,
+  p: JsonObject,
+  place: Place,
+  key: String = "src",
+): String {
   fun symbol(src: String) =
     if (src.startsWith("data:")) node.id else src.substringAfterLast('/').substringBeforeLast('.')
   val bound =
-    p.boundText("src", place)
-      ?: return file.drawable(Naming.snake(symbol(p.literal("src").orEmpty())))
+    p.boundText(key, place) ?: return file.drawable(Naming.snake(symbol(p.literal(key).orEmpty())))
   val data = bound.values.filter { it.startsWith("data:") }
   val symbols =
     bound.values.associateWith { src ->
@@ -461,17 +593,116 @@ private fun ScreenEmitter.image(node: ComponentNode, p: JsonObject, place: Place
   )
 }
 
+private fun ScreenEmitter.carousel(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
+  experimental()
+  val variant = p.choice("Carousel", "variant")
+  val items =
+    childrenByIndex(p, "children", place, "Carousel") {
+      // maskClip is a member of the item scope, so the children clip to the carousel's shape.
+      val shape = "${file.use(Sym.MaterialTheme)}.shapes.extraLarge"
+      it.copy(leading = listOf("maskClip($shape)"))
+    }
+  val itemWidth = p.number("Carousel", "itemWidth", place)
+  val state = stateName(node.id, "State")
+  val remember =
+    Assign(
+      "val $state",
+      "=",
+      Call(
+        file.use(Sym.carousel("rememberCarouselState")),
+        lambda = lambda(stmt(Raw(items.count))),
+      ),
+    )
+  val defaults = file.use(Sym.carousel("CarouselDefaults"))
+  val gap = arg("itemSpacing", dp(CarouselSpec.GAP_DP))
+  fun padding(horizontal: Float?): Arg {
+    val values =
+      if (horizontal == null) "${file.use(Sym.PaddingValues)}(${dp(0f)})"
+      else "${file.use(Sym.PaddingValues)}(horizontal = ${dp(horizontal)})"
+    return arg("contentPadding", values)
+  }
+  fun carousel(callee: String, modifier: Arg?, vararg args: Arg?): List<Stmt> =
+    listOf(
+      stmt(
+        Call(
+          file.use(Sym.carousel(callee)),
+          (listOf(arg("state", state), modifier) + args).filterNotNull(),
+          Lambda(items.param, items.body),
+        ),
+      ),
+    )
+  val modifier = modifier(place, p)
+  val body =
+    when (variant) {
+      "centered-hero" ->
+        carousel("HorizontalCenteredHeroCarousel", modifier, gap, padding(CarouselSpec.PADDING_DP))
+      "uncontained" ->
+        carousel(
+          "HorizontalUncontainedCarousel",
+          modifier,
+          arg("itemWidth", dp(itemWidth.toFloat())),
+          gap,
+          arg("flingBehavior", "$defaults.noSnapFlingBehavior()"),
+          padding(CarouselSpec.PADDING_DP),
+        )
+      "hero" ->
+        wrapWidth(
+          modifier,
+          carousel(
+            "HorizontalMultiBrowseCarousel",
+            null,
+            arg("preferredItemWidth", "maxWidth - ${dp(CarouselSpec.HERO_RESERVED_DP)}"),
+            gap,
+            arg("flingBehavior", "$defaults.multiBrowseFlingBehavior($state)"),
+            padding(CarouselSpec.PADDING_DP),
+          ),
+        )
+      "full-screen" ->
+        wrapWidth(
+          modifier,
+          carousel(
+            "HorizontalUncontainedCarousel",
+            null,
+            arg("itemWidth", "maxWidth"),
+            arg("itemSpacing", dp(CarouselSpec.FULL_SCREEN_GAP_DP)),
+            arg("flingBehavior", "$defaults.singleAdvanceFlingBehavior($state)"),
+            padding(null),
+          ),
+        )
+      else ->
+        carousel(
+          "HorizontalMultiBrowseCarousel",
+          modifier,
+          arg("preferredItemWidth", dp(itemWidth.toFloat())),
+          gap,
+          arg("flingBehavior", "$defaults.multiBrowseFlingBehavior($state)"),
+          padding(CarouselSpec.PADDING_DP),
+        )
+    }
+  return listOf<Stmt>(remember) + body
+}
+
+/** [content] inside a `BoxWithConstraints`, whose `maxWidth` is the width the carousel sizes by. */
+private fun ScreenEmitter.wrapWidth(modifier: Arg?, content: List<Stmt>): List<Stmt> =
+  one(file.use(Sym.BoxWithConstraints), listOf(modifier), content)
+
 // endregion
 
 // region structure
 
 private val LAYOUT_TYPES = setOf("Column", "Row", "Box", "Grid", "FlexBox", "List")
 
-private fun ScreenEmitter.scaffold(p: JsonObject, place: Place): List<Stmt> {
+private fun ScreenEmitter.scaffold(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val statements = mutableListOf<Stmt>()
   val topBar = p.literal("topBar")?.let(byId::get)
-  val collapsing =
-    topBar?.component == "TopAppBar" && (topBar.props.literal("size") in setOf("medium", "large"))
+  // The window sizes where the bar is shown and collapses, as the preview decides per width.
+  val collapsingSizes =
+    if (topBar == null) emptySet()
+    else
+      SizeClass.entries
+        .filter { CollapsingAppBars.collapsesAt(topBar, it, effectiveProps(topBar, it)) }
+        .toSet()
+  val collapsing = collapsingSizes.isNotEmpty()
   if (collapsing) {
     experimental()
     statements +=
@@ -487,15 +718,26 @@ private fun ScreenEmitter.scaffold(p: JsonObject, place: Place): List<Stmt> {
   val rail = p.literal("navigationRail")
   val inRow = rail != null
 
-  val nested = if (collapsing) "nestedScroll(scrollBehavior.nestedScrollConnection)" else null
+  val nested =
+    when {
+      !collapsing -> null
+      // An unattached behavior would swallow upward scroll, so it joins only where the bar uses it.
+      collapsingSizes.size < SizeClass.entries.size -> {
+        usesSizeClass = true
+        val attach = useModifier("nestedScroll(scrollBehavior.nestedScrollConnection)")
+        val modifier = file.use(Sym.Modifier)
+        "then(if (${condition(collapsingSizes)}) $modifier.$attach else $modifier)"
+      }
+      else -> useModifier("nestedScroll(scrollBehavior.nestedScrollConnection)")
+    }
   val scaffoldModifier =
     when {
       inRow ->
         modifierArg(
           place.copy(modifierBase = "Modifier"),
-          listOfNotNull("weight(1f)", nested?.let(::useModifier)),
+          listOfNotNull("weight(1f)", nested),
         )
-      nested != null -> modifierArg(place, listOf(useModifier(nested)))
+      nested != null -> modifierArg(place, listOf(nested))
       else -> modifierArg(place, emptyList())
     }
 
@@ -511,6 +753,17 @@ private fun ScreenEmitter.scaffold(p: JsonObject, place: Place): List<Stmt> {
       bottomId
         ?.takeIf { !toolbarOverContent }
         ?.let { arg("bottomBar", lambda(emit(it, place.forChild("Scaffold")))) },
+      // The snackbars of the screen show here, above the FAB and the bottom bar.
+      if (node.id == placement.snackbarScaffold && placement.snackbars.isNotEmpty()) {
+        arg(
+          "snackbarHost",
+          lambdaOf(
+            Call(m3("SnackbarHost"), listOf(pos(ScreenEmitter.SNACKBAR_HOST_STATE))),
+          ),
+        )
+      } else {
+        null
+      },
       p.literal("floatingActionButton")?.let {
         arg("floatingActionButton", lambda(emit(it, place.forChild("Scaffold"))))
       },
@@ -569,8 +822,9 @@ private fun ScreenEmitter.scaffoldContent(
   )
 }
 
-private fun ScreenEmitter.topAppBar(p: JsonObject, place: Place): List<Stmt> {
+private fun ScreenEmitter.topAppBar(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val size = p.choice("TopAppBar", "size")
+  if (SearchBars.isSearchAppBar(node.component, p)) return searchAppBar(node, p, place)
   val flexible = size == "medium" || size == "large"
   if (flexible) expressive() else experimental()
   val callee =
@@ -591,7 +845,11 @@ private fun ScreenEmitter.topAppBar(p: JsonObject, place: Place): List<Stmt> {
       modifier(place, p),
       slot(p, "navigationIcon", place, "TopAppBar")?.let { arg("navigationIcon", it) },
       if (p["actions"] == null) null else arg("actions", lambda(actions)),
-      if (place.scrollBehavior) arg("scrollBehavior", "scrollBehavior") else null,
+      if (place.scrollBehavior && CollapsingAppBars.isCollapsing(node.component, p)) {
+        arg("scrollBehavior", "scrollBehavior")
+      } else {
+        null
+      },
     ),
   )
 }
@@ -603,6 +861,69 @@ private fun ScreenEmitter.navigationBar(p: JsonObject, place: Place): List<Stmt>
     m3("ShortNavigationBar"),
     listOf(modifier(place, p), arg("arrangement", arrangement)),
     children(p, "children", place, "NavigationBar"),
+  )
+}
+
+private fun ScreenEmitter.tabs(p: JsonObject, place: Place): List<Stmt> {
+  val secondary = p.literal("variant") == "secondary"
+  val scrollable = p.sampleFlag("scrollable", place) == true
+  val callee =
+    (if (secondary) "Secondary" else "Primary") + if (scrollable) "ScrollableTabRow" else "TabRow"
+  return one(
+    m3(callee),
+    listOf(arg("selectedTabIndex", selectedTab(p, place)), modifier(place, p)),
+    children(p, "children", place, "Tabs"),
+  )
+}
+
+/**
+ * The index of the selected tab, which the row needs for its indicator. Listed tabs give the index
+ * of the first whose `selected` is set in the sample data, else the first. A template whose
+ * `selected` is bound gives the same search over its list, written with the expression each tab's
+ * `selected` uses, so the indicator follows the data.
+ */
+private fun ScreenEmitter.selectedTab(p: JsonObject, place: Place): String {
+  fun selected(tab: ComponentNode, at: Place) = tab.props.sampleFlag("selected", at) == true
+  return when (val items = p["children"].childItems()) {
+    is ChildItems.Listed ->
+      items.ids
+        .mapNotNull(byId::get)
+        .indexOfFirst { selected(it, place) }
+        .coerceAtLeast(0)
+        .toString()
+    is ChildItems.Template -> {
+      val tab = byId[items.componentId]
+      if (tab?.props?.get("selected") !is JsonObject) {
+        "0"
+      } else {
+        val template = templateScope(items.componentId, items.path, place, indexed = false)
+        val scope = template.scope
+        val condition = tab.props.boolExpr("selected", place.copy(scope = scope)) ?: "false"
+        "${template.list.expr}.indexOfFirst { ${scope.variable} -> $condition }.coerceAtLeast(0)"
+      }
+    }
+    null -> "0"
+  }
+}
+
+private fun ScreenEmitter.tab(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
+  val label = p.text("label", place) ?: Raw("\"\"")
+  val iconName = p.iconName("icon", place)
+  return one(
+    m3("Tab"),
+    listOf(
+      arg("selected", p.boolExpr("selected", place) ?: "false"),
+      arg("onClick", actionLambda(p["action"], node.id)),
+      modifier(place, p),
+      // The badge sits on the icon, else on the label.
+      arg(
+        "text",
+        lambdaOf(textOf(label).let { if (iconName == null) badged(p, place, it) else it }),
+      ),
+      iconName?.let { arg("icon", lambdaOf(badged(p, place, icon(it)))) },
+      // Material's inactive tab token; the selected color is the row's own.
+      arg("unselectedContentColor", colorRole("onSurfaceVariant")),
+    ),
   )
 }
 
@@ -639,7 +960,7 @@ private fun ScreenEmitter.navigationItem(
       selected == "false" -> painter(symbol)
       else -> togglePainter(selected, selectedSymbol, symbol)
     }
-  val icon = iconOf(painter)
+  val icon = badged(p, place, iconOf(painter))
   return one(
     m3(callee),
     listOf(
@@ -988,11 +1309,16 @@ private fun ScreenEmitter.iconButton(node: ComponentNode, p: JsonObject, place: 
   if (toggle) {
     val (name, declaration) = state(node, "Checked", p.boolExpr("checked", place) ?: "false")
     statements += declaration
-    content = iconOf(togglePainter(name, symbol, symbol, onFilled = true), description, iconSize)
+    content =
+      badged(
+        p,
+        place,
+        iconOf(togglePainter(name, symbol, symbol, onFilled = true), description, iconSize),
+      )
     val change = assignIt(name, actionStatements(p["action"], node.id))
     head = listOf(arg("checked", name), arg("onCheckedChange", change))
   } else {
-    content = icon(symbol, description, iconSize)
+    content = badged(p, place, icon(symbol, description, iconSize))
     head = listOf(arg("onClick", actionLambda(p["action"], node.id)))
   }
   statements +=
@@ -1477,8 +1803,240 @@ internal fun ScreenEmitter.overlayStatements(node: ComponentNode): List<Stmt> {
       listOf(IfStmt(listOf(shown to listOf(stmt(dialog))), null))
     }
     "Menu" -> menuStatements(node)
+    "SideSheet" -> sideSheetStatements(node, p)
     else -> emptyList()
   }
+}
+
+/**
+ * Compose has no side sheet, so it is composed like the previewer draws it: a full-window `Dialog`
+ * (its own scrim dims the screen) holding a click-away `Box` and a `Surface` on the trailing edge,
+ * rounded on the edge that faces the content. The numbers are [SideSheetSpec]'s.
+ */
+private fun ScreenEmitter.sideSheetStatements(node: ComponentNode, p: JsonObject): List<Stmt> {
+  experimental()
+  val shown = overlayVar(node.id)
+  val close = Assign(shown, "=", Raw("false"))
+  val place = Place()
+  val padding = dp(SideSheetSpec.PADDING_DP)
+  val onSurfaceVariant = colorRole("onSurfaceVariant")
+  val iconColors =
+    arg(
+      "colors",
+      Call(
+        "${m3("IconButtonDefaults")}.iconButtonColors",
+        listOf(arg("contentColor", onSurfaceVariant)),
+      ),
+    )
+  fun iconButton(symbol: String, description: String, onClick: Lambda): Stmt =
+    stmt(
+      Call(
+        m3("IconButton"),
+        listOf(arg("onClick", onClick), iconColors),
+        lambdaOf(icon(IconName.Literal(symbol), Raw(kotlinString(description)))),
+      ),
+    )
+  val hasBack = p["back"] != null
+  // Opening another overlay from the back icon replaces this sheet, as in the previewer.
+  val opensOther = calls(node).any { ActionFunction.fromWire(it.name) == ActionFunction.Open }
+  val back =
+    if (hasBack) {
+      val action =
+        actionStatements(p["back"], node.id) + if (opensOther) listOf(close) else emptyList()
+      listOf(iconButton("arrow_back", "Back", lambda(action)))
+    } else {
+      emptyList()
+    }
+  val startPadding = if (hasBack) dp(SideSheetSpec.START_PADDING_WITH_ICON_DP) else padding
+  val title = p.text("title", place) ?: Raw("\"\"")
+  val headerGap = dp(SideSheetSpec.HEADER_GAP_DP)
+  val header =
+    Call(
+      file.use(Sym.Row),
+      listOf(
+        arg(
+          "modifier",
+          Chain(
+            file.use(Sym.Modifier),
+            listOf(
+              useModifier("fillMaxWidth()"),
+              "${useModifier("padding")}(start = $startPadding, end = $padding)",
+            ),
+          ),
+        ),
+        arg("horizontalArrangement", "${file.use(Sym.Arrangement)}.spacedBy($headerGap)"),
+        arg("verticalAlignment", "${file.use(Sym.Alignment)}.CenterVertically"),
+      ),
+      lambda(
+        back +
+          stmt(
+            textOf(
+              title,
+              arg("modifier", Chain(file.use(Sym.Modifier), listOf("weight(1f)"))),
+              arg("style", typeRole("titleLarge")),
+              arg("color", onSurfaceVariant),
+            ),
+          ) +
+          iconButton("close", "Close", lambda(close)),
+      ),
+    )
+  val content =
+    Call(
+      file.use(Sym.Column),
+      listOf(
+        arg(
+          "modifier",
+          Chain(
+            file.use(Sym.Modifier),
+            listOf(
+              "weight(1f)",
+              useModifier("fillMaxWidth()"),
+              "${useModifier("verticalScroll")}(${file.use(Sym.rememberScrollState)}())",
+              "${useModifier("padding")}(horizontal = $padding)",
+            ),
+          ),
+        ),
+      ),
+      lambda(children(p, "content", place, "SideSheet")),
+    )
+  val gap =
+    Call(
+      file.use(Sym.Spacer),
+      listOf(
+        arg(
+          "modifier",
+          Chain(file.use(Sym.Modifier), listOf("${useModifier("height")}($headerGap)")),
+        ),
+      ),
+    )
+  val column =
+    Call(
+      file.use(Sym.Column),
+      listOf(
+        arg(
+          "modifier",
+          Chain(
+            file.use(Sym.Modifier),
+            listOf(
+              useModifier("fillMaxSize()"),
+              "${useModifier("padding")}(vertical = $padding)",
+            ),
+          ),
+        ),
+      ),
+      lambda(stmt(header), stmt(gap), stmt(content)),
+    )
+  val corner = dp(SideSheetSpec.CORNER_DP)
+  val surface =
+    Call(
+      m3("Surface"),
+      listOf(
+        arg(
+          "modifier",
+          Chain(
+            file.use(Sym.Modifier),
+            listOf(
+              "align(${file.use(Sym.Alignment)}.CenterEnd)",
+              "${useModifier("widthIn")}(max = ${dp(SideSheetSpec.MAX_WIDTH_DP)})",
+              useModifier("fillMaxWidth()"),
+              useModifier("fillMaxHeight()"),
+            ),
+          ),
+        ),
+        arg(
+          "shape",
+          "${file.use(Sym.RoundedCornerShape)}(topStart = $corner, topEnd = ${dp(0f)}, " +
+            "bottomEnd = ${dp(0f)}, bottomStart = $corner)",
+        ),
+        arg("color", colorRole("surfaceContainerLow")),
+        arg("contentColor", colorRole("onSurface")),
+      ),
+      lambda(stmt(column)),
+    )
+  // The click-away sits behind the sheet, so a tap on the sheet never reaches it.
+  val clickAway =
+    Call(
+      file.use(Sym.Box),
+      listOf(
+        arg(
+          "modifier",
+          Chain(
+            file.use(Sym.Modifier),
+            listOf(
+              "matchParentSize()",
+              "${useModifier("clickable")}(interactionSource = null, indication = null) " +
+                "{ $shown = false }",
+            ),
+          ),
+        ),
+      ),
+    )
+  val box =
+    Call(
+      file.use(Sym.Box),
+      listOf(
+        arg("modifier", Chain(file.use(Sym.Modifier), listOf(useModifier("fillMaxSize()")))),
+      ),
+      lambda(stmt(clickAway), stmt(surface)),
+    )
+  val dialog =
+    Call(
+      file.use(Sym.Dialog),
+      listOf(
+        arg("onDismissRequest", lambda(close)),
+        arg(
+          "properties",
+          "${file.use(Sym.DialogProperties)}(usePlatformDefaultWidth = false)",
+        ),
+      ),
+      lambda(stmt(box)),
+    )
+  return listOf(IfStmt(listOf(shown to listOf(stmt(dialog))), null))
+}
+
+/**
+ * A snackbar posts to the `SnackbarHostState` the Scaffold's `SnackbarHost` shows: opening it sets
+ * its state, which launches `showSnackbar`. That suspends until the snackbar is dismissed, then
+ * clears the state, so the state is true exactly while the snackbar shows. An action runs when
+ * `showSnackbar` returns `ActionPerformed`. A snackbar with an action stays until acted on or
+ * dismissed, which is Compose's default for one with an action label.
+ */
+internal fun ScreenEmitter.snackbarStatements(node: ComponentNode): List<Stmt> {
+  val p = effectiveProps(node, SizeClass.Compact)
+  val shown = overlayVar(node.id)
+  val place = Place()
+  val label = p.text("actionLabel", place)
+  val action = if (label == null) emptyList() else actionStatements(p["action"], node.id)
+  val show =
+    Call(
+      "${ScreenEmitter.SNACKBAR_HOST_STATE}.showSnackbar",
+      listOfNotNull(
+        arg("message", p.text("message", place) ?: Raw("\"\"")),
+        label?.let { arg("actionLabel", it) },
+        boolArg(p, "dismiss", place, "withDismissAction", omitted = false),
+      ),
+    )
+  val performed =
+    if (action.isEmpty()) {
+      emptyList()
+    } else {
+      listOf<Stmt>(
+        IfStmt(
+          listOf("result == ${m3("SnackbarResult")}.ActionPerformed" to action),
+          null,
+        ),
+      )
+    }
+  val post: List<Stmt> =
+    listOf(
+      if (action.isEmpty()) stmt(show) else Assign("val result", "=", show),
+      Assign(shown, "=", Raw("false")),
+    ) + performed
+  return one(
+    file.use(Sym.LaunchedEffect),
+    listOf(pos(shown)),
+    listOf(IfStmt(listOf(shown to post), null)),
+  )
 }
 
 internal fun ScreenEmitter.menuStatements(menu: ComponentNode): List<Stmt> {
@@ -1538,6 +2096,209 @@ private fun ScreenEmitter.menuItem(node: ComponentNode, p: JsonObject, place: Pl
       p.iconName("icon", place)?.let { arg("leadingIcon", lambdaOf(icon(it))) },
     ),
   )
+}
+
+// endregion
+
+// region search
+
+/** The 30dp circle a bar ends with, in a 48dp box like the icon buttons beside it. */
+private fun ScreenEmitter.avatar(node: ComponentNode, p: JsonObject, place: Place): Stmt? {
+  if (p["avatar"] == null) return null
+  val picture =
+    Call(
+      file.use(Sym.Image),
+      listOf(
+        arg(
+          "painter",
+          "${file.use(Sym.painterResource)}(${imageDrawable(node, p, place, "avatar")})",
+        ),
+        arg("contentDescription", "null"),
+        arg(
+          "modifier",
+          Chain(
+            file.use(Sym.Modifier),
+            listOf(
+              "${useModifier("size")}(${dp(SearchSpec.AVATAR_DP)})",
+              "${useModifier("clip")}(${file.use(Sym.CircleShape)})",
+            ),
+          ),
+        ),
+        arg("contentScale", "${file.use(Sym.ContentScale)}.Crop"),
+      ),
+    )
+  return stmt(
+    Call(
+      file.use(Sym.Box),
+      listOf(
+        sizeModifier(dp(SearchSpec.AVATAR_BOX_DP)),
+        arg("contentAlignment", alignmentName("center")),
+      ),
+      lambdaOf(picture),
+    ),
+  )
+}
+
+/**
+ * A search bar or search app bar with the view it opens, in one `Box`: the query, the colors, the
+ * input field both draw (as Compose's samples do), the bar, and the view. The previewer draws the
+ * same. [bar] builds the bar's call from the state and the input field.
+ */
+private fun ScreenEmitter.searchStatements(
+  node: ComponentNode,
+  placeholder: Expr,
+  collapsedLeading: List<Stmt>,
+  trailing: Lambda?,
+  bar: (state: String, input: String, colors: String) -> Call,
+): List<Stmt> {
+  experimental()
+  val state = searchState(node.id)
+  val query = stateName(node.id, "Query")
+  val colors = stateName(node.id, "SearchColors")
+  val input = stateName(node.id, "Input")
+  val defaults = m3("SearchBarDefaults")
+  val docked = searchDockedCondition(node.id)
+  val scope = ScreenEmitter.COROUTINE_SCOPE
+  val collapse = Raw("$scope.${file.use(Sym.launch)} { $state.animateToCollapsed() }")
+  val expanded = "$state.currentValue == ${m3("SearchBarValue")}.Expanded"
+  val back =
+    stmt(
+      Call(
+        m3("IconButton"),
+        listOf(arg("onClick", lambdaOf(collapse))),
+        lambdaOf(icon(IconName.Literal("arrow_back"), Raw(kotlinString("Back")))),
+      ),
+    )
+  val field =
+    Call(
+      "$defaults.InputField",
+      listOfNotNull(
+        arg("textFieldState", query),
+        arg("searchBarState", state),
+        arg("onSearch", lambdaOf(collapse)),
+        arg("colors", "$colors.inputFieldColors"),
+        arg("placeholder", lambdaOf(textOf(placeholder))),
+        arg("leadingIcon", lambda(IfStmt(listOf(expanded to listOf(back)), collapsedLeading))),
+        trailing?.let { arg("trailingIcon", it) },
+      ),
+    )
+  val declarations =
+    listOf<Stmt>(
+      Assign("val $query", "=", Call(file.use(Sym.rememberTextFieldState))),
+      Assign(
+        "val $colors",
+        "=",
+        Raw(
+          when (docked) {
+            "true" -> "$defaults.colors()"
+            "false" -> "$defaults.containedColors(state = $state)"
+            else -> "if ($docked) $defaults.colors() else $defaults.containedColors(state = $state)"
+          },
+        ),
+      ),
+      Assign("val $input", "=", Call("@Composable", lambda = lambdaOf(field))),
+    )
+  val view = placement.expandedViewOf(node.id)?.let { emit(it, Place()) }.orEmpty()
+  return one(
+    file.use(Sym.Box),
+    emptyList(),
+    declarations + stmt(bar(state, input, colors)) + view,
+  )
+}
+
+/**
+ * The expanded view of a search bar: the contained full-screen layout or the docked dropdown with a
+ * gap, by the layout it has at the size being written. It shares the bar's state, colors and input
+ * field.
+ */
+private fun ScreenEmitter.searchView(node: ComponentNode, p: JsonObject): List<Stmt> {
+  val bar = placement.barOf(node.id) ?: return emptyList()
+  val docked = p.choice("SearchView", "layout") == "docked"
+  return one(
+    m3(if (docked) "ExpandedDockedSearchBarWithGap" else "ExpandedFullScreenContainedSearchBar"),
+    listOfNotNull(
+      arg("state", searchState(bar)),
+      arg("inputField", stateName(bar, "Input")),
+      if (docked) null else arg("colors", stateName(bar, "SearchColors")),
+    ),
+    children(p, "content", Place(), "SearchView"),
+  )
+}
+
+private fun ScreenEmitter.searchBar(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
+  val nav = p.literal("navigationIcon")
+  val collapsedLeading =
+    if (nav != null) {
+      emit(nav, Place().forChild("SearchBar"))
+    } else {
+      val name =
+        p.iconName("leadingIcon", place) ?: IconName.Literal(p.choice("SearchBar", "leadingIcon"))
+      listOf(stmt(icon(name)))
+    }
+  val trailing = children(p, "trailing", place, "SearchBar") + listOfNotNull(avatar(node, p, place))
+  return searchStatements(
+    node,
+    p.text("placeholder", place) ?: Raw("\"\""),
+    collapsedLeading,
+    if (trailing.isEmpty()) null
+    else
+      lambdaOf(
+        Call(
+          file.use(Sym.Row),
+          listOf(arg("verticalAlignment", alignmentName("centerVertically"))),
+          lambda(trailing),
+        ),
+      ),
+  ) { state, input, colors ->
+    Call(
+      m3("SearchBar"),
+      listOfNotNull(
+        arg("state", state),
+        arg("inputField", input),
+        modifier(place, p),
+        arg("colors", colors),
+      ),
+    )
+  }
+}
+
+private fun ScreenEmitter.searchAppBar(
+  node: ComponentNode,
+  p: JsonObject,
+  place: Place,
+): List<Stmt> {
+  val actions = children(p, "actions", place, "TopAppBar") + listOfNotNull(avatar(node, p, place))
+  return searchStatements(
+    node,
+    p.text("title", place) ?: Raw("\"\""),
+    listOf(
+      stmt(
+        icon(
+          IconName.Literal(
+            checkNotNull(M3ExpressiveCatalog.find("SearchBar")?.defaultOf("leadingIcon")?.content) {
+              "SearchBar.leadingIcon has no catalog default"
+            },
+          ),
+        ),
+      ),
+    ),
+    null,
+  ) { state, input, colors ->
+    Call(
+      m3("AppBarWithSearch"),
+      listOfNotNull(
+        arg("state", state),
+        arg("inputField", input),
+        modifier(place, p),
+        slot(p, "navigationIcon", place, "TopAppBar")?.let { arg("navigationIcon", it) },
+        if (actions.isEmpty()) null else arg("actions", lambda(actions)),
+        arg(
+          "colors",
+          "${m3("SearchBarDefaults")}.appBarWithSearchColors(searchBarColors = $colors)",
+        ),
+      ),
+    )
+  }
 }
 
 // endregion

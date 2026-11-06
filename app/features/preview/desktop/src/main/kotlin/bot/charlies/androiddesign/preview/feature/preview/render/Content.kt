@@ -3,9 +3,19 @@ package bot.charlies.androiddesign.preview.feature.preview.render
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.carousel.CarouselDefaults
+import androidx.compose.material3.carousel.CarouselItemScope
+import androidx.compose.material3.carousel.HorizontalCenteredHeroCarousel
+import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
+import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
+import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -18,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import bot.charlies.androiddesign.preview.domain.CarouselSpec
 import bot.charlies.androiddesign.preview.model.TypeRole
 
 @Composable
@@ -110,3 +121,87 @@ internal fun RenderImage(ctx: NodeContext) {
 }
 
 internal fun NodeContext.imageLook(ambient: Ambient) = Look(ambient, a11yRole = "Image")
+
+private val CarouselPadding = PaddingValues(horizontal = CarouselSpec.PADDING_DP.dp)
+private val CarouselNoPadding = PaddingValues(0.dp)
+private val CarouselGap = CarouselSpec.GAP_DP.dp
+private val CarouselFullScreenGap = CarouselSpec.FULL_SCREEN_GAP_DP.dp
+private val CarouselHeroReserved = CarouselSpec.HERO_RESERVED_DP.dp
+
+internal fun NodeContext.carouselLook(ambient: Ambient) = Look(ambient)
+
+/**
+ * Draws each child as an item, clipped with `maskClip` so the carousel's masking and parallax
+ * apply. Only the items on screen are composed, as in the app.
+ */
+private fun NodeContext.carouselItems(
+  refs: List<ChildRef>,
+): @Composable CarouselItemScope.(Int) -> Unit = { index ->
+  val host =
+    ChildHost(
+      fillWidth = def.stretchesChildren,
+      scopeModifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge),
+    )
+  RenderNode(env, refs[index], id, order + listOf(0, index), host.at(index, refs.size))
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun RenderCarousel(ctx: NodeContext) {
+  val refs = ctx.props.children("children")
+  val state = rememberCarouselState { refs.size }
+  val items = ctx.carouselItems(refs)
+  val itemWidth = ctx.numberOrDefault("itemWidth").dp
+  when (ctx.enum("variant")) {
+    "centered-hero" ->
+      HorizontalCenteredHeroCarousel(
+        state = state,
+        modifier = ctx.modifier(),
+        itemSpacing = CarouselGap,
+        contentPadding = CarouselPadding,
+        content = items,
+      )
+    "uncontained" ->
+      HorizontalUncontainedCarousel(
+        state = state,
+        itemWidth = itemWidth,
+        modifier = ctx.modifier(),
+        itemSpacing = CarouselGap,
+        flingBehavior = CarouselDefaults.noSnapFlingBehavior(),
+        contentPadding = CarouselPadding,
+        content = items,
+      )
+    "hero" ->
+      BoxWithConstraints(ctx.modifier()) {
+        HorizontalMultiBrowseCarousel(
+          state = state,
+          preferredItemWidth = maxWidth - CarouselHeroReserved,
+          itemSpacing = CarouselGap,
+          flingBehavior = CarouselDefaults.multiBrowseFlingBehavior(state),
+          contentPadding = CarouselPadding,
+          content = items,
+        )
+      }
+    "full-screen" ->
+      BoxWithConstraints(ctx.modifier()) {
+        HorizontalUncontainedCarousel(
+          state = state,
+          itemWidth = maxWidth,
+          itemSpacing = CarouselFullScreenGap,
+          flingBehavior = CarouselDefaults.singleAdvanceFlingBehavior(state),
+          contentPadding = CarouselNoPadding,
+          content = items,
+        )
+      }
+    else ->
+      HorizontalMultiBrowseCarousel(
+        state = state,
+        preferredItemWidth = itemWidth,
+        modifier = ctx.modifier(),
+        itemSpacing = CarouselGap,
+        flingBehavior = CarouselDefaults.multiBrowseFlingBehavior(state),
+        contentPadding = CarouselPadding,
+        content = items,
+      )
+  }
+}

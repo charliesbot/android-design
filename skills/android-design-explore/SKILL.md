@@ -52,7 +52,10 @@ The proposal carries these design rules; `proposal-format.md` gives the syntax f
 
 - The screen has one primary action, marked as primary, and it leads its peers as `android-design` section 2 describes.
 - It adapts at 600 and 840 dp: a navigation bar in compact becomes a rail from medium up, and a list's detail screen opens beside the list at expanded widths.
-- Overlays (`BottomSheet`, `Dialog`, `Menu`) open from a control. A modal bottom sheet opens at about half the window height and scrolls inside, so its key action sits near the top.
+- Related content at the same level of hierarchy is `Tabs`, each `Tab` navigating to its screen, scrollable when the tabs do not fit; fewer than three destinations are tabs, not a `NavigationBar`. A visual collection is a `Carousel`: at most three items with text show at compact widths, item text stays brief (at most two lines at compact widths unless the background is simple).
+- Overlays (`BottomSheet`, `SideSheet`, `Dialog`, `Menu`, `SearchView`, `Tooltip`, `Snackbar`) open from a control. A modal bottom sheet opens at about half the window height and scrolls inside, so its key action sits near the top. A `SideSheet` is the modal side sheet, preferred in compact windows, and always carries its close icon button; the standard side sheet, which stays beside the main content at medium and expanded widths, is a screen with pane role `supporting` whose first element is a header with a title and a close icon button. A `Snackbar` is brief and low priority, with at most one action and no icon, and draws above the FAB and never in front of navigation.
+- A `TopAppBar` of `size: "medium"` or `"large"` is a flexible app bar that collapses to the small bar as the content scrolls (it draws expanded at rest), so it suits long scrolling screens with a prominent title.
+- A `badge` on a navigation item, tab, or icon button is `true` for a small dot or a number or text of at most four characters (such as `99+`) for a large badge. It keeps its default colors, and it leaves room at the edge so it is not cut off.
 - Text truncates on purpose, with an ellipsis. Button, chip, and navigation labels fit on one line.
 
 ## Check

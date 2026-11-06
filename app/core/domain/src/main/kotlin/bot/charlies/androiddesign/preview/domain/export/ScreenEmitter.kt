@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.domain.export
 
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
+import bot.charlies.androiddesign.preview.domain.SearchBars
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
@@ -65,6 +66,25 @@ internal sealed interface IconName {
   class Bound(val expr: String, val names: Set<String>) : IconName
 }
 
+/** The value of a `ChildList` prop: listed component ids, or a template over a data array. */
+internal sealed interface ChildItems {
+  class Listed(val ids: List<String>) : ChildItems
+
+  class Template(val componentId: String, val path: String) : ChildItems
+}
+
+/** This prop value as [ChildItems], or null when it is neither a list nor a complete template. */
+internal fun JsonElement?.childItems(): ChildItems? =
+  when (this) {
+    is JsonArray -> ChildItems.Listed(mapNotNull { (it as? JsonPrimitive)?.content })
+    is JsonObject -> {
+      val componentId = (this["componentId"] as? JsonPrimitive)?.content
+      val path = (this["path"] as? JsonPrimitive)?.content
+      if (componentId != null && path != null) ChildItems.Template(componentId, path) else null
+    }
+    else -> null
+  }
+
 /** What a component needs to know about where it is emitted. */
 internal data class Place(
   val scope: Scope? = null,
@@ -128,6 +148,13 @@ internal class ScreenEmitter(
   private val themeName: String,
 ) : ScreenEmitterBase(file, design, screenId, screen, M3ExpressiveCatalog) {
 
+  /** The search bars and search app bars: each holds the `SearchBarState` its view shares. */
+  val searchBars: List<ComponentNode> =
+    screen.components.filter { it.component == "SearchBar" || SearchBars.isSearchAppBar(it) }
+
+  /** The tooltips, each with the `TooltipState` its `TooltipBox` shares. */
+  val tooltips: List<ComponentNode> = screen.components.filter { it.component == "Tooltip" }
+
   /** Which overlays are written beside a component and which at the end of the screen. */
   val placement = OverlayPlacement(screen)
 
@@ -146,12 +173,21 @@ internal class ScreenEmitter(
   /** The screen function and its `@Preview`. */
   fun declarations(): List<Decl> {
     val body = mutableListOf<Stmt>()
-    body += overlays.map { overlayState(it) }
+    body += overlays.filter { it.component !in STATE_OVERLAYS }.map { overlayState(it) }
+    if (placement.snackbars.isNotEmpty()) body += snackbarHostState()
+    if (searchBars.isNotEmpty() || tooltips.isNotEmpty()) body += coroutineScopeDecl()
     val root = byId[ComponentNode.ROOT_ID]
     val rootStatements =
       if (root == null) emptyList() else emit(root.id, Place(modifierBase = "modifier"))
-    val tail = placement.screenLevel.flatMap { overlayStatements(it) }
+    val tail =
+      placement.screenLevel.flatMap { overlayStatements(it) } +
+        placement.snackbars.flatMap { snackbarStatements(it) }
+    // Written after the root, which says whether the states read the window width class.
+    val searchStates = searchBars.map { searchStateDecl(it) }
+    val tooltipStates = tooltips.map { tooltipStateDecl(it) }
     if (usesSizeClass) body += sizeClassState()
+    body += searchStates
+    body += tooltipStates
     body += rootStatements
     body += tail
     file.use(Sym.Composable)
@@ -196,6 +232,112 @@ internal class ScreenEmitter(
     )
   }
 
+  private fun coroutineScopeDecl(): Stmt =
+    Assign("val $COROUTINE_SCOPE", "=", Call(file.use(Sym.rememberCoroutineScope)))
+
+  fun searchState(barId: String) = stateName(barId, "SearchState")
+
+  fun tooltipState(id: String) = stateName(id, "TooltipState")
+
+  /**
+   * The Kotlin condition for "the view [barId] opens is docked": `true` or `false` when one layout
+   * holds at every window width class, else a test of the width class. The layout is read with the
+   * size class overrides laid over it, as the previewer draws it.
+   */
+  fun searchDockedCondition(barId: String): String {
+    val view = placement.expandedViewOf(barId)?.let(byId::get) ?: return "false"
+    val docked =
+      SizeClass.entries
+        .filter { effectiveProps(view, it).choice("SearchView", "layout") == "docked" }
+        .toSet()
+    return when {
+      docked.isEmpty() -> "false"
+      docked.size == SizeClass.entries.size -> "true"
+      else -> condition(docked).also { usesSizeClass = true }
+    }
+  }
+
+  /** The state a search bar shares with its view: the factory Compose pairs with the layout. */
+  private fun searchStateDecl(bar: ComponentNode): Stmt {
+    val docked = file.use(Sym.m3("rememberSearchBarWithGapState"))
+    val contained = file.use(Sym.m3("rememberContainedSearchBarState"))
+    val factory =
+      when (val condition = searchDockedCondition(bar.id)) {
+        "true" -> "$docked()"
+        "false" -> "$contained()"
+        else -> "if ($condition) $docked() else $contained()"
+      }
+    return Assign("val ${searchState(bar.id)}", "=", Raw(factory))
+  }
+
+  /**
+   * A tooltip with buttons is persistent, so it stays until acted on; Material advises against a
+   * persistent tooltip otherwise ("avoid persistent rich tooltips on icon buttons").
+   */
+  private fun tooltipStateDecl(tooltip: ComponentNode): Stmt {
+    experimentalApi()
+    val persistent =
+      SizeClass.entries.any { size ->
+        val p = effectiveProps(tooltip, size)
+        p.choice("Tooltip", "variant") == "rich" && hasChildren(p, "actions")
+      }
+    return Assign(
+      "val ${tooltipState(tooltip.id)}",
+      "=",
+      Call(
+        file.use(Sym.m3("rememberTooltipState")),
+        if (persistent) listOf(arg("isPersistent", "true")) else emptyList(),
+      ),
+    )
+  }
+
+  /** Whether the `ChildList` prop [key] holds anything, a template counting as something. */
+  fun hasChildren(props: JsonObject, key: String): Boolean =
+    when (val items = props[key].childItems()) {
+      is ChildItems.Listed -> items.ids.isNotEmpty()
+      is ChildItems.Template -> true
+      null -> false
+    }
+
+  private fun experimentalApi() = file.optIn(Sym.ExperimentalMaterial3Api)
+
+  /** `coroutineScope.launch { [call] }`: a suspend call on a state, from an action. */
+  private fun launching(call: String): Stmt =
+    stmt(Call("$COROUTINE_SCOPE.${file.use(Sym.launch)}", lambda = lambdaOf(Raw(call))))
+
+  /** What `open(id)` does: raise the overlay's flag, expand a search view, show a tooltip. */
+  override fun openOverlay(id: String): Stmt {
+    val node = byId[id]
+    return when (node?.component) {
+      "SearchView" ->
+        placement.barOf(id)?.let { launching("${searchState(it)}.animateToExpanded()") }
+      "Tooltip" -> launching("${tooltipState(id)}.show()")
+      else -> null
+    } ?: Assign(overlayVar(id), "=", Raw("true"))
+  }
+
+  /** What `dismiss()` does to overlay [id]. */
+  override fun closeOverlay(id: String): Stmt {
+    val node = byId[id]
+    return when (node?.component) {
+      "SearchView" ->
+        placement.barOf(id)?.let { launching("${searchState(it)}.animateToCollapsed()") }
+      "Tooltip" -> launching("${tooltipState(id)}.dismiss()")
+      else -> null
+    } ?: Assign(overlayVar(id), "=", Raw("false"))
+  }
+
+  /** The `SnackbarHostState` the Scaffold's `SnackbarHost` shows and each snackbar posts to. */
+  private fun snackbarHostState(): Stmt =
+    Assign(
+      "val $SNACKBAR_HOST_STATE",
+      "=",
+      Call(
+        file.use(Sym.remember),
+        lambda = lambda(stmt(Call(file.use(Sym.m3("SnackbarHostState"))))),
+      ),
+    )
+
   private fun sizeClassState(): List<Stmt> {
     file.optIn(Sym.ExperimentalMaterial3AdaptiveApi)
     val windowSizeClass = file.use(Sym.WindowSizeClass)
@@ -231,7 +373,7 @@ internal class ScreenEmitter(
     val node = byId[id] ?: return emptyList()
     val visible = linkedMapOf<JsonObject, MutableSet<SizeClass>>()
     for (size in SizeClass.entries) {
-      if (size !in showIn(node)) continue
+      if (!node.isShownAt(size)) continue
       visible.getOrPut(effectiveProps(node, size)) { linkedSetOf() } += size
     }
     if (visible.isEmpty()) return emptyList()
@@ -248,7 +390,7 @@ internal class ScreenEmitter(
     )
   }
 
-  private fun condition(sizes: Set<SizeClass>): String {
+  fun condition(sizes: Set<SizeClass>): String {
     val medium = SizeClass.Medium in sizes
     val compact = SizeClass.Compact in sizes
     val expanded = SizeClass.Expanded in sizes
@@ -261,12 +403,6 @@ internal class ScreenEmitter(
       medium -> "atLeastMedium && !atLeastExpanded"
       else -> "atLeastExpanded"
     }
-  }
-
-  private fun showIn(node: ComponentNode): Set<SizeClass> {
-    val listed = (node.props[M3ExpressiveCatalog.SHOW_IN] as? JsonArray)
-    if (listed == null) return SizeClass.entries.toSet()
-    return listed.mapNotNull { (it as? JsonPrimitive)?.content?.let(SizeClass::fromWire) }.toSet()
   }
 
   /**
@@ -315,6 +451,13 @@ internal class ScreenEmitter(
    */
   fun JsonObject.nonDefault(component: String, key: String): String? =
     literal(key)?.takeIf { it != catalogDefault(component, key) }
+
+  /** A number prop of [component]: its sample value as the previewer reads it, else its default. */
+  fun JsonObject.number(component: String, key: String, place: Place): Double =
+    sampleNumber(component, key, place)
+      ?: checkNotNull(catalogDefault(component, key)?.toDoubleOrNull()) {
+        "$component.$key has no default"
+      }
 
   /** A boolean prop of [component]: the stated literal, else its catalog default. */
   fun JsonObject.option(component: String, key: String): Boolean =
@@ -574,30 +717,26 @@ internal class ScreenEmitter(
     indexed: Boolean = false,
     shape: (Place, String, String) -> Place = { p, _, _ -> p },
   ): List<Stmt> {
-    when (val value = props[key]) {
-      is JsonArray -> {
-        val ids = value.mapNotNull { (it as? JsonPrimitive)?.content }
-        return ids.flatMapIndexed { i, id ->
-          emit(id, shape(place.forChild(parentType), i.toString(), ids.size.toString()))
+    return when (val items = props[key].childItems()) {
+      is ChildItems.Listed ->
+        items.ids.flatMapIndexed { i, id ->
+          emit(id, shape(place.forChild(parentType), i.toString(), items.ids.size.toString()))
         }
-      }
-      is JsonObject -> {
-        val componentId = (value["componentId"] as? JsonPrimitive)?.content ?: return emptyList()
-        val path = (value["path"] as? JsonPrimitive)?.content ?: return emptyList()
-        return listOf(loop(componentId, path, place, parentType, indexed, shape))
-      }
-      else -> return emptyList()
+      is ChildItems.Template ->
+        listOf(loop(items.componentId, items.path, place, parentType, indexed, shape))
+      null -> emptyList()
     }
   }
 
-  private fun loop(
+  /** A template's loop variable and index over the array at its path. */
+  class TemplateScope(val list: Bound, val scope: Scope, val withIndex: Boolean)
+
+  fun templateScope(
     componentId: String,
     path: String,
     place: Place,
-    parentType: String,
     indexed: Boolean,
-    shape: (Place, String, String) -> Place,
-  ): Stmt {
+  ): TemplateScope {
     val list = resolve(path, place.scope)
     val items = resolveAll(path, place.scope).flatMap { (it as? JsonArray).orEmpty() }
     val taken = place.scope?.names().orEmpty() + data.params.map { it.name }
@@ -609,20 +748,84 @@ internal class ScreenEmitter(
     val withIndex = indexed || usesIndex(componentId)
     val depth = (place.scope?.depth() ?: 0) + 1
     val index = if (withIndex) (if (depth == 1) "index" else "index$depth") else null
-    val scope = Scope(place.scope, variable, index, items)
+    return TemplateScope(list, Scope(place.scope, variable, index, items), withIndex)
+  }
+
+  private fun loop(
+    componentId: String,
+    path: String,
+    place: Place,
+    parentType: String,
+    indexed: Boolean,
+    shape: (Place, String, String) -> Place,
+  ): Stmt {
+    val template = templateScope(componentId, path, place, indexed)
+    val scope = template.scope
     val body =
       emit(
         componentId,
         shape(
           place.forChild(parentType).copy(scope = scope),
-          index ?: "index",
-          "${list.expr}.size",
+          scope.index ?: "index",
+          "${template.list.expr}.size",
         ),
       )
-    val callee = "${list.expr}.forEach${if (withIndex) "Indexed" else ""}"
+    val callee = "${template.list.expr}.forEach${if (template.withIndex) "Indexed" else ""}"
     return stmt(
-      Call(callee, lambda = Lambda(if (index != null) "$index, $variable" else variable, body)),
+      Call(
+        callee,
+        lambda =
+          Lambda(
+            if (scope.index != null) "${scope.index}, ${scope.variable}" else scope.variable,
+            body,
+          ),
+      ),
     )
+  }
+
+  /**
+   * The children of a `ChildList` prop for an API that asks for them by position, such as a
+   * carousel: the item count and the body of a `{ index -> ... }` lambda. Listed children are
+   * picked by `index`; a template reads its item from the list at `index`. [shape] adjusts the
+   * place of every child, as in [children].
+   */
+  class ByIndex(val count: String, val param: String, val body: List<Stmt>)
+
+  fun childrenByIndex(
+    props: JsonObject,
+    key: String,
+    place: Place,
+    parentType: String,
+    shape: (Place) -> Place = { it },
+  ): ByIndex {
+    val child = place.forChild(parentType)
+    when (val items = props[key].childItems()) {
+      is ChildItems.Listed -> {
+        val bodies = items.ids.map { emit(it, shape(child)) }
+        val body =
+          when (bodies.size) {
+            0 -> emptyList()
+            1 -> bodies.single()
+            else ->
+              listOf(
+                IfStmt(
+                  bodies.dropLast(1).mapIndexed { i, statements -> "index == $i" to statements },
+                  bodies.last(),
+                ),
+              )
+          }
+        return ByIndex(items.ids.size.toString(), if (bodies.size > 1) "index" else "_", body)
+      }
+      is ChildItems.Template -> {
+        val template = templateScope(items.componentId, items.path, place, indexed = true)
+        val scope = template.scope
+        val index = checkNotNull(scope.index)
+        val item = Assign("val ${scope.variable}", "=", Raw("${template.list.expr}[$index]"))
+        val body = listOf<Stmt>(item) + emit(items.componentId, shape(child.copy(scope = scope)))
+        return ByIndex("${template.list.expr}.size", index, body)
+      }
+      null -> return ByIndex("0", "_", emptyList())
+    }
   }
 
   /** True when [id] or anything under it shows the template index. */
@@ -641,4 +844,15 @@ internal class ScreenEmitter(
     }
 
   // endregion
+
+  companion object {
+    /** The name of the `SnackbarHostState` variable the Scaffold and the snackbars share. */
+    const val SNACKBAR_HOST_STATE = "snackbarHostState"
+
+    /** The scope that runs the suspend calls on search and tooltip states. */
+    const val COROUTINE_SCOPE = "coroutineScope"
+
+    /** Overlays whose open state is a Compose state object, not a flag. */
+    private val STATE_OVERLAYS = setOf("SearchView", "Tooltip")
+  }
 }

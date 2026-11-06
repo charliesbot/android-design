@@ -29,8 +29,9 @@ import kotlinx.serialization.json.put
  */
 class StretchAgreementTest {
   /**
-   * Components that only make sense inside another one, or open on an action, and the navigation
-   * bar, which Material itself draws at the full width of its parent.
+   * Components that only make sense inside another one (a Tab is as wide as its row gives it), or
+   * open on an action, and the navigation bar, which Material itself draws at the full width of its
+   * parent.
    */
   private val skipped =
     M3ExpressiveCatalog.overlayNames +
@@ -39,6 +40,7 @@ class StretchAgreementTest {
         "NavigationBar",
         "NavigationBarItem",
         "NavigationRailItem",
+        "Tab",
         "FabMenuItem",
         "MenuItem",
       )
@@ -160,6 +162,8 @@ class StretchAgreementTest {
   private val parents: List<ComponentDef> =
     M3ExpressiveCatalog.components
       .filter { it.name !in skipped }
+      // A carousel gives each child the width of an item, not of the carousel.
+      .filter { it.name != "Carousel" }
       .filter { def ->
         val extra = mutableListOf<JsonObject>()
         val node = requiredNode(def, "parent", extra)

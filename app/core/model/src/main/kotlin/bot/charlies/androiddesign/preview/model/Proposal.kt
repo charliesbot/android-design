@@ -8,6 +8,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonEncoder
@@ -81,6 +82,15 @@ data class ComponentNode(val id: String, val component: String, val props: JsonO
       (overrides[breakpoint.key] as? JsonObject)?.let { merged.putAll(it) }
     }
     return merged
+  }
+
+  /**
+   * Whether the component shows at [size]: always without a `showIn` prop, else only in the size
+   * classes it lists. The renderer and the exporter both read visibility through this.
+   */
+  fun isShownAt(size: SizeClass): Boolean {
+    val listed = props[M3ExpressiveCatalog.SHOW_IN] as? JsonArray ?: return true
+    return listed.any { (it as? JsonPrimitive)?.content == size.wire }
   }
 
   companion object {

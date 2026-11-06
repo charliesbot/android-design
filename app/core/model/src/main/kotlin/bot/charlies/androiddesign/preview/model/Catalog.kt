@@ -47,6 +47,17 @@ sealed interface PropKind {
 
   /** `{"@path": "..."}` only. */
   data object Binding : PropKind
+
+  /**
+   * A badge on an icon: `true` draws a small badge, a number or a string of at most
+   * [BADGE_MAX_CHARACTERS] characters draws a large badge with that text, `false` draws none.
+   */
+  data object Badge : PropKind
+
+  companion object {
+    /** The most characters a large badge's label holds, a `+` included. */
+    const val BADGE_MAX_CHARACTERS = 4
+  }
 }
 
 /**
@@ -173,7 +184,12 @@ data class ComponentDef(
 enum class ActionFunction(val wire: String, val argument: String?, val description: String) {
   Navigate("navigate", "screen", "Opens the screen with this id."),
   Back("back", null, "Goes back one screen."),
-  Open("open", "overlay", "Opens a BottomSheet, Dialog or Menu of the same screen by id."),
+  Open(
+    "open",
+    "overlay",
+    "Opens a BottomSheet, Dialog, Menu, SideSheet, SearchView, Snackbar or Tooltip of the same " +
+      "screen by id.",
+  ),
   Dismiss("dismiss", null, "Closes the open overlay.");
 
   companion object {
@@ -354,7 +370,7 @@ object M3ExpressiveCatalog : Catalog {
     components.filter { it.overlay }.map { it.name }.toSet()
   }
 
-  override val modalNames: Set<String> = setOf("BottomSheet", "Dialog")
+  override val modalNames: Set<String> = setOf("BottomSheet", "Dialog", "SideSheet", "SearchView")
 
   override val fabNames: Set<String> = setOf("FloatingActionButton", "FabMenu")
 
@@ -433,6 +449,16 @@ internal fun icon(name: String = "icon", required: Boolean = false) =
   PropDef(name, PropKind.Icon, required, "Material Symbols name, such as \"home\".")
 
 internal fun action() = PropDef("action", PropKind.Action, description = "What a tap does.")
+
+internal fun badge() =
+  PropDef(
+    "badge",
+    PropKind.Badge,
+    description =
+      "A badge on the icon's upper trailing corner: true draws a small one, a number or a " +
+        "string of at most ${PropKind.BADGE_MAX_CHARACTERS} characters (such as \"99+\") " +
+        "draws a large one with that text.",
+  )
 
 internal val interactiveProps =
   listOf(
@@ -639,6 +665,37 @@ private fun content(): List<ComponentDef> =
       ),
       width = WidthFill.WhenSet("aspectRatio"),
     ),
+    ComponentDef(
+      "Carousel",
+      ComponentGroup.Content,
+      "A horizontally scrolling collection of visual items, clipped to the carousel's item shape.",
+      "HorizontalMultiBrowseCarousel, HorizontalCenteredHeroCarousel, " +
+        "HorizontalUncontainedCarousel",
+      listOf(
+        oneOf(
+          "variant",
+          "multi-browse",
+          "hero",
+          "centered-hero",
+          "uncontained",
+          "full-screen",
+          default = "multi-browse",
+          description =
+            "hero and full-screen have no composable of their own: they size the items of a " +
+              "multi-browse and an uncontained carousel.",
+        ),
+        num(
+          "itemWidth",
+          "Item width in dp: the preferred width of multi-browse, the width of uncontained. " +
+            "The other variants size their items themselves.",
+          NumberBounds(40.0, 1000.0),
+          default = 186,
+        ),
+        children("children", required = true),
+      ),
+      stretchesChildren = true,
+      width = WidthFill.Always,
+    ),
   )
 
 private fun structure(): List<ComponentDef> =
@@ -662,11 +719,37 @@ private fun structure(): List<ComponentDef> =
       "The screen's top bar.",
       "TopAppBar, CenterAlignedTopAppBar, MediumFlexibleTopAppBar, LargeFlexibleTopAppBar",
       listOf(
-        oneOf("size", "small", "center", "medium", "large", default = "small"),
-        text("title", required = true),
+        oneOf("size", "small", "center", "medium", "large", "search", default = "small"),
+        text(
+          "title",
+          required = true,
+          description =
+            "The heading. In a search app bar it is the search field's hint, which includes the " +
+              "word Search (such as \"Search inbox\").",
+        ),
         text("subtitle"),
         child("navigationIcon", "IconButton"),
-        children("actions", "IconButton"),
+        children(
+          "actions",
+          "IconButton",
+          description =
+            "The trailing icon buttons. A search app bar has at most two at compact widths, an " +
+              "avatar coming in addition, and up to four from medium widths up (override " +
+              "`actions` in `sizeClass`).",
+        ),
+        PropDef(
+          "avatar",
+          PropKind.Image,
+          description =
+            "Search size only: a profile picture, drawn as a 30dp circle after the actions. " +
+              "Path relative to the proposal, or a data: URI.",
+        ),
+        child(
+          "expanded",
+          "SearchView",
+          description =
+            "Search size only: the SearchView that opens when the search field is tapped.",
+        ),
       ),
       width = WidthFill.Always,
     ),
@@ -687,8 +770,29 @@ private fun structure(): List<ComponentDef> =
         icon(required = true),
         icon("selectedIcon"),
         bool("selected"),
+        badge(),
         action(),
       ),
+      interactive = true,
+    ),
+    ComponentDef(
+      "Tabs",
+      ComponentGroup.Structure,
+      "A row of tabs that switches between sibling views at the same level of hierarchy.",
+      "PrimaryTabRow, SecondaryTabRow, PrimaryScrollableTabRow, SecondaryScrollableTabRow",
+      listOf(
+        oneOf("variant", "primary", "secondary", default = "primary"),
+        bool("scrollable", "Lets the tabs scroll when they do not fit."),
+        children("children", "Tab", required = true),
+      ),
+      width = WidthFill.Always,
+    ),
+    ComponentDef(
+      "Tab",
+      ComponentGroup.Structure,
+      "One tab of a Tabs row. Its content is the screen its action navigates to.",
+      "Tab",
+      listOf(text("label", required = true), icon(), bool("selected"), badge(), action()),
       interactive = true,
     ),
     ComponentDef(
@@ -708,6 +812,7 @@ private fun structure(): List<ComponentDef> =
         icon(required = true),
         icon("selectedIcon"),
         bool("selected"),
+        badge(),
         action(),
       ),
       interactive = true,
@@ -824,6 +929,7 @@ private fun actions(): List<ComponentDef> =
         oneOf("shape", "round", "square", default = "round"),
         oneOf("width", "narrow", "uniform", "wide", default = "uniform"),
         icon(required = true),
+        badge(),
         bool("toggle", "Makes the button a toggle."),
         bool("checked", "State of a toggle."),
         action(),
@@ -1014,6 +1120,45 @@ private fun inputs(): List<ComponentDef> =
       interactive = true,
       width = WidthFill.Always,
     ),
+    ComponentDef(
+      "SearchBar",
+      ComponentGroup.Inputs,
+      "A search field. Tapping it opens the SearchView named by `expanded`.",
+      "SearchBar with SearchBarDefaults.InputField and rememberSearchBarState",
+      listOf(
+        text(
+          "placeholder",
+          required = true,
+          description = "The hint, a short description of what can be searched (\"Search mail\").",
+        ),
+        PropDef(
+          "leadingIcon",
+          PropKind.Icon,
+          description = "A non-functional icon at the start. Material Symbols name.",
+          default = JsonPrimitive("search"),
+        ),
+        child(
+          "navigationIcon",
+          "IconButton",
+          description = "A navigational icon button (menu, arrow) that replaces the leading icon.",
+        ),
+        children(
+          "trailing",
+          "IconButton",
+          description = "Trailing icon buttons. At most two, an avatar counting as one.",
+        ),
+        PropDef(
+          "avatar",
+          PropKind.Image,
+          description =
+            "A profile picture, drawn as a 30dp circle after the trailing icon buttons. Path " +
+              "relative to the proposal, or a data: URI.",
+        ),
+        child("expanded", "SearchView"),
+      ) + interactiveProps,
+      interactive = true,
+      width = WidthFill.Always,
+    ),
   )
 
 private fun feedback(): List<ComponentDef> =
@@ -1079,6 +1224,74 @@ private fun overlays(): List<ComponentDef> =
       "DropdownMenuItem",
       listOf(text("label", required = true), icon(), action()),
       interactive = true,
+    ),
+    ComponentDef(
+      "SideSheet",
+      ComponentGroup.Overlays,
+      "A modal side sheet on the trailing edge, with a header (title, close icon button) over " +
+        "its content. Optional content beside the main content is a standard side sheet: a " +
+        "screen with pane role supporting.",
+      "Dialog (full window) holding a scrim and a Surface, composed; no side sheet composable",
+      listOf(
+        text("title", required = true),
+        PropDef(
+          "back",
+          PropKind.Action,
+          description =
+            "Shows a back icon button at the header's leading side and runs this on a tap.",
+        ),
+        children("content", required = true),
+      ),
+      overlay = true,
+      stretchesChildren = true,
+    ),
+    ComponentDef(
+      "SearchView",
+      ComponentGroup.Overlays,
+      "The focused state of a SearchBar or search app bar: its input field over a list of " +
+        "suggestions or results, in the contained style. Full-screen fills the window; docked " +
+        "opens a dropdown below the bar.",
+      "ExpandedFullScreenContainedSearchBar or ExpandedDockedSearchBarWithGap, sharing the " +
+        "bar's SearchBarState",
+      listOf(
+        oneOf("layout", "docked", "full-screen", default = "full-screen"),
+        children("content"),
+      ),
+      overlay = true,
+      stretchesChildren = true,
+    ),
+    ComponentDef(
+      "Tooltip",
+      ComponentGroup.Overlays,
+      "A tooltip anchored to a component. Plain describes an icon-only control; rich adds a " +
+        "subhead and up to two text buttons.",
+      "TooltipBox with PlainTooltip or RichTooltip",
+      listOf(
+        child("anchor", required = true),
+        oneOf("variant", "plain", "rich", default = "plain"),
+        text("text", required = true),
+        text("title", description = "Rich only: a one-line subhead."),
+        children(
+          "actions",
+          "Button",
+          description = "Rich only: up to two text buttons, side by side.",
+        ),
+      ),
+      overlay = true,
+    ),
+    ComponentDef(
+      "Snackbar",
+      ComponentGroup.Overlays,
+      "A brief message at the bottom of the screen, in the Scaffold's snackbar slot above the " +
+        "FAB and the navigation bar.",
+      "SnackbarHost in Scaffold(snackbarHost), Snackbar via SnackbarHostState.showSnackbar",
+      listOf(
+        text("message", required = true),
+        text("actionLabel", description = "The label of the one action a snackbar may have."),
+        PropDef("action", PropKind.Action, description = "What a tap on the action label does."),
+        bool("dismiss", "Shows a close icon that dismisses the snackbar."),
+      ),
+      overlay = true,
     ),
   )
 

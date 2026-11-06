@@ -105,5 +105,6 @@ object CatalogSummary {
       PropKind.Image -> "image"
       PropKind.Action -> "action"
       PropKind.Binding -> "binding"
+      PropKind.Badge -> "boolean|number|string"
     }
 }

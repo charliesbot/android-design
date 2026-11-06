@@ -15,6 +15,10 @@ internal object Sym {
   const val mutableFloatStateOf = "$RUNTIME.mutableFloatStateOf"
   const val getValue = "$RUNTIME.getValue"
   const val setValue = "$RUNTIME.setValue"
+  const val LaunchedEffect = "$RUNTIME.LaunchedEffect"
+  const val rememberCoroutineScope = "$RUNTIME.rememberCoroutineScope"
+  const val launch = "kotlinx.coroutines.launch"
+  const val rememberTextFieldState = "androidx.compose.foundation.text.input.rememberTextFieldState"
 
   // foundation
   const val Image = "androidx.compose.foundation.Image"
@@ -30,6 +34,8 @@ internal object Sym {
   // foundation layout
   const val Arrangement = "$LAYOUT.Arrangement"
   const val Box = "$LAYOUT.Box"
+  const val BoxWithConstraints = "$LAYOUT.BoxWithConstraints"
+  const val PaddingValues = "$LAYOUT.PaddingValues"
   const val Column = "$LAYOUT.Column"
   const val Row = "$LAYOUT.Row"
   const val Spacer = "$LAYOUT.Spacer"
@@ -45,6 +51,7 @@ internal object Sym {
   const val height = "$LAYOUT.height"
   const val size = "$LAYOUT.size"
   const val heightIn = "$LAYOUT.heightIn"
+  const val widthIn = "$LAYOUT.widthIn"
   const val offset = "$LAYOUT.offset"
   const val aspectRatio = "$LAYOUT.aspectRatio"
 
@@ -57,6 +64,8 @@ internal object Sym {
   const val contentDescription = "$UI.semantics.contentDescription"
   const val ContentScale = "$UI.layout.ContentScale"
   const val painterResource = "$UI.res.painterResource"
+  const val Dialog = "$UI.window.Dialog"
+  const val DialogProperties = "$UI.window.DialogProperties"
   const val Color = "$UI.graphics.Color"
   const val RectangleShape = "$UI.graphics.RectangleShape"
   const val Preview = "$UI.tooling.preview.Preview"
@@ -112,4 +121,7 @@ internal object Sym {
 
   /** A `androidx.compose.material3` name. */
   fun m3(name: String) = "$M3.$name"
+
+  /** A `androidx.compose.material3.carousel` name. */
+  fun carousel(name: String) = "$M3.carousel.$name"
 }

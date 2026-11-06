@@ -36,10 +36,8 @@ import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.MaterialShape
 import bot.charlies.androiddesign.preview.model.ShapeToken
-import bot.charlies.androiddesign.preview.model.SizeClass
 import bot.charlies.androiddesign.preview.model.StyleDef
 import bot.charlies.androiddesign.preview.model.TypeRole
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -76,6 +74,10 @@ internal class NodeContext(
 ) {
   val component: String
     get() = node.component
+
+  /** This component drawn in [other], for a second copy that must not record itself. */
+  fun withEnv(other: RenderEnv) =
+    NodeContext(other, node, def, id, parentId, order, props, scope, style, host)
 
   fun string(key: String) = props.string(key)
 
@@ -160,15 +162,10 @@ internal class NodeContext(
 }
 
 /** The props of [node] in the frame of [env], with its size class overrides applied. */
-private fun effectiveProps(node: ComponentNode, env: RenderEnv): JsonObject {
+internal fun effectiveProps(node: ComponentNode, env: RenderEnv): JsonObject {
   val overrides = node.sizeOverridesAt(env.catalog.sizeBreakpoints, env.widthDp)
   if (overrides.isEmpty()) return node.props
   return JsonObject(LinkedHashMap(node.props).apply { putAll(overrides) })
-}
-
-private fun visibleAt(node: ComponentNode, sizeClass: SizeClass): Boolean {
-  val showIn = node.props[M3ExpressiveCatalog.SHOW_IN] as? JsonArray ?: return true
-  return showIn.any { (it as? JsonPrimitive)?.content == sizeClass.wire }
 }
 
 private fun resolveStyle(env: RenderEnv, node: ComponentNode): ResolvedStyle {
@@ -200,7 +197,7 @@ internal fun RenderNode(
 ) {
   val node = env.nodes[ref.id] ?: return
   val def = env.catalog.find(node.component) ?: return
-  if (!visibleAt(node, env.sizeClass)) return
+  if (!node.isShownAt(env.sizeClass)) return
   val ctx =
     NodeContext(
       env = env,
@@ -229,13 +226,20 @@ internal fun RenderNode(
     DisposableEffect(ctx.id) { onDispose { recorder.unregister(ctx.id) } }
   }
   val menuId = env.placement.menuAt(node.id)
+  val tooltipId = env.placement.tooltipAt(node.id)
+  val anchored: @Composable () -> Unit =
+    if (tooltipId != null && !env.isOverlay(node)) {
+      { TooltipAnchor(env, tooltipId, ref.scope, ctx.id, order) { RenderComponent(ctx) } }
+    } else {
+      { RenderComponent(ctx) }
+    }
   if (menuId != null && !env.isOverlay(node)) {
     androidx.compose.foundation.layout.Box {
-      RenderComponent(ctx)
+      anchored()
       MenuOverlay(env, menuId, ref.scope, ctx.id, order)
     }
   } else {
-    RenderComponent(ctx)
+    anchored()
   }
 }
 

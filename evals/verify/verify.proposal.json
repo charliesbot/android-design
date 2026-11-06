@@ -1611,7 +1611,10 @@
             "range_slider",
             "fields",
             "feedback",
-            "vertical_toolbar"
+            "vertical_toolbar",
+            "search_bar",
+            "search_docked",
+            "to_search"
           ]
         },
         {
@@ -1909,6 +1912,124 @@
             "vt_undo",
             "vt_redo"
           ]
+        },
+        {
+          "id": "search_bar",
+          "component": "SearchBar",
+          "placeholder": "Search recipes",
+          "navigationIcon": "search_menu",
+          "trailing": [
+            "search_mic"
+          ],
+          "avatar": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "expanded": "search_view"
+        },
+        {
+          "id": "search_menu",
+          "component": "IconButton",
+          "icon": "menu",
+          "contentDescription": "Menu"
+        },
+        {
+          "id": "search_mic",
+          "component": "IconButton",
+          "icon": "mic",
+          "contentDescription": "Voice search"
+        },
+        {
+          "id": "search_view",
+          "component": "SearchView",
+          "layout": "full-screen",
+          "content": [
+            "search_r1",
+            "search_r2"
+          ]
+        },
+        {
+          "id": "search_r1",
+          "component": "ListItem",
+          "headline": "Mexican dishes"
+        },
+        {
+          "id": "search_r2",
+          "component": "ListItem",
+          "headline": "Quick dinners"
+        },
+        {
+          "id": "search_docked",
+          "component": "SearchBar",
+          "placeholder": "Search your messages",
+          "trailing": [
+            "search_more"
+          ],
+          "expanded": "search_docked_view"
+        },
+        {
+          "id": "search_more",
+          "component": "IconButton",
+          "icon": "more_vert",
+          "contentDescription": "More options"
+        },
+        {
+          "id": "search_docked_view",
+          "component": "SearchView",
+          "layout": "docked",
+          "content": [
+            "search_d1"
+          ]
+        },
+        {
+          "id": "search_d1",
+          "component": "ListItem",
+          "headline": "Recent: invoices"
+        },
+        {
+          "id": "to_search",
+          "component": "Button",
+          "label": "Search app bar",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "search"
+              }
+            }
+          }
+        },
+        {
+          "id": "tip_plain",
+          "component": "Tooltip",
+          "anchor": "vt_undo",
+          "text": "Undo"
+        },
+        {
+          "id": "tip_rich",
+          "component": "Tooltip",
+          "anchor": "check_on",
+          "variant": "rich",
+          "title": "Why this matters",
+          "text": "Checked items stay in your plan.",
+          "actions": [
+            "tip_ok",
+            "tip_more"
+          ]
+        },
+        {
+          "id": "tip_ok",
+          "component": "Button",
+          "variant": "text",
+          "label": "Got it",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "tip_more",
+          "component": "Button",
+          "variant": "text",
+          "label": "Learn more"
         }
       ]
     },
@@ -2141,7 +2262,9 @@
           "children": [
             "open_sheet",
             "open_dialog",
-            "open_fabs"
+            "open_fabs",
+            "open_collections",
+            "open_feedback"
           ]
         },
         {
@@ -2290,6 +2413,34 @@
             "menu_share",
             "menu_delete"
           ]
+        },
+        {
+          "id": "open_collections",
+          "component": "Button",
+          "variant": "text",
+          "label": "Tabs and carousels",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "collections"
+              }
+            }
+          }
+        },
+        {
+          "id": "open_feedback",
+          "component": "Button",
+          "variant": "text",
+          "label": "Side sheet, snackbar, badges",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "feedback"
+              }
+            }
+          }
         }
       ]
     },
@@ -2471,6 +2622,735 @@
             "fab_color_tertiary",
             "fab_color_surface"
           ]
+        }
+      ]
+    },
+    "collections": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "dataModel": {
+        "items": [
+          {
+            "name": "Tomato soup"
+          },
+          {
+            "name": "Caesar salad"
+          },
+          {
+            "name": "Mushroom risotto"
+          },
+          {
+            "name": "Lemon tart"
+          },
+          {
+            "name": "Iced tea"
+          }
+        ]
+      },
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "topBar": "top",
+          "content": "body"
+        },
+        {
+          "id": "top",
+          "component": "TopAppBar",
+          "size": "medium",
+          "title": "Tabs and carousels",
+          "navigationIcon": "back"
+        },
+        {
+          "id": "back",
+          "component": "IconButton",
+          "icon": "arrow_back",
+          "contentDescription": "Back",
+          "action": {
+            "functionCall": {
+              "@call": "back"
+            }
+          }
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "scroll": true,
+          "spacing": "lg",
+          "children": [
+            "tabs_primary",
+            "tabs_secondary",
+            "carousel_multi",
+            "carousel_hero",
+            "carousel_centered",
+            "carousel_uncontained",
+            "carousel_full"
+          ]
+        },
+        {
+          "id": "tabs_primary",
+          "component": "Tabs",
+          "children": [
+            "tab_plates",
+            "tab_menus",
+            "tab_chefs"
+          ]
+        },
+        {
+          "id": "tab_plates",
+          "component": "Tab",
+          "label": "Plates",
+          "icon": "restaurant",
+          "selected": true,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "collections"
+              }
+            }
+          }
+        },
+        {
+          "id": "tab_menus",
+          "component": "Tab",
+          "label": "Menus",
+          "icon": "menu_book",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "tab_chefs",
+          "component": "Tab",
+          "label": "Chefs",
+          "icon": "person",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "detail"
+              }
+            }
+          }
+        },
+        {
+          "id": "tabs_secondary",
+          "component": "Tabs",
+          "variant": "secondary",
+          "scrollable": true,
+          "children": [
+            "stab_all",
+            "stab_soups",
+            "stab_salads",
+            "stab_mains",
+            "stab_desserts",
+            "stab_drinks"
+          ]
+        },
+        {
+          "id": "stab_all",
+          "component": "Tab",
+          "label": "All",
+          "selected": true,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "collections"
+              }
+            }
+          }
+        },
+        {
+          "id": "stab_soups",
+          "component": "Tab",
+          "label": "Soups",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "stab_salads",
+          "component": "Tab",
+          "label": "Salads",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "stab_mains",
+          "component": "Tab",
+          "label": "Mains",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "stab_desserts",
+          "component": "Tab",
+          "label": "Desserts",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "stab_drinks",
+          "component": "Tab",
+          "label": "Drinks",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "carousel_multi",
+          "component": "Carousel",
+          "children": {
+            "componentId": "item_multi",
+            "path": "/items"
+          }
+        },
+        {
+          "id": "carousel_hero",
+          "component": "Carousel",
+          "variant": "hero",
+          "children": {
+            "componentId": "item_hero",
+            "path": "/items"
+          }
+        },
+        {
+          "id": "carousel_centered",
+          "component": "Carousel",
+          "variant": "centered-hero",
+          "children": {
+            "componentId": "item_centered",
+            "path": "/items"
+          }
+        },
+        {
+          "id": "carousel_uncontained",
+          "component": "Carousel",
+          "variant": "uncontained",
+          "itemWidth": 140,
+          "children": {
+            "componentId": "item_uncontained",
+            "path": "/items"
+          }
+        },
+        {
+          "id": "carousel_full",
+          "component": "Carousel",
+          "variant": "full-screen",
+          "children": {
+            "componentId": "item_full",
+            "path": "/items"
+          }
+        },
+        {
+          "id": "item_multi",
+          "component": "Card",
+          "content": [
+            "item_multi_image",
+            "item_multi_name"
+          ]
+        },
+        {
+          "id": "item_multi_image",
+          "component": "Image",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "fit": "crop",
+          "aspectRatio": 1.25,
+          "contentDescription": {
+            "@path": "name"
+          }
+        },
+        {
+          "id": "item_multi_name",
+          "component": "Text",
+          "text": {
+            "@path": "name"
+          },
+          "type": "titleSmall",
+          "padding": "md",
+          "maxLines": 1,
+          "overflow": "ellipsis"
+        },
+        {
+          "id": "item_hero",
+          "component": "Card",
+          "content": [
+            "item_hero_image",
+            "item_hero_name"
+          ]
+        },
+        {
+          "id": "item_hero_image",
+          "component": "Image",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "fit": "crop",
+          "aspectRatio": 1.25,
+          "contentDescription": {
+            "@path": "name"
+          }
+        },
+        {
+          "id": "item_hero_name",
+          "component": "Text",
+          "text": {
+            "@path": "name"
+          },
+          "type": "titleSmall",
+          "padding": "md",
+          "maxLines": 1,
+          "overflow": "ellipsis"
+        },
+        {
+          "id": "item_centered",
+          "component": "Card",
+          "content": [
+            "item_centered_image",
+            "item_centered_name"
+          ]
+        },
+        {
+          "id": "item_centered_image",
+          "component": "Image",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "fit": "crop",
+          "aspectRatio": 1.25,
+          "contentDescription": {
+            "@path": "name"
+          }
+        },
+        {
+          "id": "item_centered_name",
+          "component": "Text",
+          "text": {
+            "@path": "name"
+          },
+          "type": "titleSmall",
+          "padding": "md",
+          "maxLines": 1,
+          "overflow": "ellipsis"
+        },
+        {
+          "id": "item_uncontained",
+          "component": "Card",
+          "content": [
+            "item_uncontained_image",
+            "item_uncontained_name"
+          ]
+        },
+        {
+          "id": "item_uncontained_image",
+          "component": "Image",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "fit": "crop",
+          "aspectRatio": 1.25,
+          "contentDescription": {
+            "@path": "name"
+          }
+        },
+        {
+          "id": "item_uncontained_name",
+          "component": "Text",
+          "text": {
+            "@path": "name"
+          },
+          "type": "titleSmall",
+          "padding": "md",
+          "maxLines": 1,
+          "overflow": "ellipsis"
+        },
+        {
+          "id": "item_full",
+          "component": "Card",
+          "content": [
+            "item_full_image",
+            "item_full_name"
+          ]
+        },
+        {
+          "id": "item_full_image",
+          "component": "Image",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "fit": "crop",
+          "aspectRatio": 1.25,
+          "contentDescription": {
+            "@path": "name"
+          }
+        },
+        {
+          "id": "item_full_name",
+          "component": "Text",
+          "text": {
+            "@path": "name"
+          },
+          "type": "titleSmall",
+          "padding": "md",
+          "maxLines": 1,
+          "overflow": "ellipsis"
+        }
+      ]
+    },
+    "feedback": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "topBar": "top",
+          "content": "body",
+          "bottomBar": "nav_bar",
+          "floatingActionButton": "fab",
+          "navigationRail": "rail"
+        },
+        {
+          "id": "top",
+          "component": "TopAppBar",
+          "title": "Side sheet, snackbar, badges",
+          "navigationIcon": "back",
+          "actions": [
+            "bell",
+            "mail"
+          ]
+        },
+        {
+          "id": "back",
+          "component": "IconButton",
+          "icon": "arrow_back",
+          "contentDescription": "Back",
+          "action": {
+            "functionCall": {
+              "@call": "back"
+            }
+          }
+        },
+        {
+          "id": "bell",
+          "component": "IconButton",
+          "icon": "notifications",
+          "badge": true,
+          "contentDescription": "Alerts"
+        },
+        {
+          "id": "mail",
+          "component": "IconButton",
+          "icon": "mail",
+          "badge": "99+",
+          "contentDescription": "Mail"
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "padding": "lg",
+          "spacing": "md",
+          "children": [
+            "tabs",
+            "open_side",
+            "open_snack"
+          ]
+        },
+        {
+          "id": "tabs",
+          "component": "Tabs",
+          "children": [
+            "tab_all",
+            "tab_unread"
+          ]
+        },
+        {
+          "id": "tab_all",
+          "component": "Tab",
+          "label": "All",
+          "icon": "inbox",
+          "badge": 3,
+          "selected": true
+        },
+        {
+          "id": "tab_unread",
+          "component": "Tab",
+          "label": "Unread",
+          "badge": true
+        },
+        {
+          "id": "open_side",
+          "component": "Button",
+          "label": "Open side sheet",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "filters"
+              }
+            }
+          }
+        },
+        {
+          "id": "open_snack",
+          "component": "Button",
+          "variant": "tonal",
+          "label": "Delete plate",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "deleted"
+              }
+            }
+          }
+        },
+        {
+          "id": "fab",
+          "component": "FloatingActionButton",
+          "icon": "add",
+          "contentDescription": "New plate"
+        },
+        {
+          "id": "nav_bar",
+          "component": "NavigationBar",
+          "children": [
+            "nav_home",
+            "nav_chat",
+            "nav_saved"
+          ]
+        },
+        {
+          "id": "nav_home",
+          "component": "NavigationBarItem",
+          "label": "Home",
+          "icon": "home",
+          "selected": true
+        },
+        {
+          "id": "nav_chat",
+          "component": "NavigationBarItem",
+          "label": "Chat",
+          "icon": "chat",
+          "badge": 12
+        },
+        {
+          "id": "nav_saved",
+          "component": "NavigationBarItem",
+          "label": "Saved",
+          "icon": "favorite",
+          "badge": true
+        },
+        {
+          "id": "filters",
+          "component": "SideSheet",
+          "title": "Filters",
+          "back": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "more_filters"
+              }
+            }
+          },
+          "content": [
+            "filter_chips",
+            "filter_apply"
+          ]
+        },
+        {
+          "id": "filter_chips",
+          "component": "ChipGroup",
+          "multi": true,
+          "children": [
+            "chip_vegan",
+            "chip_spicy"
+          ]
+        },
+        {
+          "id": "chip_vegan",
+          "component": "FilterChip",
+          "label": "Vegan",
+          "selected": true
+        },
+        {
+          "id": "chip_spicy",
+          "component": "FilterChip",
+          "label": "Spicy"
+        },
+        {
+          "id": "filter_apply",
+          "component": "Button",
+          "label": "Apply",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "more_filters",
+          "component": "SideSheet",
+          "title": "More filters",
+          "content": [
+            "more_text"
+          ]
+        },
+        {
+          "id": "more_text",
+          "component": "Text",
+          "text": "Fewer, broader filters work better in a side sheet.",
+          "type": "bodyMedium"
+        },
+        {
+          "id": "deleted",
+          "component": "Snackbar",
+          "message": "Plate deleted",
+          "actionLabel": "Undo",
+          "dismiss": true,
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "restored"
+              }
+            }
+          }
+        },
+        {
+          "id": "restored",
+          "component": "Snackbar",
+          "message": "Plate restored"
+        },
+        {
+          "id": "rail",
+          "component": "NavigationRail",
+          "children": [
+            "rail_home",
+            "rail_chat"
+          ],
+          "showIn": [
+            "medium",
+            "expanded"
+          ]
+        },
+        {
+          "id": "rail_home",
+          "component": "NavigationRailItem",
+          "label": "Home",
+          "icon": "home",
+          "selected": true
+        },
+        {
+          "id": "rail_chat",
+          "component": "NavigationRailItem",
+          "label": "Chat",
+          "icon": "chat",
+          "badge": "9+"
+        }
+      ]
+    },
+    "search": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "topBar": "top",
+          "content": "body"
+        },
+        {
+          "id": "top",
+          "component": "TopAppBar",
+          "size": "search",
+          "title": "Search inbox",
+          "navigationIcon": "top_menu",
+          "actions": [
+            "top_cast"
+          ],
+          "avatar": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "expanded": "top_view"
+        },
+        {
+          "id": "top_menu",
+          "component": "IconButton",
+          "icon": "menu",
+          "contentDescription": "Menu"
+        },
+        {
+          "id": "top_cast",
+          "component": "IconButton",
+          "icon": "cast",
+          "contentDescription": "Cast"
+        },
+        {
+          "id": "top_view",
+          "component": "SearchView",
+          "layout": "docked",
+          "content": [
+            "top_r1",
+            "top_r2"
+          ]
+        },
+        {
+          "id": "top_r1",
+          "component": "ListItem",
+          "headline": "Recent: tickets"
+        },
+        {
+          "id": "top_r2",
+          "component": "ListItem",
+          "headline": "Recent: receipts"
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "padding": "lg",
+          "spacing": "md",
+          "children": [
+            "search_note",
+            "back_inputs"
+          ]
+        },
+        {
+          "id": "search_note",
+          "component": "Text",
+          "text": "Messages appear here."
+        },
+        {
+          "id": "back_inputs",
+          "component": "Button",
+          "label": "Back",
+          "action": {
+            "functionCall": {
+              "@call": "back"
+            }
+          }
         }
       ]
     }

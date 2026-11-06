@@ -69,6 +69,7 @@ class ModelTest {
         when (val kind = prop.kind) {
           is PropKind.Enum -> assertTrue(default.isString && default.content in kind.values, label)
           PropKind.Bool -> assertNotNull(default.booleanOrNull, label)
+          PropKind.Icon -> assertTrue(default.isString && default.content.isNotEmpty(), label)
           is PropKind.Number -> {
             val number = assertNotNull(default.doubleOrNull, label)
             assertTrue(kind.bounds == null || number in kind.bounds, label)
@@ -141,7 +142,10 @@ class ModelTest {
         }
       }
     }
-    assertEquals(setOf("BottomSheet", "Dialog", "Menu"), M3ExpressiveCatalog.overlayNames)
+    assertEquals(
+      setOf("BottomSheet", "Dialog", "Menu", "SideSheet", "SearchView", "Tooltip", "Snackbar"),
+      M3ExpressiveCatalog.overlayNames,
+    )
   }
 
   @Test

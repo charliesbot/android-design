@@ -7,7 +7,6 @@ import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.PropKind
 import bot.charlies.androiddesign.preview.model.Screen
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -26,7 +25,7 @@ internal abstract class ScreenEmitterBase(
 ) {
   val byId: Map<String, ComponentNode> = screen.components.associateBy { it.id }
 
-  /** The overlay components (dialogs, sheets, menus), in document order. */
+  /** The overlay components (sheets, dialogs, menus, snackbars), in document order. */
   val overlays: List<ComponentNode> =
     screen.components.filter { it.component in catalog.overlayNames }
 
@@ -115,12 +114,12 @@ internal abstract class ScreenEmitterBase(
       ActionFunction.Back -> listOf(stmt(Call("onBack")))
       ActionFunction.Open -> {
         val overlay = (call.args?.get("overlay") as? JsonPrimitive)?.content ?: return emptyList()
-        listOf(Assign(overlayVar(overlay), "=", Raw("true")))
+        listOf(openOverlay(overlay))
       }
       ActionFunction.Dismiss -> {
         val enclosing = overlayOf[componentId]
         val targets = if (enclosing != null) listOf(enclosing) else overlays.map { it.id }
-        targets.map { Assign(overlayVar(it), "=", Raw("false")) }
+        targets.map(::closeOverlay)
       }
       null -> emptyList()
     }
@@ -131,6 +130,12 @@ internal abstract class ScreenEmitterBase(
     lambda(actionStatements(action, componentId))
 
   fun overlayVar(id: String) = "show${Naming.pascal(id)}"
+
+  /** What `open(id)` does: raise the overlay's flag. */
+  protected open fun openOverlay(id: String): Stmt = Assign(overlayVar(id), "=", Raw("true"))
+
+  /** What `dismiss()` does to overlay [id]: lower its flag. */
+  protected open fun closeOverlay(id: String): Stmt = Assign(overlayVar(id), "=", Raw("false"))
 
   /**
    * `var name by remember { mutableStateOf(value) }`; [factory] is `mutableStateOf`,
@@ -167,16 +172,16 @@ internal abstract class ScreenEmitterBase(
   fun childIds(node: ComponentNode): List<String> {
     val def = catalog.find(node.component) ?: return emptyList()
     return def.props.flatMap { prop ->
-      when (val value = node.props[prop.name]) {
-        is JsonPrimitive ->
-          if (prop.kind == PropKind.Child && value.isString) listOf(value.content) else emptyList()
-        is JsonArray ->
-          if (prop.kind == PropKind.ChildList) value.mapNotNull { (it as? JsonPrimitive)?.content }
-          else emptyList()
-        is JsonObject ->
-          if (prop.kind == PropKind.ChildList)
-            listOfNotNull((value["componentId"] as? JsonPrimitive)?.content)
-          else emptyList()
+      val value = node.props[prop.name]
+      when {
+        prop.kind == PropKind.Child ->
+          listOfNotNull((value as? JsonPrimitive)?.takeIf { it.isString }?.content)
+        prop.kind == PropKind.ChildList ->
+          when (val items = value.childItems()) {
+            is ChildItems.Listed -> items.ids
+            is ChildItems.Template -> listOf(items.componentId)
+            null -> emptyList()
+          }
         else -> emptyList()
       }
     }
@@ -195,6 +200,7 @@ internal abstract class ScreenEmitterBase(
         "height" to Sym.height,
         "size" to Sym.size,
         "heightIn" to Sym.heightIn,
+        "widthIn" to Sym.widthIn,
         "offset" to Sym.offset,
         "aspectRatio" to Sym.aspectRatio,
         "background" to Sym.background,

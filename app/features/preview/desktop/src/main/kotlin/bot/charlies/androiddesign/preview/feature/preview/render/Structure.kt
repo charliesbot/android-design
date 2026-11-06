@@ -20,12 +20,18 @@ import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SecondaryScrollableTabRow
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.ShortNavigationBar
 import androidx.compose.material3.ShortNavigationBarArrangement
 import androidx.compose.material3.ShortNavigationBarItem
+import androidx.compose.material3.Tab
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.VerticalFloatingToolbar
 import androidx.compose.material3.WideNavigationRail
 import androidx.compose.material3.WideNavigationRailItem
@@ -33,27 +39,51 @@ import androidx.compose.material3.WideNavigationRailValue
 import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
+import bot.charlies.androiddesign.preview.domain.CollapsingAppBars
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.TypeRole
+
+/** The scroll behavior of the Scaffold whose top bar this is, if its bar collapses. */
+@OptIn(ExperimentalMaterial3Api::class)
+private val LocalTopBarScroll = compositionLocalOf<TopAppBarScrollBehavior?> { null }
 
 private val ScaffoldAmbient = Ambient(ColorRole.Background, ColorRole.OnBackground)
 
 internal fun NodeContext.scaffoldLook() = Look(ScaffoldAmbient)
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderScaffold(ctx: NodeContext) {
   val env = ctx.env
   val rail = ctx.props.childId("navigationRail")
+  val topBar = ctx.props.childId("topBar")?.let(env.nodes::get)
+  // Like the export, a medium or large bar collapses as the content scrolls. At rest it is
+  // expanded.
+  val collapsing =
+    topBar != null &&
+      CollapsingAppBars.collapsesAt(topBar, env.sizeClass, effectiveProps(topBar, env))
+  val scrollBehavior =
+    if (collapsing) TopAppBarDefaults.exitUntilCollapsedScrollBehavior() else null
   val scaffold: @Composable (Modifier) -> Unit = { modifier ->
     Scaffold(
-      modifier = modifier,
-      topBar = { ctx.Child("topBar", 1, ChildHost.Wrap) },
+      modifier =
+        if (scrollBehavior != null) modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        else modifier,
+      topBar = {
+        CompositionLocalProvider(LocalTopBarScroll provides scrollBehavior) {
+          ctx.Child("topBar", 1, ChildHost.Wrap)
+        }
+      },
       bottomBar = { ctx.Child("bottomBar", 3, ChildHost.Flow) },
       floatingActionButton = { ctx.Child("floatingActionButton", 4, ChildHost.Wrap) },
+      snackbarHost = {
+        if (ctx.node.id == env.placement.snackbarScaffold) SnackbarSlot(env)
+      },
       containerColor = env.color(ColorRole.Background),
       contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
@@ -73,17 +103,26 @@ internal fun RenderScaffold(ctx: NodeContext) {
   }
 }
 
+/** A search app bar's text is its field's hint, in body large on the field's container. */
 internal fun NodeContext.topAppBarLook() =
-  Look(
-    ColorRole.Surface,
-    ColorRole.OnSurface,
-    TypeRole.TitleLarge,
-    text = string("title"),
-  )
+  if (isSearchAppBar()) {
+    searchBarLook(string("title"))
+  } else {
+    Look(
+      ColorRole.Surface,
+      ColorRole.OnSurface,
+      TypeRole.TitleLarge,
+      text = string("title"),
+    )
+  }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderTopAppBar(ctx: NodeContext) {
+  if (ctx.isSearchAppBar()) {
+    RenderSearchAppBar(ctx)
+    return
+  }
   val title = ctx.string("title").orEmpty()
   val subtitle = ctx.string("subtitle")
   val titleSlot: @Composable () -> Unit = {
@@ -98,8 +137,7 @@ internal fun RenderTopAppBar(ctx: NodeContext) {
   }
   val modifier = ctx.modifier()
   val insets = WindowInsets(0, 0, 0, 0)
-  // Medium and large bars draw expanded; the behavior is only here so they are not collapsed.
-  val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+  val scroll = LocalTopBarScroll.current
   when (ctx.enum("size")) {
     "center" ->
       CenterAlignedTopAppBar(titleSlot, modifier, navigation, actions, windowInsets = insets)
@@ -182,9 +220,96 @@ internal fun RenderNavigationBarItem(ctx: NodeContext) {
   ShortNavigationBarItem(
     selected = selected,
     onClick = { ctx.select() },
-    icon = { IconSlot(selectedIcon(ctx, selected), filled = selected) },
+    icon = { ctx.WithBadge { IconSlot(selectedIcon(ctx, selected), filled = selected) } },
     label = { ctx.PartText(ctx.string("label").orEmpty(), maxLines = 1) },
     modifier = ctx.modifier(),
+  )
+}
+
+private val TabsAmbient = Ambient(ColorRole.Surface, ColorRole.OnSurface)
+
+internal fun NodeContext.tabsLook() = Look(TabsAmbient)
+
+/** The index of the selected tab: the one tapped last, else the first whose `selected` is set. */
+private fun NodeContext.selectedTab(): Int {
+  val refs = props.children("children")
+  val last = (refs.size - 1).coerceAtLeast(0)
+  groupSelected(id)?.let {
+    return it.coerceIn(0, last)
+  }
+  return refs
+    .indexOfFirst { ref ->
+      val node = env.nodes[ref.id] ?: return@indexOfFirst false
+      Props(effectiveProps(node, env), ref.scope).bool("selected") == true
+    }
+    .coerceAtLeast(0)
+}
+
+@Composable
+internal fun RenderTabs(ctx: NodeContext) {
+  val selected = ctx.selectedTab()
+  val tabs: @Composable () -> Unit = {
+    ctx.Children(
+      "children",
+      0,
+      ChildHost(
+        fillWidth = ctx.def.stretchesChildren,
+        groupKey = ctx.id,
+        secondaryTabs = ctx.enum("variant") == "secondary",
+      ),
+    )
+  }
+  val secondary = ctx.enum("variant") == "secondary"
+  val scrollable = ctx.bool("scrollable")
+  CompositionLocalProvider(LocalAmbient provides TabsAmbient) {
+    val modifier = ctx.modifier()
+    when {
+      secondary && scrollable -> SecondaryScrollableTabRow(selected, modifier, tabs = tabs)
+      secondary -> SecondaryTabRow(selected, modifier, tabs = tabs)
+      scrollable -> PrimaryScrollableTabRow(selected, modifier, tabs = tabs)
+      else -> PrimaryTabRow(selected, modifier, tabs = tabs)
+    }
+  }
+}
+
+/** The content color of a selected tab: its row's (primary, or on surface in a secondary row). */
+private fun NodeContext.selectedTabColor() =
+  if (host.secondaryTabs) ColorRole.OnSurface else ColorRole.Primary
+
+/** Whether this tab is the selected one of its row, as the viewer last left it. */
+private fun NodeContext.tabSelected(): Boolean =
+  host.groupKey?.let(::isPickedIn) ?: bool("selected")
+
+/**
+ * A selected tab sets its label in its row's content color, the others in on surface variant,
+ * Material's inactive tab token.
+ */
+internal fun NodeContext.tabLook() =
+  Look(
+    ColorRole.Surface,
+    if (tabSelected()) selectedTabColor() else ColorRole.OnSurfaceVariant,
+    TypeRole.TitleSmall,
+    text = string("label"),
+    a11yRole = "Tab",
+  )
+
+@Composable
+internal fun RenderTab(ctx: NodeContext) {
+  val selected = ctx.rememberSelection()
+  val icon = ctx.string("icon")
+  Tab(
+    selected = selected,
+    onClick = { ctx.select() },
+    modifier = ctx.modifier(),
+    // The badge sits on the icon, else on the label.
+    text = {
+      val label: @Composable () -> Unit = {
+        ctx.PartText(ctx.string("label").orEmpty(), maxLines = 1)
+      }
+      if (icon == null) ctx.WithBadge(label) else label()
+    },
+    icon = icon?.let { name -> { ctx.WithBadge { IconSlot(name) } } },
+    unselectedContentColor = ctx.env.color(ColorRole.OnSurfaceVariant),
   )
 }
 
@@ -230,7 +355,7 @@ internal fun RenderNavigationRailItem(ctx: NodeContext) {
   WideNavigationRailItem(
     selected = selected,
     onClick = { ctx.select() },
-    icon = { IconSlot(selectedIcon(ctx, selected), filled = selected) },
+    icon = { ctx.WithBadge { IconSlot(selectedIcon(ctx, selected), filled = selected) } },
     label = { ctx.PartText(ctx.string("label").orEmpty(), maxLines = 1) },
     railExpanded = ctx.host.railExpanded,
     modifier = ctx.modifier(),

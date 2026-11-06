@@ -19,7 +19,7 @@ ALLOWED_ROOTS = {
     # androidx.compose.foundation and androidx.compose.ui, which the inventory does not cover.
     "Modifier", "Arrangement", "Alignment", "WindowInsets", "BoxWithConstraints", "Box", "Row", "Column", "Spacer", "BorderStroke",
     "RectangleShape", "CircleShape", "ZeroCornerSize", "Color", "TextStyle", "FontFamily", "Font", "FontVariation", "FontWeight",
-    "DialogProperties", "Image", "ContentScale", "TextOverflow", "TextAlign", "Grid", "FlexBox", "FlowRow", "LazyVerticalGrid",
+    "Dialog", "DialogProperties", "RoundedCornerShape", "LaunchedEffect", "Image", "ContentScale", "TextOverflow", "TextAlign", "Grid", "FlexBox", "FlowRow", "LazyVerticalGrid",
     "GridCells",
     # Navigation 3 and its Material 3 adaptive scenes.
     "NavDisplay", "ListDetailSceneStrategy", "SupportingPaneSceneStrategy",
