@@ -330,6 +330,201 @@
           "type": "rubric"
         }
       ]
+    },
+    {
+      "id": 5,
+      "name": "workout",
+      "surface": "wear",
+      "prompt": "The active-run screen of a running app on Wear OS called \"Stride\". Show the run in progress: elapsed time 24:18, distance 3.1 of 5 km, heart rate 148 bpm, and pace 5:12 /km. Offer two actions, pause and end. Ending the run asks for confirmation before it ends (confirm or keep running). It must work on small (204x204) and large (227x227) round watches. In-memory state only.",
+      "expected_output": "One hero (the elapsed time) with distance, heart rate, and pace as quiet supporting values; pause and end are two distinct controls, with pause as the primary action; end opens a confirmation dialog; black background with color on the hero and the primary action only; nothing cut by the round edge on either watch",
+      "files": [],
+      "assertions": [
+        {
+          "id": "C-valid",
+          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
+          "type": "code"
+        },
+        {
+          "id": "C-review",
+          "text": "Every render in report.json passes the app's finding rules; no renders counts as a failure",
+          "type": "code"
+        },
+        {
+          "id": "R-hierarchy",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-controls",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-text",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-round",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-glance",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-hero",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-sizes",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-color",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-workout-hero",
+          "text": "The elapsed time (24:18) is the hero of the run screen, clearly larger than distance, heart rate, and pace, and the screen shows all four values without crowding. Renders show screens, not dialogs, so the end-run confirmation is not judged here.",
+          "type": "rubric"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "player",
+      "surface": "wear",
+      "prompt": "A now-playing screen for a podcast app called \"Drift\" on Wear OS. Show the episode title \"The Long Way Home\" and the show name \"Slow Radio\", with play/pause (currently playing), skip back, skip forward, and a volume control. No artwork is provided; the screen must not depend on an image. It must work on small (204x204) and large (227x227) round watches. In-memory state only.",
+      "expected_output": "Non-scrolling player: episode title and show at the top, play/pause as the one primary control, skip back and forward as secondary icon buttons, a volume control that fits the round screen; the title is readable without being cut off; color only on play/pause",
+      "files": [],
+      "assertions": [
+        {
+          "id": "C-valid",
+          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
+          "type": "code"
+        },
+        {
+          "id": "C-review",
+          "text": "Every render in report.json passes the app's finding rules; no renders counts as a failure",
+          "type": "code"
+        },
+        {
+          "id": "R-hierarchy",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-controls",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-text",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-round",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-glance",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-hero",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-sizes",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-color",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-player-controls",
+          "text": "Play/pause is the one primary control: visibly larger or more emphasized than skip back and skip forward, which are separate icon buttons, and a volume control is present and reachable. The episode title and show name are both readable and not cut off, truncating with an ellipsis only after a full line or two.",
+          "type": "rubric"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "reminder",
+      "surface": "wear",
+      "prompt": "A reminders app on Wear OS called \"Today\". Show today's reminders as a list: \"Call the dentist\", \"Pick up laundry\", \"Water the plants\", \"Send the invoice\", with \"Pick up laundry\" marked done. Include a second screen to add a reminder (a new one named \"Book flights\" for the demo) and a confirmation after saving that returns to the list. Tapping a reminder toggles done. It must work on small (204x204) and large (227x227) round watches. In-memory state only.",
+      "expected_output": "A scrolling list of reminders where each row is one tappable item with a clear done state; add is a clear primary action (edge button); the add screen is minimal; saving shows a confirmation and returns to the list; black background, color only on state and the primary action",
+      "files": [],
+      "assertions": [
+        {
+          "id": "C-valid",
+          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
+          "type": "code"
+        },
+        {
+          "id": "C-review",
+          "text": "Every render in report.json passes the app's finding rules; no renders counts as a failure",
+          "type": "code"
+        },
+        {
+          "id": "R-hierarchy",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-controls",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-text",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-round",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-glance",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-hero",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-sizes",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-wear-color",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-reminder-list",
+          "text": "Each reminder row is one tappable item and the done state of 'Pick up laundry' is visible at a glance by more than color alone (for example a check, a strikethrough, or a switch). The add screen, when rendered, is its own screen. FAIL when the done state is only a slight color change or does not show. Renders show screens, not dialogs, so a confirmation dialog is not judged here.",
+          "type": "rubric"
+        }
+      ]
     }
   ]
 }

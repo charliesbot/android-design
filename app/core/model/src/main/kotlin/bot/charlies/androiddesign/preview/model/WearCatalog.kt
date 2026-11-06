@@ -100,18 +100,36 @@ object WearCatalog : Catalog {
 
   override val navigationNames: List<String> = emptyList()
 
+  /**
+   * Components designed to meet the round edge: `TimeText` is the screen's clock (a `Screen`
+   * option, not a component), the ring hugs the display and the edge button follows its curve.
+   */
+  override val roundEdgeNames: Set<String> =
+    setOf(
+      "EdgeButton",
+      "TimeText",
+      "CircularProgressIndicator",
+      "SegmentedCircularProgressIndicator",
+    )
+
   /** Wear Compose sets its type scale in Roboto Flex. */
   override val platformFontFamilies: Set<String> = setOf("Roboto Flex")
 }
 
 // region registry definitions
 
-/** What an interactive Wear component also takes. There is no `primary`: the edge button leads. */
+/** What an interactive Wear component also takes. */
 private val wearInteractiveProps =
   listOf(
     text("contentDescription", description = "Accessibility label when it differs from the label."),
     bool("enabled", default = true),
   )
+
+/** What a Wear button also takes: the marker of the screen's primary action. */
+private val wearButtonProps =
+  listOf(
+    bool("primary", "Marks the screen's primary action. Exactly one is expected per screen."),
+  ) + wearInteractiveProps
 
 private val buttonVariants = arrayOf("filled", "filledTonal", "filledVariant", "outlined", "child")
 private val iconButtonVariants = arrayOf("standard", "filled", "filledTonal", "outlined")
@@ -189,7 +207,7 @@ private fun wearActions(): List<ComponentDef> =
         text("secondaryLabel"),
         icon(),
         action(),
-      ) + wearInteractiveProps,
+      ) + wearButtonProps,
       interactive = true,
       width = WidthFill.Always,
     ),
@@ -203,7 +221,7 @@ private fun wearActions(): List<ComponentDef> =
         text("label"),
         icon(),
         action(),
-      ) + wearInteractiveProps,
+      ) + wearButtonProps,
       interactive = true,
     ),
     ComponentDef(
@@ -216,7 +234,7 @@ private fun wearActions(): List<ComponentDef> =
         oneOf("size", *iconButtonSizes, default = "default"),
         icon(required = true),
         action(),
-      ) + wearInteractiveProps,
+      ) + wearButtonProps,
       interactive = true,
     ),
     ComponentDef(
@@ -229,7 +247,7 @@ private fun wearActions(): List<ComponentDef> =
         oneOf("size", "small", "default", "large", default = "default"),
         text("label", required = true),
         action(),
-      ) + wearInteractiveProps,
+      ) + wearButtonProps,
       interactive = true,
     ),
     ComponentDef(
@@ -242,7 +260,7 @@ private fun wearActions(): List<ComponentDef> =
         text("label"),
         icon(),
         action(),
-      ) + wearInteractiveProps,
+      ) + wearButtonProps,
       interactive = true,
     ),
     ComponentDef(

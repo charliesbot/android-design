@@ -5,6 +5,7 @@ import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.WearCatalog
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -674,6 +675,125 @@ class FindingRulesTest {
     val menu = node("menu", "Menu", y = 200f, w = 200f, h = 150f)
     val tiny = node("tiny", "IconButton", w = 32f, h = 32f)
     assertEquals(1, evaluate(tree(nodes = arrayOf(menu, tiny))).of(FindingRule.TouchTarget).size)
+  }
+
+  // endregion
+
+  // region round-edge-clipped
+
+  private fun iconButton(id: String, x: Float, y: Float = 76f, parent: String? = null) =
+    node(id, "IconButton", x, y, 52f, 52f, parent = parent, touch = Bounds(x, y, 52f, 52f))
+
+  @Test
+  fun `round-edge-clipped fails for a button row wider than the circle`() {
+    val row = tree(Views.Watch, iconButton("minus", 0f), iconButton("plus", 152f))
+    val findings = evaluate(row).of(FindingRule.RoundEdgeClipped)
+    assertEquals(listOf("minus", "plus"), findings.map { it.id })
+    assertEquals(Severity.Error, findings.first().severity)
+    assertEquals("reaches 3.3 dp outside the round edge", findings.first().detail)
+  }
+
+  @Test
+  fun `round-edge-clipped passes for the same row inside the circle`() {
+    val row = tree(Views.Watch, iconButton("minus", 30f), iconButton("plus", 122f))
+    assertEquals(emptyList(), evaluate(row).of(FindingRule.RoundEdgeClipped))
+  }
+
+  @Test
+  fun `round-edge-clipped checks text that is not a control`() {
+    val title =
+      node("title", "Text", x = 0f, y = 4f, w = 204f, h = 24f, text = text("A long title"))
+    assertEquals(
+      listOf("title"),
+      evaluate(tree(Views.Watch, title)).of(FindingRule.RoundEdgeClipped).map { it.id },
+    )
+  }
+
+  @Test
+  fun `round-edge-clipped judges a text by its drawn lines, not its box`() {
+    val short =
+      node("title", "Text", 0f, 4f, 204f, 24f, text = text("Hi", ink = Bounds(80f, 4f, 44f, 24f)))
+    assertEquals(emptyList(), evaluate(tree(Views.Watch, short)).of(FindingRule.RoundEdgeClipped))
+    val long =
+      node("long", "Text", 0f, 4f, 204f, 24f, text = text("Wide", ink = Bounds(0f, 4f, 204f, 24f)))
+    assertEquals(
+      listOf("long"),
+      evaluate(tree(Views.Watch, long)).of(FindingRule.RoundEdgeClipped).map { it.id },
+    )
+  }
+
+  @Test
+  fun `round-edge-clipped skips an item in a scrolling list`() {
+    val list = node("list", "Screen", w = 204f, h = 204f, scrolls = true)
+    val item = node("item", "Button", 0f, 0f, 204f, 52f, parent = "list", text = text())
+    val tree = tree(Views.Watch, list, item)
+    assertEquals(emptyList(), evaluate(tree).of(FindingRule.RoundEdgeClipped))
+    // The same item on a screen that does not scroll is clipped.
+    val fixed = node("list", "Screen", w = 204f, h = 204f)
+    assertEquals(
+      listOf("item"),
+      evaluate(tree(Views.Watch, fixed, item)).of(FindingRule.RoundEdgeClipped).map { it.id },
+    )
+  }
+
+  @Test
+  fun `round-edge-clipped skips a node nested in a scrolling list`() {
+    val list = node("list", "Screen", w = 204f, h = 204f, scrolls = true)
+    val row = node("row", "Row", 0f, 0f, 204f, 52f, parent = "list")
+    val button = node("b", "IconButton", 0f, 0f, 52f, 52f, parent = "row")
+    assertEquals(
+      emptyList(),
+      evaluate(tree(Views.Watch, list, row, button)).of(FindingRule.RoundEdgeClipped),
+    )
+  }
+
+  @Test
+  fun `round-edge-clipped skips components made for the round edge`() {
+    val edge = node("edge", "EdgeButton", 40f, 150f, 124f, 54f, text = text("Done"))
+    val ring = node("ring", "CircularProgressIndicator", w = 204f, h = 204f)
+    val clock = node("clock", "TimeText", 60f, 0f, 84f, 24f, text = text("10:09"))
+    assertEquals(
+      emptyList(),
+      evaluate(tree(Views.Watch, edge, ring, clock)).of(FindingRule.RoundEdgeClipped),
+    )
+    WearCatalog.roundEdgeNames
+      .filter { it != "TimeText" }
+      .forEach {
+        assertTrue(WearCatalog.find(it) != null, it)
+      }
+  }
+
+  @Test
+  fun `round-edge-clipped skips nodes behind an open dialog`() {
+    val dialog = node("sure", "AlertDialog", w = 204f, h = 204f)
+    val behind = iconButton("behind", 0f)
+    val inside = iconButton("inside", 0f, parent = "sure")
+    val findings =
+      evaluate(tree(Views.Watch, behind, dialog, inside)).of(FindingRule.RoundEdgeClipped)
+    assertEquals(listOf("inside"), findings.map { it.id })
+  }
+
+  @Test
+  fun `round-edge-clipped does not apply to a phone view`() {
+    val wide = tree(Views.Light, iconButton("a", 0f, y = 0f), iconButton("b", 359f, y = 871f))
+    assertEquals(emptyList(), evaluate(wide).of(FindingRule.RoundEdgeClipped))
+  }
+
+  // endregion
+
+  // region primary-largest on Wear
+
+  @Test
+  fun `primary-largest runs on a Wear tree from the Wear catalog`() {
+    val small = node("go", "IconButton", 76f, 20f, 52f, 52f, primary = true)
+    val big = node("more", "Button", 20f, 90f, 164f, 60f, text = text())
+    val findings = evaluate(tree(Views.Watch, small, big)).of(FindingRule.PrimaryLargest)
+    assertEquals(listOf("go"), findings.map { it.id })
+    assertEquals(
+      emptyList(),
+      evaluate(tree(Views.Watch, big.copy(primary = true), small.copy(primary = false)))
+        .of(FindingRule.PrimaryLargest),
+    )
   }
 
   // endregion

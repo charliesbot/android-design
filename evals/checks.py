@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic checks for one eval case. Usage: checks.py <case_dir> [phone]
+"""Deterministic checks for one eval case. Usage: checks.py <case_dir> [phone|wear]
 
 Reads renders/report.json, which the runner leaves in the case directory (the previewer app's `render` writes it).
 Prints JSON: {"C-id": {"pass": bool, "detail": str}}.
@@ -8,7 +8,10 @@ import json
 import sys
 from pathlib import Path
 
-SURFACES = {"phone"}
+SURFACES = {"phone", "wear"}
+# The checks each surface gets. C-palette guards the phone theme variant (a neon scheme floods surfaces with
+# color); a Wear proposal builds from black and R-wear-color judges the rendered color, so the variant says nothing.
+CHECKS_BY_SURFACE = {"phone": ("C-valid", "C-review", "C-palette"), "wear": ("C-valid", "C-review")}
 BAD_VARIANTS = {"expressive", "vibrant"}
 MAX_ERRORS = 3
 MAX_DETAIL = 600
@@ -64,21 +67,21 @@ def check_palette(report):
     return result(not bad, f"theme variant {variant}" if bad else "")
 
 
-def run(case_dir: Path):
-    """The deterministic checks every case gets."""
+def run(case_dir: Path, surface: str = "phone"):
+    """The deterministic checks a case of this surface gets."""
+    if surface not in SURFACES:
+        raise ValueError(f"unknown surface: {surface}")
     case_dir = Path(case_dir)
+    ids = CHECKS_BY_SURFACE[surface]
     report = read_report(case_dir)
     if report is None:
         missing = missing_report(case_dir)
-        return {"C-valid": missing, "C-review": missing, "C-palette": missing}
-    return {
-        "C-valid": check_valid(report),
-        "C-review": check_review(report),
-        "C-palette": check_palette(report),
-    }
+        return {key: missing for key in ids}
+    found = {"C-valid": check_valid, "C-review": check_review, "C-palette": check_palette}
+    return {key: found[key](report) for key in ids}
 
 
 if __name__ == "__main__":
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] not in SURFACES):
-        sys.exit("usage: checks.py <case_dir> [phone]")
-    print(json.dumps(run(Path(sys.argv[1])), indent=2))
+        sys.exit("usage: checks.py <case_dir> [phone|wear]")
+    print(json.dumps(run(Path(sys.argv[1]), *sys.argv[2:]), indent=2))

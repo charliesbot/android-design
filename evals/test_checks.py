@@ -110,5 +110,34 @@ class ChecksTests(unittest.TestCase):
             self.assertFalse(checks.run(directory)['C-valid']['pass'])
 
 
+class WearSurfaceTests(unittest.TestCase):
+    def test_wear_gets_valid_and_review_but_not_palette(self):
+        data = report([render('main', 'watch'), render('main', 'watch-large')], variant='vibrant')
+        with tempfile.TemporaryDirectory() as tmp:
+            out = checks.run(case_dir(tmp, data), 'wear')
+        self.assertEqual(set(out), {'C-valid', 'C-review'})
+        self.assertTrue(all(v['pass'] for v in out.values()), out)
+
+    def test_wear_review_names_the_failing_watch_view(self):
+        data = report([render('main', 'watch'), render('main', 'watch-large', 'touch-target: end 40x40')])
+        with tempfile.TemporaryDirectory() as tmp:
+            out = checks.run(case_dir(tmp, data), 'wear')
+        self.assertEqual(out['C-review']['detail'], 'main/watch-large: touch-target')
+
+    def test_a_wear_case_that_was_never_rendered_fails_its_checks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = checks.run(case_dir(tmp), 'wear')
+        self.assertEqual(set(out), {'C-valid', 'C-review'})
+        self.assertFalse(any(v['pass'] for v in out.values()))
+
+    def test_unknown_surface_is_rejected_and_phone_is_the_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = case_dir(tmp, report(GOOD))
+            with self.assertRaises(ValueError):
+                checks.run(directory, 'tv')
+            self.assertEqual(set(checks.run(directory)), {'C-valid', 'C-review', 'C-palette'})
+        self.assertEqual(checks.SURFACES, {'phone', 'wear'})
+
+
 if __name__ == '__main__':
     unittest.main()

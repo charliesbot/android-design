@@ -89,6 +89,11 @@ class ArtifactCliTests(unittest.TestCase):
         self.assertIn('plates/tablet (fails checks)', page)
         self.assertIn('<figcaption>plates/dark</figcaption>', page)
 
+    def test_a_wear_report_leads_with_the_small_watch(self):
+        renders = [{'screen': 'main', 'view': 'watch-large', 'png': 'main-watch-large.png', 'pass': True},
+                   {'screen': 'main', 'view': 'watch', 'png': 'main-watch.png', 'pass': True}]
+        self.assertEqual(report.primary_first(renders, 'wear')[0]['view'], 'watch')
+
     def test_promotion_copies_the_primary_render(self):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)

@@ -37,6 +37,11 @@ data class LayoutNode(
   val type: String,
   val parent: String? = null,
   val primary: Boolean = false,
+  /**
+   * True for a container that scrolls its children, such as a Wear Screen with `scroll` on: its
+   * descendants move and are transformed at the display's edge by design.
+   */
+  val scrolls: Boolean = false,
   val bounds: Bounds,
   /** The touch area, which is at least 48 x 48 dp for interactive components. */
   val touch: Bounds? = null,
@@ -61,6 +66,11 @@ data class TextInfo(
   val overflow: Boolean,
   val truncated: Boolean,
   val font: String? = null,
+  /**
+   * The box the drawn lines cover, when the node shows one text and the renderer measured it. The
+   * layout box of a centered text can span the width while its glyphs do not.
+   */
+  val ink: Bounds? = null,
 )
 
 @Serializable
@@ -98,6 +108,7 @@ enum class FindingRule(val wire: String) {
   @SerialName("primary-largest") PrimaryLargest("primary-largest"),
   @SerialName("one-fab") OneFab("one-fab"),
   @SerialName("offscreen") Offscreen("offscreen"),
+  @SerialName("round-edge-clipped") RoundEdgeClipped("round-edge-clipped"),
 }
 
 /** [id] is the component the finding is about, or null when it concerns the whole view. */

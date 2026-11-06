@@ -35,7 +35,7 @@ Rejected alternatives:
 
 - **One surface per proposal.** Every screen of a proposal uses the same catalog, the way a real project keeps its Wear app in its own module. Mixing is a validation error.
 - **Views:** `watch` (204 dp) and `watch-large` (227 dp), both round and dark. Google asks to design for the smallest round screen first and adds a breakpoint at 225 dp, so Wear size overrides use one key, `large`, applied from 225 dp.
-- **Rules:** no panes, Wear color and type roles, a 48 dp touch target.
+- **Rules:** no panes, Wear color and type roles, a 48 dp touch target, a `primary` marker on the Wear buttons (Button, CompactButton, IconButton, TextButton, EdgeButton) for the one-primary-action rule, and the `round-edge-clipped` finding. That finding flags a control or text whose bounds reach past the circle inscribed in a round view. It skips anything inside a scrolling `Screen` (the tree marks it with `scrolls`), anything behind a modal, and the components in `WearCatalog.roundEdgeNames` (EdgeButton, TimeText, the progress rings). A text is judged by the box its drawn lines cover (`text.ink` in the tree), so a centered title in a full-width box passes when its glyphs fit; a control is judged by its bounds.
 
 ### Rendering
 
@@ -54,7 +54,6 @@ Because upstream stays byte-identical, an upgrade replaces it wholesale with `sc
 ## Known gaps
 
 - Crown (rotary) input is not simulated: sending a rotary event on desktop needs Compose internals by reflection, which this project rules out. The mouse wheel scrolls lists.
-- No finding yet flags content clipped by the round edge, and Wear has no `primary` marker for the one-primary-action rule. Both are planned with the Wear evals.
 - Kotlin export rejects Wear proposals until the export delivery.
 - Rendering fidelity gaps (curved text, API-gated branches, excluded components, lazy lists in the layout tree) are listed in `app/wear/README.md`.
 

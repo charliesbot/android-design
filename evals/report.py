@@ -3,7 +3,7 @@ import html
 from pathlib import Path
 
 # The view a case's baseline image and report lead with, by surface.
-PRIMARY = {"phone": "light"}
+PRIMARY = {"phone": "light", "wear": "watch"}
 
 
 def score(items):

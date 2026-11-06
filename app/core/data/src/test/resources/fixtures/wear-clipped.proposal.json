@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "name": "Wear clipped by the round edge",
+  "navigation": { "start": "home" },
+  "screens": {
+    "home": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "scroll": false, "timeText": false, "children": ["ring", "col"] },
+        { "id": "ring", "component": "CircularProgressIndicator", "progress": 0.6 },
+        { "id": "col", "component": "Column", "arrangement": "center", "horizontalAlignment": "center", "children": ["title", "detail", "pace", "controls"] },
+        { "id": "title", "component": "Text", "text": "Workout paused", "type": "titleMedium", "align": "center" },
+        { "id": "detail", "component": "Text", "text": "12:40 elapsed", "type": "bodySmall", "align": "center" },
+        { "id": "pace", "component": "Text", "text": "Pace 6:12 /km", "type": "bodySmall", "align": "center" },
+        { "id": "controls", "component": "ButtonGroup", "children": ["stop", "resume"] },
+        { "id": "stop", "component": "IconButton", "variant": "filledTonal", "icon": "stop" },
+        { "id": "resume", "component": "IconButton", "variant": "filled", "size": "large", "icon": "play_arrow" }
+      ]
+    }
+  }
+}

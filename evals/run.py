@@ -64,8 +64,28 @@ def prepare(case, case_dir):
     return proposal
 
 
+# What the agent prompt says per surface: where the proposal must work, what check_proposal covers, and how to
+# read its layout summaries. Phone-size cases cover the window size classes; Wear cases cover the two round watches.
+SURFACE_PROMPT = {
+    'phone': {
+        'TARGET': 'The screen must work and adapt across phone (411x923), foldable (704x933), tablet (1280x800), and desktop (1920x1080) windows, in light and dark.',
+        'VIEWS': 'all five views',
+        'LAYOUT': "Read each view's `layout` summary in the `check_proposal` result (navigation, panes, and regions). Check that the larger views reveal what your section 0 adaptation answer promised, rather than rearranging the phone content. Call `get_tree` only when a summary is not enough.",
+        'DONE': 'implement the brief and adapt across all four window sizes',
+    },
+    'wear': {
+        'TARGET': 'This is a Wear OS proposal: every screen uses the Wear catalog (`get_catalog` lists it), and the previewer draws it on two round, dark watches: small (204x204) and large (227x227). The screen must work on both. Design for the small one first; the large one may show more but never less.',
+        'VIEWS': 'both watch views',
+        'LAYOUT': "Read each view's `layout` summary in the `check_proposal` result. Check that nothing important sits where the round edge cuts it, and that the large watch shows at least what the small one does. Call `get_tree` only when a summary is not enough.",
+        'DONE': 'implement the brief on the small and the large watch',
+    },
+}
+
+
 def prompt_for(case, case_dir):
     text = (HERE / "agent-prompt.md").read_text()
+    for key, value in SURFACE_PROMPT[case['surface']].items():
+        text = text.replace('{{' + key + '}}', value)
     return (text.replace("{{SKILL_DIR}}", str(case_dir / CASE_SKILLS / SKILL_DIR.name))
                 .replace("{{EXPLORE_DIR}}", str(case_dir / CASE_SKILLS / EXPLORE_DIR.name))
                 .replace("{{PROPOSAL}}", case_info(case_dir)["proposal"])
@@ -211,7 +231,7 @@ def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1)
     directory = out / case['name']
     images, render_error = render(directory)
     renders = [{k: r.get(k) for k in ('screen', 'view', 'png', 'pass')} for r in report_renders(directory)]
-    checks = run_checks(directory)
+    checks = run_checks(directory, case['surface'])
     if render_error:
         checks['C-review'] = {'pass': False, 'detail': render_error}
     (directory / 'checks.json').write_text(json.dumps(checks, indent=2))

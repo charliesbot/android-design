@@ -1,0 +1,20 @@
+{
+  "format": 1,
+  "name": "Stride run (clipped)",
+  "navigation": { "start": "main" },
+  "screens": {
+    "main": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "scroll": false, "timeText": false, "children": ["col"] },
+        { "id": "col", "component": "Column", "arrangement": "spaceBetween", "horizontalAlignment": "center", "children": ["time", "bar"] },
+        { "id": "time", "component": "Text", "text": "24:18", "type": "numeralLarge", "color": "primary", "align": "center" },
+        { "id": "bar", "component": "ButtonGroup", "children": ["b1", "b2", "b3", "b4"] },
+        { "id": "b1", "component": "IconButton", "variant": "filledTonal", "size": "large", "icon": "pause", "contentDescription": "Pause" },
+        { "id": "b2", "component": "IconButton", "variant": "filledTonal", "size": "large", "icon": "stop", "contentDescription": "End" },
+        { "id": "b3", "component": "IconButton", "variant": "filledTonal", "size": "large", "icon": "flag", "contentDescription": "Lap" },
+        { "id": "b4", "component": "IconButton", "variant": "filledTonal", "size": "large", "icon": "settings", "contentDescription": "Settings" }
+      ]
+    }
+  }
+}

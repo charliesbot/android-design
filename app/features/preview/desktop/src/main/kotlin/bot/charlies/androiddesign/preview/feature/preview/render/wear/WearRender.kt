@@ -109,7 +109,8 @@ internal fun describeWear(ctx: NodeContext, ambient: WearAmbient): NodeMeta {
     type = ctx.component,
     parent = ctx.parentId,
     order = ctx.order,
-    primary = false,
+    primary = ctx.primary,
+    scrolls = ctx.component == "Screen" && ctx.bool("scroll"),
     interactive = interactive,
     roles =
       NodeRoles(

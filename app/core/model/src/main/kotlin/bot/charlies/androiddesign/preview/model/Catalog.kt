@@ -251,6 +251,13 @@ interface Catalog {
   val navigationNames: List<String>
 
   /**
+   * Components made for the round display's edge: a full-screen ring, an edge button, the clock.
+   * The round-edge rule leaves them alone. Empty on a catalog with no round views.
+   */
+  val roundEdgeNames: Set<String>
+    get() = emptySet()
+
+  /**
    * Typefaces the platform's own components are set in, which the font rule accepts for every type
    * role besides the bundled ones. Empty when the catalog uses the bundled fonts only.
    */

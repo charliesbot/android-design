@@ -14,9 +14,20 @@ python3 run.py prepare --out /tmp/design-eval --cases music
 
 Preparation makes `music/` a fresh Git repository fixture (one empty commit) with `design/` holding the brief's assets in `design/assets/`, and a snapshot of both skills (`skills/android-design` and `skills/android-design-explore`). There is no starter and no `DESIGN.md`: the agent writes `DESIGN.md` at the fixture root and the proposal at `design/proposal.proposal.json`. `music/case.json` records the proposal path and title, and the command prints the proposal path.
 
-Read `/tmp/design-eval/music/prompt.md` in the agent session you want to test. Have that agent design the brief using the copied skills. The agent connects to the previewer app over MCP as the server `android_design_preview` and checks its work with `check_proposal` and `get_tree`, not screenshots; the runner renders again headlessly. The output directory must be new; preparation never overwrites existing work. Omit `--cases` to prepare all four cases (music, finance, settings, trek).
+Read `/tmp/design-eval/music/prompt.md` in the agent session you want to test. Have that agent design the brief using the copied skills. The agent connects to the previewer app over MCP as the server `android_design_preview` and checks its work with `check_proposal` and `get_tree`, not screenshots; the runner renders again headlessly. The output directory must be new; preparation never overwrites existing work. Omit `--cases` to prepare all seven cases: the phone cases music, finance, settings, and trek, and the Wear cases workout, player, and reminder.
 
-The Wear OS and widget cases were removed: the previewer app has no Wear or widget catalog. They need one before they return.
+## Surfaces
+
+Each case in `evals.json` has a `surface`. A proposal uses one surface, and the app picks the views from its catalog; the runner reads them from `report.json` and does not hardcode them.
+
+| Surface | Cases | Views | Checks | Rubric |
+| --- | --- | --- | --- | --- |
+| `phone` | music, finance, settings, trek | five, below | `C-valid`, `C-review`, `C-palette` | General items plus the case's own |
+| `wear` | workout, player, reminder | `watch` (204x204) and `watch-large` (227x227), both round and dark | `C-valid`, `C-review` | `R-hierarchy`, `R-controls`, `R-text`, the five `R-wear-*` items, and the case's own |
+
+Wear is the Wear OS catalog of the previewer app (`docs/design/wear-os-previewer.md`). `agent-prompt.md` is shared; `SURFACE_PROMPT` in `run.py` fills in where the proposal must work and how to read `check_proposal`'s layout summaries for each surface. `C-palette` is skipped for Wear on purpose: it guards the phone theme variant against neon surfaces, while a Wear proposal builds from black through Wear's own color mapping, and `R-wear-color` judges the rendered color directly. The phone-only rubric items (`R-fill`, `R-surfaces`, `R-font`, `R-platform`, `R-dark`, `R-adaptive`, `R-idea`) stay out of Wear cases because Wear has one dark theme, one typeface, and no size classes. To check a branch's Wear rendering, point the runner at that build: `ANDROID_DESIGN_PREVIEW=/path/to/AndroidDesignPreview python3 run.py evaluate --out ...`.
+
+There is no widget case: widgets still have no catalog in the previewer app, so they need one before they return.
 
 After implementation, render and check the artifacts without launching an agent:
 
@@ -26,7 +37,7 @@ python3 run.py evaluate --out /tmp/design-eval --no-open
 
 For each case this runs `<app> render <proposal> --out <case>/renders` (headless, no window; it passes `--design` when the agent wrote a `DESIGN.md`), reads `renders/report.json`, runs deterministic checks, and writes a report plus `<case>/judge-request.json`. No provider CLI is required for either command.
 
-Each screen of the proposal renders at five views: `light` and `dark` at phone size 411x923; `foldable` (704x933), `tablet` (1280x800), and `desktop` (1920x1080) in light. `render` writes one PNG and one layout tree per screen and view, named `<screen>-<view>`, and `report.json` lists them. The runner takes the renders from that list, so a proposal with more screens has more images.
+A phone proposal renders each screen at five views: `light` and `dark` at phone size 411x923; `foldable` (704x933), `tablet` (1280x800), and `desktop` (1920x1080) in light. `render` writes one PNG and one layout tree per screen and view, named `<screen>-<view>`, and `report.json` lists them. The runner takes the renders from that list, so a proposal with more screens has more images. A Wear proposal renders each screen at its two watch views.
 
 The deterministic checks all read `report.json`:
 
@@ -34,7 +45,7 @@ The deterministic checks all read `report.json`:
 | --- | --- |
 | `C-valid` | `valid` is true. The detail carries the first validation errors. |
 | `C-review` | Every render passes the app's finding rules. The detail lists each failure as `screen/view: rule`. No renders is a failure. |
-| `C-palette` | The merged theme's `variant` is not `expressive` or `vibrant`. |
+| `C-palette` | The merged theme's `variant` is not `expressive` or `vibrant`. Phone cases only. |
 
 For visual assessment, give each `judge-request.json` to your chosen reviewer. They must inspect every listed screenshot (each is labeled `screen/view`) against its included rubric. The layout trees stay out of the request: the judge sees one PNG per screen and view. Prefer a separate session for a blind judgment; the current chat is useful for interactive checks but is not a controlled independent evaluation.
 
@@ -69,7 +80,7 @@ python3 run.py evaluate --out /tmp/design-eval --judge codex --no-open
 
 `--generator-model` and `--judge-model` set independent model overrides. Otherwise each installed CLI uses its configured model. Both `claude` and `codex` adapters normalize their replies behind `backends.py`; adding another launcher does not change the artifact contract. `--parallel` defaults to 3. `--judge-runs` must be a positive odd number; the default is one ballot. Cost and runtime depend on the chosen providers, models, and local build cache.
 
-Automation requires the selected CLIs to be installed, authenticated, and permitted to work in the case directories, and the previewer app to be installed. The generator reaches the app over MCP, registered for that one run: Claude gets `--mcp-config <temporary json> --strict-mcp-config`, an allowance for `mcp__android_design_preview__*`, and an `Edit` allowance scoped to its case folder, since `claude -p` refuses file writes nobody allowed; Codex gets `mcp_servers.android_design_preview` through `-c` with `default_tools_approval_mode="approve"`, so `approval_policy = "never"` does not refuse the calls. Judges never see the app. The runner never bypasses permission prompts or sandboxes: configure your execution environment separately, or use the artifact-only path. Codex generation uses workspace-write and judging uses read-only; Claude judging exposes only its Read tool. These are tooling restrictions, not guarantees that global configuration or the host filesystem is invisible to the model.
+Automation requires the selected CLIs to be installed, authenticated, and permitted to work in the case directories, and the previewer app to be installed. The generator reaches the app over MCP, registered for that one run: Claude gets `--mcp-config <temporary json> --strict-mcp-config`, an allowance for `mcp__android_design_preview__*`, and an `Edit` allowance scoped to its case folder, since `claude -p` refuses file writes nobody allowed; Codex gets `mcp_servers.android_design_preview` through `-c` with `default_tools_approval_mode="approve"`, so `approval_policy = "never"` does not refuse the calls. Each generator run also gets its own socket: the previewer app is a single instance over a Unix socket, so without this a generator launched with the branch build would forward to an app already running (an installed older release) and the run would test the wrong app. The runner makes a short temporary directory under `/tmp` and passes `ANDROID_DESIGN_PREVIEW_SOCKET=<dir>/s.sock` to the MCP server (the `env` object of Claude's MCP config, `mcp_servers.android_design_preview.env.*` through `-c` for Codex), so the run starts its own instance of the app binary. That instance exits when its agent disconnects, and the runner removes the directory afterwards; other instances are untouched. Judges never see the app. The runner never bypasses permission prompts or sandboxes: configure your execution environment separately, or use the artifact-only path. Codex generation uses workspace-write and judging uses read-only; Claude judging exposes only its Read tool. These are tooling restrictions, not guarantees that global configuration or the host filesystem is invisible to the model.
 
 CLI invocation sends the prompt and any accessed files/images to that CLI's configured service. Obtain the required execution permission before launching it. Preparation and artifact-only evaluation do not start these services.
 
@@ -84,6 +95,8 @@ python3 calibrate.py prepare --out /tmp/design-calibration
 # Grade each numbered request without reading the expected labels, then import its ballot:
 python3 calibrate.py score --out /tmp/design-calibration
 ```
+
+The Wear calibration images (`calibration/wear-*.png`) are renders of the proposals in `calibration/wear-src/`, screen `main` at both watch views. To change one, edit its proposal, render it with `<app> render <file> --out <dir>`, and copy `main-watch.png` and `main-watch-large.png` over `wear-<name>-watch.png` and `wear-<name>-watch-large.png`. A label may list both watch renders in `images`.
 
 Calibration and eval artifacts use the same judging prompt, including the screen brief as task context rather than proof of implementation. Keep calibration labels out of the judging session. Manual calibration imports one ballot per image; automatic calibration defaults to three. Promotion is explicit:
 

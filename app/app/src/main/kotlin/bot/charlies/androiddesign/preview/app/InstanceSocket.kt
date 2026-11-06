@@ -19,8 +19,20 @@ import kotlin.concurrent.thread
  * window; agent processes connect and only relay stdio to it.
  */
 object InstanceSocket {
-  /** `~/Library/Application Support/AndroidDesignPreview/mcp.sock`. */
-  fun defaultPath(): Path =
+  /**
+   * Names a socket path that replaces the default, so a build can run its own instance beside an
+   * installed one (the evals do this to test the branch build, not the installed app).
+   */
+  const val SOCKET_ENV = "ANDROID_DESIGN_PREVIEW_SOCKET"
+
+  /**
+   * The path in [SOCKET_ENV] when [env] sets it, else `~/Library/Application
+   * Support/AndroidDesignPreview/mcp.sock`.
+   */
+  fun defaultPath(env: Map<String, String> = System.getenv()): Path =
+    env[SOCKET_ENV]?.takeIf { it.isNotBlank() }?.let(Path::of) ?: homePath()
+
+  private fun homePath(): Path =
     Path.of(
       System.getProperty("user.home"),
       "Library",

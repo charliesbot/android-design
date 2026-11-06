@@ -26,6 +26,7 @@ import bot.charlies.androiddesign.preview.model.ViewSpec
  * @property id The test tag and tree id. Components under a template carry the item indices
  *   (`plate_row[0]`), and components of a pane other than the one asked for carry `screen/`.
  * @property order The pre-order position: the tree lists nodes by this key.
+ * @property scrolls Whether it scrolls its children, as a Wear Screen with `scroll` on does.
  * @property text The text the node shows, when it shows any.
  * @property font The family name of its type role, when it shows text.
  */
@@ -35,6 +36,7 @@ class NodeMeta(
   val parent: String?,
   val order: List<Int>,
   val primary: Boolean,
+  val scrolls: Boolean = false,
   val interactive: Boolean,
   val roles: NodeRoles,
   val colors: NodeColors,
@@ -46,13 +48,28 @@ class NodeMeta(
 )
 
 /** One `onTextLayout` report of a text the node shows. */
-class TextReport(val lines: Int, val overflow: Boolean, val truncated: Boolean) {
+class TextReport(
+  val lines: Int,
+  val overflow: Boolean,
+  val truncated: Boolean,
+  /** The union of the line boxes, in pixels from the text's own origin. */
+  val ink: Rect? = null,
+) {
   companion object {
     fun of(layout: TextLayoutResult) =
       TextReport(
         lines = layout.lineCount,
         overflow = layout.hasVisualOverflow,
         truncated = (0 until layout.lineCount).any { layout.isLineEllipsized(it) },
+        ink =
+          if (layout.lineCount == 0) null
+          else
+            Rect(
+              (0 until layout.lineCount).minOf { layout.getLineLeft(it) },
+              layout.getLineTop(0),
+              (0 until layout.lineCount).maxOf { layout.getLineRight(it) },
+              layout.getLineBottom(layout.lineCount - 1),
+            ),
       )
   }
 }
@@ -185,16 +202,17 @@ class TreeRecorder {
       type = meta.type,
       parent = meta.parent,
       primary = meta.primary,
+      scrolls = meta.scrolls,
       bounds = bounds.toDp(density),
       touch = touchPx?.toDp(density),
-      text = textInfo(meta),
+      text = textInfo(meta, bounds, density),
       roles = meta.roles,
       colors = meta.colors,
       a11y = a11y(meta, merged),
     )
   }
 
-  private fun textInfo(meta: NodeMeta): TextInfo? {
+  private fun textInfo(meta: NodeMeta, bounds: Rect, density: Float): TextInfo? {
     val value = meta.text ?: return null
     val reports = texts[meta.id]?.values.orEmpty()
     val primary = reports.firstOrNull()
@@ -204,6 +222,8 @@ class TreeRecorder {
       overflow = reports.any { it.overflow },
       truncated = reports.any { it.truncated },
       font = meta.font,
+      // The text of a one-text node starts at the node's origin.
+      ink = reports.singleOrNull()?.ink?.translate(bounds.topLeft)?.toDp(density),
     )
   }
 

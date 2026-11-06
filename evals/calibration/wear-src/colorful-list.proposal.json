@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "name": "Today reminders (colorful)",
+  "navigation": { "start": "main" },
+  "screens": {
+    "main": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "children": ["h", "a", "b", "c", "d", "e"] },
+        { "id": "h", "component": "ListHeader", "text": "Today" },
+        { "id": "a", "component": "Button", "variant": "filled", "label": "Call the dentist", "icon": "call" },
+        { "id": "b", "component": "Button", "variant": "filledVariant", "label": "Pick up laundry", "icon": "check" },
+        { "id": "c", "component": "Button", "variant": "filled", "label": "Water the plants", "icon": "eco" },
+        { "id": "d", "component": "Button", "variant": "filledVariant", "label": "Send the invoice", "icon": "mail" },
+        { "id": "e", "component": "Button", "variant": "filled", "label": "Add reminder", "icon": "add" }
+      ]
+    }
+  }
+}

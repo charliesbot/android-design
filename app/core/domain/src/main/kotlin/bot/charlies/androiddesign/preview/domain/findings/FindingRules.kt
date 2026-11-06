@@ -12,6 +12,7 @@ import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.TypeGroup
+import kotlin.math.hypot
 import kotlin.math.round
 
 /**
@@ -102,7 +103,8 @@ object FindingRules {
       contrast(view) +
       primaryLargest(view) +
       oneFab(view) +
-      offscreen(view)
+      offscreen(view) +
+      roundEdgeClipped(view)
   }
 
   // region the view
@@ -341,6 +343,54 @@ object FindingRules {
   }
 
   private fun LayoutNode.right(): Float = bounds.x + bounds.width
+
+  // endregion
+
+  // region round-edge-clipped
+
+  /**
+   * On a round view, a control or a text whose bounds reach past the circle inscribed in the view:
+   * the display cuts off what sticks out. A scrolling list is exempt (its items scroll clear, and
+   * Wear's list transforms them at the edge), found by a `scrolls` ancestor. So are the components
+   * the catalog makes for the edge, and anything behind an open modal. The worst corner is
+   * reported.
+   */
+  private fun roundEdgeClipped(view: View): List<Finding> {
+    if (!view.tree.view.round) return emptyList()
+    val width = view.tree.view.width.toFloat()
+    val height = view.tree.view.height.toFloat()
+    val centerX = width / 2
+    val centerY = height / 2
+    val radius = minOf(width, height) / 2
+    return view.nodes
+      .filter { node ->
+        node.isLaidOut &&
+          (node.type in view.facets.actionTypes || node.text != null) &&
+          node.type !in view.catalog.roundEdgeNames &&
+          !view.isBehindModal(node) &&
+          view.ancestors(node).none { it.scrolls }
+      }
+      .mapNotNull { node ->
+        // A text is judged by the lines it drew; a control by its bounds.
+        val b = node.text?.ink?.takeIf { node.type !in view.facets.actionTypes } ?: node.bounds
+        val right = b.x + b.width
+        val reach =
+          listOf(b.x to b.y, right to b.y, b.x to b.y + b.height, right to b.y + b.height).maxOf {
+            (x, y) ->
+            hypot(x - centerX, y - centerY)
+          }
+        val outside = reach - radius
+        if (outside > EDGE_SLACK_DP) {
+          errorFinding(
+            node,
+            FindingRule.RoundEdgeClipped,
+            "reaches ${dp(outside)} dp outside the round edge",
+          )
+        } else {
+          null
+        }
+      }
+  }
 
   // endregion
 

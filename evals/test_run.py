@@ -84,15 +84,88 @@ class PrepareTest(unittest.TestCase):
 
     def test_evals_json_has_no_compose_wording_or_parked_cases(self):
         cases = json.loads((run.HERE / 'evals.json').read_text())['evals']
-        self.assertEqual([c['name'] for c in cases], ['music', 'finance', 'settings', 'trek'])
+        self.assertEqual([c['name'] for c in cases], ['music', 'finance', 'settings', 'trek', 'workout', 'player', 'reminder'])
         for case in cases:
             self.assertNotRegex(case['prompt'], r'R\.drawable|Compose|Kotlin|EvalScreen')
-            self.assertIn('1920x1080', case['prompt'])
+            ids = [a['id'] for a in case['assertions']]
             codes = [a['id'] for a in case['assertions'] if a['type'] == 'code']
-            self.assertEqual(codes, ['C-valid', 'C-review', 'C-palette'])
-            self.assertIn('R-adaptive', [a['id'] for a in case['assertions']])
+            if case['surface'] == 'phone':
+                self.assertIn('1920x1080', case['prompt'])
+                self.assertEqual(codes, ['C-valid', 'C-review', 'C-palette'])
+                self.assertIn('R-adaptive', ids)
             for target in (f['to'] for f in case['files']):
                 self.assertIn(target, case['prompt'])
+
+    def test_wear_cases_use_the_wear_checks_and_items_and_no_phone_only_ones(self):
+        cases = [c for c in json.loads((run.HERE / 'evals.json').read_text())['evals'] if c['surface'] == 'wear']
+        self.assertEqual([c['name'] for c in cases], ['workout', 'player', 'reminder'])
+        rubric = (run.HERE / 'rubric.md').read_text()
+        phone_only = {'R-fill', 'R-surfaces', 'R-font', 'R-platform', 'R-dark', 'R-adaptive', 'R-idea'}
+        wear = {'R-wear-round', 'R-wear-glance', 'R-wear-hero', 'R-wear-sizes', 'R-wear-color'}
+        for case in cases:
+            ids = [a['id'] for a in case['assertions']]
+            self.assertEqual([a['id'] for a in case['assertions'] if a['type'] == 'code'], ['C-valid', 'C-review'])
+            self.assertTrue({'R-hierarchy', 'R-controls', 'R-text'} | wear <= set(ids), case['name'])
+            self.assertFalse(phone_only & set(ids), case['name'])
+            own = [i for i in ids if i.startswith(f"R-{case['name']}-")]
+            self.assertTrue(own, case['name'])
+            self.assertIn('204x204', case['prompt'])
+            self.assertIn('227x227', case['prompt'])
+            self.assertEqual(case['files'], [])
+            for key in ids:
+                if key.startswith('R-') and key not in own:
+                    self.assertIn(f'**{key}:**', rubric)
+
+    def test_wear_prompt_targets_the_watches_and_leaves_no_phone_views(self):
+        for case in run.select_cases('workout,music'):
+            with tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp) / case['name']
+                run.prepare(case, directory)
+                text = run.prompt_for(case, directory)
+            self.assertNotIn('{{', text)
+            if case['surface'] == 'wear':
+                self.assertIn('204x204', text)
+                self.assertIn('227x227', text)
+                self.assertIn('both watch views', text)
+                for phone in ('411x923', '1920x1080', 'foldable', 'five views'):
+                    self.assertNotIn(phone, text)
+            else:
+                self.assertIn('411x923', text)
+                self.assertIn('all five views', text)
+                self.assertNotIn('227x227', text)
+
+    def test_a_wear_case_is_checked_without_the_palette_check_and_judged_with_its_own_items(self):
+        case = next(iter(run.select_cases('workout')))
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            directory = out / 'workout'
+            fake_case(directory)
+            (out / 'rubric.md').write_text('Rubric')
+            with mock.patch('subprocess.run', fake_render(directory, screens=('main',), views=('watch', 'watch-large'))):
+                result = run.evaluate_case(case, out)
+            self.assertEqual(set(result['checks']), {'C-valid', 'C-review'})
+            self.assertEqual(result['surface'], 'wear')
+            self.assertEqual(set(result['judge']), {a['id'] for a in case['assertions'] if a['type'] == 'rubric'})
+            self.assertIn('R-wear-round', result['judge'])
+            self.assertNotIn('R-adaptive', result['judge'])
+            request = json.loads((directory / 'judge-request.json').read_text())
+            self.assertIn('main/watch-large', request['prompt'])
+            self.assertEqual(result['status'], 'pending')
+
+    def test_wear_calibration_labels_match_their_sources_and_cases(self):
+        src = run.HERE / 'calibration/wear-src'
+        labels = json.loads((run.HERE / 'calibration/labels.json').read_text())['images']
+        planned = [label for label in labels if label.get('images', [''])[0].startswith('wear-')]
+        cases = {c['name']: c for c in json.loads((run.HERE / 'evals.json').read_text())['evals']}
+        catalog = 'https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1'
+        for label in planned:
+            name = label['images'][0].removeprefix('wear-').removesuffix('-watch.png')
+            proposal = json.loads((src / f'{name}.proposal.json').read_text())
+            self.assertTrue(all(s['catalogId'] == catalog for s in proposal['screens'].values()), name)
+            ids = {a['id'] for a in cases[label['case']]['assertions']}
+            self.assertLessEqual(set(label['expect']), ids, name)
+            self.assertTrue(all((run.HERE / 'calibration' / image).is_file() for image in label['images']), name)
+        self.assertEqual(len(planned), len(list(src.glob('*.proposal.json'))))
 
 
 class ArtifactPipelineTests(unittest.TestCase):

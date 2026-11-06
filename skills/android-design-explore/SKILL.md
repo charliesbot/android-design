@@ -2,13 +2,14 @@
 name: android-design-explore
 description: >
   Explore Android app ideas as live Compose proposals in the previewer app before implementation, without
-  changing app code. Use to brainstorm screens, mock up redesign alternatives, or compare and iterate on
-  visual directions in chat. Builds on the android-design skill, which owns every design decision.
+  changing app code. Use to brainstorm phone, tablet, desktop, or Wear OS app screens, mock up redesign
+  alternatives, or compare and iterate on visual directions in chat. Not for Wear tiles or watch faces.
+  Builds on the android-design skill, which owns every design decision.
 ---
 
 # Visual design exploration
 
-Follow the `android-design` skill for every design decision: its section 0 answers, components, theming, layout, and the screen check's questions. This skill owns the workflow. Each run is one shot: brief in, one proposal written, checked, shown, then stop. Phone, foldable, tablet, and desktop are in scope; Wear is not.
+Follow the `android-design` skill for every design decision: its section 0 answers, components, theming, layout, and the screen check's questions. This skill owns the workflow. Each run is one shot: brief in, one proposal written, checked, shown, then stop. Phone, foldable, tablet, desktop, and Wear OS app screens are in scope; Wear tiles and widgets are not. Where Wear differs, the **Wear OS** section below says how.
 
 A proposal is a data file that the previewer app, a native macOS window, draws with real Compose Material 3 components and redraws on every save. You check it through the app's layout tree; the user judges taste in the window.
 
@@ -85,6 +86,17 @@ The port follows the requesting project's planning, branch, verification, and re
 3. Render the result with the `compose-preview` skill and compare it with the proposal's trees at the same views.
 
 Report components the mapping marks unverified, and anything it lacks, instead of inventing a Compose equivalent. If the design cannot be preserved with the app's dependencies, ask.
+
+## Wear OS
+
+A Wear proposal follows the same workflow with these differences. `android-design` `references/wear-os.md` owns the design rules.
+
+- **Its own file.** One surface per proposal: every screen uses the Wear catalog id (`get_catalog` with `catalog: "wear"`), never mixed with the phone catalog. Write `design/<slug>-wear.proposal.json` beside the phone one.
+- **Views:** `watch` (204dp) and `watch-large` (227dp), both round and dark. Wear has no 600/840 adaptation: the size override key is `large`, applied from 225dp. The adaptation check becomes "fits and reads at both watch sizes, and the large one shows more value, never less".
+- **Primary action:** mark it `primary`. On a scrolling screen it is usually the `EdgeButton` named by the `Screen`'s `edgeButton`.
+- **Shared `DESIGN.md`:** its seed and color roles apply to Wear; its typography does not, because Wear uses Roboto Flex.
+- **Findings:** `round-edge-clipped` flags controls or text cut by the round edge on screens that do not scroll. Fix it with percentage-style margins or a smaller layout, not by clipping.
+- **Port:** `export_kotlin` does not support Wear yet. Write the port by hand from `android-design` `references/wear-os.md` and the Wear OS rows of `references/compose-mapping.md`, then render it with the `compose-preview` skill. Every Wear row is still unverified: report the ones the port relies on.
 
 ## Delete
 

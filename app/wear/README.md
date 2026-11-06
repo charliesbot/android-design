@@ -29,7 +29,8 @@ and `Build.VERSION.withSdk` raises `SDK_INT` to 35 on the calling thread for the
 A scrolling Wear screen is a `TransformingLazyColumn`, which composes only the items on screen. The layout
 tree (`get_tree`) and its findings (`check_proposal`, `render`) therefore cover only the items visible at
 the current scroll, which for a fresh render is the top of the list; items below, and an edge button that
-only appears at the end of a long list, are not checked. Scroll the window (mouse wheel) to look further.
+only appears at the end of a long list, are not checked. Scroll the window (mouse wheel) to look further. The `round-edge-clipped` finding skips every node under a
+scrolling `Screen` for the same reason: its items scroll clear and are transformed at the edge by design.
 
 ## Rule: upstream stays byte-identical
 

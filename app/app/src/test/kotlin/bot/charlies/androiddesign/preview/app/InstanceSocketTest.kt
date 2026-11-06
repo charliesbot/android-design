@@ -5,6 +5,7 @@ import java.io.PipedInputStream
 import java.io.PipedOutputStream
 import java.nio.ByteBuffer
 import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 import kotlin.test.Test
@@ -16,6 +17,16 @@ import kotlin.test.assertTrue
 
 class InstanceSocketTest {
   private val socket = Files.createTempDirectory("instance").resolve("s.sock")
+
+  @Test
+  fun `the socket path comes from the environment when it is set`() {
+    val override =
+      InstanceSocket.defaultPath(mapOf(InstanceSocket.SOCKET_ENV to "/tmp/adp-x/s.sock"))
+    assertEquals(Path.of("/tmp/adp-x/s.sock"), override)
+    val unset = InstanceSocket.defaultPath(emptyMap())
+    assertTrue(unset.endsWith("AndroidDesignPreview/mcp.sock"), unset.toString())
+    assertEquals(unset, InstanceSocket.defaultPath(mapOf(InstanceSocket.SOCKET_ENV to " ")))
+  }
 
   @Test
   fun `bytes flow both ways and the relay returns when its input ends`() {
