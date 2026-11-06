@@ -525,6 +525,35 @@ class BindingExportTest {
   }
 
   @Test
+  fun `a template under a carousel reads its item by index`() {
+    val source =
+      ExportFixtures.export(
+        """{"id":"root","component":"Carousel","children":{"componentId":"item","path":"/plates"}}""",
+        """{"id":"item","component":"Text","text":{"@path":"name"}}""",
+        dataModel = """{"plates":[{"name":"Soup"},{"name":"Salad"}]}""",
+      )
+    assertHas(
+      source,
+      "val rootState = rememberCarouselState { plates.size }",
+      ") { index ->",
+      "val plate = plates[index]",
+      "Text(plate.name, modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge))",
+    )
+  }
+
+  @Test
+  fun `the selected tab of a template is the first one the sample data selects`() {
+    val source =
+      ExportFixtures.export(
+        """{"id":"root","component":"Tabs","children":{"componentId":"tab","path":"/tabs"}}""",
+        """{"id":"tab","component":"Tab","label":{"@path":"name"},"selected":{"@path":"on"}}""",
+        dataModel =
+          """{"tabs":[{"name":"A","on":false},{"name":"B","on":true},{"name":"C","on":false}]}""",
+      )
+    assertHas(source, "PrimaryTabRow(selectedTabIndex = 1", "tabs.forEach { tab ->")
+  }
+
+  @Test
   fun `a screen without a data model has no sample object`() {
     val source = ExportFixtures.export(*column("a"), """{"id":"a","component":"Text","text":"x"}""")
     assertEquals(false, source.contains("MainSample"))

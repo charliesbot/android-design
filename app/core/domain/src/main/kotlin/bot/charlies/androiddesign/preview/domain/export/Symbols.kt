@@ -30,6 +30,8 @@ internal object Sym {
   // foundation layout
   const val Arrangement = "$LAYOUT.Arrangement"
   const val Box = "$LAYOUT.Box"
+  const val BoxWithConstraints = "$LAYOUT.BoxWithConstraints"
+  const val PaddingValues = "$LAYOUT.PaddingValues"
   const val Column = "$LAYOUT.Column"
   const val Row = "$LAYOUT.Row"
   const val Spacer = "$LAYOUT.Spacer"
@@ -112,4 +114,7 @@ internal object Sym {
 
   /** A `androidx.compose.material3` name. */
   fun m3(name: String) = "$M3.$name"
+
+  /** A `androidx.compose.material3.carousel` name. */
+  fun carousel(name: String) = "$M3.carousel.$name"
 }

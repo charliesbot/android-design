@@ -350,6 +350,148 @@ internal val componentCases: List<ComponentCase> =
         ),
       reject = listOf("SegmentedListItem", "headlineContent"),
     ),
+    // Carousel
+    case(
+      "Carousel",
+      components =
+        listOf(
+          """{"id":"root","component":"Carousel","children":["a","b"]}""",
+          """{"id":"a","component":"Card","content":["ta"]}""",
+          """{"id":"b","component":"Card","content":["tb"]}""",
+          """{"id":"ta","component":"Text","text":"A"}""",
+          """{"id":"tb","component":"Text","text":"B"}""",
+        ),
+      expect =
+        listOf(
+          "val rootState = rememberCarouselState { 2 }",
+          "HorizontalMultiBrowseCarousel(",
+          "state = rootState",
+          "preferredItemWidth = 186.dp",
+          "itemSpacing = 8.dp",
+          "flingBehavior = CarouselDefaults.multiBrowseFlingBehavior(rootState)",
+          "contentPadding = PaddingValues(horizontal = 16.dp)",
+          ") { index ->",
+          "if (index == 0) {",
+          "} else {",
+          "modifier = modifier.fillMaxWidth()",
+          "Modifier.maskClip(MaterialTheme.shapes.extraLarge).fillMaxWidth()",
+        ),
+      reject = listOf("BoxWithConstraints"),
+    ),
+    case(
+      "Carousel",
+      components =
+        listOf(
+          """{"id":"root","component":"Carousel","variant":"hero","children":["a","b"]}""",
+          """{"id":"a","component":"Text","text":"A"}""",
+          """{"id":"b","component":"Text","text":"B"}""",
+        ),
+      expect =
+        listOf(
+          "BoxWithConstraints(modifier = modifier.fillMaxWidth()) {",
+          "HorizontalMultiBrowseCarousel(",
+          "preferredItemWidth = maxWidth - 96.dp",
+          "flingBehavior = CarouselDefaults.multiBrowseFlingBehavior(rootState)",
+        ),
+    ),
+    case(
+      "Carousel",
+      components =
+        listOf(
+          """{"id":"root","component":"Carousel","variant":"centered-hero","children":["a"]}""",
+          """{"id":"a","component":"Text","text":"A"}""",
+        ),
+      expect =
+        listOf(
+          "HorizontalCenteredHeroCarousel(",
+          "itemSpacing = 8.dp",
+          ") { _ ->",
+          "Text(\"A\", modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge))",
+        ),
+    ),
+    case(
+      "Carousel",
+      components =
+        listOf(
+          """{"id":"root","component":"Carousel","variant":"uncontained","itemWidth":140,"children":["a","b"]}""",
+          """{"id":"a","component":"Text","text":"A"}""",
+          """{"id":"b","component":"Text","text":"B"}""",
+        ),
+      expect =
+        listOf(
+          "val rootState = rememberCarouselState { 2 }",
+          "HorizontalUncontainedCarousel(",
+          "itemWidth = 140.dp",
+          "flingBehavior = CarouselDefaults.noSnapFlingBehavior()",
+        ),
+    ),
+    case(
+      "Carousel",
+      components =
+        listOf(
+          """{"id":"root","component":"Carousel","variant":"full-screen","children":["a","b"]}""",
+          """{"id":"a","component":"Text","text":"A"}""",
+          """{"id":"b","component":"Text","text":"B"}""",
+        ),
+      expect =
+        listOf(
+          "HorizontalUncontainedCarousel(",
+          "itemWidth = maxWidth",
+          "itemSpacing = 16.dp",
+          "flingBehavior = CarouselDefaults.singleAdvanceFlingBehavior(rootState)",
+          "contentPadding = PaddingValues(0.dp)",
+        ),
+    ),
+    // Tabs
+    case(
+      "Tabs",
+      "Tab",
+      components =
+        listOf(
+          """{"id":"root","component":"Tabs","children":["a","b"]}""",
+          """{"id":"a","component":"Tab","label":"Plates","icon":"restaurant","action":{"functionCall":{"@call":"back"}}}""",
+          """{"id":"b","component":"Tab","label":"Menus","selected":true}""",
+        ),
+      expect =
+        listOf(
+          "PrimaryTabRow(selectedTabIndex = 1, modifier = modifier.fillMaxWidth()) {",
+          "Tab(",
+          "selected = false",
+          "selected = true",
+          "onClick = { onBack() }",
+          "text = { Text(\"Plates\") }",
+          "icon = { Icon(painterResource(R.drawable.restaurant), contentDescription = null) }",
+          "text = { Text(\"Menus\") }",
+        ),
+    ),
+    case(
+      "Tabs",
+      components =
+        listOf(
+          """{"id":"root","component":"Tabs","variant":"secondary","scrollable":true,"children":["a"]}""",
+          """{"id":"a","component":"Tab","label":"Plates"}""",
+        ),
+      expect = listOf("SecondaryScrollableTabRow(selectedTabIndex = 0"),
+      reject = listOf("PrimaryTabRow"),
+    ),
+    case(
+      "Tabs",
+      components =
+        listOf(
+          """{"id":"root","component":"Tabs","scrollable":true,"children":["a"]}""",
+          """{"id":"a","component":"Tab","label":"Plates"}""",
+        ),
+      expect = listOf("PrimaryScrollableTabRow(selectedTabIndex = 0"),
+    ),
+    case(
+      "Tabs",
+      components =
+        listOf(
+          """{"id":"root","component":"Tabs","variant":"secondary","children":["a"]}""",
+          """{"id":"a","component":"Tab","label":"Plates"}""",
+        ),
+      expect = listOf("SecondaryTabRow(selectedTabIndex = 0"),
+    ),
     // Actions
     case(
       "Button",

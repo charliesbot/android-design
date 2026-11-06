@@ -20,10 +20,15 @@ import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SecondaryScrollableTabRow
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.ShortNavigationBar
 import androidx.compose.material3.ShortNavigationBarArrangement
 import androidx.compose.material3.ShortNavigationBarItem
+import androidx.compose.material3.Tab
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalFloatingToolbar
@@ -185,6 +190,71 @@ internal fun RenderNavigationBarItem(ctx: NodeContext) {
     icon = { IconSlot(selectedIcon(ctx, selected), filled = selected) },
     label = { ctx.PartText(ctx.string("label").orEmpty(), maxLines = 1) },
     modifier = ctx.modifier(),
+  )
+}
+
+private val TabsAmbient = Ambient(ColorRole.Surface, ColorRole.OnSurface)
+
+internal fun NodeContext.tabsLook() = Look(TabsAmbient)
+
+/** The index of the selected tab: the one tapped last, else the first whose `selected` is set. */
+private fun NodeContext.selectedTab(): Int {
+  val refs = props.children("children")
+  val last = (refs.size - 1).coerceAtLeast(0)
+  groupSelected(id)?.let {
+    return it.coerceIn(0, last)
+  }
+  return refs
+    .indexOfFirst { ref ->
+      val node = env.nodes[ref.id] ?: return@indexOfFirst false
+      Props(effectiveProps(node, env), ref.scope).bool("selected") == true
+    }
+    .coerceAtLeast(0)
+}
+
+@Composable
+internal fun RenderTabs(ctx: NodeContext) {
+  val selected = ctx.selectedTab()
+  val tabs: @Composable () -> Unit = {
+    ctx.Children(
+      "children",
+      0,
+      ChildHost(fillWidth = ctx.def.stretchesChildren, groupKey = ctx.id),
+    )
+  }
+  val secondary = ctx.enum("variant") == "secondary"
+  val scrollable = ctx.bool("scrollable")
+  CompositionLocalProvider(LocalAmbient provides TabsAmbient) {
+    val modifier = ctx.modifier()
+    when {
+      secondary && scrollable -> SecondaryScrollableTabRow(selected, modifier, tabs = tabs)
+      secondary -> SecondaryTabRow(selected, modifier, tabs = tabs)
+      scrollable -> PrimaryScrollableTabRow(selected, modifier, tabs = tabs)
+      else -> PrimaryTabRow(selected, modifier, tabs = tabs)
+    }
+  }
+}
+
+/** A selected tab sets its label in primary, the others in on surface variant. */
+internal fun NodeContext.tabLook() =
+  Look(
+    ColorRole.Surface,
+    if (bool("selected")) ColorRole.Primary else ColorRole.OnSurfaceVariant,
+    TypeRole.TitleSmall,
+    text = string("label"),
+    a11yRole = "Tab",
+  )
+
+@Composable
+internal fun RenderTab(ctx: NodeContext) {
+  val selected = ctx.rememberSelection()
+  val icon = ctx.string("icon")
+  Tab(
+    selected = selected,
+    onClick = { ctx.select() },
+    modifier = ctx.modifier(),
+    text = { ctx.PartText(ctx.string("label").orEmpty(), maxLines = 1) },
+    icon = icon?.let { name -> { IconSlot(name) } },
   )
 }
 

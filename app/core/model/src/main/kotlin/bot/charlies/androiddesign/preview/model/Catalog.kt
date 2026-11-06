@@ -639,6 +639,37 @@ private fun content(): List<ComponentDef> =
       ),
       width = WidthFill.WhenSet("aspectRatio"),
     ),
+    ComponentDef(
+      "Carousel",
+      ComponentGroup.Content,
+      "A horizontally scrolling collection of visual items, clipped to the carousel's item shape.",
+      "HorizontalMultiBrowseCarousel, HorizontalCenteredHeroCarousel, " +
+        "HorizontalUncontainedCarousel",
+      listOf(
+        oneOf(
+          "variant",
+          "multi-browse",
+          "hero",
+          "centered-hero",
+          "uncontained",
+          "full-screen",
+          default = "multi-browse",
+          description =
+            "hero and full-screen have no composable of their own: they size the items of a " +
+              "multi-browse and an uncontained carousel.",
+        ),
+        num(
+          "itemWidth",
+          "Item width in dp: the preferred width of multi-browse, the width of uncontained. " +
+            "The other variants size their items themselves.",
+          NumberBounds(40.0, 1000.0),
+          default = 186,
+        ),
+        children("children", required = true),
+      ),
+      stretchesChildren = true,
+      width = WidthFill.Always,
+    ),
   )
 
 private fun structure(): List<ComponentDef> =
@@ -689,6 +720,26 @@ private fun structure(): List<ComponentDef> =
         bool("selected"),
         action(),
       ),
+      interactive = true,
+    ),
+    ComponentDef(
+      "Tabs",
+      ComponentGroup.Structure,
+      "A row of tabs that switches between sibling views at the same level of hierarchy.",
+      "PrimaryTabRow, SecondaryTabRow, PrimaryScrollableTabRow, SecondaryScrollableTabRow",
+      listOf(
+        oneOf("variant", "primary", "secondary", default = "primary"),
+        bool("scrollable", "Lets the tabs scroll when they do not fit."),
+        children("children", "Tab", required = true),
+      ),
+      width = WidthFill.Always,
+    ),
+    ComponentDef(
+      "Tab",
+      ComponentGroup.Structure,
+      "One tab of a Tabs row. Its content is the screen its action navigates to.",
+      "Tab",
+      listOf(text("label", required = true), icon(), bool("selected"), action()),
       interactive = true,
     ),
     ComponentDef(

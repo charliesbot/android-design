@@ -20,9 +20,15 @@
 //   R.drawable.home
 //   R.drawable.image
 //   R.drawable.ink_eraser
+//   R.drawable.item_centered_image
+//   R.drawable.item_full_image
+//   R.drawable.item_hero_image
+//   R.drawable.item_multi_image
+//   R.drawable.item_uncontained_image
 //   R.drawable.keyboard_arrow_down
 //   R.drawable.layers
 //   R.drawable.menu
+//   R.drawable.menu_book
 //   R.drawable.mic
 //   R.drawable.more_horiz
 //   R.drawable.more_vert
@@ -32,6 +38,7 @@
 //   R.drawable.photo_camera
 //   R.drawable.play_arrow
 //   R.drawable.redo
+//   R.drawable.restaurant
 //   R.drawable.schedule
 //   R.drawable.search
 //   R.drawable.select
@@ -62,11 +69,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalGridApi
 import androidx.compose.foundation.layout.FlexBox
 import androidx.compose.foundation.layout.FlexWrap
 import androidx.compose.foundation.layout.Grid
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -151,8 +160,10 @@ import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedIconToggleButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedToggleButton
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.ShortNavigationBar
@@ -163,6 +174,7 @@ import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -181,6 +193,11 @@ import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
+import androidx.compose.material3.carousel.CarouselDefaults
+import androidx.compose.material3.carousel.HorizontalCenteredHeroCarousel
+import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
+import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
+import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
@@ -396,6 +413,8 @@ fun VerifyTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable
 
 @Serializable private data object FabsRoute : NavKey
 
+@Serializable private data object CollectionsRoute : NavKey
+
 @Composable
 fun VerifyApp() {
   VerifyTheme {
@@ -442,9 +461,18 @@ fun VerifyApp() {
               onNavigateToInputs = { backStack.add(InputsRoute) },
               onNavigateToOverlays = { backStack.add(OverlaysRoute) },
               onNavigateToFabs = { backStack.add(FabsRoute) },
+              onNavigateToCollections = { backStack.add(CollectionsRoute) },
             )
           }
           entry<FabsRoute> { FabsScreen(onBack = { backStack.removeLastOrNull() }) }
+          entry<CollectionsRoute> {
+            CollectionsScreen(
+              onBack = { backStack.removeLastOrNull() },
+              onNavigateToCollections = { backStack.add(CollectionsRoute) },
+              onNavigateToHome = { backStack.add(HomeRoute) },
+              onNavigateToDetail = { backStack.add(DetailRoute) },
+            )
+          }
         },
     )
   }
@@ -2172,6 +2200,7 @@ fun OverlaysScreen(
   onNavigateToInputs: () -> Unit = {},
   onNavigateToOverlays: () -> Unit = {},
   onNavigateToFabs: () -> Unit = {},
+  onNavigateToCollections: () -> Unit = {},
 ) {
   var showSheet by remember { mutableStateOf(false) }
   var showDialog by remember { mutableStateOf(false) }
@@ -2367,6 +2396,7 @@ fun OverlaysScreen(
         FilledTonalButton(onClick = { showSheet = true }) { Text("Open bottom sheet") }
         OutlinedButton(onClick = { showDialog = true }) { Text("Open dialog") }
         TextButton(onClick = { onNavigateToFabs() }) { Text("All floating action buttons") }
+        TextButton(onClick = { onNavigateToCollections() }) { Text("Tabs and carousels") }
       }
     }
   }
@@ -2565,7 +2595,211 @@ private fun FabsScreenPreview() {
   VerifyTheme { FabsScreen() }
 }
 
+@Composable
+fun CollectionsScreen(
+  modifier: Modifier = Modifier,
+  items: List<Item> = CollectionsSample.items,
+  onBack: () -> Unit = {},
+  onNavigateToCollections: () -> Unit = {},
+  onNavigateToHome: () -> Unit = {},
+  onNavigateToDetail: () -> Unit = {},
+) {
+  val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+  Scaffold(
+    modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+    topBar = {
+      MediumFlexibleTopAppBar(
+        title = { Text("Tabs and carousels") },
+        navigationIcon = {
+          IconButton(
+            onClick = { onBack() },
+            colors =
+              IconButtonDefaults.iconButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+              ),
+          ) {
+            Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+          }
+        },
+        scrollBehavior = scrollBehavior,
+      )
+    },
+  ) { innerPadding ->
+    Column(
+      modifier = Modifier.fillMaxSize().padding(innerPadding).verticalScroll(rememberScrollState()),
+      verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+      PrimaryTabRow(selectedTabIndex = 0, modifier = Modifier.fillMaxWidth()) {
+        Tab(
+          selected = true,
+          onClick = { onNavigateToCollections() },
+          text = { Text("Plates") },
+          icon = { Icon(painterResource(R.drawable.restaurant), contentDescription = null) },
+        )
+        Tab(
+          selected = false,
+          onClick = { onNavigateToHome() },
+          text = { Text("Menus") },
+          icon = { Icon(painterResource(R.drawable.menu_book), contentDescription = null) },
+        )
+        Tab(
+          selected = false,
+          onClick = { onNavigateToDetail() },
+          text = { Text("Chefs") },
+          icon = { Icon(painterResource(R.drawable.person), contentDescription = null) },
+        )
+      }
+      SecondaryScrollableTabRow(selectedTabIndex = 0, modifier = Modifier.fillMaxWidth()) {
+        Tab(selected = true, onClick = { onNavigateToCollections() }, text = { Text("All") })
+        Tab(selected = false, onClick = { onNavigateToHome() }, text = { Text("Soups") })
+        Tab(selected = false, onClick = { onNavigateToHome() }, text = { Text("Salads") })
+        Tab(selected = false, onClick = { onNavigateToHome() }, text = { Text("Mains") })
+        Tab(selected = false, onClick = { onNavigateToHome() }, text = { Text("Desserts") })
+        Tab(selected = false, onClick = { onNavigateToHome() }, text = { Text("Drinks") })
+      }
+      val carouselMultiState = rememberCarouselState { items.size }
+      HorizontalMultiBrowseCarousel(
+        state = carouselMultiState,
+        modifier = Modifier.fillMaxWidth(),
+        preferredItemWidth = 186.dp,
+        itemSpacing = 8.dp,
+        flingBehavior = CarouselDefaults.multiBrowseFlingBehavior(carouselMultiState),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+      ) { index ->
+        val item = items[index]
+        Card(modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge).fillMaxWidth()) {
+          Image(
+            painter = painterResource(R.drawable.item_multi_image),
+            contentDescription = item.name,
+            modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
+            contentScale = ContentScale.Crop,
+          )
+          Text(
+            item.name,
+            modifier = Modifier.padding(12.dp),
+            overflow = TextOverflow.Ellipsis,
+            maxLines = 1,
+            style = MaterialTheme.typography.titleSmall,
+          )
+        }
+      }
+      val carouselHeroState = rememberCarouselState { items.size }
+      BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        HorizontalMultiBrowseCarousel(
+          state = carouselHeroState,
+          preferredItemWidth = maxWidth - 96.dp,
+          itemSpacing = 8.dp,
+          flingBehavior = CarouselDefaults.multiBrowseFlingBehavior(carouselHeroState),
+          contentPadding = PaddingValues(horizontal = 16.dp),
+        ) { index ->
+          val item = items[index]
+          Card(modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge).fillMaxWidth()) {
+            Image(
+              painter = painterResource(R.drawable.item_hero_image),
+              contentDescription = item.name,
+              modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
+              contentScale = ContentScale.Crop,
+            )
+            Text(
+              item.name,
+              modifier = Modifier.padding(12.dp),
+              overflow = TextOverflow.Ellipsis,
+              maxLines = 1,
+              style = MaterialTheme.typography.titleSmall,
+            )
+          }
+        }
+      }
+      val carouselCenteredState = rememberCarouselState { items.size }
+      HorizontalCenteredHeroCarousel(
+        state = carouselCenteredState,
+        modifier = Modifier.fillMaxWidth(),
+        itemSpacing = 8.dp,
+        contentPadding = PaddingValues(horizontal = 16.dp),
+      ) { index ->
+        val item = items[index]
+        Card(modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge).fillMaxWidth()) {
+          Image(
+            painter = painterResource(R.drawable.item_centered_image),
+            contentDescription = item.name,
+            modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
+            contentScale = ContentScale.Crop,
+          )
+          Text(
+            item.name,
+            modifier = Modifier.padding(12.dp),
+            overflow = TextOverflow.Ellipsis,
+            maxLines = 1,
+            style = MaterialTheme.typography.titleSmall,
+          )
+        }
+      }
+      val carouselUncontainedState = rememberCarouselState { items.size }
+      HorizontalUncontainedCarousel(
+        state = carouselUncontainedState,
+        modifier = Modifier.fillMaxWidth(),
+        itemWidth = 140.dp,
+        itemSpacing = 8.dp,
+        flingBehavior = CarouselDefaults.noSnapFlingBehavior(),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+      ) { index ->
+        val item = items[index]
+        Card(modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge).fillMaxWidth()) {
+          Image(
+            painter = painterResource(R.drawable.item_uncontained_image),
+            contentDescription = item.name,
+            modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
+            contentScale = ContentScale.Crop,
+          )
+          Text(
+            item.name,
+            modifier = Modifier.padding(12.dp),
+            overflow = TextOverflow.Ellipsis,
+            maxLines = 1,
+            style = MaterialTheme.typography.titleSmall,
+          )
+        }
+      }
+      val carouselFullState = rememberCarouselState { items.size }
+      BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        HorizontalUncontainedCarousel(
+          state = carouselFullState,
+          itemWidth = maxWidth,
+          itemSpacing = 16.dp,
+          flingBehavior = CarouselDefaults.singleAdvanceFlingBehavior(carouselFullState),
+          contentPadding = PaddingValues(0.dp),
+        ) { index ->
+          val item = items[index]
+          Card(modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge).fillMaxWidth()) {
+            Image(
+              painter = painterResource(R.drawable.item_full_image),
+              contentDescription = item.name,
+              modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
+              contentScale = ContentScale.Crop,
+            )
+            Text(
+              item.name,
+              modifier = Modifier.padding(12.dp),
+              overflow = TextOverflow.Ellipsis,
+              maxLines = 1,
+              style = MaterialTheme.typography.titleSmall,
+            )
+          }
+        }
+      }
+    }
+  }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun CollectionsScreenPreview() {
+  VerifyTheme { CollectionsScreen() }
+}
+
 data class HomeRow(val kind: String, val name: String, val detail: String, val meta: String)
+
+data class Item(val name: String)
 
 private object HomeSample {
   val rows =
@@ -2582,5 +2816,16 @@ private object HomeSample {
         detail = "Second row of the template",
         meta = "Now",
       ),
+    )
+}
+
+private object CollectionsSample {
+  val items =
+    listOf(
+      Item(name = "Tomato soup"),
+      Item(name = "Caesar salad"),
+      Item(name = "Mushroom risotto"),
+      Item(name = "Lemon tart"),
+      Item(name = "Iced tea"),
     )
 }

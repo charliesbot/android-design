@@ -26,6 +26,10 @@ class CatalogSmokeTest {
   private fun inScaffold(slot: String, subject: String, extra: String = "") =
     """{"id":"root","component":"Scaffold","$slot":"subject","content":"t1"},$subject,$text$extra"""
 
+  private val carouselItems =
+    """,{"id":"c1","component":"Card","content":["t1"]},{"id":"c2","component":"Card","content":["t2"]},""" +
+      """{"id":"c3","component":"Card","content":["t1"]}"""
+
   private val action = """"action":{"functionCall":{"@call":"open","args":{"overlay":"menu"}}}"""
 
   private val menu =
@@ -96,6 +100,41 @@ class CatalogSmokeTest {
       ),
       Case("Image", inStage("""{"id":"subject","component":"Image","src":"missing.png"}""")),
       Case(
+        "Carousel",
+        inStage(
+          """{"id":"subject","component":"Carousel","children":["c1","c2","c3"]}""",
+          carouselItems,
+        ),
+      ),
+      Case(
+        "Carousel",
+        inStage(
+          """{"id":"subject","component":"Carousel","variant":"hero","children":["c1","c2","c3"]}""",
+          carouselItems,
+        ),
+      ),
+      Case(
+        "Carousel",
+        inStage(
+          """{"id":"subject","component":"Carousel","variant":"centered-hero","children":["c1","c2","c3"]}""",
+          carouselItems,
+        ),
+      ),
+      Case(
+        "Carousel",
+        inStage(
+          """{"id":"subject","component":"Carousel","variant":"uncontained","itemWidth":120,"children":["c1","c2","c3"]}""",
+          carouselItems,
+        ),
+      ),
+      Case(
+        "Carousel",
+        inStage(
+          """{"id":"subject","component":"Carousel","variant":"full-screen","children":["c1","c2","c3"]}""",
+          carouselItems,
+        ),
+      ),
+      Case(
         "Scaffold",
         """{"id":"subject","component":"Scaffold","content":"t1"},$text"""
           .replace("subject", "root"),
@@ -145,6 +184,38 @@ class CatalogSmokeTest {
             """,{"id":"n2","component":"NavigationBarItem","label":"Search","icon":"search"}""",
           )
           .replace(""""bottomBar":"subject"""", """"bottomBar":"bar""""),
+      ),
+      Case(
+        "Tabs",
+        inStage(
+          """{"id":"subject","component":"Tabs","children":["tab1","tab2"]}""",
+          """,{"id":"tab1","component":"Tab","label":"Plates","icon":"restaurant","selected":true},{"id":"tab2","component":"Tab","label":"Menus","icon":"menu_book"}""",
+        ),
+      ),
+      Case(
+        "Tabs",
+        inStage(
+          """{"id":"subject","component":"Tabs","variant":"secondary","scrollable":true,"children":["tab1","tab2"]}""",
+          """,{"id":"tab1","component":"Tab","label":"Plates"},{"id":"tab2","component":"Tab","label":"Menus","selected":true}""",
+        ),
+      ),
+      Case(
+        "Tabs",
+        inStage(
+          """{"id":"subject","component":"Tabs","scrollable":true,"children":["tab1"]}""",
+          """,{"id":"tab1","component":"Tab","label":"Plates"}""",
+        ),
+      ),
+      Case(
+        "Tabs",
+        inStage(
+          """{"id":"subject","component":"Tabs","variant":"secondary","children":["tab1"]}""",
+          """,{"id":"tab1","component":"Tab","label":"Plates"}""",
+        ),
+      ),
+      Case(
+        "Tab",
+        """{"id":"root","component":"Scaffold","content":"tabs"},{"id":"tabs","component":"Tabs","children":["subject"]},{"id":"subject","component":"Tab","label":"Plates","icon":"restaurant","selected":true}""",
       ),
       Case(
         "NavigationRail",

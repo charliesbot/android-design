@@ -63,10 +63,13 @@ private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Pl
     "Text" -> textComponent(p, place)
     "Icon" -> iconComponent(p, place)
     "Image" -> image(node, p, place)
+    "Carousel" -> carousel(node, p, place)
     "Scaffold" -> scaffold(p, place)
     "TopAppBar" -> topAppBar(p, place)
     "NavigationBar" -> navigationBar(p, place)
     "NavigationBarItem" -> navigationItem(node, p, place, "ShortNavigationBarItem", false)
+    "Tabs" -> tabs(p, place)
+    "Tab" -> tab(node, p, place)
     "NavigationRail" -> navigationRail(p, place)
     "NavigationRailItem" -> navigationItem(node, p, place, "WideNavigationRailItem", true)
     "FloatingToolbar" -> floatingToolbar(p, place)
@@ -461,6 +464,110 @@ private fun ScreenEmitter.image(node: ComponentNode, p: JsonObject, place: Place
   )
 }
 
+/** Material's carousel specs, shared with the previewer: 16dp padding and 8dp gaps. */
+private const val CAROUSEL_PADDING = 16f
+private const val CAROUSEL_GAP = 8f
+private const val CAROUSEL_FULL_SCREEN_GAP = 16f
+
+/** A hero shows one large item and one small: the padding, the 56dp small item and a gap. */
+private const val CAROUSEL_HERO_RESERVED = CAROUSEL_PADDING * 2 + 56f + CAROUSEL_GAP
+
+private fun ScreenEmitter.carousel(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
+  experimental()
+  val variant = p.choice("Carousel", "variant")
+  val items =
+    childrenByIndex(p, "children", place, "Carousel") {
+      // maskClip is a member of the item scope, so the children clip to the carousel's shape.
+      val shape = "${file.use(Sym.MaterialTheme)}.shapes.extraLarge"
+      it.copy(leading = listOf("maskClip($shape)"))
+    }
+  val itemWidth =
+    p.sampleNumber("Carousel", "itemWidth", place)
+      ?: M3ExpressiveCatalog.find("Carousel")?.defaultOf("itemWidth")?.content?.toDoubleOrNull()
+      ?: 186.0
+  val state = stateName(node.id, "State")
+  val remember =
+    Assign(
+      "val $state",
+      "=",
+      Call(
+        file.use(Sym.carousel("rememberCarouselState")),
+        lambda = lambda(stmt(Raw(items.count))),
+      ),
+    )
+  val defaults = file.use(Sym.carousel("CarouselDefaults"))
+  val gap = arg("itemSpacing", dp(CAROUSEL_GAP))
+  fun padding(horizontal: Float?): Arg {
+    val values =
+      if (horizontal == null) "${file.use(Sym.PaddingValues)}(${dp(0f)})"
+      else "${file.use(Sym.PaddingValues)}(horizontal = ${dp(horizontal)})"
+    return arg("contentPadding", values)
+  }
+  fun carousel(callee: String, modifier: Arg?, vararg args: Arg?): List<Stmt> =
+    listOf(
+      stmt(
+        Call(
+          file.use(Sym.carousel(callee)),
+          (listOf(arg("state", state), modifier) + args).filterNotNull(),
+          Lambda(items.param, items.body),
+        ),
+      ),
+    )
+  val modifier = modifier(place, p)
+  val body =
+    when (variant) {
+      "centered-hero" ->
+        carousel("HorizontalCenteredHeroCarousel", modifier, gap, padding(CAROUSEL_PADDING))
+      "uncontained" ->
+        carousel(
+          "HorizontalUncontainedCarousel",
+          modifier,
+          arg("itemWidth", dp(itemWidth.toFloat())),
+          gap,
+          arg("flingBehavior", "$defaults.noSnapFlingBehavior()"),
+          padding(CAROUSEL_PADDING),
+        )
+      "hero" ->
+        wrapWidth(
+          modifier,
+          carousel(
+            "HorizontalMultiBrowseCarousel",
+            null,
+            arg("preferredItemWidth", "maxWidth - ${dp(CAROUSEL_HERO_RESERVED)}"),
+            gap,
+            arg("flingBehavior", "$defaults.multiBrowseFlingBehavior($state)"),
+            padding(CAROUSEL_PADDING),
+          ),
+        )
+      "full-screen" ->
+        wrapWidth(
+          modifier,
+          carousel(
+            "HorizontalUncontainedCarousel",
+            null,
+            arg("itemWidth", "maxWidth"),
+            arg("itemSpacing", dp(CAROUSEL_FULL_SCREEN_GAP)),
+            arg("flingBehavior", "$defaults.singleAdvanceFlingBehavior($state)"),
+            padding(null),
+          ),
+        )
+      else ->
+        carousel(
+          "HorizontalMultiBrowseCarousel",
+          modifier,
+          arg("preferredItemWidth", dp(itemWidth.toFloat())),
+          gap,
+          arg("flingBehavior", "$defaults.multiBrowseFlingBehavior($state)"),
+          padding(CAROUSEL_PADDING),
+        )
+    }
+  return listOf<Stmt>(remember) + body
+}
+
+/** [content] inside a `BoxWithConstraints`, whose `maxWidth` is the width the carousel sizes by. */
+private fun ScreenEmitter.wrapWidth(modifier: Arg?, content: List<Stmt>): List<Stmt> =
+  one(file.use(Sym.BoxWithConstraints), listOf(modifier), content)
+
 // endregion
 
 // region structure
@@ -603,6 +710,61 @@ private fun ScreenEmitter.navigationBar(p: JsonObject, place: Place): List<Stmt>
     m3("ShortNavigationBar"),
     listOf(modifier(place, p), arg("arrangement", arrangement)),
     children(p, "children", place, "NavigationBar"),
+  )
+}
+
+private fun ScreenEmitter.tabs(p: JsonObject, place: Place): List<Stmt> {
+  val secondary = p.literal("variant") == "secondary"
+  val scrollable = p.sampleFlag("scrollable", place) == true
+  val callee =
+    (if (secondary) "Secondary" else "Primary") + if (scrollable) "ScrollableTabRow" else "TabRow"
+  return one(
+    m3(callee),
+    listOf(arg("selectedTabIndex", selectedTab(p, place).toString()), modifier(place, p)),
+    children(p, "children", place, "Tabs"),
+  )
+}
+
+/**
+ * The index of the first tab whose `selected` is set in the sample data, else the first: the row
+ * needs it for the indicator, while each tab keeps the `selected` the proposal gives it.
+ */
+private fun ScreenEmitter.selectedTab(p: JsonObject, place: Place): Int {
+  fun selected(tab: ComponentNode, at: Place) = tab.props.sampleFlag("selected", at) == true
+  val index =
+    when (val value = p["children"]) {
+      is JsonArray ->
+        value
+          .mapNotNull { (it as? JsonPrimitive)?.content?.let(byId::get) }
+          .indexOfFirst { selected(it, place) }
+      is JsonObject -> {
+        val tab = (value["componentId"] as? JsonPrimitive)?.content?.let(byId::get)
+        val path = (value["path"] as? JsonPrimitive)?.content
+        if (tab == null || path == null) -1
+        else
+          resolveAll(path, place.scope)
+            .flatMap { (it as? JsonArray).orEmpty() }
+            .indexOfFirst { item ->
+              selected(tab, place.copy(scope = Scope(place.scope, "it", null, listOf(item))))
+            }
+      }
+      else -> -1
+    }
+  return index.coerceAtLeast(0)
+}
+
+private fun ScreenEmitter.tab(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
+  val label = p.text("label", place) ?: Raw("\"\"")
+  val iconName = p.iconName("icon", place)
+  return one(
+    m3("Tab"),
+    listOf(
+      arg("selected", p.boolExpr("selected", place) ?: "false"),
+      arg("onClick", actionLambda(p["action"], node.id)),
+      modifier(place, p),
+      arg("text", lambdaOf(textOf(label))),
+      iconName?.let { arg("icon", lambdaOf(icon(it))) },
+    ),
   )
 }
 
