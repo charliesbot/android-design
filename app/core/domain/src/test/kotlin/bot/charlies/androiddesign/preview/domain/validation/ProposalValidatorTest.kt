@@ -569,4 +569,36 @@ class ProposalValidatorTest {
   }
 
   // endregion
+
+  @Test
+  fun `a snackbar needs a scaffold to draw in`() {
+    val snackbar = """{"id":"saved","component":"Snackbar","message":"Saved"}"""
+    assertEquals(emptyList(), errors(base.with("saved", snackbar)))
+    val loose =
+      base
+        .withDetail("saved", snackbar)
+        .withDetail("root", """{"id":"root","component":"Column","children":[]}""")
+    errors(loose)
+      .assertHas(
+        "/screens/plate_detail/components/2/component",
+        "no Scaffold",
+      )
+  }
+
+  @Test
+  fun `a badge is a flag, a number or a text of at most four characters`() {
+    fun badge(value: String) =
+      base.with(
+        "more",
+        """{"id":"more","component":"IconButton","icon":"mail","badge":$value}""",
+      )
+    val path = plates("${base.indexOf("more")}") + "/badge"
+    for (ok in listOf("true", "false", "7", "\"99+\"", "\"new\"", """{"@path":"/count"}""")) {
+      assertEquals(emptyList(), errors(badge(ok)), ok)
+    }
+    errors(badge("\"12345\"")).assertHas(path, "at most 4 characters")
+    errors(badge("12345")).assertHas(path, "at most 4 characters")
+    errors(badge("1000")).let { assertEquals(emptyList(), it) }
+    errors(badge("[1]")).assertHas(path, "must be true, false")
+  }
 }

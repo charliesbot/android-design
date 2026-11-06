@@ -1384,7 +1384,7 @@
     },
     "open": {
       "type": "object",
-      "description": "Opens a BottomSheet, Dialog or Menu of the same screen by id.",
+      "description": "Opens a BottomSheet, Dialog, Menu, SideSheet or Snackbar of the same screen by id.",
       "returnType": "void",
       "properties": {
         "@call": {

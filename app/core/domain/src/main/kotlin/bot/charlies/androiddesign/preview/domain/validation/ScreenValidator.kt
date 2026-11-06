@@ -1,5 +1,7 @@
 package bot.charlies.androiddesign.preview.domain.validation
 
+import bot.charlies.androiddesign.preview.domain.BadgeContent
+import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.validation.Dynamic.asString
 import bot.charlies.androiddesign.preview.domain.validation.Dynamic.isBoolean
 import bot.charlies.androiddesign.preview.domain.validation.Dynamic.isDynamic
@@ -20,6 +22,7 @@ import bot.charlies.androiddesign.preview.model.SizeClass
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Validates one screen of a proposal against [catalog], the one it names, and the merged design
@@ -51,7 +54,21 @@ internal class ScreenValidator(
       val path = componentsPath.child(index)
       validateProps(path, def, node.props, overrides = false)
     }
+    validateSnackbarHost()
     detectCycles()
+  }
+
+  /** A snackbar draws in a Scaffold's snackbar slot, so the screen needs a Scaffold to hold it. */
+  private fun validateSnackbarHost() {
+    if (OverlayPlacement(screen).snackbarScaffold != null) return
+    screen.components.forEachIndexed { index, node ->
+      if (node.component == "Snackbar") {
+        sink.add(
+          componentsPath.child(index).child("component"),
+          "a Snackbar draws in a Scaffold's snackbar slot, and this screen has no Scaffold",
+        )
+      }
+    }
   }
 
   private fun validateCatalogId() {
@@ -323,10 +340,30 @@ internal class ScreenValidator(
             "'${value.asString() ?: value}' is not a spacing name: ${design.spacing.keys.joinToString()}",
           )
         }
+      PropKind.Badge -> validateBadge(path, value)
       PropKind.Action -> validateAction(path, value)
       PropKind.Binding ->
         if (!Dynamic.isBinding(value))
           sink.add(path, "must be a binding such as {\"@path\": \"/items\"}")
+    }
+  }
+
+  private fun validateBadge(path: String, value: JsonElement) {
+    if (isDynamic(value)) return
+    val primitive = value as? JsonPrimitive
+    if (
+      primitive == null || (!value.isBoolean() && !value.isNumber() && value.asString() == null)
+    ) {
+      sink.add(path, "must be true, false, a number, a string or a binding")
+      return
+    }
+    val label = (BadgeContent.of(primitive) as? BadgeContent.Large)?.label ?: return
+    if (label.length > PropKind.BADGE_MAX_CHARACTERS) {
+      sink.add(
+        path,
+        "a badge label holds at most ${PropKind.BADGE_MAX_CHARACTERS} characters, " +
+          "a + included (such as \"99+\"), got '$label'",
+      )
     }
   }
 

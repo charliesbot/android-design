@@ -1,9 +1,20 @@
 package bot.charlies.androiddesign.preview.feature.preview.render
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.DropdownMenuGroup
@@ -11,14 +22,25 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarData
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarVisuals
+import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import bot.charlies.androiddesign.preview.domain.SideSheetSpec
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.TypeRole
 
@@ -36,6 +58,23 @@ internal fun RenderOpenOverlay(env: RenderEnv) {
     parentId = env.idPrefix + "root",
     order = listOf(9, 0),
     host = ChildHost.Flow,
+  )
+}
+
+/**
+ * The snackbar open on this screen, if any: the Scaffold's snackbar slot calls this, so the
+ * snackbar sits above the FAB and the navigation bar.
+ */
+@Composable
+internal fun SnackbarSlot(env: RenderEnv) {
+  val open = env.openOverlay ?: return
+  if (env.placement.snackbars.none { it.id == open }) return
+  RenderNode(
+    env = env,
+    ref = ChildRef(open, DataScope.root(env.screen.dataModel)),
+    parentId = env.idPrefix + "root",
+    order = listOf(9, 0),
+    host = ChildHost.Wrap,
   )
 }
 
@@ -139,4 +178,146 @@ internal fun RenderMenuItem(ctx: NodeContext) {
     modifier = ctx.modifier(),
     leadingIcon = icon?.let { name -> { SymbolIcon(name) } },
   )
+}
+
+private val SideSheetAmbient = Ambient(ColorRole.SurfaceContainerLow, ColorRole.OnSurface)
+
+/** The container is the sheet's; the content is the title's, set in on surface variant. */
+internal fun NodeContext.sideSheetLook() =
+  Look(
+    SideSheetAmbient.container,
+    ColorRole.OnSurfaceVariant,
+    TypeRole.TitleLarge,
+    text = string("title"),
+  )
+
+/**
+ * Compose has no side sheet, so it is composed: a full-window `Dialog` (its own scrim dims the
+ * screen) holding a click-away area and a `Surface` on the trailing edge. The corners round on the
+ * edge that faces the content only, and Compose mirrors them for right-to-left. The exporter writes
+ * the same composition, with the same [SideSheetSpec] numbers.
+ */
+@Composable
+internal fun RenderSideSheet(ctx: NodeContext) {
+  val env = ctx.env
+  val back = ctx.props.action("back")
+  val dismiss = { env.act(ActionCall.Dismiss) }
+  val onSurfaceVariant = env.color(ColorRole.OnSurfaceVariant)
+  val iconColors = IconButtonDefaults.iconButtonColors(contentColor = onSurfaceVariant)
+  val padding = SideSheetSpec.PADDING_DP.dp
+  Dialog(
+    onDismissRequest = dismiss,
+    properties = DialogProperties(usePlatformDefaultWidth = false),
+  ) {
+    CompositionLocalProvider(LocalAmbient provides SideSheetAmbient) {
+      Box(Modifier.fillMaxSize()) {
+        // The click-away sits behind the sheet, so a tap on the sheet never reaches it.
+        Box(
+          Modifier.matchParentSize()
+            .clickable(interactionSource = null, indication = null, onClick = dismiss),
+        )
+        Surface(
+          modifier =
+            Modifier.align(Alignment.CenterEnd)
+              .widthIn(max = SideSheetSpec.MAX_WIDTH_DP.dp)
+              .fillMaxWidth()
+              .fillMaxHeight()
+              .then(ctx.modifier()),
+          shape =
+            RoundedCornerShape(
+              topStart = SideSheetSpec.CORNER_DP.dp,
+              topEnd = 0.dp,
+              bottomEnd = 0.dp,
+              bottomStart = SideSheetSpec.CORNER_DP.dp,
+            ),
+          color = env.color(SideSheetAmbient.container),
+          contentColor = env.color(SideSheetAmbient.content),
+        ) {
+          Column(Modifier.fillMaxSize().padding(vertical = padding)) {
+            Row(
+              Modifier.fillMaxWidth()
+                .padding(
+                  start =
+                    if (back != null) SideSheetSpec.START_PADDING_WITH_ICON_DP.dp else padding,
+                  end = padding,
+                ),
+              horizontalArrangement = Arrangement.spacedBy(SideSheetSpec.HEADER_GAP_DP.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              if (back != null) {
+                IconButton(onClick = { env.act(back) }, colors = iconColors) {
+                  SymbolIcon("arrow_back", contentDescription = "Back")
+                }
+              }
+              ctx.PartText(
+                text = ctx.string("title").orEmpty(),
+                part = "title",
+                style = env.typeStyle(TypeRole.TitleLarge),
+                color = onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+              )
+              IconButton(onClick = dismiss, colors = iconColors) {
+                SymbolIcon("close", contentDescription = "Close")
+              }
+            }
+            Spacer(Modifier.height(SideSheetSpec.HEADER_GAP_DP.dp))
+            Column(
+              Modifier.weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = padding),
+            ) {
+              ctx.Children(
+                "content",
+                1,
+                ChildHost(fillWidth = ctx.def.stretchesChildren, column = this),
+              )
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+private val SnackbarAmbient = Ambient(ColorRole.InverseSurface, ColorRole.InverseOnSurface)
+
+internal fun NodeContext.snackbarLook() =
+  Look(SnackbarAmbient, TypeRole.BodyMedium, text = string("message"))
+
+/**
+ * The real `Snackbar`, drawn from a stand-in for the `SnackbarData` a `SnackbarHost` would hand it,
+ * so it looks exactly like the one `showSnackbar` shows. A review render has no clock, so it stays
+ * open until a tap on the action or the close icon.
+ */
+@Composable
+internal fun RenderSnackbar(ctx: NodeContext) {
+  val env = ctx.env
+  val action = ctx.props.action("action")
+  val message = ctx.string("message").orEmpty()
+  val actionLabel = ctx.string("actionLabel")
+  val withDismissAction = ctx.bool("dismiss")
+  val data =
+    remember(message, actionLabel, withDismissAction, action) {
+      object : SnackbarData {
+        override val visuals =
+          object : SnackbarVisuals {
+            override val message = message
+            override val actionLabel = actionLabel
+            override val withDismissAction = withDismissAction
+            override val duration = SnackbarDuration.Indefinite
+          }
+
+        override fun performAction() {
+          env.act(action)
+          // Choosing the action closes the snackbar unless the action already moved on.
+          if (action !is ActionCall.Open) env.act(ActionCall.Dismiss)
+        }
+
+        override fun dismiss() = env.act(ActionCall.Dismiss)
+      }
+    }
+  CompositionLocalProvider(LocalAmbient provides SnackbarAmbient) {
+    Snackbar(data, ctx.modifier())
+  }
 }

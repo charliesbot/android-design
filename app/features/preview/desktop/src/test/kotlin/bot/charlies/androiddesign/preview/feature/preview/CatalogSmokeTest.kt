@@ -502,6 +502,20 @@ class CatalogSmokeTest {
         ),
         open = "menu",
       ),
+      Case(
+        "SideSheet",
+        inStage(
+          """{"id":"opener","component":"Button","label":"Open","action":{"functionCall":{"@call":"open","args":{"overlay":"subject"}}}},{"id":"subject","component":"SideSheet","title":"Filters","back":{"functionCall":{"@call":"dismiss"}},"content":["t1","t2"]}""",
+        ),
+        open = "subject",
+      ),
+      Case(
+        "Snackbar",
+        inStage(
+          """{"id":"opener","component":"Button","label":"Open","action":{"functionCall":{"@call":"open","args":{"overlay":"subject"}}}},{"id":"subject","component":"Snackbar","message":"Saved","actionLabel":"Undo","dismiss":true}""",
+        ),
+        open = "subject",
+      ),
     )
 
   @Test

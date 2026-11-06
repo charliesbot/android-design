@@ -1,12 +1,17 @@
 package bot.charlies.androiddesign.preview.domain.export
 
+import bot.charlies.androiddesign.preview.domain.BadgeContent
 import bot.charlies.androiddesign.preview.domain.CarouselSpec
+import bot.charlies.androiddesign.preview.domain.SideSheetSpec
+import bot.charlies.androiddesign.preview.model.ActionFunction
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.SizeClass
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 
 // The Compose call for each catalog component, from compose-mapping.md. Each function returns the
 // statements that draw one component; a component with state declares it first.
@@ -65,7 +70,7 @@ private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Pl
     "Icon" -> iconComponent(p, place)
     "Image" -> image(node, p, place)
     "Carousel" -> carousel(node, p, place)
-    "Scaffold" -> scaffold(p, place)
+    "Scaffold" -> scaffold(node, p, place)
     "TopAppBar" -> topAppBar(p, place)
     "NavigationBar" -> navigationBar(p, place)
     "NavigationBarItem" -> navigationItem(node, p, place, "ShortNavigationBarItem", false)
@@ -98,7 +103,8 @@ private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Pl
     "LoadingIndicator" -> loadingIndicator(p, place)
     "ProgressIndicator" -> progressIndicator(p, place)
     "MenuItem" -> menuItem(node, p, place)
-    else -> emptyList() // BottomSheet, Dialog and Menu are written at the end of the screen.
+    // Sheets, dialogs, menus and snackbars are written at the end of the screen.
+    else -> emptyList()
   }
 
 // region shared pieces
@@ -207,6 +213,41 @@ private fun ScreenEmitter.state(
 ): Pair<String, Stmt> {
   val name = stateName(node.id, suffix)
   return name to stateVar(name, initial, factory)
+}
+
+/**
+ * [content] in a `BadgedBox` when [p]'s `badge` draws one, else [content] alone. A literal gives
+ * `Badge()` or `Badge { Text("3") }`; a bound value gives a badge that follows the data: a Boolean
+ * shows the dot when true, any other value shows its text (as the sample data gives it).
+ */
+private fun ScreenEmitter.badged(p: JsonObject, place: Place, content: Expr): Expr {
+  val badge = badgeLambda(p, place) ?: return content
+  return Call(m3("BadgedBox"), listOf(arg("badge", badge)), lambdaOf(content))
+}
+
+private fun ScreenEmitter.badgeLambda(p: JsonObject, place: Place): Lambda? {
+  val element = p["badge"] ?: return null
+  val sample = p.sampleValue("badge", place) as? JsonPrimitive
+  val bound = element !is JsonPrimitive
+  val isFlag =
+    sample != null && sample !is JsonNull && !sample.isString && sample.booleanOrNull != null
+  if (bound && isFlag) {
+    val dot =
+      IfStmt(
+        listOf(checkNotNull(p.boolExpr("badge", place)) to listOf(stmt(Call(m3("Badge"))))),
+        null,
+      )
+    return lambda(dot)
+  }
+  return when (val content = BadgeContent.of(sample)) {
+    null -> null
+    BadgeContent.Small -> lambdaOf(Call(m3("Badge")))
+    is BadgeContent.Large -> {
+      val label =
+        if (bound) checkNotNull(p.text("badge", place)) else Raw(kotlinString(content.label))
+      lambdaOf(Call(m3("Badge"), emptyList(), lambdaOf(textOf(label))))
+    }
+  }
 }
 
 // endregion
@@ -564,7 +605,7 @@ private fun ScreenEmitter.wrapWidth(modifier: Arg?, content: List<Stmt>): List<S
 
 private val LAYOUT_TYPES = setOf("Column", "Row", "Box", "Grid", "FlexBox", "List")
 
-private fun ScreenEmitter.scaffold(p: JsonObject, place: Place): List<Stmt> {
+private fun ScreenEmitter.scaffold(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val statements = mutableListOf<Stmt>()
   val topBar = p.literal("topBar")?.let(byId::get)
   val collapsing =
@@ -608,6 +649,17 @@ private fun ScreenEmitter.scaffold(p: JsonObject, place: Place): List<Stmt> {
       bottomId
         ?.takeIf { !toolbarOverContent }
         ?.let { arg("bottomBar", lambda(emit(it, place.forChild("Scaffold")))) },
+      // The snackbars of the screen show here, above the FAB and the bottom bar.
+      if (node.id == placement.snackbarScaffold && placement.snackbars.isNotEmpty()) {
+        arg(
+          "snackbarHost",
+          lambdaOf(
+            Call(m3("SnackbarHost"), listOf(pos(ScreenEmitter.SNACKBAR_HOST_STATE))),
+          ),
+        )
+      } else {
+        null
+      },
       p.literal("floatingActionButton")?.let {
         arg("floatingActionButton", lambda(emit(it, place.forChild("Scaffold"))))
       },
@@ -754,8 +806,12 @@ private fun ScreenEmitter.tab(node: ComponentNode, p: JsonObject, place: Place):
       arg("selected", p.boolExpr("selected", place) ?: "false"),
       arg("onClick", actionLambda(p["action"], node.id)),
       modifier(place, p),
-      arg("text", lambdaOf(textOf(label))),
-      iconName?.let { arg("icon", lambdaOf(icon(it))) },
+      // The badge sits on the icon, else on the label.
+      arg(
+        "text",
+        lambdaOf(textOf(label).let { if (iconName == null) badged(p, place, it) else it }),
+      ),
+      iconName?.let { arg("icon", lambdaOf(badged(p, place, icon(it)))) },
       // Material's inactive tab token; the selected color is the row's own.
       arg("unselectedContentColor", colorRole("onSurfaceVariant")),
     ),
@@ -795,7 +851,7 @@ private fun ScreenEmitter.navigationItem(
       selected == "false" -> painter(symbol)
       else -> togglePainter(selected, selectedSymbol, symbol)
     }
-  val icon = iconOf(painter)
+  val icon = badged(p, place, iconOf(painter))
   return one(
     m3(callee),
     listOf(
@@ -1144,11 +1200,16 @@ private fun ScreenEmitter.iconButton(node: ComponentNode, p: JsonObject, place: 
   if (toggle) {
     val (name, declaration) = state(node, "Checked", p.boolExpr("checked", place) ?: "false")
     statements += declaration
-    content = iconOf(togglePainter(name, symbol, symbol, onFilled = true), description, iconSize)
+    content =
+      badged(
+        p,
+        place,
+        iconOf(togglePainter(name, symbol, symbol, onFilled = true), description, iconSize),
+      )
     val change = assignIt(name, actionStatements(p["action"], node.id))
     head = listOf(arg("checked", name), arg("onCheckedChange", change))
   } else {
-    content = icon(symbol, description, iconSize)
+    content = badged(p, place, icon(symbol, description, iconSize))
     head = listOf(arg("onClick", actionLambda(p["action"], node.id)))
   }
   statements +=
@@ -1633,8 +1694,240 @@ internal fun ScreenEmitter.overlayStatements(node: ComponentNode): List<Stmt> {
       listOf(IfStmt(listOf(shown to listOf(stmt(dialog))), null))
     }
     "Menu" -> menuStatements(node)
+    "SideSheet" -> sideSheetStatements(node, p)
     else -> emptyList()
   }
+}
+
+/**
+ * Compose has no side sheet, so it is composed like the previewer draws it: a full-window `Dialog`
+ * (its own scrim dims the screen) holding a click-away `Box` and a `Surface` on the trailing edge,
+ * rounded on the edge that faces the content. The numbers are [SideSheetSpec]'s.
+ */
+private fun ScreenEmitter.sideSheetStatements(node: ComponentNode, p: JsonObject): List<Stmt> {
+  experimental()
+  val shown = overlayVar(node.id)
+  val close = Assign(shown, "=", Raw("false"))
+  val place = Place()
+  val padding = dp(SideSheetSpec.PADDING_DP)
+  val onSurfaceVariant = colorRole("onSurfaceVariant")
+  val iconColors =
+    arg(
+      "colors",
+      Call(
+        "${m3("IconButtonDefaults")}.iconButtonColors",
+        listOf(arg("contentColor", onSurfaceVariant)),
+      ),
+    )
+  fun iconButton(symbol: String, description: String, onClick: Lambda): Stmt =
+    stmt(
+      Call(
+        m3("IconButton"),
+        listOf(arg("onClick", onClick), iconColors),
+        lambdaOf(icon(IconName.Literal(symbol), Raw(kotlinString(description)))),
+      ),
+    )
+  val hasBack = p["back"] != null
+  // Opening another overlay from the back icon replaces this sheet, as in the previewer.
+  val opensOther = calls(node).any { ActionFunction.fromWire(it.name) == ActionFunction.Open }
+  val back =
+    if (hasBack) {
+      val action =
+        actionStatements(p["back"], node.id) + if (opensOther) listOf(close) else emptyList()
+      listOf(iconButton("arrow_back", "Back", lambda(action)))
+    } else {
+      emptyList()
+    }
+  val startPadding = if (hasBack) dp(SideSheetSpec.START_PADDING_WITH_ICON_DP) else padding
+  val title = p.text("title", place) ?: Raw("\"\"")
+  val headerGap = dp(SideSheetSpec.HEADER_GAP_DP)
+  val header =
+    Call(
+      file.use(Sym.Row),
+      listOf(
+        arg(
+          "modifier",
+          Chain(
+            file.use(Sym.Modifier),
+            listOf(
+              useModifier("fillMaxWidth()"),
+              "${useModifier("padding")}(start = $startPadding, end = $padding)",
+            ),
+          ),
+        ),
+        arg("horizontalArrangement", "${file.use(Sym.Arrangement)}.spacedBy($headerGap)"),
+        arg("verticalAlignment", "${file.use(Sym.Alignment)}.CenterVertically"),
+      ),
+      lambda(
+        back +
+          stmt(
+            textOf(
+              title,
+              arg("modifier", Chain(file.use(Sym.Modifier), listOf("weight(1f)"))),
+              arg("style", typeRole("titleLarge")),
+              arg("color", onSurfaceVariant),
+            ),
+          ) +
+          iconButton("close", "Close", lambda(close)),
+      ),
+    )
+  val content =
+    Call(
+      file.use(Sym.Column),
+      listOf(
+        arg(
+          "modifier",
+          Chain(
+            file.use(Sym.Modifier),
+            listOf(
+              "weight(1f)",
+              useModifier("fillMaxWidth()"),
+              "${useModifier("verticalScroll")}(${file.use(Sym.rememberScrollState)}())",
+              "${useModifier("padding")}(horizontal = $padding)",
+            ),
+          ),
+        ),
+      ),
+      lambda(children(p, "content", place, "SideSheet")),
+    )
+  val gap =
+    Call(
+      file.use(Sym.Spacer),
+      listOf(
+        arg(
+          "modifier",
+          Chain(file.use(Sym.Modifier), listOf("${useModifier("height")}($headerGap)")),
+        ),
+      ),
+    )
+  val column =
+    Call(
+      file.use(Sym.Column),
+      listOf(
+        arg(
+          "modifier",
+          Chain(
+            file.use(Sym.Modifier),
+            listOf(
+              useModifier("fillMaxSize()"),
+              "${useModifier("padding")}(vertical = $padding)",
+            ),
+          ),
+        ),
+      ),
+      lambda(stmt(header), stmt(gap), stmt(content)),
+    )
+  val corner = dp(SideSheetSpec.CORNER_DP)
+  val surface =
+    Call(
+      m3("Surface"),
+      listOf(
+        arg(
+          "modifier",
+          Chain(
+            file.use(Sym.Modifier),
+            listOf(
+              "align(${file.use(Sym.Alignment)}.CenterEnd)",
+              "${useModifier("widthIn")}(max = ${dp(SideSheetSpec.MAX_WIDTH_DP)})",
+              useModifier("fillMaxWidth()"),
+              useModifier("fillMaxHeight()"),
+            ),
+          ),
+        ),
+        arg(
+          "shape",
+          "${file.use(Sym.RoundedCornerShape)}(topStart = $corner, topEnd = ${dp(0f)}, " +
+            "bottomEnd = ${dp(0f)}, bottomStart = $corner)",
+        ),
+        arg("color", colorRole("surfaceContainerLow")),
+        arg("contentColor", colorRole("onSurface")),
+      ),
+      lambda(stmt(column)),
+    )
+  // The click-away sits behind the sheet, so a tap on the sheet never reaches it.
+  val clickAway =
+    Call(
+      file.use(Sym.Box),
+      listOf(
+        arg(
+          "modifier",
+          Chain(
+            file.use(Sym.Modifier),
+            listOf(
+              "matchParentSize()",
+              "${useModifier("clickable")}(interactionSource = null, indication = null) " +
+                "{ $shown = false }",
+            ),
+          ),
+        ),
+      ),
+    )
+  val box =
+    Call(
+      file.use(Sym.Box),
+      listOf(
+        arg("modifier", Chain(file.use(Sym.Modifier), listOf(useModifier("fillMaxSize()")))),
+      ),
+      lambda(stmt(clickAway), stmt(surface)),
+    )
+  val dialog =
+    Call(
+      file.use(Sym.Dialog),
+      listOf(
+        arg("onDismissRequest", lambda(close)),
+        arg(
+          "properties",
+          "${file.use(Sym.DialogProperties)}(usePlatformDefaultWidth = false)",
+        ),
+      ),
+      lambda(stmt(box)),
+    )
+  return listOf(IfStmt(listOf(shown to listOf(stmt(dialog))), null))
+}
+
+/**
+ * A snackbar posts to the `SnackbarHostState` the Scaffold's `SnackbarHost` shows: opening it sets
+ * its state, which launches `showSnackbar`. That suspends until the snackbar is dismissed, then
+ * clears the state, so the state is true exactly while the snackbar shows. An action runs when
+ * `showSnackbar` returns `ActionPerformed`. A snackbar with an action stays until acted on or
+ * dismissed, which is Compose's default for one with an action label.
+ */
+internal fun ScreenEmitter.snackbarStatements(node: ComponentNode): List<Stmt> {
+  val p = effectiveProps(node, SizeClass.Compact)
+  val shown = overlayVar(node.id)
+  val place = Place()
+  val label = p.text("actionLabel", place)
+  val action = if (label == null) emptyList() else actionStatements(p["action"], node.id)
+  val show =
+    Call(
+      "${ScreenEmitter.SNACKBAR_HOST_STATE}.showSnackbar",
+      listOfNotNull(
+        arg("message", p.text("message", place) ?: Raw("\"\"")),
+        label?.let { arg("actionLabel", it) },
+        boolArg(p, "dismiss", place, "withDismissAction", omitted = false),
+      ),
+    )
+  val performed =
+    if (action.isEmpty()) {
+      emptyList()
+    } else {
+      listOf<Stmt>(
+        IfStmt(
+          listOf("result == ${m3("SnackbarResult")}.ActionPerformed" to action),
+          null,
+        ),
+      )
+    }
+  val post: List<Stmt> =
+    listOf(
+      if (action.isEmpty()) stmt(show) else Assign("val result", "=", show),
+      Assign(shown, "=", Raw("false")),
+    ) + performed
+  return one(
+    file.use(Sym.LaunchedEffect),
+    listOf(pos(shown)),
+    listOf(IfStmt(listOf(shown to post), null)),
+  )
 }
 
 internal fun ScreenEmitter.menuStatements(menu: ComponentNode): List<Stmt> {

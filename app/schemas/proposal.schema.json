@@ -523,7 +523,7 @@
     },
     "function.open": {
       "type": "object",
-      "description": "Opens a BottomSheet, Dialog or Menu of the same screen by id.",
+      "description": "Opens a BottomSheet, Dialog, Menu, SideSheet or Snackbar of the same screen by id.",
       "returnType": "void",
       "properties": {
         "@call": {
@@ -705,6 +705,12 @@
         },
         {
           "$ref": "#/$defs/component.MenuItem"
+        },
+        {
+          "$ref": "#/$defs/component.SideSheet"
+        },
+        {
+          "$ref": "#/$defs/component.Snackbar"
         }
       ],
       "discriminator": {
@@ -1583,6 +1589,28 @@
           "$ref": "#/$defs/DynamicBoolean",
           "default": false
         },
+        "badge": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number",
+              "maximum": 9999
+            },
+            {
+              "type": "string",
+              "maxLength": 4
+            },
+            {
+              "$ref": "#/$defs/DataBinding"
+            },
+            {
+              "$ref": "#/$defs/IndexCall"
+            }
+          ],
+          "description": "A badge on the icon's upper trailing corner: true draws a small one, a number or a string of at most 4 characters (such as \"99+\") draws a large one with that text."
+        },
         "action": {
           "$ref": "#/$defs/Action",
           "description": "What a tap does."
@@ -1659,6 +1687,28 @@
           "$ref": "#/$defs/DynamicBoolean",
           "default": false
         },
+        "badge": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number",
+              "maximum": 9999
+            },
+            {
+              "type": "string",
+              "maxLength": 4
+            },
+            {
+              "$ref": "#/$defs/DataBinding"
+            },
+            {
+              "$ref": "#/$defs/IndexCall"
+            }
+          ],
+          "description": "A badge on the icon's upper trailing corner: true draws a small one, a number or a string of at most 4 characters (such as \"99+\") draws a large one with that text."
+        },
         "action": {
           "$ref": "#/$defs/Action",
           "description": "What a tap does."
@@ -1728,6 +1778,28 @@
         "selected": {
           "$ref": "#/$defs/DynamicBoolean",
           "default": false
+        },
+        "badge": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number",
+              "maximum": 9999
+            },
+            {
+              "type": "string",
+              "maxLength": 4
+            },
+            {
+              "$ref": "#/$defs/DataBinding"
+            },
+            {
+              "$ref": "#/$defs/IndexCall"
+            }
+          ],
+          "description": "A badge on the icon's upper trailing corner: true draws a small one, a number or a string of at most 4 characters (such as \"99+\") draws a large one with that text."
         },
         "action": {
           "$ref": "#/$defs/Action",
@@ -2132,6 +2204,28 @@
         "icon": {
           "$ref": "#/$defs/DynamicString",
           "description": "Material Symbols name, such as \"home\"."
+        },
+        "badge": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number",
+              "maximum": 9999
+            },
+            {
+              "type": "string",
+              "maxLength": 4
+            },
+            {
+              "$ref": "#/$defs/DataBinding"
+            },
+            {
+              "$ref": "#/$defs/IndexCall"
+            }
+          ],
+          "description": "A badge on the icon's upper trailing corner: true draws a small one, a number or a string of at most 4 characters (such as \"99+\") draws a large one with that text."
         },
         "toggle": {
           "$ref": "#/$defs/DynamicBoolean",
@@ -3073,6 +3167,75 @@
       "required": [
         "component",
         "label"
+      ],
+      "unevaluatedProperties": false
+    },
+    "component.SideSheet": {
+      "type": "object",
+      "description": "A modal side sheet on the trailing edge, with a header (title, close icon button) over its content. Optional content beside the main content is a standard side sheet: a screen with pane role supporting.",
+      "x-compose": "Dialog (full window) holding a scrim and a Surface, composed; no side sheet composable",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "SideSheet"
+        },
+        "title": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "back": {
+          "$ref": "#/$defs/Action",
+          "description": "Shows a back icon button at the header's leading side and runs this on a tap."
+        },
+        "content": {
+          "$ref": "#/$defs/ChildList"
+        }
+      },
+      "required": [
+        "component",
+        "title",
+        "content"
+      ],
+      "unevaluatedProperties": false
+    },
+    "component.Snackbar": {
+      "type": "object",
+      "description": "A brief message at the bottom of the screen, in the Scaffold's snackbar slot above the FAB and the navigation bar.",
+      "x-compose": "SnackbarHost in Scaffold(snackbarHost), Snackbar via SnackbarHostState.showSnackbar",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Snackbar"
+        },
+        "message": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "actionLabel": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "The label of the one action a snackbar may have."
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap on the action label does."
+        },
+        "dismiss": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Shows a close icon that dismisses the snackbar.",
+          "default": false
+        }
+      },
+      "required": [
+        "component",
+        "message"
       ],
       "unevaluatedProperties": false
     },

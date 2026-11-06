@@ -2142,7 +2142,8 @@
             "open_sheet",
             "open_dialog",
             "open_fabs",
-            "open_collections"
+            "open_collections",
+            "open_feedback"
           ]
         },
         {
@@ -2302,6 +2303,20 @@
               "@call": "navigate",
               "args": {
                 "screen": "collections"
+              }
+            }
+          }
+        },
+        {
+          "id": "open_feedback",
+          "component": "Button",
+          "variant": "text",
+          "label": "Side sheet, snackbar, badges",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "feedback"
               }
             }
           }
@@ -2884,6 +2899,258 @@
           "padding": "md",
           "maxLines": 1,
           "overflow": "ellipsis"
+        }
+      ]
+    },
+    "feedback": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "topBar": "top",
+          "content": "body",
+          "bottomBar": "nav_bar",
+          "floatingActionButton": "fab",
+          "navigationRail": "rail"
+        },
+        {
+          "id": "top",
+          "component": "TopAppBar",
+          "title": "Side sheet, snackbar, badges",
+          "navigationIcon": "back",
+          "actions": [
+            "bell",
+            "mail"
+          ]
+        },
+        {
+          "id": "back",
+          "component": "IconButton",
+          "icon": "arrow_back",
+          "contentDescription": "Back",
+          "action": {
+            "functionCall": {
+              "@call": "back"
+            }
+          }
+        },
+        {
+          "id": "bell",
+          "component": "IconButton",
+          "icon": "notifications",
+          "badge": true,
+          "contentDescription": "Alerts"
+        },
+        {
+          "id": "mail",
+          "component": "IconButton",
+          "icon": "mail",
+          "badge": "99+",
+          "contentDescription": "Mail"
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "padding": "lg",
+          "spacing": "md",
+          "children": [
+            "tabs",
+            "open_side",
+            "open_snack"
+          ]
+        },
+        {
+          "id": "tabs",
+          "component": "Tabs",
+          "children": [
+            "tab_all",
+            "tab_unread"
+          ]
+        },
+        {
+          "id": "tab_all",
+          "component": "Tab",
+          "label": "All",
+          "icon": "inbox",
+          "badge": 3,
+          "selected": true
+        },
+        {
+          "id": "tab_unread",
+          "component": "Tab",
+          "label": "Unread",
+          "badge": true
+        },
+        {
+          "id": "open_side",
+          "component": "Button",
+          "label": "Open side sheet",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "filters"
+              }
+            }
+          }
+        },
+        {
+          "id": "open_snack",
+          "component": "Button",
+          "variant": "tonal",
+          "label": "Delete plate",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "deleted"
+              }
+            }
+          }
+        },
+        {
+          "id": "fab",
+          "component": "FloatingActionButton",
+          "icon": "add",
+          "contentDescription": "New plate"
+        },
+        {
+          "id": "nav_bar",
+          "component": "NavigationBar",
+          "children": [
+            "nav_home",
+            "nav_chat",
+            "nav_saved"
+          ]
+        },
+        {
+          "id": "nav_home",
+          "component": "NavigationBarItem",
+          "label": "Home",
+          "icon": "home",
+          "selected": true
+        },
+        {
+          "id": "nav_chat",
+          "component": "NavigationBarItem",
+          "label": "Chat",
+          "icon": "chat",
+          "badge": 12
+        },
+        {
+          "id": "nav_saved",
+          "component": "NavigationBarItem",
+          "label": "Saved",
+          "icon": "favorite",
+          "badge": true
+        },
+        {
+          "id": "filters",
+          "component": "SideSheet",
+          "title": "Filters",
+          "back": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "more_filters"
+              }
+            }
+          },
+          "content": [
+            "filter_chips",
+            "filter_apply"
+          ]
+        },
+        {
+          "id": "filter_chips",
+          "component": "ChipGroup",
+          "multi": true,
+          "children": [
+            "chip_vegan",
+            "chip_spicy"
+          ]
+        },
+        {
+          "id": "chip_vegan",
+          "component": "FilterChip",
+          "label": "Vegan",
+          "selected": true
+        },
+        {
+          "id": "chip_spicy",
+          "component": "FilterChip",
+          "label": "Spicy"
+        },
+        {
+          "id": "filter_apply",
+          "component": "Button",
+          "label": "Apply",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "more_filters",
+          "component": "SideSheet",
+          "title": "More filters",
+          "content": [
+            "more_text"
+          ]
+        },
+        {
+          "id": "more_text",
+          "component": "Text",
+          "text": "Fewer, broader filters work better in a side sheet.",
+          "type": "bodyMedium"
+        },
+        {
+          "id": "deleted",
+          "component": "Snackbar",
+          "message": "Plate deleted",
+          "actionLabel": "Undo",
+          "dismiss": true,
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "restored"
+              }
+            }
+          }
+        },
+        {
+          "id": "restored",
+          "component": "Snackbar",
+          "message": "Plate restored"
+        },
+        {
+          "id": "rail",
+          "component": "NavigationRail",
+          "children": [
+            "rail_home",
+            "rail_chat"
+          ],
+          "showIn": [
+            "medium",
+            "expanded"
+          ]
+        },
+        {
+          "id": "rail_home",
+          "component": "NavigationRailItem",
+          "label": "Home",
+          "icon": "home",
+          "selected": true
+        },
+        {
+          "id": "rail_chat",
+          "component": "NavigationRailItem",
+          "label": "Chat",
+          "icon": "chat",
+          "badge": "9+"
         }
       ]
     }

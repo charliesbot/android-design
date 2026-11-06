@@ -9,6 +9,7 @@
 //   R.drawable.bolt
 //   R.drawable.bookmark
 //   R.drawable.bookmark_filled
+//   R.drawable.chat
 //   R.drawable.check
 //   R.drawable.close
 //   R.drawable.delete
@@ -19,6 +20,7 @@
 //   R.drawable.favorite_filled
 //   R.drawable.home
 //   R.drawable.image
+//   R.drawable.inbox
 //   R.drawable.ink_eraser
 //   R.drawable.item_centered_image
 //   R.drawable.item_full_image
@@ -27,12 +29,14 @@
 //   R.drawable.item_uncontained_image
 //   R.drawable.keyboard_arrow_down
 //   R.drawable.layers
+//   R.drawable.mail
 //   R.drawable.menu
 //   R.drawable.menu_book
 //   R.drawable.mic
 //   R.drawable.more_horiz
 //   R.drawable.more_vert
 //   R.drawable.note
+//   R.drawable.notifications
 //   R.drawable.palette
 //   R.drawable.person
 //   R.drawable.photo_camera
@@ -88,12 +92,15 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
@@ -170,9 +177,13 @@ import androidx.compose.material3.ShortNavigationBar
 import androidx.compose.material3.ShortNavigationBarArrangement
 import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -201,6 +212,7 @@ import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -225,6 +237,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -415,6 +429,8 @@ fun VerifyTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable
 
 @Serializable private data object CollectionsRoute : NavKey
 
+@Serializable private data object FeedbackRoute : NavKey
+
 @Composable
 fun VerifyApp() {
   VerifyTheme {
@@ -462,6 +478,7 @@ fun VerifyApp() {
               onNavigateToOverlays = { backStack.add(OverlaysRoute) },
               onNavigateToFabs = { backStack.add(FabsRoute) },
               onNavigateToCollections = { backStack.add(CollectionsRoute) },
+              onNavigateToFeedback = { backStack.add(FeedbackRoute) },
             )
           }
           entry<FabsRoute> { FabsScreen(onBack = { backStack.removeLastOrNull() }) }
@@ -473,6 +490,7 @@ fun VerifyApp() {
               onNavigateToDetail = { backStack.add(DetailRoute) },
             )
           }
+          entry<FeedbackRoute> { FeedbackScreen(onBack = { backStack.removeLastOrNull() }) }
         },
     )
   }
@@ -2201,6 +2219,7 @@ fun OverlaysScreen(
   onNavigateToOverlays: () -> Unit = {},
   onNavigateToFabs: () -> Unit = {},
   onNavigateToCollections: () -> Unit = {},
+  onNavigateToFeedback: () -> Unit = {},
 ) {
   var showSheet by remember { mutableStateOf(false) }
   var showDialog by remember { mutableStateOf(false) }
@@ -2397,6 +2416,7 @@ fun OverlaysScreen(
         OutlinedButton(onClick = { showDialog = true }) { Text("Open dialog") }
         TextButton(onClick = { onNavigateToFabs() }) { Text("All floating action buttons") }
         TextButton(onClick = { onNavigateToCollections() }) { Text("Tabs and carousels") }
+        TextButton(onClick = { onNavigateToFeedback() }) { Text("Side sheet, snackbar, badges") }
       }
     }
   }
@@ -2828,6 +2848,361 @@ fun CollectionsScreen(
 @Composable
 private fun CollectionsScreenPreview() {
   VerifyTheme { CollectionsScreen() }
+}
+
+@Composable
+fun FeedbackScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {}) {
+  var showFilters by remember { mutableStateOf(false) }
+  var showMoreFilters by remember { mutableStateOf(false) }
+  var showDeleted by remember { mutableStateOf(false) }
+  var showRestored by remember { mutableStateOf(false) }
+  val snackbarHostState = remember { SnackbarHostState() }
+  val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
+  val atLeastMedium =
+    windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
+  val atLeastExpanded =
+    windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
+  Row(modifier = modifier) {
+    if (atLeastMedium) {
+      WideNavigationRail(state = rememberWideNavigationRailState()) {
+        WideNavigationRailItem(
+          railExpanded = false,
+          selected = true,
+          onClick = {},
+          icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
+          label = { Text("Home") },
+        )
+        WideNavigationRailItem(
+          railExpanded = false,
+          selected = false,
+          onClick = {},
+          icon = {
+            BadgedBox(badge = { Badge { Text("9+") } }) {
+              Icon(painterResource(R.drawable.chat), contentDescription = null)
+            }
+          },
+          label = { Text("Chat") },
+        )
+      }
+    }
+    Scaffold(
+      modifier = Modifier.weight(1f),
+      topBar = {
+        TopAppBar(
+          title = { Text("Side sheet, snackbar, badges") },
+          navigationIcon = {
+            IconButton(
+              onClick = { onBack() },
+              colors =
+                IconButtonDefaults.iconButtonColors(
+                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+              Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+            }
+          },
+          actions = {
+            IconButton(
+              onClick = {},
+              colors =
+                IconButtonDefaults.iconButtonColors(
+                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+              BadgedBox(badge = { Badge() }) {
+                Icon(painterResource(R.drawable.notifications), contentDescription = "Alerts")
+              }
+            }
+            IconButton(
+              onClick = {},
+              colors =
+                IconButtonDefaults.iconButtonColors(
+                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+              BadgedBox(badge = { Badge { Text("99+") } }) {
+                Icon(painterResource(R.drawable.mail), contentDescription = "Mail")
+              }
+            }
+          },
+        )
+      },
+      bottomBar = {
+        ShortNavigationBar(arrangement = ShortNavigationBarArrangement.EqualWeight) {
+          ShortNavigationBarItem(
+            selected = true,
+            onClick = {},
+            icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
+            label = { Text("Home") },
+          )
+          ShortNavigationBarItem(
+            selected = false,
+            onClick = {},
+            icon = {
+              BadgedBox(badge = { Badge { Text("12") } }) {
+                Icon(painterResource(R.drawable.chat), contentDescription = null)
+              }
+            },
+            label = { Text("Chat") },
+          )
+          ShortNavigationBarItem(
+            selected = false,
+            onClick = {},
+            icon = {
+              BadgedBox(badge = { Badge() }) {
+                Icon(painterResource(R.drawable.favorite), contentDescription = null)
+              }
+            },
+            label = { Text("Saved") },
+          )
+        }
+      },
+      snackbarHost = { SnackbarHost(snackbarHostState) },
+      floatingActionButton = {
+        FloatingActionButton(
+          onClick = {},
+          modifier = Modifier.semantics { contentDescription = "New plate" },
+        ) {
+          Icon(painterResource(R.drawable.add), contentDescription = "New plate")
+        }
+      },
+    ) { innerPadding ->
+      Column(
+        modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+      ) {
+        PrimaryTabRow(selectedTabIndex = 0, modifier = Modifier.fillMaxWidth()) {
+          Tab(
+            selected = true,
+            onClick = {},
+            text = { Text("All") },
+            icon = {
+              BadgedBox(badge = { Badge { Text("3") } }) {
+                Icon(painterResource(R.drawable.inbox), contentDescription = null)
+              }
+            },
+            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+          Tab(
+            selected = false,
+            onClick = {},
+            text = { BadgedBox(badge = { Badge() }) { Text("Unread") } },
+            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        Button(onClick = { showFilters = true }) { Text("Open side sheet") }
+        FilledTonalButton(onClick = { showDeleted = true }) { Text("Delete plate") }
+      }
+    }
+  }
+  if (showFilters) {
+    Dialog(
+      onDismissRequest = { showFilters = false },
+      properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+      Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+          modifier =
+            Modifier.matchParentSize().clickable(interactionSource = null, indication = null) {
+              showFilters = false
+            },
+        )
+        Surface(
+          modifier =
+            Modifier.align(Alignment.CenterEnd)
+              .widthIn(max = 400.dp)
+              .fillMaxWidth()
+              .fillMaxHeight(),
+          shape =
+            RoundedCornerShape(
+              topStart = 16.dp,
+              topEnd = 0.dp,
+              bottomEnd = 0.dp,
+              bottomStart = 16.dp,
+            ),
+          color = MaterialTheme.colorScheme.surfaceContainerLow,
+          contentColor = MaterialTheme.colorScheme.onSurface,
+        ) {
+          Column(modifier = Modifier.fillMaxSize().padding(vertical = 24.dp)) {
+            Row(
+              modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 24.dp),
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              IconButton(
+                onClick = {
+                  showMoreFilters = true
+                  showFilters = false
+                },
+                colors =
+                  IconButtonDefaults.iconButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                  ),
+              ) {
+                Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+              }
+              Text(
+                "Filters",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+              IconButton(
+                onClick = { showFilters = false },
+                colors =
+                  IconButtonDefaults.iconButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                  ),
+              ) {
+                Icon(painterResource(R.drawable.close), contentDescription = "Close")
+              }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Column(
+              modifier =
+                Modifier.weight(1f)
+                  .fillMaxWidth()
+                  .verticalScroll(rememberScrollState())
+                  .padding(horizontal = 24.dp),
+            ) {
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = FilterChipDefaults.horizontalArrangement(),
+              ) {
+                var chipVeganSelected by remember { mutableStateOf(true) }
+                FilterChip(
+                  selected = chipVeganSelected,
+                  onClick = { chipVeganSelected = !chipVeganSelected },
+                  label = { Text("Vegan") },
+                  leadingIcon =
+                    if (chipVeganSelected) {
+                      {
+                        Icon(
+                          painterResource(R.drawable.check),
+                          contentDescription = null,
+                          modifier = Modifier.size(FilterChipDefaults.IconSize),
+                        )
+                      }
+                    } else null,
+                )
+                var chipSpicySelected by remember { mutableStateOf(false) }
+                FilterChip(
+                  selected = chipSpicySelected,
+                  onClick = { chipSpicySelected = !chipSpicySelected },
+                  label = { Text("Spicy") },
+                  leadingIcon =
+                    if (chipSpicySelected) {
+                      {
+                        Icon(
+                          painterResource(R.drawable.check),
+                          contentDescription = null,
+                          modifier = Modifier.size(FilterChipDefaults.IconSize),
+                        )
+                      }
+                    } else null,
+                )
+              }
+              Button(onClick = { showFilters = false }) { Text("Apply") }
+            }
+          }
+        }
+      }
+    }
+  }
+  if (showMoreFilters) {
+    Dialog(
+      onDismissRequest = { showMoreFilters = false },
+      properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+      Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+          modifier =
+            Modifier.matchParentSize().clickable(interactionSource = null, indication = null) {
+              showMoreFilters = false
+            },
+        )
+        Surface(
+          modifier =
+            Modifier.align(Alignment.CenterEnd)
+              .widthIn(max = 400.dp)
+              .fillMaxWidth()
+              .fillMaxHeight(),
+          shape =
+            RoundedCornerShape(
+              topStart = 16.dp,
+              topEnd = 0.dp,
+              bottomEnd = 0.dp,
+              bottomStart = 16.dp,
+            ),
+          color = MaterialTheme.colorScheme.surfaceContainerLow,
+          contentColor = MaterialTheme.colorScheme.onSurface,
+        ) {
+          Column(modifier = Modifier.fillMaxSize().padding(vertical = 24.dp)) {
+            Row(
+              modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp),
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Text(
+                "More filters",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+              IconButton(
+                onClick = { showMoreFilters = false },
+                colors =
+                  IconButtonDefaults.iconButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                  ),
+              ) {
+                Icon(painterResource(R.drawable.close), contentDescription = "Close")
+              }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Column(
+              modifier =
+                Modifier.weight(1f)
+                  .fillMaxWidth()
+                  .verticalScroll(rememberScrollState())
+                  .padding(horizontal = 24.dp),
+            ) {
+              Text(
+                "Fewer, broader filters work better in a side sheet.",
+                style = MaterialTheme.typography.bodyMedium,
+              )
+            }
+          }
+        }
+      }
+    }
+  }
+  LaunchedEffect(showDeleted) {
+    if (showDeleted) {
+      val result =
+        snackbarHostState.showSnackbar(
+          message = "Plate deleted",
+          actionLabel = "Undo",
+          withDismissAction = true,
+        )
+      showDeleted = false
+      if (result == SnackbarResult.ActionPerformed) {
+        showRestored = true
+      }
+    }
+  }
+  LaunchedEffect(showRestored) {
+    if (showRestored) {
+      snackbarHostState.showSnackbar(message = "Plate restored")
+      showRestored = false
+    }
+  }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun FeedbackScreenPreview() {
+  VerifyTheme { FeedbackScreen() }
 }
 
 data class HomeRow(val kind: String, val name: String, val detail: String, val meta: String)

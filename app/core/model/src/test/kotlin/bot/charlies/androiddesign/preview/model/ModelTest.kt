@@ -141,7 +141,10 @@ class ModelTest {
         }
       }
     }
-    assertEquals(setOf("BottomSheet", "Dialog", "Menu"), M3ExpressiveCatalog.overlayNames)
+    assertEquals(
+      setOf("BottomSheet", "Dialog", "Menu", "SideSheet", "Snackbar"),
+      M3ExpressiveCatalog.overlayNames,
+    )
   }
 
   @Test
