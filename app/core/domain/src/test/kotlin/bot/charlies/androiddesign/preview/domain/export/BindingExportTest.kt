@@ -542,7 +542,7 @@ class BindingExportTest {
   }
 
   @Test
-  fun `the selected tab of a template is the first one the sample data selects`() {
+  fun `the selected tab of a template follows the bound selected flag`() {
     val source =
       ExportFixtures.export(
         """{"id":"root","component":"Tabs","children":{"componentId":"tab","path":"/tabs"}}""",
@@ -550,7 +550,12 @@ class BindingExportTest {
         dataModel =
           """{"tabs":[{"name":"A","on":false},{"name":"B","on":true},{"name":"C","on":false}]}""",
       )
-    assertHas(source, "PrimaryTabRow(selectedTabIndex = 1", "tabs.forEach { tab ->")
+    assertHas(
+      source,
+      "PrimaryTabRow(selectedTabIndex = tabs.indexOfFirst { tab -> tab.on }.coerceAtLeast(0)",
+      "tabs.forEach { tab ->",
+      "selected = tab.on",
+    )
   }
 
   @Test

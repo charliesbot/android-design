@@ -2635,27 +2635,60 @@ fun CollectionsScreen(
           onClick = { onNavigateToCollections() },
           text = { Text("Plates") },
           icon = { Icon(painterResource(R.drawable.restaurant), contentDescription = null) },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Tab(
           selected = false,
           onClick = { onNavigateToHome() },
           text = { Text("Menus") },
           icon = { Icon(painterResource(R.drawable.menu_book), contentDescription = null) },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Tab(
           selected = false,
           onClick = { onNavigateToDetail() },
           text = { Text("Chefs") },
           icon = { Icon(painterResource(R.drawable.person), contentDescription = null) },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
       SecondaryScrollableTabRow(selectedTabIndex = 0, modifier = Modifier.fillMaxWidth()) {
-        Tab(selected = true, onClick = { onNavigateToCollections() }, text = { Text("All") })
-        Tab(selected = false, onClick = { onNavigateToHome() }, text = { Text("Soups") })
-        Tab(selected = false, onClick = { onNavigateToHome() }, text = { Text("Salads") })
-        Tab(selected = false, onClick = { onNavigateToHome() }, text = { Text("Mains") })
-        Tab(selected = false, onClick = { onNavigateToHome() }, text = { Text("Desserts") })
-        Tab(selected = false, onClick = { onNavigateToHome() }, text = { Text("Drinks") })
+        Tab(
+          selected = true,
+          onClick = { onNavigateToCollections() },
+          text = { Text("All") },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Tab(
+          selected = false,
+          onClick = { onNavigateToHome() },
+          text = { Text("Soups") },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Tab(
+          selected = false,
+          onClick = { onNavigateToHome() },
+          text = { Text("Salads") },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Tab(
+          selected = false,
+          onClick = { onNavigateToHome() },
+          text = { Text("Mains") },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Tab(
+          selected = false,
+          onClick = { onNavigateToHome() },
+          text = { Text("Desserts") },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Tab(
+          selected = false,
+          onClick = { onNavigateToHome() },
+          text = { Text("Drinks") },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
       }
       val carouselMultiState = rememberCarouselState { items.size }
       HorizontalMultiBrowseCarousel(

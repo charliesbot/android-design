@@ -260,6 +260,8 @@ internal data class ChildHost(
   val connected: Boolean = false,
   val segmented: Boolean = false,
   val railExpanded: Boolean = false,
+  /** The parent is a secondary `Tabs` row, whose selected tab is on surface, not primary. */
+  val secondaryTabs: Boolean = false,
   /**
    * What the parent's own scope adds to a child's modifier, such as a Wear `ButtonGroup` weight.
    */

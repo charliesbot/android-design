@@ -67,6 +67,25 @@ internal sealed interface IconName {
   class Bound(val expr: String, val names: Set<String>) : IconName
 }
 
+/** The value of a `ChildList` prop: listed component ids, or a template over a data array. */
+internal sealed interface ChildItems {
+  class Listed(val ids: List<String>) : ChildItems
+
+  class Template(val componentId: String, val path: String) : ChildItems
+}
+
+/** This prop value as [ChildItems], or null when it is neither a list nor a complete template. */
+internal fun JsonElement?.childItems(): ChildItems? =
+  when (this) {
+    is JsonArray -> ChildItems.Listed(mapNotNull { (it as? JsonPrimitive)?.content })
+    is JsonObject -> {
+      val componentId = (this["componentId"] as? JsonPrimitive)?.content
+      val path = (this["path"] as? JsonPrimitive)?.content
+      if (componentId != null && path != null) ChildItems.Template(componentId, path) else null
+    }
+    else -> null
+  }
+
 /** What a component needs to know about where it is emitted. */
 internal data class Place(
   val scope: Scope? = null,
@@ -343,6 +362,13 @@ internal class ScreenEmitter(
    */
   fun JsonObject.nonDefault(component: String, key: String): String? =
     literal(key)?.takeIf { it != catalogDefault(component, key) }
+
+  /** A number prop of [component]: its sample value as the previewer reads it, else its default. */
+  fun JsonObject.number(component: String, key: String, place: Place): Double =
+    sampleNumber(component, key, place)
+      ?: checkNotNull(catalogDefault(component, key)?.toDoubleOrNull()) {
+        "$component.$key has no default"
+      }
 
   /** A boolean prop of [component]: the stated literal, else its catalog default. */
   fun JsonObject.option(component: String, key: String): Boolean =
@@ -678,16 +704,16 @@ internal class ScreenEmitter(
   fun childIds(node: ComponentNode): List<String> {
     val def = M3ExpressiveCatalog.find(node.component) ?: return emptyList()
     return def.props.flatMap { prop ->
-      when (val value = node.props[prop.name]) {
-        is JsonPrimitive ->
-          if (prop.kind == PropKind.Child && value.isString) listOf(value.content) else emptyList()
-        is JsonArray ->
-          if (prop.kind == PropKind.ChildList) value.mapNotNull { (it as? JsonPrimitive)?.content }
-          else emptyList()
-        is JsonObject ->
-          if (prop.kind == PropKind.ChildList)
-            listOfNotNull((value["componentId"] as? JsonPrimitive)?.content)
-          else emptyList()
+      val value = node.props[prop.name]
+      when {
+        prop.kind == PropKind.Child ->
+          listOfNotNull((value as? JsonPrimitive)?.takeIf { it.isString }?.content)
+        prop.kind == PropKind.ChildList ->
+          when (val items = value.childItems()) {
+            is ChildItems.Listed -> items.ids
+            is ChildItems.Template -> listOf(items.componentId)
+            null -> emptyList()
+          }
         else -> emptyList()
       }
     }
@@ -722,26 +748,21 @@ internal class ScreenEmitter(
     indexed: Boolean = false,
     shape: (Place, String, String) -> Place = { p, _, _ -> p },
   ): List<Stmt> {
-    when (val value = props[key]) {
-      is JsonArray -> {
-        val ids = value.mapNotNull { (it as? JsonPrimitive)?.content }
-        return ids.flatMapIndexed { i, id ->
-          emit(id, shape(place.forChild(parentType), i.toString(), ids.size.toString()))
+    return when (val items = props[key].childItems()) {
+      is ChildItems.Listed ->
+        items.ids.flatMapIndexed { i, id ->
+          emit(id, shape(place.forChild(parentType), i.toString(), items.ids.size.toString()))
         }
-      }
-      is JsonObject -> {
-        val componentId = (value["componentId"] as? JsonPrimitive)?.content ?: return emptyList()
-        val path = (value["path"] as? JsonPrimitive)?.content ?: return emptyList()
-        return listOf(loop(componentId, path, place, parentType, indexed, shape))
-      }
-      else -> return emptyList()
+      is ChildItems.Template ->
+        listOf(loop(items.componentId, items.path, place, parentType, indexed, shape))
+      null -> emptyList()
     }
   }
 
   /** A template's loop variable and index over the array at its path. */
-  private class TemplateScope(val list: Bound, val scope: Scope, val withIndex: Boolean)
+  class TemplateScope(val list: Bound, val scope: Scope, val withIndex: Boolean)
 
-  private fun templateScope(
+  fun templateScope(
     componentId: String,
     path: String,
     place: Place,
@@ -809,10 +830,9 @@ internal class ScreenEmitter(
     shape: (Place) -> Place = { it },
   ): ByIndex {
     val child = place.forChild(parentType)
-    when (val value = props[key]) {
-      is JsonArray -> {
-        val ids = value.mapNotNull { (it as? JsonPrimitive)?.content }
-        val bodies = ids.map { emit(it, shape(child)) }
+    when (val items = props[key].childItems()) {
+      is ChildItems.Listed -> {
+        val bodies = items.ids.map { emit(it, shape(child)) }
         val body =
           when (bodies.size) {
             0 -> emptyList()
@@ -825,23 +845,18 @@ internal class ScreenEmitter(
                 ),
               )
           }
-        return ByIndex(ids.size.toString(), if (bodies.size > 1) "index" else "_", body)
+        return ByIndex(items.ids.size.toString(), if (bodies.size > 1) "index" else "_", body)
       }
-      is JsonObject -> {
-        val componentId = (value["componentId"] as? JsonPrimitive)?.content
-        val path = (value["path"] as? JsonPrimitive)?.content
-        if (componentId != null && path != null) {
-          val template = templateScope(componentId, path, place, indexed = true)
-          val scope = template.scope
-          val index = checkNotNull(scope.index)
-          val item = Assign("val ${scope.variable}", "=", Raw("${template.list.expr}[$index]"))
-          val body = listOf<Stmt>(item) + emit(componentId, shape(child.copy(scope = scope)))
-          return ByIndex("${template.list.expr}.size", index, body)
-        }
+      is ChildItems.Template -> {
+        val template = templateScope(items.componentId, items.path, place, indexed = true)
+        val scope = template.scope
+        val index = checkNotNull(scope.index)
+        val item = Assign("val ${scope.variable}", "=", Raw("${template.list.expr}[$index]"))
+        val body = listOf<Stmt>(item) + emit(items.componentId, shape(child.copy(scope = scope)))
+        return ByIndex("${template.list.expr}.size", index, body)
       }
-      else -> {}
+      null -> return ByIndex("0", "_", emptyList())
     }
-    return ByIndex("0", "_", emptyList())
   }
 
   /** True when [id] or anything under it shows the template index. */

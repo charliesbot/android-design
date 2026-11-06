@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import bot.charlies.androiddesign.preview.domain.CarouselSpec
 import bot.charlies.androiddesign.preview.model.TypeRole
 
 @Composable
@@ -121,15 +122,11 @@ internal fun RenderImage(ctx: NodeContext) {
 
 internal fun NodeContext.imageLook(ambient: Ambient) = Look(ambient, a11yRole = "Image")
 
-// Material's carousel specs: 16dp padding, 8dp gaps, a small item 40 to 56dp wide. Full-screen has
-// no padding and 16dp gaps. The exporter writes the same numbers.
-private val CarouselPadding = PaddingValues(horizontal = 16.dp)
+private val CarouselPadding = PaddingValues(horizontal = CarouselSpec.PADDING_DP.dp)
 private val CarouselNoPadding = PaddingValues(0.dp)
-private val CarouselGap = 8.dp
-private val CarouselFullScreenGap = 16.dp
-
-/** A hero shows one large item and one small one: the width left once the small one is reserved. */
-private val CarouselHeroReserved = 16.dp + 16.dp + 56.dp + CarouselGap
+private val CarouselGap = CarouselSpec.GAP_DP.dp
+private val CarouselFullScreenGap = CarouselSpec.FULL_SCREEN_GAP_DP.dp
+private val CarouselHeroReserved = CarouselSpec.HERO_RESERVED_DP.dp
 
 internal fun NodeContext.carouselLook(ambient: Ambient) = Look(ambient)
 

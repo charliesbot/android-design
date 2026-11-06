@@ -219,7 +219,11 @@ internal fun RenderTabs(ctx: NodeContext) {
     ctx.Children(
       "children",
       0,
-      ChildHost(fillWidth = ctx.def.stretchesChildren, groupKey = ctx.id),
+      ChildHost(
+        fillWidth = ctx.def.stretchesChildren,
+        groupKey = ctx.id,
+        secondaryTabs = ctx.enum("variant") == "secondary",
+      ),
     )
   }
   val secondary = ctx.enum("variant") == "secondary"
@@ -235,11 +239,22 @@ internal fun RenderTabs(ctx: NodeContext) {
   }
 }
 
-/** A selected tab sets its label in primary, the others in on surface variant. */
+/** The content color of a selected tab: its row's (primary, or on surface in a secondary row). */
+private fun NodeContext.selectedTabColor() =
+  if (host.secondaryTabs) ColorRole.OnSurface else ColorRole.Primary
+
+/** Whether this tab is the selected one of its row, as the viewer last left it. */
+private fun NodeContext.tabSelected(): Boolean =
+  host.groupKey?.let(::isPickedIn) ?: bool("selected")
+
+/**
+ * A selected tab sets its label in its row's content color, the others in on surface variant,
+ * Material's inactive tab token.
+ */
 internal fun NodeContext.tabLook() =
   Look(
     ColorRole.Surface,
-    if (bool("selected")) ColorRole.Primary else ColorRole.OnSurfaceVariant,
+    if (tabSelected()) selectedTabColor() else ColorRole.OnSurfaceVariant,
     TypeRole.TitleSmall,
     text = string("label"),
     a11yRole = "Tab",
@@ -255,6 +270,7 @@ internal fun RenderTab(ctx: NodeContext) {
     modifier = ctx.modifier(),
     text = { ctx.PartText(ctx.string("label").orEmpty(), maxLines = 1) },
     icon = icon?.let { name -> { IconSlot(name) } },
+    unselectedContentColor = ctx.env.color(ColorRole.OnSurfaceVariant),
   )
 }
 

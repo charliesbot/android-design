@@ -462,6 +462,7 @@ internal val componentCases: List<ComponentCase> =
           "text = { Text(\"Plates\") }",
           "icon = { Icon(painterResource(R.drawable.restaurant), contentDescription = null) }",
           "text = { Text(\"Menus\") }",
+          "unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant",
         ),
     ),
     case(
