@@ -18,7 +18,7 @@ The through-line: **a screen feels designed when emphasis is spent deliberately.
 
 Quotes and rules marked **(Google)** come from Google's guidance. Rules marked **(default)** are this skill's starting points: follow them unless the screen's direction gives a reason not to.
 
-**Surfaces.** This skill targets phone, tablet, desktop, and Wear OS apps. For a Wear OS screen read [references/wear-os.md](references/wear-os.md) first: a watch is dark and round and has its own theme, Roboto Flex, Wear components, and a 225dp breakpoint instead of window size classes. Use the `wear-compose-m3` skill for scaffolding and migration. Where that reference differs from this file, it wins for Wear. Tiles and home screen widgets are not yet in scope: their references hold distilled Google guidance but have not reached this skill's quality bar. When building or reviewing one anyway, read its reference first and check the result yourself (widgets use `GlanceTheme` and Glance components, [references/widgets.md](references/widgets.md)).
+**Surfaces.** This skill targets phone, tablet, desktop, and Wear OS apps. For a Wear OS screen read [references/wear-os.md](references/wear-os.md) first; it wins over this file where they differ. Use the `wear-compose-m3` skill for scaffolding and migration. Tiles and home screen widgets are not yet in scope: their references hold distilled Google guidance but have not reached this skill's quality bar. When building or reviewing one anyway, read its reference first and check the result yourself (widgets use `GlanceTheme` and Glance components, [references/widgets.md](references/widgets.md)).
 
 ## Visual tooling
 

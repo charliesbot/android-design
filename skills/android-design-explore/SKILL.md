@@ -89,14 +89,13 @@ Report components the mapping marks unverified, and anything it lacks, instead o
 
 ## Wear OS
 
-A Wear proposal follows the same workflow with these differences. `android-design` `references/wear-os.md` owns the design rules.
+A Wear proposal follows the same workflow. `android-design` `references/wear-os.md` owns the design rules, and [proposal-format.md](references/proposal-format.md#wear-os) owns the file format (catalog id, views, `Screen`, `primary`, `large`).
 
-- **Its own file.** One surface per proposal: every screen uses the Wear catalog id (`get_catalog` with `catalog: "wear"`), never mixed with the phone catalog. Write `design/<slug>-wear.proposal.json` beside the phone one.
-- **Views:** `watch` (204dp) and `watch-large` (227dp), both round and dark. Wear has no 600/840 adaptation: the size override key is `large`, applied from 225dp. The adaptation check becomes "fits and reads at both watch sizes, and the large one shows more value, never less".
-- **Primary action:** mark it `primary`. On a scrolling screen it is usually the `EdgeButton` named by the `Screen`'s `edgeButton`.
-- **Shared `DESIGN.md`:** its seed and color roles apply to Wear; its typography does not, because Wear uses Roboto Flex.
-- **Findings:** `round-edge-clipped` flags controls or text cut by the round edge on screens that do not scroll. Fix it with percentage-style margins or a smaller layout, not by clipping.
-- **Port:** `export_kotlin` does not support Wear yet. Write the port by hand from `android-design` `references/wear-os.md` and the Wear OS rows of `references/compose-mapping.md`, then render it with the `compose-preview` skill. Every Wear row is still unverified: report the ones the port relies on.
+- **Its own file.** One surface per proposal: write `design/<slug>-wear.proposal.json` beside the phone one.
+- **Adaptation check:** the Wear size override applies from 225dp, so the check is "fits and reads at both watch sizes, and the large one shows more value, never less".
+- **Shared `DESIGN.md`:** its seed and color roles apply to Wear; its typography is replaced by Roboto Flex.
+- **Findings:** fix `round-edge-clipped` (control or text cut by the round edge on a fixed screen) with percentage-style margins or a smaller layout.
+- **Port:** write it by hand from `android-design` `references/wear-os.md` and the Wear OS rows of `references/compose-mapping.md` (`export_kotlin` does not support Wear yet), then render it with the `compose-preview` skill. Every Wear row is unverified: report the ones the port relies on.
 
 ## Delete
 

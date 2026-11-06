@@ -21,7 +21,6 @@ Google grades Wear apps and asks for **excellent or transformative**, and says "
 - **One or two critical tasks**, finished in seconds. No dense data, grids, or spreadsheets.
 - **Glanceable:** test while moving; tiles get about 7 seconds of attention.
 - **Shallow and vertical:** at most two levels deep; scroll in one direction only.
-- **One prominent action per screen;** every other action uses a lower-emphasis style.
 - **Embrace round:** edge-hugging buttons and bezel-hugging elements (progress rings, scroll indicators, curved time text) use the curve instead of fighting it.
 
 ## Theme
@@ -50,7 +49,7 @@ fun WearAppTheme(content: @Composable () -> Unit) {
 - Dynamic themes come from two watch-face seed colors (primary and tertiary) and meet WCAG AAA. Pair only `X` with `onX`.
 - Each accent has base, **dim**, and container roles. Primary: the main action and edge button. PrimaryDim: distinct but not demanding. Secondary: supporting actions in dense UI. Tertiary: standout feedback (tap responses, a goal reached). ErrorDim: emergencies and stop buttons.
 - Recommended pairings: Primary with PrimaryDim (main plus complementary); PrimaryDim with Tertiary (highlight plus feedback); Primary with SecondaryContainer (main stands out, rest recedes); Tertiary plus Primary with SecondaryContainer when there's no single main action.
-- Fill only the one primary action with `primary`; the rest recede (`secondaryContainer`, `primaryContainer`, or outlined and child buttons). Never a screen of filled primary buttons.
+- Fill only the one primary action ([Primary action](#primary-action)); everything else recedes.
 - Color carries meaning: red for errors, green for success.
 
 ## Typography
@@ -64,7 +63,7 @@ fun WearAppTheme(content: @Composable () -> Unit) {
 ## Layout
 
 - **Three sections:** top (optional time text, optional title, optionally a compact button on a very long page), middle (content), bottom (actions, ideally an **edge button**, or empty at the end of a journey). Time text never appears on dialogs, confirmations, or pickers, and nothing overlaps it. The scroll indicator appears only on scrolling screens.
-- **Round safe area:** the curve clips corners. Outer margins (top, bottom, sides) are **percentages**, never fixed dp, and grow where the curve cuts in (the top and bottom margins differ by what sits there). Spacing between elements is fixed dp. Keep controls and text out of the corners; bezel-hugging elements (rings, scroll indicator, time text, edge button) use the curve.
+- **Round safe area:** the curve clips corners. Outer margins (top, bottom, sides) are **percentages**, never fixed dp, and grow where the curve cuts in (the top and bottom margins differ by what sits there). Spacing between elements is fixed dp.
 - **Touch targets:** at least 48 x 48dp, icons centered in the target. Every action is inline with an icon and a label where it fits; do not rely on an icon alone.
 - **Small first:** design for the smallest round screen (204 to 216dp), render dense layouts at 192dp, and test 192dp with large fonts. **Breakpoint at 225dp:** add value past it (more content, more buttons, bigger controls, larger text for glanceability). A larger screen must never show less than a smaller one, so a size override that enlarges components must not push content out. Components fill the width; do not stretch them or scale fonts up unless they are graphic.
 - **Scrolling screens** (most screens): a `TransformingLazyColumn`; items scale and fade at the top and bottom edges. Group long mixed lists with labels, but not a list of one content type. Elevate an unambiguous primary action to the top of a long page, or close the list with the edge button. Scroll in one direction only.
@@ -92,7 +91,7 @@ Custom `TransformationSpec` effects (rotating or morphing items at the edges) ar
 - **Always-on:** few lit pixels; drop frequently updating progress.
 - **Haptics:** strong for key moments (payment confirmed), subtle for precision (scrolling), synced with motion.
 - **Gestures (Wear OS 7):** double pinch triggers the screen's one primary action, wrist turn dismisses; every gesture action must also have a visible button.
-- **Outside this skill:** tiles (one task, glanceable, system-drawn icon), watch faces, and complications. Notifications only when worth buzzing the wrist.
+- **Notifications** only when worth buzzing the wrist.
 
 ## Behaviors
 

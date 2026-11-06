@@ -23,12 +23,14 @@ object InstanceLauncher {
       // `open` does not pass its caller's environment on, so the socket override goes by `--env`.
       // A bundle that already runs would only be activated, so an override asks for a new
       // process (`-n`): each override socket has its own instance.
-      listOf("/usr/bin/open") +
-        listOfNotNull("-n".takeIf { socketOverride != null }) +
-        listOf("-a", executable.removeSuffix(PACKAGED_SUFFIX)) +
-        (socketOverride?.let { listOf("--env", "${InstanceSocket.SOCKET_ENV}=$it") }
-          ?: emptyList()) +
-        listOf("--args", INSTANCE_ARG)
+      buildList {
+        add("/usr/bin/open")
+        if (socketOverride != null) add("-n")
+        addAll(listOf("-a", executable.removeSuffix(PACKAGED_SUFFIX)))
+        if (socketOverride != null)
+          addAll(listOf("--env", "${InstanceSocket.SOCKET_ENV}=$socketOverride"))
+        addAll(listOf("--args", INSTANCE_ARG))
+      }
     } else {
       listOf(executable, "-cp", classPath, mainClass, INSTANCE_ARG)
     }

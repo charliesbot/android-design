@@ -5,8 +5,8 @@ own socket so the run starts a fresh instance of `mcp_binary` and never forwards
 judge never sees the app.
 """
 import json
+from contextlib import ExitStack
 from pathlib import Path
-import shutil
 import subprocess
 import tempfile
 
@@ -25,20 +25,14 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
         raise ValueError(f'Unknown role: {role}')
     if role == 'generator' and not mcp_binary:
         raise ValueError('A generator needs mcp_binary, the previewer app it designs with')
-    # Unix socket paths are limited to about 104 bytes on macOS, so the socket lives under /tmp, not the usual temp dir.
-    socket_dir = tempfile.mkdtemp(prefix='adp-', dir='/tmp') if role == 'generator' else None
-    socket = f'{socket_dir}/s.sock' if socket_dir else None
-    try:
-        return _execute(backend, prompt, cwd, role, images, schema, model, timeout, mcp_binary, socket)
-    finally:
-        if socket_dir:
-            shutil.rmtree(socket_dir, ignore_errors=True)
-
-
-def _execute(backend, prompt, cwd, role, images, schema, model, timeout, mcp_binary, socket):
-    with tempfile.TemporaryDirectory(prefix='android-design-backend-') as temporary:
+    with tempfile.TemporaryDirectory(prefix='android-design-backend-') as temporary, ExitStack() as stack:
         temporary = Path(temporary)
         final = temporary / 'final.txt'
+        socket = None
+        if role == 'generator':
+            # Unix socket paths are limited to about 104 bytes on macOS, so the socket lives under /tmp, not the usual
+            # temp dir.
+            socket = str(Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='adp-', dir='/tmp'))) / 's.sock')
         if backend == 'claude':
             command = ['claude', '-p', '--output-format', 'json']
             if role == 'generator':

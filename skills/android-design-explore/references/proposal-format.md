@@ -134,16 +134,16 @@ Panes fill the window's height (`android-design`, layout reference). In a propos
 
 ## Wear OS
 
-A Wear proposal is its own file, `design/<slug>-wear.proposal.json`, and every screen names the Wear catalog id (mixing catalogs is a validation error). Call `get_catalog` with `catalog: "wear"` for the components and their props. The syntax, actions (`navigate`, `back`, `open`, `dismiss`), and `DESIGN.md` are the ones above, with these differences:
+A Wear proposal is its own file, `design/<slug>-wear.proposal.json`, and every screen names the Wear catalog id (mixing catalogs is a validation error). `get_catalog` with `catalog: "wear"` lists the components and their props. The syntax, actions (`navigate`, `back`, `open`, `dismiss`), and `DESIGN.md` are the ones above, with these differences:
 
 - **`catalogId`**: `https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1`. There is no `navigation.panes`.
 - **Views:** `watch` (204 dp) and `watch-large` (227 dp), round and dark.
 - **Root:** a `Screen`. `scroll` (default `true`) makes its `children` the rows of a scrolling list that scales and fades at the round edge; `scroll: false` stacks them in a fixed box. `timeText` (default `true`) shows the clock, off on dialogs and pickers. `edgeButton` takes the id of one `EdgeButton`, drawn at the bottom edge. On a fixed screen the body ends above the edge button, so everything else must fit the space left; `text-clipped` and `round-edge-clipped` report what does not.
-- **Components:** `Screen`, `ListHeader`, `ListSubHeader`, `Button` (`variant`: `filled`, `filledTonal`, `filledVariant`, `outlined`, `child`), `CompactButton`, `IconButton`, `TextButton`, `EdgeButton`, `ButtonGroup`, `IconToggleButton`, `TextToggleButton`, `SwitchButton`, `CheckboxButton`, `RadioButton`, `Text`, `Icon`, `Image`, `Card`, `TitleCard`, `AppCard`, `Slider`, `Stepper`, the three progress indicators, `AlertDialog`, `ConfirmationDialog`, and `Column`, `Row`, `Box`, `Spacer`. A dialog is an overlay in the same screen: `open` it from a control.
+- **Components:** the Wear catalog lists them (`get_catalog`). A dialog (`AlertDialog`, `ConfirmationDialog`) is an overlay in the same screen: `open` it from a control.
 - **Roles:** colors and types are Wear role names, never hex. Wear has `primaryDim`, `surfaceContainerHigh`, and `errorDim` but no `surface`; its types include `numeral*` and `display*`.
 - **`large`:** the only `sizeClass` key, applied from 225 dp (`watch-large`): `"sizeClass": {"large": {"type": "numeralExtraLarge"}}`. A `large` override only adds value.
 - **`primary`:** set `"primary": true` on the screen's one primary action: a `Button`, `CompactButton`, `IconButton`, `TextButton`, or `EdgeButton`. On a scrolling screen it is usually the `EdgeButton`.
-- **Touch targets** are 48 dp. Give every icon-only control a `contentDescription`.
+- **Touch targets** are 48 dp; give every icon-only control a `contentDescription`.
 
 ```json
 {
