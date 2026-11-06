@@ -202,16 +202,6 @@ private fun ScreenEmitter.containerBackground(p: JsonObject): Array<String> {
   return listOfNotNull(clip, "background(${colorRole(container)})").toTypedArray()
 }
 
-private fun ScreenEmitter.painter(name: IconName, filled: Boolean = false): String =
-  "${file.use(Sym.painterResource)}(${drawable(name, filled)})"
-
-/** The drawable [name] is: `R.drawable.star`, or a call of the lookup for a bound name. */
-private fun ScreenEmitter.drawable(name: IconName, filled: Boolean = false): String =
-  when (name) {
-    is IconName.Literal -> file.drawable(Naming.snake(name.name) + if (filled) "_filled" else "")
-    is IconName.Bound -> "${file.symbolLookup(name.names, filled)}(${name.expr})"
-  }
-
 /** `painterResource(if (cond) on else off)`; [on] is the `_filled` drawable when [onFilled]. */
 private fun ScreenEmitter.togglePainter(
   cond: String,
@@ -543,30 +533,6 @@ private fun ScreenEmitter.iconComponent(p: JsonObject, place: Place): List<Stmt>
       ),
     ),
   )
-}
-
-/**
- * The drawable of an image: named after the file, or after the node for a `data:` URI. A bound
- * `src` is a call of the lookup over every source the sample data gives it; when several distinct
- * data URIs occur, the node's name is numbered in the order they first appear.
- */
-private fun ScreenEmitter.imageDrawable(
-  node: ComponentNode,
-  p: JsonObject,
-  place: Place,
-  key: String = "src",
-): String {
-  fun symbol(src: String) =
-    if (src.startsWith("data:")) node.id else src.substringAfterLast('/').substringBeforeLast('.')
-  val bound =
-    p.boundText(key, place) ?: return file.drawable(Naming.snake(symbol(p.literal(key).orEmpty())))
-  val data = bound.values.filter { it.startsWith("data:") }
-  val symbols =
-    bound.values.associateWith { src ->
-      if (src.startsWith("data:") && data.size > 1) "${node.id}_${data.indexOf(src) + 1}"
-      else symbol(src)
-    }
-  return "${file.imageLookup(symbols)}(${bound.expr})"
 }
 
 private fun ScreenEmitter.image(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {

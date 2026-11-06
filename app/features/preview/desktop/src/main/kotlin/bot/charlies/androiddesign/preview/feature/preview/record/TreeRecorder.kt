@@ -17,6 +17,7 @@ import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.NodeColors
 import bot.charlies.androiddesign.preview.model.NodeRoles
+import bot.charlies.androiddesign.preview.model.RingInset
 import bot.charlies.androiddesign.preview.model.TextInfo
 import bot.charlies.androiddesign.preview.model.ViewSpec
 
@@ -113,6 +114,7 @@ class TreeRecorder {
   private val positions = HashMap<String, Rect>()
   private val texts = HashMap<String, MutableMap<String, TextReport>>()
   private val designHeights = HashMap<String, Float>()
+  private val rings = HashMap<String, RingInset>()
   private var frame: LayoutCoordinates? = null
 
   /** Called by the preview frame: bounds are measured relative to this. */
@@ -132,6 +134,16 @@ class TreeRecorder {
     positions.remove(id)
     texts.remove(id)
     designHeights.remove(id)
+    rings.remove(id)
+  }
+
+  /**
+   * A progress ring that fills the display reports the band it takes at the edge: its padding and
+   * its stroke width, read from Wear's defaults while it composes. Null when it no longer fills it.
+   */
+  @Synchronized
+  fun reportRing(id: String, band: RingInset?) {
+    if (band == null) rings.remove(id) else rings[id] = band
   }
 
   /**
@@ -206,6 +218,7 @@ class TreeRecorder {
       bounds = bounds.toDp(density),
       touch = touchPx?.toDp(density),
       text = textInfo(meta, bounds, density),
+      ring = rings[meta.id],
       roles = meta.roles,
       colors = meta.colors,
       a11y = a11y(meta, merged),

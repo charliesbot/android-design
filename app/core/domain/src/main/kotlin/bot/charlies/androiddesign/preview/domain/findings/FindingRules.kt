@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.domain.findings
 
 import bot.charlies.androiddesign.preview.domain.design.TypeScale
+import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.BundledFont
 import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.Catalogs
@@ -355,9 +356,13 @@ object FindingRules {
   /**
    * On a round view, a control or a text whose bounds reach past the circle inscribed in the view:
    * the display cuts off what sticks out. A scrolling list is exempt (its items scroll clear, and
-   * Wear's list transforms them at the edge), found by a `scrolls` ancestor. So are the components
-   * the catalog makes for the edge, and anything behind an open modal. The worst corner is
-   * reported.
+   * Wear's list transforms them at the edge). So are the components the catalog makes for the edge,
+   * and anything behind an open modal. The worst corner is reported.
+   *
+   * A progress ring takes a band at its own edge: the padding plus the stroke it recorded, from
+   * Wear's defaults at render time. A node whose center lies inside a ring must keep its corners
+   * inside the ring's inner circle, and one that fits the display but reaches into a band is
+   * reported as reaching into the ring (by the deepest reach when rings overlap).
    */
   private fun roundEdgeClipped(view: View): List<Finding> {
     if (!view.tree.view.round) return emptyList()
@@ -366,6 +371,7 @@ object FindingRules {
     val centerX = width / 2
     val centerY = height / 2
     val radius = minOf(width, height) / 2
+    val rings = rings(view)
     return view.nodes
       .filter { node ->
         node.isLaidOut &&
@@ -384,17 +390,57 @@ object FindingRules {
             hypot(x - centerX, y - centerY)
           }
         val outside = reach - radius
-        if (outside > EDGE_SLACK_DP) {
-          errorFinding(
-            node,
-            FindingRule.RoundEdgeClipped,
-            "reaches ${dp(outside)} dp outside the round edge",
-          )
-        } else {
-          null
+        val intoRing = rings.maxOfOrNull { it.intrusion(b) } ?: 0f
+        when {
+          outside > EDGE_SLACK_DP ->
+            errorFinding(
+              node,
+              FindingRule.RoundEdgeClipped,
+              "reaches ${dp(outside)} dp outside the round edge",
+            )
+          intoRing > EDGE_SLACK_DP ->
+            errorFinding(
+              node,
+              FindingRule.RoundEdgeClipped,
+              "reaches ${dp(intoRing)} dp into the progress ring",
+            )
+          else -> null
         }
       }
   }
+
+  /** A progress ring as laid out: its center, outer radius and the band it takes inside that. */
+  private class RingBand(val x: Float, val y: Float, val radius: Float, val band: Float) {
+    /**
+     * How far [b] reaches past the ring's inner circle, or 0 when its center lies outside the ring
+     * (a node beside or below the ring is not drawn inside it).
+     */
+    fun intrusion(b: Bounds): Float {
+      if (hypot(b.x + b.width / 2 - x, b.y + b.height / 2 - y) > radius) return 0f
+      val reach =
+        listOf(b.x, b.x + b.width).maxOf { cx ->
+          listOf(b.y, b.y + b.height).maxOf { cy -> hypot(cx - x, cy - y) }
+        }
+      return maxOf(0f, reach - (radius - band))
+    }
+  }
+
+  /**
+   * The progress rings that recorded their band, were laid out, and are not behind an open modal (a
+   * dialog is drawn over a ring, not inside it).
+   */
+  private fun rings(view: View): List<RingBand> =
+    view.nodes
+      .filter { node -> node.ring != null && node.isLaidOut && !view.isBehindModal(node) }
+      .map { node ->
+        val b = node.bounds
+        RingBand(
+          x = b.x + b.width / 2,
+          y = b.y + b.height / 2,
+          radius = minOf(b.width, b.height) / 2,
+          band = checkNotNull(node.ring).inset,
+        )
+      }
 
   // endregion
 
