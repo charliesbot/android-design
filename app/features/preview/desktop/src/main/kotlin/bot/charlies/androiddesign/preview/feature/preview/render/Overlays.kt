@@ -380,7 +380,13 @@ internal fun TooltipAnchor(
       if (env.openOverlay == tooltipId) env.dismiss()
     }
   }
-  val side = env.placement.tooltipSide(tooltipId) ?: TooltipSpec.Side.Above
+  // The variant at this width: the overrides over the prop, else the catalog default.
+  val variant = node?.let {
+    Props(effectiveProps(it, env), scope).string("variant")
+      ?: env.catalog.find(it.component)?.defaultOf("variant")?.content
+  }
+  val rich = variant == "rich"
+  val side = env.placement.tooltipSide(tooltipId, rich) ?: TooltipSpec.Side.Above
   val hasAction = node?.props?.get("actions") != null
   TooltipBox(
     positionProvider =
@@ -429,7 +435,7 @@ internal fun RenderTooltip(ctx: NodeContext) {
       action =
         if (hasActions) {
           {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(TooltipSpec.ACTION_GAP_DP.dp)) {
               ctx.Children("actions", 1, ChildHost(fillWidth = false, row = this))
             }
           }

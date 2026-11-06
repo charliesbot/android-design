@@ -1822,15 +1822,15 @@ fun InputsScreen(
   onNavigateToSearch: () -> Unit = {},
 ) {
   val coroutineScope = rememberCoroutineScope()
-  val searchBarSearchState = rememberContainedSearchBarState()
-  val searchDockedSearchState = rememberSearchBarWithGapState()
-  val tipPlainTooltipState = rememberTooltipState()
-  val tipRichTooltipState = rememberTooltipState(isPersistent = true)
   val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
   val atLeastMedium =
     windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
   val atLeastExpanded =
     windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
+  val searchBarSearchState = rememberContainedSearchBarState()
+  val searchDockedSearchState = rememberSearchBarWithGapState()
+  val tipPlainTooltipState = rememberTooltipState()
+  val tipRichTooltipState = rememberTooltipState(isPersistent = true)
   Row(modifier = modifier) {
     if (atLeastMedium && !atLeastExpanded) {
       WideNavigationRail(state = rememberWideNavigationRailState()) {

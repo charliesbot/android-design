@@ -733,8 +733,9 @@ private fun structure(): List<ComponentDef> =
           "actions",
           "IconButton",
           description =
-            "The trailing icon buttons. A search app bar has at most two beside an avatar, and " +
-              "at most four without one, on large screens.",
+            "The trailing icon buttons. A search app bar has at most two at compact widths, an " +
+              "avatar coming in addition, and up to four from medium widths up (override " +
+              "`actions` in `sizeClass`).",
         ),
         PropDef(
           "avatar",

@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import bot.charlies.androiddesign.preview.domain.SearchBars
 import bot.charlies.androiddesign.preview.domain.SearchSpec
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
@@ -50,6 +51,10 @@ internal class SearchHost(
 )
 
 internal val LocalSearchHost = compositionLocalOf<SearchHost?> { null }
+
+/** Whether this node draws as a search app bar at the current width, by the shared predicate. */
+internal fun NodeContext.isSearchAppBar(): Boolean =
+  SearchBars.isSearchAppBar(component, effectiveProps(node, env))
 
 /** The look of the bar: a filled, fully rounded container with the hint in on surface variant. */
 private val SearchBarAmbient = Ambient(ColorRole.SurfaceContainerHigh, ColorRole.OnSurfaceVariant)
@@ -156,7 +161,7 @@ internal fun NodeContext.WithSearch(
 internal fun NodeContext.Avatar() {
   val src = string("avatar") ?: return
   val bitmap = env.assets.image(src)
-  Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+  Box(Modifier.size(SearchSpec.AVATAR_BOX_DP.dp), contentAlignment = Alignment.Center) {
     val circle = Modifier.size(SearchSpec.AVATAR_DP.dp).clip(CircleShape)
     if (bitmap == null) {
       Box(circle.background(env.neutralFill()))

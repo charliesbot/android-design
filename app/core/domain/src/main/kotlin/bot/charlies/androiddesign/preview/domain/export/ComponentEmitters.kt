@@ -2,8 +2,10 @@ package bot.charlies.androiddesign.preview.domain.export
 
 import bot.charlies.androiddesign.preview.domain.BadgeContent
 import bot.charlies.androiddesign.preview.domain.CarouselSpec
+import bot.charlies.androiddesign.preview.domain.SearchBars
 import bot.charlies.androiddesign.preview.domain.SearchSpec
 import bot.charlies.androiddesign.preview.domain.SideSheetSpec
+import bot.charlies.androiddesign.preview.domain.TooltipSpec
 import bot.charlies.androiddesign.preview.model.ActionFunction
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
@@ -54,14 +56,34 @@ internal fun ScreenEmitter.emitComponent(
   return besideMenu(menu, anchored)
 }
 
-/** [anchor] inside the `TooltipBox` of [tooltip], which hangs off it. */
+/**
+ * [anchor] inside the `TooltipBox` of [tooltip], which hangs off it. A tooltip whose props change
+ * with the window width class gets one box per distinct set, chosen by the width class.
+ */
 private fun ScreenEmitter.aroundAnchor(tooltip: ComponentNode, anchor: List<Stmt>): List<Stmt> {
+  val variants = linkedMapOf<JsonObject, MutableSet<SizeClass>>()
+  for (size in SizeClass.entries) {
+    variants.getOrPut(effectiveProps(tooltip, size)) { linkedSetOf() } += size
+  }
+  variants.entries.singleOrNull()?.let {
+    return tooltipBox(tooltip, it.key, anchor)
+  }
+  usesSizeClass = true
+  return listOf(
+    IfStmt(variants.map { (p, sizes) -> condition(sizes) to tooltipBox(tooltip, p, anchor) }, null),
+  )
+}
+
+private fun ScreenEmitter.tooltipBox(
+  tooltip: ComponentNode,
+  p: JsonObject,
+  anchor: List<Stmt>,
+): List<Stmt> {
   experimental()
-  val p = effectiveProps(tooltip, SizeClass.Compact)
   val rich = p.choice("Tooltip", "variant") == "rich"
   val place = Place()
   val text = textOf(p.text("text", place) ?: Raw("\"\""))
-  val side = checkNotNull(placement.tooltipSide(tooltip.id)).compose
+  val side = checkNotNull(placement.tooltipSide(tooltip.id, rich)).compose
   val title = if (rich) textSlot(p, "title", place) else null
   val actions = if (rich) children(p, "actions", place, "Tooltip") else emptyList()
   val body =
@@ -82,7 +104,7 @@ private fun ScreenEmitter.aroundAnchor(tooltip: ComponentNode, anchor: List<Stmt
                   listOf(
                     arg(
                       "horizontalArrangement",
-                      "${file.use(Sym.Arrangement)}.spacedBy(${dp(8f)})",
+                      "${file.use(Sym.Arrangement)}.spacedBy(${dp(TooltipSpec.ACTION_GAP_DP)})",
                     ),
                   ),
                   lambda(actions),
@@ -162,6 +184,7 @@ private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Pl
     "LoadingIndicator" -> loadingIndicator(p, place)
     "ProgressIndicator" -> progressIndicator(p, place)
     "MenuItem" -> menuItem(node, p, place)
+    "SearchView" -> searchView(node, p)
     // Sheets, dialogs, menus and snackbars are written at the end of the screen.
     else -> emptyList()
   }
@@ -783,7 +806,7 @@ private fun ScreenEmitter.scaffoldContent(
 
 private fun ScreenEmitter.topAppBar(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val size = p.choice("TopAppBar", "size")
-  if (size == "search") return searchAppBar(node, p, place)
+  if (SearchBars.isSearchAppBar(node.component, p)) return searchAppBar(node, p, place)
   val flexible = size == "medium" || size == "large"
   if (flexible) expressive() else experimental()
   val callee =
@@ -2085,7 +2108,10 @@ private fun ScreenEmitter.avatar(node: ComponentNode, p: JsonObject, place: Plac
   return stmt(
     Call(
       file.use(Sym.Box),
-      listOf(sizeModifier(dp(48f)), arg("contentAlignment", alignmentName("center"))),
+      listOf(
+        sizeModifier(dp(SearchSpec.AVATAR_BOX_DP)),
+        arg("contentAlignment", alignmentName("center")),
+      ),
       lambdaOf(picture),
     ),
   )
@@ -2109,7 +2135,7 @@ private fun ScreenEmitter.searchStatements(
   val colors = stateName(node.id, "SearchColors")
   val input = stateName(node.id, "Input")
   val defaults = m3("SearchBarDefaults")
-  val docked = searchDocked(node.id)
+  val docked = searchDockedCondition(node.id)
   val scope = ScreenEmitter.COROUTINE_SCOPE
   val collapse = Raw("$scope.${file.use(Sym.launch)} { $state.animateToCollapsed() }")
   val expanded = "$state.currentValue == ${m3("SearchBarValue")}.Expanded"
@@ -2140,29 +2166,40 @@ private fun ScreenEmitter.searchStatements(
       Assign(
         "val $colors",
         "=",
-        Raw(if (docked) "$defaults.colors()" else "$defaults.containedColors(state = $state)"),
+        Raw(
+          when (docked) {
+            "true" -> "$defaults.colors()"
+            "false" -> "$defaults.containedColors(state = $state)"
+            else -> "if ($docked) $defaults.colors() else $defaults.containedColors(state = $state)"
+          },
+        ),
       ),
       Assign("val $input", "=", Call("@Composable", lambda = lambdaOf(field))),
     )
-  val view = placement.expandedViewOf(node.id)?.let(byId::get)
-  val results = view?.let {
-    val results = children(effectiveProps(it, SizeClass.Compact), "content", Place(), "SearchView")
-    Call(
-      m3(
-        if (docked) "ExpandedDockedSearchBarWithGap" else "ExpandedFullScreenContainedSearchBar",
-      ),
-      listOfNotNull(
-        arg("state", state),
-        arg("inputField", input),
-        if (docked) null else arg("colors", colors),
-      ),
-      lambda(results),
-    )
-  }
+  val view = placement.expandedViewOf(node.id)?.let { emit(it, Place()) }.orEmpty()
   return one(
     file.use(Sym.Box),
     emptyList(),
-    declarations + stmt(bar(state, input, colors)) + listOfNotNull(results?.let(::stmt)),
+    declarations + stmt(bar(state, input, colors)) + view,
+  )
+}
+
+/**
+ * The expanded view of a search bar: the contained full-screen layout or the docked dropdown with a
+ * gap, by the layout it has at the size being written. It shares the bar's state, colors and input
+ * field.
+ */
+private fun ScreenEmitter.searchView(node: ComponentNode, p: JsonObject): List<Stmt> {
+  val bar = placement.barOf(node.id) ?: return emptyList()
+  val docked = p.choice("SearchView", "layout") == "docked"
+  return one(
+    m3(if (docked) "ExpandedDockedSearchBarWithGap" else "ExpandedFullScreenContainedSearchBar"),
+    listOfNotNull(
+      arg("state", searchState(bar)),
+      arg("inputField", stateName(bar, "Input")),
+      if (docked) null else arg("colors", stateName(bar, "SearchColors")),
+    ),
+    children(p, "content", Place(), "SearchView"),
   )
 }
 
@@ -2216,7 +2253,9 @@ private fun ScreenEmitter.searchAppBar(
       stmt(
         icon(
           IconName.Literal(
-            M3ExpressiveCatalog.find("SearchBar")?.defaultOf("leadingIcon")?.content ?: "search",
+            checkNotNull(M3ExpressiveCatalog.find("SearchBar")?.defaultOf("leadingIcon")?.content) {
+              "SearchBar.leadingIcon has no catalog default"
+            },
           ),
         ),
       ),

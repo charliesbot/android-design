@@ -83,7 +83,7 @@ internal fun RenderScaffold(ctx: NodeContext) {
 
 /** A search app bar's text is its field's hint, in body large on the field's container. */
 internal fun NodeContext.topAppBarLook() =
-  if (enum("size") == "search") {
+  if (isSearchAppBar()) {
     searchBarLook(string("title"))
   } else {
     Look(
@@ -97,7 +97,7 @@ internal fun NodeContext.topAppBarLook() =
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderTopAppBar(ctx: NodeContext) {
-  if (ctx.enum("size") == "search") {
+  if (ctx.isSearchAppBar()) {
     RenderSearchAppBar(ctx)
     return
   }

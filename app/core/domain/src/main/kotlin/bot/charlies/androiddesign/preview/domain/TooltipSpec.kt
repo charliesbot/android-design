@@ -8,6 +8,9 @@ object TooltipSpec {
   /** A rich tooltip has "up to two text buttons". */
   const val MAX_ACTIONS = 2
 
+  /** The gap between a rich tooltip's text buttons, which sit side by side. */
+  const val ACTION_GAP_DP = 8f
+
   /** The side of its anchor a tooltip opens on; [compose] names the `TooltipAnchorPosition`. */
   enum class Side(val compose: String) {
     Above("Above"),

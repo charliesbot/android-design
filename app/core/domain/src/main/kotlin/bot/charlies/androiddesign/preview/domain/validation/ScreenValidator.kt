@@ -2,6 +2,7 @@ package bot.charlies.androiddesign.preview.domain.validation
 
 import bot.charlies.androiddesign.preview.domain.BadgeContent
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
+import bot.charlies.androiddesign.preview.domain.SearchBars
 import bot.charlies.androiddesign.preview.domain.SearchSpec
 import bot.charlies.androiddesign.preview.domain.TooltipSpec
 import bot.charlies.androiddesign.preview.domain.export.ChildItems
@@ -70,10 +71,8 @@ internal class ScreenValidator(
 
   /**
    * Material's search rules. A search bar has "one or two trailing icons or icon buttons", and an
-   * avatar combines "with up to one other trailing icon button". A search app bar has up to two
-   * trailing icons beside an avatar, "up to four trailing icons on larger screens" without one.
-   * `avatar` and `expanded` belong to the search app bar, and a search view opens from the one bar
-   * that names it.
+   * avatar combines "with up to one other trailing icon button". A search app bar's actions are
+   * checked by [validateSearchAppBar]. A search view opens from the one bar that names it.
    */
   private fun validateSearch() {
     val holders = mutableMapOf<String, MutableList<String>>()
@@ -91,27 +90,7 @@ internal class ScreenValidator(
             )
           }
         }
-        "TopAppBar" -> {
-          val search = props.string("size") == "search"
-          if (!search) {
-            for (key in listOf("avatar", "expanded")) {
-              if (key in props) sink.add(path.child(key), "$key is for a TopAppBar of size search")
-            }
-          } else {
-            val actions = listedCount(props, "actions") ?: 0
-            val limit =
-              if ("avatar" in props) SearchSpec.MAX_APP_BAR_ACTIONS_WITH_AVATAR
-              else SearchSpec.MAX_APP_BAR_ACTIONS
-            if (actions > limit) {
-              sink.add(
-                path.child("actions"),
-                "a search app bar has at most $limit trailing icon buttons " +
-                  (if ("avatar" in props) "beside an avatar" else "(four only on large screens)") +
-                  ", got $actions",
-              )
-            }
-          }
-        }
+        "TopAppBar" -> validateSearchAppBar(path, node)
       }
       if (node.component == "SearchBar" || node.component == "TopAppBar") {
         props.string("expanded")?.let { holders.getOrPut(it) { mutableListOf() }.add(node.id) }
@@ -131,6 +110,50 @@ internal class ScreenValidator(
         bars.size > 1 ->
           sink.add(path, "'${node.id}' is the expanded view of ${bars.joinToString(" and ")}")
       }
+    }
+  }
+
+  /**
+   * `avatar` and `expanded` belong to a search app bar, which the size prop (and so a size class
+   * override) makes. A search app bar has "up to two trailing icons on mobile", an avatar coming in
+   * addition, and "up to four trailing icons on larger screens", so the actions are counted at
+   * every size class the bar is a search bar at, and reported where the count was written.
+   */
+  private fun validateSearchAppBar(path: String, node: ComponentNode) {
+    if (!SearchBars.isSearchAppBar(node)) {
+      for (key in listOf("avatar", "expanded")) {
+        if (key in node.props) sink.add(path.child(key), "$key is for a TopAppBar of size search")
+      }
+      return
+    }
+    val reported = mutableSetOf<String>()
+    for (size in SizeClass.entries) {
+      val effective = JsonObject(node.props + node.sizeOverridesAt(size))
+      if (!SearchBars.isSearchAppBar(node.component, effective)) continue
+      val count = listedCount(effective, "actions") ?: continue
+      val large = size != SizeClass.Compact
+      val limit =
+        if (large) SearchSpec.MAX_APP_BAR_ACTIONS_LARGE else SearchSpec.MAX_APP_BAR_ACTIONS_COMPACT
+      if (count <= limit) continue
+      val key =
+        catalog.sizeBreakpoints
+          .filter { it.minWidthDp <= size.minWidthDp }
+          .lastOrNull {
+            (node.props[Catalog.SIZE_CLASS] as? JsonObject)?.get(it.key)?.let { o ->
+              "actions" in (o as JsonObject)
+            } == true
+          }
+          ?.key
+      val where =
+        if (key == null) path.child("actions")
+        else path.child(Catalog.SIZE_CLASS).child(key).child("actions")
+      if (!reported.add(where)) continue
+      sink.add(
+        where,
+        "a search app bar has at most $limit trailing icon buttons " +
+          (if (large) "on larger screens" else "on compact screens, four only on larger ones") +
+          ", got $count",
+      )
     }
   }
 

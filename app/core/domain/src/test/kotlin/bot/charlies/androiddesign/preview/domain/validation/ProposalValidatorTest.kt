@@ -628,7 +628,7 @@ class ProposalValidatorTest {
   }
 
   @Test
-  fun `a search app bar has two actions beside an avatar and four without one`() {
+  fun `a search app bar has two actions, and up to four only on larger screens`() {
     fun bar(extra: String) =
       base
         .with("a", icon("a"))
@@ -641,11 +641,30 @@ class ProposalValidatorTest {
           """{"id":"bar","component":"TopAppBar","size":"search","title":"Search","expanded":"results"$extra}""",
         )
     assertEquals(emptyList(), errors(bar(""","actions":["a","b"],"avatar":"me.png"""")))
-    assertEquals(emptyList(), errors(bar(""","actions":["a","b","c","d"]""")))
+    assertEquals(
+      emptyList(),
+      errors(bar(""","actions":["a","b"],"sizeClass":{"medium":{"actions":["a","b","c","d"]}}""")),
+    )
+    val four = bar(""","actions":["a","b","c","d"]""")
+    errors(four).assertHas(plates("${four.indexOf("bar")}") + "/actions", "at most 2")
     val three = bar(""","actions":["a","b","c"],"avatar":"me.png"""")
-    errors(three).assertHas(plates("${three.indexOf("bar")}") + "/actions", "beside an avatar")
-    val five = bar(""","actions":["a","b","c","d","a"]""")
-    errors(five).assertHas(plates("${five.indexOf("bar")}") + "/actions", "at most 4")
+    errors(three).assertHas(plates("${three.indexOf("bar")}") + "/actions", "at most 2")
+    val five =
+      bar(""","actions":["a","b"],"sizeClass":{"medium":{"actions":["a","b","c","d","a"]}}""")
+    errors(five)
+      .assertHas(plates("${five.indexOf("bar")}") + "/sizeClass/medium/actions", "at most 4")
+  }
+
+  @Test
+  fun `expanded is for a search app bar, which a size class override can make`() {
+    val small =
+      base
+        .with("results", view("results"))
+        .with(
+          "bar",
+          """{"id":"bar","component":"TopAppBar","title":"Plates","sizeClass":{"medium":{"size":"search"}},"expanded":"results"}""",
+        )
+    assertEquals(emptyList(), errors(small))
   }
 
   @Test

@@ -187,6 +187,30 @@ class SearchAndTooltipRenderTest {
   }
 
   @Test
+  fun `a tap inside an open rich tooltip, on its text or an inert button, keeps it open`() {
+    val tips =
+      tooltip(
+        """{"id":"rich","component":"Tooltip","anchor":"edit","variant":"rich","title":"Edit","text":"Change it.","actions":["ok","later"]},""" +
+          """{"id":"ok","component":"Button","variant":"text","label":"Got it","action":{"functionCall":{"@call":"dismiss"}}},""" +
+          """{"id":"later","component":"Button","variant":"text","label":"Later"}""",
+      )
+    var afterBody: String? = "unset"
+    var afterButton: String? = "unset"
+    render(singleScreen(tips)) { host ->
+      host.interaction.open("home", "rich")
+      settleForTest()
+      onNodeWithTag("rich", useUnmergedTree = true).performClick()
+      settleForTest()
+      afterBody = host.interaction.openOverlay("home")
+      onNodeWithTag("later", useUnmergedTree = true).performClick()
+      settleForTest()
+      afterButton = host.interaction.openOverlay("home")
+    }
+    assertEquals("rich", afterBody, "tap on the tooltip's body")
+    assertEquals("rich", afterButton, "tap on a button with no action")
+  }
+
+  @Test
   fun `a tooltip's described colors are the ones drawn`() {
     val tips =
       tooltip(

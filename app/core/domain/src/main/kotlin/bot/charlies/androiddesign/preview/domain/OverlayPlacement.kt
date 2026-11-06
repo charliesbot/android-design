@@ -39,7 +39,7 @@ class OverlayPlacement(private val screen: Screen) {
   /** The search view each bar names as its `expanded`, by the bar's id. */
   private val expandedViews: Map<String, String> = buildMap {
     for (node in screen.components) {
-      if (node.component != SEARCH_BAR && node.component != TOP_APP_BAR) continue
+      if (node.component != SEARCH_BAR && !SearchBars.isSearchAppBar(node)) continue
       val viewId = node.stringProp("expanded") ?: continue
       if (screen.components.none { it.id == viewId && it.component == SEARCH_VIEW }) continue
       if (viewId !in values) put(node.id, viewId)
@@ -109,11 +109,13 @@ class OverlayPlacement(private val screen: Screen) {
   /** The id of the bar that holds search view [viewId], or null when nothing holds it. */
   fun barOf(viewId: String): String? = expandedViews.entries.firstOrNull { it.value == viewId }?.key
 
-  /** The side of its anchor that tooltip [tooltipId] opens on, or null for an unknown tooltip. */
-  fun tooltipSide(tooltipId: String): TooltipSpec.Side? {
-    val tooltip = screen.components.firstOrNull { it.id == tooltipId } ?: return null
-    if (tooltip.component != TOOLTIP) return null
-    val rich = tooltip.stringProp("variant") == "rich"
+  /**
+   * The side of its anchor that tooltip [tooltipId] opens on, or null for an unknown tooltip.
+   * [rich] is the tooltip's variant at the size being drawn, which the caller reads with the size
+   * class overrides laid over it.
+   */
+  fun tooltipSide(tooltipId: String, rich: Boolean): TooltipSpec.Side? {
+    if (screen.components.none { it.id == tooltipId && it.component == TOOLTIP }) return null
     return TooltipSpec.side(
       rich,
       anchorInAppBar = tooltipAnchors[tooltipId]?.let(::inAppBar) == true,

@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.domain.export
 
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
+import bot.charlies.androiddesign.preview.domain.SearchBars
 import bot.charlies.androiddesign.preview.domain.navigation.NavigationGraph
 import bot.charlies.androiddesign.preview.model.ActionFunction
 import bot.charlies.androiddesign.preview.model.ComponentNode
@@ -156,10 +157,7 @@ internal class ScreenEmitter(
 
   /** The search bars and search app bars: each holds the `SearchBarState` its view shares. */
   val searchBars: List<ComponentNode> =
-    screen.components.filter {
-      it.component == "SearchBar" ||
-        (it.component == "TopAppBar" && it.props.literal("size") == "search")
-    }
+    screen.components.filter { it.component == "SearchBar" || SearchBars.isSearchAppBar(it) }
 
   /** The tooltips, each with the `TooltipState` its `TooltipBox` shares. */
   val tooltips: List<ComponentNode> = screen.components.filter { it.component == "Tooltip" }
@@ -196,15 +194,18 @@ internal class ScreenEmitter(
     body += overlays.filter { it.component !in STATE_OVERLAYS }.map { overlayState(it) }
     if (placement.snackbars.isNotEmpty()) body += snackbarHostState()
     if (searchBars.isNotEmpty() || tooltips.isNotEmpty()) body += coroutineScopeDecl()
-    body += searchBars.map { searchStateDecl(it) }
-    body += tooltips.map { tooltipStateDecl(it) }
     val root = byId[ComponentNode.ROOT_ID]
     val rootStatements =
       if (root == null) emptyList() else emit(root.id, Place(modifierBase = "modifier"))
     val tail =
       placement.screenLevel.flatMap { overlayStatements(it) } +
         placement.snackbars.flatMap { snackbarStatements(it) }
+    // Written after the root, which says whether the states read the window width class.
+    val searchStates = searchBars.map { searchStateDecl(it) }
+    val tooltipStates = tooltips.map { tooltipStateDecl(it) }
     if (usesSizeClass) body += sizeClassState()
+    body += searchStates
+    body += tooltipStates
     body += rootStatements
     body += tail
     file.use(Sym.Composable)
@@ -258,35 +259,65 @@ internal class ScreenEmitter(
 
   fun tooltipState(id: String) = stateName(id, "TooltipState")
 
-  /** The `layout` of the search view [barId] opens: docked, else full-screen. */
-  fun searchDocked(barId: String): Boolean {
-    val view = placement.expandedViewOf(barId)?.let(byId::get) ?: return false
-    val layout =
-      effectiveProps(view, SizeClass.Compact).literal("layout")
-        ?: M3ExpressiveCatalog.find("SearchView")?.defaultOf("layout")?.content
-    return layout == "docked"
+  /**
+   * The Kotlin condition for "the view [barId] opens is docked": `true` or `false` when one layout
+   * holds at every window width class, else a test of the width class. The layout is read with the
+   * size class overrides laid over it, as the previewer draws it.
+   */
+  fun searchDockedCondition(barId: String): String {
+    val view = placement.expandedViewOf(barId)?.let(byId::get) ?: return "false"
+    val docked =
+      SizeClass.entries
+        .filter { effectiveProps(view, it).choice("SearchView", "layout") == "docked" }
+        .toSet()
+    return when {
+      docked.isEmpty() -> "false"
+      docked.size == SizeClass.entries.size -> "true"
+      else -> condition(docked).also { usesSizeClass = true }
+    }
   }
 
   /** The state a search bar shares with its view: the factory Compose pairs with the layout. */
   private fun searchStateDecl(bar: ComponentNode): Stmt {
+    val docked = file.use(Sym.m3("rememberSearchBarWithGapState"))
+    val contained = file.use(Sym.m3("rememberContainedSearchBarState"))
     val factory =
-      if (searchDocked(bar.id)) "rememberSearchBarWithGapState"
-      else "rememberContainedSearchBarState"
-    return Assign("val ${searchState(bar.id)}", "=", Call(file.use(Sym.m3(factory))))
+      when (val condition = searchDockedCondition(bar.id)) {
+        "true" -> "$docked()"
+        "false" -> "$contained()"
+        else -> "if ($condition) $docked() else $contained()"
+      }
+    return Assign("val ${searchState(bar.id)}", "=", Raw(factory))
   }
 
+  /**
+   * A tooltip with buttons is persistent, so it stays until acted on; Material advises against a
+   * persistent tooltip otherwise ("avoid persistent rich tooltips on icon buttons").
+   */
   private fun tooltipStateDecl(tooltip: ComponentNode): Stmt {
     experimentalApi()
-    val rich = tooltip.props.literal("variant") == "rich"
+    val persistent =
+      SizeClass.entries.any { size ->
+        val p = effectiveProps(tooltip, size)
+        p.choice("Tooltip", "variant") == "rich" && hasChildren(p, "actions")
+      }
     return Assign(
       "val ${tooltipState(tooltip.id)}",
       "=",
       Call(
         file.use(Sym.m3("rememberTooltipState")),
-        if (rich) listOf(arg("isPersistent", "true")) else emptyList(),
+        if (persistent) listOf(arg("isPersistent", "true")) else emptyList(),
       ),
     )
   }
+
+  /** Whether the `ChildList` prop [key] holds anything, a template counting as something. */
+  fun hasChildren(props: JsonObject, key: String): Boolean =
+    when (val items = props[key].childItems()) {
+      is ChildItems.Listed -> items.ids.isNotEmpty()
+      is ChildItems.Template -> true
+      null -> false
+    }
 
   private fun experimentalApi() = file.optIn(Sym.ExperimentalMaterial3Api)
 
@@ -379,7 +410,7 @@ internal class ScreenEmitter(
     )
   }
 
-  private fun condition(sizes: Set<SizeClass>): String {
+  fun condition(sizes: Set<SizeClass>): String {
     val medium = SizeClass.Medium in sizes
     val compact = SizeClass.Compact in sizes
     val expanded = SizeClass.Expanded in sizes

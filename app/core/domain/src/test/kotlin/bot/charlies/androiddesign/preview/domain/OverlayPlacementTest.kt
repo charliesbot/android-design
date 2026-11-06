@@ -119,9 +119,9 @@ class OverlayPlacementTest {
         node("rich", "Tooltip", "anchor" to "fab", "variant" to "rich"),
       )
 
-    assertEquals(TooltipSpec.Side.Below, placement.tooltipSide("plain_in_bar"))
-    assertEquals(TooltipSpec.Side.Above, placement.tooltipSide("plain"))
-    assertEquals(TooltipSpec.Side.Below, placement.tooltipSide("rich"))
+    assertEquals(TooltipSpec.Side.Below, placement.tooltipSide("plain_in_bar", rich = false))
+    assertEquals(TooltipSpec.Side.Above, placement.tooltipSide("plain", rich = false))
+    assertEquals(TooltipSpec.Side.Below, placement.tooltipSide("rich", rich = true))
     // The second tooltip on one anchor has no place beside it.
     assertEquals(listOf("rich"), placement.screenLevel.map { it.id })
   }
