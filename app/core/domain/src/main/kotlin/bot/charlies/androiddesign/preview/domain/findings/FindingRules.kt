@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.domain.findings
 
 import bot.charlies.androiddesign.preview.domain.design.TypeScale
+import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.BundledFont
 import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.Catalogs
@@ -358,10 +359,10 @@ object FindingRules {
    * Wear's list transforms them at the edge). So are the components the catalog makes for the edge,
    * and anything behind an open modal. The worst corner is reported.
    *
-   * A progress ring that fills the view takes a band at the edge, so the circle every other node
-   * must stay inside shrinks by the band the ring recorded (its padding plus its stroke, from
-   * Wear's defaults at render time). A node that fits the display but reaches into that band is
-   * reported as reaching into the ring.
+   * A progress ring takes a band at its own edge: the padding plus the stroke it recorded, from
+   * Wear's defaults at render time. A node whose center lies inside a ring must keep its corners
+   * inside the ring's inner circle, and one that fits the display but reaches into a band is
+   * reported as reaching into the ring (by the deepest reach when rings overlap).
    */
   private fun roundEdgeClipped(view: View): List<Finding> {
     if (!view.tree.view.round) return emptyList()
@@ -370,7 +371,7 @@ object FindingRules {
     val centerX = width / 2
     val centerY = height / 2
     val radius = minOf(width, height) / 2
-    val band = ringBand(view, width, height)
+    val rings = rings(view)
     return view.nodes
       .filter { node ->
         node.isLaidOut &&
@@ -389,7 +390,7 @@ object FindingRules {
             hypot(x - centerX, y - centerY)
           }
         val outside = reach - radius
-        val intoRing = reach - (radius - band)
+        val intoRing = rings.maxOfOrNull { it.intrusion(b) } ?: 0f
         when {
           outside > EDGE_SLACK_DP ->
             errorFinding(
@@ -397,7 +398,7 @@ object FindingRules {
               FindingRule.RoundEdgeClipped,
               "reaches ${dp(outside)} dp outside the round edge",
             )
-          band > 0f && intoRing > EDGE_SLACK_DP ->
+          intoRing > EDGE_SLACK_DP ->
             errorFinding(
               node,
               FindingRule.RoundEdgeClipped,
@@ -408,24 +409,38 @@ object FindingRules {
       }
   }
 
+  /** A progress ring as laid out: its center, outer radius and the band it takes inside that. */
+  private class RingBand(val x: Float, val y: Float, val radius: Float, val band: Float) {
+    /**
+     * How far [b] reaches past the ring's inner circle, or 0 when its center lies outside the ring
+     * (a node beside or below the ring is not drawn inside it).
+     */
+    fun intrusion(b: Bounds): Float {
+      if (hypot(b.x + b.width / 2 - x, b.y + b.height / 2 - y) > radius) return 0f
+      val reach =
+        listOf(b.x, b.x + b.width).maxOf { cx ->
+          listOf(b.y, b.y + b.height).maxOf { cy -> hypot(cx - x, cy - y) }
+        }
+      return maxOf(0f, reach - (radius - band))
+    }
+  }
+
   /**
-   * How far in from the edge the widest progress ring that fills the view reaches, or 0. A ring
-   * counts when it recorded its band, was laid out over the whole view, and is not behind an open
-   * modal (a dialog is drawn over the ring, not inside it).
+   * The progress rings that recorded their band, were laid out, and are not behind an open modal (a
+   * dialog is drawn over a ring, not inside it).
    */
-  private fun ringBand(view: View, width: Float, height: Float): Float =
+  private fun rings(view: View): List<RingBand> =
     view.nodes
-      .filter { node ->
+      .filter { node -> node.ring != null && node.isLaidOut && !view.isBehindModal(node) }
+      .map { node ->
         val b = node.bounds
-        node.ring != null &&
-          node.isLaidOut &&
-          !view.isBehindModal(node) &&
-          b.x <= EDGE_SLACK_DP &&
-          b.y <= EDGE_SLACK_DP &&
-          b.x + b.width >= width - EDGE_SLACK_DP &&
-          b.y + b.height >= height - EDGE_SLACK_DP
+        RingBand(
+          x = b.x + b.width / 2,
+          y = b.y + b.height / 2,
+          radius = minOf(b.width, b.height) / 2,
+          band = checkNotNull(node.ring).inset,
+        )
       }
-      .maxOfOrNull { checkNotNull(it.ring).inset } ?: 0f
 
   // endregion
 

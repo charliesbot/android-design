@@ -36,9 +36,17 @@ class WearScreenExportTest {
   }
 
   @Test
-  fun `a single screen has a preview inside an AppScaffold with the time text`() {
+  fun `a single screen has a preview at each watch view inside an AppScaffold`() {
     val source = WearExportFixtures.export(root("t"), text)
-    has(source, "@Preview(device = Devices.WEAR_OS_SMALL_ROUND, showSystemUi = true)")
+    has(
+      source,
+      "@Preview(name = \"watch\", device = \"spec:width=204dp,height=204dp,dpi=320,isRound=true\", showSystemUi = true)",
+    )
+    has(
+      source,
+      "@Preview(name = \"watch-large\", device = \"spec:width=227dp,height=227dp,dpi=320,isRound=true\", showSystemUi = true)",
+    )
+    lacks(source, "Devices")
     has(
       source,
       "private fun MainScreenPreview() { WearAppTheme { AppScaffold(timeText = { TimeText() }) { MainScreen() } } }",

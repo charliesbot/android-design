@@ -26,6 +26,7 @@ import bot.charlies.androiddesign.preview.model.MaterialShape
 import bot.charlies.androiddesign.preview.model.Screen
 import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.StyleDef
+import bot.charlies.androiddesign.preview.model.Views
 import bot.charlies.androiddesign.preview.model.WearCatalog
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -120,10 +121,12 @@ internal class WearScreenEmitter(
     navigateTargets.forEach { add("${callbackName(it)}: () -> Unit = {}") }
   }
 
-  /** The preview puts the screen where an app does: inside the theme and the `AppScaffold`. */
+  /**
+   * One preview per watch view the previewer draws, with the screen where an app puts it: inside
+   * the theme and the `AppScaffold`.
+   */
   private fun preview(): Decl {
     val preview = file.use(Sym.Preview)
-    val devices = file.use(WearSym.Devices)
     file.use(Sym.Composable)
     // The preview shows the clock only when the screen does.
     val clock =
@@ -142,10 +145,10 @@ internal class WearScreenEmitter(
       )
     return FunDecl(
       annotations =
-        listOf(
-          "@$preview(device = $devices.WEAR_OS_SMALL_ROUND, showSystemUi = true)",
-          "@Composable",
-        ),
+        Views.wear.map { view ->
+          val spec = "spec:width=${view.width}dp,height=${view.height}dp,dpi=320,isRound=true"
+          "@$preview(name = \"${view.name}\", device = \"$spec\", showSystemUi = true)"
+        } + "@Composable",
       modifiers = "private ",
       name = "${functionName}Preview",
       params = emptyList(),

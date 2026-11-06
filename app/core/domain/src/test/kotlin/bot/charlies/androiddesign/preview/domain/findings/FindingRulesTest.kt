@@ -917,12 +917,35 @@ class FindingRulesTest {
   }
 
   @Test
-  fun `round-edge-clipped ignores a ring that does not cover the view`() {
-    // A small spinner has no band at the edge.
+  fun `round-edge-clipped ignores a text outside a small ring`() {
+    // A small spinner in the corner: the text is not drawn inside it.
     val spinner = ring(size = 48f)
     assertEquals(
       emptyList(),
       evaluate(tree(Views.Watch, spinner, line(y = 20f))).of(FindingRule.RoundEdgeClipped),
+    )
+  }
+
+  // A ring above an edge button: 140 dp across at the top, centered at (102, 70), its band leaving
+  // a 58 dp circle inside.
+  private fun bodyRing() = ring(size = 140f).copy(bounds = Bounds(32f, 0f, 140f, 140f))
+
+  @Test
+  fun `round-edge-clipped fails for a text inside a smaller ring but inside its band`() {
+    // The corners are 65.3 dp from the ring's center, past its 58 dp inner circle.
+    val findings =
+      evaluate(tree(Views.Watch, bodyRing(), line(y = 20f))).of(FindingRule.RoundEdgeClipped)
+    assertEquals(listOf("stats"), findings.map { it.id })
+    assertEquals("reaches 7.3 dp into the progress ring", findings.single().detail)
+  }
+
+  @Test
+  fun `round-edge-clipped passes for a control outside a smaller ring`() {
+    // Centered 101 dp from the ring's center, outside the ring, and inside the display.
+    val below = iconButton("below", 76f, y = 145f)
+    assertEquals(
+      emptyList(),
+      evaluate(tree(Views.Watch, bodyRing(), below)).of(FindingRule.RoundEdgeClipped),
     )
   }
 

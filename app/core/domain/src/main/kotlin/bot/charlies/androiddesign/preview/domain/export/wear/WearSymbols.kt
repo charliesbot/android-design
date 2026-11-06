@@ -34,5 +34,4 @@ internal object WearSym {
   const val LocalConfiguration = "androidx.compose.ui.platform.LocalConfiguration"
   const val CompositionLocalProvider = "androidx.compose.runtime.CompositionLocalProvider"
   const val mutableIntStateOf = "androidx.compose.runtime.mutableIntStateOf"
-  const val Devices = "androidx.compose.ui.tooling.preview.Devices"
 }
