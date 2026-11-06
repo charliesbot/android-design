@@ -1,5 +1,6 @@
 package bot.charlies.androiddesign.preview.domain.validation
 
+import bot.charlies.androiddesign.preview.domain.BadgeContent
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.validation.Dynamic.asString
 import bot.charlies.androiddesign.preview.domain.validation.Dynamic.isBoolean
@@ -21,6 +22,7 @@ import bot.charlies.androiddesign.preview.model.SizeClass
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Validates one screen of a proposal against [catalog], the one it names, and the merged design
@@ -347,16 +349,21 @@ internal class ScreenValidator(
   }
 
   private fun validateBadge(path: String, value: JsonElement) {
-    if (isDynamic(value) || value.isBoolean() || value.isNumber()) return
-    val text = value.asString()
-    when {
-      text == null -> sink.add(path, "must be true, false, a number, a string or a binding")
-      text.length > PropKind.BADGE_MAX_CHARACTERS ->
-        sink.add(
-          path,
-          "a badge label holds at most ${PropKind.BADGE_MAX_CHARACTERS} characters, " +
-            "a + included (such as \"99+\"), got '$text'",
-        )
+    if (isDynamic(value)) return
+    val primitive = value as? JsonPrimitive
+    if (
+      primitive == null || (!value.isBoolean() && !value.isNumber() && value.asString() == null)
+    ) {
+      sink.add(path, "must be true, false, a number, a string or a binding")
+      return
+    }
+    val label = (BadgeContent.of(primitive) as? BadgeContent.Large)?.label ?: return
+    if (label.length > PropKind.BADGE_MAX_CHARACTERS) {
+      sink.add(
+        path,
+        "a badge label holds at most ${PropKind.BADGE_MAX_CHARACTERS} characters, " +
+          "a + included (such as \"99+\"), got '$label'",
+      )
     }
   }
 

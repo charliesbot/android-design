@@ -210,10 +210,12 @@ internal fun RenderSideSheet(ctx: NodeContext) {
     properties = DialogProperties(usePlatformDefaultWidth = false),
   ) {
     CompositionLocalProvider(LocalAmbient provides SideSheetAmbient) {
-      Box(
-        Modifier.fillMaxSize()
-          .clickable(interactionSource = null, indication = null, onClick = dismiss),
-      ) {
+      Box(Modifier.fillMaxSize()) {
+        // The click-away sits behind the sheet, so a tap on the sheet never reaches it.
+        Box(
+          Modifier.matchParentSize()
+            .clickable(interactionSource = null, indication = null, onClick = dismiss),
+        )
         Surface(
           modifier =
             Modifier.align(Alignment.CenterEnd)

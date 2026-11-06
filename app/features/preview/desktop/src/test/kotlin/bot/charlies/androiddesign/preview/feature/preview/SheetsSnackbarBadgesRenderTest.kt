@@ -1,7 +1,10 @@
 package bot.charlies.androiddesign.preview.feature.preview
 
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import bot.charlies.androiddesign.preview.domain.SideSheetSpec
 import bot.charlies.androiddesign.preview.feature.preview.theme.ThemeResolver
 import bot.charlies.androiddesign.preview.feature.preview.theme.toHex
@@ -84,6 +87,30 @@ class SheetsSnackbarBadgesRenderTest {
         .tree
     assertEquals(true, closed)
     assertFalse(after.has("filters"))
+  }
+
+  @Test
+  fun `a tap inside the side sheet does not close it but a tap on the scrim does`() {
+    var afterTitle: String? = null
+    var afterSort: String? = null
+    var afterScrim: String? = "unset"
+    render(singleScreen(sheet), view = Views.Tablet) { host ->
+      host.interaction.open("home", "filters")
+      settleForTest()
+      onNodeWithTag("sort", useUnmergedTree = true).performClick()
+      afterSort = host.interaction.openOverlay("home")
+      onNodeWithTag("filters", useUnmergedTree = true).performTouchInput {
+        click(androidx.compose.ui.geometry.Offset(width / 2f, height - 20f))
+      }
+      afterTitle = host.interaction.openOverlay("home")
+      onAllNodes(isRoot(), useUnmergedTree = true)[1].performTouchInput {
+        click(androidx.compose.ui.geometry.Offset(20f, 400f))
+      }
+      afterScrim = host.interaction.openOverlay("home")
+    }
+    assertEquals("filters", afterSort, "tap on content")
+    assertEquals("filters", afterTitle, "tap on empty sheet space")
+    assertEquals(null, afterScrim, "tap on the scrim")
   }
 
   @Test

@@ -3000,12 +3000,13 @@ fun FeedbackScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {}) {
       onDismissRequest = { showFilters = false },
       properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-      Box(
-        modifier =
-          Modifier.fillMaxSize().clickable(interactionSource = null, indication = null) {
-            showFilters = false
-          },
-      ) {
+      Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+          modifier =
+            Modifier.matchParentSize().clickable(interactionSource = null, indication = null) {
+              showFilters = false
+            },
+        )
         Surface(
           modifier =
             Modifier.align(Alignment.CenterEnd)
@@ -3113,12 +3114,13 @@ fun FeedbackScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {}) {
       onDismissRequest = { showMoreFilters = false },
       properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-      Box(
-        modifier =
-          Modifier.fillMaxSize().clickable(interactionSource = null, indication = null) {
-            showMoreFilters = false
-          },
-      ) {
+      Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+          modifier =
+            Modifier.matchParentSize().clickable(interactionSource = null, indication = null) {
+              showMoreFilters = false
+            },
+        )
         Surface(
           modifier =
             Modifier.align(Alignment.CenterEnd)

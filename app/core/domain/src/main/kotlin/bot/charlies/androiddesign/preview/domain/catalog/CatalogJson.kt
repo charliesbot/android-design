@@ -31,6 +31,9 @@ import kotlinx.serialization.json.buildJsonObject
  * registry, so the registry stays the one place a component is declared.
  */
 object CatalogJson {
+  /** The largest number a badge holds: [PropKind.BADGE_MAX_CHARACTERS] digits. */
+  private const val BADGE_MAX_NUMBER = 9999
+
   private const val RAW =
     "https://raw.githubusercontent.com/charliesbot/android-design/main/app/schemas"
   const val CATALOG_FILE = "m3-expressive.catalog.json"
@@ -266,7 +269,7 @@ object CatalogJson {
           JsonArray(
             listOf(
               obj("type" to "boolean"),
-              obj("type" to "number"),
+              obj("type" to "number", "maximum" to BADGE_MAX_NUMBER),
               obj("type" to "string", "maxLength" to PropKind.BADGE_MAX_CHARACTERS),
               ref(refs.common + "DataBinding"),
               ref("#/\$defs/IndexCall"),

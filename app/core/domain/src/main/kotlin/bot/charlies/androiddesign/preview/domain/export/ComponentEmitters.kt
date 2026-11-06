@@ -1844,18 +1844,31 @@ private fun ScreenEmitter.sideSheetStatements(node: ComponentNode, p: JsonObject
       ),
       lambda(stmt(column)),
     )
+  // The click-away sits behind the sheet, so a tap on the sheet never reaches it.
   val clickAway =
-    "${useModifier("clickable")}(interactionSource = null, indication = null) { $shown = false }"
-  val box =
     Call(
       file.use(Sym.Box),
       listOf(
         arg(
           "modifier",
-          Chain(file.use(Sym.Modifier), listOf(useModifier("fillMaxSize()"), clickAway)),
+          Chain(
+            file.use(Sym.Modifier),
+            listOf(
+              "matchParentSize()",
+              "${useModifier("clickable")}(interactionSource = null, indication = null) " +
+                "{ $shown = false }",
+            ),
+          ),
         ),
       ),
-      lambda(stmt(surface)),
+    )
+  val box =
+    Call(
+      file.use(Sym.Box),
+      listOf(
+        arg("modifier", Chain(file.use(Sym.Modifier), listOf(useModifier("fillMaxSize()")))),
+      ),
+      lambda(stmt(clickAway), stmt(surface)),
     )
   val dialog =
     Call(

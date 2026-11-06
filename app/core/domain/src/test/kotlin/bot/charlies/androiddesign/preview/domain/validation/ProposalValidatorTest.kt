@@ -597,6 +597,8 @@ class ProposalValidatorTest {
       assertEquals(emptyList(), errors(badge(ok)), ok)
     }
     errors(badge("\"12345\"")).assertHas(path, "at most 4 characters")
+    errors(badge("12345")).assertHas(path, "at most 4 characters")
+    errors(badge("1000")).let { assertEquals(emptyList(), it) }
     errors(badge("[1]")).assertHas(path, "must be true, false")
   }
 }
