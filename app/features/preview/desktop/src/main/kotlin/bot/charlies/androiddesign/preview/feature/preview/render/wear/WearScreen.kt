@@ -117,7 +117,10 @@ private fun FixedScreen(ctx: NodeContext, edgeButton: String?) {
   }
 }
 
-/** More room than any watch screen has, in pixels: the button is capped at its own height. */
+/**
+ * More room than any watch screen has, in pixels: the button is capped at its own height. Keep
+ * equal to the `lastItemOffset` that `WearHelpers.fixedScrollInfoProvider` (core/domain) exports.
+ */
 private const val ROOM_PX = 4096f
 
 /**

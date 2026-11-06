@@ -51,15 +51,6 @@ class WearThemeExportTest {
 
   @Test
   fun `a scheme that lacks a role is refused`() {
-    val proposal =
-      WearExportFixtures.proposal(root("t"), """{"id":"t","component":"Text","text":"Hi"}""")
-    assertFailsWith<PreviewException> {
-      KotlinExporter.export(
-        proposal,
-        WearExportFixtures.design(),
-        "main",
-        WearExportFixtures.colors - "primary",
-      )
-    }
+    assertFailsWith<PreviewException> { WearColors.of(WearExportFixtures.colors - "primary") }
   }
 }

@@ -121,4 +121,27 @@ class ExportCommandTest {
     assertTrue("primary = Color(0xFF${primary.removePrefix("#")})" in seeded.out)
     assertFalse(seeded.out == plain.out, "the seed changes the scheme")
   }
+
+  @Test
+  fun `a Wear export carries the scheme the proposal's own theme gives`() {
+    val dir = Files.createTempDirectory("export")
+    val themed = dir.resolve("themed.proposal.json")
+    val source = Files.readString(wear)
+    Files.writeString(
+      themed,
+      source.replaceFirst(
+        "\"format\": 1,",
+        "\"format\": 1, \"theme\": { \"colors\": { \"primary\": \"#006A6A\", \"on-surface\": \"#123456\" } },",
+      ),
+    )
+    val run = run("export", themed.toString(), "--screen", "home")
+    assertEquals(ExitCode.OK, run.code, run.err)
+    val resolved = ProposalReader().read(themed).designSystem
+    assertEquals("#006A6A", resolved.seed.uppercase())
+    assertTrue("onSurface = Color(0xFF123456)" in run.out, "role override")
+    val primary = WearThemeResolver.roleColors(resolved).getValue("primary")
+    assertTrue("primary = Color(0xFF${primary.removePrefix("#")})" in run.out)
+    val plain = run("export", wear.toString(), "--screen", "home")
+    assertFalse(run.out == plain.out, "the proposal's seed changes the scheme")
+  }
 }

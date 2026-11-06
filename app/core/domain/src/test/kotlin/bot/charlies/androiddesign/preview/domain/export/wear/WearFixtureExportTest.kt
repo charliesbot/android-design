@@ -20,7 +20,7 @@ class WearFixtureExportTest {
 
   @Test
   fun `the whole proposal exports with its navigation host`() {
-    val source = KotlinExporter.export(proposal, design, null, WearExportFixtures.colors)
+    val source = KotlinExporter.export(proposal, design, null, WearExportFixtures.scheme)
     WearExportFixtures.dump("wear-fixture.kt", source)
     proposal.screens.keys.forEach {
       has(source, "fun ${it.replaceFirstChar(Char::uppercase)}Screen(")
@@ -32,7 +32,7 @@ class WearFixtureExportTest {
   @Test
   fun `each screen exports on its own`() {
     proposal.screens.keys.forEach { id ->
-      val source = KotlinExporter.export(proposal, design, id, WearExportFixtures.colors)
+      val source = KotlinExporter.export(proposal, design, id, WearExportFixtures.scheme)
       assertTrue("fun ${id.replaceFirstChar(Char::uppercase)}Screen(" in source, id)
       assertTrue("NavDisplay" !in source, id)
     }

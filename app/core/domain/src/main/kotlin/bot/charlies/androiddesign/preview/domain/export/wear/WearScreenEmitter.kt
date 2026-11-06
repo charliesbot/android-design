@@ -10,9 +10,8 @@ import bot.charlies.androiddesign.preview.domain.export.Expr
 import bot.charlies.androiddesign.preview.domain.export.FileContext
 import bot.charlies.androiddesign.preview.domain.export.FunDecl
 import bot.charlies.androiddesign.preview.domain.export.IfStmt
-import bot.charlies.androiddesign.preview.domain.export.Lambda
-import bot.charlies.androiddesign.preview.domain.export.Naming
 import bot.charlies.androiddesign.preview.domain.export.Raw
+import bot.charlies.androiddesign.preview.domain.export.ScreenEmitterBase
 import bot.charlies.androiddesign.preview.domain.export.Stmt
 import bot.charlies.androiddesign.preview.domain.export.Sym
 import bot.charlies.androiddesign.preview.domain.export.arg
@@ -20,13 +19,10 @@ import bot.charlies.androiddesign.preview.domain.export.kotlinString
 import bot.charlies.androiddesign.preview.domain.export.lambda
 import bot.charlies.androiddesign.preview.domain.export.number
 import bot.charlies.androiddesign.preview.domain.export.stmt
-import bot.charlies.androiddesign.preview.domain.navigation.NavigationGraph
-import bot.charlies.androiddesign.preview.model.ActionFunction
 import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.MaterialShape
-import bot.charlies.androiddesign.preview.model.PropKind
 import bot.charlies.androiddesign.preview.model.Screen
 import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.StyleDef
@@ -80,35 +76,17 @@ internal data class WearPlace(
  * holds what they share: properties, tokens, modifiers, actions, children, and the screen frame.
  */
 internal class WearScreenEmitter(
-  val file: FileContext,
-  val design: DesignSystem,
-  val screenId: String,
-  val screen: Screen,
-) {
-  val byId: Map<String, ComponentNode> = screen.components.associateBy { it.id }
-
-  /** AlertDialog and ConfirmationDialog components, in document order. */
-  val overlays: List<ComponentNode> =
-    screen.components.filter { it.component in WearCatalog.overlayNames }
+  file: FileContext,
+  design: DesignSystem,
+  screenId: String,
+  screen: Screen,
+) : ScreenEmitterBase(file, design, screenId, screen, WearCatalog) {
 
   /** True once a component differs between a normal and a large display. */
   var usesLarge = false
 
   /** True once a fixed screen with an edge button needs the scroll provider object. */
   var usesFixedScroll = false
-
-  val functionName: String = Naming.pascal(screenId) + "Screen"
-
-  /** Screens this screen navigates to. */
-  val navigateTargets: List<String> =
-    screen.components.flatMap { NavigationGraph.navigateTargets(it, WearCatalog) }.distinct()
-
-  val usesBack: Boolean = screen.components.any { node -> calls(node).any { it.name == "back" } }
-
-  /** The overlay each component sits in, so `dismiss()` knows which one to close. */
-  private val overlayOf: Map<String, String> = buildOverlayMap()
-
-  fun callbackName(target: String) = "onNavigateTo${Naming.pascal(target)}"
 
   // region the function
 
@@ -216,24 +194,9 @@ internal class WearScreenEmitter(
 
   // region properties
 
-  fun JsonObject.literal(key: String): String? =
-    (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
-
-  /** An enum prop of [component]: the stated value, else its catalog default. */
-  fun JsonObject.choice(component: String, key: String): String =
-    literal(key)
-      ?: checkNotNull(WearCatalog.find(component)?.defaultOf(key)?.content) {
-        "$component.$key has no default"
-      }
-
-  fun JsonObject.flag(key: String): Boolean? =
-    (this[key] as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toBooleanStrictOrNull()
-
   /** A boolean prop of [component]: the stated literal, else its catalog default. */
   fun JsonObject.option(component: String, key: String): Boolean =
-    flag(key)
-      ?: WearCatalog.find(component)?.defaultOf(key)?.content?.toBooleanStrictOrNull()
-      ?: false
+    flag(key) ?: catalogDefault(component, key)?.toBooleanStrictOrNull() ?: false
 
   /** A number prop of [component], moved into the catalog's bounds like the renderer does. */
   fun JsonObject.numberProp(component: String, key: String): Float? {
@@ -269,11 +232,6 @@ internal class WearScreenEmitter(
   fun colorRole(name: String): String = "${file.use(WearSym.MaterialTheme)}.colorScheme.$name"
 
   fun typeRole(name: String): String = "${file.use(WearSym.MaterialTheme)}.typography.$name"
-
-  /** A spacing token as dp: `sm` is `8.dp` when the design system says 8. */
-  fun spacing(name: String): String = dp(design.spacing[name] ?: 0f)
-
-  fun dp(value: Float): String = "${number(value)}.${file.use(Sym.dp)}"
 
   /** A style's shape: a corner token, since Wear Compose has no `MaterialShapes`. */
   fun shapeToken(name: String): String {
@@ -369,112 +327,6 @@ internal class WearScreenEmitter(
     return Chain(base, parts)
   }
 
-  /** Imports the extension behind a modifier call written as `name(...)` and returns the call. */
-  fun useModifier(call: String): String {
-    val name = call.substringBefore('(').substringBefore(' ')
-    MODIFIER_IMPORTS[name]?.let { file.use(it) }
-    return call
-  }
-
-  // endregion
-
-  // region actions
-
-  class ActionCall(val name: String, val args: JsonObject?)
-
-  /** Every `functionCall` in the action props of [node], size overrides included. */
-  fun calls(node: ComponentNode): List<ActionCall> {
-    val def = WearCatalog.find(node.component) ?: return emptyList()
-    val names = def.props.filter { it.kind == PropKind.Action }.map { it.name }
-    val sources = buildList {
-      add(node.props)
-      (node.props[Catalog.SIZE_CLASS] as? JsonObject)?.values?.forEach {
-        (it as? JsonObject)?.let(::add)
-      }
-    }
-    return sources.flatMap { source -> names.mapNotNull { callOf(source[it]) } }
-  }
-
-  private fun callOf(action: JsonElement?): ActionCall? {
-    val call = (action as? JsonObject)?.get("functionCall") as? JsonObject ?: return null
-    val name = (call["@call"] as? JsonPrimitive)?.content ?: return null
-    return ActionCall(name, call["args"] as? JsonObject)
-  }
-
-  /** The statements an `action` runs; [componentId] is where it sits, for `dismiss()`. */
-  fun actionStatements(action: JsonElement?, componentId: String): List<Stmt> {
-    val call = callOf(action) ?: return emptyList()
-    return when (ActionFunction.fromWire(call.name)) {
-      ActionFunction.Navigate -> {
-        val target = (call.args?.get("screen") as? JsonPrimitive)?.content ?: return emptyList()
-        listOf(stmt(Call(callbackName(target))))
-      }
-      ActionFunction.Back -> listOf(stmt(Call("onBack")))
-      ActionFunction.Open -> {
-        val overlay = (call.args?.get("overlay") as? JsonPrimitive)?.content ?: return emptyList()
-        listOf(Assign(overlayVar(overlay), "=", Raw("true")))
-      }
-      ActionFunction.Dismiss -> {
-        val enclosing = overlayOf[componentId]
-        val targets = if (enclosing != null) listOf(enclosing) else overlays.map { it.id }
-        targets.map { Assign(overlayVar(it), "=", Raw("false")) }
-      }
-      null -> emptyList()
-    }
-  }
-
-  /** `{ ... }` for an action: the statements, or an empty lambda. */
-  fun actionLambda(action: JsonElement?, componentId: String): Lambda =
-    lambda(actionStatements(action, componentId))
-
-  fun overlayVar(id: String) = "show${Naming.pascal(id)}"
-
-  /**
-   * `var name by remember { mutableStateOf(value) }`; [factory] is `mutableStateOf`,
-   * `mutableFloatStateOf` or `mutableIntStateOf`.
-   */
-  fun stateVar(name: String, value: String, factory: String = Sym.mutableStateOf): Stmt {
-    file.use(Sym.getValue)
-    file.use(Sym.setValue)
-    val state = file.use(factory)
-    return Assign(
-      "var $name",
-      "by",
-      Call(file.use(Sym.remember), lambda = lambda(stmt(Raw("$state($value)")))),
-    )
-  }
-
-  fun stateName(id: String, suffix: String) = Naming.camel(id).trim('`') + suffix
-
-  private fun buildOverlayMap(): Map<String, String> {
-    val map = linkedMapOf<String, String>()
-    for (overlay in screen.components.filter { it.component in WearCatalog.overlayNames }) {
-      fun visit(id: String) {
-        if (id in map || id == overlay.id) return
-        map[id] = overlay.id
-        val node = byId[id] ?: return
-        childIds(node).forEach(::visit)
-      }
-      childIds(overlay).forEach(::visit)
-    }
-    return map
-  }
-
-  /** Ids of the components [node] references through child props. */
-  fun childIds(node: ComponentNode): List<String> {
-    val def = WearCatalog.find(node.component) ?: return emptyList()
-    return def.props.flatMap { prop ->
-      when (val value = node.props[prop.name]) {
-        is JsonPrimitive ->
-          if (prop.kind == PropKind.Child && value.isString) listOf(value.content) else emptyList()
-        is JsonArray ->
-          if (prop.kind == PropKind.ChildList) value.mapNotNull { (it as? JsonPrimitive)?.content }
-          else emptyList()
-        else -> emptyList()
-      }
-    }
-  }
-
   // endregion
 
   // region children
@@ -519,21 +371,4 @@ internal class WearScreenEmitter(
   }
 
   // endregion
-
-  private companion object {
-    val MODIFIER_IMPORTS =
-      mapOf(
-        "padding" to Sym.padding,
-        "fillMaxSize" to Sym.fillMaxSize,
-        "fillMaxWidth" to Sym.fillMaxWidth,
-        "fillMaxHeight" to Sym.fillMaxHeight,
-        "width" to Sym.width,
-        "height" to Sym.height,
-        "size" to Sym.size,
-        "aspectRatio" to Sym.aspectRatio,
-        "background" to Sym.background,
-        "clip" to Sym.clip,
-        "semantics" to Sym.semantics,
-      )
-  }
 }

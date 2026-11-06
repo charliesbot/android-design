@@ -5,9 +5,8 @@ import bot.charlies.androiddesign.preview.domain.export.Call
 import bot.charlies.androiddesign.preview.domain.export.Decl
 import bot.charlies.androiddesign.preview.domain.export.FileContext
 import bot.charlies.androiddesign.preview.domain.export.FunDecl
-import bot.charlies.androiddesign.preview.domain.export.Naming
+import bot.charlies.androiddesign.preview.domain.export.NavRoutes
 import bot.charlies.androiddesign.preview.domain.export.Raw
-import bot.charlies.androiddesign.preview.domain.export.RawDecl
 import bot.charlies.androiddesign.preview.domain.export.Sym
 import bot.charlies.androiddesign.preview.domain.export.arg
 import bot.charlies.androiddesign.preview.domain.export.lambda
@@ -28,35 +27,14 @@ internal class WearNavigationEmitter(
   private val emitters: Map<String, WearScreenEmitter>,
   private val appName: String,
 ) {
-  fun declarations(): List<Decl> {
-    file.use(Sym.Serializable)
-    file.use(Sym.NavKey)
-    return proposal.screens.keys.map {
-      RawDecl(listOf("@Serializable private data object ${route(it)} : NavKey"))
-    } + listOf(app())
-  }
-
-  private fun route(screen: String) = Naming.pascal(screen) + "Route"
+  fun declarations(): List<Decl> = NavRoutes.declarations(file, proposal) + listOf(app())
 
   private fun app(): Decl {
     file.use(Sym.Composable)
     val key = file.use(Sym.NavKey)
     val entries =
       proposal.screens.keys.map { screen ->
-        val emitter = emitters.getValue(screen)
-        val args = mutableListOf<bot.charlies.androiddesign.preview.domain.export.Arg>()
-        if (emitter.usesBack) args += arg("onBack", lambdaOf(Raw("backStack.removeLastOrNull()")))
-        emitter.navigateTargets.forEach { target ->
-          args +=
-            arg(emitter.callbackName(target), lambdaOf(Raw("backStack.add(${route(target)})")))
-        }
-        stmt(
-          Call(
-            "entry<${route(screen)}>",
-            emptyList(),
-            lambda(stmt(Call(emitter.functionName, args))),
-          ),
-        )
+        NavRoutes.entry(screen, emitters.getValue(screen), metadata = null)
       }
     val display =
       Call(
@@ -71,7 +49,7 @@ internal class WearNavigationEmitter(
           arg("entryProvider", Call(file.use(Sym.entryProvider), lambda = lambda(entries))),
         ),
       )
-    val start = route(proposal.navigation.start)
+    val start = NavRoutes.name(proposal.navigation.start)
     val scaffold =
       Call(
         file.use(WearSym.AppScaffold),

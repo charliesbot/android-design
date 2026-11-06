@@ -19,6 +19,8 @@ internal object WearExportFixtures {
       .mapIndexed { i, role -> role to "#10%02X%02X".format(0x20 + i, 0x80 + i) }
       .toMap()
 
+  val scheme: WearColors = WearColors.of(colors)
+
   fun design(): DesignSystem = DesignSystemResolver.resolve(null, null)
 
   /** A one-screen Wear proposal named "Wear test"; its screen is "main". */
@@ -40,10 +42,10 @@ internal object WearExportFixtures {
     """{"id":"root","component":"Screen",${if (props.isEmpty()) "" else "$props,"}"children":[${children.joinToString(",") { "\"$it\"" }}]}"""
 
   fun export(vararg components: String, screen: String? = "main"): String =
-    KotlinExporter.export(proposal(*components), design(), screen, colors)
+    KotlinExporter.export(proposal(*components), design(), screen, scheme)
 
   fun export(proposal: Proposal, screen: String? = null): String =
-    KotlinExporter.export(proposal, design(), screen, colors)
+    KotlinExporter.export(proposal, design(), screen, scheme)
 
   /** Whitespace and trailing commas folded away, so a line break does not matter. */
   fun flat(text: String) =

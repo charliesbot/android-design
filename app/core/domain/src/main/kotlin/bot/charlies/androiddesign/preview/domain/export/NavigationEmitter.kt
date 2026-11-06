@@ -20,15 +20,7 @@ internal class NavigationEmitter(
   private val supporting = roles.values.any { it == PaneRole.Supporting }
   private val listDetail = !supporting && roles.isNotEmpty()
 
-  fun declarations(): List<Decl> {
-    file.use(Sym.Serializable)
-    file.use(Sym.NavKey)
-    return proposal.screens.keys.map {
-      RawDecl(listOf("@Serializable private data object ${route(it)} : NavKey"))
-    } + listOf(app())
-  }
-
-  private fun route(screen: String) = Naming.pascal(screen) + "Route"
+  fun declarations(): List<Decl> = NavRoutes.declarations(file, proposal) + listOf(app())
 
   private fun strategies(): List<Pair<String, String>> {
     val key = file.use(Sym.NavKey)
@@ -72,23 +64,10 @@ internal class NavigationEmitter(
     file.use(Sym.Composable)
     val strategies = strategies()
     val backStack = file.use(Sym.rememberNavBackStack)
-    val start = route(proposal.navigation.start)
+    val start = NavRoutes.name(proposal.navigation.start)
     val entries =
       proposal.screens.keys.map { screen ->
-        val emitter = emitters.getValue(screen)
-        val args = mutableListOf<Arg>()
-        if (emitter.usesBack) args += arg("onBack", lambdaOf(Raw("backStack.removeLastOrNull()")))
-        emitter.navigateTargets.forEach { target ->
-          args +=
-            arg(emitter.callbackName(target), lambdaOf(Raw("backStack.add(${route(target)})")))
-        }
-        stmt(
-          Call(
-            "entry<${route(screen)}>",
-            listOfNotNull(metadata(screen)),
-            lambda(stmt(Call(emitter.functionName, args))),
-          ),
-        )
+        NavRoutes.entry(screen, emitters.getValue(screen), metadata(screen))
       }
     val display =
       Call(
@@ -112,6 +91,36 @@ internal class NavigationEmitter(
       name = appName,
       params = emptyList(),
       body = listOf(stmt(Call(themeName, lambda = lambda(body)))),
+    )
+  }
+}
+
+/** What the phone and Wear navigation hosts share: the route keys and the `entry` calls. */
+internal object NavRoutes {
+  fun name(screen: String) = Naming.pascal(screen) + "Route"
+
+  /** One `@Serializable` route key per screen. */
+  fun declarations(file: FileContext, proposal: Proposal): List<Decl> {
+    file.use(Sym.Serializable)
+    file.use(Sym.NavKey)
+    return proposal.screens.keys.map {
+      RawDecl(listOf("@Serializable private data object ${name(it)} : NavKey"))
+    }
+  }
+
+  /** `entry<Route>(metadata) { Screen(onBack = ..., onNavigateToX = ...) }`. */
+  fun entry(screen: String, emitter: ScreenEmitterBase, metadata: Arg?): Stmt {
+    val args = mutableListOf<Arg>()
+    if (emitter.usesBack) args += arg("onBack", lambdaOf(Raw("backStack.removeLastOrNull()")))
+    emitter.navigateTargets.forEach { target ->
+      args += arg(emitter.callbackName(target), lambdaOf(Raw("backStack.add(${name(target)})")))
+    }
+    return stmt(
+      Call(
+        "entry<${name(screen)}>",
+        listOfNotNull(metadata),
+        lambda(stmt(Call(emitter.functionName, args))),
+      ),
     )
   }
 }

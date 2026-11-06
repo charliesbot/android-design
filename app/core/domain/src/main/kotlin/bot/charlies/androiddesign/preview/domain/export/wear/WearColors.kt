@@ -8,17 +8,12 @@ import bot.charlies.androiddesign.preview.model.WearCatalog
  * computes it (Wear's own dynamic scheme over the proposal's seed, with the role overrides on top),
  * so the export carries the exact colors it drew.
  */
-internal class WearColors private constructor(val roles: Map<String, String>) {
+class WearColors private constructor(internal val roles: Map<String, String>) {
   companion object {
     private val HEX = Regex("#[0-9A-Fa-f]{6}")
 
     /** The scheme for [colors] (`#RRGGBB` per role); a missing or malformed role is an error. */
-    fun of(colors: Map<String, String>?): WearColors {
-      if (colors == null) {
-        throw PreviewException(
-          "a Wear export needs the resolved Wear color scheme, which the previewer computes",
-        )
-      }
+    fun of(colors: Map<String, String>): WearColors {
       val missing = WearCatalog.colorRoles.filter { it !in colors }
       if (missing.isNotEmpty()) {
         throw PreviewException("the Wear color scheme lacks ${missing.joinToString()}")

@@ -22,11 +22,7 @@ internal object WearHelpers {
     )
   }
 
-  /**
-   * The scroll facts of a body that does not scroll. A scaffold sizes its edge button to the room
-   * below the last item; with room for the whole button the body stops above it, as it does at the
-   * end of a list.
-   */
+  /** `FixedScrollInfoProvider`, written once for screens whose body does not scroll. */
   fun fixedScrollInfoProvider(file: FileContext): Decl {
     val provider = file.use(WearSym.ScrollInfoProvider)
     return RawDecl(
@@ -40,6 +36,7 @@ internal object WearHelpers {
         "  override val isScrollable = false",
         "  override val isScrollInProgress = false",
         "  override val anchorItemOffset = 0f",
+        // Keep equal to ROOM_PX in features/preview/desktop/.../render/wear/WearScreen.kt.
         "  override val lastItemOffset = 4096f",
         "}",
       ),

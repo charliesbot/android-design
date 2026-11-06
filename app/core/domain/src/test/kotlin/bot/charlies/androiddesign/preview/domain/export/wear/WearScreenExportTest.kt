@@ -159,7 +159,7 @@ class WearScreenExportTest {
         proposal,
         design,
         "main",
-        WearExportFixtures.colors,
+        WearExportFixtures.scheme,
       )
     has(
       source,

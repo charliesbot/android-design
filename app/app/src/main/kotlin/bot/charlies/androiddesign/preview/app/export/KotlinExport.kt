@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.app.export
 
 import bot.charlies.androiddesign.preview.domain.export.KotlinExporter
+import bot.charlies.androiddesign.preview.domain.export.wear.WearColors
 import bot.charlies.androiddesign.preview.feature.preview.theme.wear.WearThemeResolver
 import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.DesignSystem
@@ -15,7 +16,11 @@ import bot.charlies.androiddesign.preview.model.WearCatalog
 object KotlinExport {
   fun of(proposal: Proposal, design: DesignSystem, screen: String? = null): String {
     val wearColors =
-      if (Catalogs.of(proposal) === WearCatalog) WearThemeResolver.roleColors(design) else null
+      if (Catalogs.of(proposal) === WearCatalog) {
+        WearColors.of(WearThemeResolver.roleColors(design))
+      } else {
+        null
+      }
     return KotlinExporter.export(proposal, design, screen, wearColors)
   }
 }

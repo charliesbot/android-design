@@ -103,7 +103,7 @@
         { "id": "root", "component": "Screen", "scroll": false, "edgeButton": "pause", "children": ["ring", "center"] },
         { "id": "ring", "component": "CircularProgressIndicator", "progress": 0.6 },
         { "id": "center", "component": "Box", "contentAlignment": "center", "children": ["time"] },
-        { "id": "time", "component": "Text", "text": "03:00", "type": "numeralLarge", "color": "primaryDim", "align": "center", "sizeClass": {"large": {"type": "numeralExtraLarge"}} },
+        { "id": "time", "component": "Text", "text": "03:00", "type": "numeralMedium", "color": "primaryDim", "align": "center", "sizeClass": {"large": {"type": "numeralLarge"}} },
         { "id": "pause", "component": "EdgeButton", "size": "small", "label": "Pause", "icon": "pause", "primary": true, "action": {"functionCall": {"@call": "navigate", "args": {"screen": "segments"}}} }
       ]
     },
