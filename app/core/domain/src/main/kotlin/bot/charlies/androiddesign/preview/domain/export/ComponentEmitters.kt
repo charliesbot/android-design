@@ -2,6 +2,7 @@ package bot.charlies.androiddesign.preview.domain.export
 
 import bot.charlies.androiddesign.preview.domain.BadgeContent
 import bot.charlies.androiddesign.preview.domain.CarouselSpec
+import bot.charlies.androiddesign.preview.domain.CollapsingAppBars
 import bot.charlies.androiddesign.preview.domain.SearchBars
 import bot.charlies.androiddesign.preview.domain.SearchSpec
 import bot.charlies.androiddesign.preview.domain.SideSheetSpec
@@ -694,8 +695,7 @@ private val LAYOUT_TYPES = setOf("Column", "Row", "Box", "Grid", "FlexBox", "Lis
 private fun ScreenEmitter.scaffold(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val statements = mutableListOf<Stmt>()
   val topBar = p.literal("topBar")?.let(byId::get)
-  val collapsing =
-    topBar?.component == "TopAppBar" && (topBar.props.literal("size") in setOf("medium", "large"))
+  val collapsing = topBar != null && CollapsingAppBars.isCollapsing(topBar.component, topBar.props)
   if (collapsing) {
     experimental()
     statements +=
