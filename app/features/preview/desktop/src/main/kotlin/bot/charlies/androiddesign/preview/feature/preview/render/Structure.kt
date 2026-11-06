@@ -65,7 +65,8 @@ internal fun RenderScaffold(ctx: NodeContext) {
   // Like the export, a medium or large bar collapses as the content scrolls. At rest it is
   // expanded.
   val collapsing =
-    topBar != null && CollapsingAppBars.isCollapsing(topBar.component, effectiveProps(topBar, env))
+    topBar != null &&
+      CollapsingAppBars.collapsesAt(topBar, env.sizeClass, effectiveProps(topBar, env))
   val scrollBehavior =
     if (collapsing) TopAppBarDefaults.exitUntilCollapsedScrollBehavior() else null
   val scaffold: @Composable (Modifier) -> Unit = { modifier ->

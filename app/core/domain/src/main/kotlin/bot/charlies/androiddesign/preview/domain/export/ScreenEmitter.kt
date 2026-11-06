@@ -393,7 +393,7 @@ internal class ScreenEmitter(
     val node = byId[id] ?: return emptyList()
     val visible = linkedMapOf<JsonObject, MutableSet<SizeClass>>()
     for (size in SizeClass.entries) {
-      if (size !in showIn(node)) continue
+      if (!node.isShownAt(size)) continue
       visible.getOrPut(effectiveProps(node, size)) { linkedSetOf() } += size
     }
     if (visible.isEmpty()) return emptyList()
@@ -423,12 +423,6 @@ internal class ScreenEmitter(
       medium -> "atLeastMedium && !atLeastExpanded"
       else -> "atLeastExpanded"
     }
-  }
-
-  fun showIn(node: ComponentNode): Set<SizeClass> {
-    val listed = (node.props[M3ExpressiveCatalog.SHOW_IN] as? JsonArray)
-    if (listed == null) return SizeClass.entries.toSet()
-    return listed.mapNotNull { (it as? JsonPrimitive)?.content?.let(SizeClass::fromWire) }.toSet()
   }
 
   /**

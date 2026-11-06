@@ -700,8 +700,7 @@ private fun ScreenEmitter.scaffold(node: ComponentNode, p: JsonObject, place: Pl
     if (topBar == null) emptySet()
     else
       SizeClass.entries
-        .filter { it in showIn(topBar) }
-        .filter { CollapsingAppBars.isCollapsing(topBar.component, effectiveProps(topBar, it)) }
+        .filter { CollapsingAppBars.collapsesAt(topBar, it, effectiveProps(topBar, it)) }
         .toSet()
   val collapsing = collapsingSizes.isNotEmpty()
   if (collapsing) {

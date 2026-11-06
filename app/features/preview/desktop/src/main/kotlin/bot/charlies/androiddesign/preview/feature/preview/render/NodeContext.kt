@@ -36,10 +36,8 @@ import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.MaterialShape
 import bot.charlies.androiddesign.preview.model.ShapeToken
-import bot.charlies.androiddesign.preview.model.SizeClass
 import bot.charlies.androiddesign.preview.model.StyleDef
 import bot.charlies.androiddesign.preview.model.TypeRole
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -170,11 +168,6 @@ internal fun effectiveProps(node: ComponentNode, env: RenderEnv): JsonObject {
   return JsonObject(LinkedHashMap(node.props).apply { putAll(overrides) })
 }
 
-private fun visibleAt(node: ComponentNode, sizeClass: SizeClass): Boolean {
-  val showIn = node.props[M3ExpressiveCatalog.SHOW_IN] as? JsonArray ?: return true
-  return showIn.any { (it as? JsonPrimitive)?.content == sizeClass.wire }
-}
-
 private fun resolveStyle(env: RenderEnv, node: ComponentNode): ResolvedStyle {
   val name = (node.props[M3ExpressiveCatalog.STYLE] as? JsonPrimitive)?.content
   val def = env.style(name) ?: return ResolvedStyle.None
@@ -204,7 +197,7 @@ internal fun RenderNode(
 ) {
   val node = env.nodes[ref.id] ?: return
   val def = env.catalog.find(node.component) ?: return
-  if (!visibleAt(node, env.sizeClass)) return
+  if (!node.isShownAt(env.sizeClass)) return
   val ctx =
     NodeContext(
       env = env,

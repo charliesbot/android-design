@@ -554,12 +554,12 @@ class RendererBehaviorTest {
     assertTrue(tree.node("left").bounds.height < tree.node("root").bounds.height / 2)
   }
 
-  private fun collapsingScreen(size: String) =
+  private fun collapsingScreen(size: String, extra: String = "") =
     singleScreen(
       """{"id":"root","component":"Scaffold","topBar":"bar","content":"col"},""" +
-        """{"id":"bar","component":"TopAppBar","size":"$size","title":"Title"},""" +
-        """{"id":"col","component":"Column","scroll":true,"children":[${(0 until 30).joinToString(",") { "\"t$it\"" }}]},""" +
-        (0 until 30).joinToString(",") { """{"id":"t$it","component":"Text","text":"Row $it"}""" },
+        """{"id":"bar","component":"TopAppBar","size":"$size","title":"Title"$extra},""" +
+        """{"id":"col","component":"Column","scroll":true,"children":[${(0 until 60).joinToString(",") { "\"t$it\"" }}]},""" +
+        (0 until 60).joinToString(",") { """{"id":"t$it","component":"Text","text":"Row $it"}""" },
     )
 
   @Test
@@ -580,6 +580,23 @@ class RendererBehaviorTest {
           .height
       assertEquals(64f, scrolled, "$size after scrolling")
     }
+  }
+
+  @Test
+  fun `a collapsing bar hidden at the window size does not hold back the content scroll`() {
+    val proposal = collapsingScreen("large", ""","showIn":["compact"]""")
+    val before = render(proposal, view = Views.Tablet).tree.node("t10").bounds.y
+    val after =
+      render(proposal, view = Views.Tablet) {
+          settleForTest()
+          onNodeWithTag("col", useUnmergedTree = true).performTouchInput { swipeUp() }
+          settleForTest()
+        }
+        .tree
+        .node("t10")
+        .bounds
+        .y
+    assertTrue(after < before, "scrolled: $before to $after")
   }
 
   private fun androidx.compose.ui.test.ComposeUiTest.settleForTest() {
