@@ -695,7 +695,15 @@ private val LAYOUT_TYPES = setOf("Column", "Row", "Box", "Grid", "FlexBox", "Lis
 private fun ScreenEmitter.scaffold(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val statements = mutableListOf<Stmt>()
   val topBar = p.literal("topBar")?.let(byId::get)
-  val collapsing = topBar != null && CollapsingAppBars.isCollapsing(topBar.component, topBar.props)
+  // The window sizes where the bar is shown and collapses, as the preview decides per width.
+  val collapsingSizes =
+    if (topBar == null) emptySet()
+    else
+      SizeClass.entries
+        .filter { it in showIn(topBar) }
+        .filter { CollapsingAppBars.isCollapsing(topBar.component, effectiveProps(topBar, it)) }
+        .toSet()
+  val collapsing = collapsingSizes.isNotEmpty()
   if (collapsing) {
     experimental()
     statements +=
@@ -711,15 +719,26 @@ private fun ScreenEmitter.scaffold(node: ComponentNode, p: JsonObject, place: Pl
   val rail = p.literal("navigationRail")
   val inRow = rail != null
 
-  val nested = if (collapsing) "nestedScroll(scrollBehavior.nestedScrollConnection)" else null
+  val nested =
+    when {
+      !collapsing -> null
+      // An unattached behavior would swallow upward scroll, so it joins only where the bar uses it.
+      collapsingSizes.size < SizeClass.entries.size -> {
+        usesSizeClass = true
+        val attach = useModifier("nestedScroll(scrollBehavior.nestedScrollConnection)")
+        val modifier = file.use(Sym.Modifier)
+        "then(if (${condition(collapsingSizes)}) $modifier.$attach else $modifier)"
+      }
+      else -> useModifier("nestedScroll(scrollBehavior.nestedScrollConnection)")
+    }
   val scaffoldModifier =
     when {
       inRow ->
         modifierArg(
           place.copy(modifierBase = "Modifier"),
-          listOfNotNull("weight(1f)", nested?.let(::useModifier)),
+          listOfNotNull("weight(1f)", nested),
         )
-      nested != null -> modifierArg(place, listOf(useModifier(nested)))
+      nested != null -> modifierArg(place, listOf(nested))
       else -> modifierArg(place, emptyList())
     }
 
@@ -827,7 +846,11 @@ private fun ScreenEmitter.topAppBar(node: ComponentNode, p: JsonObject, place: P
       modifier(place, p),
       slot(p, "navigationIcon", place, "TopAppBar")?.let { arg("navigationIcon", it) },
       if (p["actions"] == null) null else arg("actions", lambda(actions)),
-      if (place.scrollBehavior) arg("scrollBehavior", "scrollBehavior") else null,
+      if (place.scrollBehavior && CollapsingAppBars.isCollapsing(node.component, p)) {
+        arg("scrollBehavior", "scrollBehavior")
+      } else {
+        null
+      },
     ),
   )
 }

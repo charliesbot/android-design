@@ -425,7 +425,7 @@ internal class ScreenEmitter(
     }
   }
 
-  private fun showIn(node: ComponentNode): Set<SizeClass> {
+  fun showIn(node: ComponentNode): Set<SizeClass> {
     val listed = (node.props[M3ExpressiveCatalog.SHOW_IN] as? JsonArray)
     if (listed == null) return SizeClass.entries.toSet()
     return listed.mapNotNull { (it as? JsonPrimitive)?.content?.let(SizeClass::fromWire) }.toSet()
