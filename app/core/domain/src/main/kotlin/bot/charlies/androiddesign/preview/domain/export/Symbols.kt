@@ -16,6 +16,9 @@ internal object Sym {
   const val getValue = "$RUNTIME.getValue"
   const val setValue = "$RUNTIME.setValue"
   const val LaunchedEffect = "$RUNTIME.LaunchedEffect"
+  const val rememberCoroutineScope = "$RUNTIME.rememberCoroutineScope"
+  const val launch = "kotlinx.coroutines.launch"
+  const val rememberTextFieldState = "androidx.compose.foundation.text.input.rememberTextFieldState"
 
   // foundation
   const val Image = "androidx.compose.foundation.Image"

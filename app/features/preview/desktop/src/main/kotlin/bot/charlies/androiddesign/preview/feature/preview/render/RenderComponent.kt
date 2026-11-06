@@ -53,6 +53,7 @@ internal fun RenderComponent(ctx: NodeContext) {
     "Slider" -> RenderSlider(ctx)
     "RangeSlider" -> RenderRangeSlider(ctx)
     "TextField" -> RenderTextField(ctx)
+    "SearchBar" -> RenderSearchBar(ctx)
     "LoadingIndicator" -> RenderLoadingIndicator(ctx)
     "ProgressIndicator" -> RenderProgressIndicator(ctx)
     "BottomSheet" -> RenderBottomSheet(ctx)
@@ -60,6 +61,8 @@ internal fun RenderComponent(ctx: NodeContext) {
     "Menu" -> RenderMenu(ctx)
     "MenuItem" -> RenderMenuItem(ctx)
     "SideSheet" -> RenderSideSheet(ctx)
+    "SearchView" -> RenderSearchView(ctx)
+    "Tooltip" -> RenderTooltip(ctx)
     "Snackbar" -> RenderSnackbar(ctx)
   }
 }

@@ -41,9 +41,9 @@ Both omissions are Material's own retirements:
 Search has two parts, matching Compose's split between the collapsed bar and its expanded view:
 
 - `SearchBar` is the inline bar: `placeholder`, leading and trailing icons, and an optional `expanded` child naming a `SearchView` overlay, the same way `SplitButton.menu` names its `Menu`. Tapping the bar opens it.
-- `SearchView` is the overlay: `layout: docked | full-screen` and result children. It exports to `ExpandedDockedSearchBar` or `ExpandedFullScreenSearchBar`. Material marks the divided style "Not recommended", so only the contained style is offered.
+- `SearchView` is the overlay: `layout: docked | full-screen` and result children. It exports to `ExpandedDockedSearchBarWithGap` or `ExpandedFullScreenContainedSearchBar`, which are the contained style; the plain `ExpandedDockedSearchBar` and `ExpandedFullScreenSearchBar` are the divided style, which Material marks "Not recommended", so it is not offered.
 
-The search app bar is a new `TopAppBar` size, `search`, exporting to `AppBarWithSearch`, because it occupies the app bar slot and follows app bar rules (at most one trailing action plus an avatar).
+The search app bar is a new `TopAppBar` size, `search`, exporting to `AppBarWithSearch`, because it occupies the app bar slot and follows app bar rules (up to two trailing icons plus an avatar on compact widths, up to four from medium up).
 
 ### Carousel
 

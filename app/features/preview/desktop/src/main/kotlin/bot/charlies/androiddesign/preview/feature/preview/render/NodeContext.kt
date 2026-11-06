@@ -77,6 +77,10 @@ internal class NodeContext(
   val component: String
     get() = node.component
 
+  /** This component drawn in [other], for a second copy that must not record itself. */
+  fun withEnv(other: RenderEnv) =
+    NodeContext(other, node, def, id, parentId, order, props, scope, style, host)
+
   fun string(key: String) = props.string(key)
 
   /** A boolean prop: its value, else the catalog default, else false. */
@@ -229,13 +233,20 @@ internal fun RenderNode(
     DisposableEffect(ctx.id) { onDispose { recorder.unregister(ctx.id) } }
   }
   val menuId = env.placement.menuAt(node.id)
+  val tooltipId = env.placement.tooltipAt(node.id)
+  val anchored: @Composable () -> Unit =
+    if (tooltipId != null && !env.isOverlay(node)) {
+      { TooltipAnchor(env, tooltipId, ref.scope, ctx.id, order) { RenderComponent(ctx) } }
+    } else {
+      { RenderComponent(ctx) }
+    }
   if (menuId != null && !env.isOverlay(node)) {
     androidx.compose.foundation.layout.Box {
-      RenderComponent(ctx)
+      anchored()
       MenuOverlay(env, menuId, ref.scope, ctx.id, order)
     }
   } else {
-    RenderComponent(ctx)
+    anchored()
   }
 }
 

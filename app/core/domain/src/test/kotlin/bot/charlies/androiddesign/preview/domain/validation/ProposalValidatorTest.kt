@@ -601,4 +601,178 @@ class ProposalValidatorTest {
     errors(badge("1000")).let { assertEquals(emptyList(), it) }
     errors(badge("[1]")).assertHas(path, "must be true, false")
   }
+
+  private fun icon(id: String) =
+    """{"id":"$id","component":"IconButton","icon":"mic","contentDescription":"$id"}"""
+
+  private fun view(id: String) = """{"id":"$id","component":"SearchView","content":[]}"""
+
+  @Test
+  fun `a search bar has at most two trailing elements, an avatar counting as one`() {
+    fun bar(extra: String) =
+      base
+        .with("a", icon("a"))
+        .with("b", icon("b"))
+        .with("c", icon("c"))
+        .with("results", view("results"))
+        .with(
+          "field",
+          """{"id":"field","component":"SearchBar","placeholder":"Search","expanded":"results"$extra}""",
+        )
+    assertEquals(emptyList(), errors(bar(""","trailing":["a","b"]""")))
+    assertEquals(emptyList(), errors(bar(""","trailing":["a"],"avatar":"me.png"""")))
+    val three = bar(""","trailing":["a","b","c"]""")
+    errors(three).assertHas(plates("${three.indexOf("field")}") + "/trailing", "at most 2")
+    val avatar = bar(""","trailing":["a","b"],"avatar":"me.png"""")
+    errors(avatar).assertHas(plates("${avatar.indexOf("field")}") + "/trailing", "at most 2")
+  }
+
+  @Test
+  fun `a search app bar has two actions, and up to four only on larger screens`() {
+    fun bar(extra: String) =
+      base
+        .with("a", icon("a"))
+        .with("b", icon("b"))
+        .with("c", icon("c"))
+        .with("d", icon("d"))
+        .with("results", view("results"))
+        .with(
+          "bar",
+          """{"id":"bar","component":"TopAppBar","size":"search","title":"Search","expanded":"results"$extra}""",
+        )
+    assertEquals(emptyList(), errors(bar(""","actions":["a","b"],"avatar":"me.png"""")))
+    assertEquals(
+      emptyList(),
+      errors(bar(""","actions":["a","b"],"sizeClass":{"medium":{"actions":["a","b","c","d"]}}""")),
+    )
+    val four = bar(""","actions":["a","b","c","d"]""")
+    errors(four).assertHas(plates("${four.indexOf("bar")}") + "/actions", "at most 2")
+    val three = bar(""","actions":["a","b","c"],"avatar":"me.png"""")
+    errors(three).assertHas(plates("${three.indexOf("bar")}") + "/actions", "at most 2")
+    val five =
+      bar(""","actions":["a","b"],"sizeClass":{"medium":{"actions":["a","b","c","d","a"]}}""")
+    errors(five)
+      .assertHas(plates("${five.indexOf("bar")}") + "/sizeClass/medium/actions", "at most 4")
+  }
+
+  @Test
+  fun `expanded is for a search app bar, which a size class override can make`() {
+    val small =
+      base
+        .with("results", view("results"))
+        .with(
+          "bar",
+          """{"id":"bar","component":"TopAppBar","title":"Plates","sizeClass":{"medium":{"size":"search"}},"expanded":"results"}""",
+        )
+    assertEquals(emptyList(), errors(small))
+  }
+
+  @Test
+  fun `avatar and expanded belong to the search size of the top app bar`() {
+    val small =
+      base
+        .with("results", view("results"))
+        .with(
+          "bar",
+          """{"id":"bar","component":"TopAppBar","title":"Plates","avatar":"me.png","expanded":"results"}""",
+        )
+    val path = plates("${small.indexOf("bar")}")
+    errors(small).assertHas("$path/avatar", "size search")
+    errors(small).assertHas("$path/expanded", "size search")
+  }
+
+  @Test
+  fun `a search view needs exactly one bar that names it`() {
+    val loose = base.with("results", view("results"))
+    errors(loose)
+      .assertHas(plates("${loose.indexOf("results")}") + "/component", "nothing names 'results'")
+    val twice =
+      loose
+        .with(
+          "one",
+          """{"id":"one","component":"SearchBar","placeholder":"Search","expanded":"results"}""",
+        )
+        .with(
+          "two",
+          """{"id":"two","component":"SearchBar","placeholder":"Search","expanded":"results"}""",
+        )
+    errors(twice).assertHas(plates("${twice.indexOf("results")}") + "/component", "one and two")
+  }
+
+  @Test
+  fun `a tooltip needs an anchor, and only a rich one has a subhead and up to two buttons`() {
+    fun tip(extra: String) =
+      base
+        .with("a", """{"id":"a","component":"Button","variant":"text","label":"A"}""")
+        .with("b", """{"id":"b","component":"Button","variant":"text","label":"B"}""")
+        .with("c", """{"id":"c","component":"Button","variant":"text","label":"C"}""")
+        .with(
+          "tip",
+          """{"id":"tip","component":"Tooltip","anchor":"more","text":"Hi"$extra}""",
+        )
+    assertEquals(emptyList(), errors(tip("")))
+    assertEquals(
+      emptyList(),
+      errors(tip(""","variant":"rich","title":"T","actions":["a","b"]""")),
+    )
+    val plain = tip(""","title":"T","actions":["a"]""")
+    val path = plates("${plain.indexOf("tip")}")
+    errors(plain).assertHas("$path/title", "rich tooltip")
+    errors(plain).assertHas("$path/actions", "rich tooltip")
+    val three = tip(""","variant":"rich","actions":["a","b","c"]""")
+    errors(three).assertHas(plates("${three.indexOf("tip")}") + "/actions", "at most 2")
+    val noAnchor = base.with("tip", """{"id":"tip","component":"Tooltip","text":"Hi"}""")
+    errors(noAnchor).assertHas(plates("${noAnchor.indexOf("tip")}"), "requires prop 'anchor'")
+  }
+
+  private fun buttons(vararg ids: String) =
+    ids.fold(base) { proposal, id ->
+      proposal.with(id, """{"id":"$id","component":"Button","variant":"text","label":"$id"}""")
+    }
+
+  @Test
+  fun `a malformed size class entry on a search app bar is an error, not a crash`() {
+    val bar =
+      base
+        .with("results", view("results"))
+        .with(
+          "bar",
+          """{"id":"bar","component":"TopAppBar","size":"search","title":"Search","expanded":"results","actions":["a","a","a","a","a"],"sizeClass":{"medium":"wide"}}""",
+        )
+        .with("a", icon("a"))
+    errors(bar)
+      .assertHas(plates("${bar.indexOf("bar")}") + "/sizeClass/medium", "must be an object")
+  }
+
+  @Test
+  fun `a size class override cannot get around a tooltip's limits`() {
+    fun tip(extra: String) =
+      buttons("a", "b", "c")
+        .with("tip", """{"id":"tip","component":"Tooltip","anchor":"more","text":"Hi"$extra}""")
+    val actions = tip(""","sizeClass":{"expanded":{"actions":["a","b","c"]}}""")
+    errors(actions)
+      .assertHas(plates("${actions.indexOf("tip")}") + "/sizeClass/expanded/actions", "at most 2")
+    val plain =
+      tip(
+        ""","variant":"rich","title":"T","actions":["a"],"sizeClass":{"medium":{"variant":"plain"}}""",
+      )
+    val path = plates("${plain.indexOf("tip")}") + "/sizeClass/medium"
+    errors(plain).assertHas("$path/variant", "rich tooltip")
+  }
+
+  @Test
+  fun `a size class override cannot get around the search bar's trailing limit`() {
+    val bar =
+      base
+        .with("a", icon("a"))
+        .with("b", icon("b"))
+        .with("c", icon("c"))
+        .with("results", view("results"))
+        .with(
+          "field",
+          """{"id":"field","component":"SearchBar","placeholder":"Search","expanded":"results","trailing":["a"],"sizeClass":{"medium":{"trailing":["a","b","c"]}}}""",
+        )
+    errors(bar)
+      .assertHas(plates("${bar.indexOf("field")}") + "/sizeClass/medium/trailing", "at most 2")
+  }
 }

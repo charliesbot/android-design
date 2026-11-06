@@ -96,4 +96,51 @@ class OverlayPlacementTest {
     assertEquals(emptyList(), placement.snackbars.map { it.id })
     assertEquals(listOf("saved"), placement.screenLevel.map { it.id })
   }
+
+  @Test
+  fun `a tooltip hangs off its anchor and not at screen level`() {
+    val placement =
+      placement(node("info", "IconButton"), node("tip", "Tooltip", "anchor" to "info"))
+
+    assertEquals("tip", placement.tooltipAt("info"))
+    assertNull(placement.tooltipAt("other"))
+    assertEquals(emptyList(), placement.screenLevel.map { it.id })
+  }
+
+  @Test
+  fun `plain tooltips open above and below an app bar, rich ones open below`() {
+    val placement =
+      placement(
+        node("bar", "TopAppBar", "navigationIcon" to "save"),
+        node("save", "IconButton"),
+        node("plain_in_bar", "Tooltip", "anchor" to "save"),
+        node("fab", "FloatingActionButton"),
+        node("plain", "Tooltip", "anchor" to "fab"),
+        node("rich", "Tooltip", "anchor" to "fab", "variant" to "rich"),
+      )
+
+    assertEquals(TooltipSpec.Side.Below, placement.tooltipSide("plain_in_bar", rich = false))
+    assertEquals(TooltipSpec.Side.Above, placement.tooltipSide("plain", rich = false))
+    assertEquals(TooltipSpec.Side.Below, placement.tooltipSide("rich", rich = true))
+    // The second tooltip on one anchor has no place beside it.
+    assertEquals(listOf("rich"), placement.screenLevel.map { it.id })
+  }
+
+  @Test
+  fun `a search view opens beside the bar that names it`() {
+    val placement =
+      placement(
+        node("bar", "SearchBar", "expanded" to "results"),
+        node("results", "SearchView"),
+        node("app", "TopAppBar", "size" to "search", "expanded" to "app_results"),
+        node("app_results", "SearchView"),
+        node("loose", "SearchView"),
+      )
+
+    assertEquals("results", placement.expandedViewOf("bar"))
+    assertEquals("app_results", placement.expandedViewOf("app"))
+    assertEquals("bar", placement.barOf("results"))
+    assertNull(placement.barOf("loose"))
+    assertEquals(listOf("loose"), placement.screenLevel.map { it.id })
+  }
 }

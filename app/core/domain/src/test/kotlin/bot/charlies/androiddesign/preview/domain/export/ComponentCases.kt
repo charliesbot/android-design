@@ -1042,6 +1042,94 @@ internal val componentCases: List<ComponentCase> =
         ),
     ),
     case(
+      "SearchBar",
+      "SearchView",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["bar","open"]}""",
+          """{"id":"bar","component":"SearchBar","placeholder":"Search mail","trailing":["mic"],"expanded":"results"}""",
+          """{"id":"mic","component":"IconButton","icon":"mic","contentDescription":"Voice search"}""",
+          """{"id":"open","component":"Button","label":"Search","action":{"functionCall":{"@call":"open","args":{"overlay":"results"}}}}""",
+          """{"id":"results","component":"SearchView","content":["r"]}""",
+          """{"id":"r","component":"Text","text":"Recent"}""",
+        ),
+      expect =
+        listOf(
+          "val coroutineScope = rememberCoroutineScope()",
+          "val barSearchState = rememberContainedSearchBarState()",
+          "val barQuery = rememberTextFieldState()",
+          "val barSearchColors = SearchBarDefaults.containedColors(state = barSearchState)",
+          "val barInput = @Composable {",
+          "SearchBarDefaults.InputField(",
+          "textFieldState = barQuery",
+          "searchBarState = barSearchState",
+          "placeholder = { Text(\"Search mail\") }",
+          "if (barSearchState.currentValue == SearchBarValue.Expanded) {",
+          "coroutineScope.launch { barSearchState.animateToCollapsed() }",
+          "Icon(painterResource(R.drawable.search), contentDescription = null)",
+          "SearchBar(",
+          "state = barSearchState",
+          "inputField = barInput",
+          "colors = barSearchColors",
+          "ExpandedFullScreenContainedSearchBar(",
+          "onClick = { coroutineScope.launch { barSearchState.animateToExpanded() } }",
+          "Text(\"Recent\")",
+        ),
+      reject = listOf("showResults", "ExpandedFullScreenSearchBar(", "ExpandedDockedSearchBar("),
+    ),
+    case(
+      "TopAppBar",
+      components =
+        listOf(
+          """{"id":"root","component":"Scaffold","topBar":"bar","content":"x"}""",
+          """{"id":"bar","component":"TopAppBar","size":"search","title":"Search inbox","navigationIcon":"menu","actions":["cast"],"expanded":"results"}""",
+          """{"id":"menu","component":"IconButton","icon":"menu","contentDescription":"Menu"}""",
+          """{"id":"cast","component":"IconButton","icon":"cast","contentDescription":"Cast"}""",
+          """{"id":"results","component":"SearchView","layout":"docked","content":[]}""",
+          """{"id":"x","component":"Column","children":[]}""",
+        ),
+      expect =
+        listOf(
+          "val barSearchState = rememberSearchBarWithGapState()",
+          "val barSearchColors = SearchBarDefaults.colors()",
+          "placeholder = { Text(\"Search inbox\") }",
+          "AppBarWithSearch(",
+          "navigationIcon = {",
+          "actions = {",
+          "colors = SearchBarDefaults.appBarWithSearchColors(searchBarColors = barSearchColors)",
+          "ExpandedDockedSearchBarWithGap(state = barSearchState, inputField = barInput) {}",
+        ),
+    ),
+    case(
+      "Tooltip",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["info","bar"]}""",
+          """{"id":"info","component":"IconButton","icon":"info","contentDescription":"Info"}""",
+          """{"id":"tip","component":"Tooltip","anchor":"info","variant":"rich","title":"Why","text":"Because.","actions":["ok"]}""",
+          """{"id":"ok","component":"Button","variant":"text","label":"Got it","action":{"functionCall":{"@call":"dismiss"}}}""",
+          """{"id":"bar","component":"IconButton","icon":"edit","contentDescription":"Edit"}""",
+          """{"id":"plain","component":"Tooltip","anchor":"bar","text":"Edit"}""",
+        ),
+      expect =
+        listOf(
+          "val tipTooltipState = rememberTooltipState(isPersistent = true)",
+          "val plainTooltipState = rememberTooltipState()",
+          "TooltipBox(",
+          "TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below)",
+          "TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above)",
+          "RichTooltip(",
+          "title = { Text(\"Why\") }",
+          "Row(horizontalArrangement = Arrangement.spacedBy(8.dp))",
+          "coroutineScope.launch { tipTooltipState.dismiss() }",
+          "state = tipTooltipState",
+          "hasAction = true",
+          "Text(\"Because.\")",
+          "PlainTooltip { Text(\"Edit\") }",
+        ),
+      reject = listOf("showTip"),
+    ),
+    case(
       "Snackbar",
       components =
         listOf(

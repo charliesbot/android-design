@@ -9,6 +9,7 @@
 //   R.drawable.bolt
 //   R.drawable.bookmark
 //   R.drawable.bookmark_filled
+//   R.drawable.cast
 //   R.drawable.chat
 //   R.drawable.check
 //   R.drawable.close
@@ -45,10 +46,12 @@
 //   R.drawable.restaurant
 //   R.drawable.schedule
 //   R.drawable.search
+//   R.drawable.search_bar
 //   R.drawable.select
 //   R.drawable.send
 //   R.drawable.share
 //   R.drawable.star
+//   R.drawable.top
 //   R.drawable.touch_app
 //   R.drawable.tune
 //   R.drawable.undo
@@ -94,9 +97,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AppBarWithSearch
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Badge
@@ -119,6 +125,8 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ElevatedFilterChip
 import androidx.compose.material3.ElevatedSuggestionChip
 import androidx.compose.material3.ElevatedToggleButton
+import androidx.compose.material3.ExpandedDockedSearchBarWithGap
+import androidx.compose.material3.ExpandedFullScreenContainedSearchBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -167,9 +175,14 @@ import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedIconToggleButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedToggleButton
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SearchBar
+import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.SearchBarValue
 import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Shapes
@@ -192,6 +205,9 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.ToggleFloatingActionButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Typography
@@ -209,6 +225,9 @@ import androidx.compose.material3.carousel.HorizontalCenteredHeroCarousel
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
+import androidx.compose.material3.rememberContainedSearchBarState
+import androidx.compose.material3.rememberSearchBarWithGapState
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
@@ -217,6 +236,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -247,6 +267,7 @@ import androidx.window.core.layout.WindowSizeClass
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 private val SeedColor = Color(0xFF6750A4)
@@ -431,6 +452,8 @@ fun VerifyTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable
 
 @Serializable private data object FeedbackRoute : NavKey
 
+@Serializable private data object SearchRoute : NavKey
+
 @Composable
 fun VerifyApp() {
   VerifyTheme {
@@ -468,6 +491,7 @@ fun VerifyApp() {
               onNavigateToActions = { backStack.add(ActionsRoute) },
               onNavigateToInputs = { backStack.add(InputsRoute) },
               onNavigateToOverlays = { backStack.add(OverlaysRoute) },
+              onNavigateToSearch = { backStack.add(SearchRoute) },
             )
           }
           entry<OverlaysRoute> {
@@ -491,6 +515,7 @@ fun VerifyApp() {
             )
           }
           entry<FeedbackRoute> { FeedbackScreen(onBack = { backStack.removeLastOrNull() }) }
+          entry<SearchRoute> { SearchScreen(onBack = { backStack.removeLastOrNull() }) }
         },
     )
   }
@@ -1794,12 +1819,18 @@ fun InputsScreen(
   onNavigateToActions: () -> Unit = {},
   onNavigateToInputs: () -> Unit = {},
   onNavigateToOverlays: () -> Unit = {},
+  onNavigateToSearch: () -> Unit = {},
 ) {
+  val coroutineScope = rememberCoroutineScope()
   val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
   val atLeastMedium =
     windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
   val atLeastExpanded =
     windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
+  val searchBarSearchState = rememberContainedSearchBarState()
+  val searchDockedSearchState = rememberSearchBarWithGapState()
+  val tipPlainTooltipState = rememberTooltipState()
+  val tipRichTooltipState = rememberTooltipState(isPersistent = true)
   Row(modifier = modifier) {
     if (atLeastMedium && !atLeastExpanded) {
       WideNavigationRail(state = rememberWideNavigationRailState()) {
@@ -2011,10 +2042,34 @@ fun InputsScreen(
               onCheckedChange = { switchOffChecked = it },
               modifier = Modifier.semantics { contentDescription = "Bluetooth" },
             )
-            var checkOnChecked by remember { mutableStateOf(true) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-              Checkbox(checked = checkOnChecked, onCheckedChange = { checkOnChecked = it })
-              Text("Checked")
+            TooltipBox(
+              positionProvider =
+                TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below),
+              tooltip = {
+                RichTooltip(
+                  title = { Text("Why this matters") },
+                  action = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                      TextButton(
+                        onClick = { coroutineScope.launch { tipRichTooltipState.dismiss() } },
+                      ) {
+                        Text("Got it")
+                      }
+                      TextButton(onClick = {}) { Text("Learn more") }
+                    }
+                  },
+                ) {
+                  Text("Checked items stay in your plan.")
+                }
+              },
+              state = tipRichTooltipState,
+              hasAction = true,
+            ) {
+              var checkOnChecked by remember { mutableStateOf(true) }
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = checkOnChecked, onCheckedChange = { checkOnChecked = it })
+                Text("Checked")
+              }
             }
             var checkOffChecked by remember { mutableStateOf(false) }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2130,14 +2185,21 @@ fun InputsScreen(
             expanded = true,
             colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
           ) {
-            IconButton(
-              onClick = {},
-              colors =
-                IconButtonDefaults.iconButtonColors(
-                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
+            TooltipBox(
+              positionProvider =
+                TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+              tooltip = { PlainTooltip { Text("Undo") } },
+              state = tipPlainTooltipState,
             ) {
-              Icon(painterResource(R.drawable.undo), contentDescription = "Undo")
+              IconButton(
+                onClick = {},
+                colors =
+                  IconButtonDefaults.iconButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                  ),
+              ) {
+                Icon(painterResource(R.drawable.undo), contentDescription = "Undo")
+              }
             }
             IconButton(
               onClick = {},
@@ -2149,6 +2211,137 @@ fun InputsScreen(
               Icon(painterResource(R.drawable.redo), contentDescription = "Redo")
             }
           }
+          Box {
+            val searchBarQuery = rememberTextFieldState()
+            val searchBarSearchColors =
+              SearchBarDefaults.containedColors(state = searchBarSearchState)
+            val searchBarInput =
+              @Composable {
+                SearchBarDefaults.InputField(
+                  textFieldState = searchBarQuery,
+                  searchBarState = searchBarSearchState,
+                  onSearch = {
+                    coroutineScope.launch { searchBarSearchState.animateToCollapsed() }
+                  },
+                  colors = searchBarSearchColors.inputFieldColors,
+                  placeholder = { Text("Search recipes") },
+                  leadingIcon = {
+                    if (searchBarSearchState.currentValue == SearchBarValue.Expanded) {
+                      IconButton(
+                        onClick = {
+                          coroutineScope.launch { searchBarSearchState.animateToCollapsed() }
+                        },
+                      ) {
+                        Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+                      }
+                    } else {
+                      IconButton(
+                        onClick = {},
+                        colors =
+                          IconButtonDefaults.iconButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                          ),
+                      ) {
+                        Icon(painterResource(R.drawable.menu), contentDescription = "Menu")
+                      }
+                    }
+                  },
+                  trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                      IconButton(
+                        onClick = {},
+                        colors =
+                          IconButtonDefaults.iconButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                          ),
+                      ) {
+                        Icon(painterResource(R.drawable.mic), contentDescription = "Voice search")
+                      }
+                      Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                        Image(
+                          painter = painterResource(R.drawable.search_bar),
+                          contentDescription = null,
+                          modifier = Modifier.size(30.dp).clip(CircleShape),
+                          contentScale = ContentScale.Crop,
+                        )
+                      }
+                    }
+                  },
+                )
+              }
+            SearchBar(
+              state = searchBarSearchState,
+              inputField = searchBarInput,
+              modifier = Modifier.fillMaxWidth(),
+              colors = searchBarSearchColors,
+            )
+            ExpandedFullScreenContainedSearchBar(
+              state = searchBarSearchState,
+              inputField = searchBarInput,
+              colors = searchBarSearchColors,
+            ) {
+              ListItem(modifier = Modifier.fillMaxWidth()) { Text("Mexican dishes") }
+              ListItem(modifier = Modifier.fillMaxWidth()) { Text("Quick dinners") }
+            }
+          }
+          Box {
+            val searchDockedQuery = rememberTextFieldState()
+            val searchDockedSearchColors = SearchBarDefaults.colors()
+            val searchDockedInput =
+              @Composable {
+                SearchBarDefaults.InputField(
+                  textFieldState = searchDockedQuery,
+                  searchBarState = searchDockedSearchState,
+                  onSearch = {
+                    coroutineScope.launch { searchDockedSearchState.animateToCollapsed() }
+                  },
+                  colors = searchDockedSearchColors.inputFieldColors,
+                  placeholder = { Text("Search your messages") },
+                  leadingIcon = {
+                    if (searchDockedSearchState.currentValue == SearchBarValue.Expanded) {
+                      IconButton(
+                        onClick = {
+                          coroutineScope.launch { searchDockedSearchState.animateToCollapsed() }
+                        },
+                      ) {
+                        Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+                      }
+                    } else {
+                      Icon(painterResource(R.drawable.search), contentDescription = null)
+                    }
+                  },
+                  trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                      IconButton(
+                        onClick = {},
+                        colors =
+                          IconButtonDefaults.iconButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                          ),
+                      ) {
+                        Icon(
+                          painterResource(R.drawable.more_vert),
+                          contentDescription = "More options",
+                        )
+                      }
+                    }
+                  },
+                )
+              }
+            SearchBar(
+              state = searchDockedSearchState,
+              inputField = searchDockedInput,
+              modifier = Modifier.fillMaxWidth(),
+              colors = searchDockedSearchColors,
+            )
+            ExpandedDockedSearchBarWithGap(
+              state = searchDockedSearchState,
+              inputField = searchDockedInput,
+            ) {
+              ListItem(modifier = Modifier.fillMaxWidth()) { Text("Recent: invoices") }
+            }
+          }
+          Button(onClick = { onNavigateToSearch() }) { Text("Search app bar") }
         }
         HorizontalFloatingToolbar(
           expanded = true,
@@ -3203,6 +3396,95 @@ fun FeedbackScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {}) {
 @Composable
 private fun FeedbackScreenPreview() {
   VerifyTheme { FeedbackScreen() }
+}
+
+@Composable
+fun SearchScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {}) {
+  val coroutineScope = rememberCoroutineScope()
+  val topSearchState = rememberSearchBarWithGapState()
+  Scaffold(
+    modifier = modifier,
+    topBar = {
+      Box {
+        val topQuery = rememberTextFieldState()
+        val topSearchColors = SearchBarDefaults.colors()
+        val topInput =
+          @Composable {
+            SearchBarDefaults.InputField(
+              textFieldState = topQuery,
+              searchBarState = topSearchState,
+              onSearch = { coroutineScope.launch { topSearchState.animateToCollapsed() } },
+              colors = topSearchColors.inputFieldColors,
+              placeholder = { Text("Search inbox") },
+              leadingIcon = {
+                if (topSearchState.currentValue == SearchBarValue.Expanded) {
+                  IconButton(
+                    onClick = { coroutineScope.launch { topSearchState.animateToCollapsed() } },
+                  ) {
+                    Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+                  }
+                } else {
+                  Icon(painterResource(R.drawable.search), contentDescription = null)
+                }
+              },
+            )
+          }
+        AppBarWithSearch(
+          state = topSearchState,
+          inputField = topInput,
+          navigationIcon = {
+            IconButton(
+              onClick = {},
+              colors =
+                IconButtonDefaults.iconButtonColors(
+                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+              Icon(painterResource(R.drawable.menu), contentDescription = "Menu")
+            }
+          },
+          actions = {
+            IconButton(
+              onClick = {},
+              colors =
+                IconButtonDefaults.iconButtonColors(
+                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+              Icon(painterResource(R.drawable.cast), contentDescription = "Cast")
+            }
+            Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+              Image(
+                painter = painterResource(R.drawable.top),
+                contentDescription = null,
+                modifier = Modifier.size(30.dp).clip(CircleShape),
+                contentScale = ContentScale.Crop,
+              )
+            }
+          },
+          colors = SearchBarDefaults.appBarWithSearchColors(searchBarColors = topSearchColors),
+        )
+        ExpandedDockedSearchBarWithGap(state = topSearchState, inputField = topInput) {
+          ListItem(modifier = Modifier.fillMaxWidth()) { Text("Recent: tickets") }
+          ListItem(modifier = Modifier.fillMaxWidth()) { Text("Recent: receipts") }
+        }
+      }
+    },
+  ) { innerPadding ->
+    Column(
+      modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+      Text("Messages appear here.")
+      Button(onClick = { onBack() }) { Text("Back") }
+    }
+  }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SearchScreenPreview() {
+  VerifyTheme { SearchScreen() }
 }
 
 data class HomeRow(val kind: String, val name: String, val detail: String, val meta: String)

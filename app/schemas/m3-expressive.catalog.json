@@ -583,12 +583,14 @@
             "small",
             "center",
             "medium",
-            "large"
+            "large",
+            "search"
           ],
           "default": "small"
         },
         "title": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "The heading. In a search app bar it is the search field's hint, which includes the word Search (such as \"Search inbox\")."
         },
         "subtitle": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
@@ -603,7 +605,19 @@
           "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
           "x-allowedComponents": [
             "IconButton"
-          ]
+          ],
+          "description": "The trailing icon buttons. A search app bar has at most two at compact widths, an avatar coming in addition, and up to four from medium widths up (override `actions` in `sizeClass`)."
+        },
+        "avatar": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Search size only: a profile picture, drawn as a 30dp circle after the actions. Path relative to the proposal, or a data: URI."
+        },
+        "expanded": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
+          "x-allowedComponents": [
+            "SearchView"
+          ],
+          "description": "Search size only: the SearchView that opens when the search field is tapped."
         }
       },
       "required": [
@@ -2065,6 +2079,73 @@
       ],
       "unevaluatedProperties": false
     },
+    "SearchBar": {
+      "type": "object",
+      "description": "A search field. Tapping it opens the SearchView named by `expanded`.",
+      "x-compose": "SearchBar with SearchBarDefaults.InputField and rememberSearchBarState",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "SearchBar"
+        },
+        "placeholder": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "The hint, a short description of what can be searched (\"Search mail\")."
+        },
+        "leadingIcon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "A non-functional icon at the start. Material Symbols name.",
+          "default": "search"
+        },
+        "navigationIcon": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
+          "x-allowedComponents": [
+            "IconButton"
+          ],
+          "description": "A navigational icon button (menu, arrow) that replaces the leading icon."
+        },
+        "trailing": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
+          "x-allowedComponents": [
+            "IconButton"
+          ],
+          "description": "Trailing icon buttons. At most two, an avatar counting as one."
+        },
+        "avatar": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "A profile picture, drawn as a 30dp circle after the trailing icon buttons. Path relative to the proposal, or a data: URI."
+        },
+        "expanded": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
+          "x-allowedComponents": [
+            "SearchView"
+          ]
+        },
+        "primary": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "placeholder"
+      ],
+      "unevaluatedProperties": false
+    },
     "LoadingIndicator": {
       "type": "object",
       "description": "An expressive indeterminate loading indicator.",
@@ -2280,6 +2361,84 @@
       ],
       "unevaluatedProperties": false
     },
+    "SearchView": {
+      "type": "object",
+      "description": "The focused state of a SearchBar or search app bar: its input field over a list of suggestions or results, in the contained style. Full-screen fills the window; docked opens a dropdown below the bar.",
+      "x-compose": "ExpandedFullScreenContainedSearchBar or ExpandedDockedSearchBarWithGap, sharing the bar's SearchBarState",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "SearchView"
+        },
+        "layout": {
+          "type": "string",
+          "enum": [
+            "docked",
+            "full-screen"
+          ],
+          "default": "full-screen"
+        },
+        "content": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList"
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "Tooltip": {
+      "type": "object",
+      "description": "A tooltip anchored to a component. Plain describes an icon-only control; rich adds a subhead and up to two text buttons.",
+      "x-compose": "TooltipBox with PlainTooltip or RichTooltip",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Tooltip"
+        },
+        "anchor": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "plain",
+            "rich"
+          ],
+          "default": "plain"
+        },
+        "text": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+        },
+        "title": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Rich only: a one-line subhead."
+        },
+        "actions": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
+          "x-allowedComponents": [
+            "Button"
+          ],
+          "description": "Rich only: up to two text buttons, side by side."
+        }
+      },
+      "required": [
+        "component",
+        "anchor",
+        "text"
+      ],
+      "unevaluatedProperties": false
+    },
     "Snackbar": {
       "type": "object",
       "description": "A brief message at the bottom of the screen, in the Scaffold's snackbar slot above the FAB and the navigation bar.",
@@ -2360,7 +2519,7 @@
     },
     "open": {
       "type": "object",
-      "description": "Opens a BottomSheet, Dialog, Menu, SideSheet or Snackbar of the same screen by id.",
+      "description": "Opens a BottomSheet, Dialog, Menu, SideSheet, SearchView, Snackbar or Tooltip of the same screen by id.",
       "returnType": "void",
       "properties": {
         "@call": {
@@ -2528,6 +2687,9 @@
           "$ref": "#/components/TextField"
         },
         {
+          "$ref": "#/components/SearchBar"
+        },
+        {
           "$ref": "#/components/LoadingIndicator"
         },
         {
@@ -2547,6 +2709,12 @@
         },
         {
           "$ref": "#/components/SideSheet"
+        },
+        {
+          "$ref": "#/components/SearchView"
+        },
+        {
+          "$ref": "#/components/Tooltip"
         },
         {
           "$ref": "#/components/Snackbar"

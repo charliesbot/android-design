@@ -26,21 +26,34 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarVisuals
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.TooltipScope
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import bot.charlies.androiddesign.preview.domain.SideSheetSpec
+import bot.charlies.androiddesign.preview.domain.TooltipSpec
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.TypeRole
 
@@ -319,5 +332,119 @@ internal fun RenderSnackbar(ctx: NodeContext) {
     }
   CompositionLocalProvider(LocalAmbient provides SnackbarAmbient) {
     Snackbar(data, ctx.modifier())
+  }
+}
+
+/** The scope of the tooltip popup being drawn: `PlainTooltip` and `RichTooltip` extend it. */
+@OptIn(ExperimentalMaterial3Api::class)
+private val LocalTooltipScope = compositionLocalOf<TooltipScope?> { null }
+
+private val PlainTooltipAmbient = Ambient(ColorRole.InverseSurface, ColorRole.InverseOnSurface)
+private val RichTooltipAmbient = Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurfaceVariant)
+
+internal fun NodeContext.tooltipLook(): Look =
+  if (enum("variant") == "rich") {
+    Look(RichTooltipAmbient, TypeRole.BodyMedium, "medium", string("text"))
+  } else {
+    Look(PlainTooltipAmbient, TypeRole.BodySmall, "extraSmall", string("text"))
+  }
+
+/**
+ * Draws [anchor] inside the `TooltipBox` of the tooltip [tooltipId], which hangs off it. The box is
+ * there whether or not the tooltip is open, as in the exported code, and a tooltip the viewer
+ * hovers or long presses opens the way it does on a device. The overlay state opens it for a
+ * review: the box then starts visible, and an `open` or `dismiss` action shows or hides it.
+ * Tooltips are persistent here, so a static render does not time out.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun TooltipAnchor(
+  env: RenderEnv,
+  tooltipId: String,
+  scope: DataScope,
+  parentId: String,
+  order: List<Int>,
+  anchor: @Composable () -> Unit,
+) {
+  val node = env.nodes[tooltipId]
+  val open = env.openOverlay == tooltipId
+  val state = rememberTooltipState(initialIsVisible = open, isPersistent = true)
+  LaunchedEffect(open) { if (open) state.show() else state.dismiss() }
+  // A tooltip the viewer closes (a tap outside it) closes the overlay too.
+  var shown by remember { mutableStateOf(false) }
+  LaunchedEffect(state.isVisible) {
+    if (state.isVisible) {
+      shown = true
+    } else if (shown) {
+      shown = false
+      if (env.openOverlay == tooltipId) env.dismiss()
+    }
+  }
+  // The variant at this width: the overrides over the prop, else the catalog default.
+  val variant = node?.let {
+    Props(effectiveProps(it, env), scope).string("variant")
+      ?: env.catalog.find(it.component)?.defaultOf("variant")?.content
+  }
+  val rich = variant == "rich"
+  val side = env.placement.tooltipSide(tooltipId, rich) ?: TooltipSpec.Side.Above
+  val hasAction =
+    node?.let { Props(effectiveProps(it, env), scope).children("actions").isNotEmpty() } == true
+  TooltipBox(
+    positionProvider =
+      TooltipDefaults.rememberTooltipPositionProvider(
+        when (side) {
+          TooltipSpec.Side.Above -> TooltipAnchorPosition.Above
+          TooltipSpec.Side.Below -> TooltipAnchorPosition.Below
+        },
+      ),
+    tooltip = {
+      CompositionLocalProvider(LocalTooltipScope provides this) {
+        RenderNode(
+          env,
+          ChildRef(tooltipId, scope),
+          parentId,
+          order + listOf(98, 0),
+          ChildHost.Wrap,
+        )
+      }
+    },
+    state = state,
+    hasAction = hasAction,
+    content = anchor,
+  )
+}
+
+/**
+ * The tooltip itself, called inside the `TooltipBox`'s popup. Plain is one line of text. Rich adds
+ * a subhead and up to two text buttons side by side.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun RenderTooltip(ctx: NodeContext) {
+  val scope = LocalTooltipScope.current ?: return
+  val text = ctx.string("text").orEmpty()
+  if (ctx.enum("variant") != "rich") {
+    with(scope) { PlainTooltip(modifier = ctx.modifier()) { ctx.PartText(text, "text") } }
+    return
+  }
+  val title = ctx.string("title")
+  val hasActions = ctx.props.children("actions").isNotEmpty()
+  with(scope) {
+    RichTooltip(
+      modifier = ctx.modifier(),
+      title = title?.let { value -> { ctx.PartText(value, "title") } },
+      action =
+        if (hasActions) {
+          {
+            Row(horizontalArrangement = Arrangement.spacedBy(TooltipSpec.ACTION_GAP_DP.dp)) {
+              ctx.Children("actions", 1, ChildHost(fillWidth = false, row = this))
+            }
+          }
+        } else {
+          null
+        },
+    ) {
+      ctx.PartText(text, "text")
+    }
   }
 }
