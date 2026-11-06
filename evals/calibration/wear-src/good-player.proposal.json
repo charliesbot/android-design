@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "name": "Drift player (good)",
+  "navigation": { "start": "main" },
+  "screens": {
+    "main": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "scroll": false, "children": ["col"] },
+        { "id": "col", "component": "Column", "horizontalAlignment": "center", "arrangement": "center", "spacing": "xs", "children": ["show", "title", "controls", "volume"] },
+        { "id": "show", "component": "Text", "text": "Slow Radio", "type": "labelSmall", "color": "onSurfaceVariant", "align": "center" },
+        { "id": "title", "component": "Text", "text": "The Long Way Home", "type": "titleMedium", "align": "center", "maxLines": 2, "overflow": "ellipsis" },
+        { "id": "controls", "component": "Row", "arrangement": "center", "verticalAlignment": "center", "spacing": "xs", "children": ["back", "play", "fwd"] },
+        { "id": "back", "component": "IconButton", "variant": "filledTonal", "size": "small", "icon": "replay_10", "contentDescription": "Back 10 seconds" },
+        { "id": "play", "component": "IconButton", "variant": "filled", "size": "large", "icon": "pause", "contentDescription": "Pause" },
+        { "id": "fwd", "component": "IconButton", "variant": "filledTonal", "size": "small", "icon": "forward_30", "contentDescription": "Forward 30 seconds" },
+        { "id": "volume", "component": "Slider", "value": 6, "range": [0, 10], "steps": 9, "contentDescription": "Volume" }
+      ]
+    }
+  }
+}

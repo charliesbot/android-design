@@ -116,6 +116,104 @@ class WearRenderTest {
   }
 
   @Test
+  fun `a button row wider than the round display reports round-edge-clipped`() {
+    val clipped =
+      assertIs<ProposalParse.Parsed>(
+          ProposalCodec.parse(
+            Files.readString(
+              Path.of(System.getProperty("fixtures.dir"), "wear-clipped.proposal.json"),
+            ),
+          ),
+        )
+        .proposal
+    val result = draw("home", Views.Watch, RenderSource(clipped, design(clipped.theme), null))
+    val hits = result.tree.findings.filter { it.rule == FindingRule.RoundEdgeClipped }
+    assertTrue(
+      hits.any { it.id == "stop" || it.id == "resume" },
+      "no clip finding: ${result.tree.findings}",
+    )
+    assertTrue(hits.none { it.id == "ring" }, "the ring is made for the edge: $hits")
+    assertEquals(
+      listOf("stop", "resume"),
+      hits.map { it.id },
+      "only the buttons are clipped, the centered texts fit: $hits",
+    )
+    val shipped =
+      Views.wear.flatMap { view ->
+        proposal.screens.keys.flatMap { draw(it, view).tree.findings }
+      }
+    assertEquals(emptyList(), shipped.filter { it.rule == FindingRule.RoundEdgeClipped })
+  }
+
+  @Test
+  fun `a primary icon button smaller than a rival button reports primary-largest`() {
+    val json =
+      """
+      {"format":1,"navigation":{"start":"home"},
+       "screens":{"home":{"catalogId":"${WearCatalog.ID}","components":[
+        {"id":"root","component":"Screen","scroll":true,"timeText":false,"children":["go","more"]},
+        {"id":"go","component":"IconButton","icon":"play_arrow","size":"small","primary":true},
+        {"id":"more","component":"Button","label":"More"}]}}}
+      """
+        .trimIndent()
+    val parsed = assertIs<ProposalParse.Parsed>(ProposalCodec.parse(json)).proposal
+    val result = draw("home", source = RenderSource(parsed, design(parsed.theme), null))
+    assertTrue(result.tree.node("go").primary)
+    assertEquals(
+      listOf("go"),
+      result.tree.findings.filter { it.rule == FindingRule.PrimaryLargest }.map { it.id },
+    )
+  }
+
+  @Test
+  fun `a fixed screen shows its edge button in full at the bottom`() {
+    val json =
+      """
+      {"format":1,"navigation":{"start":"home"},
+       "screens":{"home":{"catalogId":"${WearCatalog.ID}","components":[
+        {"id":"root","component":"Screen","scroll":false,"edgeButton":"pause","children":["col"]},
+        {"id":"col","component":"Column","horizontalAlignment":"center","arrangement":"center","children":["t"]},
+        {"id":"t","component":"Text","text":"Running","align":"center"},
+        {"id":"pause","component":"EdgeButton","label":"Pause","icon":"pause"}]}}}
+      """
+        .trimIndent()
+    val parsed = assertIs<ProposalParse.Parsed>(ProposalCodec.parse(json)).proposal
+    for (view in Views.wear) {
+      val tree = draw("home", view, RenderSource(parsed, design(parsed.theme), null)).tree
+      val edge = tree.node("pause").bounds
+      assertTrue(edge.width > 0f && edge.height > 0f, "${view.name}: edge button is $edge")
+      assertTrue(
+        edge.y + edge.height > view.height - 6f,
+        "${view.name}: edge button ends at ${edge.y + edge.height} of ${view.height}",
+      )
+      // The body stops above the button.
+      val col = tree.node("col").bounds
+      assertTrue(col.y + col.height <= edge.y + 1f, "${view.name}: body $col over button $edge")
+    }
+  }
+
+  @Test
+  fun `a fixed screen without an edge button has a full size body`() {
+    val json =
+      """
+      {"format":1,"navigation":{"start":"home"},
+       "screens":{"home":{"catalogId":"${WearCatalog.ID}","components":[
+        {"id":"root","component":"Screen","scroll":false,"timeText":false,"children":["col"]},
+        {"id":"col","component":"Column","horizontalAlignment":"center","arrangement":"center","children":["t"]},
+        {"id":"t","component":"Text","text":"Running","align":"center"}]}}}
+      """
+        .trimIndent()
+    val parsed = assertIs<ProposalParse.Parsed>(ProposalCodec.parse(json)).proposal
+    for (view in Views.wear) {
+      val tree = draw("home", view, RenderSource(parsed, design(parsed.theme), null)).tree
+      assertEquals(
+        Bounds(0f, 0f, view.width.toFloat(), view.height.toFloat()),
+        tree.node("col").bounds,
+      )
+    }
+  }
+
+  @Test
   fun `scrolling a list to its end brings up the edge button and the items below`() {
     val settings =
       draw("settings") { _ ->

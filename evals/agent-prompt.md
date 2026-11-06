@@ -20,13 +20,13 @@ Design exactly ONE screen as a proposal, in two files:
 
 Write only those two files. The previewer app is connected to you over MCP as the server `android_design_preview`; its tools are your only way to check the proposal. Call `open_proposal` with the proposal's absolute path, edit the file, and call `check_proposal` after each change. Do not take screenshots and do not run `render` yourself: the runner renders the final files headlessly and checks them.
 
-The screen must work and adapt across phone (411x923), foldable (704x933), tablet (1280x800), and desktop (1920x1080) windows, in light and dark.
+{{TARGET}}
 
 ## Review (the android-design screen check)
 
-1. Call `check_proposal`. It checks every screen at all five views in one call and lists only the errors. A proposal that does not validate returns its validation errors instead.
+1. Call `check_proposal`. It checks every screen at {{VIEWS}} in one call and lists only the errors. A proposal that does not validate returns its validation errors instead.
 2. Fix every error once, then call `check_proposal` again. Report anything still failing or unresolved.
-3. Read each view's `layout` summary in the `check_proposal` result (navigation, panes, and regions). Check that the larger views reveal what your section 0 adaptation answer promised, rather than rearranging the phone content. Call `get_tree` only when a summary is not enough.
+3. {{LAYOUT}}
 
 You cannot see the window. In your final message, say that visual quality was judged from the layout tree only.
 
@@ -36,7 +36,7 @@ You cannot see the window. In your final message, say that visual quality was ju
 
 ## Definition of done
 
-- `{{PROPOSAL}}` and `{{DESIGN_MD}}` implement the brief and adapt across all four window sizes.
+- `{{PROPOSAL}}` and `{{DESIGN_MD}}` {{DONE}}.
 - `check_proposal` passes, or you reported what still fails, and you confirmed the adaptation from its `layout` summaries.
 
 ## Final message (under 250 words)

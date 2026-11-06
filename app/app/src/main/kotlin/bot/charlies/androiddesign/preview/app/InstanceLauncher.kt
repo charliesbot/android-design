@@ -13,15 +13,24 @@ object InstanceLauncher {
    * process to launchd so it has no link to the caller; a JVM run from Gradle is relaunched with
    * the caller's classpath and main class.
    */
-  fun command(executable: String, classPath: String, mainClass: String): List<String> =
+  fun command(
+    executable: String,
+    classPath: String,
+    mainClass: String,
+    socketOverride: String? = null,
+  ): List<String> =
     if (executable.endsWith(PACKAGED_SUFFIX)) {
-      listOf(
-        "/usr/bin/open",
-        "-a",
-        executable.removeSuffix(PACKAGED_SUFFIX),
-        "--args",
-        INSTANCE_ARG,
-      )
+      // `open` does not pass its caller's environment on, so the socket override goes by `--env`.
+      // A bundle that already runs would only be activated, so an override asks for a new
+      // process (`-n`): each override socket has its own instance.
+      buildList {
+        add("/usr/bin/open")
+        if (socketOverride != null) add("-n")
+        addAll(listOf("-a", executable.removeSuffix(PACKAGED_SUFFIX)))
+        if (socketOverride != null)
+          addAll(listOf("--env", "${InstanceSocket.SOCKET_ENV}=$socketOverride"))
+        addAll(listOf("--args", INSTANCE_ARG))
+      }
     } else {
       listOf(executable, "-cp", classPath, mainClass, INSTANCE_ARG)
     }
@@ -33,7 +42,14 @@ object InstanceLauncher {
         IllegalStateException("cannot find this process's executable")
       }
     val mainClass = System.getProperty("sun.java.command").substringBefore(' ')
-    ProcessBuilder(command(executable, System.getProperty("java.class.path"), mainClass))
+    ProcessBuilder(
+        command(
+          executable,
+          System.getProperty("java.class.path"),
+          mainClass,
+          socketOverride = System.getenv(InstanceSocket.SOCKET_ENV)?.takeIf { it.isNotBlank() },
+        ),
+      )
       .redirectInput(ProcessBuilder.Redirect.from(File("/dev/null")))
       .redirectOutput(ProcessBuilder.Redirect.DISCARD)
       .redirectError(ProcessBuilder.Redirect.DISCARD)

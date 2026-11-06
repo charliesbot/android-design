@@ -5,8 +5,9 @@ description: >
   decides how an Android screen looks, even when the request reads as plain Compose coding: building or
   polishing a screen, reviewing UI code or screenshots, setting up a theme (color, typography, shape),
   choosing components, adapting layouts to tablet, foldable, and desktop windows (list-detail, supporting
-  pane, what fills the space), and adding motion. It owns the design decisions: load it first, then any
-  skill that covers the APIs.
+  pane, what fills the space), Wear OS app screens, and adding motion. It owns the design decisions: load
+  it first, then any skill that covers the APIs. Wear tiles, watch faces, and widgets are other skills'
+  work.
 ---
 
 # Android Design
@@ -17,7 +18,7 @@ The through-line: **a screen feels designed when emphasis is spent deliberately.
 
 Quotes and rules marked **(Google)** come from Google's guidance. Rules marked **(default)** are this skill's starting points: follow them unless the screen's direction gives a reason not to.
 
-**Surfaces.** This skill targets phone, tablet, and desktop apps. Wear OS and home screen widgets are not yet in scope: their references hold distilled Google guidance but have not reached this skill's quality bar. When building or reviewing one anyway, read its reference first and check the result yourself: Wear OS uses its own theme, Roboto Flex, and Wear components ([references/wear-os.md](references/wear-os.md), plus the `wear-compose-m3` skill for scaffolding and migration); widgets use `GlanceTheme` and Glance components ([references/widgets.md](references/widgets.md)). Where those references differ from this file, they win for their surface.
+**Surfaces.** This skill targets phone, tablet, desktop, and Wear OS apps. For a Wear OS screen read [references/wear-os.md](references/wear-os.md) first; it wins over this file where they differ. Use the `wear-compose-m3` skill for scaffolding and migration. Tiles and home screen widgets are not yet in scope: their references hold distilled Google guidance but have not reached this skill's quality bar. When building or reviewing one anyway, read its reference first and check the result yourself (widgets use `GlanceTheme` and Glance components, [references/widgets.md](references/widgets.md)).
 
 ## Visual tooling
 

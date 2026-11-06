@@ -12,5 +12,9 @@
   {"query": "review my compose PR for material 3 component usage", "should_trigger": false},
   {"query": "build a figma design system file for my web app", "should_trigger": false},
   {"query": "create a react prototype of my saas dashboard with three color themes", "should_trigger": false},
-  {"query": "set up MaterialExpressiveTheme with dynamic color in my existing android app", "should_trigger": false}
+  {"query": "set up MaterialExpressiveTheme with dynamic color in my existing android app", "should_trigger": false},
+  {"query": "explore two visual directions for the main screen of a wear os running app before we write any compose code", "should_trigger": true},
+  {"query": "mock up a wear os timer app: a countdown screen, a settings list, and a reset confirmation, and show me how it looks on a small and a large watch", "should_trigger": true},
+  {"query": "brainstorm redesign alternatives for my watch app's workout list, keep the app code as is for now", "should_trigger": true},
+  {"query": "explore a few watch face designs with complications for my wear os app idea", "should_trigger": false}
 ]

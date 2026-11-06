@@ -71,7 +71,7 @@ DESIGN.md may carry keys for other tools; the app ignores names it does not know
 
 Each screen is an A2UI v1.0 `createSurface` body:
 
-- **`catalogId`**: `https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1`, on every screen.
+- **`catalogId`**: `https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1`, on every screen (a Wear proposal uses the Wear id, see [Wear OS](#wear-os)).
 - **`components`**: a flat list. Each entry has a unique `id`, a `component` name from the catalog, and that component's props. Exactly one entry has `"id": "root"`, usually a `Scaffold`.
 - **`dataModel`** (optional): the screen's sample data as JSON.
 
@@ -131,6 +131,38 @@ Panes fill the window's height (`android-design`, layout reference). In a propos
 - Every component accepts `weight` (its share of a `Row` or `Column`) and `padding` (a spacing name), besides `showIn`, `sizeClass`, and `style`.
 - Interactive components accept `primary`, `contentDescription`, and `enabled`. Set `"primary": true` on the screen's one primary action. Give every icon-only control a `contentDescription` that states its purpose.
 - `Text` truncates with `maxLines` and `"overflow": "ellipsis"`; without `overflow` it clips.
+
+## Wear OS
+
+A Wear proposal is its own file, `design/<slug>-wear.proposal.json`, and every screen names the Wear catalog id (mixing catalogs is a validation error). `get_catalog` with `catalog: "wear"` lists the components and their props. The syntax, actions (`navigate`, `back`, `open`, `dismiss`), and `DESIGN.md` are the ones above, with these differences:
+
+- **`catalogId`**: `https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1`. There is no `navigation.panes`.
+- **Views:** `watch` (204 dp) and `watch-large` (227 dp), round and dark.
+- **Root:** a `Screen`. `scroll` (default `true`) makes its `children` the rows of a scrolling list that scales and fades at the round edge; `scroll: false` stacks them in a fixed box. `timeText` (default `true`) shows the clock, off on dialogs and pickers. `edgeButton` takes the id of one `EdgeButton`, drawn at the bottom edge. On a fixed screen the body ends above the edge button, so everything else must fit the space left; `text-clipped` and `round-edge-clipped` report what does not.
+- **Components:** the Wear catalog lists them (`get_catalog`). A dialog (`AlertDialog`, `ConfirmationDialog`) is an overlay in the same screen: `open` it from a control.
+- **Roles:** colors and types are Wear role names, never hex. Wear has `primaryDim`, `surfaceContainerHigh`, and `errorDim` but no `surface`; its types include `numeral*` and `display*`.
+- **`large`:** the only `sizeClass` key, applied from 225 dp (`watch-large`): `"sizeClass": {"large": {"type": "numeralExtraLarge"}}`. A `large` override only adds value.
+- **`primary`:** set `"primary": true` on the screen's one primary action: a `Button`, `CompactButton`, `IconButton`, `TextButton`, or `EdgeButton`. On a scrolling screen it is usually the `EdgeButton`.
+- **Touch targets** are 48 dp; give every icon-only control a `contentDescription`.
+
+```json
+{
+  "format": 1,
+  "name": "Wear timer",
+  "navigation": { "start": "home" },
+  "screens": {
+    "home": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "edgeButton": "start", "children": ["header", "time"] },
+        { "id": "header", "component": "ListHeader", "text": "Timer" },
+        { "id": "time", "component": "Text", "text": "05:00", "type": "numeralLarge", "color": "primaryDim", "align": "center", "sizeClass": { "large": { "type": "numeralExtraLarge" } } },
+        { "id": "start", "component": "EdgeButton", "label": "Start", "icon": "play_arrow", "primary": true }
+      ]
+    }
+  }
+}
+```
 
 ## Example
 

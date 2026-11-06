@@ -51,7 +51,11 @@ class BackendTests(unittest.TestCase):
 
         with patch('backends.subprocess.run', side_effect=execute):
             backends.execute('claude', 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY)
-        self.assertEqual(seen['config'], {'mcpServers': {'android_design_preview': {'command': BINARY, 'args': []}}})
+        server = seen['config']['mcpServers']['android_design_preview']
+        self.assertEqual(set(server), {'command', 'args', 'env'})
+        self.assertEqual((server['command'], server['args']), (BINARY, []))
+        self.assertEqual(list(server['env']), ['ANDROID_DESIGN_PREVIEW_SOCKET'])
+        self.assertTrue(server['env']['ANDROID_DESIGN_PREVIEW_SOCKET'].startswith('/tmp/adp-'))
         self.assertIn('--strict-mcp-config', seen['cmd'])
         self.assertEqual(seen['cmd'][seen['cmd'].index('--allowedTools') + 1], 'mcp__android_design_preview__*')
 
@@ -79,12 +83,33 @@ class BackendTests(unittest.TestCase):
             backends.execute('codex', 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY)
         cmd = call.call_args.args[0]
         overrides = [cmd[i + 1] for i, part in enumerate(cmd) if part == '-c']
+        socket = overrides[3].split('=', 1)[1].strip('"')
         self.assertEqual(overrides, [
             'mcp_servers.android_design_preview.command="/Apps/AndroidDesignPreview"',
             'mcp_servers.android_design_preview.args=[]',
             'mcp_servers.android_design_preview.default_tools_approval_mode="approve"',
+            f'mcp_servers.android_design_preview.env.ANDROID_DESIGN_PREVIEW_SOCKET="{socket}"',
         ])
+        self.assertTrue(socket.startswith('/tmp/adp-'))
         self.assertEqual(cmd[-1], '-')
+
+    def test_each_generator_run_gets_its_own_short_socket_and_cleans_it_up(self):
+        paths = []
+
+        def execute(cmd, **kwargs):
+            config = json.loads(Path(cmd[cmd.index('--mcp-config') + 1]).read_text())
+            path = Path(config['mcpServers']['android_design_preview']['env']['ANDROID_DESIGN_PREVIEW_SOCKET'])
+            self.assertTrue(path.parent.is_dir())
+            paths.append(path)
+            return subprocess.CompletedProcess(cmd, 0, json.dumps({'result': 'ok'}), '')
+
+        with patch('backends.subprocess.run', side_effect=execute):
+            for _ in range(2):
+                backends.execute('claude', 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY)
+        self.assertNotEqual(paths[0], paths[1])
+        for path in paths:
+            self.assertLess(len(str(path)), 100)
+            self.assertFalse(path.parent.exists())
 
     def test_codex_judge_gets_no_mcp_server(self):
         def execute(cmd, **kwargs):

@@ -1,0 +1,41 @@
+{
+  "format": 1,
+  "name": "Stride dashboard (cluttered)",
+  "navigation": { "start": "main" },
+  "screens": {
+    "main": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "scroll": false, "timeText": false, "children": ["grid"] },
+        { "id": "grid", "component": "Column", "spacing": "xxs", "horizontalAlignment": "center", "children": ["r1", "r2", "r3", "btns1", "btns2"] },
+        { "id": "r1", "component": "Row", "children": ["s1", "s2"] },
+        { "id": "r2", "component": "Row", "children": ["s3", "s4"] },
+        { "id": "r3", "component": "Row", "children": ["s5", "s6"] },
+        { "id": "s1", "component": "Column", "horizontalAlignment": "center", "weight": 1, "children": ["s1l", "s1v"] },
+        { "id": "s1l", "component": "Text", "text": "Time", "type": "bodyExtraSmall", "color": "onSurfaceVariant" },
+        { "id": "s1v", "component": "Text", "text": "24:18", "type": "labelSmall" },
+        { "id": "s2", "component": "Column", "horizontalAlignment": "center", "weight": 1, "children": ["s2l", "s2v"] },
+        { "id": "s2l", "component": "Text", "text": "Distance", "type": "bodyExtraSmall", "color": "onSurfaceVariant" },
+        { "id": "s2v", "component": "Text", "text": "3.1 km", "type": "labelSmall" },
+        { "id": "s3", "component": "Column", "horizontalAlignment": "center", "weight": 1, "children": ["s3l", "s3v"] },
+        { "id": "s3l", "component": "Text", "text": "Heart", "type": "bodyExtraSmall", "color": "onSurfaceVariant" },
+        { "id": "s3v", "component": "Text", "text": "148 bpm", "type": "labelSmall" },
+        { "id": "s4", "component": "Column", "horizontalAlignment": "center", "weight": 1, "children": ["s4l", "s4v"] },
+        { "id": "s4l", "component": "Text", "text": "Pace", "type": "bodyExtraSmall", "color": "onSurfaceVariant" },
+        { "id": "s4v", "component": "Text", "text": "5:12 /km", "type": "labelSmall" },
+        { "id": "s5", "component": "Column", "horizontalAlignment": "center", "weight": 1, "children": ["s5l", "s5v"] },
+        { "id": "s5l", "component": "Text", "text": "Cadence", "type": "bodyExtraSmall", "color": "onSurfaceVariant" },
+        { "id": "s5v", "component": "Text", "text": "172 spm", "type": "labelSmall" },
+        { "id": "s6", "component": "Column", "horizontalAlignment": "center", "weight": 1, "children": ["s6l", "s6v"] },
+        { "id": "s6l", "component": "Text", "text": "Calories", "type": "bodyExtraSmall", "color": "onSurfaceVariant" },
+        { "id": "s6v", "component": "Text", "text": "268 kcal", "type": "labelSmall" },
+        { "id": "btns1", "component": "ButtonGroup", "children": ["pa", "en"] },
+        { "id": "btns2", "component": "ButtonGroup", "children": ["la", "mu"] },
+        { "id": "pa", "component": "IconButton", "variant": "filledTonal", "size": "small", "icon": "pause", "contentDescription": "Pause" },
+        { "id": "en", "component": "IconButton", "variant": "filledTonal", "size": "small", "icon": "stop", "contentDescription": "End" },
+        { "id": "la", "component": "IconButton", "variant": "filledTonal", "size": "small", "icon": "flag", "contentDescription": "Lap" },
+        { "id": "mu", "component": "IconButton", "variant": "filledTonal", "size": "small", "icon": "volume_up", "contentDescription": "Sound" }
+      ]
+    }
+  }
+}

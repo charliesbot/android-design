@@ -3472,6 +3472,11 @@
           "$ref": "#/$defs/Action",
           "description": "What a tap does."
         },
+        "primary": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
         "contentDescription": {
           "$ref": "#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
@@ -3522,6 +3527,11 @@
         "action": {
           "$ref": "#/$defs/Action",
           "description": "What a tap does."
+        },
+        "primary": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "#/$defs/DynamicString",
@@ -3579,6 +3589,11 @@
           "$ref": "#/$defs/Action",
           "description": "What a tap does."
         },
+        "primary": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
         "contentDescription": {
           "$ref": "#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
@@ -3634,6 +3649,11 @@
           "$ref": "#/$defs/Action",
           "description": "What a tap does."
         },
+        "primary": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
         "contentDescription": {
           "$ref": "#/$defs/DynamicString",
           "description": "Accessibility label when it differs from the label."
@@ -3683,6 +3703,11 @@
         "action": {
           "$ref": "#/$defs/Action",
           "description": "What a tap does."
+        },
+        "primary": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
         },
         "contentDescription": {
           "$ref": "#/$defs/DynamicString",

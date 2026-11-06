@@ -26,6 +26,7 @@ internal fun node(
   h: Float = 40f,
   parent: String? = null,
   primary: Boolean = false,
+  scrolls: Boolean = false,
   touch: Bounds? = null,
   text: TextInfo? = null,
   typeRole: String? = null,
@@ -37,6 +38,7 @@ internal fun node(
     type = type,
     parent = parent,
     primary = primary,
+    scrolls = scrolls,
     bounds = Bounds(x, y, w, h),
     touch = touch,
     text = text,
@@ -50,7 +52,8 @@ internal fun text(
   overflow: Boolean = false,
   truncated: Boolean = false,
   font: String? = FLEX,
-) = TextInfo(value, lines, overflow, truncated, font)
+  ink: Bounds? = null,
+) = TextInfo(value, lines, overflow, truncated, font, ink)
 
 /** A touch area centered on the bounds and grown to at least 48 x 48 dp. */
 internal fun touchOf(x: Float, y: Float, w: Float, h: Float): Bounds {

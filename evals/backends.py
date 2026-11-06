@@ -1,9 +1,11 @@
 """Optional CLI adapters. Evaluation artifacts do not depend on these launchers.
 
-A generator reaches the previewer app over MCP, registered as `android_design_preview` for that one run only. A judge
-never sees the app.
+A generator reaches the previewer app over MCP, registered as `android_design_preview` for that one run only, with its
+own socket so the run starts a fresh instance of `mcp_binary` and never forwards to an app that is already running. A
+judge never sees the app.
 """
 import json
+from contextlib import ExitStack
 from pathlib import Path
 import subprocess
 import tempfile
@@ -11,6 +13,9 @@ import tempfile
 from preview_app import SERVER_NAME
 
 BACKENDS = ('claude', 'codex')
+
+# The app's override for its instance socket (InstanceSocket.SOCKET_ENV in app/).
+SOCKET_ENV = 'ANDROID_DESIGN_PREVIEW_SOCKET'
 
 
 def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, timeout=3600, mcp_binary=None):
@@ -20,14 +25,19 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
         raise ValueError(f'Unknown role: {role}')
     if role == 'generator' and not mcp_binary:
         raise ValueError('A generator needs mcp_binary, the previewer app it designs with')
-    with tempfile.TemporaryDirectory(prefix='android-design-backend-') as temporary:
+    with tempfile.TemporaryDirectory(prefix='android-design-backend-') as temporary, ExitStack() as stack:
         temporary = Path(temporary)
         final = temporary / 'final.txt'
+        socket = None
+        if role == 'generator':
+            # Unix socket paths are limited to about 104 bytes on macOS, so the socket lives under /tmp, not the usual
+            # temp dir.
+            socket = str(Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='adp-', dir='/tmp'))) / 's.sock')
         if backend == 'claude':
             command = ['claude', '-p', '--output-format', 'json']
             if role == 'generator':
                 config = temporary / 'mcp.json'
-                config.write_text(json.dumps({'mcpServers': {SERVER_NAME: {'command': str(mcp_binary), 'args': []}}}))
+                config.write_text(json.dumps({'mcpServers': {SERVER_NAME: {'command': str(mcp_binary), 'args': [], 'env': {SOCKET_ENV: socket}}}}))
                 # `claude -p` refuses writes nobody allowed, so the generator may edit its case folder only,
                 # like Codex's workspace-write. `//` makes the rule's path absolute.
                 command += ['--mcp-config', str(config), '--strict-mcp-config',
@@ -45,7 +55,8 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
             if role == 'generator':
                 command += ['-c', f'mcp_servers.{SERVER_NAME}.command={json.dumps(str(mcp_binary))}',
                             '-c', f'mcp_servers.{SERVER_NAME}.args=[]',
-                            '-c', f'mcp_servers.{SERVER_NAME}.default_tools_approval_mode="approve"']
+                            '-c', f'mcp_servers.{SERVER_NAME}.default_tools_approval_mode="approve"',
+                            '-c', f'mcp_servers.{SERVER_NAME}.env.{SOCKET_ENV}={json.dumps(socket)}']
             for image in images:
                 command += ['--image', str(Path(image).resolve())]
             if schema:

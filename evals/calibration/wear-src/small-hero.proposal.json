@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "name": "Stride heart rate (small hero)",
+  "navigation": { "start": "main" },
+  "screens": {
+    "main": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        { "id": "root", "component": "Screen", "scroll": false, "children": ["col"] },
+        { "id": "col", "component": "Column", "horizontalAlignment": "center", "arrangement": "center", "spacing": "xs", "children": ["pace", "hr", "label", "end"] },
+        { "id": "pace", "component": "Text", "text": "24:18 elapsed", "type": "titleLarge", "align": "center" },
+        { "id": "hr", "component": "Text", "text": "148", "type": "bodySmall", "color": "primary", "align": "center" },
+        { "id": "label", "component": "Text", "text": "bpm, pace 5:12 /km, 3.1 of 5 km", "type": "bodyMedium", "color": "onSurfaceVariant", "align": "center", "maxLines": 2},
+        { "id": "end", "component": "IconButton", "variant": "filledTonal", "icon": "stop", "contentDescription": "End run" }
+      ]
+    }
+  }
+}

@@ -15,5 +15,9 @@
   {"query": "gradle sync fails with AGP 9.1 and kotlin 2.4 in my android project, fix the build", "should_trigger": false},
   {"query": "write unit tests for the repository layer of my android app using fakes", "should_trigger": false},
   {"query": "my room database migration crashes on upgrade from version 3 to 4", "should_trigger": false},
-  {"query": "keep the scroll position and selected item of my compose list when the user rotates or folds the device", "should_trigger": false}
+  {"query": "keep the scroll position and selected item of my compose list when the user rotates or folds the device", "should_trigger": false},
+  {"query": "my wear os workout summary screen in compose looks flat and cramped on the small watch, make it feel more material 3 expressive", "should_trigger": true},
+  {"query": "which button should be the main action on my wear os timer app screen, and should it be an edge button?", "should_trigger": true},
+  {"query": "review my wear compose settings list for round screen clipping, color on black, and what changes on the larger 225dp watches", "should_trigger": true},
+  {"query": "design the tile layout and the data to show for my wear os weather tile", "should_trigger": false}
 ]
