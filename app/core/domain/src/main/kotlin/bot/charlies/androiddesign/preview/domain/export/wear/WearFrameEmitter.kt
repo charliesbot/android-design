@@ -50,11 +50,7 @@ private fun WearScreenEmitter.scrollingFrame(
 ): List<Stmt> {
   val state = file.use(WearSym.rememberTransformingLazyColumnState)
   val itemPlace = WearPlace(parentType = "Screen", item = true)
-  val children =
-    children(node, p, "children", itemPlace) { statements ->
-      if (statements.isEmpty()) emptyList()
-      else listOf(stmt(Call("item", lambda = lambda(statements))))
-    }
+  val children = children(node, p, "children", itemPlace, scrolls = true)
   val list =
     Call(
       file.use(WearSym.TransformingLazyColumn),

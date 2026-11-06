@@ -4,12 +4,12 @@ import bot.charlies.androiddesign.preview.domain.export.Arg
 import bot.charlies.androiddesign.preview.domain.export.Call
 import bot.charlies.androiddesign.preview.domain.export.Chain
 import bot.charlies.androiddesign.preview.domain.export.Expr
+import bot.charlies.androiddesign.preview.domain.export.IconName
 import bot.charlies.androiddesign.preview.domain.export.Naming
 import bot.charlies.androiddesign.preview.domain.export.Raw
 import bot.charlies.androiddesign.preview.domain.export.Stmt
 import bot.charlies.androiddesign.preview.domain.export.Sym
 import bot.charlies.androiddesign.preview.domain.export.arg
-import bot.charlies.androiddesign.preview.domain.export.kotlinString
 import bot.charlies.androiddesign.preview.domain.export.lambda
 import bot.charlies.androiddesign.preview.domain.export.lambdaOf
 import bot.charlies.androiddesign.preview.domain.export.pos
@@ -75,7 +75,7 @@ internal fun WearScreenEmitter.emitComponent(
 internal fun WearScreenEmitter.iconCall(
   painter: String,
   size: String?,
-  description: String? = null,
+  description: Expr? = null,
   tint: String? = null,
   leading: List<String> = emptyList(),
 ): Expr {
@@ -84,31 +84,32 @@ internal fun WearScreenEmitter.iconCall(
     file.use(WearSym.Icon),
     listOfNotNull(
       pos(painter),
-      arg("contentDescription", Raw(description?.let(::kotlinString) ?: "null")),
+      arg("contentDescription", description ?: Raw("null")),
       if (parts.isEmpty()) null else arg("modifier", Chain(file.use(Sym.Modifier), parts)),
       opt("tint", tint),
     ),
   )
 }
 
-/** `painterResource(R.drawable.name)`, or its `_filled` twin. */
-internal fun WearScreenEmitter.painter(name: String, filled: Boolean = false): String =
-  "${file.use(Sym.painterResource)}(${file.drawable(Naming.snake(name) + if (filled) "_filled" else "")})"
-
 /** An icon slot `icon = { Icon(...) }` sized [size], or null without an icon name. */
-internal fun WearScreenEmitter.iconSlot(name: String?, size: String): Arg? = name?.let {
+internal fun WearScreenEmitter.iconSlot(name: IconName?, size: String): Arg? = name?.let {
   arg("icon", lambdaOf(iconCall(painter(it), size)))
 }
 
-internal fun WearScreenEmitter.textCall(value: String, vararg named: Arg?): Expr =
-  Call(file.use(WearSym.Text), listOf(pos(stringLiteral(value))) + named.filterNotNull())
+internal fun WearScreenEmitter.textCall(value: Expr, vararg named: Arg?): Expr =
+  Call(file.use(WearSym.Text), listOf(pos(value)) + named.filterNotNull())
 
-/** `argName = { Text("...") }` for the text at [key], or null when there is none. */
-internal fun WearScreenEmitter.textSlot(p: JsonObject, key: String, argName: String = key): Arg? =
-  p.literal(key)?.let { arg(argName, lambdaOf(textCall(it))) }
+/** `argName = { Text(...) }` for the text at [key], or null when there is none. */
+internal fun WearScreenEmitter.textSlot(
+  p: JsonObject,
+  key: String,
+  place: WearPlace,
+  argName: String = key,
+): Arg? = p.text(key, place)?.let { arg(argName, lambdaOf(textCall(it))) }
 
-internal fun WearScreenEmitter.enabledArg(p: JsonObject): Arg? =
-  if (p.flag("enabled") == false) arg("enabled", "false") else null
+/** `enabled = ...` for a component that can be disabled: absent while it is always enabled. */
+internal fun WearScreenEmitter.enabledArg(p: JsonObject, place: WearPlace): Arg? =
+  p.boolExpr("enabled", place)?.takeIf { it != "true" }?.let { arg("enabled", it) }
 
 // endregion
 
@@ -276,7 +277,7 @@ private fun WearScreenEmitter.listHeader(
   one(
     wear("ListHeader"),
     listOf(modifier(node, p, place, item = true), transformation(place)),
-    listOf(stmt(textCall(p.literal("text").orEmpty()))),
+    listOf(stmt(textCall(p.textOrEmpty("text", place)))),
   )
 
 private fun WearScreenEmitter.listSubHeader(
@@ -289,9 +290,9 @@ private fun WearScreenEmitter.listSubHeader(
     listOf(
       modifier(node, p, place, item = true),
       transformation(place),
-      iconSlot(p.literal("icon"), "${wear("ButtonDefaults")}.IconSize"),
+      iconSlot(p.iconName("icon", place), "${wear("ButtonDefaults")}.IconSize"),
     ),
-    listOf(stmt(textCall(p.literal("text").orEmpty()))),
+    listOf(stmt(textCall(p.textOrEmpty("text", place)))),
   )
 
 private fun WearScreenEmitter.text(
@@ -321,7 +322,7 @@ private fun WearScreenEmitter.text(
   return listOf(
     stmt(
       textCall(
-        p.literal("text").orEmpty(),
+        p.textOrEmpty("text", place),
         modifierArg(place, parts),
         opt("color", (p.literal("color") ?: style?.color)?.let(::colorRole)),
         opt("style", if (stateType) typeRole(type) else null),
@@ -339,14 +340,15 @@ private fun WearScreenEmitter.iconComponent(
   place: WearPlace,
 ): List<Stmt> {
   val size = dp(p.numberProp("Icon", "size") ?: 24f)
+  val name = p.iconName("name", place) ?: IconName.Literal("")
   val leading = modifierParts(node, p, place, describe = false, item = true)
   val color = (p.literal("color") ?: styleOf(node)?.color)?.let(::colorRole)
   return listOf(
     stmt(
       iconCall(
-        painter(p.literal("name").orEmpty(), filled = p.flag("filled") == true),
+        painter(name, filled = p.sampleFlag("filled", place) == true),
         size,
-        description = p.literal("contentDescription"),
+        description = p.text("contentDescription", place),
         tint = color,
         leading = leading,
       ),
@@ -359,9 +361,6 @@ private fun WearScreenEmitter.image(
   p: JsonObject,
   place: WearPlace,
 ): List<Stmt> {
-  val src = p.literal("src").orEmpty()
-  val symbol =
-    if (src.startsWith("data:")) node.id else src.substringAfterLast('/').substringBeforeLast('.')
   val scale =
     when (p.choice("Image", "fit")) {
       "crop" -> "Crop"
@@ -379,11 +378,11 @@ private fun WearScreenEmitter.image(
   return one(
     file.use(Sym.Image),
     listOf(
-      arg("painter", "${file.use(Sym.painterResource)}(${file.image(Naming.snake(symbol))})"),
       arg(
-        "contentDescription",
-        Raw(p.literal("contentDescription")?.let(::kotlinString) ?: "null"),
+        "painter",
+        "${file.use(Sym.painterResource)}(${imageDrawable(node, p, place, asImages = true)})",
       ),
+      arg("contentDescription", p.text("contentDescription", place) ?: Raw("null")),
       modifierArg(place, parts),
       arg("contentScale", "${file.use(Sym.ContentScale)}.$scale"),
     ),
@@ -411,7 +410,7 @@ private fun WearScreenEmitter.card(
       listOf(
         onClick(node, p),
         modifier(node, p, place, describe = true, item = true),
-        if (clickable(p["action"])) enabledArg(p) else null,
+        if (clickable(p["action"])) enabledArg(p, place) else null,
         transformation(place),
       ),
       children.body,
@@ -427,13 +426,13 @@ private fun WearScreenEmitter.titleCard(
     wear("TitleCard"),
     listOf(
       onClick(node, p),
-      arg("title", lambdaOf(textCall(p.literal("title").orEmpty()))),
+      arg("title", lambdaOf(textCall(p.textOrEmpty("title", place)))),
       modifier(node, p, place, describe = true, item = true),
-      textSlot(p, "time"),
-      textSlot(p, "subtitle"),
-      if (clickable(p["action"])) enabledArg(p) else null,
+      textSlot(p, "time", place),
+      textSlot(p, "subtitle", place),
+      if (clickable(p["action"])) enabledArg(p, place) else null,
       transformation(place),
-      textSlot(p, "body", "content"),
+      textSlot(p, "body", place, "content"),
     ),
   )
 
@@ -442,20 +441,20 @@ private fun WearScreenEmitter.appCard(
   p: JsonObject,
   place: WearPlace,
 ): List<Stmt> {
-  val body = p.literal("body")?.let { listOf(stmt(textCall(it))) } ?: emptyList()
+  val body = p.text("body", place)?.let { listOf(stmt(textCall(it))) } ?: emptyList()
   return one(
     wear("AppCard"),
     listOf(
       onClick(node, p),
-      arg("appName", lambdaOf(textCall(p.literal("appName").orEmpty()))),
-      arg("title", lambdaOf(textCall(p.literal("title").orEmpty()))),
+      arg("appName", lambdaOf(textCall(p.textOrEmpty("appName", place)))),
+      arg("title", lambdaOf(textCall(p.textOrEmpty("title", place)))),
       modifier(node, p, place, describe = true, item = true),
-      if (clickable(p["action"])) enabledArg(p) else null,
+      if (clickable(p["action"])) enabledArg(p, place) else null,
       transformation(place),
-      p.literal("appIcon")?.let {
+      p.iconName("appIcon", place)?.let {
         arg("appImage", lambdaOf(iconCall(painter(it), "${wear("CardDefaults")}.AppImageSize")))
       },
-      textSlot(p, "time"),
+      textSlot(p, "time", place),
     ),
     body,
   )

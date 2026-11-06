@@ -24,10 +24,14 @@ internal object WearExportFixtures {
   fun design(): DesignSystem = DesignSystemResolver.resolve(null, null)
 
   /** A one-screen Wear proposal named "Wear test"; its screen is "main". */
-  fun proposal(vararg components: String, name: String = "Wear test"): Proposal =
+  fun proposal(
+    vararg components: String,
+    name: String = "Wear test",
+    dataModel: String? = null,
+  ): Proposal =
     json.decodeFromString(
       Proposal.serializer(),
-      """{"format":1,"name":"$name","navigation":{"start":"main"},"screens":{"main":{"catalogId":"${WearCatalog.ID}","components":[${components.joinToString(",")}]}}}""",
+      """{"format":1,"name":"$name","navigation":{"start":"main"},"screens":{"main":{"catalogId":"${WearCatalog.ID}",${dataModel?.let { """"dataModel":$it,""" }.orEmpty()}"components":[${components.joinToString(",")}]}}}""",
     )
 
   /** A Wear proposal from raw screens: `"home":[components]` pairs. */
@@ -41,8 +45,12 @@ internal object WearExportFixtures {
   fun root(vararg children: String, props: String = ""): String =
     """{"id":"root","component":"Screen",${if (props.isEmpty()) "" else "$props,"}"children":[${children.joinToString(",") { "\"$it\"" }}]}"""
 
-  fun export(vararg components: String, screen: String? = "main"): String =
-    KotlinExporter.export(proposal(*components), design(), screen, scheme)
+  fun export(
+    vararg components: String,
+    screen: String? = "main",
+    dataModel: String? = null,
+  ): String =
+    KotlinExporter.export(proposal(*components, dataModel = dataModel), design(), screen, scheme)
 
   fun export(proposal: Proposal, screen: String? = null): String =
     KotlinExporter.export(proposal, design(), screen, scheme)

@@ -85,16 +85,17 @@ internal class FileContext {
   /**
    * `imageDrawable`, the function that maps each of [sources] (a source to its file name or node
    * id) to its image drawable, and the name to call. Any other source is an error: no image stands
-   * in.
+   * in. With [asImages] the drawables are listed as images, not Material Symbols.
    */
-  fun imageLookup(sources: Map<String, String>): String {
+  fun imageLookup(sources: Map<String, String>, asImages: Boolean = false): String {
     val name = "imageDrawable"
     val lookup =
       lookups.getOrPut(name) {
         DrawableLookup(name, "src", "error(\"No drawable for image ${'$'}src\")")
       }
     sources.forEach { (source, symbol) ->
-      lookup.cases[source] = drawable(Naming.snake(symbol))
+      lookup.cases[source] =
+        if (asImages) image(Naming.snake(symbol)) else drawable(Naming.snake(symbol))
     }
     return name
   }

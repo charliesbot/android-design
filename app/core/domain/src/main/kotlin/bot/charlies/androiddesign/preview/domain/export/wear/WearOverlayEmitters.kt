@@ -2,6 +2,7 @@ package bot.charlies.androiddesign.preview.domain.export.wear
 
 import bot.charlies.androiddesign.preview.domain.export.Assign
 import bot.charlies.androiddesign.preview.domain.export.Call
+import bot.charlies.androiddesign.preview.domain.export.IconName
 import bot.charlies.androiddesign.preview.domain.export.Raw
 import bot.charlies.androiddesign.preview.domain.export.Stmt
 import bot.charlies.androiddesign.preview.domain.export.arg
@@ -35,6 +36,7 @@ private fun WearScreenEmitter.alertDialog(
 ): List<Stmt> {
   // A dialog's two buttons share its width, like the upstream confirm and dismiss buttons do.
   val buttons = WearPlace(parentType = "AlertDialog", parentStretches = false, scopeWeight = true)
+  val place = WearPlace()
   val confirm =
     p.literal("confirm")?.let { emit(it, buttons) }
       ?: listOf(
@@ -54,12 +56,12 @@ private fun WearScreenEmitter.alertDialog(
           arg("visible", overlayVar(node.id)),
           arg("onDismissRequest", close),
           arg("confirmButton", lambda(confirm)),
-          arg("title", lambdaOf(textCall(p.literal("title").orEmpty()))),
+          arg("title", lambdaOf(textCall(p.textOrEmpty("title", place)))),
           dismiss?.let { arg("dismissButton", lambda(it)) },
-          p.literal("icon")?.let {
+          p.iconName("icon", place)?.let {
             arg("icon", lambdaOf(iconCall(painter(it), dp(DIALOG_ICON_DP))))
           },
-          textSlot(p, "text"),
+          textSlot(p, "text", place),
         ),
       ),
     ),
@@ -72,6 +74,7 @@ private fun WearScreenEmitter.confirmationDialog(
   close: bot.charlies.androiddesign.preview.domain.export.Lambda,
 ): List<Stmt> {
   val size = "${wear("ConfirmationDialogDefaults")}.IconSize"
+  val place = WearPlace()
   return listOf(
     stmt(
       Call(
@@ -80,10 +83,10 @@ private fun WearScreenEmitter.confirmationDialog(
           arg("visible", overlayVar(node.id)),
           arg("onDismissRequest", close),
           // The text parameter has no default: null is no text.
-          p.literal("text")?.let { arg("text", lambdaOf(textCall(it))) } ?: arg("text", "null"),
+          p.text("text", place)?.let { arg("text", lambdaOf(textCall(it))) } ?: arg("text", "null"),
         ),
         lambda(
-          stmt(iconCall(painter(p.literal("icon").orEmpty()), size)),
+          stmt(iconCall(painter(p.iconName("icon", place) ?: IconName.Literal("")), size)),
         ),
       ),
     ),

@@ -103,7 +103,7 @@
         { "id": "root", "component": "Screen", "scroll": false, "edgeButton": "pause", "children": ["ring", "center"] },
         { "id": "ring", "component": "CircularProgressIndicator", "progress": 0.6 },
         { "id": "center", "component": "Box", "contentAlignment": "center", "children": ["time"] },
-        { "id": "time", "component": "Text", "text": "03:00", "type": "numeralMedium", "color": "primaryDim", "align": "center", "sizeClass": {"large": {"type": "numeralLarge"}} },
+        { "id": "time", "component": "Text", "text": "03:00", "type": "numeralSmall", "color": "primaryDim", "align": "center", "sizeClass": {"large": {"type": "numeralMedium"}} },
         { "id": "pause", "component": "EdgeButton", "size": "small", "label": "Pause", "icon": "pause", "primary": true, "action": {"functionCall": {"@call": "navigate", "args": {"screen": "segments"}}} }
       ]
     },
@@ -131,6 +131,20 @@
         { "id": "root", "component": "Screen", "scroll": false, "timeText": false, "children": ["stepper"] },
         { "id": "stepper", "component": "Stepper", "value": 5, "range": [1, 30], "steps": 28, "content": "minutes", "contentDescription": "Minutes" },
         { "id": "minutes", "component": "Text", "text": "5 min", "type": "numeralSmall" }
+      ]
+    },
+    "bindings": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "dataModel": {
+        "tasks": [
+          { "name": "Water plants", "due": "8:00", "done": true },
+          { "name": "Call Sam", "due": "12:30", "done": false },
+          { "name": "Stretch", "due": "18:00", "done": false }
+        ]
+      },
+      "components": [
+        { "id": "root", "component": "Screen", "children": { "componentId": "task", "path": "/tasks" } },
+        { "id": "task", "component": "SwitchButton", "label": { "@path": "name" }, "secondaryLabel": { "@path": "due" }, "checked": { "@path": "done" } }
       ]
     }
   }

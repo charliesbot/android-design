@@ -39,26 +39,17 @@ object KotlinExporter {
     if (catalog !== M3ExpressiveCatalog) {
       throw PreviewException("exporting a ${catalog.key} proposal to Compose is not supported yet")
     }
-    val first = build(proposal, design, screen, reserved = emptySet())
-    // A sample class named like an imported symbol (`Row`) would shadow the import, so the names
-    // the first pass imported are kept free and the file is built again.
-    val clash = first.sampleClassNames.intersect(first.importedNames)
-    return if (clash.isEmpty()) first.source
-    else build(proposal, design, screen, reserved = first.importedNames).source
+    return SampleModel.writeAvoidingClashes { reserved ->
+      build(proposal, design, screen, reserved)
+    }
   }
-
-  private class Built(
-    val source: String,
-    val importedNames: Set<String>,
-    val sampleClassNames: Set<String>,
-  )
 
   private fun build(
     proposal: Proposal,
     design: DesignSystem,
     screen: String?,
     reserved: Set<String>,
-  ): Built {
+  ): BuiltSource {
     val screens = screensToExport(proposal, screen)
 
     val file = FileContext()
@@ -98,7 +89,7 @@ object KotlinExporter {
       append(file.importLines(code + optIn.orEmpty()).joinToString("\n")).append("\n\n")
       append(code)
     }
-    return Built(source, file.importedNames(), samples.classNames())
+    return BuiltSource(source, file.importedNames(), samples.classNames())
   }
 
   private fun header(title: String, file: FileContext): String = buildString {

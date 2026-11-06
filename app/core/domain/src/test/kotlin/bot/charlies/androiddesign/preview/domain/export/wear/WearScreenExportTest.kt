@@ -176,16 +176,6 @@ class WearScreenExportTest {
   }
 
   @Test
-  fun `data bindings are rejected until the Wear export supports them`() {
-    val proposal =
-      WearExportFixtures.proposal(
-        root("t"),
-        """{"id":"t","component":"Text","text":{"@path":"/name"}}""",
-      )
-    assertFailsWith<PreviewException> { WearExportFixtures.export(proposal, "main") }
-  }
-
-  @Test
   fun `an unknown screen is reported with the screens there are`() {
     val error =
       assertFailsWith<PreviewException> {

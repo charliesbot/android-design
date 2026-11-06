@@ -3,6 +3,7 @@ package bot.charlies.androiddesign.preview.domain.export.wear
 import bot.charlies.androiddesign.preview.domain.export.Arg
 import bot.charlies.androiddesign.preview.domain.export.Assign
 import bot.charlies.androiddesign.preview.domain.export.Call
+import bot.charlies.androiddesign.preview.domain.export.IconName
 import bot.charlies.androiddesign.preview.domain.export.Raw
 import bot.charlies.androiddesign.preview.domain.export.Stmt
 import bot.charlies.androiddesign.preview.domain.export.Sym
@@ -35,7 +36,7 @@ private fun WearScreenEmitter.buttonColors(variant: String): Arg? {
   }?.let { arg("colors", it) }
 }
 
-private fun WearScreenEmitter.outlinedBorder(enabled: Boolean): Arg =
+private fun WearScreenEmitter.outlinedBorder(enabled: String): Arg =
   arg("border", "${defaults("ButtonDefaults")}.outlinedButtonBorder(enabled = $enabled)")
 
 internal fun WearScreenEmitter.button(
@@ -57,13 +58,13 @@ internal fun WearScreenEmitter.button(
     listOf(
       onClick(node, p),
       modifier(node, p, place, describe = true, item = true),
-      textSlot(p, "secondaryLabel"),
-      iconSlot(p.literal("icon"), "${defaults("ButtonDefaults")}.IconSize"),
-      enabledArg(p),
+      textSlot(p, "secondaryLabel", place),
+      iconSlot(p.iconName("icon", place), "${defaults("ButtonDefaults")}.IconSize"),
+      enabledArg(p, place),
       if (variant == "filledVariant") buttonColors(variant) else null,
       transformation(place),
     ),
-    listOf(stmt(textCall(p.literal("label").orEmpty()))),
+    listOf(stmt(textCall(p.textOrEmpty("label", place)))),
   )
 }
 
@@ -73,16 +74,16 @@ internal fun WearScreenEmitter.compactButton(
   place: WearPlace,
 ): List<Stmt> {
   val variant = p.choice("CompactButton", "variant")
-  val label = p.literal("label")
+  val label = p.text("label", place)
   return one(
     wear("CompactButton"),
     listOf(
         onClick(node, p),
         modifier(node, p, place, describe = true, item = true),
-        iconSlot(p.literal("icon"), "${defaults("ButtonDefaults")}.IconSize"),
-        enabledArg(p),
+        iconSlot(p.iconName("icon", place), "${defaults("ButtonDefaults")}.IconSize"),
+        enabledArg(p, place),
         buttonColors(variant),
-        if (variant == "outlined") outlinedBorder(p.flag("enabled") != false) else null,
+        if (variant == "outlined") outlinedBorder(p.boolExpr("enabled", place) ?: "true") else null,
         label?.let { arg("label", lambdaOf(textCall(it))) },
       )
       .let { args ->
@@ -120,10 +121,15 @@ internal fun WearScreenEmitter.iconButton(
     listOf(
       onClick(node, p),
       modifier(node, p, place, true, true, sizeCall(size)),
-      enabledArg(p),
+      enabledArg(p, place),
     ),
     listOf(
-      stmt(iconCall(painter(p.literal("icon").orEmpty()), "$defaults.iconSizeFor($size)")),
+      stmt(
+        iconCall(
+          painter(p.iconName("icon", place) ?: IconName.Literal("")),
+          "$defaults.iconSizeFor($size)",
+        ),
+      ),
     ),
   )
 }
@@ -153,11 +159,11 @@ internal fun WearScreenEmitter.textButton(
     listOf(
       onClick(node, p),
       modifier(node, p, place, true, true, sizeCall("$defaults.$size")),
-      enabledArg(p),
+      enabledArg(p, place),
       colors?.let { arg("colors", "$defaults.$it()") },
-      if (variant == "outlined") outlinedBorder(p.flag("enabled") != false) else null,
+      if (variant == "outlined") outlinedBorder(p.boolExpr("enabled", place) ?: "true") else null,
     ),
-    listOf(stmt(textCall(p.literal("label").orEmpty()))),
+    listOf(stmt(textCall(p.textOrEmpty("label", place)))),
   )
 }
 
@@ -180,10 +186,10 @@ internal fun WearScreenEmitter.edgeButton(
 ): List<Stmt> {
   val size = edgeSize(p)
   val content = buildList {
-    p.literal("icon")?.let {
+    p.iconName("icon", place)?.let {
       add(stmt(iconCall(painter(it), "${wear("EdgeButtonDefaults")}.iconSizeFor($size)")))
     }
-    p.literal("label")?.let { add(stmt(textCall(it))) }
+    p.text("label", place)?.let { add(stmt(textCall(it))) }
   }
   return one(
     wear("EdgeButton"),
@@ -191,7 +197,7 @@ internal fun WearScreenEmitter.edgeButton(
       onClick(node, p),
       modifier(node, p, place, describe = true, item = false),
       if (p.choice("EdgeButton", "size") == "small") null else arg("buttonSize", size),
-      enabledArg(p),
+      enabledArg(p, place),
     ),
     content,
   )
@@ -221,10 +227,10 @@ internal fun WearScreenEmitter.buttonGroup(
 private fun WearScreenEmitter.checkedState(
   node: ComponentNode,
   p: JsonObject,
-  key: String = "checked",
+  place: WearPlace,
 ): Pair<String, Stmt> {
   val name = stateName(node.id, "Checked")
-  return name to stateVar(name, p.option(node.component, key).toString())
+  return name to stateVar(name, p.boolValue(node.component, "checked", place))
 }
 
 private fun WearScreenEmitter.onCheckedChange(
@@ -242,12 +248,12 @@ internal fun WearScreenEmitter.iconToggleButton(
   p: JsonObject,
   place: WearPlace,
 ): List<Stmt> {
-  val (state, declaration) = checkedState(node, p)
+  val (state, declaration) = checkedState(node, p, place)
   val button = defaults("IconButtonDefaults")
   val size = "$button.${iconButtonSize(p.choice("IconToggleButton", "size"))}"
-  val name = p.literal("icon").orEmpty()
+  val name = p.iconName("icon", place) ?: IconName.Literal("")
   val painter =
-    "${file.use(Sym.painterResource)}(if ($state) ${file.drawable(bot.charlies.androiddesign.preview.domain.export.Naming.snake(name) + "_filled")} else ${file.drawable(bot.charlies.androiddesign.preview.domain.export.Naming.snake(name))})"
+    "${file.use(Sym.painterResource)}(if ($state) ${drawable(name, filled = true)} else ${drawable(name)})"
   return listOf(declaration) +
     one(
       wear("IconToggleButton"),
@@ -255,7 +261,7 @@ internal fun WearScreenEmitter.iconToggleButton(
         arg("checked", state),
         onCheckedChange(node, p, state),
         modifier(node, p, place, true, true, sizeCall(size)),
-        enabledArg(p),
+        enabledArg(p, place),
       ),
       listOf(
         stmt(iconCall(painter, "${defaults("IconToggleButtonDefaults")}.iconSizeFor($size)")),
@@ -268,7 +274,7 @@ internal fun WearScreenEmitter.textToggleButton(
   p: JsonObject,
   place: WearPlace,
 ): List<Stmt> {
-  val (state, declaration) = checkedState(node, p)
+  val (state, declaration) = checkedState(node, p, place)
   val size =
     when (p.choice("TextToggleButton", "size")) {
       "small" -> "${defaults("IconToggleButtonDefaults")}.SmallSize"
@@ -282,9 +288,9 @@ internal fun WearScreenEmitter.textToggleButton(
         arg("checked", state),
         onCheckedChange(node, p, state),
         modifier(node, p, place, true, true, sizeCall(size)),
-        enabledArg(p),
+        enabledArg(p, place),
       ),
-      listOf(stmt(textCall(p.literal("label").orEmpty()))),
+      listOf(stmt(textCall(p.textOrEmpty("label", place)))),
     )
 }
 
@@ -294,7 +300,7 @@ internal fun WearScreenEmitter.rowToggle(
   place: WearPlace,
   callee: String,
 ): List<Stmt> {
-  val (state, declaration) = checkedState(node, p)
+  val (state, declaration) = checkedState(node, p, place)
   return listOf(declaration) +
     one(
       wear(callee),
@@ -302,12 +308,12 @@ internal fun WearScreenEmitter.rowToggle(
         arg("checked", state),
         onCheckedChange(node, p, state),
         modifier(node, p, place, describe = true, item = true),
-        enabledArg(p),
+        enabledArg(p, place),
         transformation(place),
-        iconSlot(p.literal("icon"), "${defaults("ButtonDefaults")}.IconSize"),
-        textSlot(p, "secondaryLabel"),
+        iconSlot(p.iconName("icon", place), "${defaults("ButtonDefaults")}.IconSize"),
+        textSlot(p, "secondaryLabel", place),
       ),
-      listOf(stmt(textCall(p.literal("label").orEmpty()))),
+      listOf(stmt(textCall(p.textOrEmpty("label", place)))),
     )
 }
 
@@ -318,23 +324,27 @@ internal fun WearScreenEmitter.radioButton(
   place: WearPlace,
 ): List<Stmt> {
   val radio = place.radio
-  // A radio button the parent did not group (a template child) keeps its own state.
+  // A radio button no parent groups (one nested in a template's Row, say) keeps its own state.
   val (state, index, declaration) =
     if (radio != null) Triple(radio.state, radio.index, null)
     else {
       val own = stateName(node.id, "Selected")
       Triple(
         own,
-        0,
+        "0",
         stateVar(
           own,
-          if (p.option("RadioButton", "selected")) "0" else "-1",
+          when (val selected = p.boolValue("RadioButton", "selected", place)) {
+            "true" -> "0"
+            "false" -> "-1"
+            else -> "if ($selected) 0 else -1"
+          },
           WearSym.mutableIntStateOf,
         ),
       )
     }
   val selectAction =
-    listOf<Stmt>(Assign(state, "=", Raw(index.toString()))) + actionStatements(p["action"], node.id)
+    listOf<Stmt>(Assign(state, "=", Raw(index))) + actionStatements(p["action"], node.id)
   return listOfNotNull(declaration) +
     one(
       wear("RadioButton"),
@@ -342,12 +352,12 @@ internal fun WearScreenEmitter.radioButton(
         arg("selected", "$state == $index"),
         arg("onSelect", lambda(selectAction)),
         modifier(node, p, place, describe = true, item = true),
-        enabledArg(p),
+        enabledArg(p, place),
         transformation(place),
-        iconSlot(p.literal("icon"), "${defaults("ButtonDefaults")}.IconSize"),
-        textSlot(p, "secondaryLabel"),
+        iconSlot(p.iconName("icon", place), "${defaults("ButtonDefaults")}.IconSize"),
+        textSlot(p, "secondaryLabel", place),
       ),
-      listOf(stmt(textCall(p.literal("label").orEmpty()))),
+      listOf(stmt(textCall(p.textOrEmpty("label", place)))),
     )
 }
 
@@ -365,11 +375,17 @@ private fun WearScreenEmitter.valueState(
   node: ComponentNode,
   p: JsonObject,
   range: Pair<Float, Float>,
+  place: WearPlace,
 ): Pair<String, Stmt> {
   val initial =
-    (p.numberProp(node.component, "value") ?: range.first).coerceIn(range.first, range.second)
+    p.boundFloat("value", place)?.let {
+      "$it.coerceIn(${floatLiteral(range.first)}, ${floatLiteral(range.second)})"
+    }
+      ?: floatLiteral(
+        (p.numberProp(node.component, "value") ?: range.first).coerceIn(range.first, range.second),
+      )
   val name = stateName(node.id, "Value")
-  return name to stateVar(name, floatLiteral(initial), Sym.mutableFloatStateOf)
+  return name to stateVar(name, initial, Sym.mutableFloatStateOf)
 }
 
 internal fun WearScreenEmitter.slider(
@@ -378,7 +394,7 @@ internal fun WearScreenEmitter.slider(
   place: WearPlace,
 ): List<Stmt> {
   val range = valueRange(p)
-  val (state, declaration) = valueState(node, p, range)
+  val (state, declaration) = valueState(node, p, range, place)
   return listOf(declaration) +
     one(
       wear("Slider"),
@@ -387,7 +403,7 @@ internal fun WearScreenEmitter.slider(
         arg("onValueChange", lambda(Assign(state, "=", Raw("it")))),
         arg("steps", (p.numberProp("Slider", "steps")?.toInt() ?: 0).toString()),
         modifier(node, p, place, describe = true, item = true),
-        enabledArg(p),
+        enabledArg(p, place),
         arg("valueRange", "${floatLiteral(range.first)}..${floatLiteral(range.second)}"),
       ),
     )
@@ -399,7 +415,7 @@ internal fun WearScreenEmitter.stepper(
   place: WearPlace,
 ): List<Stmt> {
   val range = valueRange(p)
-  val (state, declaration) = valueState(node, p, range)
+  val (state, declaration) = valueState(node, p, range, place)
   val defaults = defaults("SliderDefaults")
   val content =
     p.literal("content")
@@ -415,7 +431,7 @@ internal fun WearScreenEmitter.stepper(
         arg("decreaseIcon", lambdaOf(Call("$defaults.DecreaseIcon"))),
         arg("increaseIcon", lambdaOf(Call("$defaults.IncreaseIcon"))),
         modifier(node, p, place, describe = true, item = true),
-        enabledArg(p),
+        enabledArg(p, place),
         arg("valueRange", "${floatLiteral(range.first)}..${floatLiteral(range.second)}"),
       ),
       content,
@@ -435,8 +451,24 @@ private fun WearScreenEmitter.strokeArg(indeterminate: Boolean): Arg {
   )
 }
 
-private fun WearScreenEmitter.progressArg(p: JsonObject, component: String): Arg =
-  arg("progress", lambdaOf(Raw(floatLiteral(p.numberProp(component, "progress") ?: 0f))))
+private fun WearScreenEmitter.progressArg(
+  p: JsonObject,
+  component: String,
+  place: WearPlace,
+): Arg =
+  arg(
+    "progress",
+    lambdaOf(
+      Raw(
+        p.boundFloat("progress", place) ?: floatLiteral(p.numberProp(component, "progress") ?: 0f),
+      ),
+    ),
+  )
+
+/** A progress ring with no progress, literal or bound, spins. */
+private fun WearScreenEmitter.hasProgress(p: JsonObject, place: WearPlace): Boolean =
+  p.numberProp("CircularProgressIndicator", "progress") != null ||
+    p.boundFloat("progress", place) != null
 
 /**
  * A ring fills the display when its parent gives it the whole screen (the body of a fixed screen),
@@ -470,10 +502,9 @@ internal fun WearScreenEmitter.circularProgress(
   one(
     wear("CircularProgressIndicator"),
     listOf(
-      if (p.numberProp("CircularProgressIndicator", "progress") == null) null
-      else progressArg(p, "CircularProgressIndicator"),
+      if (!hasProgress(p, place)) null else progressArg(p, "CircularProgressIndicator", place),
       ringModifier(node, p, place),
-      strokeArg(indeterminate = p.numberProp("CircularProgressIndicator", "progress") == null),
+      strokeArg(indeterminate = !hasProgress(p, place)),
     ),
   )
 
@@ -490,7 +521,7 @@ internal fun WearScreenEmitter.segmentedProgress(
         (p.numberProp("SegmentedCircularProgressIndicator", "segmentCount")?.toInt() ?: 1)
           .toString(),
       ),
-      progressArg(p, "SegmentedCircularProgressIndicator"),
+      progressArg(p, "SegmentedCircularProgressIndicator", place),
       ringModifier(node, p, place),
       strokeArg(indeterminate = false),
     ),
@@ -504,7 +535,7 @@ internal fun WearScreenEmitter.linearProgress(
   one(
     wear("LinearProgressIndicator"),
     listOf(
-      progressArg(p, "LinearProgressIndicator"),
+      progressArg(p, "LinearProgressIndicator", place),
       modifier(node, p, place, item = true),
     ),
   )

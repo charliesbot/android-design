@@ -5,19 +5,26 @@ import bot.charlies.androiddesign.preview.domain.export.Arg
 import bot.charlies.androiddesign.preview.domain.export.Assign
 import bot.charlies.androiddesign.preview.domain.export.Call
 import bot.charlies.androiddesign.preview.domain.export.Chain
+import bot.charlies.androiddesign.preview.domain.export.ChildItems
 import bot.charlies.androiddesign.preview.domain.export.Decl
 import bot.charlies.androiddesign.preview.domain.export.Expr
 import bot.charlies.androiddesign.preview.domain.export.FileContext
 import bot.charlies.androiddesign.preview.domain.export.FunDecl
 import bot.charlies.androiddesign.preview.domain.export.IfStmt
+import bot.charlies.androiddesign.preview.domain.export.Lambda
 import bot.charlies.androiddesign.preview.domain.export.Raw
+import bot.charlies.androiddesign.preview.domain.export.Scope
+import bot.charlies.androiddesign.preview.domain.export.Scoped
+import bot.charlies.androiddesign.preview.domain.export.ScreenData
 import bot.charlies.androiddesign.preview.domain.export.ScreenEmitterBase
 import bot.charlies.androiddesign.preview.domain.export.Stmt
 import bot.charlies.androiddesign.preview.domain.export.Sym
 import bot.charlies.androiddesign.preview.domain.export.arg
+import bot.charlies.androiddesign.preview.domain.export.childItems
 import bot.charlies.androiddesign.preview.domain.export.kotlinString
 import bot.charlies.androiddesign.preview.domain.export.lambda
 import bot.charlies.androiddesign.preview.domain.export.number
+import bot.charlies.androiddesign.preview.domain.export.pos
 import bot.charlies.androiddesign.preview.domain.export.stmt
 import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.ComponentNode
@@ -34,10 +41,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /** The state one `RadioButton` group shares: which of its parent's children is picked. */
-internal class WearRadio(val state: String, val index: Int)
+internal class WearRadio(val state: String, val index: String)
 
 /** What a component needs to know about where it is emitted, as the renderer's `ChildHost` does. */
 internal data class WearPlace(
+  override val scope: Scope? = null,
   val parentType: String? = null,
   /** The parent lets its children stretch to its width (`ComponentDef.stretchesChildren`). */
   val parentStretches: Boolean = true,
@@ -56,9 +64,10 @@ internal data class WearPlace(
   val radio: WearRadio? = null,
   /** `Modifier`, or `modifier` for the screen's root. */
   val modifierBase: String = "Modifier",
-) {
+) : Scoped {
   fun forChild(parentType: String) =
     WearPlace(
+      scope = scope,
       parentType = parentType,
       parentStretches = WearCatalog.find(parentType)?.stretchesChildren ?: false,
       weightable = parentType in WEIGHT_SCOPES,
@@ -81,7 +90,8 @@ internal class WearScreenEmitter(
   design: DesignSystem,
   screenId: String,
   screen: Screen,
-) : ScreenEmitterBase(file, design, screenId, screen, WearCatalog) {
+  data: ScreenData,
+) : ScreenEmitterBase(file, design, screenId, screen, data, WearCatalog) {
 
   /** True once a component differs between a normal and a large display. */
   var usesLarge = false
@@ -113,12 +123,6 @@ internal class WearScreenEmitter(
       ),
       preview(),
     )
-  }
-
-  private fun parameters(): List<String> = buildList {
-    add("modifier: ${file.use(Sym.Modifier)} = ${file.use(Sym.Modifier)}")
-    if (usesBack) add("onBack: () -> Unit = {}")
-    navigateTargets.forEach { add("${callbackName(it)}: () -> Unit = {}") }
   }
 
   /**
@@ -200,6 +204,20 @@ internal class WearScreenEmitter(
   /** A boolean prop of [component]: the stated literal, else its catalog default. */
   fun JsonObject.option(component: String, key: String): Boolean =
     flag(key) ?: catalogDefault(component, key)?.toBooleanStrictOrNull() ?: false
+
+  /**
+   * A boolean prop of [component] as a Kotlin expression: a literal, a bound value, or its default.
+   */
+  fun JsonObject.boolValue(component: String, key: String, place: WearPlace): String =
+    boolExpr(key, place)
+      ?: (catalogDefault(component, key)?.toBooleanStrictOrNull() ?: false).toString()
+
+  /** A number prop bound to data as a `Float` expression, or null when it is not bound. */
+  fun JsonObject.boundFloat(key: String, place: WearPlace): String? =
+    this[key]?.let(::bindingPath)?.let { "${resolve(it, place.scope).expr}.toFloat()" }
+
+  /** A string prop as a Kotlin expression, an empty string when it is absent. */
+  fun JsonObject.textOrEmpty(key: String, place: WearPlace): Expr = text(key, place) ?: Raw("\"\"")
 
   /** A number prop of [component], moved into the catalog's bounds like the renderer does. */
   fun JsonObject.numberProp(component: String, key: String): Float? {
@@ -297,9 +315,9 @@ internal class WearScreenEmitter(
       parts += "${useModifier("padding")}(${spacing(it)})"
     }
     if (describe) {
-      p.literal("contentDescription")?.let {
+      p.text("contentDescription", place)?.let {
         file.use(Sym.contentDescription)
-        parts += "${useModifier("semantics")} { contentDescription = ${kotlinString(it)} }"
+        parts += "${useModifier("semantics")} { contentDescription = ${checkNotNull(it.flat())} }"
       }
     }
     if (item && place.item) parts += itemHeight()
@@ -337,23 +355,31 @@ internal class WearScreenEmitter(
   /** The statements that set a block of children up, and the ones that draw them. */
   class Children(val prelude: List<Stmt>, val body: List<Stmt>)
 
-  /** The ids of a `ChildList` prop. */
-  fun childList(p: JsonObject, key: String): List<String> =
-    (p[key] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty()
-
   /**
    * The children of [parent] listed under [key], each drawn in [place] (a radio button also learns
-   * its group). [wrap] puts one child's statements where the parent needs them, such as in an `item
-   * { }`.
+   * its group), or the loop a template over a data array makes. With [scrolls] the children are the
+   * items of the screen's `TransformingLazyColumn`: each is an `item { }`, a template one
+   * `items(list) { }`.
    */
   fun children(
     parent: ComponentNode,
     p: JsonObject,
     key: String,
     place: WearPlace,
-    wrap: (List<Stmt>) -> List<Stmt> = { it },
+    scrolls: Boolean = false,
+  ): Children =
+    when (val items = p[key].childItems()) {
+      is ChildItems.Listed -> listedChildren(parent, items.ids, place, scrolls)
+      is ChildItems.Template -> templateChildren(parent, items, place, scrolls)
+      null -> Children(emptyList(), emptyList())
+    }
+
+  private fun listedChildren(
+    parent: ComponentNode,
+    ids: List<String>,
+    place: WearPlace,
+    scrolls: Boolean,
   ): Children {
-    val ids = childList(p, key)
     val radios = ids.filter { byId[it]?.component == "RadioButton" }
     val state = stateName(parent.id, "Selected")
     val prelude =
@@ -361,16 +387,75 @@ internal class WearScreenEmitter(
       else {
         val picked = ids.indexOfFirst { id ->
           byId[id]?.let {
-            it.component == "RadioButton" && effectiveProps(it, false).flag("selected") == true
+            it.component == "RadioButton" &&
+              effectiveProps(it, false).sampleFlag("selected", place) == true
           } == true
         }
         listOf(stateVar(state, picked.toString(), WearSym.mutableIntStateOf))
       }
     val body = ids.flatMapIndexed { index, id ->
-      val child = if (id in radios) place.copy(radio = WearRadio(state, index)) else place
-      wrap(emit(id, child))
+      val child =
+        if (id in radios) place.copy(radio = WearRadio(state, index.toString())) else place
+      val statements = emit(id, child)
+      if (scrolls && statements.isNotEmpty()) {
+        listOf(stmt(Call("item", lambda = lambda(statements))))
+      } else statements
     }
     return Children(prelude, body)
+  }
+
+  /**
+   * `list.forEach { x -> ... }`, or in the scrolling list `items(list) { x -> ... }`. Radio buttons
+   * in a template are one group like listed ones: the group's state is declared outside the loop
+   * and each item reads its own index.
+   */
+  private fun templateChildren(
+    parent: ComponentNode,
+    template: ChildItems.Template,
+    place: WearPlace,
+    scrolls: Boolean,
+  ): Children {
+    val radio = byId[template.componentId]?.component == "RadioButton"
+    val loop = templateScope(template.componentId, template.path, place, indexed = radio)
+    val scope = loop.scope
+    val group =
+      if (radio) WearRadio(stateName(parent.id, "Selected"), checkNotNull(scope.index)) else null
+    val body = emit(template.componentId, place.copy(scope = scope, radio = group))
+    if (body.isEmpty()) return Children(emptyList(), emptyList())
+    val params = if (scope.index != null) "${scope.index}, ${scope.variable}" else scope.variable
+    val call =
+      if (scrolls) {
+        val callee = file.use(if (loop.withIndex) WearSym.itemsIndexed else WearSym.items)
+        Call(callee, listOf(pos(Raw(loop.list.expr))), Lambda(params, body))
+      } else {
+        Call(
+          "${loop.list.expr}.forEach${if (loop.withIndex) "Indexed" else ""}",
+          lambda = Lambda(params, body),
+        )
+      }
+    val prelude =
+      group
+        ?.let {
+          listOf(stateVar(it.state, pickedIndex(template, loop, place), WearSym.mutableIntStateOf))
+        }
+        .orEmpty()
+    return Children(prelude, listOf(stmt(call)))
+  }
+
+  /** The index of the first item whose `selected` is true in the sample data, else -1. */
+  private fun pickedIndex(
+    template: ChildItems.Template,
+    loop: TemplateScope,
+    place: WearPlace,
+  ): String {
+    val props = effectiveProps(byId.getValue(template.componentId), large = false)
+    val inside = place.copy(scope = loop.scope)
+    return when (val selected = props.boolExpr("selected", inside)) {
+      null,
+      "false" -> "-1"
+      "true" -> "0"
+      else -> "${loop.list.expr}.indexOfFirst { ${loop.scope.variable} -> $selected }"
+    }
   }
 
   // endregion

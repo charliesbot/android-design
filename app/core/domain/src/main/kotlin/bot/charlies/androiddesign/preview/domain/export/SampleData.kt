@@ -19,6 +19,13 @@ internal class ScreenData(
   val objectName: String = Naming.pascal(screenId) + "Sample"
 }
 
+/** A written file, with what [SampleModel.writeAvoidingClashes] needs to check its names. */
+internal class BuiltSource(
+  val source: String,
+  val importedNames: Set<String>,
+  val sampleClassNames: Set<String>,
+)
+
 /**
  * Turns each screen's `dataModel` into data classes and sample values. Objects become public data
  * classes named after their key (`plates` gives `Plate`), because the screen functions take them as
@@ -36,6 +43,19 @@ internal class SampleModel(private val reserved: Set<String> = emptySet()) {
   private class Typed(val type: String, val sample: Expr)
 
   private val classes = linkedMapOf<String, ClassInfo>()
+
+  companion object {
+    /**
+     * Writes a file with [build], given the simple names the sample classes must not take. A sample
+     * class named like an imported symbol (`Row`) would shadow the import, so the names the first
+     * pass imported are kept free and the file is built again.
+     */
+    fun writeAvoidingClashes(build: (reserved: Set<String>) -> BuiltSource): String {
+      val first = build(emptySet())
+      val clash = first.sampleClassNames.intersect(first.importedNames)
+      return if (clash.isEmpty()) first.source else build(first.importedNames).source
+    }
+  }
 
   fun forScreen(screenId: String, dataModel: JsonElement?): ScreenData {
     val root = dataModel as? JsonObject

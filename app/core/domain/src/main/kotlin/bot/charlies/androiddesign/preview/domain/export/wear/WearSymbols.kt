@@ -24,6 +24,8 @@ internal object WearSym {
   const val TransformingLazyColumn = "$FOUNDATION.lazy.TransformingLazyColumn"
   const val rememberTransformingLazyColumnState =
     "$FOUNDATION.lazy.rememberTransformingLazyColumnState"
+  const val items = "$FOUNDATION.lazy.items"
+  const val itemsIndexed = "$FOUNDATION.lazy.itemsIndexed"
   const val ScrollInfoProvider = "$FOUNDATION.ScrollInfoProvider"
 
   // navigation3
