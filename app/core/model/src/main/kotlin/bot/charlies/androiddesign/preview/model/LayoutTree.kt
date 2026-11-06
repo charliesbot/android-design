@@ -109,6 +109,8 @@ enum class FindingRule(val wire: String) {
   @SerialName("one-fab") OneFab("one-fab"),
   @SerialName("offscreen") Offscreen("offscreen"),
   @SerialName("round-edge-clipped") RoundEdgeClipped("round-edge-clipped"),
+  @SerialName("carousel-items") CarouselItems("carousel-items"),
+  @SerialName("nav-destinations") NavDestinations("nav-destinations"),
 }
 
 /** [id] is the component the finding is about, or null when it concerns the whole view. */

@@ -596,6 +596,9 @@
           "$ref": "#/$defs/component.Image"
         },
         {
+          "$ref": "#/$defs/component.Carousel"
+        },
+        {
           "$ref": "#/$defs/component.Scaffold"
         },
         {
@@ -606,6 +609,12 @@
         },
         {
           "$ref": "#/$defs/component.NavigationBarItem"
+        },
+        {
+          "$ref": "#/$defs/component.Tabs"
+        },
+        {
+          "$ref": "#/$defs/component.Tab"
         },
         {
           "$ref": "#/$defs/component.NavigationRail"
@@ -1382,6 +1391,46 @@
       ],
       "unevaluatedProperties": false
     },
+    "component.Carousel": {
+      "type": "object",
+      "description": "A horizontally scrolling collection of visual items, clipped to the carousel's item shape.",
+      "x-compose": "HorizontalMultiBrowseCarousel, HorizontalCenteredHeroCarousel, HorizontalUncontainedCarousel",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Carousel"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "multi-browse",
+            "hero",
+            "centered-hero",
+            "uncontained",
+            "full-screen"
+          ],
+          "description": "hero and full-screen have no composable of their own: they size the items of a multi-browse and an uncontained carousel.",
+          "default": "multi-browse"
+        },
+        "itemWidth": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "Item width in dp: the preferred width of multi-browse, the width of uncontained. The other variants size their items themselves. Must be a number from 40 to 1000.",
+          "default": 186
+        },
+        "children": {
+          "$ref": "#/$defs/ChildList"
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
     "component.Scaffold": {
       "type": "object",
       "description": "The screen frame: bars, floating action button and content.",
@@ -1543,6 +1592,81 @@
         "component",
         "label",
         "icon"
+      ],
+      "unevaluatedProperties": false
+    },
+    "component.Tabs": {
+      "type": "object",
+      "description": "A row of tabs that switches between sibling views at the same level of hierarchy.",
+      "x-compose": "PrimaryTabRow, SecondaryTabRow, PrimaryScrollableTabRow, SecondaryScrollableTabRow",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Tabs"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary"
+          ],
+          "default": "primary"
+        },
+        "scrollable": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Lets the tabs scroll when they do not fit.",
+          "default": false
+        },
+        "children": {
+          "$ref": "#/$defs/ChildList",
+          "x-allowedComponents": [
+            "Tab"
+          ]
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "component.Tab": {
+      "type": "object",
+      "description": "One tab of a Tabs row. Its content is the screen its action navigates to.",
+      "x-compose": "Tab",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "Tab"
+        },
+        "label": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "icon": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Material Symbols name, such as \"home\"."
+        },
+        "selected": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        }
+      },
+      "required": [
+        "component",
+        "label"
       ],
       "unevaluatedProperties": false
     },

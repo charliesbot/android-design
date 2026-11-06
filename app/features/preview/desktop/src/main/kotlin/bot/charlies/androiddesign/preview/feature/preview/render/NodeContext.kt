@@ -160,7 +160,7 @@ internal class NodeContext(
 }
 
 /** The props of [node] in the frame of [env], with its size class overrides applied. */
-private fun effectiveProps(node: ComponentNode, env: RenderEnv): JsonObject {
+internal fun effectiveProps(node: ComponentNode, env: RenderEnv): JsonObject {
   val overrides = node.sizeOverridesAt(env.catalog.sizeBreakpoints, env.widthDp)
   if (overrides.isEmpty()) return node.props
   return JsonObject(LinkedHashMap(node.props).apply { putAll(overrides) })

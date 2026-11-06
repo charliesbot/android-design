@@ -1,7 +1,9 @@
 package bot.charlies.androiddesign.preview.feature.preview
 
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import bot.charlies.androiddesign.preview.feature.preview.theme.ThemeResolver
@@ -170,6 +172,26 @@ class RendererBehaviorTest {
       after = true
     }
     assertTrue(before && after)
+  }
+
+  @Test
+  fun `tapping a tab moves the selection to it`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"tabs"},{"id":"tabs","component":"Tabs","children":["a","b"]},""" +
+          """{"id":"a","component":"Tab","label":"Plates","selected":true},{"id":"b","component":"Tab","label":"Menus"}""",
+      )
+    var checked = false
+    render(proposal) {
+      onNodeWithTag("a", useUnmergedTree = true).assertIsSelected()
+      onNodeWithTag("b", useUnmergedTree = true).assertIsNotSelected()
+      onNodeWithTag("b", useUnmergedTree = true).performClick()
+      settleForTest()
+      onNodeWithTag("a", useUnmergedTree = true).assertIsNotSelected()
+      onNodeWithTag("b", useUnmergedTree = true).assertIsSelected()
+      checked = true
+    }
+    assertTrue(checked)
   }
 
   @Test

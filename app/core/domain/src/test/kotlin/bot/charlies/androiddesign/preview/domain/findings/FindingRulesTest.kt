@@ -2,8 +2,10 @@ package bot.charlies.androiddesign.preview.domain.findings
 
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.FindingRule
+import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.Severity
+import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
 import bot.charlies.androiddesign.preview.model.WearCatalog
 import kotlin.test.Test
@@ -390,19 +392,13 @@ class FindingRulesTest {
   fun `primary-largest ignores navigation chrome sliders and text fields`() {
     val primary = button("cook", primary = true, h = 40f)
     val bar = node("bar", "NavigationBar", y = 800f, w = 411f, h = 80f)
-    val item =
-      node(
-        "home",
-        "NavigationBarItem",
-        parent = "bar",
-        y = 800f,
-        w = 80f,
-        h = 80f,
-        touch = Bounds(0f, 800f, 80f, 80f),
-      )
+    val items = destinations("bar", 3)
     val slider = node("volume", "Slider", y = 300f, w = 280f, h = 56f)
     val field = node("amount", "TextField", y = 400f, w = 280f, h = 56f)
-    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(primary, bar, item, slider, field))))
+    assertEquals(
+      emptyList(),
+      evaluate(tree(nodes = arrayOf(primary, bar, *items, slider, field))),
+    )
   }
 
   @Test
@@ -462,6 +458,118 @@ class FindingRulesTest {
     val b = button("b", y = 200f, primary = true, h = 56f)
     val findings = evaluate(tree(nodes = arrayOf(a, b))).of(FindingRule.PrimaryLargest)
     assertEquals(listOf("a"), findings.map { it.id })
+  }
+
+  // endregion
+
+  // region carousel-items
+
+  private fun carousel(vararg itemWidths: Pair<Float, Float>, withText: Boolean = true) =
+    arrayOf(node("gallery", "Carousel", y = 100f, w = 411f, h = 200f)) +
+      itemWidths.flatMapIndexed { i, (x, w) ->
+        val item = node("item$i", "Card", parent = "gallery", x = x, y = 100f, w = w, h = 200f)
+        if (withText) {
+          listOf(
+            item,
+            node("label$i", "Text", parent = "item$i", x = x, y = 250f, text = text()),
+          )
+        } else {
+          listOf(item)
+        }
+      }
+
+  private fun carouselFindings(view: ViewSpec, vararg nodes: LayoutNode) =
+    evaluate(tree(view, *nodes)).of(FindingRule.CarouselItems)
+
+  @Test
+  fun `carousel-items passes for the items of a multi-browse carousel`() {
+    // Two large items and a small one; the items past it are laid out inside it.
+    val nodes =
+      carousel(
+        13.33f to 177.5f,
+        193.5f to 177.5f,
+        304.92f to 106.08f,
+        332.58f to 78.42f,
+        352.46f to 58.54f,
+      )
+    assertEquals(emptyList(), carouselFindings(Views.Light, *nodes))
+  }
+
+  @Test
+  fun `carousel-items flags four items with text at a compact view`() {
+    val nodes = carousel(16f to 80f, 104f to 80f, 192f to 80f, 280f to 131f, 330f to 81f)
+    val finding = carouselFindings(Views.Light, *nodes).single()
+    assertEquals("gallery", finding.id)
+    assertEquals(Severity.Info, finding.severity)
+    assertEquals(
+      "4 items with text show at 411 dp; Material shows at most 3 at compact widths unless " +
+        "they are easy to recognize",
+      finding.detail,
+    )
+  }
+
+  @Test
+  fun `carousel-items does not count items without text`() {
+    val nodes = carousel(16f to 80f, 104f to 80f, 192f to 80f, 280f to 131f, withText = false)
+    assertEquals(emptyList(), carouselFindings(Views.Light, *nodes))
+  }
+
+  @Test
+  fun `carousel-items does not count items outside the view`() {
+    val nodes = carousel(16f to 140f, 164f to 140f, 312f to 99f, 420f to 140f, 568f to 140f)
+    assertEquals(emptyList(), carouselFindings(Views.Light, *nodes))
+  }
+
+  @Test
+  fun `carousel-items leaves wider views alone`() {
+    val nodes = carousel(16f to 80f, 104f to 80f, 192f to 80f, 280f to 131f)
+    assertEquals(emptyList(), carouselFindings(Views.Tablet, *nodes))
+  }
+
+  // endregion
+
+  // region nav-destinations
+
+  private fun destinations(bar: String, count: Int) =
+    Array(count) { i ->
+      node(
+        "$bar-item$i",
+        "NavigationBarItem",
+        parent = bar,
+        x = i * 100f,
+        y = 800f,
+        w = 80f,
+        h = 80f,
+        touch = Bounds(i * 100f, 800f, 80f, 80f),
+      )
+    }
+
+  @Test
+  fun `nav-destinations passes for three destinations`() {
+    val bar = node("bar", "NavigationBar", y = 800f, w = 411f, h = 80f)
+    val findings = evaluate(tree(nodes = arrayOf(bar, *destinations("bar", 3))))
+    assertEquals(emptyList(), findings.of(FindingRule.NavDestinations))
+  }
+
+  @Test
+  fun `nav-destinations fails for fewer than three and points at tabs`() {
+    val bar = node("bar", "NavigationBar", y = 800f, w = 411f, h = 80f)
+    val finding =
+      evaluate(tree(nodes = arrayOf(bar, *destinations("bar", 2))))
+        .of(FindingRule.NavDestinations)
+        .single()
+    assertEquals("bar", finding.id)
+    assertEquals(Severity.Error, finding.severity)
+    assertEquals(
+      "2 destinations; a navigation bar needs at least 3, use tabs for fewer",
+      finding.detail,
+    )
+  }
+
+  @Test
+  fun `nav-destinations ignores a bar that is not drawn`() {
+    val bar = node("bar", "NavigationBar", w = 0f, h = 0f)
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(bar))).of(FindingRule.NavDestinations))
   }
 
   // endregion

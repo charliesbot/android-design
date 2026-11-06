@@ -2141,7 +2141,8 @@
           "children": [
             "open_sheet",
             "open_dialog",
-            "open_fabs"
+            "open_fabs",
+            "open_collections"
           ]
         },
         {
@@ -2290,6 +2291,20 @@
             "menu_share",
             "menu_delete"
           ]
+        },
+        {
+          "id": "open_collections",
+          "component": "Button",
+          "variant": "text",
+          "label": "Tabs and carousels",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "collections"
+              }
+            }
+          }
         }
       ]
     },
@@ -2471,6 +2486,404 @@
             "fab_color_tertiary",
             "fab_color_surface"
           ]
+        }
+      ]
+    },
+    "collections": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "dataModel": {
+        "items": [
+          {
+            "name": "Tomato soup"
+          },
+          {
+            "name": "Caesar salad"
+          },
+          {
+            "name": "Mushroom risotto"
+          },
+          {
+            "name": "Lemon tart"
+          },
+          {
+            "name": "Iced tea"
+          }
+        ]
+      },
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "topBar": "top",
+          "content": "body"
+        },
+        {
+          "id": "top",
+          "component": "TopAppBar",
+          "size": "medium",
+          "title": "Tabs and carousels",
+          "navigationIcon": "back"
+        },
+        {
+          "id": "back",
+          "component": "IconButton",
+          "icon": "arrow_back",
+          "contentDescription": "Back",
+          "action": {
+            "functionCall": {
+              "@call": "back"
+            }
+          }
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "scroll": true,
+          "spacing": "lg",
+          "children": [
+            "tabs_primary",
+            "tabs_secondary",
+            "carousel_multi",
+            "carousel_hero",
+            "carousel_centered",
+            "carousel_uncontained",
+            "carousel_full"
+          ]
+        },
+        {
+          "id": "tabs_primary",
+          "component": "Tabs",
+          "children": [
+            "tab_plates",
+            "tab_menus",
+            "tab_chefs"
+          ]
+        },
+        {
+          "id": "tab_plates",
+          "component": "Tab",
+          "label": "Plates",
+          "icon": "restaurant",
+          "selected": true,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "collections"
+              }
+            }
+          }
+        },
+        {
+          "id": "tab_menus",
+          "component": "Tab",
+          "label": "Menus",
+          "icon": "menu_book",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "tab_chefs",
+          "component": "Tab",
+          "label": "Chefs",
+          "icon": "person",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "detail"
+              }
+            }
+          }
+        },
+        {
+          "id": "tabs_secondary",
+          "component": "Tabs",
+          "variant": "secondary",
+          "scrollable": true,
+          "children": [
+            "stab_all",
+            "stab_soups",
+            "stab_salads",
+            "stab_mains",
+            "stab_desserts",
+            "stab_drinks"
+          ]
+        },
+        {
+          "id": "stab_all",
+          "component": "Tab",
+          "label": "All",
+          "selected": true,
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "collections"
+              }
+            }
+          }
+        },
+        {
+          "id": "stab_soups",
+          "component": "Tab",
+          "label": "Soups",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "stab_salads",
+          "component": "Tab",
+          "label": "Salads",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "stab_mains",
+          "component": "Tab",
+          "label": "Mains",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "stab_desserts",
+          "component": "Tab",
+          "label": "Desserts",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "stab_drinks",
+          "component": "Tab",
+          "label": "Drinks",
+          "action": {
+            "functionCall": {
+              "@call": "navigate",
+              "args": {
+                "screen": "home"
+              }
+            }
+          }
+        },
+        {
+          "id": "carousel_multi",
+          "component": "Carousel",
+          "children": {
+            "componentId": "item_multi",
+            "path": "/items"
+          }
+        },
+        {
+          "id": "carousel_hero",
+          "component": "Carousel",
+          "variant": "hero",
+          "children": {
+            "componentId": "item_hero",
+            "path": "/items"
+          }
+        },
+        {
+          "id": "carousel_centered",
+          "component": "Carousel",
+          "variant": "centered-hero",
+          "children": {
+            "componentId": "item_centered",
+            "path": "/items"
+          }
+        },
+        {
+          "id": "carousel_uncontained",
+          "component": "Carousel",
+          "variant": "uncontained",
+          "itemWidth": 140,
+          "children": {
+            "componentId": "item_uncontained",
+            "path": "/items"
+          }
+        },
+        {
+          "id": "carousel_full",
+          "component": "Carousel",
+          "variant": "full-screen",
+          "children": {
+            "componentId": "item_full",
+            "path": "/items"
+          }
+        },
+        {
+          "id": "item_multi",
+          "component": "Card",
+          "content": [
+            "item_multi_image",
+            "item_multi_name"
+          ]
+        },
+        {
+          "id": "item_multi_image",
+          "component": "Image",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "fit": "crop",
+          "aspectRatio": 1.25,
+          "contentDescription": {
+            "@path": "name"
+          }
+        },
+        {
+          "id": "item_multi_name",
+          "component": "Text",
+          "text": {
+            "@path": "name"
+          },
+          "type": "titleSmall",
+          "padding": "md",
+          "maxLines": 1,
+          "overflow": "ellipsis"
+        },
+        {
+          "id": "item_hero",
+          "component": "Card",
+          "content": [
+            "item_hero_image",
+            "item_hero_name"
+          ]
+        },
+        {
+          "id": "item_hero_image",
+          "component": "Image",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "fit": "crop",
+          "aspectRatio": 1.25,
+          "contentDescription": {
+            "@path": "name"
+          }
+        },
+        {
+          "id": "item_hero_name",
+          "component": "Text",
+          "text": {
+            "@path": "name"
+          },
+          "type": "titleSmall",
+          "padding": "md",
+          "maxLines": 1,
+          "overflow": "ellipsis"
+        },
+        {
+          "id": "item_centered",
+          "component": "Card",
+          "content": [
+            "item_centered_image",
+            "item_centered_name"
+          ]
+        },
+        {
+          "id": "item_centered_image",
+          "component": "Image",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "fit": "crop",
+          "aspectRatio": 1.25,
+          "contentDescription": {
+            "@path": "name"
+          }
+        },
+        {
+          "id": "item_centered_name",
+          "component": "Text",
+          "text": {
+            "@path": "name"
+          },
+          "type": "titleSmall",
+          "padding": "md",
+          "maxLines": 1,
+          "overflow": "ellipsis"
+        },
+        {
+          "id": "item_uncontained",
+          "component": "Card",
+          "content": [
+            "item_uncontained_image",
+            "item_uncontained_name"
+          ]
+        },
+        {
+          "id": "item_uncontained_image",
+          "component": "Image",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "fit": "crop",
+          "aspectRatio": 1.25,
+          "contentDescription": {
+            "@path": "name"
+          }
+        },
+        {
+          "id": "item_uncontained_name",
+          "component": "Text",
+          "text": {
+            "@path": "name"
+          },
+          "type": "titleSmall",
+          "padding": "md",
+          "maxLines": 1,
+          "overflow": "ellipsis"
+        },
+        {
+          "id": "item_full",
+          "component": "Card",
+          "content": [
+            "item_full_image",
+            "item_full_name"
+          ]
+        },
+        {
+          "id": "item_full_image",
+          "component": "Image",
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          "fit": "crop",
+          "aspectRatio": 1.25,
+          "contentDescription": {
+            "@path": "name"
+          }
+        },
+        {
+          "id": "item_full_name",
+          "component": "Text",
+          "text": {
+            "@path": "name"
+          },
+          "type": "titleSmall",
+          "padding": "md",
+          "maxLines": 1,
+          "overflow": "ellipsis"
         }
       ]
     }

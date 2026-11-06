@@ -52,6 +52,7 @@ The proposal carries these design rules; `proposal-format.md` gives the syntax f
 
 - The screen has one primary action, marked as primary, and it leads its peers as `android-design` section 2 describes.
 - It adapts at 600 and 840 dp: a navigation bar in compact becomes a rail from medium up, and a list's detail screen opens beside the list at expanded widths.
+- Related content at the same level of hierarchy is `Tabs`, each `Tab` navigating to its screen, scrollable when the tabs do not fit; fewer than three destinations are tabs, not a `NavigationBar`. A visual collection is a `Carousel`: at most three items with text show at compact widths, item text stays brief (at most two lines at compact widths unless the background is simple).
 - Overlays (`BottomSheet`, `Dialog`, `Menu`) open from a control. A modal bottom sheet opens at about half the window height and scrolls inside, so its key action sits near the top.
 - Text truncates on purpose, with an ellipsis. Button, chip, and navigation labels fit on one line.
 

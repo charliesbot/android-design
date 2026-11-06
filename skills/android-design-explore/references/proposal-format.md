@@ -109,6 +109,8 @@ An `action` prop calls a renderer function; the renderer never calls the agent, 
 - `open` with `overlay`: opens a `BottomSheet`, `Dialog`, or `Menu` of the same screen by id. Overlays are closed until opened.
 - `dismiss`: closes the open overlay.
 
+`Tabs` holds `Tab` children and has no content of its own: each `Tab`'s `action` is a `navigate` to the screen that shows that tab, which repeats the `Tabs` with its own tab `selected`. A `Carousel` takes `children` like a list, usually a template, and clips each item to the carousel shape.
+
 A `Menu` opened by `open` names the component it hangs from in `anchor`. A `Menu` held by a `SplitButton`'s `menu` slot leaves `anchor` out: the split's trailing button opens it, and an `anchor` back to the split is rejected as a cycle.
 
 ## Responsive props
