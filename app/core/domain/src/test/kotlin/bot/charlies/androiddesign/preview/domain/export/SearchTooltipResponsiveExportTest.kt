@@ -76,4 +76,20 @@ class SearchTooltipResponsiveExportTest {
     has(withActions, "hasAction = true")
     check(buttons.isNotEmpty())
   }
+
+  @Test
+  fun `buttons that exist only in an override make the tooltip persistent and have an action`() {
+    val source =
+      flat(
+        ExportFixtures.export(
+          """{"id":"root","component":"Column","children":["info"]}""",
+          """{"id":"info","component":"IconButton","icon":"info","contentDescription":"Info"}""",
+          """{"id":"tip","component":"Tooltip","anchor":"info","variant":"rich","text":"Hi","sizeClass":{"medium":{"actions":["ok"]}}}""",
+          """{"id":"ok","component":"Button","variant":"text","label":"Got it"}""",
+        ),
+      )
+    has(source, "val tipTooltipState = rememberTooltipState(isPersistent = true)")
+    has(source, "if (atLeastMedium) {")
+    has(source, "hasAction = true")
+  }
 }

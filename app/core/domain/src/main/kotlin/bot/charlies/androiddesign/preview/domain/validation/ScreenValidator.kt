@@ -61,7 +61,6 @@ internal class ScreenValidator(
     }
     validateSnackbarHost()
     validateSearch()
-    validateTooltips()
     detectCycles()
   }
 
@@ -80,17 +79,7 @@ internal class ScreenValidator(
       val path = componentsPath.child(index)
       val props = node.props
       when (node.component) {
-        "SearchBar" -> {
-          val trailing = (listedCount(props, "trailing") ?: 0) + if ("avatar" in props) 1 else 0
-          if (trailing > SearchSpec.MAX_BAR_TRAILING) {
-            sink.add(
-              path.child("trailing"),
-              "a search bar has at most ${SearchSpec.MAX_BAR_TRAILING} trailing elements, " +
-                "an avatar counting as one, got $trailing",
-            )
-          }
-        }
-        "TopAppBar" -> validateSearchAppBar(path, node)
+        "TopAppBar" -> validateSearchOnlyProps(path, node)
       }
       if (node.component == "SearchBar" || node.component == "TopAppBar") {
         props.string("expanded")?.let { holders.getOrPut(it) { mutableListOf() }.add(node.id) }
@@ -113,70 +102,78 @@ internal class ScreenValidator(
     }
   }
 
-  /**
-   * `avatar` and `expanded` belong to a search app bar, which the size prop (and so a size class
-   * override) makes. A search app bar has "up to two trailing icons on mobile", an avatar coming in
-   * addition, and "up to four trailing icons on larger screens", so the actions are counted at
-   * every size class the bar is a search bar at, and reported where the count was written.
-   */
-  private fun validateSearchAppBar(path: String, node: ComponentNode) {
-    if (!SearchBars.isSearchAppBar(node)) {
-      for (key in listOf("avatar", "expanded")) {
-        if (key in node.props) sink.add(path.child(key), "$key is for a TopAppBar of size search")
-      }
-      return
-    }
-    val reported = mutableSetOf<String>()
-    for (size in SizeClass.entries) {
-      val effective = JsonObject(node.props + node.sizeOverridesAt(size))
-      if (!SearchBars.isSearchAppBar(node.component, effective)) continue
-      val count = listedCount(effective, "actions") ?: continue
-      val large = size != SizeClass.Compact
-      val limit =
-        if (large) SearchSpec.MAX_APP_BAR_ACTIONS_LARGE else SearchSpec.MAX_APP_BAR_ACTIONS_COMPACT
-      if (count <= limit) continue
-      val key =
-        catalog.sizeBreakpoints
-          .filter { it.minWidthDp <= size.minWidthDp }
-          .lastOrNull {
-            (node.props[Catalog.SIZE_CLASS] as? JsonObject)?.get(it.key)?.let { o ->
-              "actions" in (o as JsonObject)
-            } == true
-          }
-          ?.key
-      val where =
-        if (key == null) path.child("actions")
-        else path.child(Catalog.SIZE_CLASS).child(key).child("actions")
-      if (!reported.add(where)) continue
-      sink.add(
-        where,
-        "a search app bar has at most $limit trailing icon buttons " +
-          (if (large) "on larger screens" else "on compact screens, four only on larger ones") +
-          ", got $count",
-      )
+  /** `avatar` and `expanded` belong to a search app bar, at some size class at least. */
+  private fun validateSearchOnlyProps(path: String, node: ComponentNode) {
+    if (SearchBars.isSearchAppBar(node)) return
+    for (key in listOf("avatar", "expanded")) {
+      if (key in node.props) sink.add(path.child(key), "$key is for a TopAppBar of size search")
     }
   }
 
   /**
-   * Material's tooltip rules: only a rich tooltip has a subhead and text buttons, and it has "up to
-   * two text buttons".
+   * Material's limits that count children, checked on the props in effect at one size class, so a
+   * `sizeClass` override cannot step around them. [changed] is the keys the object at [path] sets,
+   * or null for the base props, which hold at compact: only a check that involves a changed key is
+   * reported, where it was written.
+   *
+   * A search bar has "one or two trailing icons or icon buttons", and an avatar combines "with up
+   * to one other trailing icon button". A search app bar has "up to two trailing icons on mobile",
+   * an avatar in addition, and "up to four trailing icons on larger screens". A rich tooltip has
+   * "up to two text buttons", and only a rich tooltip has a subhead or buttons.
    */
-  private fun validateTooltips() {
-    screen.components.forEachIndexed { index, node ->
-      if (node.component != "Tooltip") return@forEachIndexed
-      val path = componentsPath.child(index)
-      val rich = node.props.string("variant") == "rich"
-      if (!rich) {
-        for (key in listOf("title", "actions")) {
-          if (key in node.props) sink.add(path.child(key), "$key is for a rich tooltip")
+  private fun validateCountLimits(
+    path: String,
+    def: ComponentDef,
+    effective: JsonObject,
+    size: SizeClass,
+    changed: Set<String>?,
+  ) {
+    fun touched(vararg keys: String) = changed == null || keys.any { it in changed }
+    when {
+      def.name == "SearchBar" && touched("trailing", "avatar") -> {
+        val trailing =
+          (listedCount(effective, "trailing") ?: 0) + if ("avatar" in effective) 1 else 0
+        if (trailing > SearchSpec.MAX_BAR_TRAILING) {
+          sink.add(
+            path.child(if (touched("trailing")) "trailing" else "avatar"),
+            "a search bar has at most ${SearchSpec.MAX_BAR_TRAILING} trailing elements, " +
+              "an avatar counting as one, got $trailing",
+          )
         }
       }
-      val actions = listedCount(node.props, "actions") ?: 0
-      if (actions > TooltipSpec.MAX_ACTIONS) {
-        sink.add(
-          path.child("actions"),
-          "a rich tooltip has at most ${TooltipSpec.MAX_ACTIONS} text buttons, got $actions",
-        )
+      SearchBars.isSearchAppBar(def.name, effective) && touched("actions", "size") -> {
+        val count = listedCount(effective, "actions") ?: return
+        val large = size != SizeClass.Compact
+        val limit =
+          if (large) SearchSpec.MAX_APP_BAR_ACTIONS_LARGE
+          else SearchSpec.MAX_APP_BAR_ACTIONS_COMPACT
+        if (count > limit) {
+          sink.add(
+            path.child(if (touched("actions")) "actions" else "size"),
+            "a search app bar has at most $limit trailing icon buttons " +
+              (if (large) "on larger screens" else "on compact screens, four only on larger ones") +
+              ", got $count",
+          )
+        }
+      }
+      def.name == "Tooltip" -> {
+        if (effective.string("variant") != "rich") {
+          for (key in listOf("title", "actions")) {
+            if (key in effective && touched(key, "variant")) {
+              sink.add(
+                path.child(if (touched(key)) key else "variant"),
+                "$key is for a rich tooltip",
+              )
+            }
+          }
+        }
+        val actions = listedCount(effective, "actions") ?: 0
+        if (actions > TooltipSpec.MAX_ACTIONS && touched("actions")) {
+          sink.add(
+            path.child("actions"),
+            "a rich tooltip has at most ${TooltipSpec.MAX_ACTIONS} text buttons, got $actions",
+          )
+        }
       }
     }
   }
@@ -274,6 +271,7 @@ internal class ScreenValidator(
         }
       }
       validateRelations(path, def, props, changed = null)
+      validateCountLimits(path, def, props, SizeClass.Compact, changed = null)
     }
   }
 
@@ -393,6 +391,9 @@ internal class ScreenValidator(
           )
         }
       validateRelations(path.child(key), def, JsonObject(effective), changed = props.keys)
+      SizeClass.fromWire(key)?.let {
+        validateCountLimits(path.child(key), def, JsonObject(effective), it, props.keys)
+      }
     }
   }
 

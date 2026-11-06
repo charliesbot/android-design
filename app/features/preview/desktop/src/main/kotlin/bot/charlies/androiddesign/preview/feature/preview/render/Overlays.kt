@@ -387,7 +387,8 @@ internal fun TooltipAnchor(
   }
   val rich = variant == "rich"
   val side = env.placement.tooltipSide(tooltipId, rich) ?: TooltipSpec.Side.Above
-  val hasAction = node?.props?.get("actions") != null
+  val hasAction =
+    node?.let { Props(effectiveProps(it, env), scope).children("actions").isNotEmpty() } == true
   TooltipBox(
     positionProvider =
       TooltipDefaults.rememberTooltipPositionProvider(

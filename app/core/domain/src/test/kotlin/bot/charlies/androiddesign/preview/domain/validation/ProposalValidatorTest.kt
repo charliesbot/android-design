@@ -724,4 +724,55 @@ class ProposalValidatorTest {
     val noAnchor = base.with("tip", """{"id":"tip","component":"Tooltip","text":"Hi"}""")
     errors(noAnchor).assertHas(plates("${noAnchor.indexOf("tip")}"), "requires prop 'anchor'")
   }
+
+  private fun buttons(vararg ids: String) =
+    ids.fold(base) { proposal, id ->
+      proposal.with(id, """{"id":"$id","component":"Button","variant":"text","label":"$id"}""")
+    }
+
+  @Test
+  fun `a malformed size class entry on a search app bar is an error, not a crash`() {
+    val bar =
+      base
+        .with("results", view("results"))
+        .with(
+          "bar",
+          """{"id":"bar","component":"TopAppBar","size":"search","title":"Search","expanded":"results","actions":["a","a","a","a","a"],"sizeClass":{"medium":"wide"}}""",
+        )
+        .with("a", icon("a"))
+    errors(bar)
+      .assertHas(plates("${bar.indexOf("bar")}") + "/sizeClass/medium", "must be an object")
+  }
+
+  @Test
+  fun `a size class override cannot get around a tooltip's limits`() {
+    fun tip(extra: String) =
+      buttons("a", "b", "c")
+        .with("tip", """{"id":"tip","component":"Tooltip","anchor":"more","text":"Hi"$extra}""")
+    val actions = tip(""","sizeClass":{"expanded":{"actions":["a","b","c"]}}""")
+    errors(actions)
+      .assertHas(plates("${actions.indexOf("tip")}") + "/sizeClass/expanded/actions", "at most 2")
+    val plain =
+      tip(
+        ""","variant":"rich","title":"T","actions":["a"],"sizeClass":{"medium":{"variant":"plain"}}""",
+      )
+    val path = plates("${plain.indexOf("tip")}") + "/sizeClass/medium"
+    errors(plain).assertHas("$path/variant", "rich tooltip")
+  }
+
+  @Test
+  fun `a size class override cannot get around the search bar's trailing limit`() {
+    val bar =
+      base
+        .with("a", icon("a"))
+        .with("b", icon("b"))
+        .with("c", icon("c"))
+        .with("results", view("results"))
+        .with(
+          "field",
+          """{"id":"field","component":"SearchBar","placeholder":"Search","expanded":"results","trailing":["a"],"sizeClass":{"medium":{"trailing":["a","b","c"]}}}""",
+        )
+    errors(bar)
+      .assertHas(plates("${bar.indexOf("field")}") + "/sizeClass/medium/trailing", "at most 2")
+  }
 }
