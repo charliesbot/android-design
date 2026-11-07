@@ -407,4 +407,59 @@ class RadioAndVariantsRenderTest {
       "a middle group's corner",
     )
   }
+
+  private fun menuWith(items: String, members: String) =
+    """{"id":"root","component":"Scaffold","content":"stage"},""" +
+      """{"id":"stage","component":"Column","padding":"lg","children":["anchor"]},""" +
+      """{"id":"anchor","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"menu"}}}},""" +
+      """{"id":"menu","component":"Menu","anchor":"anchor","items":[$items]},""" +
+      members
+
+  @Test
+  fun `a menu whose only group is hidden draws no group box`() {
+    val result =
+      render(
+        singleScreen(
+          menuWith(
+            "\"g\"",
+            """{"id":"g","component":"MenuGroup","items":["i"],"showIn":[]},""" +
+              """{"id":"i","component":"MenuItem","label":"Never"}""",
+          ),
+        ),
+      ) {
+        it.interaction.open("home", "menu")
+      }
+    assertFalse(result.tree.has("i"))
+    val below = result.tree.node("anchor").bounds
+    val background = roleRgb(ColorRole.Surface)
+    var drawn = 0
+    for (x in 0 until 200) for (y in 0 until 120) {
+      val px = pixel(result.png, below.x + x * 0.5f, below.y + below.height + 8f + y * 0.5f)
+      if (distance(px, background) > 12) drawn++
+    }
+    assertEquals(0, drawn, "nothing is drawn below the anchor")
+  }
+
+  @Test
+  fun `a menu of items stays a menu of items when a group is hidden at this size`() {
+    val result =
+      render(
+        singleScreen(
+          menuWith(
+            "\"g\",\"x\"",
+            """{"id":"g","component":"MenuGroup","items":["i"],"showIn":[]},""" +
+              """{"id":"i","component":"MenuItem","label":"Never"},""" +
+              """{"id":"x","component":"MenuItem","label":"Kept"}""",
+          ),
+        ),
+      ) {
+        it.interaction.open("home", "menu")
+      }
+    val item = result.tree.node("x").bounds
+    assertSame(
+      roleRgb(ColorRole.SurfaceContainer),
+      pixel(result.png, item.x + item.width - 6f, item.y + item.height / 2),
+      "the item sits in its group's container",
+    )
+  }
 }

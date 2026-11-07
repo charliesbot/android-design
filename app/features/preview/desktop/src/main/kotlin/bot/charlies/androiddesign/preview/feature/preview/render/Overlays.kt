@@ -163,8 +163,7 @@ internal fun RenderDialog(ctx: NodeContext) {
 
 internal fun NodeContext.menuLook() = Look(menuAmbient(vibrantMenu), shape = "extraLarge")
 
-private fun NodeContext.hasGroups(): Boolean =
-  props.children("items").any { env.nodes[it.id]?.component == "MenuGroup" }
+private fun NodeContext.menuLayout() = MenuSpec.layout(node, env.nodes)
 
 /**
  * A menu of items is one group; a menu of `MenuGroup`s holds the groups, a gap apart. The popup
@@ -173,11 +172,13 @@ private fun NodeContext.hasGroups(): Boolean =
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderMenu(ctx: NodeContext) {
+  // A menu with nothing drawn at any size class draws no popup, not an empty group.
+  if (ctx.menuLayout() == MenuSpec.Layout.Empty) return
   val vibrant = ctx.vibrantMenu
   val ambient = menuAmbient(vibrant)
   CompositionLocalProvider(LocalAmbient provides ambient) {
     DropdownMenuPopup(expanded = true, onDismissRequest = { ctx.env.act(ActionCall.Dismiss) }) {
-      if (ctx.hasGroups()) {
+      if (ctx.menuLayout() != MenuSpec.Layout.Items) {
         // The popup is itself a column: groups sit in it directly, each as wide as its content.
         ctx.ShownChildren(
           "items",

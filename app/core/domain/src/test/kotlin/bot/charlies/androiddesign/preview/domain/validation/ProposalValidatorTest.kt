@@ -876,5 +876,38 @@ class ProposalValidatorTest {
     errors(mixed).assertHas(plates("${mixed.indexOf("menu")}") + "/items", "not both")
   }
 
+  @Test
+  fun `a menu's groups and items may not mix across size classes either`() {
+    val shown =
+      menuOf(single(false), single(false))
+        .with(
+          "g1",
+          """{"id":"g1","component":"MenuGroup","items":["i0"],"showIn":["medium","expanded"]}""",
+        )
+        .with(
+          "i1",
+          """{"id":"i1","component":"MenuItem","label":"A","showIn":["compact"]}""",
+        )
+        .with("menu", """{"id":"menu","component":"Menu","anchor":"more","items":["g1","i1"]}""")
+    errors(shown).assertHas(plates("${shown.indexOf("menu")}") + "/items", "not both")
+    val overridden =
+      menuOf(single(false), single(false))
+        .with("g1", """{"id":"g1","component":"MenuGroup","items":["i0"]}""")
+        .with(
+          "menu",
+          """{"id":"menu","component":"Menu","anchor":"more","items":["i1"],"sizeClass":{"medium":{"items":["g1"]}}}""",
+        )
+    errors(overridden).assertHas(plates("${overridden.indexOf("menu")}") + "/items", "not both")
+  }
+
+  @Test
+  fun `a group hidden at every size does not make a menu of items mixed`() {
+    val hidden =
+      menuOf(single(false), single(false))
+        .with("g1", """{"id":"g1","component":"MenuGroup","items":["i0"],"showIn":[]}""")
+        .with("menu", """{"id":"menu","component":"Menu","anchor":"more","items":["g1","i1"]}""")
+    assertEquals(emptyList(), errors(hidden).filter { "not both" in it.message })
+  }
+
   // endregion
 }

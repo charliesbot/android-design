@@ -2312,18 +2312,20 @@ internal fun ScreenEmitter.menuStatements(menu: ComponentNode): List<Stmt> {
   val p = effectiveProps(menu, SizeClass.Compact)
   val shown = overlayVar(menu.id)
   val vibrant = p.literal("colors") == ColorStyle.VIBRANT
-  val listed = drawnIds(menu, "items")
+  val layout = MenuSpec.layout(menu, byId)
+  // A menu with nothing drawn at any size class has no popup, not an empty group.
+  if (layout == MenuSpec.Layout.Empty) return emptyList()
   // A menu of items is one group; a menu of groups holds each group, a gap apart.
   val groups =
-    if (listed.any { it.component == "MenuGroup" }) {
-      listed.filter { it.component == "MenuGroup" }
-    } else {
+    if (layout == MenuSpec.Layout.Items) {
       listOf(menu)
+    } else {
+      MenuSpec.drawnMembers(menu, byId).filter { it.component == MenuSpec.GROUP }
     }
   val declarations = groups.flatMap { menuState(it) }
   val inMenu = Place(parentType = "Menu", menuVibrant = vibrant)
   val drawn =
-    if (groups.singleOrNull() === menu) menuGroup(menu, p, inMenu)
+    if (layout == MenuSpec.Layout.Items) menuGroup(menu, p, inMenu)
     else groups.flatMap { emit(it.id, inMenu) }
   val popup =
     Call(

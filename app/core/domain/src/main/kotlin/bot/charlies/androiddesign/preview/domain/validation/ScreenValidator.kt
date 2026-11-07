@@ -99,16 +99,13 @@ internal class ScreenValidator(
     }
   }
 
-  /** A menu holds items or groups, not both: items beside groups would sit outside any group. */
+  /**
+   * A menu holds items or groups, not both, at any of its size classes together: items beside
+   * groups would sit outside any group, and the menu would change layout with the width.
+   */
   private fun validateMenuLayout(path: String, node: ComponentNode) {
-    for (size in SizeClass.entries) {
-      val members = membersAt(node, "items", size) ?: continue
-      if (
-        members.any { it.component == "MenuGroup" } && members.any { it.component != "MenuGroup" }
-      ) {
-        sink.add(path.child("items"), "a Menu holds MenuItems or MenuGroups, not both")
-        return
-      }
+    if (MenuSpec.layout(node, byId) == MenuSpec.Layout.Mixed) {
+      sink.add(path.child("items"), "a Menu holds MenuItems or MenuGroups, not both")
     }
   }
 

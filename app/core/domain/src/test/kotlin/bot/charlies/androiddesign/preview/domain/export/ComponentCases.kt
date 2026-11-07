@@ -1103,6 +1103,33 @@ internal val componentCases: List<ComponentCase> =
       reject = listOf("Hidden", "hChecked"),
     ),
     case(
+      "MenuGroup",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","items":["g"]}""",
+          """{"id":"g","component":"MenuGroup","items":["a"],"showIn":[]}""",
+          """{"id":"a","component":"MenuItem","label":"Never"}""",
+        ),
+      expect = listOf("Button("),
+      reject = listOf("DropdownMenuPopup", "DropdownMenuGroup", "Never"),
+    ),
+    case(
+      "MenuItem",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","items":["g","x"]}""",
+          """{"id":"g","component":"MenuGroup","items":["a"],"showIn":[]}""",
+          """{"id":"a","component":"MenuItem","label":"Never"}""",
+          """{"id":"x","component":"MenuItem","label":"Kept"}""",
+        ),
+      expect = listOf("groupShape(0, 1)", "Text(\"Kept\")"),
+      reject = listOf("Never"),
+    ),
+    case(
       "RadioGroup",
       components =
         listOf(
