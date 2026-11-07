@@ -2320,13 +2320,7 @@ fun InputsScreen(
               tooltip = { PlainTooltip { Text("Undo") } },
               state = tipPlainTooltipState,
             ) {
-              IconButton(
-                onClick = {},
-                colors =
-                  IconButtonDefaults.iconButtonColors(
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                  ),
-              ) {
+              IconButton(onClick = {}) {
                 Icon(painterResource(R.drawable.undo), contentDescription = "Undo")
               }
             }

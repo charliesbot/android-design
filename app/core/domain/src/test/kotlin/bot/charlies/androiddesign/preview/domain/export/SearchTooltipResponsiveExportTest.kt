@@ -92,4 +92,23 @@ class SearchTooltipResponsiveExportTest {
     has(source, "if (atLeastMedium) {")
     has(source, "hasAction = true")
   }
+
+  @Test
+  fun `a tooltip button in a toolbar keeps the toolbar content color`() {
+    for (toolbar in
+      listOf(
+        """{"id":"bar","component":"FloatingToolbar","colors":"vibrant","children":["info"]}""",
+        """{"id":"bar","component":"DockedToolbar","children":["info"]}""",
+      )) {
+      val source =
+        export(
+          """{"id":"root","component":"Column","children":["bar"]}""",
+          toolbar,
+          """{"id":"info","component":"IconButton","icon":"info","contentDescription":"Info"}""",
+          """{"id":"tip","component":"Tooltip","anchor":"info","text":"Hi"}""",
+        )
+      has(source, "TooltipBox(")
+      lacks(source, "iconButtonColors")
+    }
+  }
 }

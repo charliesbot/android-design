@@ -88,7 +88,7 @@ internal fun RenderColumn(ctx: NodeContext) {
       "end" -> Alignment.End
       else -> Alignment.Start
     }
-  var modifier = ctx.modifier(fillHeight = true).then(ctx.styleBackground())
+  var modifier = ctx.modifier(fillHeight = true, container = true)
   if (ctx.bool("scroll")) modifier = modifier.verticalScroll(rememberScrollState())
   ctx.StyledAmbient {
     Column(
@@ -117,7 +117,7 @@ internal fun RenderRow(ctx: NodeContext) {
     }
   // A row with a vertical divider is as tall as its tallest child so the divider can span it. When
   // the row is offered a height, that intrinsic height is coerced to the filled one.
-  var modifier = ctx.modifier(fillHeight = true).then(ctx.styleBackground())
+  var modifier = ctx.modifier(fillHeight = true, container = true)
   if (hasVerticalDivider) modifier = modifier.height(IntrinsicSize.Min)
   ctx.StyledAmbient {
     Row(
@@ -144,7 +144,7 @@ internal fun RenderRow(ctx: NodeContext) {
 internal fun RenderBox(ctx: NodeContext) {
   ctx.StyledAmbient {
     Box(
-      modifier = ctx.modifier(fillHeight = true).then(ctx.styleBackground()),
+      modifier = ctx.modifier(fillHeight = true, container = true),
       contentAlignment = alignmentOf(ctx.string("contentAlignment")),
     ) {
       ctx.Children("children", 0, ChildHost(fillWidth = ctx.def.stretchesChildren))
@@ -156,7 +156,7 @@ internal fun RenderBox(ctx: NodeContext) {
 @Composable
 internal fun RenderGrid(ctx: NodeContext) {
   val gap = ctx.spacing("spacing") ?: 0.dp
-  val modifier = ctx.modifier().then(ctx.styleBackground())
+  val modifier = ctx.modifier(container = true)
   val fixed = ctx.whole("columns")
   val minWidth = ctx.number("minColumnWidth")
   ctx.StyledAmbient {
@@ -195,7 +195,7 @@ internal fun RenderFlexBox(ctx: NodeContext) {
   val wrap = ctx.bool("wrap")
   ctx.StyledAmbient {
     FlexBox(
-      modifier = ctx.modifier().then(ctx.styleBackground()),
+      modifier = ctx.modifier(container = true),
       config =
         FlexBoxConfig {
           wrap(if (wrap) FlexWrap.Wrap else FlexWrap.NoWrap)

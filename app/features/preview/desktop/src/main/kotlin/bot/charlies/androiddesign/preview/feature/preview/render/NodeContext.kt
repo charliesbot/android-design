@@ -262,11 +262,16 @@ internal fun RenderNode(
 }
 
 /**
- * The modifier of a component: weight, stretch, padding, then its id for the tree. It stretches
- * across the width when the catalog says the component does and the parent lets it.
+ * The modifier of a component: weight, stretch, its style's container when [container] is set,
+ * padding, then its id for the tree. The container goes before the padding so the padding sits
+ * inside it, as the exporter writes it. It stretches across the width when the catalog says the
+ * component does and the parent lets it. The tree reports the box inside the padding.
  */
 @Composable
-internal fun NodeContext.modifier(fillHeight: Boolean = false): Modifier {
+internal fun NodeContext.modifier(
+  fillHeight: Boolean = false,
+  container: Boolean = false,
+): Modifier {
   var modifier: Modifier = Modifier
   if (host.flexItem) modifier = modifier.restoreUnboundedHeight()
   val weight = number("weight")
@@ -277,6 +282,7 @@ internal fun NodeContext.modifier(fillHeight: Boolean = false): Modifier {
   modifier = modifier.then(host.scopeModifier)
   if (host.fillWidth && def.fillsWidth(props::value)) modifier = modifier.fillMaxWidth()
   if (fillHeight && host.fillHeight) modifier = modifier.fillMaxHeight()
+  if (container) modifier = modifier.then(styleBackground())
   padding?.let { modifier = modifier.padding(it) }
   return modifier.then(tagged())
 }

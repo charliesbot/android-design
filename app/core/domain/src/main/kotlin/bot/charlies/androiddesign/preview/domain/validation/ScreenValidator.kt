@@ -155,7 +155,8 @@ internal class ScreenValidator(
   /**
    * Material's search rules. A search bar has "one or two trailing icons or icon buttons", and an
    * avatar combines "with up to one other trailing icon button". A search app bar's actions are
-   * checked by [validateSearchAppBar]. A search view opens from the one bar that names it.
+   * checked per size class by [validateCountLimits]. A search view opens from the one bar that
+   * names it.
    */
   private fun validateSearch() {
     val holders = mutableMapOf<String, MutableList<String>>()

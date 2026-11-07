@@ -43,7 +43,7 @@ internal fun RenderText(ctx: NodeContext) {
   val color = ctx.colorRole()?.let(ctx.env::color) ?: Color.Unspecified
   Text(
     text = ctx.string("text").orEmpty(),
-    modifier = ctx.modifier().then(ctx.styleBackground()),
+    modifier = ctx.modifier(container = true),
     color = color,
     style = ctx.textStyle(TypeRole.BodyLarge),
     textAlign = align,

@@ -143,6 +143,16 @@ A component omitted as `no-compose-api` can become possible on a material3 upgra
 
 The desktop build lags Android. The app renders with JetBrains' material3 (1.13.0-beta01, mapped to AndroidX 1.5.0-beta01) while the export sandbox pins AndroidX 1.5.0-alpha29, so an API in the Android inventory may not exist on desktop yet. A component can join the catalog only when both builds have its composables; until then it stays omitted as `no-compose-api` with the desktop version it is waiting for.
 
+## Follow-ups
+
+The gap is closed (PRs #75, #77, #78, #79, #80, #82, #83). These were found along the way and predate those PRs or sit outside them:
+
+- **Templated menu items are not exported.** A `Menu` whose `items` is a data template renders in the previewer, but the export writes an empty `DropdownMenuGroup`.
+- **Sheets and menus export from compact props.** `SideSheet`, `BottomSheet`, and `Menu` bodies are exported once from compact props, so a `sizeClass` override of their own props is lost in the export. Dialogs and pickers already export per size class through `ScreenEmitter.perSize`.
+- **The verify inputs screen fails in the export sandbox at phone width.** layoutlib reports a `FlexBox` constraint error ("Can't represent a width of 630 and height of 262194 in Constraints") for the exported inputs screen, with or without the new components.
+- **Icon buttons are 40dp in the previewer and 48dp on Android.** In the export check, a vertical toolbar of two icon buttons rendered about 16dp taller on Android. The likely cause is `minimumInteractiveComponentSize()` resolving to 48dp on Android and not in the desktop renderer; confirm the desktop value before changing the preview.
+- **An eval case that needs tabs, search, and a carousel.** The planned recipe case waits on photo assets.
+
 ## Links
 
 - [Visual design exploration v3](visual-design-exploration-v3.md): why the previewer exists, its fidelity bar, and its architecture
