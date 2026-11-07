@@ -19,6 +19,7 @@ import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -148,6 +149,16 @@ private fun NodeContext.carouselItems(
       fillWidth = def.stretchesChildren,
       scopeModifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge),
     )
+  // The tree records the item as its mask shows it, not as it is laid out.
+  val itemId = env.idPrefix + refs[index].id + refs[index].scope.instanceSuffix
+  val recorder = env.recorder
+  if (recorder != null) {
+    val info = carouselItemDrawInfo
+    DisposableEffect(itemId, info) {
+      recorder.reportCarouselMask(itemId) { info.maskRect }
+      onDispose { recorder.reportCarouselMask(itemId, null) }
+    }
+  }
   // The nodes inside the item read its current size from this, to apply `itemSize`.
   CompositionLocalProvider(LocalCarouselItemDrawInfo provides carouselItemDrawInfo) {
     RenderNode(env, refs[index], id, order + listOf(0, index), host.at(index, refs.size))

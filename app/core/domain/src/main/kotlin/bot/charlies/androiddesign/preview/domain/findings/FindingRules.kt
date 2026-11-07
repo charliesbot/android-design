@@ -117,6 +117,7 @@ object FindingRules {
     return touchTargets(view) +
       fonts(view) +
       clippedText(view) +
+      croppedByCarouselItem(view) +
       truncatedText(view) +
       truncatedLabels(view) +
       contrast(view) +
@@ -164,6 +165,12 @@ object FindingRules {
         parent = parent.parent?.let(byId::get)
       }
     }
+
+    /** The carousel item [node] is in or is: the nearest one of itself and its parents. */
+    fun carouselItem(node: LayoutNode): LayoutNode? =
+      (sequenceOf(node) + ancestors(node)).firstOrNull { item ->
+        item.parent?.let(byId::get)?.type == CAROUSEL
+      }
 
     /** True for a node outside every open modal: inert behind its scrim. */
     fun isBehindModal(node: LayoutNode): Boolean =
@@ -232,6 +239,33 @@ object FindingRules {
     view.nodes
       .filter { it.text?.let { text -> text.overflow && !text.truncated } == true }
       .map { errorFinding(it, FindingRule.TextClipped, "text is cut off with no ellipsis") }
+
+  /**
+   * A text in a carousel item that extends past the item's visible edges. The carousel's mask crops
+   * an item on both sides (a large item is laid out wider than it shows), and the tree records the
+   * item as the mask shows it, so a text that starts or ends outside it is cut off. The text's box
+   * is its unclipped layout box where there is one.
+   */
+  private fun croppedByCarouselItem(view: View): List<Finding> =
+    view.nodes.mapNotNull { node ->
+      if (node.text == null || !node.isLaidOut || view.isBehindModal(node)) return@mapNotNull null
+      val item = view.carouselItem(node) ?: return@mapNotNull null
+      if (!item.isLaidOut) return@mapNotNull null
+      val box = node.layout ?: node.bounds
+      val before = item.bounds.x - box.x
+      val past = box.right() - item.right()
+      val detail =
+        when {
+          before > OVERFLOW_SLACK_DP ->
+            "text starts ${dp(before)} dp before the visible edge of carousel item ${item.id}: " +
+              "the carousel's mask crops the item, so the start of the text is cut off"
+          past > OVERFLOW_SLACK_DP ->
+            "text ends ${dp(past)} dp past the visible edge of carousel item ${item.id}: " +
+              "the carousel's mask crops the item, so the end of the text is cut off"
+          else -> null
+        }
+      detail?.let { errorFinding(node, FindingRule.TextClipped, it) }
+    }
 
   private fun truncatedText(view: View): List<Finding> =
     view.nodes

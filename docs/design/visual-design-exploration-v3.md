@@ -204,7 +204,7 @@ The skill checks that the server is connected before it starts and, if not, tell
 
 The agent reads a flat list of nodes plus findings. Each node carries:
 - its proposal id, type, and parent
-- its bounds and touch bounds in dp, plus the unclipped layout box when it reaches past the bounds
+- its bounds and touch bounds in dp, plus the unclipped layout box when it reaches past the bounds; a carousel item's bounds are the rect its mask shows (`carouselItemDrawInfo.maskRect`, read when the tree is taken), since the mask crops a large item on both sides, and its layout box is kept in `layout`
 - for text: the line count, overflow, and whether it was truncated
 - the color, type, and shape roles it used
 - its accessibility role, label, and actions
@@ -236,6 +236,7 @@ The finding rules carry over from v2's runtime checks, with v2's thresholds:
 - at most one FAB per pane
 - nothing wider than the view (`offscreen`)
 - nothing laid out wider than its parent or past the view's edge (`overflow`): bounds come from semantics and clip to the window, so the tree adds a node's unclipped `layout` box when it reaches past `bounds`; the children of a carousel or tab row, which scroll sideways, are exempt
+- no text past the visible edges of its carousel item (`text-clipped`): the item's mask crops it, which the unmasked layout box would hide, so a text at the item's edge with no padding is reported with the distance it is cut by
 
 A view passes when it has no error findings. Intentional truncation is reported as information, not an error.
 

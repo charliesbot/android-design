@@ -154,6 +154,45 @@ class TabsAndCarouselRenderTest {
     assertFalse(tree.has("title3"), "the small item hides the title: ${tree.nodes.map { it.id }}")
   }
 
+  /** A multi-browse carousel whose items are a Column holding one Text with [textProps]. */
+  private fun croppedCarousel(textProps: String): LayoutTree {
+    val items =
+      (1..3).joinToString(",") {
+        """{"id":"col$it","component":"Column","children":["name$it"]},""" +
+          """{"id":"name$it","component":"Text","text":"Shakshuka $it","maxLines":1$textProps}"""
+      }
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"stage"},""" +
+          """{"id":"stage","component":"Column","children":["gallery"]},""" +
+          """{"id":"gallery","component":"Carousel","itemWidth":186,"children":["col1","col2","col3"]},$items""",
+      )
+    return render(proposal, view = Views.Light).tree
+  }
+
+  private fun LayoutTree.cropped() = findings.filter {
+    it.rule == FindingRule.TextClipped && it.id == "name1"
+  }
+
+  @Test
+  fun `the tree records a carousel item as its mask shows it, with the layout box kept`() {
+    val item = croppedCarousel("").node("col1")
+    val layout = checkNotNull(item.layout) { "the item is laid out wider than its mask" }
+    assertTrue(layout.width > item.bounds.width + 1, "mask ${item.bounds}, layout $layout")
+  }
+
+  @Test
+  fun `text at the start edge of a large carousel item is reported as cropped by its mask`() {
+    val finding = croppedCarousel("").cropped().single()
+    assertTrue("carousel item" in finding.detail.orEmpty(), finding.detail)
+    assertTrue("mask" in finding.detail.orEmpty(), finding.detail)
+  }
+
+  @Test
+  fun `text padded in from the edge of a carousel item is not reported`() {
+    assertEquals(emptyList(), croppedCarousel(""","padding":"md"""").cropped())
+  }
+
   private fun androidx.compose.ui.test.ComposeUiTest.settleForTest() {
     with(bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessRenderer) { settle() }
   }
