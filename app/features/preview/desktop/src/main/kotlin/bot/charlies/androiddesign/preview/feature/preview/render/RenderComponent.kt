@@ -61,6 +61,8 @@ internal fun RenderComponent(ctx: NodeContext) {
     "ProgressIndicator" -> RenderProgressIndicator(ctx)
     "BottomSheet" -> RenderBottomSheet(ctx)
     "Dialog" -> RenderDialog(ctx)
+    "DatePicker" -> RenderDatePicker(ctx)
+    "TimePicker" -> RenderTimePicker(ctx)
     "Menu" -> RenderMenu(ctx)
     "MenuGroup" -> RenderMenuGroup(ctx)
     "MenuItem" -> RenderMenuItem(ctx)

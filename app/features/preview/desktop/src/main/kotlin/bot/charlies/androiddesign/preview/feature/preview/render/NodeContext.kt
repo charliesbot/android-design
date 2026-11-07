@@ -249,10 +249,12 @@ internal fun RenderNode(
     } else {
       { RenderComponent(ctx) }
     }
-  if (menuId != null && !env.isOverlay(node)) {
+  val pickerId = env.placement.datePickerAt(node.id)
+  if ((menuId != null || pickerId != null) && !env.isOverlay(node)) {
     androidx.compose.foundation.layout.Box {
       anchored()
-      MenuOverlay(env, menuId, ref.scope, ctx.id, order)
+      if (menuId != null) MenuOverlay(env, menuId, ref.scope, ctx.id, order)
+      if (pickerId != null) PickerOverlay(env, pickerId, ref.scope, ctx.id, order)
     }
   } else {
     anchored()

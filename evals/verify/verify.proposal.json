@@ -2329,7 +2329,16 @@
             "open_fabs",
             "open_collections",
             "open_feedback",
-            "menu_vibrant_anchor"
+            "menu_vibrant_anchor",
+            "date_field",
+            "open_date_docked",
+            "open_date_modal",
+            "open_date_input",
+            "open_date_range",
+            "open_date_full",
+            "open_time_dial",
+            "open_time_input",
+            "open_dialog_full"
           ]
         },
         {
@@ -2596,6 +2605,209 @@
               }
             }
           }
+        },
+        {
+          "id": "date_field",
+          "component": "TextField",
+          "variant": "outlined",
+          "label": "Date",
+          "value": "Nov 6, 2026",
+          "trailingIcon": "calendar_today"
+        },
+        {
+          "id": "open_date_docked",
+          "component": "Button",
+          "variant": "outlined",
+          "label": "Docked date",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "date_docked"
+              }
+            }
+          }
+        },
+        {
+          "id": "open_date_modal",
+          "component": "Button",
+          "variant": "outlined",
+          "label": "Modal date",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "date_modal"
+              }
+            }
+          }
+        },
+        {
+          "id": "open_date_input",
+          "component": "Button",
+          "variant": "outlined",
+          "label": "Date input",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "date_input"
+              }
+            }
+          }
+        },
+        {
+          "id": "open_date_range",
+          "component": "Button",
+          "variant": "outlined",
+          "label": "Date range",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "date_range"
+              }
+            }
+          }
+        },
+        {
+          "id": "open_date_full",
+          "component": "Button",
+          "variant": "outlined",
+          "label": "Full-screen date",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "date_full"
+              }
+            }
+          }
+        },
+        {
+          "id": "open_time_dial",
+          "component": "Button",
+          "variant": "outlined",
+          "label": "Time dial",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "time_dial"
+              }
+            }
+          }
+        },
+        {
+          "id": "open_time_input",
+          "component": "Button",
+          "variant": "outlined",
+          "label": "Time input",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "time_input"
+              }
+            }
+          }
+        },
+        {
+          "id": "open_dialog_full",
+          "component": "Button",
+          "variant": "outlined",
+          "label": "Full-screen dialog",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "dialog_full"
+              }
+            }
+          }
+        },
+        {
+          "id": "date_docked",
+          "component": "DatePicker",
+          "variant": "docked",
+          "selected": "2026-11-06",
+          "anchor": "date_field"
+        },
+        {
+          "id": "date_modal",
+          "component": "DatePicker",
+          "selected": "2026-11-06"
+        },
+        {
+          "id": "date_input",
+          "component": "DatePicker",
+          "variant": "modal-input",
+          "selected": "2026-11-06"
+        },
+        {
+          "id": "date_range",
+          "component": "DatePicker",
+          "range": true,
+          "start": "2026-11-06",
+          "end": "2026-11-12"
+        },
+        {
+          "id": "date_full",
+          "component": "DatePicker",
+          "variant": "full-screen",
+          "selected": "2026-11-06",
+          "sizeClass": {
+            "medium": {
+              "variant": "modal"
+            }
+          }
+        },
+        {
+          "id": "time_dial",
+          "component": "TimePicker",
+          "time": "09:30"
+        },
+        {
+          "id": "time_input",
+          "component": "TimePicker",
+          "variant": "input",
+          "time": "14:05",
+          "is24Hour": true
+        },
+        {
+          "id": "dialog_full",
+          "component": "Dialog",
+          "variant": "full-screen",
+          "title": "New event",
+          "confirm": "dialog_full_save",
+          "content": [
+            "dialog_full_title",
+            "dialog_full_place"
+          ],
+          "showIn": [
+            "compact"
+          ]
+        },
+        {
+          "id": "dialog_full_save",
+          "component": "Button",
+          "variant": "text",
+          "label": "Save",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "dialog_full_title",
+          "component": "TextField",
+          "label": "Title"
+        },
+        {
+          "id": "dialog_full_place",
+          "component": "TextField",
+          "label": "Location"
         }
       ]
     },

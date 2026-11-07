@@ -538,6 +538,25 @@ class CatalogSmokeTest {
         open = "subject",
       ),
       Case(
+        "DatePicker",
+        inStage(
+          """{"id":"field","component":"TextField","label":"Date"},{"id":"subject","component":"DatePicker","variant":"docked","selected":"2026-11-06","anchor":"field"}""",
+        ),
+        open = "subject",
+      ),
+      Case(
+        "TimePicker",
+        inStage("""{"id":"subject","component":"TimePicker","time":"09:30"}"""),
+        open = "subject",
+      ),
+      Case(
+        "Dialog",
+        inStage(
+          """{"id":"subject","component":"Dialog","variant":"full-screen","title":"New event","confirm":"save","content":["t1"],"showIn":["compact"]},{"id":"save","component":"Button","variant":"text","label":"Save"}""",
+        ),
+        open = "subject",
+      ),
+      Case(
         "SearchBar",
         inStage(
           """{"id":"subject","component":"SearchBar","placeholder":"Search mail","trailing":["mic"],"expanded":"results"},{"id":"mic","component":"IconButton","icon":"mic","contentDescription":"Voice search"},{"id":"results","component":"SearchView","content":["t1"]}""",

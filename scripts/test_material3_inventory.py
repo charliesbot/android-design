@@ -20,7 +20,7 @@ ALLOWED_ROOTS = {
     "Modifier", "Arrangement", "Alignment", "WindowInsets", "BoxWithConstraints", "Box", "Row", "Column", "Spacer", "BorderStroke",
     "RectangleShape", "CircleShape", "ZeroCornerSize", "Color", "TextStyle", "FontFamily", "Font", "FontVariation", "FontWeight",
     "Dialog", "DialogProperties", "RoundedCornerShape", "LaunchedEffect", "Image", "ContentScale", "TextOverflow", "TextAlign", "Grid", "FlexBox", "FlowRow", "LazyVerticalGrid",
-    "GridCells", "ToggleableState", "Role",
+    "GridCells", "ToggleableState", "Role", "Popup",
     # Navigation 3 and its Material 3 adaptive scenes.
     "NavDisplay", "ListDetailSceneStrategy", "SupportingPaneSceneStrategy",
     # MaterialKolor, the Kotlin port of Google's color utilities.

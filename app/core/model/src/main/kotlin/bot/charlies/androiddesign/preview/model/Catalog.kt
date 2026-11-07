@@ -187,7 +187,8 @@ enum class ActionFunction(val wire: String, val argument: String?, val descripti
   Open(
     "open",
     "overlay",
-    "Opens a BottomSheet, Dialog, Menu, SideSheet, SearchView, Snackbar or Tooltip of the same " +
+    "Opens a BottomSheet, Dialog, Menu, SideSheet, SearchView, Snackbar, Tooltip, DatePicker " +
+      "or TimePicker of the same " +
       "screen by id.",
   ),
   Dismiss("dismiss", null, "Closes the open overlay.");
@@ -370,7 +371,8 @@ object M3ExpressiveCatalog : Catalog {
     components.filter { it.overlay }.map { it.name }.toSet()
   }
 
-  override val modalNames: Set<String> = setOf("BottomSheet", "Dialog", "SideSheet", "SearchView")
+  override val modalNames: Set<String> =
+    setOf("BottomSheet", "Dialog", "SideSheet", "SearchView", "DatePicker", "TimePicker")
 
   override val fabNames: Set<String> = setOf("FloatingActionButton", "FabMenu")
 
@@ -1266,13 +1268,65 @@ private fun overlays(): List<ComponentDef> =
     ComponentDef(
       "Dialog",
       ComponentGroup.Overlays,
-      "A modal dialog.",
-      "AlertDialog",
+      "A modal dialog. Basic is for alerts, quick selection and confirmation. Full-screen is " +
+        "for tasks with several steps, keyboard input or changes that are not saved at once, " +
+        "and only for compact windows: from medium up, use a basic dialog.",
+      "AlertDialog; full-screen: Dialog (full window) holding a Scaffold with a TopAppBar, " +
+        "composed; no full-screen dialog composable",
       listOf(
-        text("title", required = true),
-        text("text"),
-        child("confirm", "Button"),
-        child("dismiss", "Button"),
+        oneOf("variant", "basic", "full-screen", default = "basic"),
+        text("title", required = true, description = "The headline."),
+        text("text", description = "Basic only: the supporting text."),
+        child(
+          "confirm",
+          "Button",
+          description =
+            "The confirming text button. Full-screen: in the header, labeled by its outcome " +
+              "(Save, Send, Create), never disabled.",
+        ),
+        child("dismiss", "Button", description = "Basic only: the dismissive text button."),
+        children("content", description = "Full-screen only: the body below the header."),
+      ),
+      overlay = true,
+      stretchesChildren = true,
+    ),
+    ComponentDef(
+      "DatePicker",
+      ComponentGroup.Overlays,
+      "A date or date range picker. Modal is a calendar in a dialog, modal-input is keyboard " +
+        "entry in a dialog, docked is a dropdown calendar below the text field named by " +
+        "`anchor`, and full-screen (compact windows) fills the window. Dates are ISO " +
+        "(\"2026-11-06\") and the picker opens on the month of the selected one.",
+      "DatePickerDialog holding DatePicker or DateRangePicker; docked: Popup below the text " +
+        "field; full-screen: Dialog (full window) holding a Scaffold, composed",
+      listOf(
+        oneOf("variant", "modal", "modal-input", "docked", "full-screen", default = "modal"),
+        bool("range", "Picks a range of dates (DateRangePicker) instead of one."),
+        text("selected", description = "The selected date, ISO (YYYY-MM-DD). Not for a range."),
+        text(
+          "start",
+          description = "A range's first date, ISO (YYYY-MM-DD). Required for a range.",
+        ),
+        text("end", description = "A range's last date, ISO, on or after `start`."),
+        child(
+          "anchor",
+          "TextField",
+          description = "The text field a docked picker opens below. Required when docked.",
+        ),
+      ),
+      overlay = true,
+    ),
+    ComponentDef(
+      "TimePicker",
+      ComponentGroup.Overlays,
+      "A time picker in a dialog: a dial, or keyboard entry (input). The keyboard icon switches " +
+        "between them. Whether the clock is 12 or 24 hours is the device's setting, set here by " +
+        "`is24Hour`.",
+      "TimePickerDialog holding TimePicker or TimeInput",
+      listOf(
+        oneOf("variant", "dial", "input", default = "dial"),
+        text("time", required = true, description = "The selected time, 24-hour HH:mm."),
+        bool("is24Hour", "Uses a 24-hour clock: no AM/PM selector."),
       ),
       overlay = true,
     ),

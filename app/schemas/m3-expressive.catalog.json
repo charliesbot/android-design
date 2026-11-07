@@ -2366,8 +2366,8 @@
     },
     "Dialog": {
       "type": "object",
-      "description": "A modal dialog.",
-      "x-compose": "AlertDialog",
+      "description": "A modal dialog. Basic is for alerts, quick selection and confirmation. Full-screen is for tasks with several steps, keyboard input or changes that are not saved at once, and only for compact windows: from medium up, use a basic dialog.",
+      "x-compose": "AlertDialog; full-screen: Dialog (full window) holding a Scaffold with a TopAppBar, composed; no full-screen dialog composable",
       "x-overlay": true,
       "allOf": [
         {
@@ -2378,28 +2378,136 @@
         "component": {
           "const": "Dialog"
         },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "basic",
+            "full-screen"
+          ],
+          "default": "basic"
+        },
         "title": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "The headline."
         },
         "text": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "Basic only: the supporting text."
         },
         "confirm": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
           "x-allowedComponents": [
             "Button"
-          ]
+          ],
+          "description": "The confirming text button. Full-screen: in the header, labeled by its outcome (Save, Send, Create), never disabled."
         },
         "dismiss": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
           "x-allowedComponents": [
             "Button"
-          ]
+          ],
+          "description": "Basic only: the dismissive text button."
+        },
+        "content": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
+          "description": "Full-screen only: the body below the header."
         }
       },
       "required": [
         "component",
         "title"
+      ],
+      "unevaluatedProperties": false
+    },
+    "DatePicker": {
+      "type": "object",
+      "description": "A date or date range picker. Modal is a calendar in a dialog, modal-input is keyboard entry in a dialog, docked is a dropdown calendar below the text field named by `anchor`, and full-screen (compact windows) fills the window. Dates are ISO (\"2026-11-06\") and the picker opens on the month of the selected one.",
+      "x-compose": "DatePickerDialog holding DatePicker or DateRangePicker; docked: Popup below the text field; full-screen: Dialog (full window) holding a Scaffold, composed",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "DatePicker"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "modal",
+            "modal-input",
+            "docked",
+            "full-screen"
+          ],
+          "default": "modal"
+        },
+        "range": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Picks a range of dates (DateRangePicker) instead of one.",
+          "default": false
+        },
+        "selected": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "The selected date, ISO (YYYY-MM-DD). Not for a range."
+        },
+        "start": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "A range's first date, ISO (YYYY-MM-DD). Required for a range."
+        },
+        "end": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "A range's last date, ISO, on or after `start`."
+        },
+        "anchor": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
+          "x-allowedComponents": [
+            "TextField"
+          ],
+          "description": "The text field a docked picker opens below. Required when docked."
+        }
+      },
+      "required": [
+        "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "TimePicker": {
+      "type": "object",
+      "description": "A time picker in a dialog: a dial, or keyboard entry (input). The keyboard icon switches between them. Whether the clock is 12 or 24 hours is the device's setting, set here by `is24Hour`.",
+      "x-compose": "TimePickerDialog holding TimePicker or TimeInput",
+      "x-overlay": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "TimePicker"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "dial",
+            "input"
+          ],
+          "default": "dial"
+        },
+        "time": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
+          "description": "The selected time, 24-hour HH:mm."
+        },
+        "is24Hour": {
+          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
+          "description": "Uses a 24-hour clock: no AM/PM selector.",
+          "default": false
+        }
+      },
+      "required": [
+        "component",
+        "time"
       ],
       "unevaluatedProperties": false
     },
@@ -2707,7 +2815,7 @@
     },
     "open": {
       "type": "object",
-      "description": "Opens a BottomSheet, Dialog, Menu, SideSheet, SearchView, Snackbar or Tooltip of the same screen by id.",
+      "description": "Opens a BottomSheet, Dialog, Menu, SideSheet, SearchView, Snackbar, Tooltip, DatePicker or TimePicker of the same screen by id.",
       "returnType": "void",
       "properties": {
         "@call": {
@@ -2897,6 +3005,12 @@
         },
         {
           "$ref": "#/components/Dialog"
+        },
+        {
+          "$ref": "#/components/DatePicker"
+        },
+        {
+          "$ref": "#/components/TimePicker"
         },
         {
           "$ref": "#/components/Menu"

@@ -25,21 +25,21 @@ import kotlinx.serialization.json.booleanOrNull
 // The Compose call for each catalog component, from compose-mapping.md. Each function returns the
 // statements that draw one component; a component with state declares it first.
 
-private fun ScreenEmitter.m3(name: String): String = file.use(Sym.m3(name))
+internal fun ScreenEmitter.m3(name: String): String = file.use(Sym.m3(name))
 
-private fun ScreenEmitter.expressive() = file.optIn(Sym.ExperimentalMaterial3ExpressiveApi)
+internal fun ScreenEmitter.expressive() = file.optIn(Sym.ExperimentalMaterial3ExpressiveApi)
 
-private fun ScreenEmitter.experimental() = file.optIn(Sym.ExperimentalMaterial3Api)
+internal fun ScreenEmitter.experimental() = file.optIn(Sym.ExperimentalMaterial3Api)
 
 private fun opt(name: String, value: String?): Arg? = value?.let { arg(name, it) }
 
 private fun opt(name: String, value: Expr?): Arg? = value?.let { arg(name, it) }
 
-private fun ScreenEmitter.calls(callee: String, args: List<Arg?>, body: List<Stmt>? = null): Expr =
+internal fun ScreenEmitter.calls(callee: String, args: List<Arg?>, body: List<Stmt>? = null): Expr =
   Call(callee, args.filterNotNull(), body?.let { lambda(it) })
 
 /** `Component(args) { body }` as a one-statement list. */
-private fun ScreenEmitter.one(callee: String, args: List<Arg?>, body: List<Stmt>? = null) =
+internal fun ScreenEmitter.one(callee: String, args: List<Arg?>, body: List<Stmt>? = null) =
   listOf(stmt(calls(callee, args, body)))
 
 internal fun ScreenEmitter.emitComponent(
@@ -58,8 +58,20 @@ internal fun ScreenEmitter.emitComponent(
   val wrapped = menu != null || tooltip != null
   val own = dispatch(node, props, if (wrapped) placed.copy(parentType = "Box") else placed)
   val anchored = if (tooltip == null) own else aroundAnchor(tooltip, own)
-  if (menu == null || menu.id in placedOverlays) return anchored
-  return besideMenu(menu, anchored)
+  val picker = placement.datePickerAt(node.id)?.let(byId::get)
+  val withMenu =
+    if (menu == null || menu.id in placedOverlays) anchored else besideMenu(menu, anchored)
+  if (picker == null || picker.id in placedOverlays) return withMenu
+  return besidePicker(picker, withMenu)
+}
+
+/**
+ * [own] and the date [picker] anchored to it, wrapped in a `Box` so a docked picker opens below it.
+ * The picker is written at every size class, each variant where it applies.
+ */
+private fun ScreenEmitter.besidePicker(picker: ComponentNode, own: List<Stmt>): List<Stmt> {
+  placedOverlays += picker.id
+  return one(file.use(Sym.Box), emptyList(), own + overlayStatements(picker))
 }
 
 /**
@@ -233,7 +245,7 @@ private fun ScreenEmitter.iconOf(
   )
 
 /** `Icon(painterResource(R.drawable.name), contentDescription = ...)`. */
-private fun ScreenEmitter.icon(
+internal fun ScreenEmitter.icon(
   symbol: IconName,
   description: Expr? = null,
   vararg extra: Arg?,
@@ -242,11 +254,11 @@ private fun ScreenEmitter.icon(
 private fun ScreenEmitter.sizeModifier(size: String): Arg =
   arg("modifier", Chain(file.use(Sym.Modifier), listOf("${useModifier("size")}($size)")))
 
-private fun ScreenEmitter.textOf(value: Expr, vararg named: Arg?): Expr =
+internal fun ScreenEmitter.textOf(value: Expr, vararg named: Arg?): Expr =
   Call(file.use(Sym.Text), listOf(pos(value)) + named.filterNotNull())
 
 /** `argName = { Text(...) }` for the text at [key], or null when there is none. */
-private fun ScreenEmitter.textSlot(
+internal fun ScreenEmitter.textSlot(
   p: JsonObject,
   key: String,
   place: Place,
@@ -1987,23 +1999,9 @@ internal fun ScreenEmitter.overlayStatements(node: ComponentNode): List<Stmt> {
         )
       listOf(IfStmt(listOf(shown to listOf(stmt(sheet))), null))
     }
-    "Dialog" -> {
-      val title = p.text("title", place) ?: Raw("\"\"")
-      val confirm = slot(p, "confirm", place, "Dialog") ?: lambda()
-      val dismiss = slot(p, "dismiss", place, "Dialog")
-      val dialog =
-        Call(
-          m3("AlertDialog"),
-          listOfNotNull(
-            arg("onDismissRequest", lambda(Assign(shown, "=", Raw("false")))),
-            arg("confirmButton", confirm),
-            dismiss?.let { arg("dismissButton", it) },
-            arg("title", lambdaOf(textOf(title))),
-            textSlot(p, "text", place),
-          ),
-        )
-      listOf(IfStmt(listOf(shown to listOf(stmt(dialog))), null))
-    }
+    "Dialog" -> perSize(node) { sized -> dialogStatements(node, sized) }
+    "DatePicker" -> perSize(node) { sized -> datePickerStatements(node, sized) }
+    "TimePicker" -> perSize(node) { sized -> timePickerStatements(node, sized) }
     "Menu" -> menuStatements(node)
     "SideSheet" -> sideSheetStatements(node, p)
     else -> emptyList()

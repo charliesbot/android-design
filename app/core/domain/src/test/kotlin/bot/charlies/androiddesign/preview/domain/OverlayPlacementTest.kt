@@ -143,4 +143,19 @@ class OverlayPlacementTest {
     assertNull(placement.barOf("loose"))
     assertEquals(listOf("loose"), placement.screenLevel.map { it.id })
   }
+
+  @Test
+  fun `a date picker that names an anchor opens beside it and not at screen level`() {
+    val placement =
+      placement(
+        node("field", "TextField"),
+        node("when", "DatePicker", "anchor" to "field"),
+        node("free", "DatePicker"),
+        node("clock", "TimePicker"),
+      )
+
+    assertEquals("when", placement.datePickerAt("field"))
+    assertNull(placement.datePickerAt("other"))
+    assertEquals(listOf("free", "clock"), placement.screenLevel.map { it.id })
+  }
 }

@@ -70,6 +70,7 @@ internal object Sym {
   const val painterResource = "$UI.res.painterResource"
   const val Dialog = "$UI.window.Dialog"
   const val DialogProperties = "$UI.window.DialogProperties"
+  const val Popup = "$UI.window.Popup"
   const val Color = "$UI.graphics.Color"
   const val RectangleShape = "$UI.graphics.RectangleShape"
   const val Preview = "$UI.tooling.preview.Preview"
