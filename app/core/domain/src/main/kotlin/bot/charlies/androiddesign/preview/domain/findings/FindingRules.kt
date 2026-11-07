@@ -23,9 +23,9 @@ import kotlin.math.round
  * The checks a rendered view must pass, run over its layout tree: touch targets, fonts, clipped or
  * truncated text, contrast, a primary action at least as tall as its rivals, one FAB per pane,
  * content past the view's edges, a compact carousel with too many text items, and a navigation bar
- * with fewer than three destinations, and a docked toolbar drawn with a navigation bar. [tree]
- * arrives with its nodes and no findings yet. Findings come out in rule order, then in document
- * order.
+ * with fewer than three destinations, a docked toolbar drawn with a navigation bar, and a list pane
+ * beside an empty detail pane. [tree] arrives with its nodes and no findings yet. Findings come out
+ * in rule order, then in document order.
  *
  * A node with no area is not laid out (a closed overlay is never composed), so the rules that
  * measure geometry skip it. While a modal sheet or dialog is open, everything outside it is inert
@@ -104,8 +104,16 @@ object FindingRules {
   private val fontGroups: Map<String, Set<TypeGroup>> =
     BundledFont.entries.associate { it.family.lowercase() to it.groups }
 
-  /** The findings of [tree], under the rules of [catalog], which is its view's by default. */
-  fun evaluate(tree: LayoutTree, catalog: Catalog = Catalogs.forView(tree.view)): List<Finding> {
+  /**
+   * The findings of [tree], under the rules of [catalog], which is its view's by default.
+   * [emptyDetailLists] are the list screens the view shows beside a detail pane with no
+   * placeholder: the tree holds no node for an empty pane, so the renderer reports them.
+   */
+  fun evaluate(
+    tree: LayoutTree,
+    catalog: Catalog = Catalogs.forView(tree.view),
+    emptyDetailLists: List<String> = emptyList(),
+  ): List<Finding> {
     val view = View(tree, checkNotNull(facets[catalog.id]) { "unknown catalog ${catalog.id}" })
     return touchTargets(view) +
       fonts(view) +
@@ -121,7 +129,8 @@ object FindingRules {
       carouselItems(view) +
       navDestinations(view) +
       dockedToolbarWithNavBar(view) +
-      fullScreenDatePicker(view)
+      fullScreenDatePicker(view) +
+      emptyDetailPane(emptyDetailLists)
   }
 
   // region the view
@@ -643,6 +652,23 @@ object FindingRules {
         )
       }
   }
+
+  /**
+   * Material: "A single-pane layout shows a list view, while a two-pane layout shows placeholder
+   * content in the detail pane." A list screen that a two-pane scene shows with nothing selected
+   * and no `navigation.placeholders` entry leaves that pane empty, so it is a note on the view.
+   */
+  private fun emptyDetailPane(lists: List<String>): List<Finding> =
+    lists.distinct().map { list ->
+      Finding(
+        rule = FindingRule.EmptyDetailPane,
+        severity = Severity.Info,
+        detail =
+          "'$list' is a list pane beside an empty detail pane; with nothing selected a " +
+            "two-pane layout shows placeholder content, so declare it with " +
+            "navigation.placeholders: {\"$list\": \"<screen id>\"}",
+      )
+    }
 
   private const val DATE_PICKER = "DatePicker"
   private const val DOCKED_TOOLBAR = "DockedToolbar"

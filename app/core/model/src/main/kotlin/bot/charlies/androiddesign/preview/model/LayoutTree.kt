@@ -142,6 +142,7 @@ enum class FindingRule(val wire: String) {
   @SerialName("nav-destinations") NavDestinations("nav-destinations"),
   @SerialName("docked-toolbar-nav-bar") DockedToolbarNavBar("docked-toolbar-nav-bar"),
   @SerialName("full-screen-date-picker") FullScreenDatePicker("full-screen-date-picker"),
+  @SerialName("empty-detail-pane") EmptyDetailPane("empty-detail-pane"),
 }
 
 /** [id] is the component the finding is about, or null when it concerns the whole view. */

@@ -843,6 +843,27 @@ class FindingRulesTest {
 
   // endregion
 
+  // region empty detail pane
+
+  @Test
+  fun `a list pane beside an empty detail pane is a note on the view`() {
+    val found =
+      FindingRules.evaluate(tree(Views.Tablet), emptyDetailLists = listOf("plates"))
+        .of(FindingRule.EmptyDetailPane)
+    val finding = found.single()
+    assertEquals(Severity.Info, finding.severity)
+    assertEquals(null, finding.id)
+    assertTrue("plates" in finding.detail.orEmpty(), finding.detail)
+    assertTrue("navigation.placeholders" in finding.detail.orEmpty(), finding.detail)
+  }
+
+  @Test
+  fun `no empty detail pane means no note`() {
+    assertEquals(emptyList(), evaluate(tree(Views.Tablet)).of(FindingRule.EmptyDetailPane))
+  }
+
+  // endregion
+
   // region modal overlays
 
   @Test

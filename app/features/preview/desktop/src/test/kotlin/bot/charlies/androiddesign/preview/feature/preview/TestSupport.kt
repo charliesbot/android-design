@@ -38,11 +38,12 @@ fun screenJson(components: String, dataModel: String? = null): String = buildStr
 fun proposalOf(
   vararg screens: Pair<String, String>,
   panes: String = "{}",
+  placeholders: String = "{}",
   theme: String? = null,
 ): Proposal {
   val themeJson = if (theme != null) """"theme":$theme,""" else ""
   val json =
-    """{"format":1,"name":"Test",$themeJson"navigation":{"start":"${screens.first().first}","panes":$panes},""" +
+    """{"format":1,"name":"Test",$themeJson"navigation":{"start":"${screens.first().first}","panes":$panes,"placeholders":$placeholders},""" +
       """"screens":{${screens.joinToString(",") { """"${it.first}":${it.second}""" }}}}"""
   return strictJson.decodeFromString(Proposal.serializer(), json)
 }

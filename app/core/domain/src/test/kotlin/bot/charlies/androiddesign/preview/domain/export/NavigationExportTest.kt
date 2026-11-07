@@ -51,6 +51,36 @@ class NavigationExportTest {
     has(source, "entry<PlateDetailRoute>(metadata = ListDetailSceneStrategy.detailPane())")
   }
 
+  private fun withPlaceholder() =
+    TestProposal.valid()
+      .withPickScreen()
+      .withNavigation(
+        """{"start":"plates","panes":{"plates":"list","plate_detail":"detail"},"placeholders":{"plates":"pick"}}""",
+      )
+      .build()
+
+  @Test
+  fun `a list pane passes its placeholder screen as the detail placeholder`() {
+    val source = export(withPlaceholder())
+    has(
+      source,
+      "entry<PlatesRoute>(metadata = ListDetailSceneStrategy.listPane(detailPlaceholder = { PickScreen() }))",
+    )
+    has(source, "fun PickScreen(")
+  }
+
+  @Test
+  fun `a placeholder screen has no route or entry`() {
+    val source = export(withPlaceholder())
+    lacks(source, "PickRoute")
+    has(source, "entry<PlateDetailRoute>(metadata = ListDetailSceneStrategy.detailPane())")
+  }
+
+  @Test
+  fun `a list pane without a placeholder keeps the plain list pane`() {
+    has(export(TestProposal.valid().build()), "ListDetailSceneStrategy.listPane())")
+  }
+
   @Test
   fun `an extra pane uses the list detail strategy`() {
     val source =

@@ -13,6 +13,7 @@ import bot.charlies.androiddesign.preview.feature.preview.theme.toHex
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.Proposal
+import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.Views
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -106,6 +107,51 @@ class RendererBehaviorTest {
     val phone = render(twoScreens(), "detail", Views.Light).tree
     assertTrue(phone.has("body"))
     assertFalse(phone.nodes.any { it.id.startsWith("list/") })
+  }
+
+  private fun withPlaceholder(declared: Boolean) =
+    proposalOf(
+      "list" to
+        screenJson(platesList, """{"plates":[{"name":"Burrata"},{"name":"Miso"}],"owner":"Ada"}"""),
+      "detail" to screenJson(platesDetail, """{"plate":{"name":"Burrata"}}"""),
+      "pick" to
+        screenJson(
+          """{"id":"root","component":"Scaffold","content":"hint"},""" +
+            """{"id":"hint","component":"Text","text":"Pick a plate"}""",
+        ),
+      panes = """{"list":"list","detail":"detail"}""",
+      placeholders = if (declared) """{"list":"pick"}""" else "{}",
+    )
+
+  @Test
+  fun `a two-pane list shows its placeholder in the detail pane`() {
+    val tree = render(withPlaceholder(declared = true), "list", Views.Tablet).tree
+    assertTrue(tree.has("row[0]"), "the list pane keeps plain ids")
+    assertEquals("Pick a plate", tree.node("pick/hint").text?.value)
+    assertEquals(emptyList(), tree.findings.filter { it.rule == FindingRule.EmptyDetailPane })
+  }
+
+  @Test
+  fun `a one-pane list does not draw its placeholder`() {
+    val tree = render(withPlaceholder(declared = true), "list", Views.Light).tree
+    assertFalse(tree.nodes.any { it.id.startsWith("pick/") })
+    assertEquals(emptyList(), tree.findings.filter { it.rule == FindingRule.EmptyDetailPane })
+  }
+
+  @Test
+  fun `a two-pane list without a placeholder is noted`() {
+    val tree = render(withPlaceholder(declared = false), "list", Views.Tablet).tree
+    val note = tree.findings.single { it.rule == FindingRule.EmptyDetailPane }
+    assertEquals(Severity.Info, note.severity)
+    assertTrue("navigation.placeholders" in note.detail.orEmpty(), note.detail)
+    val phone = render(withPlaceholder(declared = false), "list", Views.Light).tree
+    assertEquals(emptyList(), phone.findings.filter { it.rule == FindingRule.EmptyDetailPane })
+  }
+
+  @Test
+  fun `a selected detail leaves no empty pane`() {
+    val tree = render(withPlaceholder(declared = false), "detail", Views.Tablet).tree
+    assertEquals(emptyList(), tree.findings.filter { it.rule == FindingRule.EmptyDetailPane })
   }
 
   @Test

@@ -117,6 +117,7 @@ class TreeRecorder {
   private val texts = HashMap<String, MutableMap<String, TextReport>>()
   private val designHeights = HashMap<String, Float>()
   private val rings = HashMap<String, RingInset>()
+  private val emptyDetailLists = LinkedHashSet<String>()
   private var frame: LayoutCoordinates? = null
 
   /** Called by the preview frame: bounds are measured relative to this. */
@@ -137,6 +138,15 @@ class TreeRecorder {
     texts.remove(id)
     designHeights.remove(id)
     rings.remove(id)
+  }
+
+  /**
+   * The scene shows the list screen [list] beside a detail pane with no placeholder. The host
+   * reports it while that is on screen, since an empty pane has no node to find.
+   */
+  @Synchronized
+  fun reportEmptyDetail(list: String, empty: Boolean) {
+    if (empty) emptyDetailLists += list else emptyDetailLists -= list
   }
 
   /**
@@ -197,7 +207,10 @@ class TreeRecorder {
         .sortedWith { a, b -> compareOrder(a.order, b.order) }
         .mapNotNull { meta -> node(meta, density, semantics) }
     val withoutFindings = LayoutTree(screen, view, nodes, emptyList())
-    return withoutFindings.copy(findings = FindingRules.evaluate(withoutFindings))
+    return withoutFindings.copy(
+      findings =
+        FindingRules.evaluate(withoutFindings, emptyDetailLists = emptyDetailLists.toList()),
+    )
   }
 
   private fun node(meta: NodeMeta, density: Float, semantics: SemanticsIndex?): LayoutNode? {

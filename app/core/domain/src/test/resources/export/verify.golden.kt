@@ -497,7 +497,9 @@ fun VerifyApp() {
       sceneStrategies = listOf(listDetailStrategy),
       entryProvider =
         entryProvider {
-          entry<HomeRoute>(metadata = ListDetailSceneStrategy.listPane()) {
+          entry<HomeRoute>(
+            metadata = ListDetailSceneStrategy.listPane(detailPlaceholder = { PickScreen() }),
+          ) {
             HomeScreen(
               onNavigateToHome = { backStack.add(HomeRoute) },
               onNavigateToActions = { backStack.add(ActionsRoute) },
@@ -1065,6 +1067,25 @@ fun DetailScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {}) {
 @Composable
 private fun DetailScreenPreview() {
   VerifyTheme { DetailScreen() }
+}
+
+@Composable
+fun PickScreen(modifier: Modifier = Modifier) {
+  Scaffold(modifier = modifier) { innerPadding ->
+    Box(modifier = Modifier.padding(innerPadding)) {
+      Text(
+        "Select an item to see it here.",
+        modifier = Modifier.padding(16.dp),
+        style = MaterialTheme.typography.bodyLarge,
+      )
+    }
+  }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PickScreenPreview() {
+  VerifyTheme { PickScreen() }
 }
 
 @Composable

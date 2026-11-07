@@ -18,6 +18,7 @@ class TestProposal(
   private val theme: String? = null,
   private val format: Int = 1,
   private val platesCatalogId: String = M3ExpressiveCatalog.ID,
+  private val extraScreens: LinkedHashMap<String, String> = linkedMapOf(),
 ) {
   fun with(id: String, json: String) = copy(plates = LinkedHashMap(plates).also { it[id] = json })
 
@@ -27,6 +28,18 @@ class TestProposal(
     copy(detail = LinkedHashMap(detail).also { it[id] = json })
 
   fun withNavigation(json: String) = copy(navigation = json)
+
+  /** Adds a screen after the two built-in ones; [componentsJson] is its component list. */
+  fun withScreen(id: String, componentsJson: String) =
+    copy(extraScreens = LinkedHashMap(extraScreens).also { it[id] = componentsJson })
+
+  /** Adds `pick`, a screen that says what to choose, for use as a detail placeholder. */
+  fun withPickScreen() =
+    withScreen(
+      "pick",
+      """{"id":"root","component":"Scaffold","content":"hint"},""" +
+        """{"id":"hint","component":"Text","text":"Pick a plate","type":"bodyLarge"}""",
+    )
 
   fun withTheme(json: String) = copy(theme = json)
 
@@ -44,7 +57,8 @@ class TestProposal(
     theme: String? = this.theme,
     format: Int = this.format,
     platesCatalogId: String = this.platesCatalogId,
-  ) = TestProposal(plates, detail, navigation, theme, format, platesCatalogId)
+    extraScreens: LinkedHashMap<String, String> = this.extraScreens,
+  ) = TestProposal(plates, detail, navigation, theme, format, platesCatalogId, extraScreens)
 
   fun json(): String = buildString {
     append("""{"format":$format,"name":"Test",""")
@@ -56,6 +70,9 @@ class TestProposal(
     append(
       """"plate_detail":{"catalogId":"${M3ExpressiveCatalog.ID}","components":[${detail.values.joinToString(",")}]}""",
     )
+    extraScreens.forEach { (id, components) ->
+      append(""","$id":{"catalogId":"${M3ExpressiveCatalog.ID}","components":[$components]}""")
+    }
     append("}}")
   }
 
