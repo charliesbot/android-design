@@ -46,6 +46,7 @@ internal fun describe(ctx: NodeContext, ambient: Ambient): NodeMeta {
     parent = ctx.parentId,
     order = ctx.order,
     primary = ctx.primary,
+    variant = if (ctx.component == "DatePicker") ctx.enum("variant") else null,
     interactive = interactive,
     roles =
       NodeRoles(
@@ -125,6 +126,8 @@ private fun look(ctx: NodeContext, ambient: Ambient): Look =
     "ProgressIndicator" -> ctx.progressIndicatorLook(ambient)
     "BottomSheet" -> ctx.bottomSheetLook()
     "Dialog" -> ctx.dialogLook()
+    "DatePicker" -> ctx.datePickerLook()
+    "TimePicker" -> ctx.timePickerLook()
     "Menu" -> ctx.menuLook()
     "MenuGroup" -> ctx.menuGroupLook()
     "MenuItem" -> ctx.menuItemLook()

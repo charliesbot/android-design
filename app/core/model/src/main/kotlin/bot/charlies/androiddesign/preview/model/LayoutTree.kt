@@ -51,6 +51,11 @@ data class LayoutNode(
    * every other node.
    */
   val ring: RingInset? = null,
+  /**
+   * The `variant` of a component whose variant changes how the layout checks treat it, which is a
+   * date picker (a docked one is a dropdown, the rest are modal). Omitted for every other node.
+   */
+  val variant: String? = null,
   val roles: NodeRoles? = null,
   val colors: NodeColors? = null,
   val a11y: A11yInfo? = null,
@@ -129,6 +134,7 @@ enum class FindingRule(val wire: String) {
   @SerialName("carousel-items") CarouselItems("carousel-items"),
   @SerialName("nav-destinations") NavDestinations("nav-destinations"),
   @SerialName("docked-toolbar-nav-bar") DockedToolbarNavBar("docked-toolbar-nav-bar"),
+  @SerialName("full-screen-date-picker") FullScreenDatePicker("full-screen-date-picker"),
 }
 
 /** [id] is the component the finding is about, or null when it concerns the whole view. */

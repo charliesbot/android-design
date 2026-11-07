@@ -163,11 +163,6 @@ internal class ScreenEmitter(
   /** Which overlays are written beside a component and which at the end of the screen. */
   val placement = OverlayPlacement(screen)
 
-  /**
-   * Menus already written beside a component, so one drawn from several variants is not doubled.
-   */
-  val placedOverlays = mutableSetOf<String>()
-
   var usesSizeClass = false
 
   // region the function
@@ -359,6 +354,15 @@ internal class ScreenEmitter(
   /** The statements that draw component [id] in [place], or none when it is not in this screen. */
   fun emit(id: String, place: Place): List<Stmt> {
     val node = byId[id] ?: return emptyList()
+    return perSize(node) { props -> emitComponent(node, props, place) }
+  }
+
+  /**
+   * [draw] for [node] at the size classes it is shown at: once when one set of props holds at all
+   * of them, else one branch per distinct set, chosen by the window width class. Nothing when the
+   * node is shown at none.
+   */
+  fun perSize(node: ComponentNode, draw: (JsonObject) -> List<Stmt>): List<Stmt> {
     val visible = linkedMapOf<JsonObject, MutableSet<SizeClass>>()
     for (size in SizeClass.entries) {
       if (!node.isShownAt(size)) continue
@@ -367,15 +371,10 @@ internal class ScreenEmitter(
     if (visible.isEmpty()) return emptyList()
     val single = visible.entries.singleOrNull()
     if (single != null && single.value.size == SizeClass.entries.size) {
-      return emitComponent(node, single.key, place)
+      return draw(single.key)
     }
     usesSizeClass = true
-    return listOf(
-      IfStmt(
-        visible.map { (props, sizes) -> condition(sizes) to emitComponent(node, props, place) },
-        null,
-      ),
-    )
+    return listOf(IfStmt(visible.map { (props, sizes) -> condition(sizes) to draw(props) }, null))
   }
 
   fun condition(sizes: Set<SizeClass>): String {

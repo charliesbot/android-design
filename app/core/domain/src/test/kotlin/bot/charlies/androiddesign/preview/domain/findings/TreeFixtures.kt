@@ -34,6 +34,7 @@ internal fun node(
   content: String? = null,
   container: String? = null,
   ring: RingInset? = null,
+  variant: String? = null,
 ) =
   LayoutNode(
     id = id,
@@ -45,6 +46,7 @@ internal fun node(
     touch = touch,
     text = text,
     ring = ring,
+    variant = variant,
     roles = typeRole?.let { NodeRoles(type = it) },
     colors = if (content != null || container != null) NodeColors(container, content) else null,
   )

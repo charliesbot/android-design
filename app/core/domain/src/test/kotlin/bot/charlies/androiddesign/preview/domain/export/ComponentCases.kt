@@ -1291,6 +1291,96 @@ internal val componentCases: List<ComponentCase> =
         ),
     ),
     case(
+      "Dialog",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"New","action":{"functionCall":{"@call":"open","args":{"overlay":"d"}}}}""",
+          """{"id":"d","component":"Dialog","variant":"full-screen","title":"New event","confirm":"save","content":["f"]}""",
+          """{"id":"save","component":"Button","variant":"text","label":"Save","action":{"functionCall":{"@call":"dismiss"}}}""",
+          """{"id":"f","component":"TextField","label":"Title"}""",
+        ),
+      expect =
+        listOf(
+          "if (showD) {",
+          "properties = DialogProperties(usePlatformDefaultWidth = false)",
+          "Scaffold(modifier = Modifier.fillMaxSize()",
+          "TopAppBar(",
+          "title = { Text(\"New event\") }",
+          "IconButton(onClick = { showD = false }) {",
+          "contentDescription = \"Close\"",
+          "actions = { TextButton(onClick = { showD = false }) { Text(\"Save\") } }",
+          "expandedHeight = 56.dp",
+          "containerColor = MaterialTheme.colorScheme.surfaceContainerHigh",
+          "{ innerPadding ->",
+          ".verticalScroll(rememberScrollState())",
+          ".padding(horizontal = 24.dp)",
+          "label = { Text(\"Title\") }",
+        ),
+      reject = listOf("AlertDialog("),
+    ),
+    case(
+      "DatePicker",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b","field"]}""",
+          """{"id":"b","component":"Button","label":"Pick","action":{"functionCall":{"@call":"open","args":{"overlay":"d"}}}}""",
+          """{"id":"field","component":"TextField","label":"Date"}""",
+          """{"id":"d","component":"DatePicker","selected":"2026-11-06"}""",
+          """{"id":"r","component":"DatePicker","variant":"modal-input","range":true,"start":"2026-11-06","end":"2026-11-12"}""",
+          """{"id":"k","component":"DatePicker","variant":"docked","selected":"2026-11-06","anchor":"field"}""",
+          """{"id":"f","component":"DatePicker","variant":"full-screen","selected":"2026-11-06"}""",
+        ),
+      expect =
+        listOf(
+          "val dDatePickerState = rememberDatePickerState(initialSelectedDateMillis = 1793923200000L)",
+          "if (showD) {",
+          "DatePickerDialog(",
+          "onDismissRequest = { showD = false }",
+          "confirmButton = { TextButton(onClick = { showD = false }) { Text(\"OK\") } }",
+          "dismissButton = { TextButton(onClick = { showD = false }) { Text(\"Cancel\") } }",
+          "DatePicker(state = dDatePickerState)",
+          "rememberDateRangePickerState(",
+          "initialSelectedStartDateMillis = 1793923200000L",
+          "initialSelectedEndDateMillis = 1794441600000L",
+          "initialDisplayMode = DisplayMode.Input",
+          "DateRangePicker(state = rDatePickerState)",
+          "Box(modifier = Modifier.align(Alignment.BottomStart))",
+          "Popup(alignment = Alignment.TopStart, onDismissRequest = { showK = false })",
+          "modifier = Modifier.width(360.dp)",
+          "shape = DatePickerDefaults.shape",
+          "title = null",
+          "headline = null",
+          "showModeToggle = false",
+          "title = { DatePickerDefaults.DatePickerTitle(displayMode = DisplayMode.Picker) }",
+          "actions = { TextButton(onClick = { showF = false }) { Text(\"Save\") } }",
+          "modifier = Modifier.padding(innerPadding)",
+        ),
+    ),
+    case(
+      "TimePicker",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"Time","action":{"functionCall":{"@call":"open","args":{"overlay":"t"}}}}""",
+          """{"id":"t","component":"TimePicker","time":"09:30"}""",
+          """{"id":"u","component":"TimePicker","variant":"input","time":"14:05","is24Hour":true}""",
+        ),
+      expect =
+        listOf(
+          "val tTimePickerState = rememberTimePickerState(initialHour = 9, initialMinute = 30)",
+          "var tDisplayMode by remember { mutableStateOf(TimePickerDisplayMode.Picker) }",
+          "if (showT) {",
+          "TimePickerDialog(",
+          "TimePickerDialogDefaults.Title(displayMode = tDisplayMode)",
+          "TimePickerDialogDefaults.DisplayModeToggle(",
+          "TimePicker(state = tTimePickerState)",
+          "TimeInput(state = tTimePickerState)",
+          "rememberTimePickerState(initialHour = 14, initialMinute = 5)",
+          "var uDisplayMode by remember { mutableStateOf(TimePickerDisplayMode.Input) }",
+        ),
+    ),
+    case(
       "Menu",
       components =
         listOf(

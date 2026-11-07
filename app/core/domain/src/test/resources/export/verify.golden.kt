@@ -9,6 +9,7 @@
 //   R.drawable.bolt
 //   R.drawable.bookmark
 //   R.drawable.bookmark_filled
+//   R.drawable.calendar_today
 //   R.drawable.cast
 //   R.drawable.chat
 //   R.drawable.check
@@ -121,6 +122,11 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DateRangePicker
+import androidx.compose.material3.DisplayMode
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
@@ -212,6 +218,11 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TimeInput
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerDialog
+import androidx.compose.material3.TimePickerDialogDefaults
+import androidx.compose.material3.TimePickerDisplayMode
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.ToggleFloatingActionButton
@@ -238,8 +249,11 @@ import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.material3.rememberContainedSearchBarState
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.material3.rememberSearchBarWithGapState
 import androidx.compose.material3.rememberSliderState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.material3.toShape
@@ -274,6 +288,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Popup
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -2526,6 +2541,14 @@ fun OverlaysScreen(
   var showDialog by remember { mutableStateOf(false) }
   var showMenu by remember { mutableStateOf(false) }
   var showMenuVibrant by remember { mutableStateOf(false) }
+  var showDateDocked by remember { mutableStateOf(false) }
+  var showDateModal by remember { mutableStateOf(false) }
+  var showDateInput by remember { mutableStateOf(false) }
+  var showDateRange by remember { mutableStateOf(false) }
+  var showDateFull by remember { mutableStateOf(false) }
+  var showTimeDial by remember { mutableStateOf(false) }
+  var showTimeInput by remember { mutableStateOf(false) }
+  var showDialogFull by remember { mutableStateOf(false) }
   val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
   val atLeastMedium =
     windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
@@ -2802,6 +2825,47 @@ fun OverlaysScreen(
             }
           }
         }
+        Box {
+          var dateFieldValue by remember { mutableStateOf("Nov 6, 2026") }
+          OutlinedTextField(
+            value = dateFieldValue,
+            onValueChange = { dateFieldValue = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Date") },
+            trailingIcon = {
+              Icon(painterResource(R.drawable.calendar_today), contentDescription = null)
+            },
+            singleLine = true,
+          )
+          val dateDockedDatePickerState =
+            rememberDatePickerState(initialSelectedDateMillis = 1793923200000L)
+          if (showDateDocked) {
+            Box(modifier = Modifier.align(Alignment.BottomStart)) {
+              Popup(alignment = Alignment.TopStart, onDismissRequest = { showDateDocked = false }) {
+                Surface(
+                  modifier = Modifier.width(360.dp),
+                  shape = DatePickerDefaults.shape,
+                  color = DatePickerDefaults.colors().containerColor,
+                ) {
+                  DatePicker(
+                    state = dateDockedDatePickerState,
+                    title = null,
+                    headline = null,
+                    showModeToggle = false,
+                  )
+                }
+              }
+            }
+          }
+        }
+        OutlinedButton(onClick = { showDateDocked = true }) { Text("Docked date") }
+        OutlinedButton(onClick = { showDateModal = true }) { Text("Modal date") }
+        OutlinedButton(onClick = { showDateInput = true }) { Text("Date input") }
+        OutlinedButton(onClick = { showDateRange = true }) { Text("Date range") }
+        OutlinedButton(onClick = { showDateFull = true }) { Text("Full-screen date") }
+        OutlinedButton(onClick = { showTimeDial = true }) { Text("Time dial") }
+        OutlinedButton(onClick = { showTimeInput = true }) { Text("Time input") }
+        OutlinedButton(onClick = { showDialogFull = true }) { Text("Full-screen dialog") }
       }
     }
   }
@@ -2824,6 +2888,200 @@ fun OverlaysScreen(
       title = { Text("Discard draft?") },
       text = { Text("Your changes will be lost.") },
     )
+  }
+  val dateModalDatePickerState = rememberDatePickerState(initialSelectedDateMillis = 1793923200000L)
+  if (showDateModal) {
+    DatePickerDialog(
+      onDismissRequest = { showDateModal = false },
+      confirmButton = { TextButton(onClick = { showDateModal = false }) { Text("OK") } },
+      dismissButton = { TextButton(onClick = { showDateModal = false }) { Text("Cancel") } },
+    ) {
+      DatePicker(state = dateModalDatePickerState)
+    }
+  }
+  val dateInputDatePickerState =
+    rememberDatePickerState(
+      initialSelectedDateMillis = 1793923200000L,
+      initialDisplayMode = DisplayMode.Input,
+    )
+  if (showDateInput) {
+    DatePickerDialog(
+      onDismissRequest = { showDateInput = false },
+      confirmButton = { TextButton(onClick = { showDateInput = false }) { Text("OK") } },
+      dismissButton = { TextButton(onClick = { showDateInput = false }) { Text("Cancel") } },
+    ) {
+      DatePicker(state = dateInputDatePickerState)
+    }
+  }
+  val dateRangeDatePickerState =
+    rememberDateRangePickerState(
+      initialSelectedStartDateMillis = 1793923200000L,
+      initialSelectedEndDateMillis = 1794441600000L,
+    )
+  if (showDateRange) {
+    DatePickerDialog(
+      onDismissRequest = { showDateRange = false },
+      confirmButton = { TextButton(onClick = { showDateRange = false }) { Text("OK") } },
+      dismissButton = { TextButton(onClick = { showDateRange = false }) { Text("Cancel") } },
+    ) {
+      DateRangePicker(state = dateRangeDatePickerState)
+    }
+  }
+  if (!atLeastMedium) {
+    val dateFullDatePickerState =
+      rememberDatePickerState(initialSelectedDateMillis = 1793923200000L)
+    if (showDateFull) {
+      Dialog(
+        onDismissRequest = { showDateFull = false },
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+      ) {
+        Scaffold(
+          modifier = Modifier.fillMaxSize(),
+          topBar = {
+            TopAppBar(
+              title = { DatePickerDefaults.DatePickerTitle(displayMode = DisplayMode.Picker) },
+              navigationIcon = {
+                IconButton(onClick = { showDateFull = false }) {
+                  Icon(painterResource(R.drawable.close), contentDescription = "Close")
+                }
+              },
+              actions = { TextButton(onClick = { showDateFull = false }) { Text("Save") } },
+              expandedHeight = 56.dp,
+              colors =
+                TopAppBarDefaults.topAppBarColors(
+                  containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ),
+            )
+          },
+          containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) { innerPadding ->
+          DatePicker(
+            state = dateFullDatePickerState,
+            modifier = Modifier.padding(innerPadding),
+            title = null,
+            showModeToggle = false,
+          )
+        }
+      }
+    }
+  } else if (atLeastMedium) {
+    val dateFullDatePickerState =
+      rememberDatePickerState(initialSelectedDateMillis = 1793923200000L)
+    if (showDateFull) {
+      DatePickerDialog(
+        onDismissRequest = { showDateFull = false },
+        confirmButton = { TextButton(onClick = { showDateFull = false }) { Text("OK") } },
+        dismissButton = { TextButton(onClick = { showDateFull = false }) { Text("Cancel") } },
+      ) {
+        DatePicker(state = dateFullDatePickerState)
+      }
+    }
+  }
+  val timeDialTimePickerState = rememberTimePickerState(initialHour = 9, initialMinute = 30)
+  var timeDialDisplayMode by remember { mutableStateOf(TimePickerDisplayMode.Picker) }
+  if (showTimeDial) {
+    TimePickerDialog(
+      onDismissRequest = { showTimeDial = false },
+      confirmButton = { TextButton(onClick = { showTimeDial = false }) { Text("OK") } },
+      dismissButton = { TextButton(onClick = { showTimeDial = false }) { Text("Cancel") } },
+      title = { TimePickerDialogDefaults.Title(displayMode = timeDialDisplayMode) },
+      modeToggleButton = {
+        TimePickerDialogDefaults.DisplayModeToggle(
+          onDisplayModeChange = {
+            timeDialDisplayMode =
+              if (timeDialDisplayMode == TimePickerDisplayMode.Picker) TimePickerDisplayMode.Input
+              else TimePickerDisplayMode.Picker
+          },
+          displayMode = timeDialDisplayMode,
+        )
+      },
+    ) {
+      if (timeDialDisplayMode == TimePickerDisplayMode.Picker) {
+        TimePicker(state = timeDialTimePickerState)
+      } else {
+        TimeInput(state = timeDialTimePickerState)
+      }
+    }
+  }
+  val timeInputTimePickerState = rememberTimePickerState(initialHour = 14, initialMinute = 5)
+  var timeInputDisplayMode by remember { mutableStateOf(TimePickerDisplayMode.Input) }
+  if (showTimeInput) {
+    TimePickerDialog(
+      onDismissRequest = { showTimeInput = false },
+      confirmButton = { TextButton(onClick = { showTimeInput = false }) { Text("OK") } },
+      dismissButton = { TextButton(onClick = { showTimeInput = false }) { Text("Cancel") } },
+      title = { TimePickerDialogDefaults.Title(displayMode = timeInputDisplayMode) },
+      modeToggleButton = {
+        TimePickerDialogDefaults.DisplayModeToggle(
+          onDisplayModeChange = {
+            timeInputDisplayMode =
+              if (timeInputDisplayMode == TimePickerDisplayMode.Picker) TimePickerDisplayMode.Input
+              else TimePickerDisplayMode.Picker
+          },
+          displayMode = timeInputDisplayMode,
+        )
+      },
+    ) {
+      if (timeInputDisplayMode == TimePickerDisplayMode.Picker) {
+        TimePicker(state = timeInputTimePickerState)
+      } else {
+        TimeInput(state = timeInputTimePickerState)
+      }
+    }
+  }
+  if (!atLeastMedium) {
+    if (showDialogFull) {
+      Dialog(
+        onDismissRequest = { showDialogFull = false },
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+      ) {
+        Scaffold(
+          modifier = Modifier.fillMaxSize(),
+          topBar = {
+            TopAppBar(
+              title = { Text("New event") },
+              navigationIcon = {
+                IconButton(onClick = { showDialogFull = false }) {
+                  Icon(painterResource(R.drawable.close), contentDescription = "Close")
+                }
+              },
+              actions = { TextButton(onClick = { showDialogFull = false }) { Text("Save") } },
+              expandedHeight = 56.dp,
+              colors =
+                TopAppBarDefaults.topAppBarColors(
+                  containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ),
+            )
+          },
+          containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) { innerPadding ->
+          Column(
+            modifier =
+              Modifier.fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp),
+          ) {
+            var dialogFullTitleValue by remember { mutableStateOf("") }
+            TextField(
+              value = dialogFullTitleValue,
+              onValueChange = { dialogFullTitleValue = it },
+              modifier = Modifier.fillMaxWidth(),
+              label = { Text("Title") },
+              singleLine = true,
+            )
+            var dialogFullPlaceValue by remember { mutableStateOf("") }
+            TextField(
+              value = dialogFullPlaceValue,
+              onValueChange = { dialogFullPlaceValue = it },
+              modifier = Modifier.fillMaxWidth(),
+              label = { Text("Location") },
+              singleLine = true,
+            )
+          }
+        }
+      }
+    }
   }
 }
 

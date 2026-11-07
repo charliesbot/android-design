@@ -38,6 +38,8 @@ class NodeMeta(
   val order: List<Int>,
   val primary: Boolean,
   val scrolls: Boolean = false,
+  /** See [bot.charlies.androiddesign.preview.model.LayoutNode.variant]. */
+  val variant: String? = null,
   val interactive: Boolean,
   val roles: NodeRoles,
   val colors: NodeColors,
@@ -215,6 +217,7 @@ class TreeRecorder {
       parent = meta.parent,
       primary = meta.primary,
       scrolls = meta.scrolls,
+      variant = meta.variant,
       bounds = bounds.toDp(density),
       touch = touchPx?.toDp(density),
       text = textInfo(meta, bounds, density),

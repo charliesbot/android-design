@@ -1,10 +1,13 @@
 package bot.charlies.androiddesign.preview.domain.validation
 
 import bot.charlies.androiddesign.preview.domain.BadgeContent
+import bot.charlies.androiddesign.preview.domain.DatePickerSpec
+import bot.charlies.androiddesign.preview.domain.DialogSpec
 import bot.charlies.androiddesign.preview.domain.MenuSpec
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.SearchBars
 import bot.charlies.androiddesign.preview.domain.SearchSpec
+import bot.charlies.androiddesign.preview.domain.TimePickerSpec
 import bot.charlies.androiddesign.preview.domain.TooltipSpec
 import bot.charlies.androiddesign.preview.domain.export.ChildItems
 import bot.charlies.androiddesign.preview.domain.export.childItems
@@ -63,6 +66,7 @@ internal class ScreenValidator(
     validateSnackbarHost()
     validateSearch()
     validateSelections()
+    validateDialogsAndPickers()
     detectCycles()
   }
 
@@ -271,6 +275,103 @@ internal class ScreenValidator(
     }
   }
 
+  /**
+   * The rules of dialogs and pickers, checked on the props in effect at each size class where the
+   * component is shown, so a `sizeClass` override cannot step around them and the previewer, the
+   * exporter and this agree on what is drawn.
+   *
+   * Material: full-screen dialogs "are for compact breakpoints only", and "for medium and expanded
+   * breakpoints, use a basic dialog". A full-screen date picker is only "recommended" on compact
+   * windows, so at medium and wider it is a note from the finding rules, not an error here. A date
+   * or time is written out in the proposal (never bound to data), because a picker needs the date
+   * it opens on and a preview must not read the clock. This is a validator rule, not a finding: a
+   * finding reads the rendered tree, which does not say which variant a node is.
+   */
+  private fun validateDialogsAndPickers() {
+    screen.components.forEachIndexed { index, node ->
+      if (node.component !in PICKER_OVERLAYS) return@forEachIndexed
+      val path = componentsPath.child(index)
+      val problems = linkedMapOf<Pair<String, String>, MutableList<SizeClass>>()
+      SizeClass.entries.filter(node::isShownAt).forEach { size ->
+        pickerProblems(node, propsAt(node, size), size).forEach { (key, message) ->
+          problems.getOrPut(path.child(key) to message) { mutableListOf() } += size
+        }
+      }
+      for ((where, sizes) in problems) {
+        val at =
+          if (sizes.size == SizeClass.entries.size) "" else " at ${sizes.joinToString { it.wire }}"
+        sink.add(where.first, where.second + at)
+      }
+    }
+  }
+
+  /** The problems of [node] with [props] at [size], each with the prop it is about. */
+  private fun pickerProblems(
+    node: ComponentNode,
+    props: Map<String, JsonElement>,
+    size: SizeClass,
+  ): List<Pair<String, String>> = buildList {
+    fun has(key: String) = key in props
+    fun text(key: String) = (props[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
+    val variant = text("variant")
+    val compact = size == SizeClass.Compact
+    when (node.component) {
+      "Dialog" -> {
+        val full = DialogSpec.variant(variant) == DialogSpec.Variant.FullScreen
+        if (full && !compact) {
+          add(
+            "variant" to
+              "a full-screen dialog is for compact windows only; use a basic dialog from medium " +
+                "up (override variant in sizeClass)",
+          )
+        }
+        if (full) {
+          for (key in listOf("text", "dismiss")) {
+            if (has(key)) add(key to "$key is for a basic dialog")
+          }
+        } else if (has("content")) {
+          add("content" to "content is for a full-screen dialog")
+        }
+      }
+      "DatePicker" -> {
+        val range = (props["range"] as? JsonPrimitive)?.content == "true"
+        if (variant == DatePickerSpec.Variant.Docked.wire && !has("anchor")) {
+          add("variant" to "a docked date picker opens below a TextField, named in anchor")
+        }
+        val own = if (range) listOf("start", "end") else listOf("selected")
+        val other = if (range) listOf("selected") else listOf("start", "end")
+        other.filter(::has).forEach {
+          add(it to "$it is for a ${if (range) "single date" else "date range"} picker")
+        }
+        if (own.first() !in props) {
+          add(own.first() to "a ${if (range) "date range" else "date"} picker needs ${own.first()}")
+        }
+        val dates = own.filter(::has).associateWith { key -> pickedDate(props[key]) }
+        dates.forEach { (key, date) ->
+          if (date == null) add(key to DATE_MESSAGE)
+        }
+        val start = dates["start"]
+        val end = dates["end"]
+        if (range && start != null && end != null && end < start) {
+          add("end" to "end must not be before start")
+        }
+      }
+      "TimePicker" -> {
+        val value = props["time"]
+        if (
+          value != null &&
+            TimePickerSpec.time((value as? JsonPrimitive)?.takeIf { it.isString }?.content) == null
+        ) {
+          add("time" to "time must be written as HH:mm (00:00 to 23:59), not bound to data")
+        }
+      }
+    }
+  }
+
+  /** The date [value] writes, or null when it is not a date literal. */
+  private fun pickedDate(value: JsonElement?): java.time.LocalDate? =
+    DatePickerSpec.date((value as? JsonPrimitive)?.takeIf { it.isString }?.content)
+
   private fun validateCatalogId() {
     val path = root.child("catalogId")
     when {
@@ -339,6 +440,13 @@ internal class ScreenValidator(
                 .joinToString()
             sink.add(path.child(key), "unknown prop '$key' on ${def.name} (known: $known)")
           } else {
+            if (overrides && key == ANCHOR && def.name in ANCHORED_OVERLAYS) {
+              sink.add(
+                path.child(key),
+                "the anchor of a ${def.name} is part of where it is drawn, so it goes in the " +
+                  "base props, not in a size class",
+              )
+            }
             validateValue(path.child(key), prop, value)
           }
         }
@@ -761,6 +869,10 @@ internal class ScreenValidator(
     private val ICON_NAME = Regex("^[a-z0-9_]+$")
     /** Components whose `value` and `range` props must agree. */
     private val RANGE_COMPONENTS = setOf("Slider", "RangeSlider", "Stepper")
+    private val ANCHORED_OVERLAYS = setOf("Menu", "Tooltip", "DatePicker")
+    private val PICKER_OVERLAYS = setOf("Dialog", "DatePicker", "TimePicker")
+    private const val DATE_MESSAGE =
+      "a date must be written as YYYY-MM-DD, a real day from 1900 to 2100, not bound to data"
     private const val MENU = "Menu"
     private const val TOOLTIP = "Tooltip"
     private const val ANCHOR = "anchor"

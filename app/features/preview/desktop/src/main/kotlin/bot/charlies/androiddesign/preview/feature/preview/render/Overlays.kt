@@ -3,6 +3,7 @@ package bot.charlies.androiddesign.preview.feature.preview.render
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -55,6 +56,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import bot.charlies.androiddesign.preview.domain.ColorStyle
+import bot.charlies.androiddesign.preview.domain.DialogSpec
+import bot.charlies.androiddesign.preview.domain.FullScreenSpec
 import bot.charlies.androiddesign.preview.domain.MenuSpec
 import bot.charlies.androiddesign.preview.domain.SideSheetSpec
 import bot.charlies.androiddesign.preview.domain.TooltipSpec
@@ -108,6 +111,25 @@ internal fun MenuOverlay(
   RenderNode(env, ChildRef(menuId, scope), parentId, order + listOf(99, 0), ChildHost.Wrap)
 }
 
+/**
+ * Draws the date picker [pickerId] beside the field it names as its `anchor`, when it is open. It
+ * sits in an empty box at the bottom start of the field, so a docked picker's popup, which opens at
+ * the top start of its parent, opens directly below the field. The exporter writes the same box.
+ */
+@Composable
+internal fun BoxScope.PickerOverlay(
+  env: RenderEnv,
+  pickerId: String,
+  scope: DataScope,
+  parentId: String,
+  order: List<Int>,
+) {
+  if (env.openOverlay != pickerId) return
+  Box(Modifier.align(Alignment.BottomStart)) {
+    RenderNode(env, ChildRef(pickerId, scope), parentId, order + listOf(97, 0), ChildHost.Wrap)
+  }
+}
+
 private val BottomSheetAmbient = Ambient(ColorRole.SurfaceContainerLow, ColorRole.OnSurface)
 private val DialogAmbient = Ambient(ColorRole.SurfaceContainerHigh, ColorRole.OnSurface)
 private val MenuAmbient = Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurface)
@@ -147,6 +169,10 @@ internal fun NodeContext.dialogLook() =
 
 @Composable
 internal fun RenderDialog(ctx: NodeContext) {
+  if (DialogSpec.variant(ctx.enum("variant")) == DialogSpec.Variant.FullScreen) {
+    RenderFullScreenDialog(ctx)
+    return
+  }
   val text = ctx.string("text")
   CompositionLocalProvider(LocalAmbient provides DialogAmbient) {
     AlertDialog(
@@ -158,6 +184,29 @@ internal fun RenderDialog(ctx: NodeContext) {
       text = text?.let { value -> { ctx.PartText(value, "text") } },
       properties = DialogProperties(usePlatformDefaultWidth = false),
     )
+  }
+}
+
+/**
+ * Compose has no full-screen dialog, so it is composed ([FullScreenWindow]): the headline in the
+ * header with the close icon and the confirm text button, and the content below, scrolling, with
+ * 24dp at the sides. The exporter writes the same composition.
+ */
+@Composable
+private fun RenderFullScreenDialog(ctx: NodeContext) {
+  FullScreenWindow(
+    ctx = ctx,
+    title = { ctx.PartText(ctx.string("title").orEmpty(), "title") },
+    confirm = { ctx.Child("confirm", 1) },
+  ) { padding ->
+    Column(
+      Modifier.fillMaxSize()
+        .padding(padding)
+        .verticalScroll(rememberScrollState())
+        .padding(horizontal = FullScreenSpec.CONTENT_PADDING_DP.dp),
+    ) {
+      ctx.Children("content", 2, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))
+    }
   }
 }
 

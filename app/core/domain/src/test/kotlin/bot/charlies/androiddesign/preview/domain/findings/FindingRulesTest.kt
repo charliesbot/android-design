@@ -828,6 +828,42 @@ class FindingRulesTest {
     assertEquals(1, evaluate(tree(nodes = arrayOf(menu, tiny))).of(FindingRule.TouchTarget).size)
   }
 
+  @Test
+  fun `a docked date picker does not exempt the content behind it, a modal one does`() {
+    val tiny = node("tiny", "IconButton", w = 32f, h = 32f)
+    fun picker(variant: String) =
+      node("pick", "DatePicker", y = 200f, w = 360f, h = 392f, variant = variant)
+    for (variant in listOf("modal", "modal-input", "full-screen")) {
+      assertEquals(
+        emptyList(),
+        evaluate(tree(nodes = arrayOf(tiny, picker(variant)))).of(FindingRule.TouchTarget),
+        variant,
+      )
+    }
+    assertEquals(
+      1,
+      evaluate(tree(nodes = arrayOf(tiny, picker("docked")))).of(FindingRule.TouchTarget).size,
+    )
+  }
+
+  @Test
+  fun `a full-screen date picker is flagged from medium widths up, as a note`() {
+    val full = node("pick", "DatePicker", w = 1280f, h = 800f, variant = "full-screen")
+    val finding = evaluate(tree(Views.Tablet, full)).of(FindingRule.FullScreenDatePicker).single()
+    assertEquals("pick", finding.id)
+    assertEquals(Severity.Info, finding.severity)
+    assertEquals(
+      emptyList(),
+      evaluate(tree(Views.Light, full)).of(FindingRule.FullScreenDatePicker),
+    )
+    val modal = node("pick", "DatePicker", w = 360f, h = 400f, variant = "modal")
+    assertEquals(
+      emptyList(),
+      evaluate(tree(Views.Tablet, modal)).of(FindingRule.FullScreenDatePicker),
+    )
+    assertTrue(evaluate(tree(Views.Tablet, full)).none { it.severity == Severity.Error })
+  }
+
   // endregion
 
   // region round-edge-clipped

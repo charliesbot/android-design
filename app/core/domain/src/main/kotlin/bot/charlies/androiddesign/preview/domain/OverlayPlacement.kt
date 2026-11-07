@@ -11,11 +11,12 @@ import kotlinx.serialization.json.JsonPrimitive
 /**
  * Where each overlay of a screen draws. A menu opens beside a component: the one named by its
  * `anchor`, or the SplitButton that names it as its `menu`. A tooltip hangs off the component named
- * by its `anchor`. A search view opens from the SearchBar or search app bar that names it as its
- * `expanded`. A snackbar draws in the snackbar slot of the screen's [snackbarScaffold], above its
- * FAB and navigation bar. Every other overlay (a sheet, a dialog, a menu nobody holds) draws at
- * screen level. The renderer and the exporter both follow this, so the preview and the exported
- * code place overlays the same way.
+ * by its `anchor`, and so does a date picker that names one (a docked picker opens below its text
+ * field; a dialog picker is its own window, wherever it is written). A search view opens from the
+ * SearchBar or search app bar that names it as its `expanded`. A snackbar draws in the snackbar
+ * slot of the screen's [snackbarScaffold], above its FAB and navigation bar. Every other overlay (a
+ * sheet, a dialog, a menu nobody holds) draws at screen level. The renderer and the exporter both
+ * follow this, so the preview and the exported code place overlays the same way.
  */
 class OverlayPlacement(private val screen: Screen) {
   private val overlayNames: Set<String> = Catalogs.of(screen).overlayNames
@@ -31,6 +32,14 @@ class OverlayPlacement(private val screen: Screen) {
   private val tooltips: Map<String, String> = buildMap {
     for (node in screen.components) {
       if (node.component != TOOLTIP) continue
+      val anchorId = node.stringProp("anchor") ?: continue
+      putIfAbsent(anchorId, node.id)
+    }
+  }
+
+  private val datePickers: Map<String, String> = buildMap {
+    for (node in screen.components) {
+      if (node.component != DATE_PICKER) continue
       val anchorId = node.stringProp("anchor") ?: continue
       putIfAbsent(anchorId, node.id)
     }
@@ -100,6 +109,9 @@ class OverlayPlacement(private val screen: Screen) {
   /** The id of the menu anchored to [componentId] by `Menu.anchor`, or null. */
   fun menuAt(componentId: String): String? = anchored[componentId]
 
+  /** The id of the date picker anchored to [componentId] by `DatePicker.anchor`, or null. */
+  fun datePickerAt(componentId: String): String? = datePickers[componentId]
+
   /** The id of the tooltip anchored to [componentId] by `Tooltip.anchor`, or null. */
   fun tooltipAt(componentId: String): String? = tooltips[componentId]
 
@@ -144,6 +156,7 @@ class OverlayPlacement(private val screen: Screen) {
     when (node.component) {
       MENU -> node.id in anchored.values || node.id in splitButtonMenus
       TOOLTIP -> node.id in tooltips.values
+      DATE_PICKER -> node.id in datePickers.values
       SEARCH_VIEW -> node.id in expandedViews.values
       else -> false
     }
@@ -154,6 +167,7 @@ class OverlayPlacement(private val screen: Screen) {
     const val SCAFFOLD = "Scaffold"
     const val SNACKBAR = "Snackbar"
     const val TOOLTIP = "Tooltip"
+    const val DATE_PICKER = "DatePicker"
     const val SEARCH_BAR = "SearchBar"
     const val SEARCH_VIEW = "SearchView"
     const val TOP_APP_BAR = "TopAppBar"

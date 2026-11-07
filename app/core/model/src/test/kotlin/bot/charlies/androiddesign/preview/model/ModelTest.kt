@@ -143,7 +143,17 @@ class ModelTest {
       }
     }
     assertEquals(
-      setOf("BottomSheet", "Dialog", "Menu", "SideSheet", "SearchView", "Tooltip", "Snackbar"),
+      setOf(
+        "BottomSheet",
+        "Dialog",
+        "Menu",
+        "SideSheet",
+        "SearchView",
+        "Tooltip",
+        "Snackbar",
+        "DatePicker",
+        "TimePicker",
+      ),
       M3ExpressiveCatalog.overlayNames,
     )
   }
