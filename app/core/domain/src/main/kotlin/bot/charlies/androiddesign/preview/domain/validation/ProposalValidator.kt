@@ -1,8 +1,10 @@
 package bot.charlies.androiddesign.preview.domain.validation
 
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
+import bot.charlies.androiddesign.preview.domain.navigation.NavigationGraph
 import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.Catalogs
+import bot.charlies.androiddesign.preview.model.PaneRole
 import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.ThemeOverride
 import bot.charlies.androiddesign.preview.model.ValidationError
@@ -52,6 +54,54 @@ class ProposalValidator {
           "/navigation/panes".child(screenId),
           "'$screenId' is not a screen of this proposal",
         )
+      }
+    }
+    validatePlaceholders(sink, proposal, catalog)
+  }
+
+  private fun validatePlaceholders(sink: ErrorSink, proposal: Proposal, catalog: Catalog) {
+    val navigation = proposal.navigation
+    if (navigation.placeholders.isEmpty()) return
+    if (!catalog.supportsPanes) {
+      sink.add(
+        "/navigation/placeholders",
+        "${catalog.title} proposals have no panes, so no detail placeholders; remove placeholders",
+      )
+      return
+    }
+    if (PaneRole.Supporting in navigation.panes.values) {
+      sink.add(
+        "/navigation/placeholders",
+        "placeholders fill the detail pane of a list-detail layout; a supporting pane layout has none",
+      )
+      return
+    }
+    val destinations = NavigationGraph(proposal).edges.groupBy { it.to }
+    for ((list, placeholder) in navigation.placeholders) {
+      val path = "/navigation/placeholders".child(list)
+      if (list !in proposal.screens) {
+        sink.add(path, "'$list' is not a screen of this proposal")
+      } else if (navigation.panes[list] != PaneRole.List) {
+        sink.add(path, "'$list' needs the pane role list in navigation.panes to have a placeholder")
+      }
+      when {
+        placeholder !in proposal.screens ->
+          sink.add(path, "placeholder '$placeholder' is not a screen of this proposal")
+        placeholder in navigation.panes ->
+          sink.add(
+            path,
+            "placeholder '$placeholder' is in navigation.panes; remove it from the panes",
+          )
+        placeholder == navigation.start ->
+          sink.add(path, "placeholder '$placeholder' is the start screen; start on a real screen")
+        else ->
+          destinations[placeholder]?.firstOrNull()?.let { edge ->
+            sink.add(
+              path,
+              "screen '${edge.from}' navigates to placeholder '$placeholder' " +
+                "(component '${edge.componentId}'); a placeholder is not a destination",
+            )
+          }
       }
     }
   }

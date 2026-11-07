@@ -102,7 +102,7 @@ material:
 **`design/<slug>.proposal.json`** wraps A2UI content in our own envelope. The A2UI wrapper file allows no keys besides `messages`, so the envelope is ours. It holds:
 - `$schema` and a `format` version
 - an optional `theme` override with the same keys as `DESIGN.md`, for exploring a new look
-- `navigation`: the start screen, plus each screen's pane role
+- `navigation`: the start screen, each screen's pane role, and optionally the screen a list pane's empty detail pane shows (`placeholders`)
 - `screens`: one A2UI `createSurface` body per screen, with its components and its sample `dataModel`
 
 The app only reads the proposal; the agent owns the file and writes it one component per line, so diffs stay readable.

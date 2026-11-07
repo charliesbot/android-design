@@ -174,6 +174,7 @@ The first cell is the catalog component and the prop values that select the patt
 | `contentDescription` | The `contentDescription` parameter, or `Modifier.semantics` | |
 | `navigate`, `back` | Add or remove the destination key on the Navigation 3 back stack shown by `NavDisplay` | |
 | `navigation.panes` | `ListDetailSceneStrategy` or `SupportingPaneSceneStrategy` with each entry's pane metadata | `list`, `detail`, `extra` belong to the list-detail scene; `supporting` to the supporting-pane scene. |
+| `navigation.placeholders` | `ListDetailSceneStrategy.listPane(detailPlaceholder = ...)` on the list's entry, the lambda calling the placeholder screen's composable | The placeholder screen is exported as a composable with no route or entry of its own. |
 | `open`, `dismiss` | The `onClick` that sets the sheet, dialog, or menu visible, and the `onDismissRequest` that hides it | The overlay itself is its Components row. |
 
 ## Wear OS components

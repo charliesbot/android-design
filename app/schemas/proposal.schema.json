@@ -250,6 +250,13 @@
               "extra"
             ]
           }
+        },
+        "placeholders": {
+          "type": "object",
+          "description": "List screen id to the id of the screen drawn in the detail pane while nothing is selected. The placeholder is a screen in no pane that nothing navigates to.",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       },
       "required": [

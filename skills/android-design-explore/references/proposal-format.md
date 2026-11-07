@@ -64,7 +64,7 @@ DESIGN.md may carry keys for other tools; the app ignores names it does not know
 
 - **`format`** is `1`. **`name`** is the title the viewer shows.
 - **`theme`** (optional) takes the same keys as the DESIGN.md front matter and deep-merges over it, key by key. Put a direction's own seed, variant, faces, or styles here so DESIGN.md stays the shared base.
-- **`navigation.start`** names the first screen. **`navigation.panes`** gives a screen a pane role, `list`, `detail`, `supporting`, or `extra`; an unlisted screen is a single pane. At expanded widths a `detail` screen shows beside its `list`. The graph's edges are the `navigate` actions in the screens; there is no separate edge list.
+- **`navigation.start`** names the first screen. **`navigation.panes`** gives a screen a pane role, `list`, `detail`, `supporting`, or `extra`; an unlisted screen is a single pane. At expanded widths a `detail` screen shows beside its `list`. **`navigation.placeholders`** maps a `list` screen to the screen drawn in the detail pane while nothing is selected (`"placeholders": { "plates": "pick_plate" }`): Material shows "placeholder content in the detail pane" of a two-pane layout, and `check_proposal` notes (`empty-detail-pane`) a list pane shown beside an empty one. The placeholder is an ordinary screen in `screens` that is in no pane and that no `navigate` action opens. The graph's edges are the `navigate` actions in the screens; there is no separate edge list.
 - **`screens`** maps a screen id to its content. Screen ids and component ids are identifiers: letters, digits, and underscores, not starting with a digit (`plate_detail`, never `plate-detail`).
 
 ## Screens and components

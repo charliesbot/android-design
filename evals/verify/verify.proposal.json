@@ -23,6 +23,9 @@
     "panes": {
       "home": "list",
       "detail": "detail"
+    },
+    "placeholders": {
+      "home": "pick"
     }
   },
   "screens": {
@@ -722,6 +725,23 @@
           "component": "Text",
           "text": "Right pane",
           "type": "titleMedium"
+        }
+      ]
+    },
+    "pick": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
+      "components": [
+        {
+          "id": "root",
+          "component": "Scaffold",
+          "content": "pick_hint"
+        },
+        {
+          "id": "pick_hint",
+          "component": "Text",
+          "text": "Select an item to see it here.",
+          "type": "bodyLarge",
+          "padding": "lg"
         }
       ]
     },

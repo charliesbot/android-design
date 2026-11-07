@@ -36,6 +36,12 @@ data class Navigation(
   val start: String,
   /** Screen id to its pane role. A screen that is not listed is a single pane. */
   val panes: Map<String, PaneRole> = emptyMap(),
+  /**
+   * List screen id to the id of the screen a list-detail scene draws in its detail pane while
+   * nothing is selected. The placeholder is an ordinary screen that is in no pane and that nothing
+   * navigates to.
+   */
+  val placeholders: Map<String, String> = emptyMap(),
 )
 
 @Serializable

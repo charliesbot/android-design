@@ -8,12 +8,14 @@ import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.Posture
 import androidx.compose.material3.adaptive.WindowAdaptiveInfo
 import androidx.compose.material3.adaptive.layout.PaneScaffoldDirective
+import androidx.compose.material3.adaptive.layout.ThreePaneScaffoldScope
 import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.SupportingPaneSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberSupportingPaneSceneStrategy
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -27,6 +29,7 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
 import androidx.window.core.layout.computeWindowSizeClass
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
+import bot.charlies.androiddesign.preview.domain.navigation.DetailPlaceholders
 import bot.charlies.androiddesign.preview.feature.preview.record.PreviewFrame
 import bot.charlies.androiddesign.preview.feature.preview.record.TreeRecorder
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState
@@ -69,6 +72,11 @@ fun ProposalHost(
   val supportingLayout = PaneRole.Supporting in panes.values
   val listDetail = rememberListDetailSceneStrategy<String>(directive = directive)
   val supporting = rememberSupportingPaneSceneStrategy<String>(directive = directive)
+  val emptyDetail = emptyDetailList(host, directive, supportingLayout)
+  DisposableEffect(recorder, emptyDetail) {
+    emptyDetail?.let { recorder?.reportEmptyDetail(it, empty = true) }
+    onDispose { emptyDetail?.let { recorder?.reportEmptyDetail(it, empty = false) } }
+  }
   // A new size class starts a new NavDisplay: the nav is rebuilt only when the pane count can
   // change. Keeping one would move a screen's content from the pane scaffold, which measures in a
   // lookahead pass, into a one-pane scene, and the moved content keeps a stale lookahead state:
@@ -82,7 +90,15 @@ fun ProposalHost(
       sceneStrategies = listOf(if (supportingLayout) supporting else listDetail),
       onBack = { host.back() },
       entryProvider = { screenId ->
-        NavEntry(screenId, metadata = paneMetadata(panes[screenId], supportingLayout)) {
+        val placeholder: (@Composable ThreePaneScaffoldScope.() -> Unit)? =
+          if (DetailPlaceholders.of(host.proposal, screenId) == null) null
+          else {
+            { DetailPlaceholder(host, screenId, sizeClass, currentRecorder) }
+          }
+        NavEntry(
+          screenId,
+          metadata = paneMetadata(panes[screenId], supportingLayout, placeholder),
+        ) {
           ProposalRenderer(
             host = host,
             screenId = screenId,
@@ -94,6 +110,42 @@ fun ProposalHost(
       },
     )
   }
+}
+
+/**
+ * The list screen the scene shows beside an empty detail pane, if any: the screen on top is a list
+ * pane with no placeholder, and the directive has room for two panes.
+ */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+private fun emptyDetailList(
+  host: ProposalHostState,
+  directive: PaneScaffoldDirective,
+  supportingLayout: Boolean,
+): String? {
+  val top = host.current
+  val isList = host.proposal.navigation.panes[top] == PaneRole.List
+  val twoPanes = directive.maxHorizontalPartitions >= 2
+  return top.takeIf {
+    !supportingLayout && isList && twoPanes && DetailPlaceholders.of(host.proposal, it) == null
+  }
+}
+
+/** The placeholder screen of the list [listScreen], drawn in the detail pane beside it. */
+@Composable
+private fun DetailPlaceholder(
+  host: ProposalHostState,
+  listScreen: String,
+  sizeClass: SizeClass,
+  recorder: TreeRecorder?,
+) {
+  val screenId = DetailPlaceholders.of(host.proposal, listScreen) ?: return
+  ProposalRenderer(
+    host = host,
+    screenId = screenId,
+    sizeClass = sizeClass,
+    recorder = recorder,
+    idPrefix = "$screenId/",
+  )
 }
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
@@ -112,7 +164,11 @@ private fun rememberDirective(frameSize: DpSize): PaneScaffoldDirective =
   }
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
-private fun paneMetadata(role: PaneRole?, supportingLayout: Boolean): Map<String, Any> =
+private fun paneMetadata(
+  role: PaneRole?,
+  supportingLayout: Boolean,
+  detailPlaceholder: (@Composable ThreePaneScaffoldScope.() -> Unit)?,
+): Map<String, Any> =
   when {
     role == null -> emptyMap()
     supportingLayout ->
@@ -124,7 +180,9 @@ private fun paneMetadata(role: PaneRole?, supportingLayout: Boolean): Map<String
       }
     else ->
       when (role) {
-        PaneRole.List -> ListDetailSceneStrategy.listPane()
+        PaneRole.List ->
+          if (detailPlaceholder == null) ListDetailSceneStrategy.listPane()
+          else ListDetailSceneStrategy.listPane(detailPlaceholder = detailPlaceholder)
         PaneRole.Detail,
         PaneRole.Supporting -> ListDetailSceneStrategy.detailPane()
         PaneRole.Extra -> ListDetailSceneStrategy.extraPane()

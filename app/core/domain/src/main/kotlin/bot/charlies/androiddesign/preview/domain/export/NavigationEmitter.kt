@@ -1,5 +1,6 @@
 package bot.charlies.androiddesign.preview.domain.export
 
+import bot.charlies.androiddesign.preview.domain.navigation.DetailPlaceholders
 import bot.charlies.androiddesign.preview.model.PaneRole
 import bot.charlies.androiddesign.preview.model.Proposal
 
@@ -43,21 +44,32 @@ internal class NavigationEmitter(
         val pane = file.use(Sym.SupportingPaneSceneStrategy)
         when (role) {
           PaneRole.List,
-          PaneRole.Detail -> "$pane.mainPane()"
-          PaneRole.Supporting -> "$pane.supportingPane()"
-          PaneRole.Extra -> "$pane.extraPane()"
+          PaneRole.Detail -> Call("$pane.mainPane")
+          PaneRole.Supporting -> Call("$pane.supportingPane")
+          PaneRole.Extra -> Call("$pane.extraPane")
         }
       } else {
         val pane = file.use(Sym.ListDetailSceneStrategy)
         when (role) {
-          PaneRole.List -> "$pane.listPane()"
-          PaneRole.Detail -> "$pane.detailPane()"
-          PaneRole.Extra -> "$pane.extraPane()"
+          PaneRole.List -> listPane(pane, DetailPlaceholders.of(proposal, screen))
+          PaneRole.Detail -> Call("$pane.detailPane")
+          PaneRole.Extra -> Call("$pane.extraPane")
           PaneRole.Supporting -> error("handled by the supporting branch")
         }
       }
     return arg("metadata", call)
   }
+
+  /** `listPane()`, or `listPane(detailPlaceholder = { PickScreen() })` with a placeholder. */
+  private fun listPane(pane: String, placeholder: String?): Call =
+    Call(
+      "$pane.listPane",
+      listOfNotNull(
+        placeholder?.let {
+          arg("detailPlaceholder", lambdaOf(NavRoutes.screenCall(emitters.getValue(it))))
+        },
+      ),
+    )
 
   private fun app(): Decl {
     file.optIn(Sym.ExperimentalMaterial3AdaptiveApi)
@@ -66,7 +78,7 @@ internal class NavigationEmitter(
     val backStack = file.use(Sym.rememberNavBackStack)
     val start = NavRoutes.name(proposal.navigation.start)
     val entries =
-      proposal.screens.keys.map { screen ->
+      NavRoutes.routed(proposal).map { screen ->
         NavRoutes.entry(screen, emitters.getValue(screen), metadata(screen))
       }
     val display =
@@ -99,28 +111,30 @@ internal class NavigationEmitter(
 internal object NavRoutes {
   fun name(screen: String) = Naming.pascal(screen) + "Route"
 
-  /** One `@Serializable` route key per screen. */
+  /** The screens that are destinations: all but the detail placeholders, which have no route. */
+  fun routed(proposal: Proposal): List<String> =
+    (proposal.screens.keys - DetailPlaceholders.screens(proposal)).toList()
+
+  /** One `@Serializable` route key per destination screen. */
   fun declarations(file: FileContext, proposal: Proposal): List<Decl> {
     file.use(Sym.Serializable)
     file.use(Sym.NavKey)
-    return proposal.screens.keys.map {
+    return routed(proposal).map {
       RawDecl(listOf("@Serializable private data object ${name(it)} : NavKey"))
     }
   }
 
-  /** `entry<Route>(metadata) { Screen(onBack = ..., onNavigateToX = ...) }`. */
-  fun entry(screen: String, emitter: ScreenEmitterBase, metadata: Arg?): Stmt {
+  /** `Screen(onBack = ..., onNavigateToX = ...)`, wired to the back stack. */
+  fun screenCall(emitter: ScreenEmitterBase): Call {
     val args = mutableListOf<Arg>()
     if (emitter.usesBack) args += arg("onBack", lambdaOf(Raw("backStack.removeLastOrNull()")))
     emitter.navigateTargets.forEach { target ->
       args += arg(emitter.callbackName(target), lambdaOf(Raw("backStack.add(${name(target)})")))
     }
-    return stmt(
-      Call(
-        "entry<${name(screen)}>",
-        listOfNotNull(metadata),
-        lambda(stmt(Call(emitter.functionName, args))),
-      ),
-    )
+    return Call(emitter.functionName, args)
   }
+
+  /** `entry<Route>(metadata) { Screen(onBack = ..., onNavigateToX = ...) }`. */
+  fun entry(screen: String, emitter: ScreenEmitterBase, metadata: Arg?): Stmt =
+    stmt(Call("entry<${name(screen)}>", listOfNotNull(metadata), lambda(stmt(screenCall(emitter)))))
 }

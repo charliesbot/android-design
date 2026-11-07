@@ -593,6 +593,14 @@ object CatalogJson {
                   "enum" to strings(*PaneRole.entries.map { it.name.lowercase() }.toTypedArray()),
                 ),
             ),
+          "placeholders" to
+            obj(
+              "type" to "object",
+              "description" to
+                "List screen id to the id of the screen drawn in the detail pane while nothing " +
+                  "is selected. The placeholder is a screen in no pane that nothing navigates to.",
+              "additionalProperties" to obj("type" to "string"),
+            ),
         ),
       "required" to strings("start"),
       "additionalProperties" to false,

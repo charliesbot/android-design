@@ -313,6 +313,71 @@ class ProposalValidatorTest {
       .assertHas("/navigation/panes/ghost", "screen")
   }
 
+  private val withPick = base.withPickScreen()
+
+  private fun placeholders(json: String) =
+    withPick.withNavigation(
+      """{"start":"plates","panes":{"plates":"list","plate_detail":"detail"},"placeholders":$json}""",
+    )
+
+  @Test
+  fun `a list screen may declare a placeholder screen`() {
+    assertEquals(emptyList(), errors(placeholders("""{"plates":"pick"}""")))
+  }
+
+  @Test
+  fun `a placeholder key must be a list screen`() {
+    errors(placeholders("""{"ghost":"pick"}"""))
+      .assertHas("/navigation/placeholders/ghost", "not a screen")
+    errors(placeholders("""{"plate_detail":"pick"}"""))
+      .assertHas("/navigation/placeholders/plate_detail", "list")
+    errors(placeholders("""{"pick":"pick"}""")).assertHas("/navigation/placeholders/pick", "list")
+  }
+
+  @Test
+  fun `a placeholder must name a screen`() {
+    errors(placeholders("""{"plates":"ghost"}"""))
+      .assertHas("/navigation/placeholders/plates", "'ghost' is not a screen")
+  }
+
+  @Test
+  fun `a placeholder is in no pane`() {
+    errors(placeholders("""{"plates":"plate_detail"}"""))
+      .assertHas("/navigation/placeholders/plates", "pane")
+  }
+
+  @Test
+  fun `a placeholder is not a navigation destination`() {
+    val p =
+      withPick
+        .with(
+          "more",
+          """{"id":"more","component":"Button","label":"x","action":{"functionCall":{"@call":"navigate","args":{"screen":"pick"}}}}""",
+        )
+        .withNavigation(
+          """{"start":"plates","panes":{"plates":"list","plate_detail":"detail"},"placeholders":{"plates":"pick"}}""",
+        )
+    errors(p).assertHas("/navigation/placeholders/plates", "navigates to")
+  }
+
+  @Test
+  fun `the start screen cannot be a placeholder`() {
+    val p =
+      withPick.withNavigation(
+        """{"start":"pick","panes":{"plates":"list","plate_detail":"detail"},"placeholders":{"plates":"pick"}}""",
+      )
+    errors(p).assertHas("/navigation/placeholders/plates", "start")
+  }
+
+  @Test
+  fun `a supporting pane layout has no placeholders`() {
+    val p =
+      withPick.withNavigation(
+        """{"start":"plates","panes":{"plates":"list","plate_detail":"supporting"},"placeholders":{"plates":"pick"}}""",
+      )
+    errors(p).assertHas("/navigation/placeholders", "supporting")
+  }
+
   @Test
   fun `showIn must list size classes`() {
     val p =
