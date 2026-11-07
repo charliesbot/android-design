@@ -371,4 +371,40 @@ class RadioAndVariantsRenderTest {
     assertSame(active, pixel(result.png, x, b.y + b.height - 12f), "the bottom is filled")
     assertTrue(distance(active, pixel(result.png, x, b.y + 12f)) > 60, "the top is not")
   }
+
+  @Test
+  fun `a menu's groups and items are shaped by the siblings shown at this size`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"stage"},""" +
+          """{"id":"stage","component":"Column","padding":"lg","children":["anchor"]},""" +
+          """{"id":"anchor","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"menu"}}}},""" +
+          """{"id":"menu","component":"Menu","anchor":"anchor","items":["a1","a2","a3"]},""" +
+          """{"id":"a1","component":"MenuGroup","items":["i1"],"showIn":["medium","expanded"]},""" +
+          """{"id":"a2","component":"MenuGroup","items":["i2","i2b"]},""" +
+          """{"id":"a3","component":"MenuGroup","items":["i3"]},""" +
+          """{"id":"i1","component":"MenuItem","label":"One"},""" +
+          """{"id":"i2","component":"MenuItem","label":"Two"},""" +
+          """{"id":"i2b","component":"MenuItem","label":"Two b"},""" +
+          """{"id":"i3","component":"MenuItem","label":"Three"}""",
+      )
+    val compact = render(proposal) { it.interaction.open("home", "menu") }
+    assertFalse(compact.tree.has("a1"), "hidden at compact")
+    val first = compact.tree.node("a2").bounds
+    val second = compact.tree.node("a3").bounds
+    assertTrue(second.y > first.y + first.height, "a gap between the groups shown")
+    // groupShape(0, 2): the first group's top corners are the large outer radius, so the pixel just
+    // inside its corner is outside the rounded shape.
+    val corner = pixel(compact.png, first.x + 4f, first.y + 4f)
+    val container = roleRgb(ColorRole.SurfaceContainer)
+    assertTrue(distance(container, corner) > 24, "the first group's top corner is rounded")
+    // With the hidden group shown, a2 is the second of three and its top corners are square.
+    val medium = render(proposal, view = Views.Tablet) { it.interaction.open("home", "menu") }
+    val middle = medium.tree.node("a2").bounds
+    assertSame(
+      container,
+      pixel(medium.png, middle.x + 4f, middle.y + 4f),
+      "a middle group's corner",
+    )
+  }
 }

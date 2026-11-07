@@ -159,6 +159,22 @@ internal class NodeContext(
       RenderNode(env, ref, id, order + listOf(slot, index), host.at(index, refs.size))
     }
   }
+
+  /**
+   * Like [Children], but each child is told its place among the siblings that show at this size
+   * class, for a parent whose children are shaped by their neighbors (a menu's groups and items),
+   * where a hidden sibling is not a neighbor.
+   */
+  @Composable
+  fun ShownChildren(key: String, slot: Int, host: ChildHost = ChildHost.Flow) {
+    val shown =
+      props.children(key).withIndex().filter { (_, ref) ->
+        env.nodes[ref.id]?.isShownAt(env.sizeClass) == true
+      }
+    shown.forEachIndexed { position, (index, ref) ->
+      RenderNode(env, ref, id, order + listOf(slot, index), host.at(position, shown.size))
+    }
+  }
 }
 
 /** The props of [node] in the frame of [env], with its size class overrides applied. */

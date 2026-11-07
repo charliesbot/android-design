@@ -1705,6 +1705,8 @@ private fun ScreenEmitter.sizeDependent(
   val bySize = linkedMapOf<String, MutableSet<SizeClass>>()
   for (size in sizes) bySize.getOrPut(valueAt(size)) { linkedSetOf() } += size
   val values = bySize.entries.toList()
+  // No size class to draw at: nothing is drawn, so the value is never read.
+  if (values.isEmpty()) return ""
   if (values.size == 1) return values.single().key
   usesSizeClass = true
   return values.dropLast(1).foldRight(values.last().key) { (value, at), rest ->
@@ -2246,6 +2248,10 @@ private fun ScreenEmitter.menuRole(item: ComponentNode, size: SizeClass) =
 private fun ScreenEmitter.menuRoles(item: ComponentNode): Set<MenuSpec.Role> =
   SizeClass.entries.filter(item::isShownAt).map { menuRole(item, it) }.toSet()
 
+/** The components [key] lists on [node] at any size class that are shown at some size class. */
+private fun ScreenEmitter.drawnIds(node: ComponentNode, key: String): List<ComponentNode> =
+  listedIds(node, key).mapNotNull(byId::get).filter { n -> SizeClass.entries.any(n::isShownAt) }
+
 /** The ids [key] lists on [node] at [size] that are shown there, in order. */
 private fun ScreenEmitter.shownAt(node: ComponentNode, key: String, size: SizeClass): List<String> =
   (effectiveProps(node, size)[key].childItems() as? ChildItems.Listed)?.ids.orEmpty().filter {
@@ -2306,7 +2312,7 @@ internal fun ScreenEmitter.menuStatements(menu: ComponentNode): List<Stmt> {
   val p = effectiveProps(menu, SizeClass.Compact)
   val shown = overlayVar(menu.id)
   val vibrant = p.literal("colors") == ColorStyle.VIBRANT
-  val listed = listedIds(menu, "items").mapNotNull(byId::get)
+  val listed = drawnIds(menu, "items")
   // A menu of items is one group; a menu of groups holds each group, a gap apart.
   val groups =
     if (listed.any { it.component == "MenuGroup" }) {
@@ -2342,7 +2348,7 @@ private fun ScreenEmitter.menuGroup(node: ComponentNode, p: JsonObject, place: P
   val position =
     if (menu == null) ListPosition(false, "0", "1")
     else positionIn(menu, "items", node.id, "MenuGroup")
-  val items = listedIds(node, "items").mapNotNull(byId::get)
+  val items = drawnIds(node, "items")
   val selection =
     if (items.any { MenuSpec.Role.Single in menuRoles(it) }) {
       ChipSelection(stateName(node.id, "Selected"))

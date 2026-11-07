@@ -179,14 +179,18 @@ internal fun RenderMenu(ctx: NodeContext) {
     DropdownMenuPopup(expanded = true, onDismissRequest = { ctx.env.act(ActionCall.Dismiss) }) {
       if (ctx.hasGroups()) {
         // The popup is itself a column: groups sit in it directly, each as wide as its content.
-        ctx.Children("items", 0, ChildHost(fillWidth = false, column = this, vibrantMenu = vibrant))
+        ctx.ShownChildren(
+          "items",
+          0,
+          ChildHost(fillWidth = false, column = this, vibrantMenu = vibrant),
+        )
       } else {
         DropdownMenuGroup(
           shapes = MenuDefaults.groupShape(0, 1),
           modifier = ctx.modifier(),
           containerColor = menuContainer(ctx.env, vibrant),
         ) {
-          ctx.Children(
+          ctx.ShownChildren(
             "items",
             0,
             ChildHost(
@@ -219,7 +223,7 @@ internal fun RenderMenuGroup(ctx: NodeContext) {
     modifier = ctx.modifier(),
     containerColor = menuContainer(ctx.env, vibrant),
   ) {
-    ctx.Children(
+    ctx.ShownChildren(
       "items",
       0,
       ChildHost(

@@ -1089,6 +1089,20 @@ internal val componentCases: List<ComponentCase> =
         listOf("var iChecked by remember { mutableStateOf(if (!atLeastMedium) false else true) }"),
     ),
     case(
+      "MenuItem",
+      "MenuGroup",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","items":["a","h"]}""",
+          """{"id":"a","component":"MenuItem","label":"Shown"}""",
+          """{"id":"h","component":"MenuItem","label":"Hidden","role":"multi","showIn":[]}""",
+        ),
+      expect = listOf("itemShape(0, 1)", "Text(\"Shown\")"),
+      reject = listOf("Hidden", "hChecked"),
+    ),
+    case(
       "RadioGroup",
       components =
         listOf(
