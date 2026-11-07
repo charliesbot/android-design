@@ -850,7 +850,7 @@ private fun structure(): List<ComponentDef> =
       "Tab",
       listOf(text("label", required = true), icon(), bool("selected"), badge(), action()),
       interactive = true,
-      m3Pages = listOf("tabs"),
+      m3Pages = listOf("tabs", "badges"),
     ),
     ComponentDef(
       "NavigationRail",
@@ -1014,7 +1014,7 @@ private fun actions(): List<ComponentDef> =
         action(),
       ) + interactiveProps,
       interactive = true,
-      m3Pages = listOf("icon-buttons"),
+      m3Pages = listOf("icon-buttons", "badges"),
     ),
     ComponentDef(
       "SplitButton",

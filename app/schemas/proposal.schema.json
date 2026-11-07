@@ -1728,7 +1728,8 @@
       "description": "One tab of a Tabs row. Its content is the screen its action navigates to.",
       "x-compose": "Tab",
       "x-m3-pages": [
-        "tabs"
+        "tabs",
+        "badges"
       ],
       "x-interactive": true,
       "allOf": [
@@ -2280,7 +2281,8 @@
       "description": "A button that shows only an icon.",
       "x-compose": "IconButton, FilledIconButton, FilledTonalIconButton, OutlinedIconButton, IconToggleButton",
       "x-m3-pages": [
-        "icon-buttons"
+        "icon-buttons",
+        "badges"
       ],
       "x-interactive": true,
       "allOf": [
