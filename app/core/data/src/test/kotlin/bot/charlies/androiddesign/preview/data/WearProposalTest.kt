@@ -29,6 +29,18 @@ class WearProposalTest {
   }
 
   @Test
+  fun `an edge button takes an icon or a label, never both or neither`() {
+    val label = """{ "id": "start", "component": "EdgeButton", "label": "Start","""
+    val path = "/screens/home/components/4"
+    errors(fixture.replace(label, "$label \"icon\": \"play_arrow\","))
+      .assertHas(path, "Either an Icon or Text")
+    val icon = """{ "id": "start", "component": "EdgeButton", "icon": "play_arrow","""
+    assertEquals(emptyList(), errors(fixture.replace(label, icon)))
+    val neither = """{ "id": "start", "component": "EdgeButton","""
+    errors(fixture.replace(label, neither)).assertHas(path, "Either an Icon or Text")
+  }
+
+  @Test
   fun `a phone screen cannot use a wear component`() {
     errors(fixture.replace(wearId, phoneId))
       .assertHas("/screens/home/components/0/component", "unknown component 'Screen'")

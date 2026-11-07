@@ -257,8 +257,11 @@ private fun wearActions(): List<ComponentDef> =
       "EdgeButton",
       listOf(
         oneOf("size", *edgeButtonSizes, default = "small"),
-        text("label"),
-        icon(),
+        text("label", description = "Short text. Set exactly one of label or icon."),
+        icon(
+          description =
+            "Material Symbols name, shown instead of a label. Set exactly one of label or icon.",
+        ),
         action(),
       ) + wearButtonProps,
       interactive = true,

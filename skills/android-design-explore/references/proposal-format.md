@@ -144,7 +144,7 @@ A Wear proposal is its own file, `design/<slug>-wear.proposal.json`, and every s
 
 - **`catalogId`**: `https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1`. There is no `navigation.panes`.
 - **Views:** `watch` (204 dp) and `watch-large` (227 dp), round and dark.
-- **Root:** a `Screen`. `scroll` (default `true`) makes its `children` the rows of a scrolling list that scales and fades at the round edge; `scroll: false` stacks them in a fixed box. `timeText` (default `true`) shows the clock, off on dialogs and pickers. `edgeButton` takes the id of one `EdgeButton`, drawn at the bottom edge. On a fixed screen the body ends above the edge button, so everything else must fit the space left; `text-clipped` and `round-edge-clipped` report what does not.
+- **Root:** a `Screen`. `scroll` (default `true`) makes its `children` the rows of a scrolling list that scales and fades at the round edge; `scroll: false` stacks them in a fixed box. `timeText` (default `true`) shows the clock, off on dialogs and pickers. `edgeButton` takes the id of one `EdgeButton`, drawn at the bottom edge. An `EdgeButton` takes exactly one of `label` or `icon`, never both (the API's content is "Either an Icon or Text"); validation rejects both or neither. On a fixed screen the body ends above the edge button, so everything else must fit the space left; `text-clipped` and `round-edge-clipped` report what does not.
 - **Components:** the Wear catalog lists them (`get_catalog`). A dialog (`AlertDialog`, `ConfirmationDialog`) is an overlay in the same screen: `open` it from a control.
 - **Roles:** colors and types are Wear role names, never hex. Wear has `primaryDim`, `surfaceContainerHigh`, and `errorDim` but no `surface`; its types include `numeral*` and `display*`.
 - **`large`:** the only `sizeClass` key, applied from 225 dp (`watch-large`): `"sizeClass": {"large": {"type": "numeralExtraLarge"}}`. A `large` override only adds value.
@@ -163,7 +163,7 @@ A Wear proposal is its own file, `design/<slug>-wear.proposal.json`, and every s
         { "id": "root", "component": "Screen", "edgeButton": "start", "children": ["header", "time"] },
         { "id": "header", "component": "ListHeader", "text": "Timer" },
         { "id": "time", "component": "Text", "text": "05:00", "type": "numeralLarge", "color": "primaryDim", "align": "center", "sizeClass": { "large": { "type": "numeralExtraLarge" } } },
-        { "id": "start", "component": "EdgeButton", "label": "Start", "icon": "play_arrow", "primary": true }
+        { "id": "start", "component": "EdgeButton", "label": "Start", "primary": true }
       ]
     }
   }

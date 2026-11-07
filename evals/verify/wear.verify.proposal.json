@@ -14,7 +14,7 @@
         { "id": "go_controls", "component": "Button", "variant": "child", "label": "Controls", "action": {"functionCall": {"@call": "navigate", "args": {"screen": "slider"}}} },
         { "id": "go_ring", "component": "Button", "variant": "child", "label": "Ring", "action": {"functionCall": {"@call": "navigate", "args": {"screen": "ring"}}} },
         { "id": "go_toggles", "component": "Button", "variant": "child", "label": "Toggles", "action": {"functionCall": {"@call": "navigate", "args": {"screen": "toggles"}}} },
-        { "id": "start", "component": "EdgeButton", "label": "Start", "icon": "play_arrow", "primary": true, "action": {"functionCall": {"@call": "open", "args": {"overlay": "done"}}} },
+        { "id": "start", "component": "EdgeButton", "label": "Start", "primary": true, "action": {"functionCall": {"@call": "open", "args": {"overlay": "done"}}} },
         { "id": "sure", "component": "AlertDialog", "icon": "restart_alt", "title": "Reset timer?", "text": "The countdown starts over.", "confirm": "yes", "dismiss": "no" },
         { "id": "yes", "component": "IconButton", "variant": "filled", "icon": "check", "contentDescription": "Reset", "primary": true, "action": {"functionCall": {"@call": "dismiss"}} },
         { "id": "no", "component": "IconButton", "variant": "filledTonal", "icon": "close", "contentDescription": "Cancel", "action": {"functionCall": {"@call": "dismiss"}} },
@@ -104,7 +104,7 @@
         { "id": "ring", "component": "CircularProgressIndicator", "progress": 0.6 },
         { "id": "center", "component": "Box", "contentAlignment": "center", "children": ["time"] },
         { "id": "time", "component": "Text", "text": "03:00", "type": "numeralSmall", "color": "primaryDim", "align": "center", "sizeClass": {"large": {"type": "numeralMedium"}} },
-        { "id": "pause", "component": "EdgeButton", "size": "small", "label": "Pause", "icon": "pause", "primary": true, "action": {"functionCall": {"@call": "navigate", "args": {"screen": "segments"}}} }
+        { "id": "pause", "component": "EdgeButton", "size": "small", "label": "Pause", "primary": true, "action": {"functionCall": {"@call": "navigate", "args": {"screen": "segments"}}} }
       ]
     },
     "segments": {

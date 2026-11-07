@@ -243,7 +243,7 @@ class WearRenderTest {
         {"id":"root","component":"Screen","scroll":false,"edgeButton":"pause","children":["col"]},
         {"id":"col","component":"Column","horizontalAlignment":"center","arrangement":"center","children":["t"]},
         {"id":"t","component":"Text","text":"Running","align":"center"},
-        {"id":"pause","component":"EdgeButton","label":"Pause","icon":"pause"}]}}}
+        {"id":"pause","component":"EdgeButton","label":"Pause"}]}}}
       """
         .trimIndent()
     val parsed = assertIs<ProposalParse.Parsed>(ProposalCodec.parse(json)).proposal

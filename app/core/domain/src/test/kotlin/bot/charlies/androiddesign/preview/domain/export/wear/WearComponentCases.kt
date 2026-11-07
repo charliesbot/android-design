@@ -147,14 +147,14 @@ internal val wearCases: List<WearCase> =
         listOf(
           root("t", props = """"timeText":true,"edgeButton":"go""""),
           """{"id":"t","component":"Text","text":"Hi"}""",
-          """{"id":"go","component":"EdgeButton","size":"medium","label":"Start","icon":"play_arrow"}""",
+          """{"id":"go","component":"EdgeButton","size":"medium","icon":"play_arrow"}""",
         ),
       expect =
         listOf(
-          "edgeButton = { EdgeButton(onClick = {}, buttonSize = EdgeButtonSize.Medium) { Icon(painterResource(R.drawable.play_arrow), contentDescription = null, modifier = Modifier.size(EdgeButtonDefaults.iconSizeFor(EdgeButtonSize.Medium))) Text(\"Start\") } }",
+          "edgeButton = { EdgeButton(onClick = {}, buttonSize = EdgeButtonSize.Medium) { Icon(painterResource(R.drawable.play_arrow), contentDescription = null, modifier = Modifier.size(EdgeButtonDefaults.iconSizeFor(EdgeButtonSize.Medium))) } }",
         ),
       // The button sits in the scaffold's slot, not in the list.
-      reject = listOf("item { EdgeButton"),
+      reject = listOf("item { EdgeButton", "Text(\"Start\")"),
     ),
     WearCase(
       covers = listOf("ButtonGroup"),

@@ -72,7 +72,7 @@ fun WearAppTheme(content: @Composable () -> Unit) {
 
 ## Primary action
 
-One prominent action per screen. On a scrolling screen it is usually the **edge button** at the end of the list: filled `primary`, a label (and icon) the user can read at a glance. On a non-scrolling screen use an edge button when space allows, otherwise one filled icon button among lower-emphasis neighbors. Supporting actions are tonal, outlined, or child buttons; more than one bottom action goes in a button stack or a two-icon button group. If nothing is clearly main, pair `tertiary` and `primary` with `secondaryContainer`.
+One prominent action per screen. On a scrolling screen it is usually the **edge button** at the end of the list: filled `primary`, with either a short label the user can read at a glance or a single clear icon (the API takes one or the other, never both). On a non-scrolling screen use an edge button when space allows, otherwise one filled icon button among lower-emphasis neighbors. Supporting actions are tonal, outlined, or child buttons; more than one bottom action goes in a button stack or a two-icon button group. If nothing is clearly main, pair `tertiary` and `primary` with `secondaryContainer`.
 
 ## Expressive components
 

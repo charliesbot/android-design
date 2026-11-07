@@ -445,8 +445,11 @@ internal fun shape(name: String = "shape") = PropDef(name, PropKind.Shape)
 internal fun spacing(name: String, description: String = "") =
   PropDef(name, PropKind.Spacing, description = description)
 
-internal fun icon(name: String = "icon", required: Boolean = false) =
-  PropDef(name, PropKind.Icon, required, "Material Symbols name, such as \"home\".")
+internal fun icon(
+  name: String = "icon",
+  required: Boolean = false,
+  description: String = "Material Symbols name, such as \"home\".",
+) = PropDef(name, PropKind.Icon, required, description)
 
 internal fun action() = PropDef("action", PropKind.Action, description = "What a tap does.")
 

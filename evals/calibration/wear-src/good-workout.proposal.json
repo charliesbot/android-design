@@ -11,7 +11,7 @@
         { "id": "time", "component": "Text", "text": "24:18", "type": "numeralLarge", "color": "primary", "align": "center", "sizeClass": { "large": { "type": "numeralExtraLarge" } } },
         { "id": "stats", "component": "Text", "text": "3.1 of 5 km", "type": "bodySmall", "color": "onSurface", "align": "center" },
         { "id": "stats2", "component": "Text", "text": "148 bpm  5:12 /km", "type": "bodySmall", "color": "onSurfaceVariant", "align": "center" },
-        { "id": "pause", "component": "EdgeButton", "label": "Pause", "icon": "pause", "primary": true }
+        { "id": "pause", "component": "EdgeButton", "label": "Pause", "primary": true }
       ]
     }
   }
