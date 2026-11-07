@@ -138,6 +138,11 @@ enum class ComponentGroup {
  * @property stretchesChildren True when the parent lets its children stretch to its width (a Column
  *   does; a Row does not, since that would push its siblings out: they use `weight`). The renderer
  *   and the exporter both read these two, so a stretched child looks the same in both.
+ * @property m3Pages The slugs of the Material 3 component pages this entry implements
+ *   (`sources/m3.material.io/pages/components/<slug>.md`). Entries may share a page (`Tabs` and
+ *   `Tab`), and an entry claims the page of each variant it draws (`FloatingActionButton` claims
+ *   `extended-fab`). Empty for layout primitives and content parts that no page describes. A page
+ *   that no entry claims must be in [Catalog.m3Omissions]; a script test enforces it.
  */
 data class ComponentDef(
   val name: String,
@@ -149,6 +154,7 @@ data class ComponentDef(
   val overlay: Boolean = false,
   val width: WidthFill = WidthFill.Never,
   val stretchesChildren: Boolean = false,
+  val m3Pages: List<String> = emptyList(),
 ) {
   fun prop(name: String): PropDef? = props.firstOrNull { it.name == name }
 
@@ -179,6 +185,30 @@ data class ComponentDef(
   /** The catalog default of prop [name], or null when it is not a prop or has no default. */
   fun defaultOf(name: String): JsonPrimitive? = prop(name)?.default
 }
+
+/** Why the catalog does not draw a Material 3 component page. */
+enum class OmissionReason(val wire: String) {
+  /** Material no longer recommends the component, and names its replacement. */
+  Retired("retired"),
+
+  /** Material specifies it, but Compose has no API for it yet on the build that renders it. */
+  NoComposeApi("no-compose-api"),
+}
+
+/**
+ * A Material 3 component page the catalog deliberately does not draw.
+ *
+ * @property page The page slug, as in [ComponentDef.m3Pages].
+ * @property why One sentence: what replaces it, or what Compose lacks.
+ * @property waitsFor For [OmissionReason.NoComposeApi], the desktop material3 version that is
+ *   expected to bring the API, when known.
+ */
+data class M3Omission(
+  val page: String,
+  val reason: OmissionReason,
+  val why: String,
+  val waitsFor: String? = null,
+)
 
 /** Renderer-only functions an `action` may call. */
 enum class ActionFunction(val wire: String, val argument: String?, val description: String) {
@@ -227,6 +257,10 @@ interface Catalog {
   /** One sentence for the catalog JSON. */
   val description: String
   val components: List<ComponentDef>
+
+  /** Material 3 component pages this catalog deliberately does not draw. */
+  val m3Omissions: List<M3Omission>
+    get() = emptyList()
 
   /** Props every component accepts besides `id`, `component`, `showIn`, `sizeClass` and `style`. */
   val commonProps: List<PropDef>
@@ -341,6 +375,20 @@ object M3ExpressiveCatalog : Catalog {
   const val STYLE = Catalog.STYLE
 
   override val components: List<ComponentDef> by lazy { buildComponents() }
+
+  override val m3Omissions =
+    listOf(
+      M3Omission(
+        "navigation-drawer",
+        OmissionReason.Retired,
+        "Material 3 Expressive no longer recommends it; use an expanded navigation rail.",
+      ),
+      M3Omission(
+        "segmented-buttons",
+        OmissionReason.Retired,
+        "Material 3 Expressive no longer recommends it; use a connected button group.",
+      ),
+    )
 
   private val byName: Map<String, ComponentDef> by lazy { components.associateBy { it.name } }
 
@@ -595,6 +643,7 @@ internal fun layout(): List<ComponentDef> =
       "HorizontalDivider, VerticalDivider",
       listOf(bool("vertical")),
       width = WidthFill.UnlessIs("vertical", "true"),
+      m3Pages = listOf("divider"),
     ),
     ComponentDef(
       "Shape",
@@ -697,6 +746,7 @@ private fun content(): List<ComponentDef> =
       ),
       stretchesChildren = true,
       width = WidthFill.Always,
+      m3Pages = listOf("carousel"),
     ),
   )
 
@@ -754,6 +804,7 @@ private fun structure(): List<ComponentDef> =
         ),
       ),
       width = WidthFill.Always,
+      m3Pages = listOf("app-bars"),
     ),
     ComponentDef(
       "NavigationBar",
@@ -761,6 +812,7 @@ private fun structure(): List<ComponentDef> =
       "Bottom navigation for compact windows.",
       "ShortNavigationBar",
       listOf(children("children", "NavigationBarItem", required = true)),
+      m3Pages = listOf("navigation-bar"),
     ),
     ComponentDef(
       "NavigationBarItem",
@@ -776,6 +828,7 @@ private fun structure(): List<ComponentDef> =
         action(),
       ),
       interactive = true,
+      m3Pages = listOf("navigation-bar", "badges"),
     ),
     ComponentDef(
       "Tabs",
@@ -788,6 +841,7 @@ private fun structure(): List<ComponentDef> =
         children("children", "Tab", required = true),
       ),
       width = WidthFill.Always,
+      m3Pages = listOf("tabs"),
     ),
     ComponentDef(
       "Tab",
@@ -796,6 +850,7 @@ private fun structure(): List<ComponentDef> =
       "Tab",
       listOf(text("label", required = true), icon(), bool("selected"), badge(), action()),
       interactive = true,
+      m3Pages = listOf("tabs", "badges"),
     ),
     ComponentDef(
       "NavigationRail",
@@ -803,6 +858,7 @@ private fun structure(): List<ComponentDef> =
       "Side navigation for medium and expanded windows.",
       "WideNavigationRail",
       listOf(children("children", "NavigationRailItem", required = true), bool("expanded")),
+      m3Pages = listOf("navigation-rail"),
     ),
     ComponentDef(
       "NavigationRailItem",
@@ -818,6 +874,7 @@ private fun structure(): List<ComponentDef> =
         action(),
       ),
       interactive = true,
+      m3Pages = listOf("navigation-rail", "badges"),
     ),
     ComponentDef(
       "FloatingToolbar",
@@ -829,6 +886,7 @@ private fun structure(): List<ComponentDef> =
         oneOf("colors", "standard", "vibrant", default = "standard"),
         children("children", required = true),
       ),
+      m3Pages = listOf("toolbars"),
     ),
     ComponentDef(
       "DockedToolbar",
@@ -841,6 +899,7 @@ private fun structure(): List<ComponentDef> =
         children("children", required = true),
       ),
       width = WidthFill.Always,
+      m3Pages = listOf("toolbars"),
     ),
     ComponentDef(
       "Card",
@@ -855,6 +914,7 @@ private fun structure(): List<ComponentDef> =
       ),
       stretchesChildren = true,
       width = WidthFill.Always,
+      m3Pages = listOf("cards"),
     ),
   )
 
@@ -871,6 +931,7 @@ private fun lists(): List<ComponentDef> =
       ),
       stretchesChildren = true,
       width = WidthFill.Always,
+      m3Pages = listOf("lists"),
     ),
     ComponentDef(
       "ListItem",
@@ -887,6 +948,7 @@ private fun lists(): List<ComponentDef> =
         action(),
       ),
       width = WidthFill.Always,
+      m3Pages = listOf("lists"),
     ),
   )
 
@@ -906,6 +968,7 @@ private fun actions(): List<ComponentDef> =
         action(),
       ) + interactiveProps,
       interactive = true,
+      m3Pages = listOf("buttons"),
     ),
     ComponentDef(
       "ToggleButton",
@@ -921,6 +984,7 @@ private fun actions(): List<ComponentDef> =
         action(),
       ) + interactiveProps,
       interactive = true,
+      m3Pages = listOf("buttons"),
     ),
     ComponentDef(
       "ButtonGroup",
@@ -931,6 +995,7 @@ private fun actions(): List<ComponentDef> =
         oneOf("variant", "standard", "connected", default = "standard"),
         children("children", "Button", "ToggleButton", "IconButton", required = true),
       ),
+      m3Pages = listOf("button-groups"),
     ),
     ComponentDef(
       "IconButton",
@@ -949,6 +1014,7 @@ private fun actions(): List<ComponentDef> =
         action(),
       ) + interactiveProps,
       interactive = true,
+      m3Pages = listOf("icon-buttons", "badges"),
     ),
     ComponentDef(
       "SplitButton",
@@ -963,6 +1029,7 @@ private fun actions(): List<ComponentDef> =
         child("menu", "Menu"),
       ) + interactiveProps,
       interactive = true,
+      m3Pages = listOf("split-button"),
     ),
     ComponentDef(
       "FloatingActionButton",
@@ -988,6 +1055,7 @@ private fun actions(): List<ComponentDef> =
         action(),
       ) + interactiveProps,
       interactive = true,
+      m3Pages = listOf("floating-action-button", "extended-fab"),
     ),
     ComponentDef(
       "FabMenu",
@@ -1000,6 +1068,7 @@ private fun actions(): List<ComponentDef> =
         children("children", "FabMenuItem", required = true),
       ) + interactiveProps,
       interactive = true,
+      m3Pages = listOf("fab-menu"),
     ),
     ComponentDef(
       "FabMenuItem",
@@ -1008,6 +1077,7 @@ private fun actions(): List<ComponentDef> =
       "FloatingActionButtonMenuItem",
       listOf(text("label", required = true), icon(required = true), action()),
       interactive = true,
+      m3Pages = listOf("fab-menu"),
     ),
   )
 
@@ -1025,6 +1095,7 @@ private fun chips(): List<ComponentDef> =
       "AssistChip, ElevatedAssistChip",
       listOf(oneOf("variant", *chipVariants, default = "outlined")) + chipProps(selectable = false),
       interactive = true,
+      m3Pages = listOf("chips"),
     ),
     ComponentDef(
       "FilterChip",
@@ -1033,6 +1104,7 @@ private fun chips(): List<ComponentDef> =
       "FilterChip, ElevatedFilterChip",
       listOf(oneOf("variant", *chipVariants, default = "outlined")) + chipProps(selectable = true),
       interactive = true,
+      m3Pages = listOf("chips"),
     ),
     ComponentDef(
       "InputChip",
@@ -1041,6 +1113,7 @@ private fun chips(): List<ComponentDef> =
       "InputChip",
       chipProps(selectable = true),
       interactive = true,
+      m3Pages = listOf("chips"),
     ),
     ComponentDef(
       "SuggestionChip",
@@ -1049,6 +1122,7 @@ private fun chips(): List<ComponentDef> =
       "SuggestionChip, ElevatedSuggestionChip",
       listOf(oneOf("variant", *chipVariants, default = "outlined")) + chipProps(selectable = false),
       interactive = true,
+      m3Pages = listOf("chips"),
     ),
     ComponentDef(
       "ChipGroup",
@@ -1067,6 +1141,7 @@ private fun chips(): List<ComponentDef> =
         bool("multi", "Allows more than one selected chip."),
       ),
       width = WidthFill.Always,
+      m3Pages = listOf("chips"),
     ),
   )
 
@@ -1091,6 +1166,7 @@ private fun inputs(): List<ComponentDef> =
         action(),
       ) + interactiveProps,
       interactive = true,
+      m3Pages = listOf("switch"),
     ),
     ComponentDef(
       "Checkbox",
@@ -1108,6 +1184,7 @@ private fun inputs(): List<ComponentDef> =
         action(),
       ) + interactiveProps,
       interactive = true,
+      m3Pages = listOf("checkbox"),
     ),
     ComponentDef(
       "Slider",
@@ -1138,6 +1215,7 @@ private fun inputs(): List<ComponentDef> =
       ) + interactiveProps,
       interactive = true,
       width = WidthFill.UnlessIs("orientation", "vertical"),
+      m3Pages = listOf("sliders"),
     ),
     ComponentDef(
       "RangeSlider",
@@ -1151,6 +1229,7 @@ private fun inputs(): List<ComponentDef> =
       ) + interactiveProps,
       interactive = true,
       width = WidthFill.Always,
+      m3Pages = listOf("sliders"),
     ),
     ComponentDef(
       "RadioGroup",
@@ -1160,6 +1239,7 @@ private fun inputs(): List<ComponentDef> =
       listOf(children("children", "RadioButton", required = true)),
       stretchesChildren = true,
       width = WidthFill.Always,
+      m3Pages = listOf("radio-button"),
     ),
     ComponentDef(
       "RadioButton",
@@ -1169,6 +1249,7 @@ private fun inputs(): List<ComponentDef> =
       listOf(text("label", required = true), bool("selected"), action()) + interactiveProps,
       interactive = true,
       width = WidthFill.Always,
+      m3Pages = listOf("radio-button"),
     ),
     ComponentDef(
       "TextField",
@@ -1189,6 +1270,7 @@ private fun inputs(): List<ComponentDef> =
       ) + interactiveProps,
       interactive = true,
       width = WidthFill.Always,
+      m3Pages = listOf("text-fields"),
     ),
     ComponentDef(
       "SearchBar",
@@ -1228,6 +1310,7 @@ private fun inputs(): List<ComponentDef> =
       ) + interactiveProps,
       interactive = true,
       width = WidthFill.Always,
+      m3Pages = listOf("search"),
     ),
   )
 
@@ -1239,6 +1322,7 @@ private fun feedback(): List<ComponentDef> =
       "An expressive indeterminate loading indicator.",
       "LoadingIndicator, ContainedLoadingIndicator",
       listOf(bool("contained")),
+      m3Pages = listOf("loading-indicator"),
     ),
     ComponentDef(
       "ProgressIndicator",
@@ -1251,6 +1335,7 @@ private fun feedback(): List<ComponentDef> =
         num("progress", "Completed fraction.", NumberBounds(0.0, 1.0)),
       ),
       width = WidthFill.UnlessIs("shape", "circular"),
+      m3Pages = listOf("progress-indicators"),
     ),
   )
 
@@ -1264,6 +1349,7 @@ private fun overlays(): List<ComponentDef> =
       listOf(children("content", required = true)),
       overlay = true,
       stretchesChildren = true,
+      m3Pages = listOf("bottom-sheets"),
     ),
     ComponentDef(
       "Dialog",
@@ -1289,6 +1375,7 @@ private fun overlays(): List<ComponentDef> =
       ),
       overlay = true,
       stretchesChildren = true,
+      m3Pages = listOf("dialogs"),
     ),
     ComponentDef(
       "DatePicker",
@@ -1315,6 +1402,7 @@ private fun overlays(): List<ComponentDef> =
         ),
       ),
       overlay = true,
+      m3Pages = listOf("date-pickers"),
     ),
     ComponentDef(
       "TimePicker",
@@ -1333,6 +1421,7 @@ private fun overlays(): List<ComponentDef> =
         ),
       ),
       overlay = true,
+      m3Pages = listOf("time-pickers"),
     ),
     ComponentDef(
       "Menu",
@@ -1358,6 +1447,7 @@ private fun overlays(): List<ComponentDef> =
       ),
       overlay = true,
       stretchesChildren = true,
+      m3Pages = listOf("menus"),
     ),
     ComponentDef(
       "MenuGroup",
@@ -1367,6 +1457,7 @@ private fun overlays(): List<ComponentDef> =
       "DropdownMenuGroup with MenuDefaults.groupShape(index, count)",
       listOf(children("items", "MenuItem", required = true)),
       stretchesChildren = true,
+      m3Pages = listOf("menus"),
     ),
     ComponentDef(
       "MenuItem",
@@ -1390,6 +1481,7 @@ private fun overlays(): List<ComponentDef> =
         action(),
       ),
       interactive = true,
+      m3Pages = listOf("menus"),
     ),
     ComponentDef(
       "SideSheet",
@@ -1410,6 +1502,7 @@ private fun overlays(): List<ComponentDef> =
       ),
       overlay = true,
       stretchesChildren = true,
+      m3Pages = listOf("side-sheets"),
     ),
     ComponentDef(
       "SearchView",
@@ -1425,6 +1518,7 @@ private fun overlays(): List<ComponentDef> =
       ),
       overlay = true,
       stretchesChildren = true,
+      m3Pages = listOf("search"),
     ),
     ComponentDef(
       "Tooltip",
@@ -1444,6 +1538,7 @@ private fun overlays(): List<ComponentDef> =
         ),
       ),
       overlay = true,
+      m3Pages = listOf("tooltips"),
     ),
     ComponentDef(
       "Snackbar",
@@ -1458,6 +1553,7 @@ private fun overlays(): List<ComponentDef> =
         bool("dismiss", "Shows a close icon that dismisses the snackbar."),
       ),
       overlay = true,
+      m3Pages = listOf("snackbar"),
     ),
   )
 

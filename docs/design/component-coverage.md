@@ -60,7 +60,7 @@ Two parts of Material's carousel guidance have no Compose API, so the catalog do
 - **Uncontained multi-aspect ratio:** `HorizontalUncontainedCarousel` takes one `itemWidth` for every item, and the layout exists to give items different widths.
 - **Vertical full-screen feeds:** Material describes full-screen as suited to "vertically-scrolling video or image feeds", and every Compose carousel is horizontal. A vertical feed would be a `VerticalPager`, which has no carousel masking, so it is not a carousel and stays out.
 
-Both are recorded as `no-compose-api` omissions (see Staying current), so a material3 release that adds them is noticed.
+They sit inside the claimed `carousel` page, so no page-level omission records them. The material3 upgrade review checks them by hand (see Staying current, Compose adds an API).
 
 ### Snackbar
 
@@ -116,6 +116,8 @@ Selection counts and the compact-only full-screen dialog are validator rules ins
 
 ## Staying current
 
+Implemented: `ComponentDef.m3Pages`, `Catalog.m3Omissions` and `scripts/test_m3_page_coverage.py`. The `all-buttons` chooser is the only page the test exempts. Today the omissions are `navigation-drawer` and `segmented-buttons` (both `retired`); no whole page is `no-compose-api`, because the carousel gaps above are layouts inside the claimed `carousel` page.
+
 Material and Compose change on separate schedules, so coverage can drift in three ways, and each has its own signal.
 
 ### Material adds or retires a component
@@ -124,8 +126,8 @@ Material and Compose change on separate schedules, so coverage can drift in thre
 
 The registry closes that link:
 
-- Each `ComponentDef` names the M3 page it implements (`m3Page`, a slug such as `carousel`). Several entries may share a page (`Tabs` and `Tab`), and a page may be claimed by a variant of another entry (`extended-fab` by `FloatingActionButton`).
-- The catalog holds an omission list: each M3 page the catalog deliberately does not draw, with a reason of `retired` (navigation drawer, segmented buttons) or `no-compose-api` (carousel multi-aspect and vertical feeds), and a sentence of why.
+- Each `ComponentDef` names the M3 pages it implements (`m3Pages`, slugs such as `carousel`). Several entries may share a page (`Tabs` and `Tab`), and a page may be claimed by a variant of another entry (`extended-fab` by `FloatingActionButton`), or by every entry that takes its prop (`badges`).
+- The catalog holds an omission list: each M3 page the catalog deliberately does not draw, with a reason of `retired` (navigation drawer, segmented buttons) or `no-compose-api` (none today), and a sentence of why.
 - Both are written into `app/schemas/m3-expressive.catalog.json` by `writeSchemas`, which `scripts/test_material3_inventory.py` already reads.
 - A test in `scripts/` fails when a component page in `sources/` (other than the `all-buttons` chooser) is neither claimed nor omitted, and when a claim or omission names a page that no longer exists.
 
@@ -137,7 +139,7 @@ A new variant or configuration on an existing page shows up as that page's diff 
 
 ### Compose adds an API
 
-A component omitted as `no-compose-api` can become possible on a material3 upgrade. Upgrades already regenerate `scripts/material3-inventory.txt` with `material3_inventory.py`, so the upgrade's inventory diff lists every new public name. On each upgrade, read the added top-level names against the `no-compose-api` omissions and against Material components composed from parts (modal side sheet, full-screen dialog, full-screen date picker): a dedicated composable replaces the composition.
+A component omitted as `no-compose-api` can become possible on a material3 upgrade. Upgrades already regenerate `scripts/material3-inventory.txt` with `material3_inventory.py`, so the upgrade's inventory diff lists every new public name. On each upgrade, read the added top-level names against the `no-compose-api` omissions and against Material components composed from parts (modal side sheet, full-screen dialog, full-screen date picker): a dedicated composable replaces the composition. Also read them against the in-page variant gaps, which no omission records: today the carousel's uncontained multi-aspect ratio layout and vertical full-screen feeds (listed under Carousel above). A new carousel API means drawing them.
 
 The desktop build lags Android. The app renders with JetBrains' material3 (1.13.0-beta01, mapped to AndroidX 1.5.0-beta01) while the export sandbox pins AndroidX 1.5.0-alpha29, so an API in the Android inventory may not exist on desktop yet. A component can join the catalog only when both builds have its composables; until then it stays omitted as `no-compose-api` with the desktop version it is waiting for.
 

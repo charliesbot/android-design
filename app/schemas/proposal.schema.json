@@ -1200,6 +1200,9 @@
       "type": "object",
       "description": "A thin separating line.",
       "x-compose": "HorizontalDivider, VerticalDivider",
+      "x-m3-pages": [
+        "divider"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -1428,6 +1431,9 @@
       "type": "object",
       "description": "A horizontally scrolling collection of visual items, clipped to the carousel's item shape.",
       "x-compose": "HorizontalMultiBrowseCarousel, HorizontalCenteredHeroCarousel, HorizontalUncontainedCarousel",
+      "x-m3-pages": [
+        "carousel"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -1518,6 +1524,9 @@
       "type": "object",
       "description": "The screen's top bar.",
       "x-compose": "TopAppBar, CenterAlignedTopAppBar, MediumFlexibleTopAppBar, LargeFlexibleTopAppBar",
+      "x-m3-pages": [
+        "app-bars"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -1580,6 +1589,9 @@
       "type": "object",
       "description": "Bottom navigation for compact windows.",
       "x-compose": "ShortNavigationBar",
+      "x-m3-pages": [
+        "navigation-bar"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -1606,6 +1618,10 @@
       "type": "object",
       "description": "One destination of a NavigationBar.",
       "x-compose": "ShortNavigationBarItem",
+      "x-m3-pages": [
+        "navigation-bar",
+        "badges"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -1669,6 +1685,9 @@
       "type": "object",
       "description": "A row of tabs that switches between sibling views at the same level of hierarchy.",
       "x-compose": "PrimaryTabRow, SecondaryTabRow, PrimaryScrollableTabRow, SecondaryScrollableTabRow",
+      "x-m3-pages": [
+        "tabs"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -1708,6 +1727,10 @@
       "type": "object",
       "description": "One tab of a Tabs row. Its content is the screen its action navigates to.",
       "x-compose": "Tab",
+      "x-m3-pages": [
+        "tabs",
+        "badges"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -1766,6 +1789,9 @@
       "type": "object",
       "description": "Side navigation for medium and expanded windows.",
       "x-compose": "WideNavigationRail",
+      "x-m3-pages": [
+        "navigation-rail"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -1796,6 +1822,10 @@
       "type": "object",
       "description": "One destination of a NavigationRail.",
       "x-compose": "WideNavigationRailItem",
+      "x-m3-pages": [
+        "navigation-rail",
+        "badges"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -1859,6 +1889,9 @@
       "type": "object",
       "description": "A floating toolbar of actions.",
       "x-compose": "HorizontalFloatingToolbar, VerticalFloatingToolbar",
+      "x-m3-pages": [
+        "toolbars"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -1898,6 +1931,9 @@
       "type": "object",
       "description": "A toolbar docked to the bottom of the window, full width, in the Scaffold's bottomBar slot. It replaces the bottom app bar and is never shown with a navigation bar.",
       "x-compose": "FlexibleBottomAppBar",
+      "x-m3-pages": [
+        "toolbars"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -1929,6 +1965,9 @@
       "type": "object",
       "description": "A container for related content.",
       "x-compose": "Card, ElevatedCard, OutlinedCard",
+      "x-m3-pages": [
+        "cards"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -1968,6 +2007,9 @@
       "type": "object",
       "description": "A list of ListItems.",
       "x-compose": "Column of ListItem, or of SegmentedListItem for the segmented variant",
+      "x-m3-pages": [
+        "lists"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -2002,6 +2044,9 @@
       "type": "object",
       "description": "A row with a headline and optional supporting content.",
       "x-compose": "ListItem, SegmentedListItem",
+      "x-m3-pages": [
+        "lists"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -2045,6 +2090,9 @@
       "type": "object",
       "description": "A button.",
       "x-compose": "Button, FilledTonalButton, ElevatedButton, OutlinedButton, TextButton",
+      "x-m3-pages": [
+        "buttons"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -2120,6 +2168,9 @@
       "type": "object",
       "description": "A button with an on and off state.",
       "x-compose": "ToggleButton, FilledTonalToggleButton, ElevatedToggleButton, OutlinedToggleButton",
+      "x-m3-pages": [
+        "buttons"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -2190,6 +2241,9 @@
       "type": "object",
       "description": "Buttons laid out as one group.",
       "x-compose": "ButtonGroup, or a Row of toggle buttons with ButtonGroupDefaults.connected shapes",
+      "x-m3-pages": [
+        "button-groups"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -2226,6 +2280,10 @@
       "type": "object",
       "description": "A button that shows only an icon.",
       "x-compose": "IconButton, FilledIconButton, FilledTonalIconButton, OutlinedIconButton, IconToggleButton",
+      "x-m3-pages": [
+        "icon-buttons",
+        "badges"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -2338,6 +2396,9 @@
       "type": "object",
       "description": "A button with a leading action and a trailing menu.",
       "x-compose": "SplitButtonLayout with SplitButtonDefaults.LeadingButton and TrailingButton",
+      "x-m3-pages": [
+        "split-button"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -2399,6 +2460,10 @@
       "type": "object",
       "description": "The screen's floating action button.",
       "x-compose": "FloatingActionButton, MediumFloatingActionButton, LargeFloatingActionButton, ExtendedFloatingActionButton",
+      "x-m3-pages": [
+        "floating-action-button",
+        "extended-fab"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -2470,6 +2535,9 @@
       "type": "object",
       "description": "A floating action button that expands into a menu of actions.",
       "x-compose": "FloatingActionButtonMenu with ToggleFloatingActionButton",
+      "x-m3-pages": [
+        "fab-menu"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -2520,6 +2588,9 @@
       "type": "object",
       "description": "One action of a FabMenu.",
       "x-compose": "FloatingActionButtonMenuItem",
+      "x-m3-pages": [
+        "fab-menu"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -2553,6 +2624,9 @@
       "type": "object",
       "description": "A chip that starts a smart or automated action.",
       "x-compose": "AssistChip, ElevatedAssistChip",
+      "x-m3-pages": [
+        "chips"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -2606,6 +2680,9 @@
       "type": "object",
       "description": "A chip that toggles a filter.",
       "x-compose": "FilterChip, ElevatedFilterChip",
+      "x-m3-pages": [
+        "chips"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -2663,6 +2740,9 @@
       "type": "object",
       "description": "A chip that represents user input.",
       "x-compose": "InputChip",
+      "x-m3-pages": [
+        "chips"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -2712,6 +2792,9 @@
       "type": "object",
       "description": "A chip that offers a suggestion.",
       "x-compose": "SuggestionChip, ElevatedSuggestionChip",
+      "x-m3-pages": [
+        "chips"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -2765,6 +2848,9 @@
       "type": "object",
       "description": "Chips laid out as one group.",
       "x-compose": "Row with FilterChipDefaults.horizontalArrangement",
+      "x-m3-pages": [
+        "chips"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -2799,6 +2885,9 @@
       "type": "object",
       "description": "An on and off switch.",
       "x-compose": "Switch",
+      "x-m3-pages": [
+        "switch"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -2850,6 +2939,9 @@
       "type": "object",
       "description": "A checkbox with an optional label.",
       "x-compose": "Checkbox",
+      "x-m3-pages": [
+        "checkbox"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -2899,6 +2991,9 @@
       "type": "object",
       "description": "Picks one value from a range.",
       "x-compose": "Slider",
+      "x-m3-pages": [
+        "sliders"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -2968,6 +3063,9 @@
       "type": "object",
       "description": "Picks a start and an end value from a range.",
       "x-compose": "RangeSlider",
+      "x-m3-pages": [
+        "sliders"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -3024,6 +3122,9 @@
       "type": "object",
       "description": "A vertical list of radio buttons. Exactly one is selected, and a tap moves the selection.",
       "x-compose": "Column with Modifier.selectableGroup()",
+      "x-m3-pages": [
+        "radio-button"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -3050,6 +3151,9 @@
       "type": "object",
       "description": "One option of a RadioGroup, with its label. The whole row is the touch target.",
       "x-compose": "RadioButton in a Row with Modifier.selectable(role = Role.RadioButton)",
+      "x-m3-pages": [
+        "radio-button"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -3095,6 +3199,9 @@
       "type": "object",
       "description": "A text input.",
       "x-compose": "TextField, OutlinedTextField",
+      "x-m3-pages": [
+        "text-fields"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -3168,6 +3275,9 @@
       "type": "object",
       "description": "A search field. Tapping it opens the SearchView named by `expanded`.",
       "x-compose": "SearchBar with SearchBarDefaults.InputField and rememberSearchBarState",
+      "x-m3-pages": [
+        "search"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -3235,6 +3345,9 @@
       "type": "object",
       "description": "An expressive indeterminate loading indicator.",
       "x-compose": "LoadingIndicator, ContainedLoadingIndicator",
+      "x-m3-pages": [
+        "loading-indicator"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -3258,6 +3371,9 @@
       "type": "object",
       "description": "A linear or circular progress indicator; indeterminate when progress is absent.",
       "x-compose": "LinearProgressIndicator, CircularProgressIndicator, and the Wavy variants",
+      "x-m3-pages": [
+        "progress-indicators"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -3293,6 +3409,9 @@
       "type": "object",
       "description": "A modal sheet from the bottom edge, with a drag handle.",
       "x-compose": "ModalBottomSheet with BottomSheetDefaults.DragHandle",
+      "x-m3-pages": [
+        "bottom-sheets"
+      ],
       "x-overlay": true,
       "allOf": [
         {
@@ -3317,6 +3436,9 @@
       "type": "object",
       "description": "A modal dialog. Basic is for alerts, quick selection and confirmation. Full-screen is for tasks with several steps, keyboard input or changes that are not saved at once, and only for compact windows: from medium up, use a basic dialog.",
       "x-compose": "AlertDialog; full-screen: Dialog (full window) holding a Scaffold with a TopAppBar, composed; no full-screen dialog composable",
+      "x-m3-pages": [
+        "dialogs"
+      ],
       "x-overlay": true,
       "allOf": [
         {
@@ -3372,6 +3494,9 @@
       "type": "object",
       "description": "A date or date range picker. Modal is a calendar in a dialog, modal-input is keyboard entry in a dialog, docked is a dropdown calendar below the text field named by `anchor`, and full-screen (compact windows) fills the window. Dates are ISO (\"2026-11-06\") and the picker opens on the month of the selected one.",
       "x-compose": "DatePickerDialog holding DatePicker or DateRangePicker; docked: Popup below the text field; full-screen: Dialog (full window) holding a Scaffold, composed",
+      "x-m3-pages": [
+        "date-pickers"
+      ],
       "x-overlay": true,
       "allOf": [
         {
@@ -3426,6 +3551,9 @@
       "type": "object",
       "description": "A time picker in a dialog: a dial, or keyboard entry (input). The keyboard icon switches between them. Whether the clock is 12 or 24 hours is the device's setting; `is24Hour` only sets it for the preview.",
       "x-compose": "TimePickerDialog holding TimePicker or TimeInput",
+      "x-m3-pages": [
+        "time-pickers"
+      ],
       "x-overlay": true,
       "allOf": [
         {
@@ -3464,6 +3592,9 @@
       "type": "object",
       "description": "A popup menu anchored to a component.",
       "x-compose": "DropdownMenuPopup with DropdownMenuGroup and DropdownMenuItem",
+      "x-m3-pages": [
+        "menus"
+      ],
       "x-overlay": true,
       "allOf": [
         {
@@ -3505,6 +3636,9 @@
       "type": "object",
       "description": "A group of a Menu, set apart from its neighbors by a gap. Single-select items select within their group.",
       "x-compose": "DropdownMenuGroup with MenuDefaults.groupShape(index, count)",
+      "x-m3-pages": [
+        "menus"
+      ],
       "allOf": [
         {
           "$ref": "#/$defs/ComponentCommon"
@@ -3531,6 +3665,9 @@
       "type": "object",
       "description": "One entry of a Menu.",
       "x-compose": "DropdownMenuItem, SelectableDropdownMenuItem or CheckableDropdownMenuItem",
+      "x-m3-pages": [
+        "menus"
+      ],
       "x-interactive": true,
       "allOf": [
         {
@@ -3578,6 +3715,9 @@
       "type": "object",
       "description": "A modal side sheet on the trailing edge, with a header (title, close icon button) over its content. Optional content beside the main content is a standard side sheet: a screen with pane role supporting.",
       "x-compose": "Dialog (full window) holding a scrim and a Surface, composed; no side sheet composable",
+      "x-m3-pages": [
+        "side-sheets"
+      ],
       "x-overlay": true,
       "allOf": [
         {
@@ -3610,6 +3750,9 @@
       "type": "object",
       "description": "The focused state of a SearchBar or search app bar: its input field over a list of suggestions or results, in the contained style. Full-screen fills the window; docked opens a dropdown below the bar.",
       "x-compose": "ExpandedFullScreenContainedSearchBar or ExpandedDockedSearchBarWithGap, sharing the bar's SearchBarState",
+      "x-m3-pages": [
+        "search"
+      ],
       "x-overlay": true,
       "allOf": [
         {
@@ -3641,6 +3784,9 @@
       "type": "object",
       "description": "A tooltip anchored to a component. Plain describes an icon-only control; rich adds a subhead and up to two text buttons.",
       "x-compose": "TooltipBox with PlainTooltip or RichTooltip",
+      "x-m3-pages": [
+        "tooltips"
+      ],
       "x-overlay": true,
       "allOf": [
         {
@@ -3688,6 +3834,9 @@
       "type": "object",
       "description": "A brief message at the bottom of the screen, in the Scaffold's snackbar slot above the FAB and the navigation bar.",
       "x-compose": "SnackbarHost in Scaffold(snackbarHost), Snackbar via SnackbarHostState.showSnackbar",
+      "x-m3-pages": [
+        "snackbar"
+      ],
       "x-overlay": true,
       "allOf": [
         {

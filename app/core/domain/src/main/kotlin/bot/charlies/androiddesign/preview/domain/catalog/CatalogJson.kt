@@ -9,6 +9,7 @@ import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
+import bot.charlies.androiddesign.preview.model.M3Omission
 import bot.charlies.androiddesign.preview.model.MaterialShape
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.PaneRole
@@ -64,6 +65,7 @@ object CatalogJson {
       "catalogId" to catalog.id,
       "instructions" to instructions(catalog),
       "components" to JsonObject(catalog.components.associate { it.name to component(it, scope) }),
+      "x-m3-omissions" to JsonArray(catalog.m3Omissions.map(::omission)),
       "functions" to JsonObject(ActionFunction.entries.associate { it.wire to function(it) }),
       "\$defs" to
         JsonObject(
@@ -201,12 +203,24 @@ object CatalogJson {
         "description" to JsonPrimitive(def.description),
         "x-compose" to JsonPrimitive(def.compose),
       )
+    if (def.m3Pages.isNotEmpty()) fields["x-m3-pages"] = strings(*def.m3Pages.toTypedArray())
     if (def.interactive) fields["x-interactive"] = JsonPrimitive(true)
     if (def.overlay) fields["x-overlay"] = JsonPrimitive(true)
     fields["allOf"] = JsonArray(listOf(ref(scope.def("ComponentCommon"))))
     fields["properties"] = JsonObject(properties)
     fields["required"] = strings(*required.toTypedArray())
     fields["unevaluatedProperties"] = JsonPrimitive(false)
+    return JsonObject(fields)
+  }
+
+  private fun omission(omission: M3Omission): JsonObject {
+    val fields =
+      linkedMapOf<String, JsonElement>(
+        "page" to JsonPrimitive(omission.page),
+        "reason" to JsonPrimitive(omission.reason.wire),
+        "why" to JsonPrimitive(omission.why),
+      )
+    omission.waitsFor?.let { fields["waitsFor"] = JsonPrimitive(it) }
     return JsonObject(fields)
   }
 

@@ -54,6 +54,27 @@ class CatalogJsonTest {
   }
 
   @Test
+  fun `only layout primitives and content parts name no Material page`() {
+    val pageless = M3ExpressiveCatalog.components.filter { it.m3Pages.isEmpty() }.map { it.name }
+    assertEquals(
+      listOf(
+        "Column",
+        "Row",
+        "Box",
+        "Grid",
+        "FlexBox",
+        "Spacer",
+        "Shape",
+        "Text",
+        "Icon",
+        "Image",
+        "Scaffold",
+      ),
+      pageless,
+    )
+  }
+
+  @Test
   fun `required props are listed as required`() {
     val button = catalog.obj("components").obj("Button")
     val required = button.getValue("required").jsonArray.map { it.jsonPrimitive.content }
