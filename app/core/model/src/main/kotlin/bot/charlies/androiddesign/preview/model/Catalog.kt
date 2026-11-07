@@ -376,7 +376,7 @@ object M3ExpressiveCatalog : Catalog {
 
   /** Names of the navigation components, in the order a view lists them. */
   override val navigationNames: List<String> =
-    listOf("NavigationBar", "NavigationRail", "FloatingToolbar")
+    listOf("NavigationBar", "NavigationRail", "FloatingToolbar", "DockedToolbar")
 }
 
 // region registry definitions

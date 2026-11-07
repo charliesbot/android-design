@@ -34,6 +34,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LargeExtendedFloatingActionButton
 import androidx.compose.material3.LargeFloatingActionButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MediumExtendedFloatingActionButton
 import androidx.compose.material3.MediumFloatingActionButton
 import androidx.compose.material3.OutlinedButton
@@ -329,6 +330,8 @@ internal fun RenderButtonGroup(ctx: NodeContext) {
 internal fun NodeContext.iconButtonLook(ambient: Ambient): Look {
   val toggle = bool("toggle")
   val checked = toggle && bool("checked")
+  // A toolbar's icon buttons rest on the toolbar's content color.
+  val resting = if (host.toolbar) ambient.content else ColorRole.OnSurfaceVariant
   val (container, content) =
     when (enum("variant")) {
       "filled" ->
@@ -339,8 +342,8 @@ internal fun NodeContext.iconButtonLook(ambient: Ambient): Look {
         else ColorRole.SecondaryContainer to ColorRole.OnSecondaryContainer
       "outlined" ->
         if (checked) ColorRole.InverseSurface to ColorRole.InverseOnSurface
-        else ambient.container to ColorRole.OnSurfaceVariant
-      else -> ambient.container to (if (checked) ColorRole.Primary else ColorRole.OnSurfaceVariant)
+        else ambient.container to resting
+      else -> ambient.container to (if (checked) ColorRole.Primary else resting)
     }
   return Look(
     container,
@@ -425,7 +428,9 @@ internal fun RenderIconButton(ctx: NodeContext) {
   val modifier = ctx.modifier().size(container.width, container.height).then(ctx.describedBy())
   val enabled = ctx.enabled
   val variant = ctx.enum("variant")
-  val onSurfaceVariant = env.color(ColorRole.OnSurfaceVariant)
+  // Inside a toolbar the icon takes the toolbar's content color, which differs by its style.
+  val onSurfaceVariant =
+    if (ctx.host.toolbar) LocalContentColor.current else env.color(ColorRole.OnSurfaceVariant)
   val outline = BorderStroke(1.dp, env.color(ColorRole.OutlineVariant))
   val content: @Composable () -> Unit = {
     ctx.WithBadge { SymbolIcon(icon, size = iconSize, filled = toggle && checked.value) }

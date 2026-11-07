@@ -316,4 +316,59 @@ class RadioAndVariantsRenderTest {
     val horizontal = render(sliderScreen(""""variant":"centered"""")).tree.node("s").bounds
     assertTrue(horizontal.width > horizontal.height * 4, "centered stays horizontal")
   }
+
+  /** The pixel in [region] (dp) farthest from [backdrop]: the fully covered color of an icon. */
+  private fun farthest(
+    png: ByteArray,
+    region: bot.charlies.androiddesign.preview.model.Bounds,
+    backdrop: Int,
+  ): Int {
+    val image = image(png)
+    var best = backdrop
+    for (x in (region.x * scale).toInt() until ((region.x + region.width) * scale).toInt()) {
+      for (y in (region.y * scale).toInt() until ((region.y + region.height) * scale).toInt()) {
+        if (x >= image.width || y >= image.height) continue
+        val pixel = image.getRGB(x, y) and 0xFFFFFF
+        if (distance(pixel, backdrop) > distance(best, backdrop)) best = pixel
+      }
+    }
+    return best
+  }
+
+  @Test
+  fun `an icon button in a toolbar takes the toolbar's content color`() {
+    for (toolbar in listOf("DockedToolbar", "FloatingToolbar")) {
+      for (colors in listOf("standard", "vibrant")) {
+        val proposal =
+          singleScreen(
+            """{"id":"root","component":"Scaffold","bottomBar":"bar","content":"t"},""" +
+              """{"id":"bar","component":"$toolbar","colors":"$colors","children":["i"]},""" +
+              """{"id":"i","component":"IconButton","icon":"edit","contentDescription":"Edit"},""" +
+              """{"id":"t","component":"Text","text":"Body"}""",
+          )
+        val result = render(proposal, view = Views.Light)
+        val container = rgb(checkNotNull(result.tree.node("bar").colors?.container))
+        val expected =
+          roleRgb(if (colors == "vibrant") ColorRole.OnPrimaryContainer else ColorRole.OnSurface)
+        val icon = result.tree.node("i")
+        assertEquals(expected, rgb(checkNotNull(icon.colors?.content)), "$toolbar $colors tree")
+        assertSame(expected, farthest(result.png, icon.bounds, container), "$toolbar $colors drawn")
+      }
+    }
+  }
+
+  @Test
+  fun `a vertical slider has zero at the bottom`() {
+    val proposal =
+      singleScreen(
+        stage.replace("\"subject\"", "\"s\"") +
+          """,{"id":"s","component":"Slider","orientation":"vertical","range":[0,100],"value":25}""",
+      )
+    val result = render(proposal)
+    val b = result.tree.node("s").bounds
+    val x = b.x + b.width / 2
+    val active = roleRgb(ColorRole.Primary)
+    assertSame(active, pixel(result.png, x, b.y + b.height - 12f), "the bottom is filled")
+    assertTrue(distance(active, pixel(result.png, x, b.y + 12f)) > 60, "the top is not")
+  }
 }

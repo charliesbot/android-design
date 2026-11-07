@@ -3,6 +3,7 @@ package bot.charlies.androiddesign.preview.domain.export
 import bot.charlies.androiddesign.preview.domain.BadgeContent
 import bot.charlies.androiddesign.preview.domain.CarouselSpec
 import bot.charlies.androiddesign.preview.domain.CollapsingAppBars
+import bot.charlies.androiddesign.preview.domain.ColorStyle
 import bot.charlies.androiddesign.preview.domain.MenuSpec
 import bot.charlies.androiddesign.preview.domain.RadioSpec
 import bot.charlies.androiddesign.preview.domain.SearchBars
@@ -185,6 +186,7 @@ private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Pl
     "Checkbox" -> checkbox(node, p, place)
     "RadioGroup" -> radioGroup(node, p, place)
     "RadioButton" -> radioButton(node, p, place)
+    "MenuGroup" -> menuGroup(node, p, place)
     "Slider" -> slider(node, p, place)
     "RangeSlider" -> rangeSlider(node, p, place)
     "TextField" -> textField(node, p, place)
@@ -985,7 +987,7 @@ private fun ScreenEmitter.floatingToolbar(p: JsonObject, place: Place): List<Stm
   expressive()
   val vertical = p.literal("orientation") == "vertical"
   val colors =
-    if (p.literal("colors") == "vibrant")
+    if (p.literal("colors") == ColorStyle.VIBRANT)
       "${m3("FloatingToolbarDefaults")}.vibrantFloatingToolbarColors()"
     else null
   val over =
@@ -1010,7 +1012,7 @@ private fun ScreenEmitter.floatingToolbar(p: JsonObject, place: Place): List<Stm
 
 private fun ScreenEmitter.dockedToolbar(p: JsonObject, place: Place): List<Stmt> {
   expressive()
-  val vibrant = p.literal("colors") == "vibrant"
+  val vibrant = p.literal("colors") == ColorStyle.VIBRANT
   return one(
     m3("FlexibleBottomAppBar"),
     listOf(
@@ -1288,9 +1290,11 @@ private fun ScreenEmitter.iconButton(node: ComponentNode, p: JsonObject, place: 
       ?.takeIf { it == "narrow" || it == "wide" }
       ?.let { "${m3("IconButtonDefaults.IconButtonWidthOption")}.${Naming.pascal(it)}" }
   val onSurfaceVariant = colorRole("onSurfaceVariant")
+  // Inside a toolbar the button keeps the default colors, which take the toolbar's content color.
+  val inToolbar = place.parentType == "FloatingToolbar" || place.parentType == "DockedToolbar"
   val colors: Expr? =
     when {
-      toggle -> null
+      toggle || inToolbar -> null
       variant == "standard" ->
         Call("$defaults.iconButtonColors", listOf(arg("contentColor", onSurfaceVariant)))
       variant == "outlined" ->
@@ -1715,13 +1719,53 @@ private fun ScreenEmitter.checkbox(node: ComponentNode, p: JsonObject, place: Pl
     )
 }
 
-/** The initial selected child of a group: the first listed child whose `selected` is set. */
-internal fun ScreenEmitter.initiallySelected(ids: List<String>, place: Place): String =
-  ids.firstOrNull { byId[it]?.props?.sampleFlag("selected", place) == true }.orEmpty()
+/** The ids [key] lists on [node] at any size class, in first-seen order. */
+private fun ScreenEmitter.listedIds(node: ComponentNode, key: String): List<String> =
+  SizeClass.entries
+    .flatMap { size ->
+      (effectiveProps(node, size)[key].childItems() as? ChildItems.Listed)?.ids.orEmpty()
+    }
+    .distinct()
+
+/**
+ * The expression for the id a single-selection group starts on: the first listed child that is
+ * shown and `selected` at each size class (and that [counts] there), so a size class override of
+ * `selected` gives a size dependent start, as it does in the previewer and the validator.
+ */
+private fun ScreenEmitter.initialSelection(
+  ids: List<String>,
+  counts: (ComponentNode, SizeClass) -> Boolean = { _, _ -> true },
+): String {
+  val bySize = linkedMapOf<String, MutableSet<SizeClass>>()
+  for (size in SizeClass.entries) {
+    val id =
+      ids
+        .firstOrNull { id ->
+          val child = byId[id]
+          child != null &&
+            child.isShownAt(size) &&
+            counts(child, size) &&
+            effectiveProps(child, size).sampleFlag("selected", Place()) == true
+        }
+        .orEmpty()
+    bySize.getOrPut(id) { linkedSetOf() } += size
+  }
+  val starts = bySize.entries.toList()
+  if (starts.size == 1) return kotlinString(starts.single().key)
+  usesSizeClass = true
+  return starts.dropLast(1).foldRight(kotlinString(starts.last().key)) { (id, sizes), rest ->
+    "if (${condition(sizes)}) ${kotlinString(id)} else $rest"
+  }
+}
+
+/** Whether [id] is the selected child of the group that [this] holds the state of. */
+private fun ChipSelection.picks(id: String) = "$state == ${kotlinString(id)}"
+
+/** The statement that makes [id] the selected child. */
+private fun ChipSelection.choose(id: String): Stmt = Assign(state, "=", Raw(kotlinString(id)))
 
 private fun ScreenEmitter.radioGroup(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
-  val ids = (p["children"].childItems() as? ChildItems.Listed)?.ids.orEmpty()
-  val (name, declaration) = state(node, "Selected", kotlinString(initiallySelected(ids, place)))
+  val (name, declaration) = state(node, "Selected", initialSelection(listedIds(node, "children")))
   val inner = place.copy(chipSelection = ChipSelection(name))
   return listOf(declaration) +
     one(
@@ -1740,13 +1784,9 @@ private fun ScreenEmitter.radioButton(
   place: Place,
 ): List<Stmt> {
   val selection = place.chipSelection
-  val selected =
-    selection?.let { "${it.state} == ${kotlinString(node.id)}" }
-      ?: (p.boolExpr("selected", place) ?: "false")
+  val selected = selection?.picks(node.id) ?: (p.boolExpr("selected", place) ?: "false")
   val action = actionStatements(p["action"], node.id)
-  val onClickBody =
-    (selection?.let { listOf<Stmt>(Assign(it.state, "=", Raw(kotlinString(node.id)))) }
-      ?: emptyList()) + action
+  val onClickBody = listOfNotNull(selection?.choose(node.id)) + action
   val enabledValue = p.boolExpr("enabled", place)?.takeIf { it != "true" }
   val onClick =
     onClickBody
@@ -1860,6 +1900,8 @@ private fun ScreenEmitter.slider(node: ComponentNode, p: JsonObject, place: Plac
         arg("onValueChange", lambda(Assign("$name.value", "=", Raw("it")))),
         modifier(place, p, height),
         enabled(p, place),
+        // Material: zero is at the bottom.
+        if (vertical) arg("topToBottom", "false") else null,
         track,
       ),
     )
@@ -2220,81 +2262,68 @@ internal fun ScreenEmitter.snackbarStatements(node: ComponentNode): List<Stmt> {
   )
 }
 
+private fun ScreenEmitter.menuRole(item: ComponentNode, size: SizeClass) =
+  MenuSpec.role(effectiveProps(item, size).literal("role"))
+
+/** The roles [item] takes at the size classes it is shown at. */
+private fun ScreenEmitter.menuRoles(item: ComponentNode): Set<MenuSpec.Role> =
+  SizeClass.entries.filter(item::isShownAt).map { menuRole(item, it) }.toSet()
+
+/** The listed ids of [key] in [props] that are shown at compact, which is what a menu exports. */
+private fun ScreenEmitter.shownIds(props: JsonObject, key: String): List<String> =
+  (props[key].childItems() as? ChildItems.Listed)?.ids.orEmpty().filter {
+    byId[it]?.isShownAt(SizeClass.Compact) == true
+  }
+
+/**
+ * The state of the items of [unit], a menu group (or a menu of items, which is one group): one
+ * selected id for its single-select items and one flag for each multi-select item. It lives above
+ * the popup so it survives the menu closing, and it covers every size class the roles change at.
+ */
+private fun ScreenEmitter.menuState(unit: ComponentNode): List<Stmt> {
+  val items = listedIds(unit, "items").mapNotNull(byId::get)
+  val declarations = mutableListOf<Stmt>()
+  if (items.any { MenuSpec.Role.Single in menuRoles(it) }) {
+    val initial =
+      initialSelection(items.map { it.id }) { item, size ->
+        menuRole(item, size) == MenuSpec.Role.Single
+      }
+    declarations += state(unit, "Selected", initial).second
+  }
+  items
+    .filter { MenuSpec.Role.Multi in menuRoles(it) }
+    .forEach { item ->
+      val size =
+        SizeClass.entries.first { item.isShownAt(it) && menuRole(item, it) == MenuSpec.Role.Multi }
+      val selected = effectiveProps(item, size).boolExpr("selected", Place()) ?: "false"
+      declarations += state(item, "Checked", selected).second
+    }
+  return declarations
+}
+
 internal fun ScreenEmitter.menuStatements(menu: ComponentNode): List<Stmt> {
   expressive()
   val p = effectiveProps(menu, SizeClass.Compact)
   val shown = overlayVar(menu.id)
-  val vibrant = p.literal("colors") == MenuSpec.COLORS_VIBRANT
-  val defaults = m3("MenuDefaults")
-  val members = (p["items"].childItems() as? ChildItems.Listed)?.ids.orEmpty()
-  val grouped = members.any { byId[it]?.component == "MenuGroup" }
+  val vibrant = p.literal("colors") == ColorStyle.VIBRANT
+  val grouped = listedIds(menu, "items").any { byId[it]?.component == "MenuGroup" }
   // A menu of items is one group; a menu of groups holds each group, a gap apart.
-  val groups: List<Pair<ComponentNode, List<String>>> =
+  val groups =
     if (grouped) {
-      members.mapNotNull(byId::get).map { group ->
-        group to
-          (effectiveProps(group, SizeClass.Compact)["items"].childItems() as? ChildItems.Listed)
-            ?.ids
-            .orEmpty()
+      shownIds(p, "items").mapNotNull(byId::get).filter { it.component == "MenuGroup" }
+    } else {
+      listOf(menu)
+    }
+  val declarations = groups.flatMap { menuState(it) }
+  val inMenu = Place(parentType = "Menu", menuVibrant = vibrant)
+  val drawn =
+    if (grouped) {
+      groups.flatMapIndexed { i, group ->
+        emit(group.id, inMenu.copy(listPosition = ListPosition(false, "$i", "${groups.size}")))
       }
     } else {
-      listOf(menu to members)
+      menuGroup(menu, p, inMenu)
     }
-  val container =
-    if (vibrant) "$defaults.groupVibrantContainerColor" else colorRole("surfaceContainer")
-  val declarations = mutableListOf<Stmt>()
-  val drawn = mutableListOf<Stmt>()
-  groups.forEachIndexed { groupIndex, (group, ids) ->
-    val items = ids.mapNotNull(byId::get)
-    // The state of the items lives above the popup, so it survives the menu closing.
-    val singles = items.filter { MenuSpec.role(it.props.literalRole()) == MenuSpec.Role.Single }
-    var inner = Place(parentType = "Menu", menuVibrant = vibrant)
-    if (singles.isNotEmpty()) {
-      val initial = initiallySelected(singles.map { it.id }, Place())
-      val (name, declaration) = state(group, "Selected", kotlinString(initial))
-      declarations += declaration
-      inner = inner.copy(chipSelection = ChipSelection(name))
-    }
-    items
-      .filter { MenuSpec.role(it.props.literalRole()) == MenuSpec.Role.Multi }
-      .forEach { item ->
-        declarations +=
-          state(item, "Checked", item.props.boolExpr("selected", Place()) ?: "false").second
-      }
-    val content = items.flatMapIndexed { i, item ->
-      emit(
-        item.id,
-        inner.copy(listPosition = ListPosition(false, i.toString(), items.size.toString())),
-      )
-    }
-    if (grouped && groupIndex > 0) {
-      drawn +=
-        stmt(
-          Call(
-            file.use(Sym.Spacer),
-            listOf(
-              pos(
-                Chain(
-                  file.use(Sym.Modifier),
-                  listOf(useModifier("height($defaults.GroupSpacing)")),
-                ),
-              ),
-            ),
-          ),
-        )
-    }
-    drawn +=
-      stmt(
-        Call(
-          m3("DropdownMenuGroup"),
-          listOf(
-            arg("shapes", "$defaults.groupShape($groupIndex, ${groups.size})"),
-            arg("containerColor", container),
-          ),
-          lambda(content),
-        ),
-      )
-  }
   val popup =
     Call(
       m3("DropdownMenuPopup"),
@@ -2307,9 +2336,57 @@ internal fun ScreenEmitter.menuStatements(menu: ComponentNode): List<Stmt> {
   return declarations + stmt(popup)
 }
 
-/** The `role` of a menu item as it is written, or null. */
-private fun JsonObject.literalRole(): String? =
-  (this["role"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+/**
+ * One `DropdownMenuGroup` of a menu, behind the gap that separates it from the group before it. A
+ * `MenuGroup` is placed by its position among its menu's groups; a menu of items is the only group.
+ */
+private fun ScreenEmitter.menuGroup(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
+  val defaults = m3("MenuDefaults")
+  val position = place.listPosition
+  val items = shownIds(p, "items").mapNotNull(byId::get)
+  val selection =
+    if (items.any { MenuSpec.Role.Single in menuRoles(it) }) {
+      ChipSelection(stateName(node.id, "Selected"))
+    } else {
+      null
+    }
+  val inner = Place(parentType = "Menu", menuVibrant = place.menuVibrant, chipSelection = selection)
+  val content = items.flatMapIndexed { i, item ->
+    emit(item.id, inner.copy(listPosition = ListPosition(false, "$i", "${items.size}")))
+  }
+  val container =
+    if (place.menuVibrant) "$defaults.groupVibrantContainerColor" else colorRole("surfaceContainer")
+  val gap =
+    if (position != null && position.index != "0") {
+      listOf(
+        stmt(
+          Call(
+            file.use(Sym.Spacer),
+            listOf(
+              pos(
+                Chain(
+                  file.use(Sym.Modifier),
+                  listOf(useModifier("height($defaults.GroupSpacing)")),
+                ),
+              ),
+            ),
+          ),
+        ),
+      )
+    } else {
+      emptyList()
+    }
+  return gap +
+    one(
+      m3("DropdownMenuGroup"),
+      listOf(
+        arg("shapes", "$defaults.groupShape(${position?.index ?: "0"}, ${position?.count ?: "1"})"),
+        modifier(Place(parentType = "Menu"), p),
+        arg("containerColor", container),
+      ),
+      content,
+    )
+}
 
 private fun ScreenEmitter.menuItem(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val defaults = m3("MenuDefaults")
@@ -2338,10 +2415,8 @@ private fun ScreenEmitter.menuItem(node: ComponentNode, p: JsonObject, place: Pl
       )
     MenuSpec.Role.Single -> {
       val selection = place.chipSelection
-      val picked = selection?.let { "${it.state} == ${kotlinString(node.id)}" } ?: "false"
-      val choose =
-        selection?.let { listOf<Stmt>(Assign(it.state, "=", Raw(kotlinString(node.id)))) }
-          ?: emptyList()
+      val picked = selection?.picks(node.id) ?: "false"
+      val choose = listOfNotNull(selection?.choose(node.id))
       one(
         m3("SelectableDropdownMenuItem"),
         listOf(

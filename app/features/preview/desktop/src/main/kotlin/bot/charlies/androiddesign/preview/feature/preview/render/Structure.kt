@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import bot.charlies.androiddesign.preview.domain.CollapsingAppBars
+import bot.charlies.androiddesign.preview.domain.ColorStyle
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.TypeRole
 
@@ -367,7 +368,7 @@ private fun selectedIcon(ctx: NodeContext, selected: Boolean): String? =
   if (selected) ctx.string("selectedIcon") ?: ctx.string("icon") else ctx.string("icon")
 
 private val NodeContext.vibrant: Boolean
-  get() = enum("colors") == "vibrant"
+  get() = enum("colors") == ColorStyle.VIBRANT
 
 private fun NodeContext.floatingToolbarAmbient() =
   if (vibrant) Ambient(ColorRole.PrimaryContainer, ColorRole.OnPrimaryContainer)
@@ -391,7 +392,7 @@ internal fun RenderFloatingToolbar(ctx: NodeContext) {
           ctx.Children(
             "children",
             0,
-            ChildHost(fillWidth = ctx.def.stretchesChildren, column = this),
+            ChildHost(fillWidth = ctx.def.stretchesChildren, column = this, toolbar = true),
           )
         },
       )
@@ -408,7 +409,7 @@ internal fun RenderFloatingToolbar(ctx: NodeContext) {
             ctx.Children(
               "children",
               0,
-              ChildHost(fillWidth = ctx.def.stretchesChildren, row = this),
+              ChildHost(fillWidth = ctx.def.stretchesChildren, row = this, toolbar = true),
             )
           },
         )
@@ -435,7 +436,11 @@ internal fun RenderDockedToolbar(ctx: NodeContext) {
       containerColor = ctx.env.color(ambient.container),
       contentColor = ctx.env.color(ambient.content),
     ) {
-      ctx.Children("children", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, row = this))
+      ctx.Children(
+        "children",
+        0,
+        ChildHost(fillWidth = ctx.def.stretchesChildren, row = this, toolbar = true),
+      )
     }
   }
 }

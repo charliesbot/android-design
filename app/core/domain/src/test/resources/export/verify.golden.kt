@@ -2150,6 +2150,7 @@ fun InputsScreen(
             state = sliderVerticalState,
             onValueChange = { sliderVerticalState.value = it },
             modifier = Modifier.height(200.dp),
+            topToBottom = false,
           )
           var radioGroupSelected by remember { mutableStateOf("radio_medium") }
           Column(modifier = Modifier.fillMaxWidth().selectableGroup()) {
@@ -2314,13 +2315,7 @@ fun InputsScreen(
                 Icon(painterResource(R.drawable.undo), contentDescription = "Undo")
               }
             }
-            IconButton(
-              onClick = {},
-              colors =
-                IconButtonDefaults.iconButtonColors(
-                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            ) {
+            IconButton(onClick = {}) {
               Icon(painterResource(R.drawable.redo), contentDescription = "Redo")
             }
           }
@@ -3039,31 +3034,13 @@ fun CollectionsScreen(
         containerColor = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
       ) {
-        IconButton(
-          onClick = {},
-          colors =
-            IconButtonDefaults.iconButtonColors(
-              contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        ) {
+        IconButton(onClick = {}) {
           Icon(painterResource(R.drawable.edit), contentDescription = "Edit")
         }
-        IconButton(
-          onClick = {},
-          colors =
-            IconButtonDefaults.iconButtonColors(
-              contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        ) {
+        IconButton(onClick = {}) {
           Icon(painterResource(R.drawable.share), contentDescription = "Share")
         }
-        IconButton(
-          onClick = {},
-          colors =
-            IconButtonDefaults.iconButtonColors(
-              contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        ) {
+        IconButton(onClick = {}) {
           Icon(painterResource(R.drawable.more_vert), contentDescription = "More")
         }
       }

@@ -54,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import bot.charlies.androiddesign.preview.domain.ColorStyle
 import bot.charlies.androiddesign.preview.domain.MenuSpec
 import bot.charlies.androiddesign.preview.domain.SideSheetSpec
 import bot.charlies.androiddesign.preview.domain.TooltipSpec
@@ -114,7 +115,7 @@ private val VibrantMenuAmbient = Ambient(ColorRole.TertiaryContainer, ColorRole.
 
 /** Whether this menu is vibrant: tertiary based and more prominent than the standard one. */
 private val NodeContext.vibrantMenu: Boolean
-  get() = enum("colors") == MenuSpec.COLORS_VIBRANT
+  get() = enum("colors") == ColorStyle.VIBRANT
 
 private fun menuAmbient(vibrant: Boolean) = if (vibrant) VibrantMenuAmbient else MenuAmbient
 

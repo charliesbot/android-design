@@ -18,6 +18,4 @@ object MenuSpec {
 
   /** The role named [wire], else [Role.Action], the catalog default. */
   fun role(wire: String?): Role = Role.entries.firstOrNull { it.wire == wire } ?: Role.Action
-
-  const val COLORS_VIBRANT = "vibrant"
 }

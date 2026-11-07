@@ -227,6 +227,8 @@ internal fun RenderSlider(ctx: NodeContext) {
       state = state,
       onValueChange = change,
       modifier = modifier.height(SliderSpec.VERTICAL_HEIGHT_DP.dp),
+      // Material: zero is at the bottom.
+      topToBottom = false,
       enabled = ctx.enabled,
       track = track,
     )

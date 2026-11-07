@@ -884,6 +884,7 @@ internal val componentCases: List<ComponentCase> =
           "containerColor = MaterialTheme.colorScheme.primaryContainer",
           "contentColor = MaterialTheme.colorScheme.onPrimaryContainer",
         ),
+      reject = listOf("iconButtonColors"),
     ),
     case(
       "DockedToolbar",
@@ -963,7 +964,7 @@ internal val componentCases: List<ComponentCase> =
           "val xState = rememberSliderState(value = 0.5f)",
           "VerticalSlider(",
           "state = xState",
-          "VerticalSlider(state = xState, onValueChange = { xState.value = it }, modifier = Modifier.height(200.dp))",
+          "VerticalSlider(state = xState, onValueChange = { xState.value = it }, modifier = Modifier.height(200.dp), topToBottom = false)",
         ),
       reject = listOf("CenteredTrack"),
     ),
@@ -1003,6 +1004,66 @@ internal val componentCases: List<ComponentCase> =
           "colors = MenuDefaults.itemVibrantColors()",
         ),
       reject = listOf("surfaceContainer", "k1Checked = it showM"),
+    ),
+    case(
+      "FloatingToolbar",
+      components =
+        listOf(
+          """{"id":"root","component":"Scaffold","bottomBar":"x","content":"c"}""",
+          """{"id":"x","component":"FloatingToolbar","colors":"vibrant","children":["i","o"]}""",
+          """{"id":"i","component":"IconButton","icon":"edit","contentDescription":"Edit"}""",
+          """{"id":"o","component":"IconButton","variant":"outlined","icon":"share","contentDescription":"Share"}""",
+          """{"id":"c","component":"Column","children":[]}""",
+        ),
+      expect = listOf("HorizontalFloatingToolbar("),
+      reject = listOf("iconButtonColors", "outlinedIconButtonColors"),
+    ),
+    case(
+      "MenuItem",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","items":["i"]}""",
+          """{"id":"i","component":"MenuItem","label":"Unread","sizeClass":{"medium":{"role":"multi","selected":true}}}""",
+        ),
+      expect =
+        listOf(
+          "var iChecked by remember { mutableStateOf(true) }",
+          "CheckableDropdownMenuItem(",
+          "DropdownMenuItem(",
+        ),
+    ),
+    case(
+      "MenuGroup",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","items":["g1","g2","g3"]}""",
+          """{"id":"g1","component":"MenuGroup","items":["a1"],"showIn":["medium","expanded"]}""",
+          """{"id":"g2","component":"MenuGroup","items":["a2"]}""",
+          """{"id":"g3","component":"MenuGroup","items":["a3"]}""",
+          """{"id":"a1","component":"MenuItem","label":"One"}""",
+          """{"id":"a2","component":"MenuItem","label":"Two"}""",
+          """{"id":"a3","component":"MenuItem","label":"Three"}""",
+        ),
+      expect =
+        listOf("MenuDefaults.groupShape(0, 2)", "MenuDefaults.groupShape(1, 2)", "Text(\"Two\")"),
+      reject = listOf("groupShape(2", "Text(\"One\")"),
+    ),
+    case(
+      "RadioGroup",
+      components =
+        listOf(
+          """{"id":"root","component":"RadioGroup","children":["a","b"]}""",
+          """{"id":"a","component":"RadioButton","label":"Small","selected":true,"sizeClass":{"medium":{"selected":false}}}""",
+          """{"id":"b","component":"RadioButton","label":"Large","sizeClass":{"medium":{"selected":true}}}""",
+        ),
+      expect =
+        listOf(
+          "var rootSelected by remember { mutableStateOf(if (!atLeastMedium) \"a\" else \"b\") }",
+        ),
     ),
     case(
       "Switch",

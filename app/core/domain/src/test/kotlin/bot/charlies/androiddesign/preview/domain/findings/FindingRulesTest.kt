@@ -402,6 +402,14 @@ class FindingRulesTest {
   }
 
   @Test
+  fun `primary-largest ignores buttons inside a docked toolbar`() {
+    val primary = button("cook", primary = true, h = 40f)
+    val toolbar = node("toolbar", "DockedToolbar", y = 800f, w = 411f, h = 80f)
+    val inside = button("more", parent = "toolbar", y = 806f, h = 96f)
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(primary, toolbar, inside))))
+  }
+
+  @Test
   fun `primary-largest ignores toggle buttons inside a floating toolbar`() {
     val primary = button("cook", primary = true, h = 40f)
     val toolbar = node("toolbar", "FloatingToolbar", y = 800f, w = 280f, h = 64f)
