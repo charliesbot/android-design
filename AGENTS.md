@@ -2,7 +2,7 @@
 
 This is the home of the `android-design` and `android-design-explore` agent skills: Material 3 Expressive design judgment for Jetpack Compose, and exploration built on it in a native previewer app. The repository holds the skills, the previewer app, the research the skills are distilled from, and the evals that check them.
 
-**Scope status:** phone, tablet, desktop, and Wear OS app screens are the validated target, with Wear eval cases. Wear tiles, watch faces, and widgets are out of scope: the guidance exists (references and research) but its results do not yet meet the quality bar, so the skills mark it out of scope, with no eval cases and no widget catalog. The previewer draws and exports Wear proposals (`docs/design/wear-os-previewer.md`). Raising tiles and widgets is future work: improve the references, add eval cases and a widget catalog, and widen the skills' descriptions once their renders pass.
+**Scope status:** phone, tablet, desktop, and Wear OS app screens are the validated target, with Wear eval cases. Wear tiles, watch faces, and widgets are out of scope: the guidance exists (references and research) but its results do not yet meet the quality bar, so the skills mark it out of scope, with no eval cases and no widget catalog. The previewer draws and exports Wear proposals (`docs/design/wear-os-previewer.md`). Widen the skills' descriptions to tiles and widgets only once they have eval cases and a widget catalog whose renders pass.
 
 It is charliesbot's personal repository. Optimize for the owner's workflow, not broad applicability.
 
@@ -47,7 +47,18 @@ These are settled. Don't flag them in reviews unless the reasoning no longer hol
 
 ## Verification
 
-After changing either skill, run the evals (`evals/README.md`). After changing a skill's `description`, run the trigger evals (`evals/README.md`, Trigger evals). After changing the rubric, run `evals/calibrate.py` first. After changing `evals/`, run `python3 -m unittest discover evals`. After changing `scripts/`, run `python3 -m unittest discover scripts`. After changing the app, run `cd app && ./gradlew build spotlessCheck`. To upgrade Wear Compose, follow `app/wear/README.md` (Upgrading). After changing the catalog registry, run `cd app && ./gradlew :core:domain:writeSchemas`, commit `app/schemas/`, and give each new component a row in `skills/android-design-explore/references/compose-mapping.md` (`python3 -m unittest discover scripts` fails until it has one). After changing the material3 version of `evals/compose-starter/`, run `python3 scripts/material3_inventory.py`, read the inventory diff against the `no-compose-api` omissions, the components composed from parts, and the in-page variant gaps (the carousel's multi-aspect and vertical layouts), all listed in `docs/design/component-coverage.md` (Staying current), and fix `skills/android-design-explore/references/compose-mapping.md` until `python3 -m unittest discover scripts` passes. After changing `compose-mapping.md`, the app's exporter, or the material3 version, run the manual export check in `evals/README.md`.
+Run the check for every kind of change you made:
+
+- **Either skill:** the evals (`evals/README.md`).
+- **A skill's `description`:** the trigger evals (`evals/README.md`, Trigger evals).
+- **The rubric:** `evals/calibrate.py` first.
+- **`evals/`:** `python3 -m unittest discover evals`.
+- **`scripts/`:** `python3 -m unittest discover scripts`.
+- **The app:** `cd app && ./gradlew build spotlessCheck`.
+- **The catalog registry:** `cd app && ./gradlew :core:domain:writeSchemas`, commit `app/schemas/`, and give each new component a row in `skills/android-design-explore/references/compose-mapping.md` (the scripts tests fail until it has one).
+- **The material3 version of `evals/compose-starter/`:** run `python3 scripts/material3_inventory.py` and read its diff against the gaps listed in `docs/design/component-coverage.md` (Staying current): the `no-compose-api` omissions, the components composed from parts, and the in-page variant gaps. Then fix `compose-mapping.md` until the scripts tests pass.
+- **`compose-mapping.md`, the app's exporter, or the material3 version:** the manual export check in `evals/README.md`.
+- **Wear Compose upgrade:** follow `app/wear/README.md` (Upgrading).
 
 ## Prose
 
@@ -55,14 +66,7 @@ No em-dashes anywhere in this repo's prose (`SKILL.md`, references, docs, `READM
 
 ## Project documentation
 
-- `docs/PRD.md`, when present, defines the project direction and north star.
-- `docs/ARCHITECTURE.md`, when present, describes the current system.
-- `docs/design/`, when present, contains focused design documents.
-- `docs/research/`, when present, contains external API, platform, and technical research.
-- `docs/archive/`, when present, contains non-current documents and is historical context only.
-
-Other project documents can live directly under `docs/`. Use lowercase kebab-case
-filenames except for the fixed `PRD.md` and `ARCHITECTURE.md` names.
+`docs/design/` holds focused design documents and `docs/archive/` holds superseded ones, historical context only. Name new docs in lowercase kebab-case.
 
 ## Task tracking
 
