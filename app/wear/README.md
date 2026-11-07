@@ -137,7 +137,8 @@ the device when a dialog may show.
 2. `python3 scripts/sync_wear_compose.py <version>` (about 10 s; downloads the four `-sources.jar` files and the material3 `.aar` from Google Maven).
 3. `cd app && ./gradlew build spotlessCheck`.
 4. Fix compile errors with shims or exclusions, and record each new one in this README.
-5. Look at `compose/build/renders/*.png` and at a Wear fixture rendered with the CLI.
+5. Set the new version in `WearExporter.WEAR_COMPOSE_VERSION` (`core/domain/.../export/wear/`, named in the exported Kotlin's header) and in `evals/wear-starter/gradle/libs.versions.toml`, then check the exporter's calls against the new API with the Wear export check (`evals/README.md`).
+6. Look at `compose/build/renders/*.png` and at a Wear fixture rendered with the CLI.
 
 ## License
 

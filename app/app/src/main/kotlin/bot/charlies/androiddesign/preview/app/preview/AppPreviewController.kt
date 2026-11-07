@@ -1,5 +1,6 @@
 package bot.charlies.androiddesign.preview.app.preview
 
+import bot.charlies.androiddesign.preview.app.export.KotlinExport
 import bot.charlies.androiddesign.preview.domain.OpenedProposal
 import bot.charlies.androiddesign.preview.domain.PreviewController
 import bot.charlies.androiddesign.preview.domain.PreviewException
@@ -13,7 +14,6 @@ import bot.charlies.androiddesign.preview.domain.ViewState
 import bot.charlies.androiddesign.preview.domain.catalog.CatalogJson
 import bot.charlies.androiddesign.preview.domain.catalog.CatalogSummary
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
-import bot.charlies.androiddesign.preview.domain.export.KotlinExporter
 import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
 import bot.charlies.androiddesign.preview.model.Catalog
@@ -230,7 +230,7 @@ class AppPreviewController(
 
   override suspend fun exportKotlin(screen: String?): String {
     val snapshot = validSnapshot()
-    return KotlinExporter.export(checkNotNull(snapshot.proposal), snapshot.designSystem, screen)
+    return KotlinExport.of(checkNotNull(snapshot.proposal), snapshot.designSystem, screen)
   }
 
   override suspend fun status(): PreviewStatus {

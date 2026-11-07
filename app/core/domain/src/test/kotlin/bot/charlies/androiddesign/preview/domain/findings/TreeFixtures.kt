@@ -7,6 +7,7 @@ import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.NodeColors
 import bot.charlies.androiddesign.preview.model.NodeRoles
+import bot.charlies.androiddesign.preview.model.RingInset
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.TextInfo
 import bot.charlies.androiddesign.preview.model.ViewSpec
@@ -32,6 +33,7 @@ internal fun node(
   typeRole: String? = null,
   content: String? = null,
   container: String? = null,
+  ring: RingInset? = null,
 ) =
   LayoutNode(
     id = id,
@@ -42,6 +44,7 @@ internal fun node(
     bounds = Bounds(x, y, w, h),
     touch = touch,
     text = text,
+    ring = ring,
     roles = typeRole?.let { NodeRoles(type = it) },
     colors = if (content != null || container != null) NodeColors(container, content) else null,
   )

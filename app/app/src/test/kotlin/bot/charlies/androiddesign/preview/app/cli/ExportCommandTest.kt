@@ -1,6 +1,9 @@
 package bot.charlies.androiddesign.preview.app.cli
 
+import bot.charlies.androiddesign.preview.data.ProposalReader
+import bot.charlies.androiddesign.preview.feature.preview.theme.wear.WearThemeResolver
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
+import bot.charlies.androiddesign.preview.model.WearCatalog
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.nio.file.Files
@@ -84,5 +87,61 @@ class ExportCommandTest {
     assertTrue("plates" in unknown.err, "lists the screens that exist")
     assertEquals(ExitCode.USAGE, run("export", plates.toString(), "--bogus").code)
     assertEquals(ExitCode.USAGE, run("export", plates.toString(), "--screen").code)
+  }
+
+  private val wear = fixtures.resolve("wear.proposal.json")
+
+  @Test
+  fun `a Wear proposal exports as Wear Compose with the colors the previewer draws`() {
+    val run = run("export", wear.toString())
+    assertEquals(ExitCode.OK, run.code, run.err)
+    assertEquals("", run.err)
+    assertTrue("fun WearAppTheme" in run.out)
+    assertTrue("rememberSwipeDismissableSceneStrategy" in run.out)
+    assertTrue("fun HomeScreen" in run.out)
+    val design = ProposalReader().read(wear).designSystem
+    val scheme = WearThemeResolver.roleColors(design)
+    assertEquals(WearCatalog.colorRoles.toSet(), scheme.keys)
+    WearCatalog.colorRoles.forEach { role ->
+      val hex = scheme.getValue(role).removePrefix("#")
+      assertTrue("$role = Color(0xFF$hex)" in run.out, "$role should be $hex in:\n${run.out}")
+    }
+  }
+
+  @Test
+  fun `a Wear export carries the scheme the design's seed gives`() {
+    val dir = Files.createTempDirectory("export")
+    val design = dir.resolve("OTHER.md")
+    Files.writeString(design, "---\nversion: alpha\ncolors:\n  primary: \"#006A6A\"\n---\n")
+    val seeded = run("export", wear.toString(), "--design", design.toString(), "--screen", "home")
+    assertEquals(ExitCode.OK, seeded.code, seeded.err)
+    val plain = run("export", wear.toString(), "--screen", "home")
+    val resolved = ProposalReader().read(wear, design).designSystem
+    val primary = WearThemeResolver.roleColors(resolved).getValue("primary")
+    assertTrue("primary = Color(0xFF${primary.removePrefix("#")})" in seeded.out)
+    assertFalse(seeded.out == plain.out, "the seed changes the scheme")
+  }
+
+  @Test
+  fun `a Wear export carries the scheme the proposal's own theme gives`() {
+    val dir = Files.createTempDirectory("export")
+    val themed = dir.resolve("themed.proposal.json")
+    val source = Files.readString(wear)
+    Files.writeString(
+      themed,
+      source.replaceFirst(
+        "\"format\": 1,",
+        "\"format\": 1, \"theme\": { \"colors\": { \"primary\": \"#006A6A\", \"on-surface\": \"#123456\" } },",
+      ),
+    )
+    val run = run("export", themed.toString(), "--screen", "home")
+    assertEquals(ExitCode.OK, run.code, run.err)
+    val resolved = ProposalReader().read(themed).designSystem
+    assertEquals("#006A6A", resolved.seed.uppercase())
+    assertTrue("onSurface = Color(0xFF123456)" in run.out, "role override")
+    val primary = WearThemeResolver.roleColors(resolved).getValue("primary")
+    assertTrue("primary = Color(0xFF${primary.removePrefix("#")})" in run.out)
+    val plain = run("export", wear.toString(), "--screen", "home")
+    assertFalse(run.out == plain.out, "the proposal's seed changes the scheme")
   }
 }

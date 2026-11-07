@@ -127,6 +127,10 @@ The evals judge proposals rendered by the previewer app, so they cannot show whe
 3. Render the sandbox from its folder with `rm -rf app/src/screenshotTestDebug/reference && ./gradlew :app:updateDebugScreenshotTest`, which writes the PNGs under `app/src/screenshotTestDebug/reference/` (this step needs JDK 17+ and the Android SDK; see the starter's README).
 4. Compare the Compose render with the app's phone render of the same screen, and the exported layout with the proposal's tree. Differences the proposal determined (layout, hierarchy, color roles, type roles, component choice) are exporter bugs or mapping bugs to fix in `compose-mapping.md`. Small style choices the proposal left open are expected.
 
+### Wear
+
+The same four steps, with these changes. The proposal is `evals/verify/wear.verify.proposal.json` (every Wear catalog component; a Wear proposal needs no `--design` or `--screen`: `<app> export <proposal>` prints every screen). The sandbox is `evals/wear-starter/`, a scratch copy of which needs Android SDK platform 37.1; its README says where the export lands and how to add one preview per screen at 204 and 227 dp. The comparison is against `<app> render <proposal> --out <dir>` at the same two sizes. Expect two differences that are not bugs: the clock text, and lighter label weights in the sandbox (layoutlib has no Roboto Flex). A scrolling screen renders only the rows at the top of its list, so the verify proposal keeps each row group on a screen of its own; keep that when adding components. A render cannot open a dialog, so the two Wear dialogs stay unverified.
+
 ## Verification and files
 
 Run `python3 -m unittest discover evals` from the repository root to test adapters, artifact contracts, ballot validation, and binary resolution without model calls. Also run the [exploration workflow checks](exploration.md). Those separate rendering and isolation checks from agent routing behavior.
@@ -137,6 +141,6 @@ Run `python3 -m unittest discover evals` from the repository root to test adapte
 | `run.py`, `backends.py`, `preview_app.py` | Artifact lifecycle, optional CLI launchers, and the previewer app's location |
 | `checks.py`, `judge.py`, `rubric.md` | Deterministic checks on `report.json` and provider-independent rubric judgments |
 | `calibration/`, `baseline/` | Labeled renders and explicitly accepted baselines |
-| `compose-starter/` | The Android sandbox the export check lands in |
+| `compose-starter/`, `wear-starter/` | The Android sandboxes the export check lands in (phone and Wear) |
 
 Renders come from the previewer app's headless renderer, the same composables as its window. They do not verify motion or the export; check device behavior in the exported app when it matters. The app's layout checks come from its own tree, not from pixels, so contrast and truncation findings are exact; hierarchy and character are what the judge sees in the PNGs.

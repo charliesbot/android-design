@@ -100,7 +100,7 @@ A Wear proposal follows the same workflow. `android-design` `references/wear-os.
 - **Adaptation check:** the Wear size override applies from 225dp, so the check is "fits and reads at both watch sizes, and the large one shows more value, never less".
 - **Shared `DESIGN.md`:** its seed and color roles apply to Wear; its typography is replaced by Roboto Flex.
 - **Findings:** fix `round-edge-clipped` (control or text cut by the round edge on a fixed screen) with percentage-style margins or a smaller layout.
-- **Port:** write it by hand from `android-design` `references/wear-os.md` and the Wear OS rows of `references/compose-mapping.md` (`export_kotlin` does not support Wear yet), then render it with the `compose-preview` skill. Every Wear row is unverified: report the ones the port relies on.
+- **Port:** the same three steps. `export_kotlin` writes Wear Compose: a `WearAppTheme` with the previewer's exact colors, `AppScaffold` and `ScreenScaffold`, and Navigation 3 with swipe to dismiss. Render the port at both round sizes (204 and 227dp).
 
 ## Delete
 

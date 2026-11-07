@@ -306,6 +306,17 @@ class AppPreviewControllerTest {
   }
 
   @Test
+  fun `export_kotlin writes Wear Compose for a Wear proposal`() = runBlocking {
+    controller.openProposal(fixtures.resolve("wear.proposal.json").toString())
+    val screen = controller.exportKotlin("home")
+    assertTrue("fun HomeScreen" in screen)
+    assertTrue("androidx.wear.compose.material3.ScreenScaffold" in screen)
+    assertTrue("fun WearAppTheme" in screen)
+    assertTrue("rememberSwipeDismissableSceneStrategy" in controller.exportKotlin())
+    Unit
+  }
+
+  @Test
   fun `check_proposal renders every screen at every view by default`() = runBlocking {
     controller.openProposal(workspace().toString())
 
