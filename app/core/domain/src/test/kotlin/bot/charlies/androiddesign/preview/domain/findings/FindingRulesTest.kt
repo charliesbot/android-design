@@ -763,6 +763,13 @@ class FindingRulesTest {
   }
 
   @Test
+  fun `overflow exempts the tabs of a scrollable tab row`() {
+    val tabs = node("tabs", "Tabs", w = 300f, h = 48f)
+    val tab = node("tab", "Tab", x = 250f, w = 100f, h = 48f, parent = "tabs")
+    assertEquals(emptyList(), overflow(tabs, tab))
+  }
+
+  @Test
   fun `overflow names a child wider than its parent inside the view`() {
     val card = node("card", "Card", w = 150f, h = 100f)
     val row = node("row", "Row", w = 200f, h = 48f, parent = "card")
