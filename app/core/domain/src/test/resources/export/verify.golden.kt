@@ -96,6 +96,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -284,6 +285,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -2305,10 +2307,16 @@ fun InputsScreen(
           ) {
             LoadingIndicator()
             ContainedLoadingIndicator()
-            LinearProgressIndicator(progress = { 0.4f })
-            LinearWavyProgressIndicator()
-            CircularProgressIndicator(progress = { 0.7f })
-            CircularWavyProgressIndicator()
+            LinearProgressIndicator(
+              progress = { 0.4f },
+              modifier = Modifier.requiredHeightIn(max = Dp.Infinity),
+            )
+            LinearWavyProgressIndicator(modifier = Modifier.requiredHeightIn(max = Dp.Infinity))
+            CircularProgressIndicator(
+              progress = { 0.7f },
+              modifier = Modifier.requiredHeightIn(max = Dp.Infinity),
+            )
+            CircularWavyProgressIndicator(modifier = Modifier.requiredHeightIn(max = Dp.Infinity))
           }
           VerticalFloatingToolbar(
             expanded = true,
@@ -3261,6 +3269,7 @@ fun CollectionsScreen(
   onNavigateToHome: () -> Unit = {},
   onNavigateToDetail: () -> Unit = {},
 ) {
+  var showPlatesMenu by remember { mutableStateOf(false) }
   val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
   Scaffold(
     modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -3292,8 +3301,27 @@ fun CollectionsScreen(
         IconButton(onClick = {}) {
           Icon(painterResource(R.drawable.share), contentDescription = "Share")
         }
-        IconButton(onClick = {}) {
-          Icon(painterResource(R.drawable.more_vert), contentDescription = "More")
+        Box {
+          IconButton(onClick = { showPlatesMenu = true }) {
+            Icon(painterResource(R.drawable.more_vert), contentDescription = "More")
+          }
+          DropdownMenuPopup(
+            expanded = showPlatesMenu,
+            onDismissRequest = { showPlatesMenu = false },
+          ) {
+            DropdownMenuGroup(
+              shapes = MenuDefaults.groupShape(0, 1),
+              containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ) {
+              items.forEachIndexed { index, item ->
+                DropdownMenuItem(
+                  text = { Text(item.name) },
+                  onClick = { showPlatesMenu = false },
+                  shape = MenuDefaults.itemShape(index, items.size).shape,
+                )
+              }
+            }
+          }
         }
       }
     },

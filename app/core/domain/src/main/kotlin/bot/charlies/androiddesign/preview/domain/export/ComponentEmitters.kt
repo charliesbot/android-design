@@ -54,7 +54,12 @@ internal fun ScreenEmitter.emitComponent(
   val fillWidth =
     place.parentStretches &&
       M3ExpressiveCatalog.find(node.component)?.fillsWidth { props.sampleValue(it, place) } == true
-  val placed = place.copy(fillWidth = fillWidth)
+  val inFlexBox = place.parentType == "FlexBox" && growsSemanticsBounds(node)
+  val placed =
+    place.copy(
+      fillWidth = fillWidth,
+      leading = if (inFlexBox) place.leading + unboundedHeight() else place.leading,
+    )
   val wrapped = menu != null || tooltip != null
   val own = dispatch(node, props, if (wrapped) placed.copy(parentType = "Box") else placed)
   val anchored = if (tooltip == null) own else aroundAnchor(tooltip, own)
@@ -1982,27 +1987,27 @@ private fun ScreenEmitter.progressIndicator(p: JsonObject, place: Place): List<S
 
 /** The statements that draw an overlay when it is not placed beside an anchor. */
 internal fun ScreenEmitter.overlayStatements(node: ComponentNode): List<Stmt> {
-  val p = effectiveProps(node, SizeClass.Compact)
-  val shown = overlayVar(node.id)
-  val place = Place()
   return when (node.component) {
-    "BottomSheet" -> {
-      experimental()
-      val sheet =
-        Call(
-          m3("ModalBottomSheet"),
-          listOf(arg("onDismissRequest", lambda(Assign(shown, "=", Raw("false"))))),
-          lambda(children(p, "content", place, "BottomSheet")),
-        )
-      listOf(IfStmt(listOf(shown to listOf(stmt(sheet))), null))
-    }
+    "BottomSheet" -> perSize(node) { sized -> bottomSheetStatements(node, sized) }
     "Dialog" -> perSize(node) { sized -> dialogStatements(node, sized) }
     "DatePicker" -> perSize(node) { sized -> datePickerStatements(node, sized) }
     "TimePicker" -> perSize(node) { sized -> timePickerStatements(node, sized) }
     "Menu" -> menuStatements(node)
-    "SideSheet" -> sideSheetStatements(node, p)
+    "SideSheet" -> perSize(node) { sized -> sideSheetStatements(node, sized) }
     else -> emptyList()
   }
+}
+
+private fun ScreenEmitter.bottomSheetStatements(node: ComponentNode, p: JsonObject): List<Stmt> {
+  experimental()
+  val shown = overlayVar(node.id)
+  val sheet =
+    Call(
+      m3("ModalBottomSheet"),
+      listOf(arg("onDismissRequest", lambda(Assign(shown, "=", Raw("false"))))),
+      lambda(children(p, "content", Place(), "BottomSheet")),
+    )
+  return listOf(IfStmt(listOf(shown to listOf(stmt(sheet))), null))
 }
 
 /**
@@ -2304,25 +2309,43 @@ private fun ScreenEmitter.menuState(unit: ComponentNode): List<Stmt> {
 
 internal fun ScreenEmitter.menuStatements(menu: ComponentNode): List<Stmt> {
   expressive()
-  val p = effectiveProps(menu, SizeClass.Compact)
-  val shown = overlayVar(menu.id)
-  val vibrant = p.literal("colors") == ColorStyle.VIBRANT
   val layout = MenuSpec.layout(menu, byId)
   // A menu with nothing drawn at any size class has no popup, not an empty group.
   if (layout == MenuSpec.Layout.Empty) return emptyList()
-  // A menu of items is one group; a menu of groups holds each group, a gap apart.
-  val groups =
-    if (layout == MenuSpec.Layout.Items) {
-      listOf(menu)
-    } else {
-      // Templated groups are not exported (as before): the menu keeps its empty group.
-      drawnIds(menu, "items").filter { it.component == MenuSpec.GROUP }.ifEmpty { listOf(menu) }
-    }
-  val declarations = groups.flatMap { menuState(it) }
+  // The state of the items covers every size class, so it is declared once, above the popups.
+  val declarations = menuUnits(menu, layout).flatMap { menuState(it) }
+  return declarations + perSize(menu) { sized -> menuPopup(menu, sized, layout) }
+}
+
+/** The groups whose item state a menu declares: a menu of items is one group, its own. */
+private fun ScreenEmitter.menuUnits(menu: ComponentNode, layout: MenuSpec.Layout) =
+  if (layout == MenuSpec.Layout.Items) {
+    listOf(menu)
+  } else {
+    // Templated groups are not exported (as before): the menu keeps its empty group.
+    drawnIds(menu, "items").filter { it.component == MenuSpec.GROUP }.ifEmpty { listOf(menu) }
+  }
+
+/** The popup of [menu] with the props [p] it has at some size classes. */
+private fun ScreenEmitter.menuPopup(
+  menu: ComponentNode,
+  p: JsonObject,
+  layout: MenuSpec.Layout,
+): List<Stmt> {
+  val shown = overlayVar(menu.id)
+  val vibrant = p.literal("colors") == ColorStyle.VIBRANT
   val inMenu = Place(parentType = "Menu", menuVibrant = vibrant)
+  // A menu of groups holds each group listed at these size classes, a gap apart.
+  val listed =
+    if (layout == MenuSpec.Layout.Items) {
+      emptyList()
+    } else {
+      (p["items"].childItems() as? ChildItems.Listed)?.ids.orEmpty().filter {
+        byId[it]?.component == MenuSpec.GROUP
+      }
+    }
   val drawn =
-    if (groups.singleOrNull() === menu) menuGroup(menu, p, inMenu)
-    else groups.flatMap { emit(it.id, inMenu) }
+    if (listed.isEmpty()) menuGroup(menu, p, inMenu) else listed.flatMap { emit(it, inMenu) }
   val popup =
     Call(
       m3("DropdownMenuPopup"),
@@ -2332,7 +2355,7 @@ internal fun ScreenEmitter.menuStatements(menu: ComponentNode): List<Stmt> {
       ),
       lambda(drawn),
     )
-  return declarations + stmt(popup)
+  return listOf(stmt(popup))
 }
 
 /**
@@ -2354,9 +2377,22 @@ private fun ScreenEmitter.menuGroup(node: ComponentNode, p: JsonObject, place: P
       null
     }
   val inner = Place(parentType = "Menu", menuVibrant = place.menuVibrant, chipSelection = selection)
-  val content = items.flatMap { item ->
-    emit(item.id, inner.copy(listPosition = positionIn(node, "items", item.id)))
-  }
+  // A template of groups is not exported (as before), so only a template of items is a loop.
+  val rows =
+    (p["items"].childItems() as? ChildItems.Template)?.takeIf {
+      byId[it.componentId]?.component != MenuSpec.GROUP
+    }
+  val content =
+    if (rows != null) {
+      // Data rows: a row's place among them is its loop index out of the list's size.
+      children(p, "items", inner, "Menu", indexed = true) { row, i, n ->
+        row.copy(listPosition = ListPosition(false, i, n), menuVibrant = place.menuVibrant)
+      }
+    } else {
+      items.flatMap { item ->
+        emit(item.id, inner.copy(listPosition = positionIn(node, "items", item.id)))
+      }
+    }
   val container =
     if (place.menuVibrant) "$defaults.groupVibrantContainerColor" else colorRole("surfaceContainer")
   // The gap shows only at the size classes where a group comes before this one.
@@ -2423,7 +2459,8 @@ private fun ScreenEmitter.menuItem(node: ComponentNode, p: JsonObject, place: Pl
       )
     MenuSpec.Role.Single -> {
       val selection = place.chipSelection
-      val picked = selection?.picks(node.id) ?: "false"
+      // A data row has no remembered selection: it shows its bound `selected`.
+      val picked = selection?.picks(node.id) ?: p.boolExpr("selected", place) ?: "false"
       val choose = listOfNotNull(selection?.choose(node.id))
       one(
         m3("SelectableDropdownMenuItem"),
@@ -2438,12 +2475,15 @@ private fun ScreenEmitter.menuItem(node: ComponentNode, p: JsonObject, place: Pl
       )
     }
     MenuSpec.Role.Multi -> {
-      val checked = stateName(node.id, "Checked")
+      // A data row has no remembered state: it shows its bound `selected` and only runs its action.
+      val dataRow = place.scope != null
+      val checked =
+        if (dataRow) p.boolExpr("selected", place) ?: "false" else stateName(node.id, "Checked")
       one(
         m3("CheckableDropdownMenuItem"),
         listOf(
           arg("checked", checked),
-          arg("onCheckedChange", assignIt(checked, action)),
+          arg("onCheckedChange", if (dataRow) lambda(action) else assignIt(checked, action)),
           text,
           shapes?.let { arg("shapes", it) },
           leading,

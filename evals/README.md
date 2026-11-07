@@ -14,7 +14,7 @@ python3 run.py prepare --out /tmp/design-eval --cases music
 
 Preparation makes `music/` a fresh Git repository fixture (one empty commit) with `design/` holding the brief's assets in `design/assets/`, and a snapshot of both skills (`skills/android-design` and `skills/android-design-explore`). There is no starter and no `DESIGN.md`: the agent writes `DESIGN.md` at the fixture root and the proposal at `design/proposal.proposal.json`. `music/case.json` records the proposal path and title, and the command prints the proposal path.
 
-Read `/tmp/design-eval/music/prompt.md` in the agent session you want to test. Have that agent design the brief using the copied skills. The agent connects to the previewer app over MCP as the server `android_design_preview` and checks its work with `check_proposal` and `get_tree`, not screenshots; the runner renders again headlessly. The output directory must be new; preparation never overwrites existing work. Omit `--cases` to prepare all seven cases: the phone cases music, finance, settings, and trek, and the Wear cases workout, player, and reminder.
+Read `/tmp/design-eval/music/prompt.md` in the agent session you want to test. Have that agent design the brief using the copied skills. The agent connects to the previewer app over MCP as the server `android_design_preview` and checks its work with `check_proposal` and `get_tree`, not screenshots; the runner renders again headlessly. The output directory must be new; preparation never overwrites existing work. Omit `--cases` to prepare all eight cases: the phone cases music, finance, settings, trek, and recipes, and the Wear cases workout, player, and reminder.
 
 ## Surfaces
 
@@ -22,7 +22,7 @@ Each case in `evals.json` has a `surface`. A proposal uses one surface, and the 
 
 | Surface | Cases | Views | Checks | Rubric |
 | --- | --- | --- | --- | --- |
-| `phone` | music, finance, settings, trek | five, below | `C-valid`, `C-review`, `C-palette` | General items plus the case's own |
+| `phone` | music, finance, settings, trek, recipes | five, below | `C-valid`, `C-review`, `C-palette` | General items plus the case's own |
 | `wear` | workout, player, reminder | `watch` (204x204) and `watch-large` (227x227), both round and dark | `C-valid`, `C-review` | `R-hierarchy`, `R-controls`, `R-text`, the five `R-wear-*` items, and the case's own |
 
 Wear is the Wear OS catalog of the previewer app (`docs/design/wear-os-previewer.md`). `agent-prompt.md` is shared; `SURFACE_PROMPT` in `run.py` fills in where the proposal must work and how to read `check_proposal`'s layout summaries for each surface. `C-palette` is skipped for Wear on purpose: it guards the phone theme variant against neon surfaces, while a Wear proposal builds from black through Wear's own color mapping, and `R-wear-color` judges the rendered color directly. `rubric.md` says which items each surface judges. To check a branch's Wear rendering, point the runner at that build: `ANDROID_DESIGN_PREVIEW=/path/to/AndroidDesignPreview python3 run.py evaluate --out ...`.

@@ -383,6 +383,20 @@ internal class ScreenEmitter(
     return listOf(IfStmt(visible.map { (props, sizes) -> condition(sizes) to draw(props) }, null))
   }
 
+  /** True when [node] or anything under it grows its semantics bounds vertically. */
+  fun growsSemanticsBounds(
+    node: ComponentNode,
+    seen: MutableSet<String> = mutableSetOf(),
+  ): Boolean {
+    if (!seen.add(node.id)) return false
+    val vertical =
+      node.component == "Slider" &&
+        SizeClass.entries.any { effectiveProps(node, it).literal("orientation") == "vertical" }
+    return vertical ||
+      node.component == "ProgressIndicator" ||
+      childIds(node).mapNotNull(byId::get).any { growsSemanticsBounds(it, seen) }
+  }
+
   fun condition(sizes: Set<SizeClass>): String {
     val medium = SizeClass.Medium in sizes
     val compact = SizeClass.Compact in sizes

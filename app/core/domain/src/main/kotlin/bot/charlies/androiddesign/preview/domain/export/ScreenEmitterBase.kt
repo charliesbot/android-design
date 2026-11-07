@@ -331,6 +331,19 @@ internal abstract class ScreenEmitterBase(
     return call
   }
 
+  /**
+   * The height a `FlexBox` item is measured with, unbounded again. FlexBox hands a wrapped item the
+   * largest height `Constraints` can hold, and a Material component that grows its semantics bounds
+   * (material3's `IncreaseVerticalSemanticsBounds`: progress indicators and vertical sliders) adds
+   * to that and throws. The previewer restores the same height for every flex item
+   * (`restoreUnboundedHeight`); the exported code does it for the items that need it, so the others
+   * stay plain.
+   */
+  fun unboundedHeight(): String {
+    file.use(Sym.Dp)
+    return useModifier("requiredHeightIn(max = Dp.Infinity)")
+  }
+
   // endregion
 
   // region actions
@@ -456,6 +469,7 @@ internal abstract class ScreenEmitterBase(
         "height" to Sym.height,
         "size" to Sym.size,
         "heightIn" to Sym.heightIn,
+        "requiredHeightIn" to Sym.requiredHeightIn,
         "widthIn" to Sym.widthIn,
         "offset" to Sym.offset,
         "aspectRatio" to Sym.aspectRatio,

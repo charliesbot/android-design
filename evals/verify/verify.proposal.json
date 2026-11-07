@@ -3405,7 +3405,31 @@
           "id": "docked_more",
           "component": "IconButton",
           "icon": "more_vert",
-          "contentDescription": "More"
+          "contentDescription": "More",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "plates_menu"
+              }
+            }
+          }
+        },
+        {
+          "id": "plates_menu",
+          "component": "Menu",
+          "anchor": "docked_more",
+          "items": {
+            "componentId": "plates_menu_item",
+            "path": "/items"
+          }
+        },
+        {
+          "id": "plates_menu_item",
+          "component": "MenuItem",
+          "label": {
+            "@path": "name"
+          }
         },
         {
           "id": "docked",

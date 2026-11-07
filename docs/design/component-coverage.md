@@ -147,10 +147,9 @@ The desktop build lags Android. The app renders with JetBrains' material3 (1.13.
 
 The gap is closed (PRs #75, #77, #78, #79, #80, #82, #83). These were found along the way and predate those PRs or sit outside them:
 
-- **Templated menu items are not exported.** A `Menu` whose `items` is a data template renders in the previewer, but the export writes an empty `DropdownMenuGroup`.
-- **Sheets and menus export from compact props.** `SideSheet`, `BottomSheet`, and `Menu` bodies are exported once from compact props, so a `sizeClass` override of their own props is lost in the export. Dialogs and pickers already export per size class through `ScreenEmitter.perSize`.
-- **The verify inputs screen fails in the export sandbox at phone width.** layoutlib reports a `FlexBox` constraint error ("Can't represent a width of 630 and height of 262194 in Constraints") for the exported inputs screen, with or without the new components.
-- **Icon buttons are 40dp in the previewer and 48dp on Android.** In the export check, a vertical toolbar of two icon buttons rendered about 16dp taller on Android. The likely cause is `minimumInteractiveComponentSize()` resolving to 48dp on Android and not in the desktop renderer; confirm the desktop value before changing the preview.
+- **Templated groups in a menu are not exported.** A `Menu` whose `items` is a data template of `MenuItem`s exports as a loop inside its one group, but a template of `MenuGroup`s still exports an empty group. A group repeated per data row needs per-group selection state, which has no home yet.
+- **Selection state of templated menu items.** A `role: single` or `multi` item in a template shows its bound `selected` and does not remember a choice, because the exported code declares state per listed item and a data row has no id to declare it for.
+- **A `FlexBox` item that nests a progress indicator or vertical slider gets the unbounded-height modifier by a fixed list.** The previewer restores the unbounded height for every flex item; the export adds `requiredHeightIn(max = Dp.Infinity)` only where material3 grows the semantics bounds (progress indicators, vertical sliders), so an item whose growth comes from a library outside material3 would still throw on Android. The list lives in `ScreenEmitter.growsSemanticsBounds`.
 - **An eval case that needs tabs, search, and a carousel.** The planned recipe case waits on photo assets.
 
 ## Links

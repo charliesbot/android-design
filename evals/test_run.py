@@ -84,7 +84,7 @@ class PrepareTest(unittest.TestCase):
 
     def test_evals_json_has_no_compose_wording_or_parked_cases(self):
         cases = json.loads((run.HERE / 'evals.json').read_text())['evals']
-        self.assertEqual([c['name'] for c in cases], ['music', 'finance', 'settings', 'trek', 'workout', 'player', 'reminder'])
+        self.assertEqual([c['name'] for c in cases], ['music', 'finance', 'settings', 'trek', 'recipes', 'workout', 'player', 'reminder'])
         for case in cases:
             self.assertNotRegex(case['prompt'], r'R\.drawable|Compose|Kotlin|EvalScreen')
             ids = [a['id'] for a in case['assertions']]
