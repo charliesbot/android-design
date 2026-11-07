@@ -12,9 +12,9 @@ The audit compares the 36 component pages in `sources/m3.material.io/pages/compo
 
 | Status | Components |
 |---|---|
-| Covered | Buttons, button groups (standard and connected), split button, icon buttons, FAB, extended FAB, FAB menu, app bars (except the search app bar), bottom sheets, cards, chips, divider, lists, loading indicator, navigation bar, navigation rail, progress indicators, text fields |
-| Covered, variants missing | Toolbars (docked), sliders (centered, vertical), checkbox (indeterminate), switch (thumb icons), menus (groups, vibrant colors, selectable items), dialogs (full-screen) |
-| Missing | Tabs, search, carousel, snackbar, radio button, badges, tooltips, date pickers, time pickers, side sheets |
+| Covered | Tabs, search, carousel, snackbar, badges, tooltips, side sheets, buttons, button groups (standard and connected), split button, icon buttons, FAB, extended FAB, FAB menu, app bars (except the search app bar), bottom sheets, cards, chips, divider, lists, loading indicator, navigation bar, navigation rail, progress indicators, radio buttons, text fields, toolbars (floating and docked), sliders (including centered and vertical), checkbox (including indeterminate), switch (including thumb icons), menus (groups, vibrant colors, selectable items) |
+| Covered, variants missing | Dialogs (full-screen) |
+| Missing | Date pickers, time pickers |
 | Left out on purpose | Navigation drawer, segmented buttons |
 
 Both omissions are Material's own retirements:
@@ -110,7 +110,9 @@ The skill's guidance ("bottom sheet on phones, side sheet on medium and up") sta
 
 ## Findings that come with the new components
 
-Several skill rules become checkable once the components exist, and the checks belong in the finding rules beside the components: at most one snackbar open, exactly one selected radio button per group, at most three carousel items with text at compact widths, no docked toolbar together with a navigation bar, full-screen dialogs and date pickers only at compact widths, and no navigation bar with fewer than three destinations (tabs instead). Each traces to the component's source page in `docs/research/material-3-components.md`.
+Several skill rules become checkable once the components exist, and the checks belong in the finding rules beside the components: at most one snackbar open, at most three carousel items with text at compact widths, no docked toolbar together with a navigation bar, full-screen dialogs and date pickers only at compact widths, and no navigation bar with fewer than three destinations (tabs instead). Each traces to the component's source page in `docs/research/material-3-components.md`.
+
+Selection counts are validator rules instead: exactly one selected radio button per group, and at most one selected single-select menu item per group. A selection is authored in props (a `selected` flag per button or item), and a finding sees only the rendered tree, where the group's own selection state has already picked one. The validator reads the authored props at each size class, so it reports the proposal that is wrong, not the render.
 
 ## Staying current
 

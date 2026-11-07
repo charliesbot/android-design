@@ -444,6 +444,26 @@ class CatalogSmokeTest {
         "Checkbox",
         inStage("""{"id":"subject","component":"Checkbox","contentDescription":"Agree"}"""),
       ),
+      Case(
+        "DockedToolbar",
+        inScaffold(
+          "bottomBar",
+          """{"id":"subject","component":"DockedToolbar","colors":"vibrant","children":["b1","b2"]}""",
+          """,{"id":"b1","component":"IconButton","icon":"edit","contentDescription":"Edit"},{"id":"b2","component":"IconButton","icon":"share","contentDescription":"Share"}""",
+        ),
+      ),
+      Case(
+        "RadioGroup",
+        inStage(
+          """{"id":"subject","component":"RadioGroup","children":["r1","r2"]},{"id":"r1","component":"RadioButton","label":"Small","selected":true},{"id":"r2","component":"RadioButton","label":"Large"}""",
+        ),
+      ),
+      Case(
+        "RadioButton",
+        inStage(
+          """{"id":"group","component":"RadioGroup","children":["subject","r2"]},{"id":"subject","component":"RadioButton","label":"Small","selected":true},{"id":"r2","component":"RadioButton","label":"Large"}""",
+        ),
+      ),
       Case("Slider", inStage("""{"id":"subject","component":"Slider","value":0.4,"steps":4}""")),
       Case(
         "RangeSlider",
@@ -499,6 +519,14 @@ class CatalogSmokeTest {
         "MenuItem",
         inStage(
           """{"id":"anchor","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"menu"}}}},{"id":"menu","component":"Menu","anchor":"anchor","items":["subject"]},{"id":"subject","component":"MenuItem","label":"Edit","icon":"edit"}""",
+        ),
+        open = "menu",
+      ),
+      Case(
+        "MenuGroup",
+        inStage(
+          """{"id":"anchor","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"menu"}}}},{"id":"menu","component":"Menu","anchor":"anchor","colors":"vibrant","items":["subject","g2"]},{"id":"subject","component":"MenuGroup","items":["s1","s2"]},{"id":"g2","component":"MenuGroup","items":["k1"]}""",
+          """,{"id":"s1","component":"MenuItem","label":"Newest","role":"single","selected":true},{"id":"s2","component":"MenuItem","label":"Oldest","role":"single"},{"id":"k1","component":"MenuItem","label":"Unread","role":"multi"}""",
         ),
         open = "menu",
       ),

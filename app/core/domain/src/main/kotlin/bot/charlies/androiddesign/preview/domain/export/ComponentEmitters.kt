@@ -3,9 +3,14 @@ package bot.charlies.androiddesign.preview.domain.export
 import bot.charlies.androiddesign.preview.domain.BadgeContent
 import bot.charlies.androiddesign.preview.domain.CarouselSpec
 import bot.charlies.androiddesign.preview.domain.CollapsingAppBars
+import bot.charlies.androiddesign.preview.domain.ColorStyle
+import bot.charlies.androiddesign.preview.domain.MenuSpec
+import bot.charlies.androiddesign.preview.domain.RadioSpec
 import bot.charlies.androiddesign.preview.domain.SearchBars
 import bot.charlies.androiddesign.preview.domain.SearchSpec
 import bot.charlies.androiddesign.preview.domain.SideSheetSpec
+import bot.charlies.androiddesign.preview.domain.SliderSpec
+import bot.charlies.androiddesign.preview.domain.SwitchSpec
 import bot.charlies.androiddesign.preview.domain.TooltipSpec
 import bot.charlies.androiddesign.preview.model.ActionFunction
 import bot.charlies.androiddesign.preview.model.ComponentNode
@@ -160,6 +165,7 @@ private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Pl
     "NavigationRail" -> navigationRail(p, place)
     "NavigationRailItem" -> navigationItem(node, p, place, "WideNavigationRailItem", true)
     "FloatingToolbar" -> floatingToolbar(p, place)
+    "DockedToolbar" -> dockedToolbar(p, place)
     "Card" -> card(node, p, place)
     "List" -> list(p, place)
     "ListItem" -> listItem(node, p, place)
@@ -178,6 +184,9 @@ private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Pl
     "ChipGroup" -> chipGroup(node, p, place)
     "Switch" -> switch(node, p, place)
     "Checkbox" -> checkbox(node, p, place)
+    "RadioGroup" -> radioGroup(node, p, place)
+    "RadioButton" -> radioButton(node, p, place)
+    "MenuGroup" -> menuGroup(node, p, place)
     "Slider" -> slider(node, p, place)
     "RangeSlider" -> rangeSlider(node, p, place)
     "TextField" -> textField(node, p, place)
@@ -944,7 +953,7 @@ private fun ScreenEmitter.floatingToolbar(p: JsonObject, place: Place): List<Stm
   expressive()
   val vertical = p.literal("orientation") == "vertical"
   val colors =
-    if (p.literal("colors") == "vibrant")
+    if (p.literal("colors") == ColorStyle.VIBRANT)
       "${m3("FloatingToolbarDefaults")}.vibrantFloatingToolbarColors()"
     else null
   val over =
@@ -964,6 +973,20 @@ private fun ScreenEmitter.floatingToolbar(p: JsonObject, place: Place): List<Stm
       opt("colors", colors),
     ),
     children(p, "children", place, "FloatingToolbar"),
+  )
+}
+
+private fun ScreenEmitter.dockedToolbar(p: JsonObject, place: Place): List<Stmt> {
+  expressive()
+  val vibrant = p.literal("colors") == ColorStyle.VIBRANT
+  return one(
+    m3("FlexibleBottomAppBar"),
+    listOf(
+      modifier(place, p),
+      if (vibrant) arg("containerColor", colorRole("primaryContainer")) else null,
+      if (vibrant) arg("contentColor", colorRole("onPrimaryContainer")) else null,
+    ),
+    children(p, "children", place, "DockedToolbar"),
   )
 }
 
@@ -1233,9 +1256,11 @@ private fun ScreenEmitter.iconButton(node: ComponentNode, p: JsonObject, place: 
       ?.takeIf { it == "narrow" || it == "wide" }
       ?.let { "${m3("IconButtonDefaults.IconButtonWidthOption")}.${Naming.pascal(it)}" }
   val onSurfaceVariant = colorRole("onSurfaceVariant")
+  // Inside a toolbar the button keeps the default colors, which take the toolbar's content color.
+  val inToolbar = place.parentType == "FloatingToolbar" || place.parentType == "DockedToolbar"
   val colors: Expr? =
     when {
-      toggle -> null
+      toggle || inToolbar -> null
       variant == "standard" ->
         Call("$defaults.iconButtonColors", listOf(arg("contentColor", onSurfaceVariant)))
       variant == "outlined" ->
@@ -1586,32 +1611,193 @@ private fun ScreenEmitter.switch(node: ComponentNode, p: JsonObject, place: Plac
         arg("onCheckedChange", change),
         modifier(place, p, semantics(p)),
         enabled(p, place),
+        switchThumb(p, name),
       ),
     )
 }
 
+/**
+ * The `thumbContent` of a switch: a check when on (`selected`), and a close when off (`both`),
+ * sized `SwitchDefaults.IconSize`, as [SwitchSpec] says.
+ */
+private fun ScreenEmitter.switchThumb(p: JsonObject, checked: String): Arg? {
+  val size = sizeModifier("${m3("SwitchDefaults")}.IconSize")
+  val icons = p.choice("Switch", "icons")
+  val on = SwitchSpec.iconAt(icons, true)?.let(IconName::Literal) ?: return null
+  val off = SwitchSpec.iconAt(icons, false)?.let(IconName::Literal)
+  return if (off == null) {
+    arg("thumbContent", IfValue(checked, lambdaOf(icon(on, null, size)), "null"))
+  } else {
+    arg("thumbContent", lambdaOf(iconOf(togglePainter(checked, on, off), null, size)))
+  }
+}
+
 private fun ScreenEmitter.checkbox(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val (name, declaration) = state(node, "Checked", p.boolExpr("checked", place) ?: "false")
-  val change = assignIt(name, actionStatements(p["action"], node.id))
+  val partly = p.boolExpr("indeterminate", place)?.takeIf { it != "false" }
+  val statements = mutableListOf(declaration)
   val label = p.text("label", place)
+  val action = actionStatements(p["action"], node.id)
   val box =
-    calls(
-      m3("Checkbox"),
-      listOf(
-        arg("checked", name),
-        arg("onCheckedChange", change),
-        if (label == null) modifier(place, p, semantics(p)) else null,
-        enabled(p, place),
-      ),
-    )
-  if (label == null) return listOf(declaration, stmt(box))
+    if (partly == null) {
+      calls(
+        m3("Checkbox"),
+        listOf(
+          arg("checked", name),
+          arg("onCheckedChange", assignIt(name, action)),
+          if (label == null) modifier(place, p, semantics(p)) else null,
+          enabled(p, place),
+        ),
+      )
+    } else {
+      // An indeterminate box shows a dash until it is tapped, which checks it.
+      val (partlyName, partlyDeclaration) = state(node, "Indeterminate", partly)
+      statements += partlyDeclaration
+      val toggleable = file.use(Sym.ToggleableState)
+      val state =
+        "if ($partlyName) $toggleable.Indeterminate else if ($name) $toggleable.On " +
+          "else $toggleable.Off"
+      calls(
+        m3("TriStateCheckbox"),
+        listOf(
+          arg("state", state),
+          arg(
+            "onClick",
+            lambda(
+              listOf<Stmt>(
+                Assign(name, "=", Raw("$partlyName || !$name")),
+                Assign(partlyName, "=", Raw("false")),
+              ) + action,
+            ),
+          ),
+          if (label == null) modifier(place, p, semantics(p)) else null,
+          enabled(p, place),
+        ),
+      )
+    }
+  if (label == null) return statements + stmt(box)
   val alignment = "${file.use(Sym.Alignment)}.CenterVertically"
-  return listOf(declaration) +
+  return statements +
     one(
       file.use(Sym.Row),
       listOf(modifier(place, p), arg("verticalAlignment", alignment)),
       listOf(stmt(box), stmt(textOf(label))),
     )
+}
+
+/** The ids [key] lists on [node] at any size class, in first-seen order. */
+private fun ScreenEmitter.listedIds(node: ComponentNode, key: String): List<String> =
+  SizeClass.entries
+    .flatMap { size ->
+      (effectiveProps(node, size)[key].childItems() as? ChildItems.Listed)?.ids.orEmpty()
+    }
+    .distinct()
+
+/**
+ * The expression that is [valueAt] each of [sizes]: the one value when they agree, else an `if`
+ * chain over the size class conditions, so a value that a size class override changes is exported
+ * as the previewer draws it at each size.
+ */
+private fun ScreenEmitter.sizeDependent(
+  sizes: Collection<SizeClass>,
+  valueAt: (SizeClass) -> String,
+): String {
+  val bySize = linkedMapOf<String, MutableSet<SizeClass>>()
+  for (size in sizes) bySize.getOrPut(valueAt(size)) { linkedSetOf() } += size
+  val values = bySize.entries.toList()
+  // No size class to draw at: nothing is drawn, so the value is never read.
+  if (values.isEmpty()) return ""
+  if (values.size == 1) return values.single().key
+  usesSizeClass = true
+  return values.dropLast(1).foldRight(values.last().key) { (value, at), rest ->
+    "if (${condition(at)}) $value else $rest"
+  }
+}
+
+/**
+ * The expression for the id a single-selection group starts on: the first listed child that is
+ * shown and `selected` at each size class (and that [counts] there), so a size class override of
+ * `selected` gives a size dependent start, as it does in the previewer and the validator.
+ */
+private fun ScreenEmitter.initialSelection(
+  ids: List<String>,
+  counts: (ComponentNode, SizeClass) -> Boolean = { _, _ -> true },
+): String =
+  sizeDependent(SizeClass.entries) { size ->
+    val id =
+      ids
+        .firstOrNull { id ->
+          val child = byId[id]
+          child != null &&
+            child.isShownAt(size) &&
+            counts(child, size) &&
+            effectiveProps(child, size).sampleFlag("selected", Place()) == true
+        }
+        .orEmpty()
+    kotlinString(id)
+  }
+
+/** Whether [id] is the selected child of the group that [this] holds the state of. */
+private fun ChipSelection.picks(id: String) = "$state == ${kotlinString(id)}"
+
+/** The statement that makes [id] the selected child. */
+private fun ChipSelection.choose(id: String): Stmt = Assign(state, "=", Raw(kotlinString(id)))
+
+private fun ScreenEmitter.radioGroup(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
+  val (name, declaration) = state(node, "Selected", initialSelection(listedIds(node, "children")))
+  val inner = place.copy(chipSelection = ChipSelection(name))
+  return listOf(declaration) +
+    one(
+      file.use(Sym.Column),
+      listOf(modifier(place, p, "selectableGroup()")),
+      children(p, "children", inner, "RadioGroup") { pl, _, _ ->
+        pl.copy(chipSelection = inner.chipSelection)
+      },
+    )
+}
+
+/** A row of a `RadioButton` and its label; the whole row is the touch target. */
+private fun ScreenEmitter.radioButton(
+  node: ComponentNode,
+  p: JsonObject,
+  place: Place,
+): List<Stmt> {
+  val selection = place.chipSelection
+  val selected = selection?.picks(node.id) ?: (p.boolExpr("selected", place) ?: "false")
+  val action = actionStatements(p["action"], node.id)
+  val onClickBody = listOfNotNull(selection?.choose(node.id)) + action
+  val enabledValue = p.boolExpr("enabled", place)?.takeIf { it != "true" }
+  val onClick =
+    onClickBody
+      .mapNotNull { it.flat() }
+      .joinToString("; ")
+      .let { if (it.isEmpty()) "{}" else "{ $it }" }
+  val role = "${file.use(Sym.Role)}.RadioButton"
+  val selectable =
+    useModifier(
+      "selectable(selected = $selected, " +
+        (enabledValue?.let { "enabled = $it, " } ?: "") +
+        "role = $role, onClick = $onClick)",
+    )
+  val min = "${useModifier("heightIn")}(min = ${dp(RadioSpec.MIN_HEIGHT_DP)})"
+  val label = p.text("label", place) ?: Raw("\"\"")
+  val button =
+    calls(
+      m3("RadioButton"),
+      listOf(arg("selected", selected), arg("onClick", "null"), enabled(p, place)),
+    )
+  return one(
+    file.use(Sym.Row),
+    listOf(
+      modifier(place, p, min, selectable),
+      arg(
+        "horizontalArrangement",
+        "${file.use(Sym.Arrangement)}.spacedBy(${dp(RadioSpec.GAP_DP)})",
+      ),
+      arg("verticalAlignment", "${file.use(Sym.Alignment)}.CenterVertically"),
+    ),
+    listOf(stmt(button), stmt(textOf(label))),
+  )
 }
 
 private fun ScreenEmitter.range(p: JsonObject): Pair<Double, Double> {
@@ -1637,16 +1823,66 @@ private fun ScreenEmitter.rangeArgs(
 private fun ScreenEmitter.slider(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val (min, max) = range(p)
   val initial = p.floatExpr("value", place) ?: floatLiteral(min)
-  val (name, declaration) = state(node, "Value", initial, Sym.mutableFloatStateOf)
-  return listOf(declaration) +
+  val vertical = p.choice("Slider", "orientation") == "vertical"
+  val centered = p.choice("Slider", "variant") == "centered"
+  if (!vertical && !centered) {
+    val (name, declaration) = state(node, "Value", initial, Sym.mutableFloatStateOf)
+    return listOf(declaration) +
+      one(
+        m3("Slider"),
+        listOf(
+          arg("value", name),
+          arg("onValueChange", assignIt(name)),
+          modifier(place, p),
+          enabled(p, place),
+        ) + rangeArgs("Slider", p, place, min, max),
+      )
+  }
+  // The centered track and the vertical slider take a SliderState, which holds the value; the
+  // slider reports a drag to onValueChange and the caller stores it.
+  val name = stateName(node.id, "State")
+  val steps = p.sampleNumber("Slider", "steps", place)?.toInt()?.takeIf { it > 0 }
+  val stateDeclaration =
+    Assign(
+      "val $name",
+      "=",
+      Call(
+        m3("rememberSliderState"),
+        listOfNotNull(
+          arg("value", initial),
+          steps?.let { arg("steps", it.toString()) },
+          if (p["range"] != null) arg("trackRange", "${floatLiteral(min)}..${floatLiteral(max)}")
+          else null,
+        ),
+      ),
+    )
+  val track =
+    if (centered) {
+      arg(
+        "track",
+        lambdaOf(
+          Call(
+            "${m3("SliderDefaults")}.CenteredTrack",
+            listOf(arg("sliderState", "it")),
+          ),
+        ),
+      )
+    } else {
+      null
+    }
+  val height = if (vertical) "height(${dp(SliderSpec.VERTICAL_HEIGHT_DP)})" else null
+  return listOf<Stmt>(stateDeclaration) +
     one(
-      m3("Slider"),
+      m3(if (vertical) "VerticalSlider" else "Slider"),
       listOf(
-        arg("value", name),
-        arg("onValueChange", assignIt(name)),
-        modifier(place, p),
+        arg("state", name),
+        arg("onValueChange", lambda(Assign("$name.value", "=", Raw("it")))),
+        modifier(place, p, height),
         enabled(p, place),
-      ) + rangeArgs("Slider", p, place, min, max),
+        // Material: zero is at the bottom.
+        if (vertical) arg("topToBottom", "false") else null,
+        track,
+      ),
     )
 }
 
@@ -2005,31 +2241,93 @@ internal fun ScreenEmitter.snackbarStatements(node: ComponentNode): List<Stmt> {
   )
 }
 
+private fun ScreenEmitter.menuRole(item: ComponentNode, size: SizeClass) =
+  MenuSpec.role(effectiveProps(item, size).literal("role"))
+
+/** The roles [item] takes at the size classes it is shown at. */
+private fun ScreenEmitter.menuRoles(item: ComponentNode): Set<MenuSpec.Role> =
+  SizeClass.entries.filter(item::isShownAt).map { menuRole(item, it) }.toSet()
+
+/** The components [key] lists on [node] at any size class that are shown at some size class. */
+private fun ScreenEmitter.drawnIds(node: ComponentNode, key: String): List<ComponentNode> =
+  listedIds(node, key).mapNotNull(byId::get).filter { n -> SizeClass.entries.any(n::isShownAt) }
+
+/** The ids [key] lists on [node] at [size] that are shown there, in order. */
+private fun ScreenEmitter.shownAt(node: ComponentNode, key: String, size: SizeClass): List<String> =
+  (effectiveProps(node, size)[key].childItems() as? ChildItems.Listed)?.ids.orEmpty().filter {
+    byId[it]?.isShownAt(size) == true
+  }
+
+/**
+ * Where [id] sits among the [key] members of [parent] at each size class it is shown at, as the
+ * `index` and `count` that `MenuDefaults.itemShape` and `groupShape` take, which change with a size
+ * class that hides a sibling.
+ */
+private fun ScreenEmitter.positionIn(
+  parent: ComponentNode,
+  key: String,
+  id: String,
+  kind: String? = null,
+): ListPosition {
+  val child = byId.getValue(id)
+  val shown = SizeClass.entries.filter(child::isShownAt)
+  fun members(size: SizeClass) =
+    shownAt(parent, key, size).filter { kind == null || byId[it]?.component == kind }
+  return ListPosition(
+    false,
+    sizeDependent(shown) { members(it).indexOf(id).coerceAtLeast(0).toString() },
+    sizeDependent(shown) { members(it).size.toString() },
+  )
+}
+
+/**
+ * The state of the items of [unit], a menu group (or a menu of items, which is one group): one
+ * selected id for its single-select items and one flag for each multi-select item. It lives above
+ * the popup so it survives the menu closing, and it covers every size class the roles change at.
+ */
+private fun ScreenEmitter.menuState(unit: ComponentNode): List<Stmt> {
+  val items = listedIds(unit, "items").mapNotNull(byId::get)
+  val declarations = mutableListOf<Stmt>()
+  if (items.any { MenuSpec.Role.Single in menuRoles(it) }) {
+    val initial =
+      initialSelection(items.map { it.id }) { item, size ->
+        menuRole(item, size) == MenuSpec.Role.Single
+      }
+    declarations += state(unit, "Selected", initial).second
+  }
+  items
+    .filter { MenuSpec.Role.Multi in menuRoles(it) }
+    .forEach { item ->
+      val checked =
+        sizeDependent(SizeClass.entries.filter(item::isShownAt)) { size ->
+          effectiveProps(item, size).boolExpr("selected", Place()) ?: "false"
+        }
+      declarations += state(item, "Checked", checked).second
+    }
+  return declarations
+}
+
 internal fun ScreenEmitter.menuStatements(menu: ComponentNode): List<Stmt> {
   expressive()
   val p = effectiveProps(menu, SizeClass.Compact)
   val shown = overlayVar(menu.id)
-  val items = (p["items"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty()
-  val defaults = m3("MenuDefaults")
-  val group =
-    Call(
-      m3("DropdownMenuGroup"),
-      listOf(
-        arg("shapes", "$defaults.groupShape(0, 1)"),
-        arg("containerColor", colorRole("surfaceContainer")),
-      ),
-      lambda(
-        items.flatMapIndexed { i, id ->
-          emit(
-            id,
-            Place(
-              parentType = "Menu",
-              listPosition = ListPosition(false, i.toString(), items.size.toString()),
-            ),
-          )
-        },
-      ),
-    )
+  val vibrant = p.literal("colors") == ColorStyle.VIBRANT
+  val layout = MenuSpec.layout(menu, byId)
+  // A menu with nothing drawn at any size class has no popup, not an empty group.
+  if (layout == MenuSpec.Layout.Empty) return emptyList()
+  // A menu of items is one group; a menu of groups holds each group, a gap apart.
+  val groups =
+    if (layout == MenuSpec.Layout.Items) {
+      listOf(menu)
+    } else {
+      // Templated groups are not exported (as before): the menu keeps its empty group.
+      drawnIds(menu, "items").filter { it.component == MenuSpec.GROUP }.ifEmpty { listOf(menu) }
+    }
+  val declarations = groups.flatMap { menuState(it) }
+  val inMenu = Place(parentType = "Menu", menuVibrant = vibrant)
+  val drawn =
+    if (groups.singleOrNull() === menu) menuGroup(menu, p, inMenu)
+    else groups.flatMap { emit(it.id, inMenu) }
   val popup =
     Call(
       m3("DropdownMenuPopup"),
@@ -2037,31 +2335,128 @@ internal fun ScreenEmitter.menuStatements(menu: ComponentNode): List<Stmt> {
         arg("expanded", shown),
         arg("onDismissRequest", lambda(Assign(shown, "=", Raw("false")))),
       ),
-      lambda(stmt(group)),
+      lambda(drawn),
     )
-  return listOf(stmt(popup))
+  return declarations + stmt(popup)
+}
+
+/**
+ * One `DropdownMenuGroup` of a menu, behind the gap that separates it from the group before it
+ * (where there is one at a size class). A `MenuGroup` takes its place among its menu's groups; a
+ * menu of items is the only group.
+ */
+private fun ScreenEmitter.menuGroup(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
+  val defaults = m3("MenuDefaults")
+  val menu = if (node.component == "Menu") null else enclosingOverlay(node.id)?.let(byId::get)
+  val position =
+    if (menu == null) ListPosition(false, "0", "1")
+    else positionIn(menu, "items", node.id, "MenuGroup")
+  val items = drawnIds(node, "items")
+  val selection =
+    if (items.any { MenuSpec.Role.Single in menuRoles(it) }) {
+      ChipSelection(stateName(node.id, "Selected"))
+    } else {
+      null
+    }
+  val inner = Place(parentType = "Menu", menuVibrant = place.menuVibrant, chipSelection = selection)
+  val content = items.flatMap { item ->
+    emit(item.id, inner.copy(listPosition = positionIn(node, "items", item.id)))
+  }
+  val container =
+    if (place.menuVibrant) "$defaults.groupVibrantContainerColor" else colorRole("surfaceContainer")
+  // The gap shows only at the size classes where a group comes before this one.
+  val sizes = SizeClass.entries.filter(node::isShownAt)
+  val gapAt = sizes.filter { size ->
+    menu != null &&
+      shownAt(menu, "items", size).filter { byId[it]?.component == "MenuGroup" }.indexOf(node.id) >
+        0
+  }
+  val spacer =
+    stmt(
+      Call(
+        file.use(Sym.Spacer),
+        listOf(
+          pos(Chain(file.use(Sym.Modifier), listOf(useModifier("height($defaults.GroupSpacing)")))),
+        ),
+      ),
+    )
+  val gap =
+    when {
+      gapAt.isEmpty() -> emptyList()
+      gapAt.size == sizes.size -> listOf(spacer)
+      else -> {
+        usesSizeClass = true
+        listOf(IfStmt(listOf(condition(gapAt.toSet()) to listOf(spacer)), null))
+      }
+    }
+  return gap +
+    one(
+      m3("DropdownMenuGroup"),
+      listOf(
+        arg("shapes", "$defaults.groupShape(${position.index}, ${position.count})"),
+        modifier(Place(parentType = "Menu"), p),
+        arg("containerColor", container),
+      ),
+      content,
+    )
 }
 
 private fun ScreenEmitter.menuItem(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val defaults = m3("MenuDefaults")
   val position = place.listPosition
+  val role = MenuSpec.role(p.choice("MenuItem", "role"))
+  val vibrant = place.menuVibrant
   val label = p.text("label", place) ?: Raw("\"\"")
-  val close =
-    byId.values
-      .firstOrNull { it.component == "Menu" && node.id in childIds(it) }
-      ?.let { overlayVar(it.id) }
+  val close = enclosingOverlay(node.id)?.let { overlayVar(it) }
   val action =
     actionStatements(p["action"], node.id) +
-      listOfNotNull(close?.let { Assign(it, "=", Raw("false")) })
-  return one(
-    m3("DropdownMenuItem"),
-    listOf(
-      arg("text", lambdaOf(textOf(label))),
-      arg("onClick", lambda(action)),
-      position?.let { arg("shape", "$defaults.itemShape(${it.index}, ${it.count}).shape") },
-      p.iconName("icon", place)?.let { arg("leadingIcon", lambdaOf(icon(it))) },
-    ),
-  )
+      listOfNotNull(close?.takeIf { role.closesMenu }?.let { Assign(it, "=", Raw("false")) })
+  val text = arg("text", lambdaOf(textOf(label)))
+  val leading = p.iconName("icon", place)?.let { arg("leadingIcon", lambdaOf(icon(it))) }
+  val shapes = position?.let { "$defaults.itemShape(${it.index}, ${it.count})" }
+  return when (role) {
+    MenuSpec.Role.Action ->
+      one(
+        m3("DropdownMenuItem"),
+        listOf(
+          text,
+          arg("onClick", lambda(action)),
+          shapes?.let { arg("shape", "$it.shape") },
+          leading,
+          if (vibrant) arg("colors", "$defaults.itemVibrantColors()") else null,
+        ),
+      )
+    MenuSpec.Role.Single -> {
+      val selection = place.chipSelection
+      val picked = selection?.picks(node.id) ?: "false"
+      val choose = listOfNotNull(selection?.choose(node.id))
+      one(
+        m3("SelectableDropdownMenuItem"),
+        listOf(
+          arg("selected", picked),
+          arg("onClick", lambda(choose + action)),
+          text,
+          shapes?.let { arg("shapes", it) },
+          leading,
+          if (vibrant) arg("colors", "$defaults.selectableItemVibrantColors()") else null,
+        ),
+      )
+    }
+    MenuSpec.Role.Multi -> {
+      val checked = stateName(node.id, "Checked")
+      one(
+        m3("CheckableDropdownMenuItem"),
+        listOf(
+          arg("checked", checked),
+          arg("onCheckedChange", assignIt(checked, action)),
+          text,
+          shapes?.let { arg("shapes", it) },
+          leading,
+          if (vibrant) arg("colors", "$defaults.selectableItemVibrantColors()") else null,
+        ),
+      )
+    }
+  }
 }
 
 // endregion

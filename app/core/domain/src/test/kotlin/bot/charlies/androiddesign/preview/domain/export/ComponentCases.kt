@@ -841,6 +841,307 @@ internal val componentCases: List<ComponentCase> =
       reject = listOf("rootSelected"),
     ),
     // Inputs
+    // Radio buttons, indeterminate checkboxes, switch icons, centered and vertical sliders
+    case(
+      "RadioGroup",
+      "RadioButton",
+      components =
+        listOf(
+          """{"id":"root","component":"RadioGroup","children":["a","b"]}""",
+          """{"id":"a","component":"RadioButton","label":"Small"}""",
+          """{"id":"b","component":"RadioButton","label":"Large","selected":true,"action":{"functionCall":{"@call":"back"}}}""",
+        ),
+      expect =
+        listOf(
+          "var rootSelected by remember { mutableStateOf(\"b\") }",
+          "Column(modifier = modifier.fillMaxWidth().selectableGroup())",
+          "Row(",
+          "heightIn(min = 48.dp)",
+          "selectable(selected = rootSelected == \"a\"",
+          "role = Role.RadioButton",
+          "onClick = { rootSelected = \"a\" }",
+          "rootSelected = \"b\"",
+          "onBack()",
+          "RadioButton(selected = rootSelected == \"a\", onClick = null)",
+          "horizontalArrangement = Arrangement.spacedBy(12.dp)",
+          "Text(\"Small\")",
+        ),
+      reject = listOf("var aSelected"),
+    ),
+    case(
+      "DockedToolbar",
+      components =
+        listOf(
+          """{"id":"root","component":"Scaffold","bottomBar":"x","content":"c"}""",
+          """{"id":"x","component":"DockedToolbar","colors":"vibrant","children":["i"]}""",
+          """{"id":"i","component":"IconButton","icon":"edit","contentDescription":"Edit"}""",
+          """{"id":"c","component":"Column","children":[]}""",
+        ),
+      expect =
+        listOf(
+          "bottomBar = {",
+          "FlexibleBottomAppBar(",
+          "containerColor = MaterialTheme.colorScheme.primaryContainer",
+          "contentColor = MaterialTheme.colorScheme.onPrimaryContainer",
+        ),
+      reject = listOf("iconButtonColors"),
+    ),
+    case(
+      "DockedToolbar",
+      components =
+        listOf(
+          """{"id":"root","component":"Scaffold","bottomBar":"x","content":"c"}""",
+          """{"id":"x","component":"DockedToolbar","children":[]}""",
+          """{"id":"c","component":"Column","children":[]}""",
+        ),
+      expect = listOf("bottomBar = { FlexibleBottomAppBar {} }"),
+      reject = listOf("containerColor", "HorizontalFloatingToolbar"),
+    ),
+    case(
+      "Switch",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"Switch","checked":true,"icons":"both"}""",
+        ),
+      expect =
+        listOf(
+          "thumbContent = {",
+          "painterResource(if (xChecked) R.drawable.check else R.drawable.close)",
+          "Modifier.size(SwitchDefaults.IconSize)",
+        ),
+    ),
+    case(
+      "Switch",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"Switch","icons":"selected"}""",
+        ),
+      expect = listOf("thumbContent = if (xChecked) {", "R.drawable.check"),
+      reject = listOf("R.drawable.close"),
+    ),
+    case(
+      "Checkbox",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"Checkbox","indeterminate":true,"label":"All"}""",
+        ),
+      expect =
+        listOf(
+          "var xIndeterminate by remember { mutableStateOf(true) }",
+          "TriStateCheckbox(",
+          "state = if (xIndeterminate) ToggleableState.Indeterminate else if (xChecked) ToggleableState.On else ToggleableState.Off",
+          "xChecked = xIndeterminate || !xChecked",
+          "xIndeterminate = false",
+        ),
+      reject = listOf("Checkbox(checked"),
+    ),
+    case(
+      "Slider",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"Slider","variant":"centered","value":0,"range":[-1,1]}""",
+        ),
+      expect =
+        listOf(
+          "val xState = rememberSliderState(value = 0f, trackRange = -1f..1f)",
+          "Slider(state = xState, onValueChange = { xState.value = it }",
+          "track = { SliderDefaults.CenteredTrack(sliderState = it) }",
+        ),
+    ),
+    case(
+      "Slider",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"Slider","orientation":"vertical","value":0.5}""",
+        ),
+      expect =
+        listOf(
+          "val xState = rememberSliderState(value = 0.5f)",
+          "VerticalSlider(",
+          "state = xState",
+          "VerticalSlider(state = xState, onValueChange = { xState.value = it }, modifier = Modifier.height(200.dp), topToBottom = false)",
+        ),
+      reject = listOf("CenteredTrack"),
+    ),
+    case(
+      "Menu",
+      "MenuGroup",
+      "MenuItem",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","colors":"vibrant","items":["g1","g2"]}""",
+          """{"id":"g1","component":"MenuGroup","items":["s1","s2"]}""",
+          """{"id":"g2","component":"MenuGroup","items":["k1","a1"]}""",
+          """{"id":"s1","component":"MenuItem","label":"Newest","role":"single","selected":true}""",
+          """{"id":"s2","component":"MenuItem","label":"Oldest","role":"single"}""",
+          """{"id":"k1","component":"MenuItem","label":"Unread","role":"multi","selected":true}""",
+          """{"id":"a1","component":"MenuItem","label":"Settings","icon":"settings"}""",
+        ),
+      expect =
+        listOf(
+          "var g1Selected by remember { mutableStateOf(\"s1\") }",
+          "var k1Checked by remember { mutableStateOf(true) }",
+          "shapes = MenuDefaults.groupShape(0, 2)",
+          "shapes = MenuDefaults.groupShape(1, 2)",
+          "Spacer(Modifier.height(MenuDefaults.GroupSpacing))",
+          "containerColor = MenuDefaults.groupVibrantContainerColor",
+          "SelectableDropdownMenuItem(",
+          "selected = g1Selected == \"s1\"",
+          "onClick = { g1Selected = \"s1\" showM = false }",
+          "shapes = MenuDefaults.itemShape(0, 2)",
+          "colors = MenuDefaults.selectableItemVibrantColors()",
+          "CheckableDropdownMenuItem(",
+          "checked = k1Checked",
+          "onCheckedChange = { k1Checked = it }",
+          "DropdownMenuItem(",
+          "colors = MenuDefaults.itemVibrantColors()",
+        ),
+      reject = listOf("surfaceContainer", "k1Checked = it showM"),
+    ),
+    case(
+      "FloatingToolbar",
+      components =
+        listOf(
+          """{"id":"root","component":"Scaffold","bottomBar":"x","content":"c"}""",
+          """{"id":"x","component":"FloatingToolbar","colors":"vibrant","children":["i","o"]}""",
+          """{"id":"i","component":"IconButton","icon":"edit","contentDescription":"Edit"}""",
+          """{"id":"o","component":"IconButton","variant":"outlined","icon":"share","contentDescription":"Share"}""",
+          """{"id":"c","component":"Column","children":[]}""",
+        ),
+      expect = listOf("HorizontalFloatingToolbar("),
+      reject = listOf("iconButtonColors", "outlinedIconButtonColors"),
+    ),
+    case(
+      "MenuItem",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","items":["i"]}""",
+          """{"id":"i","component":"MenuItem","label":"Unread","sizeClass":{"medium":{"role":"multi","selected":true}}}""",
+        ),
+      expect =
+        listOf(
+          "var iChecked by remember { mutableStateOf(if (!atLeastMedium) false else true) }",
+          "CheckableDropdownMenuItem(",
+          "DropdownMenuItem(",
+        ),
+    ),
+    case(
+      "MenuGroup",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","items":["g1","g2","g3"]}""",
+          """{"id":"g1","component":"MenuGroup","items":["a1"],"showIn":["medium","expanded"]}""",
+          """{"id":"g2","component":"MenuGroup","items":["a2"]}""",
+          """{"id":"g3","component":"MenuGroup","items":["a3"]}""",
+          """{"id":"a1","component":"MenuItem","label":"One"}""",
+          """{"id":"a2","component":"MenuItem","label":"Two"}""",
+          """{"id":"a3","component":"MenuItem","label":"Three"}""",
+        ),
+      expect =
+        listOf(
+          "groupShape(0, 3)",
+          "groupShape(if (!atLeastMedium) 0 else 1, if (!atLeastMedium) 2 else 3)",
+          "groupShape(if (!atLeastMedium) 1 else 2, if (!atLeastMedium) 2 else 3)",
+          "Text(\"One\")",
+          "Text(\"Two\")",
+          "Text(\"Three\")",
+        ),
+    ),
+    case(
+      "MenuItem",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","items":["a","c"]}""",
+          """{"id":"a","component":"MenuItem","label":"A"}""",
+          """{"id":"c","component":"MenuItem","label":"C","showIn":["medium","expanded"],"action":{"functionCall":{"@call":"back"}}}""",
+        ),
+      expect =
+        listOf(
+          "itemShape(0, if (!atLeastMedium) 1 else 2)",
+          "itemShape(1, 2)",
+          "Text(\"C\")",
+          "onBack()",
+        ),
+    ),
+    case(
+      "MenuItem",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","items":["i"]}""",
+          """{"id":"i","component":"MenuItem","label":"Unread","role":"multi","selected":false,"sizeClass":{"medium":{"selected":true}}}""",
+        ),
+      expect =
+        listOf("var iChecked by remember { mutableStateOf(if (!atLeastMedium) false else true) }"),
+    ),
+    case(
+      "MenuItem",
+      "MenuGroup",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","items":["a","h"]}""",
+          """{"id":"a","component":"MenuItem","label":"Shown"}""",
+          """{"id":"h","component":"MenuItem","label":"Hidden","role":"multi","showIn":[]}""",
+        ),
+      expect = listOf("itemShape(0, 1)", "Text(\"Shown\")"),
+      reject = listOf("Hidden", "hChecked"),
+    ),
+    case(
+      "MenuGroup",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","items":["g"]}""",
+          """{"id":"g","component":"MenuGroup","items":["a"],"showIn":[]}""",
+          """{"id":"a","component":"MenuItem","label":"Never"}""",
+        ),
+      expect = listOf("Button("),
+      reject = listOf("DropdownMenuPopup", "DropdownMenuGroup", "Never"),
+    ),
+    case(
+      "MenuItem",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","items":["g","x"]}""",
+          """{"id":"g","component":"MenuGroup","items":["a"],"showIn":[]}""",
+          """{"id":"a","component":"MenuItem","label":"Never"}""",
+          """{"id":"x","component":"MenuItem","label":"Kept"}""",
+        ),
+      expect = listOf("groupShape(0, 1)", "Text(\"Kept\")"),
+      reject = listOf("Never"),
+    ),
+    case(
+      "RadioGroup",
+      components =
+        listOf(
+          """{"id":"root","component":"RadioGroup","children":["a","b"]}""",
+          """{"id":"a","component":"RadioButton","label":"Small","selected":true,"sizeClass":{"medium":{"selected":false}}}""",
+          """{"id":"b","component":"RadioButton","label":"Large","sizeClass":{"medium":{"selected":true}}}""",
+        ),
+      expect =
+        listOf(
+          "var rootSelected by remember { mutableStateOf(if (!atLeastMedium) \"a\" else \"b\") }",
+        ),
+    ),
     case(
       "Switch",
       components = listOf(ROOT_COLUMN, """{"id":"x","component":"Switch","checked":true}"""),

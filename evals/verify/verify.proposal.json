@@ -1607,8 +1607,12 @@
             "chips",
             "chip_group",
             "controls",
+            "check_partial",
             "slider",
             "range_slider",
+            "slider_centered",
+            "slider_vertical",
+            "radio_group",
             "fields",
             "feedback",
             "vertical_toolbar",
@@ -1722,13 +1726,15 @@
           "id": "switch_on",
           "component": "Switch",
           "checked": true,
-          "contentDescription": "Wi-Fi"
+          "contentDescription": "Wi-Fi",
+          "icons": "both"
         },
         {
           "id": "switch_off",
           "component": "Switch",
           "checked": false,
-          "contentDescription": "Bluetooth"
+          "contentDescription": "Bluetooth",
+          "icons": "selected"
         },
         {
           "id": "check_on",
@@ -2030,6 +2036,64 @@
           "component": "Button",
           "variant": "text",
           "label": "Learn more"
+        },
+        {
+          "id": "check_partial",
+          "component": "Checkbox",
+          "indeterminate": true,
+          "label": "Partly"
+        },
+        {
+          "id": "radio_small",
+          "component": "RadioButton",
+          "label": "Small"
+        },
+        {
+          "id": "radio_medium",
+          "component": "RadioButton",
+          "label": "Medium",
+          "selected": true,
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "radio_large",
+          "component": "RadioButton",
+          "label": "Large"
+        },
+        {
+          "id": "radio_group",
+          "component": "RadioGroup",
+          "children": [
+            "radio_small",
+            "radio_medium",
+            "radio_large"
+          ]
+        },
+        {
+          "id": "slider_centered",
+          "component": "Slider",
+          "variant": "centered",
+          "value": 0,
+          "range": [
+            -50,
+            50
+          ],
+          "contentDescription": "Balance"
+        },
+        {
+          "id": "slider_vertical",
+          "component": "Slider",
+          "orientation": "vertical",
+          "value": 60,
+          "range": [
+            0,
+            100
+          ],
+          "contentDescription": "Brightness"
         }
       ]
     },
@@ -2264,7 +2328,8 @@
             "open_dialog",
             "open_fabs",
             "open_collections",
-            "open_feedback"
+            "open_feedback",
+            "menu_vibrant_anchor"
           ]
         },
         {
@@ -2438,6 +2503,96 @@
               "@call": "navigate",
               "args": {
                 "screen": "feedback"
+              }
+            }
+          }
+        },
+        {
+          "id": "menu_sort_newest",
+          "component": "MenuItem",
+          "label": "Newest",
+          "role": "single",
+          "selected": true,
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "menu_sort_oldest",
+          "component": "MenuItem",
+          "label": "Oldest",
+          "role": "single"
+        },
+        {
+          "id": "menu_unread",
+          "component": "MenuItem",
+          "label": "Unread",
+          "role": "multi",
+          "selected": true
+        },
+        {
+          "id": "menu_starred",
+          "component": "MenuItem",
+          "label": "Starred",
+          "role": "multi"
+        },
+        {
+          "id": "menu_settings",
+          "component": "MenuItem",
+          "label": "Settings",
+          "icon": "settings",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "menu_group_sort",
+          "component": "MenuGroup",
+          "items": [
+            "menu_sort_newest",
+            "menu_sort_oldest"
+          ]
+        },
+        {
+          "id": "menu_group_filter",
+          "component": "MenuGroup",
+          "items": [
+            "menu_unread",
+            "menu_starred"
+          ]
+        },
+        {
+          "id": "menu_group_more",
+          "component": "MenuGroup",
+          "items": [
+            "menu_settings"
+          ]
+        },
+        {
+          "id": "menu_vibrant",
+          "component": "Menu",
+          "anchor": "menu_vibrant_anchor",
+          "colors": "vibrant",
+          "items": [
+            "menu_group_sort",
+            "menu_group_filter",
+            "menu_group_more"
+          ]
+        },
+        {
+          "id": "menu_vibrant_anchor",
+          "component": "IconButton",
+          "icon": "sort",
+          "contentDescription": "Sort and filter",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "menu_vibrant"
               }
             }
           }
@@ -2651,7 +2806,8 @@
           "id": "root",
           "component": "Scaffold",
           "topBar": "top",
-          "content": "body"
+          "content": "body",
+          "bottomBar": "docked"
         },
         {
           "id": "top",
@@ -3020,6 +3176,34 @@
           "padding": "md",
           "maxLines": 1,
           "overflow": "ellipsis"
+        },
+        {
+          "id": "docked_edit",
+          "component": "IconButton",
+          "icon": "edit",
+          "contentDescription": "Edit"
+        },
+        {
+          "id": "docked_share",
+          "component": "IconButton",
+          "icon": "share",
+          "contentDescription": "Share"
+        },
+        {
+          "id": "docked_more",
+          "component": "IconButton",
+          "icon": "more_vert",
+          "contentDescription": "More"
+        },
+        {
+          "id": "docked",
+          "component": "DockedToolbar",
+          "colors": "vibrant",
+          "children": [
+            "docked_edit",
+            "docked_share",
+            "docked_more"
+          ]
         }
       ]
     },

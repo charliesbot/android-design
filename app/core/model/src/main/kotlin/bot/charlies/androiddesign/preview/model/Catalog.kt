@@ -376,7 +376,7 @@ object M3ExpressiveCatalog : Catalog {
 
   /** Names of the navigation components, in the order a view lists them. */
   override val navigationNames: List<String> =
-    listOf("NavigationBar", "NavigationRail", "FloatingToolbar")
+    listOf("NavigationBar", "NavigationRail", "FloatingToolbar", "DockedToolbar")
 }
 
 // region registry definitions
@@ -707,7 +707,7 @@ private fun structure(): List<ComponentDef> =
       "Scaffold",
       listOf(
         child("topBar", "TopAppBar"),
-        child("bottomBar", "NavigationBar", "FloatingToolbar"),
+        child("bottomBar", "NavigationBar", "FloatingToolbar", "DockedToolbar"),
         child("floatingActionButton", "FloatingActionButton", "FabMenu"),
         child("content", required = true),
         child("navigationRail", "NavigationRail"),
@@ -827,6 +827,18 @@ private fun structure(): List<ComponentDef> =
         oneOf("colors", "standard", "vibrant", default = "standard"),
         children("children", required = true),
       ),
+    ),
+    ComponentDef(
+      "DockedToolbar",
+      ComponentGroup.Structure,
+      "A toolbar docked to the bottom of the window, full width, in the Scaffold's bottomBar " +
+        "slot. It replaces the bottom app bar and is never shown with a navigation bar.",
+      "FlexibleBottomAppBar",
+      listOf(
+        oneOf("colors", "standard", "vibrant", default = "standard"),
+        children("children", required = true),
+      ),
+      width = WidthFill.Always,
     ),
     ComponentDef(
       "Card",
@@ -1063,7 +1075,19 @@ private fun inputs(): List<ComponentDef> =
       ComponentGroup.Inputs,
       "An on and off switch.",
       "Switch",
-      listOf(bool("checked"), action()) + interactiveProps,
+      listOf(
+        bool("checked"),
+        oneOf(
+          "icons",
+          "none",
+          "selected",
+          "both",
+          description =
+            "The icon in the thumb: a check when on (`selected`), plus a close when off (`both`).",
+          default = "none",
+        ),
+        action(),
+      ) + interactiveProps,
       interactive = true,
     ),
     ComponentDef(
@@ -1071,7 +1095,16 @@ private fun inputs(): List<ComponentDef> =
       ComponentGroup.Inputs,
       "A checkbox with an optional label.",
       "Checkbox",
-      listOf(bool("checked"), text("label"), action()) + interactiveProps,
+      listOf(
+        bool("checked"),
+        bool(
+          "indeterminate",
+          "Partly selected, such as a parent whose children are only partly checked. It shows a " +
+            "dash and takes the place of `checked`; a tap checks the box.",
+        ),
+        text("label"),
+        action(),
+      ) + interactiveProps,
       interactive = true,
     ),
     ComponentDef(
@@ -1083,9 +1116,26 @@ private fun inputs(): List<ComponentDef> =
         num("value", "Current value."),
         range("range", "[min, max]; [0, 1] by default."),
         num("steps", bounds = NumberBounds(0.0, 100.0, whole = true), default = 0),
+        oneOf(
+          "variant",
+          "standard",
+          "centered",
+          description =
+            "Centered fills from the middle of the range to the handle, for a range that " +
+              "crosses zero.",
+          default = "standard",
+        ),
+        oneOf(
+          "orientation",
+          "horizontal",
+          "vertical",
+          description =
+            "A vertical slider has a fixed height, so it never stretches across the width.",
+          default = "horizontal",
+        ),
       ) + interactiveProps,
       interactive = true,
-      width = WidthFill.Always,
+      width = WidthFill.UnlessIs("orientation", "vertical"),
     ),
     ComponentDef(
       "RangeSlider",
@@ -1097,6 +1147,24 @@ private fun inputs(): List<ComponentDef> =
         range("range", "[min, max]; [0, 1] by default."),
         num("steps", bounds = NumberBounds(0.0, 100.0, whole = true), default = 0),
       ) + interactiveProps,
+      interactive = true,
+      width = WidthFill.Always,
+    ),
+    ComponentDef(
+      "RadioGroup",
+      ComponentGroup.Inputs,
+      "A vertical list of radio buttons. Exactly one is selected, and a tap moves the selection.",
+      "Column with Modifier.selectableGroup()",
+      listOf(children("children", "RadioButton", required = true)),
+      stretchesChildren = true,
+      width = WidthFill.Always,
+    ),
+    ComponentDef(
+      "RadioButton",
+      ComponentGroup.Inputs,
+      "One option of a RadioGroup, with its label. The whole row is the touch target.",
+      "RadioButton in a Row with Modifier.selectable(role = Role.RadioButton)",
+      listOf(text("label", required = true), bool("selected"), action()) + interactiveProps,
       interactive = true,
       width = WidthFill.Always,
     ),
@@ -1213,16 +1281,56 @@ private fun overlays(): List<ComponentDef> =
       ComponentGroup.Overlays,
       "A popup menu anchored to a component.",
       "DropdownMenuPopup with DropdownMenuGroup and DropdownMenuItem",
-      listOf(child("anchor"), children("items", "MenuItem", required = true)),
+      listOf(
+        child("anchor"),
+        oneOf(
+          "colors",
+          "standard",
+          "vibrant",
+          description = "Vibrant is tertiary-based and more prominent: use it sparingly.",
+          default = "standard",
+        ),
+        children(
+          "items",
+          "MenuItem",
+          "MenuGroup",
+          required = true,
+          description = "MenuItems, or MenuGroups of MenuItems (not both).",
+        ),
+      ),
       overlay = true,
+      stretchesChildren = true,
+    ),
+    ComponentDef(
+      "MenuGroup",
+      ComponentGroup.Overlays,
+      "A group of a Menu, set apart from its neighbors by a gap. Single-select items select " +
+        "within their group.",
+      "DropdownMenuGroup with MenuDefaults.groupShape(index, count)",
+      listOf(children("items", "MenuItem", required = true)),
       stretchesChildren = true,
     ),
     ComponentDef(
       "MenuItem",
       ComponentGroup.Overlays,
       "One entry of a Menu.",
-      "DropdownMenuItem",
-      listOf(text("label", required = true), icon(), action()),
+      "DropdownMenuItem, SelectableDropdownMenuItem or CheckableDropdownMenuItem",
+      listOf(
+        text("label", required = true),
+        icon(),
+        oneOf(
+          "role",
+          "action",
+          "single",
+          "multi",
+          description =
+            "Action runs and closes the menu. Single is one choice of its group: the selection " +
+              "moves and the menu closes. Multi toggles and the menu stays open.",
+          default = "action",
+        ),
+        bool("selected", "Single and multi only: the initial selection."),
+        action(),
+      ),
       interactive = true,
     ),
     ComponentDef(

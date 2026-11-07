@@ -1,22 +1,39 @@
 package bot.charlies.androiddesign.preview.feature.preview.render
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.triStateToggleable
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SliderState
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TriStateCheckbox
+import androidx.compose.material3.VerticalSlider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
+import bot.charlies.androiddesign.preview.domain.RadioSpec
+import bot.charlies.androiddesign.preview.domain.SliderSpec
+import bot.charlies.androiddesign.preview.domain.SwitchSpec
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.TypeRole
 
@@ -26,6 +43,16 @@ internal fun NodeContext.switchLook() =
   } else {
     Look(ColorRole.SurfaceContainerHighest, ColorRole.Outline, shape = "full", a11yRole = "Switch")
   }
+
+/**
+ * The thumb icon at the switch's state: a check when on, a close when off, each only as far as
+ * `icons` says. Material: "icons that clearly communicate whether the switch is on or off, such as
+ * an X and a checkmark".
+ */
+private fun NodeContext.switchThumbIcon(checked: Boolean): (@Composable () -> Unit)? {
+  val name = SwitchSpec.iconAt(enum("icons"), checked) ?: return null
+  return { SymbolIcon(name, size = SwitchDefaults.IconSize) }
+}
 
 @Composable
 internal fun RenderSwitch(ctx: NodeContext) {
@@ -38,6 +65,7 @@ internal fun RenderSwitch(ctx: NodeContext) {
     },
     modifier = ctx.modifier().then(ctx.describedBy()),
     enabled = ctx.enabled,
+    thumbContent = ctx.switchThumbIcon(checked.value),
   )
 }
 
@@ -50,34 +78,103 @@ internal fun NodeContext.checkboxLook(ambient: Ambient) =
     a11yRole = "Checkbox",
   )
 
+/** The box's tri-state: indeterminate (a dash) wins over `checked`; a tap on it checks the box. */
+private fun checkboxState(indeterminate: Boolean, checked: Boolean) =
+  when {
+    indeterminate -> ToggleableState.Indeterminate
+    checked -> ToggleableState.On
+    else -> ToggleableState.Off
+  }
+
 @Composable
 internal fun RenderCheckbox(ctx: NodeContext) {
   val checked = ctx.checkedState()
+  val indeterminate = ctx.local("indeterminate", ctx.bool("indeterminate"))
   val label = ctx.string("label")
   val onChange: (Boolean) -> Unit = {
     checked.set(it)
+    indeterminate.set(false)
     ctx.env.act(ctx.props.action("action"))
   }
+  val state = checkboxState(indeterminate.value, checked.value)
+  // A tap on an indeterminate box checks it, as it does a clear one.
+  val next = state != ToggleableState.On
   if (label == null) {
-    Checkbox(checked.value, onChange, ctx.modifier().then(ctx.describedBy()), ctx.enabled)
+    TriStateCheckbox(
+      state,
+      { onChange(next) },
+      ctx.modifier().then(ctx.describedBy()),
+      ctx.enabled,
+    )
   } else {
     Row(
       modifier =
         ctx
           .modifier()
-          .toggleable(
-            value = checked.value,
+          .triStateToggleable(
+            state = state,
             enabled = ctx.enabled,
             role = Role.Checkbox,
-            onValueChange = onChange,
+            onClick = { onChange(next) },
           )
           .then(ctx.describedBy()),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      Checkbox(checked.value, null, enabled = ctx.enabled)
+      TriStateCheckbox(state, null, enabled = ctx.enabled)
       Spacer(Modifier.width(4.dp))
       ctx.PartText(label, style = ctx.env.typeStyle(TypeRole.BodyLarge))
     }
+  }
+}
+
+internal fun NodeContext.radioGroupLook(ambient: Ambient) = Look(ambient)
+
+/** The label is on surface and does not change with the state; the button is primary when on. */
+internal fun NodeContext.radioButtonLook(ambient: Ambient) =
+  Look(
+    ambient.container,
+    ColorRole.OnSurface,
+    TypeRole.BodyLarge,
+    text = string("label"),
+    a11yRole = "RadioButton",
+  )
+
+@Composable
+internal fun RenderRadioGroup(ctx: NodeContext) {
+  Column(ctx.modifier().selectableGroup()) {
+    ctx.Children(
+      "children",
+      0,
+      ChildHost(fillWidth = ctx.def.stretchesChildren, column = this, groupKey = ctx.id),
+    )
+  }
+}
+
+@Composable
+internal fun RenderRadioButton(ctx: NodeContext) {
+  val group = ctx.host.groupKey
+  val selected = if (group == null) ctx.bool("selected") else ctx.isPickedIn(group)
+  val onClick = {
+    group?.let(ctx::selectInGroup)
+    ctx.env.act(ctx.props.action("action"))
+  }
+  Row(
+    modifier =
+      ctx
+        .modifier()
+        .heightIn(min = RadioSpec.MIN_HEIGHT_DP.dp)
+        .selectable(
+          selected = selected,
+          enabled = ctx.enabled,
+          role = Role.RadioButton,
+          onClick = onClick,
+        )
+        .then(ctx.describedBy()),
+    horizontalArrangement = Arrangement.spacedBy(RadioSpec.GAP_DP.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    RadioButton(selected = selected, onClick = null, enabled = ctx.enabled)
+    ctx.PartText(ctx.string("label").orEmpty(), style = ctx.env.typeStyle(TypeRole.BodyLarge))
   }
 }
 
@@ -98,15 +195,52 @@ internal fun RenderSlider(ctx: NodeContext) {
       "value",
       (ctx.props.float("value") ?: range.start).coerceIn(range.start, range.endInclusive),
     )
-  Slider(
-    // The kept value may predate an edit that narrowed the range.
-    value = value.value.coerceIn(range.start, range.endInclusive),
-    onValueChange = { value.set(it) },
-    modifier = ctx.modifier().then(ctx.describedBy()),
-    enabled = ctx.enabled,
-    valueRange = range,
-    steps = ctx.wholeOrDefault("steps"),
-  )
+  // The kept value may predate an edit that narrowed the range.
+  val current = value.value.coerceIn(range.start, range.endInclusive)
+  val vertical = ctx.enum("orientation") == "vertical"
+  val centered = ctx.enum("variant") == "centered"
+  val modifier = ctx.modifier().then(ctx.describedBy())
+  val steps = ctx.wholeOrDefault("steps")
+  if (!vertical && !centered) {
+    Slider(
+      value = current,
+      onValueChange = { value.set(it) },
+      modifier = modifier,
+      enabled = ctx.enabled,
+      valueRange = range,
+      steps = steps,
+    )
+    return
+  }
+  // The centered track and the vertical slider take a SliderState, which holds the value itself.
+  val state = remember(range, steps) { SliderState(current, steps, range) }
+  if (state.value != current) state.value = current
+  val change: (Float) -> Unit = {
+    state.value = it
+    value.set(it)
+  }
+  val track: @Composable (SliderState) -> Unit = {
+    if (centered) SliderDefaults.CenteredTrack(sliderState = it) else SliderDefaults.Track(it)
+  }
+  if (vertical) {
+    VerticalSlider(
+      state = state,
+      onValueChange = change,
+      modifier = modifier.height(SliderSpec.VERTICAL_HEIGHT_DP.dp),
+      // Material: zero is at the bottom.
+      topToBottom = false,
+      enabled = ctx.enabled,
+      track = track,
+    )
+  } else {
+    Slider(
+      state = state,
+      onValueChange = change,
+      modifier = modifier,
+      enabled = ctx.enabled,
+      track = track,
+    )
+  }
 }
 
 @Composable

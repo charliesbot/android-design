@@ -21,8 +21,9 @@ import kotlin.math.round
  * The checks a rendered view must pass, run over its layout tree: touch targets, fonts, clipped or
  * truncated text, contrast, a primary action at least as tall as its rivals, one FAB per pane,
  * content past the view's edges, a compact carousel with too many text items, and a navigation bar
- * with fewer than three destinations. [tree] arrives with its nodes and no findings yet. Findings
- * come out in rule order, then in document order.
+ * with fewer than three destinations, and a docked toolbar drawn with a navigation bar. [tree]
+ * arrives with its nodes and no findings yet. Findings come out in rule order, then in document
+ * order.
  *
  * A node with no area is not laid out (a closed overlay is never composed), so the rules that
  * measure geometry skip it. While a modal sheet or dialog is open, everything outside it is inert
@@ -109,7 +110,8 @@ object FindingRules {
       offscreen(view) +
       roundEdgeClipped(view) +
       carouselItems(view) +
-      navDestinations(view)
+      navDestinations(view) +
+      dockedToolbarWithNavBar(view)
   }
 
   // region the view
@@ -525,6 +527,29 @@ object FindingRules {
       }
   }
 
+  /**
+   * Material: docked toolbars go "only at the bottom of the window, never alongside other
+   * bottom-aligned elements such as a nav bar", and the navigation bar and a toolbar "sit at the
+   * bottom so should not be shown at the same time". A Scaffold's bottom bar slot holds one
+   * component, so this can only happen when a navigation bar is drawn elsewhere on the view, such
+   * as inside the content or beside the toolbar in another pane. The tree holds what the view draws
+   * at its width, so a size class override is already applied.
+   */
+  private fun dockedToolbarWithNavBar(view: View): List<Finding> {
+    if (view.nodes.none { it.type == NAVIGATION_BAR && it.isLaidOut }) return emptyList()
+    return view.nodes
+      .filter { it.type == DOCKED_TOOLBAR && it.isLaidOut }
+      .map {
+        errorFinding(
+          it,
+          FindingRule.DockedToolbarNavBar,
+          "a docked toolbar and a navigation bar are both at the bottom; show the navigation " +
+            "bar on primary pages and the toolbar on pages with actions",
+        )
+      }
+  }
+
+  private const val DOCKED_TOOLBAR = "DockedToolbar"
   private const val NAVIGATION_BAR = "NavigationBar"
   private const val NAVIGATION_BAR_ITEM = "NavigationBarItem"
   private const val MIN_DESTINATIONS = 3

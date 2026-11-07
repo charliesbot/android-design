@@ -51,7 +51,10 @@ internal class Scope(
  */
 internal class ListPosition(val segmented: Boolean, val index: String, val count: String)
 
-/** A `ChipGroup` with single selection: one state variable holds the selected chip id. */
+/**
+ * A group with single selection (a `ChipGroup`, a `RadioGroup`, the single-select items of a menu
+ * group): one state variable holds the id of the selected child.
+ */
 internal class ChipSelection(val state: String)
 
 /**
@@ -113,6 +116,8 @@ internal data class Place(
   /** `ButtonGroupDefaults.connectedMiddleButtonShapes()` for a child of a connected group. */
   val groupShapes: String? = null,
   val chipSelection: ChipSelection? = null,
+  /** True for an item of a vibrant `Menu`. */
+  val menuVibrant: Boolean = false,
   /** True for a floating toolbar placed over content in a `Box`. */
   val floating: Boolean = false,
   val scrollBehavior: Boolean = false,
@@ -128,6 +133,7 @@ internal data class Place(
       listPosition = null,
       groupShapes = null,
       chipSelection = null,
+      menuVibrant = false,
       floating = false,
       scrollBehavior = false,
     )

@@ -775,4 +775,139 @@ class ProposalValidatorTest {
     errors(bar)
       .assertHas(plates("${bar.indexOf("field")}") + "/sizeClass/medium/trailing", "at most 2")
   }
+
+  // region selection groups
+
+  private fun radios(vararg selected: Boolean, extra: String = "") =
+    selected.indices.fold(
+      base.with(
+        "group",
+        """{"id":"group","component":"RadioGroup","children":[${selected.indices.joinToString { "\"r$it\"" }}]$extra}""",
+      ),
+    ) { acc, i ->
+      acc.with(
+        "r$i",
+        """{"id":"r$i","component":"RadioButton","label":"Option $i"${if (selected[i]) ""","selected":true""" else ""}}""",
+      )
+    }
+
+  @Test
+  fun `a radio group has exactly one selected button`() {
+    assertEquals(emptyList(), errors(radios(false, true, false)))
+    val none = radios(false, false)
+    errors(none).assertHas(plates("${none.indexOf("group")}") + "/children", "exactly one selected")
+    val two = radios(true, true)
+    errors(two).assertHas(plates("${two.indexOf("group")}") + "/children", "got 2")
+  }
+
+  @Test
+  fun `a radio button hidden at a size class does not count there`() {
+    val hidden =
+      radios(true, true)
+        .with(
+          "r1",
+          """{"id":"r1","component":"RadioButton","label":"Two","selected":true,"showIn":["expanded"]}""",
+        )
+    val found = errors(hidden).filter { "exactly one selected" in it.message }
+    assertEquals(1, found.size, "$found")
+    assertTrue(found.single().message.endsWith("got 2 at expanded"), found.single().message)
+  }
+
+  @Test
+  fun `a radio group whose selection comes from data is not judged`() {
+    val bound =
+      radios(true, false)
+        .with(
+          "r1",
+          """{"id":"r1","component":"RadioButton","label":"Two","selected":{"@path":"/two"}}""",
+        )
+    assertEquals(emptyList(), errors(bound).filter { "exactly one selected" in it.message })
+  }
+
+  @Test
+  fun `a malformed selected value is left to the prop checks and does not crash`() {
+    val odd =
+      radios(true, false)
+        .with("r1", """{"id":"r1","component":"RadioButton","label":"Two","selected":"yes"}""")
+    errors(odd)
+  }
+
+  private fun menuOf(vararg items: String) =
+    items
+      .foldIndexed(base) { i, acc, item -> acc.with("i$i", item.replace("ID", "i$i")) }
+      .with(
+        "menu",
+        """{"id":"menu","component":"Menu","anchor":"more","items":[${items.indices.joinToString { "\"i$it\"" }}]}""",
+      )
+
+  private fun single(selected: Boolean) =
+    """{"id":"ID","component":"MenuItem","label":"A","role":"single"${if (selected) ""","selected":true""" else ""}}"""
+
+  @Test
+  fun `a single-select menu group has at most one selected item`() {
+    assertEquals(emptyList(), errors(menuOf(single(true), single(false))))
+    assertEquals(emptyList(), errors(menuOf(single(false), single(false))))
+    val two = menuOf(single(true), single(true))
+    errors(two).assertHas(plates("${two.indexOf("menu")}") + "/items", "one at a time")
+  }
+
+  @Test
+  fun `a multi-select menu may select any number`() {
+    val multi = """{"id":"ID","component":"MenuItem","label":"A","role":"multi","selected":true}"""
+    assertEquals(emptyList(), errors(menuOf(multi, multi)))
+  }
+
+  @Test
+  fun `single-select items are counted per menu group`() {
+    val grouped =
+      menuOf(single(true), single(true))
+        .with("g1", """{"id":"g1","component":"MenuGroup","items":["i0"]}""")
+        .with("g2", """{"id":"g2","component":"MenuGroup","items":["i1"]}""")
+        .with("menu", """{"id":"menu","component":"Menu","anchor":"more","items":["g1","g2"]}""")
+    assertEquals(emptyList(), errors(grouped))
+  }
+
+  @Test
+  fun `a menu holds items or groups, not both`() {
+    val mixed =
+      menuOf(single(false), single(false))
+        .with("g1", """{"id":"g1","component":"MenuGroup","items":["i0"]}""")
+        .with("menu", """{"id":"menu","component":"Menu","anchor":"more","items":["g1","i1"]}""")
+    errors(mixed).assertHas(plates("${mixed.indexOf("menu")}") + "/items", "not both")
+  }
+
+  @Test
+  fun `a menu's groups and items may not mix across size classes either`() {
+    val shown =
+      menuOf(single(false), single(false))
+        .with(
+          "g1",
+          """{"id":"g1","component":"MenuGroup","items":["i0"],"showIn":["medium","expanded"]}""",
+        )
+        .with(
+          "i1",
+          """{"id":"i1","component":"MenuItem","label":"A","showIn":["compact"]}""",
+        )
+        .with("menu", """{"id":"menu","component":"Menu","anchor":"more","items":["g1","i1"]}""")
+    errors(shown).assertHas(plates("${shown.indexOf("menu")}") + "/items", "not both")
+    val overridden =
+      menuOf(single(false), single(false))
+        .with("g1", """{"id":"g1","component":"MenuGroup","items":["i0"]}""")
+        .with(
+          "menu",
+          """{"id":"menu","component":"Menu","anchor":"more","items":["i1"],"sizeClass":{"medium":{"items":["g1"]}}}""",
+        )
+    errors(overridden).assertHas(plates("${overridden.indexOf("menu")}") + "/items", "not both")
+  }
+
+  @Test
+  fun `a group hidden at every size does not make a menu of items mixed`() {
+    val hidden =
+      menuOf(single(false), single(false))
+        .with("g1", """{"id":"g1","component":"MenuGroup","items":["i0"],"showIn":[]}""")
+        .with("menu", """{"id":"menu","component":"Menu","anchor":"more","items":["g1","i1"]}""")
+    assertEquals(emptyList(), errors(hidden).filter { "not both" in it.message })
+  }
+
+  // endregion
 }

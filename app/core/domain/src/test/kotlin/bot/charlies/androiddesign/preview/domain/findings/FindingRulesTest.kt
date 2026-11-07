@@ -403,6 +403,14 @@ class FindingRulesTest {
   }
 
   @Test
+  fun `primary-largest ignores buttons inside a docked toolbar`() {
+    val primary = button("cook", primary = true, h = 40f)
+    val toolbar = node("toolbar", "DockedToolbar", y = 800f, w = 411f, h = 80f)
+    val inside = button("more", parent = "toolbar", y = 806f, h = 96f)
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(primary, toolbar, inside))))
+  }
+
+  @Test
   fun `primary-largest ignores toggle buttons inside a floating toolbar`() {
     val primary = button("cook", primary = true, h = 40f)
     val toolbar = node("toolbar", "FloatingToolbar", y = 800f, w = 280f, h = 64f)
@@ -571,6 +579,40 @@ class FindingRulesTest {
   fun `nav-destinations ignores a bar that is not drawn`() {
     val bar = node("bar", "NavigationBar", w = 0f, h = 0f)
     assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(bar))).of(FindingRule.NavDestinations))
+  }
+
+  // endregion
+
+  // region docked-toolbar-nav-bar
+
+  @Test
+  fun `docked-toolbar-nav-bar fails when a navigation bar is drawn beside a docked toolbar`() {
+    val toolbar = node("toolbar", "DockedToolbar", y = 800f, w = 411f, h = 80f)
+    val bar = node("bar", "NavigationBar", y = 700f, w = 411f, h = 80f)
+    val finding =
+      evaluate(tree(nodes = arrayOf(toolbar, bar))).of(FindingRule.DockedToolbarNavBar).single()
+    assertEquals("toolbar", finding.id)
+    assertEquals(Severity.Error, finding.severity)
+  }
+
+  @Test
+  fun `docked-toolbar-nav-bar passes for either alone and for a bar that is not drawn`() {
+    val toolbar = node("toolbar", "DockedToolbar", y = 800f, w = 411f, h = 80f)
+    val bar = node("bar", "NavigationBar", y = 800f, w = 411f, h = 80f)
+    val hidden = node("hidden", "NavigationBar", w = 0f, h = 0f)
+    assertEquals(
+      emptyList(),
+      evaluate(tree(nodes = arrayOf(toolbar))).of(FindingRule.DockedToolbarNavBar),
+    )
+    assertEquals(
+      emptyList(),
+      evaluate(tree(nodes = arrayOf(bar, *destinations("bar", 3))))
+        .of(FindingRule.DockedToolbarNavBar),
+    )
+    assertEquals(
+      emptyList(),
+      evaluate(tree(nodes = arrayOf(toolbar, hidden))).of(FindingRule.DockedToolbarNavBar),
+    )
   }
 
   // endregion

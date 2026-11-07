@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.CheckableDropdownMenuItem
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
@@ -28,6 +29,7 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.RichTooltip
+import androidx.compose.material3.SelectableDropdownMenuItem
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarDuration
@@ -52,6 +54,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import bot.charlies.androiddesign.preview.domain.ColorStyle
+import bot.charlies.androiddesign.preview.domain.MenuSpec
 import bot.charlies.androiddesign.preview.domain.SideSheetSpec
 import bot.charlies.androiddesign.preview.domain.TooltipSpec
 import bot.charlies.androiddesign.preview.model.ColorRole
@@ -107,6 +111,13 @@ internal fun MenuOverlay(
 private val BottomSheetAmbient = Ambient(ColorRole.SurfaceContainerLow, ColorRole.OnSurface)
 private val DialogAmbient = Ambient(ColorRole.SurfaceContainerHigh, ColorRole.OnSurface)
 private val MenuAmbient = Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurface)
+private val VibrantMenuAmbient = Ambient(ColorRole.TertiaryContainer, ColorRole.OnTertiaryContainer)
+
+/** Whether this menu is vibrant: tertiary based and more prominent than the standard one. */
+private val NodeContext.vibrantMenu: Boolean
+  get() = enum("colors") == ColorStyle.VIBRANT
+
+private fun menuAmbient(vibrant: Boolean) = if (vibrant) VibrantMenuAmbient else MenuAmbient
 
 internal fun NodeContext.bottomSheetLook() = Look(BottomSheetAmbient, shape = "extraLarge")
 
@@ -150,47 +161,186 @@ internal fun RenderDialog(ctx: NodeContext) {
   }
 }
 
-internal fun NodeContext.menuLook() = Look(MenuAmbient, shape = "extraLarge")
+internal fun NodeContext.menuLook() = Look(menuAmbient(vibrantMenu), shape = "extraLarge")
 
+private fun NodeContext.menuLayout() = MenuSpec.layout(node, env.nodes)
+
+/**
+ * A menu of items is one group; a menu of `MenuGroup`s holds the groups, a gap apart. The popup
+ * itself has no container: each `DropdownMenuGroup` draws its own.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderMenu(ctx: NodeContext) {
-  CompositionLocalProvider(LocalAmbient provides MenuAmbient) {
+  // A menu with nothing drawn at any size class draws no popup, not an empty group.
+  if (ctx.menuLayout() == MenuSpec.Layout.Empty) return
+  val vibrant = ctx.vibrantMenu
+  val ambient = menuAmbient(vibrant)
+  CompositionLocalProvider(LocalAmbient provides ambient) {
     DropdownMenuPopup(expanded = true, onDismissRequest = { ctx.env.act(ActionCall.Dismiss) }) {
-      DropdownMenuGroup(
-        shapes = MenuDefaults.groupShape(0, 1),
-        modifier = ctx.modifier(),
-        containerColor = ctx.env.color(MenuAmbient.container),
-      ) {
-        ctx.Children("items", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))
+      if (ctx.menuLayout() != MenuSpec.Layout.Items) {
+        // The popup is itself a column: groups sit in it directly, each as wide as its content.
+        ctx.ShownChildren(
+          "items",
+          0,
+          ChildHost(fillWidth = false, column = this, vibrantMenu = vibrant),
+        )
+      } else {
+        DropdownMenuGroup(
+          shapes = MenuDefaults.groupShape(0, 1),
+          modifier = ctx.modifier(),
+          containerColor = menuContainer(ctx.env, vibrant),
+        ) {
+          ctx.ShownChildren(
+            "items",
+            0,
+            ChildHost(
+              fillWidth = ctx.def.stretchesChildren,
+              column = this,
+              groupKey = ctx.id,
+              vibrantMenu = vibrant,
+            ),
+          )
+        }
       }
     }
   }
 }
 
-internal fun NodeContext.menuItemLook() =
-  Look(
-    MenuAmbient,
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun menuContainer(env: RenderEnv, vibrant: Boolean) =
+  if (vibrant) MenuDefaults.groupVibrantContainerColor else env.color(MenuAmbient.container)
+
+internal fun NodeContext.menuGroupLook() = Look(menuAmbient(host.vibrantMenu), shape = "extraLarge")
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun RenderMenuGroup(ctx: NodeContext) {
+  val vibrant = ctx.host.vibrantMenu
+  if (ctx.host.groupIndex > 0) Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+  DropdownMenuGroup(
+    shapes = MenuDefaults.groupShape(ctx.host.groupIndex, ctx.host.groupCount),
+    modifier = ctx.modifier(),
+    containerColor = menuContainer(ctx.env, vibrant),
+  ) {
+    ctx.ShownChildren(
+      "items",
+      0,
+      ChildHost(
+        fillWidth = ctx.def.stretchesChildren,
+        column = this,
+        groupKey = ctx.id,
+        vibrantMenu = vibrant,
+      ),
+    )
+  }
+}
+
+private fun NodeContext.menuItemRole() = MenuSpec.role(enum("role"))
+
+/** Whether this selectable item is selected: its stored state, else its prop. */
+private fun NodeContext.menuItemSelected(): Boolean =
+  when (menuItemRole()) {
+    MenuSpec.Role.Action -> false
+    MenuSpec.Role.Single -> host.groupKey?.let { isPickedIn(it) } ?: bool("selected")
+    MenuSpec.Role.Multi -> storedBool("selected")
+  }
+
+/**
+ * A selected item swaps its colors: tertiary container in a standard menu and tertiary in a vibrant
+ * one. The rest sit on the menu's container.
+ */
+internal fun NodeContext.menuItemLook(): Look {
+  val vibrant = host.vibrantMenu
+  val ambient = menuAmbient(vibrant)
+  val selected = menuItemSelected()
+  val container =
+    when {
+      !selected -> ambient.container
+      vibrant -> ColorRole.Tertiary
+      else -> ColorRole.TertiaryContainer
+    }
+  val content =
+    when {
+      !selected -> ambient.content
+      vibrant -> ColorRole.OnTertiary
+      else -> ColorRole.OnTertiaryContainer
+    }
+  return Look(
+    container,
+    content,
     TypeRole.LabelLarge,
     text = string("label"),
-    a11yRole = "Button",
+    a11yRole =
+      when (menuItemRole()) {
+        MenuSpec.Role.Action -> "Button"
+        MenuSpec.Role.Single -> "RadioButton"
+        MenuSpec.Role.Multi -> "Checkbox"
+      },
   )
+}
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderMenuItem(ctx: NodeContext) {
+  val role = ctx.menuItemRole()
+  val vibrant = ctx.host.vibrantMenu
   val icon = ctx.string("icon")
-  DropdownMenuItem(
-    onClick = {
-      ctx.env.act(ctx.props.action("action"))
-      // Choosing an item closes its menu unless the action already moved on.
-      if (ctx.props.action("action") !is ActionCall.Open) ctx.env.act(ActionCall.Dismiss)
-    },
-    text = { ctx.PartText(ctx.string("label").orEmpty()) },
-    shape = MenuDefaults.itemShape(ctx.host.groupIndex, ctx.host.groupCount).shape,
-    modifier = ctx.modifier(),
-    leadingIcon = icon?.let { name -> { SymbolIcon(name) } },
-  )
+  val leading: (@Composable () -> Unit)? = icon?.let { name -> { SymbolIcon(name) } }
+  val text: @Composable () -> Unit = { ctx.PartText(ctx.string("label").orEmpty()) }
+  val shapes = MenuDefaults.itemShape(ctx.host.groupIndex, ctx.host.groupCount)
+  val choose = {
+    ctx.env.act(ctx.props.action("action"))
+    // Choosing an option closes its menu unless the action already moved on; a multi-select menu
+    // stays open until it is dismissed.
+    if (role.closesMenu && ctx.props.action("action") !is ActionCall.Open) {
+      ctx.env.act(ActionCall.Dismiss)
+    }
+  }
+  when (role) {
+    MenuSpec.Role.Action ->
+      DropdownMenuItem(
+        onClick = choose,
+        text = text,
+        shape = shapes.shape,
+        modifier = ctx.modifier(),
+        leadingIcon = leading,
+        colors = if (vibrant) MenuDefaults.itemVibrantColors() else MenuDefaults.itemColors(),
+      )
+    MenuSpec.Role.Single ->
+      SelectableDropdownMenuItem(
+        selected = ctx.menuItemSelected(),
+        onClick = {
+          ctx.host.groupKey?.let(ctx::selectInGroup)
+          choose()
+        },
+        text = text,
+        shapes = shapes,
+        modifier = ctx.modifier(),
+        leadingIcon = leading,
+        colors =
+          if (vibrant) MenuDefaults.selectableItemVibrantColors()
+          else MenuDefaults.selectableItemColors(),
+      )
+    MenuSpec.Role.Multi -> {
+      val checked = ctx.checkedState("selected")
+      CheckableDropdownMenuItem(
+        checked = checked.value,
+        onCheckedChange = {
+          checked.set(it)
+          choose()
+        },
+        text = text,
+        shapes = shapes,
+        modifier = ctx.modifier(),
+        leadingIcon = leading,
+        colors =
+          if (vibrant) MenuDefaults.selectableItemVibrantColors()
+          else MenuDefaults.selectableItemColors(),
+      )
+    }
+  }
 }
 
 private val SideSheetAmbient = Ambient(ColorRole.SurfaceContainerLow, ColorRole.OnSurface)

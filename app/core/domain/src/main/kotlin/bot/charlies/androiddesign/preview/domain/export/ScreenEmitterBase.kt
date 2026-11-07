@@ -384,6 +384,9 @@ internal abstract class ScreenEmitterBase(
 
   fun overlayVar(id: String) = "show${Naming.pascal(id)}"
 
+  /** The id of the overlay that holds [componentId], or null when it is in none. */
+  fun enclosingOverlay(componentId: String): String? = overlayOf[componentId]
+
   /** What `open(id)` does: raise the overlay's flag. */
   protected open fun openOverlay(id: String): Stmt = Assign(overlayVar(id), "=", Raw("true"))
 
@@ -462,6 +465,8 @@ internal abstract class ScreenEmitterBase(
         "clip" to Sym.clip,
         "nestedScroll" to Sym.nestedScroll,
         "semantics" to Sym.semantics,
+        "selectable" to Sym.selectable,
+        "selectableGroup" to Sym.selectableGroup,
       )
   }
 }
