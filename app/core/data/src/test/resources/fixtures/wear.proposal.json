@@ -10,7 +10,7 @@
         { "id": "header", "component": "ListHeader", "text": "Timer" },
         { "id": "ring", "component": "Text", "text": "05:00", "type": "numeralLarge", "color": "primaryDim", "align": "center", "sizeClass": {"large": {"type": "numeralExtraLarge"}} },
         { "id": "gear", "component": "Button", "variant": "child", "label": "Settings", "icon": "settings", "action": {"functionCall": {"@call": "navigate", "args": {"screen": "settings"}}} },
-        { "id": "start", "component": "EdgeButton", "label": "Start", "icon": "play_arrow", "action": {"functionCall": {"@call": "navigate", "args": {"screen": "adjust"}}} }
+        { "id": "start", "component": "EdgeButton", "label": "Start", "action": {"functionCall": {"@call": "navigate", "args": {"screen": "adjust"}}} }
       ]
     },
     "settings": {

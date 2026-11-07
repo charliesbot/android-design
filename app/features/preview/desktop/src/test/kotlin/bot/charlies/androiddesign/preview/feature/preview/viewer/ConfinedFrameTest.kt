@@ -149,5 +149,40 @@ class ConfinedFrameTest {
     }
   }
 
+  @Test
+  fun `a round frame is painted in the stage colour so its corners stay off the bezel`() {
+    assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display")
+    val state =
+      ViewerState(
+        name = "Round",
+        screens = listOf("home"),
+        design = designOf(),
+        host =
+          ProposalHostState(singleScreen("""{"id":"root","component":"Text","text":"Page"}""")),
+        device = Device.Watch,
+      )
+    lateinit var window: JFrame
+    lateinit var outer: ComposePanel
+    SwingUtilities.invokeAndWait {
+      outer = ComposePanel()
+      outer.setContent {
+        ViewerContent(state, NoActions, { h, d, v, f, s -> ConfinedFrame(h, d, v, f, s) })
+      }
+      window = JFrame("round")
+      window.contentPane.add(outer)
+      window.setSize(1100, 1000)
+      window.isVisible = true
+    }
+    try {
+      assertTrue(await { onEdt { panels(window).any { it !== outer } } }, "frame drawn")
+      val frame = onEdt { panels(window).first { it !== outer } }
+      // The panel is square, so what it paints beyond the bezel's circle is the stage's colour.
+      val stage = ThemeResolver.resolve(designOf(), dark = false).colorScheme.surface
+      assertEquals(java.awt.Color(stage.toArgb(), true), onEdt { frame.background })
+    } finally {
+      SwingUtilities.invokeAndWait { window.dispose() }
+    }
+  }
+
   private fun Rectangle.grow(by: Int) = Rectangle(x - by, y - by, width + 2 * by, height + 2 * by)
 }

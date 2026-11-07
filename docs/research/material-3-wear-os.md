@@ -504,7 +504,10 @@ Source root: `wear/compose/compose-material3/src/main/java/androidx/wear/compose
   inside a `CurvedScope`.
 - **Edge-hugging button:** `EdgeButton(onClick, buttonSize = EdgeButtonSize.Small, ...)`
   with sizes ExtraSmall 46, Small 56, Medium 70, Large 96dp; place it through
-  `ScreenScaffold(edgeButton = ...)`.
+  `ScreenScaffold(edgeButton = ...)`. Its content slot is "Either an Icon or
+  Text" and "a single icon can be used instead of the text" (KDoc of
+  `EdgeButton` in Wear Compose Material 3): give it a label or an icon, not
+  both. Sizes take 1 line of text (ExtraSmall), 2 (Small, Medium), or 3 (Large).
 - **Button group:** `ButtonGroup(...)`; in its scope, give each button its own
   `MutableInteractionSource`, apply `Modifier.animateWidth(interactionSource)`,
   and pass the same source to the button. Pressed buttons widen and squeeze

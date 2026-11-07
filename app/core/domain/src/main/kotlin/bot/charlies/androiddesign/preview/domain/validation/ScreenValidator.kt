@@ -478,6 +478,7 @@ internal class ScreenValidator(
     fun touched(vararg keys: String) = changed == null || keys.any { it in changed }
     /** Where to report a problem between [first] and the range: the first if it is set here. */
     fun at(first: String) = path.child(if (touched(first)) first else "range")
+    if (def.name == "EdgeButton") validateEdgeButtonContent(path, props, changed)
     if (def.name !in RANGE_COMPONENTS) return
     val (min, max) = rangeOf(props) ?: return
     if (min >= max) {
@@ -504,6 +505,21 @@ internal class ScreenValidator(
             "value [${format(start)}, ${format(end)}] is outside the range [${format(min)}, ${format(max)}]",
           )
       }
+    }
+  }
+
+  /**
+   * The Wear API doc's content slot of an edge button is "Either an Icon or Text": exactly one of
+   * `icon` and `label`, never both, and a button with neither draws nothing.
+   */
+  private fun validateEdgeButtonContent(path: String, props: JsonObject, changed: Set<String>?) {
+    if (changed != null && "icon" !in changed && "label" !in changed) return
+    if (("icon" in props) == ("label" in props)) {
+      sink.add(
+        path,
+        "an EdgeButton takes exactly one of icon or label: its content is \"Either an Icon or " +
+          "Text\" in the Wear Compose API",
+      )
     }
   }
 

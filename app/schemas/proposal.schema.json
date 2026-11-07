@@ -4612,11 +4612,12 @@
           "default": "small"
         },
         "label": {
-          "$ref": "#/$defs/DynamicString"
+          "$ref": "#/$defs/DynamicString",
+          "description": "Short text. Set exactly one of label or icon."
         },
         "icon": {
           "$ref": "#/$defs/DynamicString",
-          "description": "Material Symbols name, such as \"home\"."
+          "description": "Material Symbols name, shown instead of a label. Set exactly one of label or icon."
         },
         "action": {
           "$ref": "#/$defs/Action",

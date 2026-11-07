@@ -229,7 +229,7 @@ private fun Stage(
 internal const val DEVICE_FRAME_TAG = "deviceFrame"
 
 /** The bezel around the screen, drawn for every device. */
-private val FrameRing = 10.dp
+internal val FrameRing = 10.dp
 
 /** The largest scale at most 1 at which a frame fits the space. */
 internal fun fitScale(
