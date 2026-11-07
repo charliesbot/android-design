@@ -787,6 +787,27 @@ class FindingRulesTest {
   }
 
   @Test
+  fun `overflow measures any overlay against the view, not its tree parent`() {
+    val pane = node("pane", "Column", w = 150f, h = 100f)
+    val sheet = node("sheet", "BottomSheet", w = 411f, h = 300f, parent = "pane")
+    val inside = node("handle", "Row", w = 400f, h = 48f, parent = "sheet")
+    assertEquals(emptyList(), overflow(pane, sheet, inside))
+    val past =
+      node(
+        "sheet",
+        "BottomSheet",
+        w = 411f,
+        h = 300f,
+        parent = "pane",
+        layout = Bounds(0f, 0f, 500f, 300f),
+      )
+    assertEquals("ends 89 dp past the view", overflow(pane, past).single().detail)
+    val wide = node("handle", "Row", w = 411f, h = 48f, parent = "sheet")
+    val narrow = node("sheet", "BottomSheet", w = 300f, h = 300f, parent = "pane")
+    assertEquals("ends 111 dp past sheet", overflow(pane, narrow, wide).single().detail)
+  }
+
+  @Test
   fun `overflow names the parent before its children`() {
     val card = node("card", "Card", w = 150f, h = 100f)
     val row = node("row", "Row", w = 200f, h = 48f, parent = "card")
