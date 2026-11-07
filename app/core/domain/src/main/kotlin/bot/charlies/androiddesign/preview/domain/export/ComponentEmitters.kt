@@ -519,7 +519,7 @@ private fun ScreenEmitter.textComponent(p: JsonObject, place: Place): List<Stmt>
     stmt(
       textOf(
         text,
-        modifier(place, p),
+        modifier(place, p, *containerBackground(p)),
         opt("color", p.literal("color")?.let(::colorRole)),
         opt("textAlign", align),
         opt("overflow", overflow),
@@ -1267,10 +1267,9 @@ private fun ScreenEmitter.iconButton(node: ComponentNode, p: JsonObject, place: 
       ?.let { "${m3("IconButtonDefaults.IconButtonWidthOption")}.${Naming.pascal(it)}" }
   val onSurfaceVariant = colorRole("onSurfaceVariant")
   // Inside a toolbar the button keeps the default colors, which take the toolbar's content color.
-  val inToolbar = place.parentType == "FloatingToolbar" || place.parentType == "DockedToolbar"
   val colors: Expr? =
     when {
-      toggle || inToolbar -> null
+      toggle || place.inToolbar -> null
       variant == "standard" ->
         Call("$defaults.iconButtonColors", listOf(arg("contentColor", onSurfaceVariant)))
       variant == "outlined" ->

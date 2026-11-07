@@ -20,7 +20,7 @@ internal fun RenderList(ctx: NodeContext) {
   val segmented = ctx.enum("variant") == "segmented"
   ctx.StyledAmbient {
     Column(
-      modifier = ctx.modifier().then(ctx.styleBackground()),
+      modifier = ctx.modifier(container = true),
       verticalArrangement =
         if (segmented) Arrangement.spacedBy(ListItemDefaults.SegmentedGap) else Arrangement.Top,
     ) {

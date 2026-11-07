@@ -121,10 +121,16 @@ internal data class Place(
   /** True for a floating toolbar placed over content in a `Box`. */
   val floating: Boolean = false,
   val scrollBehavior: Boolean = false,
+  /**
+   * True for a child of a floating or docked toolbar, whose icon buttons take the toolbar's content
+   * color. Kept when a tooltip or menu wraps the child, which makes [parentType] a `Box`.
+   */
+  val inToolbar: Boolean = false,
 ) : Scoped {
   fun forChild(parentType: String) =
     copy(
       parentType = parentType,
+      inToolbar = parentType == "FloatingToolbar" || parentType == "DockedToolbar",
       parentStretches = M3ExpressiveCatalog.find(parentType)?.stretchesChildren ?: false,
       fillWidth = false,
       fillHeight = false,
