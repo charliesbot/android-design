@@ -211,6 +211,79 @@ class TabsAndCarouselRenderTest {
     assertEquals(emptyList(), croppedCarousel(""","align":"center"""").cropped())
   }
 
+  /** A hero carousel of six text items on the foldable view, whose last items scroll past it. */
+  private fun heroCarousel(): LayoutTree {
+    val ids = (1..6).joinToString(",") { "\"c$it\"" }
+    val items =
+      (1..6).joinToString(",") {
+        """{"id":"c$it","component":"Column","children":["x$it"]},""" +
+          """{"id":"x$it","component":"Text","text":"Shakshuka $it","maxLines":1}"""
+      }
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"stage"},""" +
+          """{"id":"stage","component":"Column","children":["gallery"]},""" +
+          """{"id":"gallery","component":"Carousel","variant":"hero","children":[$ids]},$items""",
+      )
+    return render(proposal, view = Views.Foldable).tree
+  }
+
+  @Test
+  fun `carousel items past the window edge are clipped to it, not reported offscreen`() {
+    val tree = heroCarousel()
+    val width = Views.Foldable.width.toFloat()
+    val items = tree.nodes.filter { it.parent == "gallery" && it.isLaidOut }
+    assertTrue(items.isNotEmpty())
+    for (item in items) {
+      assertTrue(item.bounds.x + item.bounds.width <= width + 0.5f, "${item.id} ${item.bounds}")
+    }
+    assertEquals(emptyList(), tree.findings.filter { it.rule == FindingRule.Offscreen })
+    // The window clips the text of an item at its edge. That is scrolling, not the mask cropping.
+    val atEdge = items.filter { it.bounds.x + it.bounds.width >= width - 1f }.map { it.id }.toSet()
+    assertTrue(atEdge.isNotEmpty(), "no item reaches the window edge: ${items.map { it.bounds }}")
+    val texts =
+      tree.findings.filter { it.rule == FindingRule.TextClipped && "ends" in it.detail.orEmpty() }
+    assertEquals(
+      emptyList(),
+      texts.filter { f -> tree.nodes.first { it.id == f.id }.parent in atEdge },
+    )
+  }
+
+  @Test
+  fun `carousel items are clipped to the carousel inside a padded parent`() {
+    val ids = (1..6).joinToString(",") { "\"c$it\"" }
+    val items =
+      (1..6).joinToString(",") {
+        """{"id":"c$it","component":"Column","children":["x$it"]},""" +
+          """{"id":"x$it","component":"Text","text":"Shakshuka $it","maxLines":1}"""
+      }
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"stage"},""" +
+          """{"id":"stage","component":"Column","padding":"xl","children":["gallery"]},""" +
+          """{"id":"gallery","component":"Carousel","itemWidth":186,"children":[$ids]},$items""",
+      )
+    val tree = render(proposal, view = Views.Light).tree
+    val gallery = tree.node("gallery")
+    val edge = gallery.bounds.x + gallery.bounds.width
+    val shown = tree.nodes.filter { it.parent == "gallery" && it.isLaidOut }
+    assertTrue(shown.isNotEmpty())
+    for (item in shown) {
+      assertTrue(
+        item.bounds.x + item.bounds.width <= edge + 0.5f,
+        "${item.id} ${item.bounds} edge $edge",
+      )
+    }
+    val atEdge = shown.filter { it.bounds.x + it.bounds.width >= edge - 1f }.map { it.id }.toSet()
+    assertTrue(atEdge.isNotEmpty(), "no item reaches the carousel edge")
+    val ends =
+      tree.findings.filter { it.rule == FindingRule.TextClipped && "ends" in it.detail.orEmpty() }
+    assertEquals(
+      emptyList(),
+      ends.filter { f -> tree.nodes.first { it.id == f.id }.parent in atEdge },
+    )
+  }
+
   private fun androidx.compose.ui.test.ComposeUiTest.settleForTest() {
     with(bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessRenderer) { settle() }
   }

@@ -50,7 +50,7 @@ object FindingRules {
   private const val OVERFLOW_SLACK_DP = 0.5f
 
   /** Components whose children scroll sideways, so they are meant to run past their parent. */
-  private val horizontalScrollers = setOf("Carousel", "TabRow")
+  private val horizontalScrollers = setOf(CAROUSEL, TABS)
 
   internal val fabTypes = M3ExpressiveCatalog.fabNames
   internal val modalTypes = M3ExpressiveCatalog.modalNames
@@ -245,7 +245,9 @@ object FindingRules {
    * an item on both sides (a large item is laid out wider than it shows), and the tree records the
    * item as the mask shows it, so a text that starts or ends outside it is cut off. A text is
    * judged by the glyphs it drew, as the round-edge rule does, since a centered text's box spans
-   * the item while its glyphs do not; without them, by its unclipped layout box.
+   * the item while its glyphs do not; without them, by its unclipped layout box. The item's bounds
+   * are also cut to its carousel's (and so to the window), so an edge that sits on the carousel's
+   * is not the mask's.
    */
   private fun croppedByCarouselItem(view: View): List<Finding> =
     view.nodes.mapNotNull { node ->
@@ -253,8 +255,13 @@ object FindingRules {
       val item = view.carouselItem(node) ?: return@mapNotNull null
       if (!item.isLaidOut) return@mapNotNull null
       val box = node.text?.ink ?: node.layout ?: node.bounds
-      val before = item.bounds.x - box.x
-      val past = box.right() - item.right()
+      // Where the carousel cuts the item (its own edge, which is inside the window), the carousel
+      // clips the text: that is scrolling, not the mask.
+      val carousel = view.tree.nodes.firstOrNull { it.id == item.parent }
+      val start = carousel?.bounds?.x ?: 0f
+      val end = carousel?.right() ?: view.tree.view.width.toFloat()
+      val before = if (item.bounds.x <= start + EDGE_SLACK_DP) 0f else item.bounds.x - box.x
+      val past = if (item.right() >= end - EDGE_SLACK_DP) 0f else box.right() - item.right()
       val detail =
         when {
           before > OVERFLOW_SLACK_DP ->
@@ -613,6 +620,7 @@ object FindingRules {
     node.text != null || children[node.id].orEmpty().any { holdsText(it, children) }
 
   private const val CAROUSEL = "Carousel"
+  private const val TABS = "Tabs"
   private const val MAX_COMPACT_CAROUSEL_ITEMS = 3
 
   // endregion
