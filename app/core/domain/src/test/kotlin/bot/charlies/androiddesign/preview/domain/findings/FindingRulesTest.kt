@@ -473,6 +473,28 @@ class FindingRulesTest {
 
   // region carousel-items
 
+  private fun clippedText(itemX: Float, itemW: Float, textX: Float, textW: Float) =
+    evaluate(
+        tree(
+          Views.Light,
+          node("gallery", "Carousel", w = 411f, h = 200f),
+          node("item", "Card", parent = "gallery", x = itemX, y = 0f, w = itemW, h = 200f),
+          node("label", "Text", parent = "item", x = textX, y = 50f, w = textW, text = text()),
+        ),
+      )
+      .of(FindingRule.TextClipped)
+
+  @Test
+  fun `text-clipped leaves text cut by the window at a carousel item's edge alone`() {
+    // The item ends at the 411 dp window, so the window clips the text, not the mask.
+    assertEquals(emptyList(), clippedText(itemX = 300f, itemW = 111f, textX = 316f, textW = 200f))
+  }
+
+  @Test
+  fun `text-clipped flags text past a carousel item's mask inside the window`() {
+    assertEquals(1, clippedText(itemX = 100f, itemW = 111f, textX = 116f, textW = 200f).size)
+  }
+
   private fun carousel(vararg itemWidths: Pair<Float, Float>, withText: Boolean = true) =
     arrayOf(node("gallery", "Carousel", y = 100f, w = 411f, h = 200f)) +
       itemWidths.flatMapIndexed { i, (x, w) ->

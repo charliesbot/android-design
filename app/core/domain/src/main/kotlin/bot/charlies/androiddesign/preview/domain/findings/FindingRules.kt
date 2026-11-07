@@ -245,7 +245,8 @@ object FindingRules {
    * an item on both sides (a large item is laid out wider than it shows), and the tree records the
    * item as the mask shows it, so a text that starts or ends outside it is cut off. A text is
    * judged by the glyphs it drew, as the round-edge rule does, since a centered text's box spans
-   * the item while its glyphs do not; without them, by its unclipped layout box.
+   * the item while its glyphs do not; without them, by its unclipped layout box. The item's bounds
+   * are also cut to the window, so an edge that sits on the window's is not the mask's.
    */
   private fun croppedByCarouselItem(view: View): List<Finding> =
     view.nodes.mapNotNull { node ->
@@ -253,8 +254,11 @@ object FindingRules {
       val item = view.carouselItem(node) ?: return@mapNotNull null
       if (!item.isLaidOut) return@mapNotNull null
       val box = node.text?.ink ?: node.layout ?: node.bounds
-      val before = item.bounds.x - box.x
-      val past = box.right() - item.right()
+      // Where the item is cut by the window, the window clips the text: that is scrolling, not
+      // the mask.
+      val windowWidth = view.tree.view.width.toFloat()
+      val before = if (item.bounds.x <= EDGE_SLACK_DP) 0f else item.bounds.x - box.x
+      val past = if (item.right() >= windowWidth - EDGE_SLACK_DP) 0f else box.right() - item.right()
       val detail =
         when {
           before > OVERFLOW_SLACK_DP ->

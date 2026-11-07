@@ -216,6 +216,17 @@ class TreeRecorder {
     }
   }
 
+  /**
+   * This rect cut to the preview frame, as every other node's bounds are. A rect with nothing left
+   * inside collapses to zero width, so the node counts as not laid out.
+   */
+  private fun Rect.withinWindow(): Rect {
+    val size = frame?.takeIf { it.isAttached }?.size ?: return this
+    val clipped = intersect(Rect(0f, 0f, size.width.toFloat(), size.height.toFloat()))
+    return if (clipped.width > 0f && clipped.height > 0f) clipped
+    else Rect(clipped.left, clipped.top, clipped.left, clipped.top)
+  }
+
   /** [part] names which text of the node this is, such as `label` or `supporting`. */
   @Synchronized
   fun reportText(id: String, part: String, report: TextReport) {
@@ -250,7 +261,8 @@ class TreeRecorder {
     val layout = positions[meta.id]
     val mask = masks[meta.id]?.invoke()
     val box = maskBoxes[meta.id]
-    val visible = if (mask != null && box != null) mask.translate(box.topLeft) else null
+    val visible =
+      if (mask != null && box != null) mask.translate(box.topLeft).withinWindow() else null
     val bounds = visible ?: unmerged?.boundsInRoot?.within(layout) ?: layout ?: return null
     val touchPx =
       when {
