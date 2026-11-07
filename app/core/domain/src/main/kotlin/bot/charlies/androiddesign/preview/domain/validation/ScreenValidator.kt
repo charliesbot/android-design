@@ -2,7 +2,7 @@ package bot.charlies.androiddesign.preview.domain.validation
 
 import bot.charlies.androiddesign.preview.domain.BadgeContent
 import bot.charlies.androiddesign.preview.domain.DatePickerSpec
-import bot.charlies.androiddesign.preview.domain.FullScreenSpec
+import bot.charlies.androiddesign.preview.domain.DialogSpec
 import bot.charlies.androiddesign.preview.domain.MenuSpec
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.SearchBars
@@ -281,11 +281,11 @@ internal class ScreenValidator(
    * exporter and this agree on what is drawn.
    *
    * Material: full-screen dialogs "are for compact breakpoints only", and "for medium and expanded
-   * breakpoints, use a basic dialog"; "on compact breakpoints, a full-screen modal date picker is
-   * recommended", while a medium or expanded window takes a docked or modal one. A date or time is
-   * written out in the proposal (never bound to data), because a picker needs the date it opens on
-   * and a preview must not read the clock. This is a validator rule, not a finding: a finding reads
-   * the rendered tree, which does not say which variant a node is.
+   * breakpoints, use a basic dialog". A full-screen date picker is only "recommended" on compact
+   * windows, so at medium and wider it is a note from the finding rules, not an error here. A date
+   * or time is written out in the proposal (never bound to data), because a picker needs the date
+   * it opens on and a preview must not read the clock. This is a validator rule, not a finding: a
+   * finding reads the rendered tree, which does not say which variant a node is.
    */
   private fun validateDialogsAndPickers() {
     screen.components.forEachIndexed { index, node ->
@@ -317,7 +317,7 @@ internal class ScreenValidator(
     val compact = size == SizeClass.Compact
     when (node.component) {
       "Dialog" -> {
-        val full = variant == FullScreenSpec.VARIANT
+        val full = DialogSpec.variant(variant) == DialogSpec.Variant.FullScreen
         if (full && !compact) {
           add(
             "variant" to
@@ -335,14 +335,7 @@ internal class ScreenValidator(
       }
       "DatePicker" -> {
         val range = (props["range"] as? JsonPrimitive)?.content == "true"
-        if (variant == FullScreenSpec.VARIANT && !compact) {
-          add(
-            "variant" to
-              "a full-screen date picker is for compact windows; use a modal or docked one from " +
-                "medium up (override variant in sizeClass)",
-          )
-        }
-        if (variant == "docked" && !has("anchor")) {
+        if (variant == DatePickerSpec.Variant.Docked.wire && !has("anchor")) {
           add("variant" to "a docked date picker opens below a TextField, named in anchor")
         }
         val own = if (range) listOf("start", "end") else listOf("selected")
@@ -447,6 +440,13 @@ internal class ScreenValidator(
                 .joinToString()
             sink.add(path.child(key), "unknown prop '$key' on ${def.name} (known: $known)")
           } else {
+            if (overrides && key == ANCHOR && def.name in ANCHORED_OVERLAYS) {
+              sink.add(
+                path.child(key),
+                "the anchor of a ${def.name} is part of where it is drawn, so it goes in the " +
+                  "base props, not in a size class",
+              )
+            }
             validateValue(path.child(key), prop, value)
           }
         }
@@ -869,6 +869,7 @@ internal class ScreenValidator(
     private val ICON_NAME = Regex("^[a-z0-9_]+$")
     /** Components whose `value` and `range` props must agree. */
     private val RANGE_COMPONENTS = setOf("Slider", "RangeSlider", "Stepper")
+    private val ANCHORED_OVERLAYS = setOf("Menu", "Tooltip", "DatePicker")
     private val PICKER_OVERLAYS = setOf("Dialog", "DatePicker", "TimePicker")
     private const val DATE_MESSAGE =
       "a date must be written as YYYY-MM-DD, a real day from 1900 to 2100, not bound to data"

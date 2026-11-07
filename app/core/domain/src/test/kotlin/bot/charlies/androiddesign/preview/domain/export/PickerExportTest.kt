@@ -83,4 +83,45 @@ class PickerExportTest {
     has(source, "Popup(")
     has(source, "DatePickerDialog(")
   }
+
+  private fun count(source: String, part: String) =
+    source.windowed(part.length).count { it == part }
+
+  @Test
+  fun `a picker anchored to a field that changes with the width is written beside every variant`() {
+    val source =
+      flat(
+        ExportFixtures.export(
+          """{"id":"root","component":"Column","children":["field"]}""",
+          """{"id":"field","component":"TextField","label":"Date","sizeClass":{"medium":{"label":"When"}}}""",
+          """{"id":"pick","component":"DatePicker","variant":"docked","selected":"2026-11-06","anchor":"field"}""",
+        ),
+      )
+    has(source, "label = { Text(\"Date\") }")
+    has(source, "label = { Text(\"When\") }")
+    check(count(source, "Popup(") == 2) { "expected a popup beside each field, got $source" }
+    check(count(source, "var showPick by") == 1) { "the open flag is declared once" }
+  }
+
+  @Test
+  fun `a menu anchored to a button that changes with the width is written beside every variant`() {
+    val source =
+      flat(
+        ExportFixtures.export(
+          """{"id":"root","component":"Column","children":["more"]}""",
+          """{"id":"more","component":"Button","label":"More","sizeClass":{"medium":{"label":"Menu"}}}""",
+          """{"id":"menu","component":"Menu","anchor":"more","items":["edit"]}""",
+          """{"id":"edit","component":"MenuItem","label":"Edit"}""",
+        ),
+      )
+    check(count(source, "DropdownMenuPopup(") == 2) { "expected a menu beside each button" }
+    check(count(source, "var showMenu by") == 1) { "the open flag is declared once" }
+  }
+
+  @Test
+  fun `the exported time picker leaves the clock format to the device`() {
+    val source = export("""{"id":"pick","component":"TimePicker","time":"14:05","is24Hour":true}""")
+    has(source, "rememberTimePickerState(initialHour = 14, initialMinute = 5)")
+    lacks(source, "is24Hour")
+  }
 }

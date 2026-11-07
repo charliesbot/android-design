@@ -1,6 +1,9 @@
 package bot.charlies.androiddesign.preview.feature.preview
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ComposeUiTest
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -183,6 +186,7 @@ class PickersRenderTest {
       assertEquals(field.y + field.height, picker.y, 0.5f, view.name)
       assertEquals(field.x, picker.x, 0.5f, view.name)
       assertEquals(360f, picker.width, 1f, view.name)
+      assertEquals("docked", tree.node("pick").variant, view.name)
     }
   }
 
@@ -294,4 +298,41 @@ class PickersRenderTest {
         .let { farthest(it.png, Bounds(48f, 8f, 160f, 40f), surface) }
     assertSame(onSurface, title, "full-screen headline")
   }
+
+  @Test
+  @OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+  fun `a picker whose variant changes with the size class follows a live view change`() =
+    androidx.compose.ui.test.runDesktopComposeUiTest(2000, 1200) {
+      val proposal =
+        page(
+          """{"id":"pick","component":"DatePicker","selected":"2026-11-06","sizeClass":{"medium":{"variant":"modal-input"}}}""",
+        )
+      val host =
+        bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState(proposal)
+      var view by androidx.compose.runtime.mutableStateOf(Views.Light)
+      setContent {
+        bot.charlies.androiddesign.preview.feature.preview.nav.ProposalPreview(
+          host,
+          designOf(),
+          view,
+        )
+      }
+      host.interaction.open("home", "pick")
+      fun shows(description: String) =
+        waitUntil(timeoutMillis = 5_000) {
+          onAllNodesWithContentDescription(
+              description,
+              substring = true,
+              ignoreCase = true,
+              useUnmergedTree = true,
+            )
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+        }
+      shows("Switch to text input mode")
+      view = Views.Tablet
+      shows("calendar")
+      view = Views.Light
+      shows("Switch to text input mode")
+    }
 }

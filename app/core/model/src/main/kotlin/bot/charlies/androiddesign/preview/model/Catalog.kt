@@ -1320,13 +1320,17 @@ private fun overlays(): List<ComponentDef> =
       "TimePicker",
       ComponentGroup.Overlays,
       "A time picker in a dialog: a dial, or keyboard entry (input). The keyboard icon switches " +
-        "between them. Whether the clock is 12 or 24 hours is the device's setting, set here by " +
-        "`is24Hour`.",
+        "between them. Whether the clock is 12 or 24 hours is the device's setting; `is24Hour` " +
+        "only sets it for the preview.",
       "TimePickerDialog holding TimePicker or TimeInput",
       listOf(
         oneOf("variant", "dial", "input", default = "dial"),
         text("time", required = true, description = "The selected time, 24-hour HH:mm."),
-        bool("is24Hour", "Uses a 24-hour clock: no AM/PM selector."),
+        bool(
+          "is24Hour",
+          "Preview only: a 24-hour clock, with no AM/PM selector. The export leaves the clock " +
+            "format to the device, as Material does.",
+        ),
       ),
       overlay = true,
     ),

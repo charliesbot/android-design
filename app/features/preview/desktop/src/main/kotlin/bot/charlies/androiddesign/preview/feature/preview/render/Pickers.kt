@@ -93,15 +93,16 @@ internal fun RenderDatePicker(ctx: NodeContext) {
     if (ctx.bool("range")) {
       val start = ctx.local("start", ctx.string("start").orEmpty())
       val end = ctx.local("end", ctx.string("end").orEmpty())
-      val state = remember {
-        DateRangePickerState(
-          locale = Locale.US,
-          initialSelectedStartDateMillis = millis(start.value),
-          initialSelectedEndDateMillis = millis(end.value),
-          initialDisplayedMonthMillis = millis(start.value) ?: millis(end.value) ?: fallbackMonth,
-          initialDisplayMode = mode,
-        )
-      }
+      val state =
+        remember(mode) {
+          DateRangePickerState(
+            locale = Locale.US,
+            initialSelectedStartDateMillis = millis(start.value),
+            initialSelectedEndDateMillis = millis(end.value),
+            initialDisplayedMonthMillis = millis(start.value) ?: millis(end.value) ?: fallbackMonth,
+            initialDisplayMode = mode,
+          )
+        }
       LaunchedEffect(state) {
         snapshotFlow { state.selectedStartDateMillis to state.selectedEndDateMillis }
           .collect { (from, to) ->
@@ -112,14 +113,15 @@ internal fun RenderDatePicker(ctx: NodeContext) {
       ({ modifier -> RangeBody(state, variant, modifier, colors) })
     } else {
       val selected = ctx.local("selected", ctx.string("selected").orEmpty())
-      val state = remember {
-        DatePickerState(
-          locale = Locale.US,
-          initialSelectedDateMillis = millis(selected.value),
-          initialDisplayedMonthMillis = millis(selected.value) ?: fallbackMonth,
-          initialDisplayMode = mode,
-        )
-      }
+      val state =
+        remember(mode) {
+          DatePickerState(
+            locale = Locale.US,
+            initialSelectedDateMillis = millis(selected.value),
+            initialDisplayedMonthMillis = millis(selected.value) ?: fallbackMonth,
+            initialDisplayMode = mode,
+          )
+        }
       LaunchedEffect(state) {
         snapshotFlow { state.selectedDateMillis }
           .collect { selected.set(it?.let(DatePickerSpec::iso).orEmpty()) }
@@ -169,6 +171,10 @@ internal fun RenderDatePicker(ctx: NodeContext) {
   }
 }
 
+/**
+ * The picker with the chrome [DatePickerSpec.chrome] says the variant has. Compose's own title,
+ * headline and mode toggle have no default to pass on, so each combination is its own call.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SingleBody(
@@ -177,25 +183,24 @@ private fun SingleBody(
   modifier: Modifier,
   colors: DatePickerColors,
 ) {
-  when (variant) {
-    DatePickerSpec.Variant.Modal,
-    DatePickerSpec.Variant.ModalInput ->
-      DatePicker(state = state, modifier = modifier, colors = colors)
-    DatePickerSpec.Variant.Docked ->
+  val chrome = DatePickerSpec.chrome(variant)
+  when {
+    chrome.isDefault -> DatePicker(state = state, modifier = modifier, colors = colors)
+    chrome.headline ->
+      DatePicker(
+        state = state,
+        modifier = modifier,
+        colors = colors,
+        title = null,
+        showModeToggle = false,
+      )
+    else ->
       DatePicker(
         state = state,
         modifier = modifier,
         colors = colors,
         title = null,
         headline = null,
-        showModeToggle = false,
-      )
-    DatePickerSpec.Variant.FullScreen ->
-      DatePicker(
-        state = state,
-        modifier = modifier,
-        colors = colors,
-        title = null,
         showModeToggle = false,
       )
   }
@@ -209,25 +214,24 @@ private fun RangeBody(
   modifier: Modifier,
   colors: DatePickerColors,
 ) {
-  when (variant) {
-    DatePickerSpec.Variant.Modal,
-    DatePickerSpec.Variant.ModalInput ->
-      DateRangePicker(state = state, modifier = modifier, colors = colors)
-    DatePickerSpec.Variant.Docked ->
+  val chrome = DatePickerSpec.chrome(variant)
+  when {
+    chrome.isDefault -> DateRangePicker(state = state, modifier = modifier, colors = colors)
+    chrome.headline ->
+      DateRangePicker(
+        state = state,
+        modifier = modifier,
+        colors = colors,
+        title = null,
+        showModeToggle = false,
+      )
+    else ->
       DateRangePicker(
         state = state,
         modifier = modifier,
         colors = colors,
         title = null,
         headline = null,
-        showModeToggle = false,
-      )
-    DatePickerSpec.Variant.FullScreen ->
-      DateRangePicker(
-        state = state,
-        modifier = modifier,
-        colors = colors,
-        title = null,
         showModeToggle = false,
       )
   }

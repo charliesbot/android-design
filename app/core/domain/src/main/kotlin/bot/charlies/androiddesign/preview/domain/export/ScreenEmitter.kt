@@ -163,11 +163,6 @@ internal class ScreenEmitter(
   /** Which overlays are written beside a component and which at the end of the screen. */
   val placement = OverlayPlacement(screen)
 
-  /**
-   * Menus already written beside a component, so one drawn from several variants is not doubled.
-   */
-  val placedOverlays = mutableSetOf<String>()
-
   var usesSizeClass = false
 
   // region the function

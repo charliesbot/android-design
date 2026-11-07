@@ -46,6 +46,7 @@ internal fun describe(ctx: NodeContext, ambient: Ambient): NodeMeta {
     parent = ctx.parentId,
     order = ctx.order,
     primary = ctx.primary,
+    variant = if (ctx.component == "DatePicker") ctx.enum("variant") else null,
     interactive = interactive,
     roles =
       NodeRoles(

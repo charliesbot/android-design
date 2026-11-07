@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.domain.export
 
 import bot.charlies.androiddesign.preview.domain.DatePickerSpec
+import bot.charlies.androiddesign.preview.domain.DialogSpec
 import bot.charlies.androiddesign.preview.domain.FullScreenSpec
 import bot.charlies.androiddesign.preview.domain.TimePickerSpec
 import bot.charlies.androiddesign.preview.model.ComponentNode
@@ -30,7 +31,8 @@ private fun ScreenEmitter.guarded(node: ComponentNode, vararg body: Stmt): Stmt 
   IfStmt(listOf(overlayVar(node.id) to body.toList()), null)
 
 internal fun ScreenEmitter.dialogStatements(node: ComponentNode, p: JsonObject): List<Stmt> =
-  if (p.choice("Dialog", "variant") == FullScreenSpec.VARIANT) fullScreenDialog(node, p)
+  if (DialogSpec.variant(p.choice("Dialog", "variant")) == DialogSpec.Variant.FullScreen)
+    fullScreenDialog(node, p)
   else basicDialog(node, p)
 
 private fun ScreenEmitter.basicDialog(node: ComponentNode, p: JsonObject): List<Stmt> {
@@ -180,14 +182,13 @@ internal fun ScreenEmitter.datePickerStatements(node: ComponentNode, p: JsonObje
     }
   val declaration = Assign("val $state", "=", remembered)
   fun picker(modifier: Arg? = null): Stmt {
+    val chrome = DatePickerSpec.chrome(variant)
     val extras =
-      when (variant) {
-        DatePickerSpec.Variant.Docked ->
-          listOf(arg("title", "null"), arg("headline", "null"), arg("showModeToggle", "false"))
-        DatePickerSpec.Variant.FullScreen ->
-          listOf(arg("title", "null"), arg("showModeToggle", "false"))
-        else -> emptyList()
-      }
+      listOfNotNull(
+        if (chrome.title) null else arg("title", "null"),
+        if (chrome.headline) null else arg("headline", "null"),
+        if (chrome.modeToggle) null else arg("showModeToggle", "false"),
+      )
     return stmt(
       Call(
         m3(if (range) "DateRangePicker" else "DatePicker"),
@@ -269,7 +270,9 @@ internal fun ScreenEmitter.datePickerStatements(node: ComponentNode, p: JsonObje
 
 /**
  * The time picker for the props in effect at one size class: `TimePickerDialog` holding
- * `TimePicker` or `TimeInput`. The keyboard icon switches between them, as in the previewer.
+ * `TimePicker` or `TimeInput`. The keyboard icon switches between them, as in the previewer. The
+ * previewer's `is24Hour` is not exported: Material has the system settings decide the clock, and
+ * `rememberTimePickerState` follows the device's by default.
  */
 internal fun ScreenEmitter.timePickerStatements(node: ComponentNode, p: JsonObject): List<Stmt> {
   experimental()
@@ -289,7 +292,6 @@ internal fun ScreenEmitter.timePickerStatements(node: ComponentNode, p: JsonObje
         listOfNotNull(
           time?.let { arg("initialHour", it.hour.toString()) },
           time?.let { arg("initialMinute", it.minute.toString()) },
-          arg("is24Hour", p.option("TimePicker", "is24Hour").toString()),
         ),
       ),
     )

@@ -2475,7 +2475,7 @@
     },
     "TimePicker": {
       "type": "object",
-      "description": "A time picker in a dialog: a dial, or keyboard entry (input). The keyboard icon switches between them. Whether the clock is 12 or 24 hours is the device's setting, set here by `is24Hour`.",
+      "description": "A time picker in a dialog: a dial, or keyboard entry (input). The keyboard icon switches between them. Whether the clock is 12 or 24 hours is the device's setting; `is24Hour` only sets it for the preview.",
       "x-compose": "TimePickerDialog holding TimePicker or TimeInput",
       "x-overlay": true,
       "allOf": [
@@ -2501,7 +2501,7 @@
         },
         "is24Hour": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "description": "Uses a 24-hour clock: no AM/PM selector.",
+          "description": "Preview only: a 24-hour clock, with no AM/PM selector. The export leaves the clock format to the device, as Material does.",
           "default": false
         }
       },

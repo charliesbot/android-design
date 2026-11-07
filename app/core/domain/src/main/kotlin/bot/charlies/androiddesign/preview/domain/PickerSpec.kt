@@ -18,12 +18,27 @@ object DatePickerSpec {
     Modal("modal"),
     ModalInput("modal-input"),
     Docked("docked"),
-    FullScreen("full-screen");
-
-    /** Whether the picker is its own window over a scrim (a docked one is a dropdown). */
-    val isDialog: Boolean
-      get() = this != Docked
+    FullScreen("full-screen"),
   }
+
+  /**
+   * What of its own chrome a picker draws, which is Compose's `title`, `headline` and
+   * `showModeToggle`: a modal picker has all of it, a full-screen one has its header in the
+   * window's app bar and keeps the headline, and a docked one is the calendar alone.
+   */
+  class Chrome(val title: Boolean, val headline: Boolean, val modeToggle: Boolean) {
+    /** Whether the picker keeps all of Compose's own chrome, so no argument says otherwise. */
+    val isDefault: Boolean
+      get() = title && headline && modeToggle
+  }
+
+  fun chrome(variant: Variant): Chrome =
+    when (variant) {
+      Variant.Modal,
+      Variant.ModalInput -> Chrome(title = true, headline = true, modeToggle = true)
+      Variant.FullScreen -> Chrome(title = false, headline = true, modeToggle = false)
+      Variant.Docked -> Chrome(title = false, headline = false, modeToggle = false)
+    }
 
   /** The variant named [wire], else [Variant.Modal], the catalog default. */
   fun variant(wire: String?): Variant =
@@ -104,6 +119,17 @@ object TimePickerSpec {
   private val HOUR_MINUTE = Regex("""\d{2}:\d{2}""")
 }
 
+object DialogSpec {
+  enum class Variant(val wire: String) {
+    Basic("basic"),
+    FullScreen("full-screen"),
+  }
+
+  /** The variant named [wire], else [Variant.Basic], the catalog default. */
+  fun variant(wire: String?): Variant =
+    Variant.entries.firstOrNull { it.wire == wire } ?: Variant.Basic
+}
+
 /** What the full-screen dialog and the full-screen date picker share: Material's header. */
 object FullScreenSpec {
   /** The header's height, "Header height 56dp". */
@@ -111,7 +137,4 @@ object FullScreenSpec {
 
   /** The padding at the sides of a full-screen dialog's body, "Top/left/right padding 24dp". */
   const val CONTENT_PADDING_DP = 24f
-
-  /** The wire value of the `variant` that asks for it, on a Dialog and on a DatePicker. */
-  const val VARIANT = "full-screen"
 }

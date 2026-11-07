@@ -59,10 +59,10 @@ internal fun ScreenEmitter.emitComponent(
   val own = dispatch(node, props, if (wrapped) placed.copy(parentType = "Box") else placed)
   val anchored = if (tooltip == null) own else aroundAnchor(tooltip, own)
   val picker = placement.datePickerAt(node.id)?.let(byId::get)
-  val withMenu =
-    if (menu == null || menu.id in placedOverlays) anchored else besideMenu(menu, anchored)
-  if (picker == null || picker.id in placedOverlays) return withMenu
-  return besidePicker(picker, withMenu)
+  // An anchored overlay is written in every branch where its anchor is, each branch being its own
+  // scope: its open flag is declared once, at the top of the screen.
+  val withMenu = if (menu == null) anchored else besideMenu(menu, anchored)
+  return if (picker == null) withMenu else besidePicker(picker, withMenu)
 }
 
 /**
@@ -70,7 +70,6 @@ internal fun ScreenEmitter.emitComponent(
  * The picker is written at every size class, each variant where it applies.
  */
 private fun ScreenEmitter.besidePicker(picker: ComponentNode, own: List<Stmt>): List<Stmt> {
-  placedOverlays += picker.id
   return one(file.use(Sym.Box), emptyList(), own + overlayStatements(picker))
 }
 
@@ -150,7 +149,6 @@ private fun ScreenEmitter.tooltipBox(
 
 /** [own] and the [menu] anchored to it, wrapped in a `Box` so the menu opens beside them. */
 private fun ScreenEmitter.besideMenu(menu: ComponentNode, own: List<Stmt>): List<Stmt> {
-  placedOverlays += menu.id
   return one(file.use(Sym.Box), emptyList(), own + menuStatements(menu))
 }
 

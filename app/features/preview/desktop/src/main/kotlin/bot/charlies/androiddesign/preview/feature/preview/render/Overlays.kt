@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import bot.charlies.androiddesign.preview.domain.ColorStyle
+import bot.charlies.androiddesign.preview.domain.DialogSpec
 import bot.charlies.androiddesign.preview.domain.FullScreenSpec
 import bot.charlies.androiddesign.preview.domain.MenuSpec
 import bot.charlies.androiddesign.preview.domain.SideSheetSpec
@@ -168,7 +169,7 @@ internal fun NodeContext.dialogLook() =
 
 @Composable
 internal fun RenderDialog(ctx: NodeContext) {
-  if (ctx.enum("variant") == FullScreenSpec.VARIANT) {
+  if (DialogSpec.variant(ctx.enum("variant")) == DialogSpec.Variant.FullScreen) {
     RenderFullScreenDialog(ctx)
     return
   }

@@ -1,5 +1,6 @@
 package bot.charlies.androiddesign.preview.domain.findings
 
+import bot.charlies.androiddesign.preview.domain.DatePickerSpec
 import bot.charlies.androiddesign.preview.domain.design.TypeScale
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.BundledFont
@@ -111,7 +112,8 @@ object FindingRules {
       roundEdgeClipped(view) +
       carouselItems(view) +
       navDestinations(view) +
-      dockedToolbarWithNavBar(view)
+      dockedToolbarWithNavBar(view) +
+      fullScreenDatePicker(view)
   }
 
   // region the view
@@ -125,7 +127,14 @@ object FindingRules {
 
     /** Open modal surfaces: a sheet or dialog node that takes up space. */
     private val modals: Set<String> =
-      nodes.filter { it.type in catalog.modalNames && it.isLaidOut }.map { it.id }.toSet()
+      nodes
+        .filter { it.type in catalog.modalNames && it.isLaidOut && !it.isDropdown }
+        .map { it.id }
+        .toSet()
+
+    /** A docked date picker is a dropdown, not a modal: the screen stays live behind it. */
+    private val LayoutNode.isDropdown: Boolean
+      get() = type == DATE_PICKER && variant == DatePickerSpec.Variant.Docked.wire
 
     val modalOpen: Boolean
       get() = modals.isNotEmpty()
@@ -549,6 +558,33 @@ object FindingRules {
       }
   }
 
+  /**
+   * Material: "On compact breakpoints, such as mobile, a full-screen modal date picker is
+   * recommended to increase readability and touch target size." Only a recommendation for compact
+   * windows, so a full-screen date picker at medium or wider is a note, not an error.
+   */
+  private fun fullScreenDatePicker(view: View): List<Finding> {
+    val width = view.tree.view.width.toFloat()
+    if (width < SizeClass.MEDIUM_MIN_DP) return emptyList()
+    return view.nodes
+      .filter {
+        it.type == DATE_PICKER &&
+          it.isLaidOut &&
+          it.variant == DatePickerSpec.Variant.FullScreen.wire
+      }
+      .map {
+        Finding(
+          id = it.id,
+          rule = FindingRule.FullScreenDatePicker,
+          severity = Severity.Info,
+          detail =
+            "a full-screen date picker is recommended on compact windows; at ${dp(width)} dp a " +
+              "modal or docked one reads better",
+        )
+      }
+  }
+
+  private const val DATE_PICKER = "DatePicker"
   private const val DOCKED_TOOLBAR = "DockedToolbar"
   private const val NAVIGATION_BAR = "NavigationBar"
   private const val NAVIGATION_BAR_ITEM = "NavigationBarItem"

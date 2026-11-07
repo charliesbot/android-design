@@ -99,9 +99,10 @@ class PickerValidatorTest {
   }
 
   @Test
-  fun `full-screen is for compact windows only, whatever the size class overrides say`() {
+  fun `a full-screen dialog is for compact windows only, whatever the size class overrides say`() {
     val date = date(""","variant":"full-screen","selected":"2026-11-06"""")
-    errors(date).assertHas(path(date, "pick") + "/variant", "at medium, expanded")
+    // Only recommended on compact windows: a note from the finding rules, not an error.
+    assertEquals(emptyList(), errors(date))
     val adaptive =
       date(
         ""","variant":"full-screen","selected":"2026-11-06","sizeClass":{"medium":{"variant":"modal"}}""",
@@ -135,5 +136,36 @@ class PickerValidatorTest {
     assertTrue(errors(weird).isNotEmpty())
     val time = time(""","time":null""")
     assertTrue(errors(time).isNotEmpty())
+  }
+
+  @Test
+  fun `an anchor lives in the base props, not in a size class override`() {
+    val field = """{"id":"dates","component":"TextField","label":"Date"}"""
+    val picker =
+      date(
+          ""","selected":"2026-11-06","sizeClass":{"medium":{"variant":"docked","anchor":"dates"}}""",
+        )
+        .with("dates", field)
+    errors(picker).assertHas(path(picker, "pick") + "/sizeClass/medium/anchor", "base props")
+    val menu =
+      base
+        .with("edit", """{"id":"edit","component":"MenuItem","label":"Edit"}""")
+        .with(
+          "menu",
+          """{"id":"menu","component":"Menu","items":["edit"],"sizeClass":{"medium":{"anchor":"more"}}}""",
+        )
+    errors(menu).assertHas(path(menu, "menu") + "/sizeClass/medium/anchor", "base props")
+    val tip =
+      base.with(
+        "tip",
+        """{"id":"tip","component":"Tooltip","anchor":"more","text":"Hi","sizeClass":{"expanded":{"anchor":"more"}}}""",
+      )
+    errors(tip).assertHas(path(tip, "tip") + "/sizeClass/expanded/anchor", "base props")
+    val modalWithAnchor =
+      date(
+          ""","selected":"2026-11-06","anchor":"dates","sizeClass":{"medium":{"variant":"docked"}}""",
+        )
+        .with("dates", field)
+    assertEquals(emptyList(), errors(modalWithAnchor))
   }
 }

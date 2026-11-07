@@ -2977,8 +2977,7 @@ fun OverlaysScreen(
       }
     }
   }
-  val timeDialTimePickerState =
-    rememberTimePickerState(initialHour = 9, initialMinute = 30, is24Hour = false)
+  val timeDialTimePickerState = rememberTimePickerState(initialHour = 9, initialMinute = 30)
   var timeDialDisplayMode by remember { mutableStateOf(TimePickerDisplayMode.Picker) }
   if (showTimeDial) {
     TimePickerDialog(
@@ -3004,8 +3003,7 @@ fun OverlaysScreen(
       }
     }
   }
-  val timeInputTimePickerState =
-    rememberTimePickerState(initialHour = 14, initialMinute = 5, is24Hour = true)
+  val timeInputTimePickerState = rememberTimePickerState(initialHour = 14, initialMinute = 5)
   var timeInputDisplayMode by remember { mutableStateOf(TimePickerDisplayMode.Input) }
   if (showTimeInput) {
     TimePickerDialog(

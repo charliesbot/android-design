@@ -1368,7 +1368,7 @@ internal val componentCases: List<ComponentCase> =
         ),
       expect =
         listOf(
-          "val tTimePickerState = rememberTimePickerState(initialHour = 9, initialMinute = 30, is24Hour = false)",
+          "val tTimePickerState = rememberTimePickerState(initialHour = 9, initialMinute = 30)",
           "var tDisplayMode by remember { mutableStateOf(TimePickerDisplayMode.Picker) }",
           "if (showT) {",
           "TimePickerDialog(",
@@ -1376,7 +1376,7 @@ internal val componentCases: List<ComponentCase> =
           "TimePickerDialogDefaults.DisplayModeToggle(",
           "TimePicker(state = tTimePickerState)",
           "TimeInput(state = tTimePickerState)",
-          "rememberTimePickerState(initialHour = 14, initialMinute = 5, is24Hour = true)",
+          "rememberTimePickerState(initialHour = 14, initialMinute = 5)",
           "var uDisplayMode by remember { mutableStateOf(TimePickerDisplayMode.Input) }",
         ),
     ),
