@@ -1347,7 +1347,8 @@ private fun overlays(): List<ComponentDef> =
     ComponentDef(
       "BottomSheet",
       ComponentGroup.Overlays,
-      "A modal sheet from the bottom edge, with a drag handle.",
+      "A modal sheet from the bottom edge, with a drag handle. Its content spans the sheet edge to " +
+        "edge, as ModalBottomSheet adds no side padding: put it in a Column with padding.",
       "ModalBottomSheet with BottomSheetDefaults.DragHandle",
       listOf(children("content", required = true)),
       overlay = true,

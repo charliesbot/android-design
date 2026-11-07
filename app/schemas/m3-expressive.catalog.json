@@ -2458,7 +2458,7 @@
     },
     "BottomSheet": {
       "type": "object",
-      "description": "A modal sheet from the bottom edge, with a drag handle.",
+      "description": "A modal sheet from the bottom edge, with a drag handle. Its content spans the sheet edge to edge, as ModalBottomSheet adds no side padding: put it in a Column with padding.",
       "x-compose": "ModalBottomSheet with BottomSheetDefaults.DragHandle",
       "x-m3-pages": [
         "bottom-sheets"

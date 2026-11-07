@@ -769,6 +769,13 @@ class FindingRulesTest {
   }
 
   @Test
+  fun `overflow measures a modal sheet against the view, not the pane it opens from`() {
+    val pane = node("root", "Column", w = 200f, h = 400f)
+    val sheet = node("sheet", "BottomSheet", w = 411f, h = 300f, parent = "root")
+    assertEquals(emptyList(), overflow(pane, sheet))
+  }
+
+  @Test
   fun `overflow measures an anchored menu against the view, not its anchor`() {
     val anchor = node("more", "IconButton", x = 300f, w = 48f, h = 48f)
     val menu = node("menu", "Menu", x = 200f, w = 200f, h = 120f, parent = "more")
