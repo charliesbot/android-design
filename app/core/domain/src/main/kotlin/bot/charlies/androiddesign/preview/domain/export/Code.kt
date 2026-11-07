@@ -15,6 +15,14 @@ internal data class Raw(val text: String) : Expr {
   override fun flat() = text
 }
 
+/**
+ * Operands joined by `||`. Too long for its line, it breaks after each `||` and indents the later
+ * operands a step, as ktfmt does.
+ */
+internal data class Or(val operands: List<String>) : Expr {
+  override fun flat() = operands.joinToString(" || ")
+}
+
 /** `receiver.call().call()`. Each call is written whole, such as `padding(16.dp)`. */
 internal data class Chain(val receiver: String, val calls: List<String>) : Expr {
   override fun flat() = receiver + calls.joinToString("") { ".$it" }
@@ -230,13 +238,22 @@ internal object CodePrinter {
       out += "${pad(indent)}$head$flat$suffix"
       return
     }
-    if (prefix.endsWith("=") && expr !is Lambda) {
+    // ktfmt breaks after `by` before a call that has both arguments and a trailing lambda.
+    val keyedDelegate =
+      prefix.endsWith(" by") && expr is Call && expr.args.isNotEmpty() && expr.lambda != null
+    if ((prefix.endsWith("=") && expr !is Lambda) || keyedDelegate) {
       out += "${pad(indent)}$prefix"
       printWithPrefix("", expr, suffix, indent + INDENT, out)
       return
     }
     when (expr) {
       is Raw -> printRaw(head, expr.text, suffix, indent, out)
+      is Or ->
+        expr.operands.forEachIndexed { i, operand ->
+          val lead = pad(if (i == 0) indent else indent + INDENT)
+          val last = i == expr.operands.lastIndex
+          out += "$lead${if (i == 0) head else ""}$operand${if (last) suffix else " ||"}"
+        }
       is Chain -> printChain(head, expr, suffix, indent, out)
       is Call -> printCall(head, expr, suffix, indent, out)
       is Lambda -> {

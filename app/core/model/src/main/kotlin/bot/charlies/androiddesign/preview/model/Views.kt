@@ -19,6 +19,20 @@ enum class Device {
   }
 }
 
+/**
+ * The size of a Carousel item, as a node inside it names it with `itemSize`: the smallest item size
+ * the node shows at. A multi-browse or hero carousel has large, medium and small items; Material
+ * hides the text of the small one.
+ */
+enum class CarouselItemSize(val wire: String) {
+  Large("large"),
+  Medium("medium");
+
+  companion object {
+    fun fromWire(wire: String?): CarouselItemSize? = entries.firstOrNull { it.wire == wire }
+  }
+}
+
 /** Window width classes: compact under 600 dp, medium 600 to 839, expanded from 840. */
 @Serializable
 enum class SizeClass {

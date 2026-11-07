@@ -114,6 +114,7 @@ Rules for both:
 - A card holds content and actions on a single topic. "Don't force content into cards when spacing, headlines, or dividers would create a simpler visual hierarchy." At compact sizes, "consider swapping cards for lists."
 - Elevated, filled, and outlined differ in style only. A card is either actionable itself or contains actions, never both. No internal scrolling or swipeable content inside a card.
 - Carousel: visual items with brief text; snap scrolling except uncontained; at most three items with text on compact screens; buttons go above or below, never on or beside the carousel; offer "Show all."
+- Carousel item text adapts to the item size: the large item carries the full title and label, the medium item hides the title, and the small item hides the text or abbreviates the label. Text should always be understandable at each size, so prefer brief labels on the smaller items.
 
 ### Dialogs and sheets
 

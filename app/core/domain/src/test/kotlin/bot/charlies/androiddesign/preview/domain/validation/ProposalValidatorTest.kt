@@ -388,6 +388,70 @@ class ProposalValidatorTest {
     errors(p).assertHas(plates("${p.indexOf("more")}") + "/showIn/1", "huge")
   }
 
+  private val withCarousel =
+    base
+      .with("gallery", """{"id":"gallery","component":"Carousel","children":["card"]}""")
+      .with("card", """{"id":"card","component":"Card","content":["col"]}""")
+      .with("col", """{"id":"col","component":"Column","children":["caption"]}""")
+      .with("caption", """{"id":"caption","component":"Text","text":"Dinner"}""")
+      .with(
+        "body",
+        """{"id":"body","component":"Column","children":["open_plate","more","gallery","outside"]}""",
+      )
+      .with("outside", """{"id":"outside","component":"Text","text":"Tonight"}""")
+
+  @Test
+  fun `itemSize is accepted on a node inside a carousel item`() {
+    val gated =
+      mapOf(
+        "card" to """{"id":"card","component":"Card","content":["col"],"itemSize":"large"}""",
+        "col" to """{"id":"col","component":"Column","children":["caption"],"itemSize":"medium"}""",
+        "caption" to """{"id":"caption","component":"Text","text":"Dinner","itemSize":"large"}""",
+      )
+    for ((id, json) in gated) assertEquals(emptyList(), errors(withCarousel.with(id, json)), id)
+  }
+
+  @Test
+  fun `itemSize outside a carousel item is an error`() {
+    val p =
+      withCarousel.with(
+        "outside",
+        """{"id":"outside","component":"Text","text":"Tonight","itemSize":"large"}""",
+      )
+    errors(p).assertHas(plates("${p.indexOf("outside")}") + "/itemSize", "carousel item")
+  }
+
+  @Test
+  fun `itemSize on the carousel itself is an error`() {
+    val p =
+      withCarousel.with(
+        "gallery",
+        """{"id":"gallery","component":"Carousel","children":["card"],"itemSize":"medium"}""",
+      )
+    errors(p).assertHas(plates("${p.indexOf("gallery")}") + "/itemSize", "carousel item")
+  }
+
+  @Test
+  fun `itemSize must be large or medium`() {
+    val p =
+      withCarousel.with(
+        "caption",
+        """{"id":"caption","component":"Text","text":"Dinner","itemSize":"small"}""",
+      )
+    errors(p).assertHas(plates("${p.indexOf("caption")}") + "/itemSize", "small")
+  }
+
+  @Test
+  fun `itemSize is not a size class override`() {
+    val p =
+      withCarousel.with(
+        "caption",
+        """{"id":"caption","component":"Text","text":"Dinner","sizeClass":{"medium":{"itemSize":"large"}}}""",
+      )
+    errors(p)
+      .assertHas(plates("${p.indexOf("caption")}") + "/sizeClass/medium/itemSize", "base props")
+  }
+
   @Test
   fun `sizeClass overrides are validated like props`() {
     val p =

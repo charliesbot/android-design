@@ -11,6 +11,7 @@ internal object Sym {
   // runtime
   const val Composable = "$RUNTIME.Composable"
   const val remember = "$RUNTIME.remember"
+  const val derivedStateOf = "$RUNTIME.derivedStateOf"
   const val mutableStateOf = "$RUNTIME.mutableStateOf"
   const val mutableFloatStateOf = "$RUNTIME.mutableFloatStateOf"
   const val mutableIntStateOf = "$RUNTIME.mutableIntStateOf"
@@ -21,6 +22,8 @@ internal object Sym {
   const val rememberCoroutineScope = "$RUNTIME.rememberCoroutineScope"
   const val launch = "kotlinx.coroutines.launch"
   const val rememberTextFieldState = "androidx.compose.foundation.text.input.rememberTextFieldState"
+
+  const val LocalDensity = "androidx.compose.ui.platform.LocalDensity"
 
   // foundation
   const val Image = "androidx.compose.foundation.Image"

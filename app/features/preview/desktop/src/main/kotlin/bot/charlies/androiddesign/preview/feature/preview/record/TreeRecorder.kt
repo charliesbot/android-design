@@ -118,6 +118,8 @@ class TreeRecorder {
   private val positions = HashMap<String, Rect>()
   private val texts = HashMap<String, MutableMap<String, TextReport>>()
   private val designHeights = HashMap<String, Float>()
+  private val masks = HashMap<String, () -> Rect>()
+  private val maskBoxes = HashMap<String, Rect>()
   private val rings = HashMap<String, RingInset>()
   private val emptyDetailLists = LinkedHashSet<String>()
   private var frame: LayoutCoordinates? = null
@@ -146,6 +148,27 @@ class TreeRecorder {
     texts.remove(id)
     designHeights.remove(id)
     rings.remove(id)
+  }
+
+  /**
+   * A carousel item reports the rect its mask shows, read when the tree is taken, because it
+   * changes as the carousel scrolls. [mask] is relative to the item's own top-left corner, in
+   * pixels. The tree records the item as that rect and keeps its laid-out box in `layout`.
+   */
+  @Synchronized
+  fun reportCarouselMask(id: String, mask: (() -> Rect)?) {
+    if (mask == null) {
+      masks.remove(id)
+      maskBoxes.remove(id)
+    } else {
+      masks[id] = mask
+    }
+  }
+
+  /** Where the box the mask is relative to landed: the item's outer box, outside its padding. */
+  @Synchronized
+  fun reportCarouselBox(id: String, coordinates: LayoutCoordinates) {
+    if (coordinates.isAttached) maskBoxes[id] = frameRect(coordinates)
   }
 
   /**
@@ -179,18 +202,18 @@ class TreeRecorder {
   @Synchronized
   fun reportPosition(id: String, coordinates: LayoutCoordinates) {
     if (!coordinates.isAttached) return
-    val frame = frame?.takeIf { it.isAttached }
-    positions[id] =
-      when {
-        frame == null -> coordinates.boundsInRoot()
-        else ->
-          try {
-            frame.localBoundingBoxOf(coordinates, clipBounds = false)
-          } catch (_: IllegalArgumentException) {
-            // Sheets, dialogs and menus live in a window layer of their own.
-            coordinates.boundsInWindow().translate(-frame.positionInWindow())
-          }
-      }
+    positions[id] = frameRect(coordinates)
+  }
+
+  /** [coordinates] as a rect in the preview frame's pixels. */
+  private fun frameRect(coordinates: LayoutCoordinates): Rect {
+    val frame = frame?.takeIf { it.isAttached } ?: return coordinates.boundsInRoot()
+    return try {
+      frame.localBoundingBoxOf(coordinates, clipBounds = false)
+    } catch (_: IllegalArgumentException) {
+      // Sheets, dialogs and menus live in a window layer of their own.
+      coordinates.boundsInWindow().translate(-frame.positionInWindow())
+    }
   }
 
   /** [part] names which text of the node this is, such as `label` or `supporting`. */
@@ -225,7 +248,10 @@ class TreeRecorder {
     val unmerged = semantics?.unmerged(meta.id)
     val merged = semantics?.merged(meta.id) ?: unmerged
     val layout = positions[meta.id]
-    val bounds = unmerged?.boundsInRoot?.within(layout) ?: layout ?: return null
+    val mask = masks[meta.id]?.invoke()
+    val box = maskBoxes[meta.id]
+    val visible = if (mask != null && box != null) mask.translate(box.topLeft) else null
+    val bounds = visible ?: unmerged?.boundsInRoot?.within(layout) ?: layout ?: return null
     val touchPx =
       when {
         !meta.interactive -> null

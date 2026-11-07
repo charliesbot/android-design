@@ -260,6 +260,7 @@ import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -272,6 +273,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -3426,13 +3428,18 @@ fun CollectionsScreen(
             modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
             contentScale = ContentScale.Crop,
           )
-          Text(
-            item.name,
-            modifier = Modifier.padding(12.dp),
-            overflow = TextOverflow.Ellipsis,
-            maxLines = 1,
-            style = MaterialTheme.typography.titleSmall,
-          )
+          val itemMultiNameShown by remember {
+            derivedStateOf { carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f }
+          }
+          if (itemMultiNameShown) {
+            Text(
+              item.name,
+              modifier = Modifier.padding(12.dp),
+              overflow = TextOverflow.Ellipsis,
+              maxLines = 1,
+              style = MaterialTheme.typography.titleSmall,
+            )
+          }
         }
       }
       val carouselHeroState = rememberCarouselState { items.size }
@@ -3452,13 +3459,23 @@ fun CollectionsScreen(
               modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
               contentScale = ContentScale.Crop,
             )
-            Text(
-              item.name,
-              modifier = Modifier.padding(12.dp),
-              overflow = TextOverflow.Ellipsis,
-              maxLines = 1,
-              style = MaterialTheme.typography.titleSmall,
-            )
+            val itemHeroNameSmallPx = with(LocalDensity.current) { 56.dp.toPx() }
+            val itemHeroNameShown by
+              remember(itemHeroNameSmallPx) {
+                derivedStateOf {
+                  carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f ||
+                    carouselItemDrawInfo.size > itemHeroNameSmallPx
+                }
+              }
+            if (itemHeroNameShown) {
+              Text(
+                item.name,
+                modifier = Modifier.padding(12.dp),
+                overflow = TextOverflow.Ellipsis,
+                maxLines = 1,
+                style = MaterialTheme.typography.titleSmall,
+              )
+            }
           }
         }
       }

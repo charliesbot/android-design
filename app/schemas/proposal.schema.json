@@ -790,6 +790,14 @@
           "type": "string",
           "x-token": "spacing",
           "description": "Padding around the component. A name from the design system's spacing scale (default: none, xxs, xs, sm, md, lg, xl, xxl, xxxl)."
+        },
+        "itemSize": {
+          "type": "string",
+          "enum": [
+            "large",
+            "medium"
+          ],
+          "description": "Only on a node inside a Carousel item: the smallest item size the node shows at. large shows it only while its item is at full size; medium hides it only on the smallest item. Leave it out to always show the node."
         }
       },
       "required": [

@@ -15,17 +15,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import bot.charlies.androiddesign.preview.domain.CarouselItemGate
 import bot.charlies.androiddesign.preview.domain.layout.growsSemanticsBounds
 import bot.charlies.androiddesign.preview.feature.preview.record.NodeMeta
 import bot.charlies.androiddesign.preview.feature.preview.record.TextReport
@@ -180,6 +185,24 @@ internal class NodeContext(
   }
 }
 
+/**
+ * Whether [node]'s `itemSize` lets it show on the carousel item it is in, at the item's size right
+ * now. The size changes every scroll frame, so the answer is derived state: the node recomposes
+ * only when it flips, as in the exported code.
+ */
+@Composable
+private fun shownOnCarouselItem(node: ComponentNode): Boolean {
+  val minimum = node.carouselItemSize
+  val info = LocalCarouselItemDrawInfo.current
+  val density = LocalDensity.current.density
+  if (minimum == null || info == null) return true
+  val shown by
+    remember(minimum, info, density) {
+      derivedStateOf { CarouselItemGate.isShown(minimum, info.size, info.maxSize, density) }
+    }
+  return shown
+}
+
 /** The props of [node] in the frame of [env], with its size class overrides applied. */
 internal fun effectiveProps(node: ComponentNode, env: RenderEnv): JsonObject {
   val overrides = node.sizeOverridesAt(env.catalog.sizeBreakpoints, env.widthDp)
@@ -217,6 +240,7 @@ internal fun RenderNode(
   val node = env.nodes[ref.id] ?: return
   val def = env.catalog.find(node.component) ?: return
   if (!node.isShownAt(env.sizeClass)) return
+  if (!shownOnCarouselItem(node)) return
   val ctx =
     NodeContext(
       env = env,

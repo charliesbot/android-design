@@ -322,6 +322,7 @@ interface Catalog {
     const val SHOW_IN = "showIn"
     const val SIZE_CLASS = "sizeClass"
     const val STYLE = "style"
+    const val ITEM_SIZE = "itemSize"
   }
 }
 
@@ -365,7 +366,16 @@ object M3ExpressiveCatalog : Catalog {
   override val description =
     "Material 3 Expressive components that map one to one onto Jetpack Compose material3."
 
-  override val commonProps: List<PropDef> = COMMON_PROPS
+  override val commonProps: List<PropDef> =
+    COMMON_PROPS +
+      oneOf(
+        Catalog.ITEM_SIZE,
+        *CarouselItemSize.entries.map { it.wire }.toTypedArray(),
+        description =
+          "Only on a node inside a Carousel item: the smallest item size the node shows at. " +
+            "large shows it only while its item is at full size; medium hides it only on the " +
+            "smallest item. Leave it out to always show the node.",
+      )
 
   /** The most columns a `Grid` has. */
   const val MAX_GRID_COLUMNS = 24
@@ -373,6 +383,7 @@ object M3ExpressiveCatalog : Catalog {
   const val SHOW_IN = Catalog.SHOW_IN
   const val SIZE_CLASS = Catalog.SIZE_CLASS
   const val STYLE = Catalog.STYLE
+  const val ITEM_SIZE = Catalog.ITEM_SIZE
 
   override val components: List<ComponentDef> by lazy { buildComponents() }
 
