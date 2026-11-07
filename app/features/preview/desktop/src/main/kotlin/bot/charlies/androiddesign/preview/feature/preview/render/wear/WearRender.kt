@@ -110,7 +110,8 @@ internal fun describeWear(ctx: NodeContext, ambient: WearAmbient): NodeMeta {
     parent = ctx.parentId,
     order = ctx.order,
     primary = ctx.primary,
-    scrolls = ctx.component == "Screen" && ctx.bool("scroll"),
+    // Upstream's AlertDialog holds its content in a scrolling list, as a scrolling Screen does.
+    scrolls = (ctx.component == "Screen" && ctx.bool("scroll")) || ctx.component == "AlertDialog",
     interactive = interactive,
     roles =
       NodeRoles(

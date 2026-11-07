@@ -40,9 +40,10 @@ class RenderCheckTest {
       screen: String,
       view: ViewSpec,
       live: ProposalHostState?,
+      overlay: String?,
     ): LayoutTree {
       calls += Call(screen, view, live)
-      return real.render(source, screen, view, live)
+      return real.render(source, screen, view, live, overlay)
     }
   }
 

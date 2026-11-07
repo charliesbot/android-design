@@ -40,7 +40,8 @@ interface PreviewController {
   /**
    * `check_proposal`: renders each of [screens] (every screen when null or empty) at each of
    * [views] (every view of the proposal's catalog when null or empty) headlessly, tree only, and
-   * reports which pass.
+   * reports which pass. Each overlay component of a screen is one more render of it with that
+   * overlay open, reported as `screen+overlay`.
    */
   suspend fun checkProposal(
     screens: List<String>? = null,
@@ -92,7 +93,8 @@ data class ViewState(
 
 /**
  * What `check_proposal` returns: small enough to read after every edit. [screens] maps a screen id
- * to its views by name; [ms] is the time the renders took.
+ * to its views by name, and a screen with its overlay `id` open as `screen+id`; [ms] is the time
+ * the renders took.
  */
 @Serializable
 data class ProposalCheck(

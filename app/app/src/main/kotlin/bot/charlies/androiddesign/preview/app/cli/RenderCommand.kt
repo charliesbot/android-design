@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.app.cli
 
 import bot.charlies.androiddesign.preview.data.ProposalReader
+import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessRenderer
 import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessResult
@@ -16,23 +17,32 @@ import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.Path
 
-/** Draws one screen at one view; [HeadlessRenderer.image] in the app, a stub in tests. */
+/**
+ * Draws one screen at one view, with [overlay] open when given; [HeadlessRenderer.image] in the
+ * app, a stub in tests.
+ */
 fun interface ScreenRenderer {
-  fun render(source: RenderSource, screen: String, view: ViewSpec): HeadlessResult
+  fun render(source: RenderSource, screen: String, view: ViewSpec, overlay: String?): HeadlessResult
 }
 
 /**
  * `render <proposal.json> --out <dir> [--design <DESIGN.md>] [--views a,b] [--screens a,b]`
  *
  * Draws each screen at each view without a window and writes `<screen>-<view>.png`,
- * `<screen>-<view>.tree.json` and `report.json` into `<dir>`. Exit 0 when the proposal is valid and
- * every render passes, 1 when a render has error findings or threw, 2 when the proposal is invalid.
+ * `<screen>-<view>.tree.json` and `report.json` into `<dir>`. Each overlay of a screen is one more
+ * render with it open, named `<screen>+<overlay>`, whose failures leave out what the plain screen
+ * at that view already reports. A scrolling Wear screen is drawn at the top of its list with a tree
+ * of the whole list, and also writes `<screen>-<view>-end.png` and `-end.tree.json`, the list
+ * scrolled to its end. Exit 0 when the proposal is valid and every render passes, 1 when a render
+ * has error findings or threw, 2 when the proposal is invalid.
  *
  * A render that throws does not stop the run: the report lists it as failed with a `render-error`
  * failure and no files, and the rest are still drawn.
  */
 class RenderCommand(
-  private val renderer: ScreenRenderer = ScreenRenderer(HeadlessRenderer::image),
+  private val renderer: ScreenRenderer = ScreenRenderer { source, screen, view, overlay ->
+    HeadlessRenderer.image(source, screen, view, overlay = overlay)
+  },
 ) : Command {
   override val name = "render"
   override val usage =
@@ -105,21 +115,54 @@ class RenderCommand(
     views: List<ViewSpec>,
     options: Options,
   ): List<RenderEntry> = screens.flatMap { screen ->
-    views.map { view ->
-      val base = "$screen-${view.name}"
-      val result =
-        try {
-          renderer.render(source, screen, view)
-        } catch (e: Exception) {
-          return@map RenderEntry.of(screen, view.name, null, ViewCheck.renderError(e))
+    val base = views.map { view -> renderOne(source, screen, null, view, options, null) }
+    val overlays =
+      OverlayPlacement(source.proposal.screens.getValue(screen)).overlays.flatMap { overlay ->
+        views.mapIndexed { i, view ->
+          renderOne(source, screen, overlay.id, view, options, base[i].check)
         }
-      Files.write(options.out.resolve("$base.png"), result.png)
-      Files.writeString(
-        options.out.resolve("$base.tree.json"),
-        PreviewJson.pretty.encodeToString(LayoutTree.serializer(), result.tree) + "\n",
-      )
-      RenderEntry.of(screen, view.name, base, ViewCheck.of(source.proposal, result.tree))
-    }
+      }
+    (base + overlays).map { it.entry }
+  }
+
+  private class Rendered(val entry: RenderEntry, val check: ViewCheck)
+
+  /**
+   * One render written to the output folder; [overlay] is open in it when given, and [base] is the
+   * verdict on the same screen and view without it, whose findings the overlay render does not
+   * repeat.
+   */
+  private fun renderOne(
+    source: RenderSource,
+    screen: String,
+    overlay: String?,
+    view: ViewSpec,
+    options: Options,
+    base: ViewCheck?,
+  ): Rendered {
+    val name = overlay?.let { OverlayPlacement.renderName(screen, it) } ?: screen
+    val result =
+      try {
+        renderer.render(source, screen, view, overlay)
+      } catch (e: Exception) {
+        val failed = ViewCheck.renderError(e)
+        return Rendered(RenderEntry.of(name, view.name, null, failed), failed)
+      }
+    val files = "$name-${view.name}"
+    write(options, files, result.png, result.tree)
+    val endFiles =
+      result.end?.let { "$files-end".also { end -> write(options, end, it.png, it.tree) } }
+    val full = ViewCheck.of(source.proposal, result.tree)
+    val check = if (base == null) full else full.overlaying(base)
+    return Rendered(RenderEntry.of(name, view.name, files, check, endFiles), full)
+  }
+
+  private fun write(options: Options, base: String, png: ByteArray, tree: LayoutTree) {
+    Files.write(options.out.resolve("$base.png"), png)
+    Files.writeString(
+      options.out.resolve("$base.tree.json"),
+      PreviewJson.pretty.encodeToString(LayoutTree.serializer(), tree) + "\n",
+    )
   }
 
   private fun writeReport(

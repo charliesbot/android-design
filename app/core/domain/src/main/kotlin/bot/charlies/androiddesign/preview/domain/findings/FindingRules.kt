@@ -367,8 +367,9 @@ object FindingRules {
   /**
    * On a round view, a control or a text whose bounds reach past the circle inscribed in the view:
    * the display cuts off what sticks out. A scrolling list is exempt (its items scroll clear, and
-   * Wear's list transforms them at the edge). So are the components the catalog makes for the edge,
-   * and anything behind an open modal. The worst corner is reported.
+   * Wear's list transforms them at the edge): a scrolling Screen, and an AlertDialog, whose content
+   * is a scrolling list upstream. So are the components the catalog makes for the edge, and
+   * anything behind an open modal. The worst corner is reported.
    *
    * A progress ring takes a band at its own edge: the padding plus the stroke it recorded, from
    * Wear's defaults at render time. A node whose center lies inside a ring must keep its corners
@@ -389,6 +390,7 @@ object FindingRules {
           (node.type in view.facets.actionTypes || node.text != null) &&
           node.type !in view.catalog.roundEdgeNames &&
           !view.isBehindModal(node) &&
+          !node.scrolls &&
           view.ancestors(node).none { it.scrolls }
       }
       .mapNotNull { node ->

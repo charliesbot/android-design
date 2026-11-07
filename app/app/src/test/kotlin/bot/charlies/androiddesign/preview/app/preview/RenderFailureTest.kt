@@ -40,10 +40,11 @@ class RenderFailureTest {
       screen: String,
       view: ViewSpec,
       live: ProposalHostState?,
+      overlay: String?,
     ): LayoutTree {
       check(source.proposal.name != BROKEN) { "cannot measure $screen" }
       if (source.proposal.name == BLANK) throw IllegalStateException("")
-      val tree = real.render(source, screen, view, live)
+      val tree = real.render(source, screen, view, live, overlay)
       // A bad value that only some states or sizes draw, as a slider with a reversed range does.
       check(tree.nodes.none { it.text?.value == BAD_TEXT }) {
         "cannot draw '$BAD_TEXT' in $screen at ${view.name}"

@@ -881,6 +881,28 @@ class FindingRulesTest {
   }
 
   @Test
+  fun `round-edge-clipped passes for buttons under a scrolling AlertDialog`() {
+    val dialog =
+      tree(
+        Views.Watch,
+        node("sure", "AlertDialog", 0f, 0f, 204f, 204f, scrolls = true),
+        iconButton("minus", 0f, parent = "sure"),
+        iconButton("plus", 152f, parent = "sure"),
+      )
+    assertEquals(emptyList(), evaluate(dialog).of(FindingRule.RoundEdgeClipped))
+  }
+
+  @Test
+  fun `round-edge-clipped passes for a scrolling AlertDialog that carries its title`() {
+    val dialog =
+      tree(
+        Views.Watch,
+        node("sure", "AlertDialog", 0f, 0f, 204f, 204f, scrolls = true, text = text("End run?")),
+      )
+    assertEquals(emptyList(), evaluate(dialog).of(FindingRule.RoundEdgeClipped))
+  }
+
+  @Test
   fun `round-edge-clipped passes for the same row inside the circle`() {
     val row = tree(Views.Watch, iconButton("minus", 30f), iconButton("plus", 122f))
     assertEquals(emptyList(), evaluate(row).of(FindingRule.RoundEdgeClipped))

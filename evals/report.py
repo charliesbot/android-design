@@ -12,7 +12,8 @@ def score(items):
 
 
 def label(render):
-    return f"{render.get('screen')}/{render.get('view')}"
+    """`screen/view`; `screen+overlay/view` with an overlay open; `(end of list)` for the scrolled list's end."""
+    return f"{render.get('screen')}/{render.get('view')}" + (" (end of list)" if render.get("end") else "")
 
 
 def primary_first(renders, surface):

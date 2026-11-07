@@ -40,9 +40,9 @@ class CliTest {
     val report = readReport(out)
 
     assertTrue(report.valid, report.errors.toString())
-    assertEquals(10, report.renders.size, "two screens by five views")
+    assertEquals(15, report.renders.size, "two screens and one overlay by five views")
     assertEquals(
-      setOf("plates", "plate_detail"),
+      setOf("plates", "plates+new_sheet", "plate_detail"),
       report.renders.map { it.screen }.toSet(),
     )
     assertEquals(Views.all.map { it.name }.toSet(), report.renders.map { it.view }.toSet())
@@ -160,6 +160,70 @@ class CliTest {
     assertEquals(ExitCode.INVALID, export.code)
     assertTrue(design.toString() in render.err, render.err)
     assertTrue(design.toString() in readReport(dir.resolve("out")).errors.single().message)
+  }
+
+  private val repoDir: Path = Path.of(System.getProperty("repo.dir"))
+
+  @Test
+  fun `render draws each overlay of a screen open, under screen+overlay, with the layout summary left out`() {
+    val out = Files.createTempDirectory("render")
+    run(
+      "render",
+      repoDir.resolve("evals/verify/wear.verify.proposal.json").toString(),
+      "--out",
+      out.toString(),
+      "--screens",
+      "home",
+      "--views",
+      "watch",
+    )
+    val report = readReport(out)
+
+    assertEquals(
+      listOf("home", "home+sure", "home+done"),
+      report.renders.map { it.screen },
+      "the screen, then each overlay in document order",
+    )
+    val sure = report.renders.single { it.screen == "home+sure" }
+    assertEquals("home+sure-watch.png", sure.png)
+    assertEquals("home+sure-watch.tree.json", sure.tree)
+    assertTrue(Files.size(out.resolve(assertNotNull(sure.png))) > 1000)
+    assertTrue(
+      "\"sure\"" in Files.readString(out.resolve(assertNotNull(sure.tree))),
+      "the dialog is open",
+    )
+    assertEquals(null, sure.endPng, "nothing scrolls behind a dialog")
+  }
+
+  @Test
+  fun `render writes the end of a scrolling Wear list beside the top and lists it in the report`() {
+    val out = Files.createTempDirectory("render")
+    run(
+      "render",
+      repoDir.resolve("evals/verify/wear.verify.proposal.json").toString(),
+      "--out",
+      out.toString(),
+      "--screens",
+      "bindings,ring",
+      "--views",
+      "watch",
+    )
+    val report = readReport(out)
+
+    val bindings = report.renders.single { it.screen == "bindings" }
+    assertEquals("bindings-watch-end.png", bindings.endPng)
+    assertEquals("bindings-watch-end.tree.json", bindings.endTree)
+    assertTrue(Files.size(out.resolve(assertNotNull(bindings.endPng))) > 1000)
+    val whole = Files.readString(out.resolve(assertNotNull(bindings.tree)))
+    val end = Files.readString(out.resolve(assertNotNull(bindings.endTree)))
+    val ids = Regex(""""id": "([^"]+)"""")
+    fun nodeIds(json: String) = ids.findAll(json).map { it.groupValues[1] }.toSet()
+    assertTrue(
+      nodeIds(whole).containsAll(nodeIds(end)),
+      "the tree of the screen covers every node the end of the list shows",
+    )
+    val ring = report.renders.single { it.screen == "ring" }
+    assertEquals(null, ring.endPng, "a screen that does not scroll has no end render")
   }
 
   @Test

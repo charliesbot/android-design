@@ -144,13 +144,22 @@ def render(case_dir):
 
 
 def report_renders(case_dir):
-    """The renders listed in renders/report.json whose PNG exists, each with its absolute `png_path`."""
+    """The renders listed in renders/report.json whose PNG exists, each with its absolute `png_path`.
+
+    A scrolling Wear screen lists a second PNG, the list scrolled to its end (`endPng`). It comes back as
+    an entry of its own, marked `end`, so the judge sees the rows and the edge button below the first screenful.
+    An overlay render is already an entry: its `screen` is `screen+overlay`.
+    """
     listed = (read_report(case_dir) or {}).get('renders') or []
     found = []
     for entry in listed:
         png = (case_dir / 'renders' / str(entry.get('png', ''))).resolve()
         if png.is_file():
             found.append({**entry, 'png_path': str(png)})
+        end = entry.get('endPng')
+        if end and (case_dir / 'renders' / str(end)).resolve().is_file():
+            found.append({**entry, 'png': end, 'end': True, 'pass': None,
+                          'png_path': str((case_dir / 'renders' / str(end)).resolve())})
     return found
 
 
@@ -230,7 +239,7 @@ def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1)
     started = time.time()
     directory = out / case['name']
     images, render_error = render(directory)
-    renders = [{k: r.get(k) for k in ('screen', 'view', 'png', 'pass')} for r in report_renders(directory)]
+    renders = [{k: r.get(k) for k in ('screen', 'view', 'png', 'pass', 'end') if k in r} for r in report_renders(directory)]
     checks = run_checks(directory, case['surface'])
     if render_error:
         checks['C-review'] = {'pass': False, 'detail': render_error}

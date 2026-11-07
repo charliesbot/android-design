@@ -2,6 +2,7 @@ package bot.charlies.androiddesign.preview.app.preview
 
 import bot.charlies.androiddesign.preview.app.export.KotlinExport
 import bot.charlies.androiddesign.preview.domain.OpenedProposal
+import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.PreviewController
 import bot.charlies.androiddesign.preview.domain.PreviewException
 import bot.charlies.androiddesign.preview.domain.PreviewStatus
@@ -171,9 +172,16 @@ class AppPreviewController(
     val catalog = Catalogs.of(proposal)
     val specs = views.orEmpty().distinct().map { viewNamed(it, catalog) }.ifEmpty { catalog.views }
     val started = System.nanoTime()
-    val results = screenIds.associateWith { screen ->
-      specs.associate { view ->
-        view.name to check(proposal, snapshot, screen, view)
+    val results = linkedMapOf<String, Map<String, ViewCheck>>()
+    for (screen in screenIds) {
+      val base = specs.associate { view -> view.name to check(proposal, snapshot, screen, view) }
+      results[screen] = base
+      // One more render per overlay of the screen, with it open, under the name `screen+overlay`.
+      for (overlay in OverlayPlacement(proposal.screens.getValue(screen)).overlays) {
+        results[OverlayPlacement.renderName(screen, overlay.id)] = specs.associate { view ->
+          val verdict = check(proposal, snapshot, screen, view, overlay.id)
+          view.name to verdict.overlaying(base.getValue(view.name))
+        }
       }
     }
     return ProposalCheck(
@@ -183,16 +191,21 @@ class AppPreviewController(
     )
   }
 
-  /** One fresh headless render. A render that throws fails its view and not the whole check. */
+  /**
+   * One fresh headless render, with [overlay] open when given. A render that throws fails its view
+   * and not the whole check. An overlay render leaves out the layout summary, which is the screen's
+   * and not the overlay's, to keep the result small.
+   */
   private suspend fun check(
     proposal: Proposal,
     snapshot: ProposalSnapshot,
     screen: String,
     view: ViewSpec,
+    overlay: String? = null,
   ): ViewCheck {
     val tree =
       try {
-        renderer.render(sourceOf(proposal, snapshot), screen, view)
+        renderer.render(sourceOf(proposal, snapshot), screen, view, overlay = overlay)
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {

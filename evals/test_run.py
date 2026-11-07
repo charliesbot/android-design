@@ -23,23 +23,32 @@ def fake_case(directory):
     return proposal
 
 
-def write_report(directory, screens=('plates',), views=VIEWS, *, valid=True, failing=()):
-    """What the app's `render` leaves in <case>/renders/: a PNG and a tree per screen and view, and report.json."""
+def write_report(directory, screens=('plates',), views=VIEWS, *, valid=True, failing=(), ends=(), overlays=()):
+    """What the app's `render` leaves in <case>/renders/: a PNG and a tree per screen and view, and report.json.
+
+    `overlays` are screens named `screen+overlay`, listed like any other. `ends` are the screens whose entries
+    also list a list-scrolled-to-its-end PNG and tree (`endPng`, `endTree`). Returns the PNG paths on disk.
+    """
     out = directory / 'renders'
     out.mkdir(exist_ok=True)
     entries = []
-    for screen in screens:
+    for screen in (*screens, *overlays):
         for view in views:
             (out / f'{screen}-{view}.png').write_bytes(b'png')
             (out / f'{screen}-{view}.tree.json').write_text('{}')
             bad = (screen, view) in failing
-            entries.append({'screen': screen, 'view': view, 'png': f'{screen}-{view}.png',
-                            'tree': f'{screen}-{view}.tree.json', 'pass': not bad,
-                            'failures': ['touch-target: open 40x40'] if bad else []})
+            entry = {'screen': screen, 'view': view, 'png': f'{screen}-{view}.png',
+                     'tree': f'{screen}-{view}.tree.json', 'pass': not bad,
+                     'failures': ['touch-target: open 40x40'] if bad else []}
+            if screen in ends:
+                (out / f'{screen}-{view}-end.png').write_bytes(b'end')
+                (out / f'{screen}-{view}-end.tree.json').write_text('{}')
+                entry |= {'endPng': f'{screen}-{view}-end.png', 'endTree': f'{screen}-{view}-end.tree.json'}
+            entries.append(entry)
     report = {'proposal': 'p', 'design': None, 'theme': {'seed': '#B5523B', 'variant': 'tonal-spot', 'contrast': 0.0},
               'valid': valid, 'errors': [], 'renders': entries, 'pass': valid and not failing}
     (out / 'report.json').write_text(json.dumps(report))
-    return [str((out / e['png']).resolve()) for e in entries]
+    return [str(p.resolve()) for p in sorted(out.glob('*.png'))]
 
 
 def fake_render(directory, **kwargs):
@@ -321,6 +330,53 @@ class ArtifactPipelineTests(unittest.TestCase):
             self.assertIn('DESIGN.md', hashed)
             self.assertIn('renders/player-desktop.png', hashed)
             self.assertFalse(any(k.endswith('.tree.json') for k in hashed))
+
+    def test_the_judge_gets_the_end_of_a_scrolling_list_and_each_overlay_render(self):
+        case = next(iter(run.select_cases('workout')))
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            fake_case(directory)
+            views = ('watch', 'watch-large')
+            images = write_report(directory, screens=('list',), views=views, ends=('list',),
+                                  overlays=('list+sure',))
+            request = run.make_request(case, directory, (run.HERE / 'rubric.md').read_text())
+            self.assertEqual(request['images'], sorted(images))
+            self.assertEqual(len(images), 6)
+            for view in views:
+                self.assertIn(f'- list/{view}: ', request['prompt'])
+                self.assertIn(f'- list/{view} (end of list): ', request['prompt'])
+                self.assertIn(f'- list+sure/{view}: ', request['prompt'])
+            self.assertIn('renders/list-watch-end.png', request['artifacts'])
+            self.assertFalse(any(k.endswith('.tree.json') for k in request['artifacts']))
+
+    def test_report_renders_lists_the_end_png_as_its_own_entry_after_the_top_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            fake_case(directory)
+            write_report(directory, screens=('list', 'detail'), views=('watch',), ends=('list',))
+            found = run.report_renders(directory)
+            self.assertEqual([(r['screen'], r['png'], r.get('end')) for r in found],
+                             [('list', 'list-watch.png', None), ('list', 'list-watch-end.png', True),
+                              ('detail', 'detail-watch.png', None)])
+            self.assertTrue(all(Path(r['png_path']).is_file() for r in found))
+
+    def test_a_listed_end_png_that_is_missing_is_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            fake_case(directory)
+            write_report(directory, screens=('list',), views=('watch',), ends=('list',))
+            (directory / 'renders/list-watch-end.png').unlink()
+            self.assertEqual([r['png'] for r in run.report_renders(directory)], ['list-watch.png'])
+
+    def test_a_failing_overlay_render_fails_c_review_by_its_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            fake_case(directory)
+            write_report(directory, screens=('list',), views=('watch',), overlays=('list+sure',),
+                         failing=(('list+sure', 'watch'),))
+            out = run.run_checks(directory, 'wear')
+            self.assertFalse(out['C-review']['pass'])
+            self.assertIn('list+sure/watch', out['C-review']['detail'])
 
     def test_import_refuses_changed_artifacts_and_wrong_request(self):
         with tempfile.TemporaryDirectory() as tmp:

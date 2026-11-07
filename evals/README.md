@@ -37,17 +37,17 @@ python3 run.py evaluate --out /tmp/design-eval --no-open
 
 For each case this runs `<app> render <proposal> --out <case>/renders` (headless, no window; it passes `--design` when the agent wrote a `DESIGN.md`), reads `renders/report.json`, runs deterministic checks, and writes a report plus `<case>/judge-request.json`. No provider CLI is required for either command.
 
-A phone proposal renders each screen at five views: `light` and `dark` at phone size 411x923; `foldable` (704x933), `tablet` (1280x800), and `desktop` (1920x1080) in light. `render` writes one PNG and one layout tree per screen and view, named `<screen>-<view>`, and `report.json` lists them. The runner takes the renders from that list, so a proposal with more screens has more images.
+A phone proposal renders each screen at five views: `light` and `dark` at phone size 411x923; `foldable` (704x933), `tablet` (1280x800), and `desktop` (1920x1080) in light. `render` writes one PNG and one layout tree per screen and view, named `<screen>-<view>`, and `report.json` lists them. Each overlay component of a screen (sheet, dialog, menu, search view, tooltip, snackbar, picker; on Wear an AlertDialog or ConfirmationDialog) is one more render of that screen with it open, named `<screen>+<overlay>-<view>` and listed as the screen `<screen>+<overlay>`; its failures are only those the plain screen at that view does not already report (matched by rule and component id), so an overlay entry that fails names something the overlay caused. A scrolling Wear screen is drawn at the top of its list with a tree of the whole list, and also writes `<screen>-<view>-end.png` and `-end.tree.json`, the list scrolled to its end, listed as `endPng` and `endTree` on its entry. The runner takes the renders from that list, so a proposal with more screens, overlays, or long Wear lists has more images; each end-of-list PNG is its own image, labeled `screen/view (end of list)`.
 
 The deterministic checks all read `report.json`:
 
 | Check | Passes when |
 | --- | --- |
 | `C-valid` | `valid` is true. The detail carries the first validation errors. |
-| `C-review` | Every render passes the app's finding rules. The detail lists each failure as `screen/view: rule`. No renders is a failure. |
+| `C-review` | Every render passes the app's finding rules, overlay renders included. The detail lists each failure as `screen/view: rule` (`screen+overlay/view: rule` for an overlay render). No renders is a failure. |
 | `C-palette` | The merged theme's `variant` is not `expressive` or `vibrant`. Phone cases only. |
 
-For visual assessment, give each `judge-request.json` to your chosen reviewer. They must inspect every listed screenshot (each is labeled `screen/view`) against its included rubric. The layout trees stay out of the request: the judge sees one PNG per screen and view. Prefer a separate session for a blind judgment; the current chat is useful for interactive checks but is not a controlled independent evaluation.
+For visual assessment, give each `judge-request.json` to your chosen reviewer. They must inspect every listed screenshot (each is labeled `screen/view`) against its included rubric. The layout trees stay out of the request: the judge sees one PNG per screen and view, one per overlay and view, and the end of each scrolling Wear list. Prefer a separate session for a blind judgment; the current chat is useful for interactive checks but is not a controlled independent evaluation.
 
 The reviewer writes `<case>/judge-ballot.json`:
 
@@ -129,7 +129,7 @@ The evals judge proposals rendered by the previewer app, so they cannot show whe
 
 ### Wear
 
-The same four steps, with these changes. The proposal is `evals/verify/wear.verify.proposal.json` (every Wear catalog component; a Wear proposal needs no `--design` or `--screen`: `<app> export <proposal>` prints every screen). The sandbox is `evals/wear-starter/`, a scratch copy of which needs Android SDK platform 37.1; its README says where the export lands and how to add one preview per screen at 204 and 227 dp. The comparison is against `<app> render <proposal> --out <dir>` at the same two sizes. Expect two differences that are not bugs: the clock text, and lighter label weights in the sandbox (layoutlib has no Roboto Flex). A scrolling screen renders only the rows at the top of its list, so the verify proposal keeps each row group on a screen of its own; keep that when adding components. A render cannot open a dialog, so the two Wear dialogs stay unverified.
+The same four steps, with these changes. The proposal is `evals/verify/wear.verify.proposal.json` (every Wear catalog component; a Wear proposal needs no `--design` or `--screen`: `<app> export <proposal>` prints every screen). The sandbox is `evals/wear-starter/`, a scratch copy of which needs Android SDK platform 37.1; its README says where the export lands and how to add one preview per screen at 204 and 227 dp. The comparison is against `<app> render <proposal> --out <dir>` at the same two sizes. Expect two differences that are not bugs: the clock text, and lighter label weights in the sandbox (layoutlib has no Roboto Flex). The previewer merges a scrolling screen's whole list into its tree and writes the end of the list as `<screen>-<view>-end.png`, but the sandbox's screenshot still shows only the rows at the top of the list, so the verify proposal keeps each row group on a screen of its own; keep that when adding components. `render` writes one PNG per overlay, `<screen>+<overlayId>-<view>.png`; layoutlib screenshots do not show a `Dialog` window, so render a dialog by composing `AlertDialogContent` or `ConfirmationDialogContent` with the exported slots. A layoutlib render also freezes `ConfirmationDialog` on its first animation frame, so that row stays unverified.
 
 ## Verification and files
 
