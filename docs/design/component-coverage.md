@@ -143,13 +143,6 @@ A component omitted as `no-compose-api` can become possible on a material3 upgra
 
 The desktop build lags Android. The app renders with JetBrains' material3 (1.13.0-beta01, mapped to AndroidX 1.5.0-beta01) while the export sandbox pins AndroidX 1.5.0-alpha29, so an API in the Android inventory may not exist on desktop yet. A component can join the catalog only when both builds have its composables; until then it stays omitted as `no-compose-api` with the desktop version it is waiting for.
 
-## Follow-ups
-
-The gap is closed (PRs #75, #77, #78, #79, #80, #82, #83). These were found along the way and predate those PRs or sit outside them:
-
-- **Templated groups in a menu are not exported.** A `Menu` whose `items` is a data template of `MenuItem`s exports as a loop inside its one group, but a template of `MenuGroup`s still exports an empty group. A group repeated per data row needs per-group selection state, which has no home yet.
-- **Selection state of templated menu items.** A `role: single` or `multi` item in a template shows its bound `selected` and does not remember a choice, because the exported code declares state per listed item and a data row has no id to declare it for.
-
 ## Links
 
 - [Visual design exploration v3](visual-design-exploration-v3.md): why the previewer exists, its fidelity bar, and its architecture

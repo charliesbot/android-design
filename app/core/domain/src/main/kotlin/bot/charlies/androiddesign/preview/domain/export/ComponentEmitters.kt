@@ -2280,29 +2280,123 @@ private fun ScreenEmitter.positionIn(
   )
 }
 
+/** The first template [node] holds under [key] at a size class it is shown at, if it has one. */
+private fun ScreenEmitter.templateOf(node: ComponentNode, key: String): ChildItems.Template? =
+  SizeClass.entries.filter(node::isShownAt).firstNotNullOfOrNull {
+    effectiveProps(node, it)[key].childItems() as? ChildItems.Template
+  }
+
+/** The template of `MenuGroup`s that [menu] repeats per data row, if its members are such. */
+private fun ScreenEmitter.groupTemplate(menu: ComponentNode): ChildItems.Template? =
+  templateOf(menu, "items")?.takeIf { byId[it.componentId]?.component == MenuSpec.GROUP }
+
+/** The template of items that [unit], a group or a menu of items, repeats per data row. */
+private fun ScreenEmitter.itemTemplate(unit: ComponentNode): ChildItems.Template? =
+  templateOf(unit, "items")?.takeIf { byId[it.componentId]?.component != MenuSpec.GROUP }
+
+/** A lambda parameter that is [variable] when [body] reads it, else `_`. */
+private fun lambdaParam(variable: String, body: String) =
+  if (Regex("\\b${Regex.escape(variable)}\\b").containsMatchIn(body)) variable else "_"
+
+/**
+ * `remember([key]) { [value] }` bound to the plain `val` [name]: state that is a collection, not a
+ * delegate. It holds an entry for each row of the list [key] names, so a new list rebuilds it.
+ */
+private fun ScreenEmitter.rememberedVal(name: String, key: String, value: String): Stmt =
+  Assign(
+    "val $name",
+    "=",
+    Call(file.use(Sym.remember), listOf(pos(key)), lambda(stmt(Raw(value)))),
+  )
+
 /**
  * The state of the items of [unit], a menu group (or a menu of items, which is one group): one
  * selected id for its single-select items and one flag for each multi-select item. It lives above
  * the popup so it survives the menu closing, and it covers every size class the roles change at.
+ *
+ * A data template has no ids to name state by, so its state is keyed by the data row, seeded from
+ * the bound `selected`: items repeated per row share one picked row index (single) or a list of
+ * flags (multi), and a group repeated per row keeps one of those per group row.
  */
-private fun ScreenEmitter.menuState(unit: ComponentNode): List<Stmt> {
-  val items = listedIds(unit, "items").mapNotNull(byId::get)
+private fun ScreenEmitter.menuState(menu: ComponentNode, unit: ComponentNode): List<Stmt> {
+  val groupRows =
+    if (unit == menu) null
+    else groupTemplate(menu)?.let { templateScope(unit.id, it.path, Place(), indexed = true) }
+  val itemRows =
+    itemTemplate(unit)?.let {
+      templateScope(it.componentId, it.path, Place(scope = groupRows?.scope), indexed = true)
+    }
+  val items =
+    if (itemRows != null) {
+      listOfNotNull(byId[itemTemplate(unit)?.componentId])
+    } else {
+      listedIds(unit, "items").mapNotNull(byId::get)
+    }
+  val scope = (itemRows ?: groupRows)?.scope
+  val toState = "." + file.use(Sym.toMutableStateList) + "()"
+  /** [element] for each data row of the group template, as the state list of the group rows. */
+  fun perGroupRow(element: String) = groupRows?.let { g ->
+    "${g.list.expr}.map { ${lambdaParam(g.scope.variable, element)} -> $element }"
+  }
+  // The list the state has an entry per row of, which a new list must rebuild it for.
+  val groupKey = groupRows?.list?.expr
   val declarations = mutableListOf<Stmt>()
   if (items.any { MenuSpec.Role.Single in menuRoles(it) }) {
-    val initial =
-      initialSelection(items.map { it.id }) { item, size ->
-        menuRole(item, size) == MenuSpec.Role.Single
-      }
-    declarations += state(unit, "Selected", initial).second
+    if (itemRows != null) {
+      val item = items.single()
+      val sizes = SizeClass.entries.filter(item::isShownAt)
+      val picked =
+        sizeDependent(sizes) { size ->
+          if (menuRole(item, size) == MenuSpec.Role.Single) {
+            effectiveProps(item, size).boolExpr("selected", Place(scope = scope)) ?: "false"
+          } else {
+            "false"
+          }
+        }
+      val row =
+        "${itemRows.list.expr}.indexOfFirst { ${lambdaParam(itemRows.scope.variable, picked)} -> $picked }"
+      val name = stateName(unit.id, "Picked")
+      declarations +=
+        if (groupRows == null) {
+          stateVar(name, row, Sym.mutableIntStateOf, key = itemRows.list.expr)
+        } else {
+          rememberedVal(name, groupRows.list.expr, perGroupRow(row) + toState)
+        }
+    } else {
+      val initial =
+        initialSelection(items.map { it.id }) { item, size ->
+          menuRole(item, size) == MenuSpec.Role.Single
+        }
+      declarations +=
+        if (groupRows == null) {
+          state(unit, "Selected", initial).second
+        } else {
+          rememberedVal(
+            stateName(unit.id, "Selected"),
+            groupRows.list.expr,
+            perGroupRow(initial) + toState,
+          )
+        }
+    }
   }
   items
     .filter { MenuSpec.Role.Multi in menuRoles(it) }
     .forEach { item ->
       val checked =
         sizeDependent(SizeClass.entries.filter(item::isShownAt)) { size ->
-          effectiveProps(item, size).boolExpr("selected", Place()) ?: "false"
+          effectiveProps(item, size).boolExpr("selected", Place(scope = scope)) ?: "false"
         }
-      declarations += state(item, "Checked", checked).second
+      val name = stateName(item.id, "Checked")
+      declarations +=
+        when {
+          itemRows != null -> {
+            val row =
+              "${itemRows.list.expr}.map { ${lambdaParam(itemRows.scope.variable, checked)} -> $checked }$toState"
+            rememberedVal(name, groupKey ?: itemRows.list.expr, perGroupRow(row) ?: row)
+          }
+          groupKey != null -> rememberedVal(name, groupKey, perGroupRow(checked) + toState)
+          else -> state(item, "Checked", checked).second
+        }
     }
   return declarations
 }
@@ -2313,7 +2407,7 @@ internal fun ScreenEmitter.menuStatements(menu: ComponentNode): List<Stmt> {
   // A menu with nothing drawn at any size class has no popup, not an empty group.
   if (layout == MenuSpec.Layout.Empty) return emptyList()
   // The state of the items covers every size class, so it is declared once, above the popups.
-  val declarations = menuUnits(menu, layout).flatMap { menuState(it) }
+  val declarations = menuUnits(menu, layout).flatMap { menuState(menu, it) }
   return declarations + perSize(menu) { sized -> menuPopup(menu, sized, layout) }
 }
 
@@ -2322,8 +2416,10 @@ private fun ScreenEmitter.menuUnits(menu: ComponentNode, layout: MenuSpec.Layout
   if (layout == MenuSpec.Layout.Items) {
     listOf(menu)
   } else {
-    // Templated groups are not exported (as before): the menu keeps its empty group.
-    drawnIds(menu, "items").filter { it.component == MenuSpec.GROUP }.ifEmpty { listOf(menu) }
+    // A template of groups is one group, repeated; its state holds a part for each data row.
+    val repeated = groupTemplate(menu)?.let { byId[it.componentId] }
+    (drawnIds(menu, "items").filter { it.component == MenuSpec.GROUP } + listOfNotNull(repeated))
+      .ifEmpty { listOf(menu) }
   }
 
 /** The popup of [menu] with the props [p] it has at some size classes. */
@@ -2344,8 +2440,20 @@ private fun ScreenEmitter.menuPopup(
         byId[it]?.component == MenuSpec.GROUP
       }
     }
+  // A template of groups is a loop over the data rows, a group each.
+  val repeated =
+    (p["items"].childItems() as? ChildItems.Template)?.takeIf {
+      byId[it.componentId]?.component == MenuSpec.GROUP
+    }
   val drawn =
-    if (listed.isEmpty()) menuGroup(menu, p, inMenu) else listed.flatMap { emit(it, inMenu) }
+    when {
+      repeated != null ->
+        children(p, "items", inMenu, "Menu", indexed = true) { row, i, n ->
+          row.copy(listPosition = ListPosition(false, i, n), menuVibrant = vibrant)
+        }
+      listed.isEmpty() -> menuGroup(menu, p, inMenu)
+      else -> listed.flatMap { emit(it, inMenu) }
+    }
   val popup =
     Call(
       m3("DropdownMenuPopup"),
@@ -2366,27 +2474,43 @@ private fun ScreenEmitter.menuPopup(
 private fun ScreenEmitter.menuGroup(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val defaults = m3("MenuDefaults")
   val menu = if (node.component == "Menu") null else enclosingOverlay(node.id)?.let(byId::get)
+  // One of the data rows of a template of groups: its place is the loop's, not a listed one.
+  val repeated = menu != null && groupTemplate(menu)?.componentId == node.id
   val position =
-    if (menu == null) ListPosition(false, "0", "1")
-    else positionIn(menu, "items", node.id, "MenuGroup")
-  val items = drawnIds(node, "items")
+    when {
+      menu == null -> ListPosition(false, "0", "1")
+      repeated -> checkNotNull(place.listPosition)
+      else -> positionIn(menu, "items", node.id, "MenuGroup")
+    }
+  val rows = itemTemplate(node)
+  val items = if (rows != null) listOfNotNull(byId[rows.componentId]) else drawnIds(node, "items")
+  // State is kept per data row of a template of groups, behind the index of the group's row.
+  val groupSuffix = if (repeated) "[${checkNotNull(place.scope?.index)}]" else ""
   val selection =
     if (items.any { MenuSpec.Role.Single in menuRoles(it) }) {
-      ChipSelection(stateName(node.id, "Selected"))
+      val byRow = rows != null
+      ChipSelection(stateName(node.id, if (byRow) "Picked" else "Selected") + groupSuffix, byRow)
     } else {
       null
     }
-  val inner = Place(parentType = "Menu", menuVibrant = place.menuVibrant, chipSelection = selection)
-  // A template of groups is not exported (as before), so only a template of items is a loop.
-  val rows =
-    (p["items"].childItems() as? ChildItems.Template)?.takeIf {
-      byId[it.componentId]?.component != MenuSpec.GROUP
-    }
+  val inner =
+    Place(
+      scope = place.scope,
+      parentType = "Menu",
+      menuVibrant = place.menuVibrant,
+      chipSelection = selection,
+      menuRows = MenuRows(groupSuffix, itemsTemplated = rows != null),
+    )
   val content =
     if (rows != null) {
       // Data rows: a row's place among them is its loop index out of the list's size.
       children(p, "items", inner, "Menu", indexed = true) { row, i, n ->
-        row.copy(listPosition = ListPosition(false, i, n), menuVibrant = place.menuVibrant)
+        row.copy(
+          listPosition = ListPosition(false, i, n),
+          menuVibrant = place.menuVibrant,
+          chipSelection = selection,
+          menuRows = inner.menuRows,
+        )
       }
     } else {
       items.flatMap { item ->
@@ -2413,6 +2537,7 @@ private fun ScreenEmitter.menuGroup(node: ComponentNode, p: JsonObject, place: P
     )
   val gap =
     when {
+      repeated -> listOf(IfStmt(listOf("${position.index} > 0" to listOf(spacer)), null))
       gapAt.isEmpty() -> emptyList()
       gapAt.size == sizes.size -> listOf(spacer)
       else -> {
@@ -2459,9 +2584,18 @@ private fun ScreenEmitter.menuItem(node: ComponentNode, p: JsonObject, place: Pl
       )
     MenuSpec.Role.Single -> {
       val selection = place.chipSelection
-      // A data row has no remembered selection: it shows its bound `selected`.
-      val picked = selection?.picks(node.id) ?: p.boolExpr("selected", place) ?: "false"
-      val choose = listOfNotNull(selection?.choose(node.id))
+      // A data row is picked by its index in the template, a listed item by its id.
+      val row = place.scope?.index.takeIf { selection?.byRow == true }
+      val picked =
+        selection?.let { if (row != null) "${it.state} == $row" else it.picks(node.id) }
+          ?: p.boolExpr("selected", place)
+          ?: "false"
+      val choose =
+        listOfNotNull(
+          selection?.let {
+            if (row != null) Assign(it.state, "=", Raw(row)) else it.choose(node.id)
+          },
+        )
       one(
         m3("SelectableDropdownMenuItem"),
         listOf(
@@ -2475,15 +2609,17 @@ private fun ScreenEmitter.menuItem(node: ComponentNode, p: JsonObject, place: Pl
       )
     }
     MenuSpec.Role.Multi -> {
-      // A data row has no remembered state: it shows its bound `selected` and only runs its action.
-      val dataRow = place.scope != null
+      // A data row has no id: its flag is the entry of the item's list at the row's index.
+      val rows = place.menuRows
       val checked =
-        if (dataRow) p.boolExpr("selected", place) ?: "false" else stateName(node.id, "Checked")
+        stateName(node.id, "Checked") +
+          rows.groupSuffix +
+          if (rows.itemsTemplated) "[${checkNotNull(place.scope?.index)}]" else ""
       one(
         m3("CheckableDropdownMenuItem"),
         listOf(
           arg("checked", checked),
-          arg("onCheckedChange", if (dataRow) lambda(action) else assignIt(checked, action)),
+          arg("onCheckedChange", assignIt(checked, action)),
           text,
           shapes?.let { arg("shapes", it) },
           leading,

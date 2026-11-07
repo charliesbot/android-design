@@ -13,6 +13,8 @@ internal object Sym {
   const val remember = "$RUNTIME.remember"
   const val mutableStateOf = "$RUNTIME.mutableStateOf"
   const val mutableFloatStateOf = "$RUNTIME.mutableFloatStateOf"
+  const val mutableIntStateOf = "$RUNTIME.mutableIntStateOf"
+  const val toMutableStateList = "$RUNTIME.toMutableStateList"
   const val getValue = "$RUNTIME.getValue"
   const val setValue = "$RUNTIME.setValue"
   const val LaunchedEffect = "$RUNTIME.LaunchedEffect"

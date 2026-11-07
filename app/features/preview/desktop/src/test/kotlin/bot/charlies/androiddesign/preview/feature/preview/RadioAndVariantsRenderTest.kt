@@ -152,6 +152,81 @@ class RadioAndVariantsRenderTest {
     assertEquals("menu", open, "a multi-select menu stays open until dismissed")
   }
 
+  private val plates = """{"plates":[{"name":"Ramen","on":false},{"name":"Udon","on":true}]}"""
+
+  private fun templatedMenu(role: String) =
+    """{"id":"root","component":"Scaffold","content":"stage"},""" +
+      """{"id":"stage","component":"Column","padding":"lg","children":["anchor"]},""" +
+      """{"id":"anchor","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"menu"}}}},""" +
+      """{"id":"menu","component":"Menu","anchor":"anchor","items":{"componentId":"item","path":"/plates"}},""" +
+      """{"id":"item","component":"MenuItem","label":{"@path":"name"},"role":"$role","selected":{"@path":"on"}}"""
+
+  @Test
+  fun `a templated multi item toggles from its bound selection`() {
+    var toggled = false
+    render(singleScreen(templatedMenu("multi"), plates)) { host ->
+      host.interaction.open("home", "menu")
+      settleForTest()
+      onNodeWithTag("item[0]", useUnmergedTree = true).assertIsNotSelected()
+      onNodeWithTag("item[1]", useUnmergedTree = true).assertIsSelected()
+      onNodeWithTag("item[0]", useUnmergedTree = true).performClick()
+      settleForTest()
+      onNodeWithTag("item[0]", useUnmergedTree = true).assertIsSelected()
+      onNodeWithTag("item[1]", useUnmergedTree = true).assertIsSelected()
+      toggled = true
+    }
+    assertTrue(toggled)
+  }
+
+  @Test
+  fun `a templated single item moves the pick among the data rows`() {
+    var moved = false
+    render(singleScreen(templatedMenu("single"), plates)) { host ->
+      host.interaction.open("home", "menu")
+      settleForTest()
+      onNodeWithTag("item[0]", useUnmergedTree = true).assertIsNotSelected()
+      onNodeWithTag("item[1]", useUnmergedTree = true).assertIsSelected()
+      onNodeWithTag("item[0]", useUnmergedTree = true).performClick()
+      settleForTest()
+      host.interaction.open("home", "menu")
+      settleForTest()
+      onNodeWithTag("item[0]", useUnmergedTree = true).assertIsSelected()
+      onNodeWithTag("item[1]", useUnmergedTree = true).assertIsNotSelected()
+      moved = true
+    }
+    assertTrue(moved)
+  }
+
+  @Test
+  fun `a templated group keeps one pick per data row`() {
+    val sections =
+      """{"sections":[{"opts":[{"name":"A","on":true},{"name":"B","on":false}]},""" +
+        """{"opts":[{"name":"C","on":true},{"name":"D","on":false}]}]}"""
+    val components =
+      """{"id":"root","component":"Scaffold","content":"stage"},""" +
+        """{"id":"stage","component":"Column","padding":"lg","children":["anchor"]},""" +
+        """{"id":"anchor","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"menu"}}}},""" +
+        """{"id":"menu","component":"Menu","anchor":"anchor","items":{"componentId":"grp","path":"/sections"}},""" +
+        """{"id":"grp","component":"MenuGroup","items":{"componentId":"item","path":"opts"}},""" +
+        """{"id":"item","component":"MenuItem","label":{"@path":"name"},"role":"single","selected":{"@path":"on"}}"""
+    var done = false
+    render(singleScreen(components, sections)) { host ->
+      host.interaction.open("home", "menu")
+      settleForTest()
+      onNodeWithTag("item[1][1]", useUnmergedTree = true).assertIsNotSelected()
+      onNodeWithTag("item[1][1]", useUnmergedTree = true).performClick()
+      settleForTest()
+      host.interaction.open("home", "menu")
+      settleForTest()
+      onNodeWithTag("item[1][1]", useUnmergedTree = true).assertIsSelected()
+      onNodeWithTag("item[1][0]", useUnmergedTree = true).assertIsNotSelected()
+      // The other group keeps its own pick.
+      onNodeWithTag("item[0][0]", useUnmergedTree = true).assertIsSelected()
+      done = true
+    }
+    assertTrue(done)
+  }
+
   @Test
   fun `a vibrant menu draws the container and the selected item colors its tree reports`() {
     for (colors in listOf("standard", "vibrant")) {

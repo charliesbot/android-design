@@ -56,7 +56,14 @@ internal class ListPosition(val segmented: Boolean, val index: String, val count
  * A group with single selection (a `ChipGroup`, a `RadioGroup`, the single-select items of a menu
  * group): one state variable holds the id of the selected child.
  */
-internal class ChipSelection(val state: String)
+internal class ChipSelection(val state: String, val byRow: Boolean = false)
+
+/**
+ * How the selectable items of one menu group address their remembered state when a data template is
+ * involved. A templated group keeps one entry per data row ([groupSuffix], such as `[index]`), and
+ * templated items keep one entry per data row of their own, so a row has no id to name them by.
+ */
+internal class MenuRows(val groupSuffix: String = "", val itemsTemplated: Boolean = false)
 
 /**
  * A Material Symbol name: written in the proposal, or bound to data. A bound name is a Kotlin
@@ -117,6 +124,7 @@ internal data class Place(
   /** `ButtonGroupDefaults.connectedMiddleButtonShapes()` for a child of a connected group. */
   val groupShapes: String? = null,
   val chipSelection: ChipSelection? = null,
+  val menuRows: MenuRows = MenuRows(),
   /** True for an item of a vibrant `Menu`. */
   val menuVibrant: Boolean = false,
   /** True for a floating toolbar placed over content in a `Box`. */
@@ -140,6 +148,7 @@ internal data class Place(
       listPosition = null,
       groupShapes = null,
       chipSelection = null,
+      menuRows = MenuRows(),
       menuVibrant = false,
       floating = false,
       scrollBehavior = false,
