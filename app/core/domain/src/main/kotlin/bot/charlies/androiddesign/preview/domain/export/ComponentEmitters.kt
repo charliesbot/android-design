@@ -2320,12 +2320,13 @@ internal fun ScreenEmitter.menuStatements(menu: ComponentNode): List<Stmt> {
     if (layout == MenuSpec.Layout.Items) {
       listOf(menu)
     } else {
-      MenuSpec.drawnMembers(menu, byId).filter { it.component == MenuSpec.GROUP }
+      // Templated groups are not exported (as before): the menu keeps its empty group.
+      drawnIds(menu, "items").filter { it.component == MenuSpec.GROUP }.ifEmpty { listOf(menu) }
     }
   val declarations = groups.flatMap { menuState(it) }
   val inMenu = Place(parentType = "Menu", menuVibrant = vibrant)
   val drawn =
-    if (layout == MenuSpec.Layout.Items) menuGroup(menu, p, inMenu)
+    if (groups.singleOrNull() === menu) menuGroup(menu, p, inMenu)
     else groups.flatMap { emit(it.id, inMenu) }
   val popup =
     Call(

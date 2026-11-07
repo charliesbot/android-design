@@ -42,10 +42,14 @@ object MenuSpec {
   fun drawnMembers(menu: ComponentNode, nodes: Map<String, ComponentNode>): List<ComponentNode> =
     SizeClass.entries
       .flatMap { size ->
-        val items = (menu.props + menu.sizeOverridesAt(size))["items"].childItems()
-        (items as? ChildItems.Listed)?.ids.orEmpty().mapNotNull(nodes::get).filter {
-          it.isShownAt(size)
-        }
+        val ids =
+          when (val items = (menu.props + menu.sizeOverridesAt(size))["items"].childItems()) {
+            is ChildItems.Listed -> items.ids
+            // A template repeats one component per data item: its members are that component.
+            is ChildItems.Template -> listOf(items.componentId)
+            null -> emptyList()
+          }
+        ids.mapNotNull(nodes::get).filter { it.isShownAt(size) }
       }
       .distinct()
 

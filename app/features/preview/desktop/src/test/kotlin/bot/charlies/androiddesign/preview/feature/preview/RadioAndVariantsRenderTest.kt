@@ -462,4 +462,23 @@ class RadioAndVariantsRenderTest {
       "the item sits in its group's container",
     )
   }
+
+  @Test
+  fun `a menu of templated items draws a row for each data item`() {
+    val result =
+      render(
+        singleScreen(
+          """{"id":"root","component":"Scaffold","content":"stage"},""" +
+            """{"id":"stage","component":"Column","padding":"lg","children":["anchor"]},""" +
+            """{"id":"anchor","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"menu"}}}},""" +
+            """{"id":"menu","component":"Menu","anchor":"anchor","items":{"componentId":"row","path":"/recent"}},""" +
+            """{"id":"row","component":"MenuItem","label":{"@path":"name"}}""",
+          """{"recent":[{"name":"Alpha"},{"name":"Beta"}]}""",
+        ),
+      ) {
+        it.interaction.open("home", "menu")
+      }
+    assertEquals("Alpha", result.tree.node("row[0]").text?.value)
+    assertEquals("Beta", result.tree.node("row[1]").text?.value)
+  }
 }
