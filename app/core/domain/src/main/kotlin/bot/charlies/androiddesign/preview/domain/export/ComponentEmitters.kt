@@ -54,7 +54,7 @@ internal fun ScreenEmitter.emitComponent(
   val fillWidth =
     place.parentStretches &&
       M3ExpressiveCatalog.find(node.component)?.fillsWidth { props.sampleValue(it, place) } == true
-  val inFlexBox = place.parentType == "FlexBox" && growsSemanticsBounds(node)
+  val inFlexBox = place.parentType == "FlexBox" && needsUnboundedHeight(node)
   val placed =
     place.copy(
       fillWidth = fillWidth,

@@ -149,8 +149,6 @@ The gap is closed (PRs #75, #77, #78, #79, #80, #82, #83). These were found alon
 
 - **Templated groups in a menu are not exported.** A `Menu` whose `items` is a data template of `MenuItem`s exports as a loop inside its one group, but a template of `MenuGroup`s still exports an empty group. A group repeated per data row needs per-group selection state, which has no home yet.
 - **Selection state of templated menu items.** A `role: single` or `multi` item in a template shows its bound `selected` and does not remember a choice, because the exported code declares state per listed item and a data row has no id to declare it for.
-- **A `FlexBox` item that nests a progress indicator or vertical slider gets the unbounded-height modifier by a fixed list.** The previewer restores the unbounded height for every flex item; the export adds `requiredHeightIn(max = Dp.Infinity)` only where material3 grows the semantics bounds (progress indicators, vertical sliders), so an item whose growth comes from a library outside material3 would still throw on Android. The list lives in `ScreenEmitter.growsSemanticsBounds`.
-- **An eval case that needs tabs, search, and a carousel.** The planned recipe case waits on photo assets.
 
 ## Links
 

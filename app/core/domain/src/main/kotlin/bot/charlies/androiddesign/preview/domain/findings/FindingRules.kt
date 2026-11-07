@@ -46,6 +46,12 @@ object FindingRules {
 
   private const val MAX_OFFSCREEN = 5
 
+  /** Slack on a child reaching past its parent or the window. */
+  private const val OVERFLOW_SLACK_DP = 0.5f
+
+  /** Components whose children scroll sideways, so they are meant to run past their parent. */
+  private val horizontalScrollers = setOf("Carousel", "TabRow")
+
   internal val fabTypes = M3ExpressiveCatalog.fabNames
   internal val modalTypes = M3ExpressiveCatalog.modalNames
 
@@ -109,6 +115,7 @@ object FindingRules {
       primaryLargest(view) +
       oneFab(view) +
       offscreen(view) +
+      overflow(view) +
       roundEdgeClipped(view) +
       carouselItems(view) +
       navDestinations(view) +
@@ -359,6 +366,51 @@ object FindingRules {
   }
 
   private fun LayoutNode.right(): Float = bounds.x + bounds.width
+
+  // endregion
+
+  // region overflow
+
+  /**
+   * A node laid out wider than its parent or past the edge of the view. The tree's bounds clip to
+   * the window, so this reads the unclipped layout box ([LayoutNode.layout]) where there is one: a
+   * row of icon buttons that needs more width than its cell gets is cut off, and the bounds alone
+   * show a box that fits. What [offscreen] already reports is left to it. Children of a carousel or
+   * a tab row scroll sideways and are exempt, as is anything behind an open modal. A child of a
+   * flagged node is left out, so the cause is named first, and at most five are reported.
+   */
+  private fun overflow(view: View): List<Finding> {
+    val width = view.tree.view.width.toFloat()
+    val byId = view.nodes.associateBy { it.id }
+    val flagged =
+      view.nodes.mapNotNull { node ->
+        if (!node.isLaidOut || view.isBehindModal(node)) return@mapNotNull null
+        if (view.ancestors(node).any { it.type in horizontalScrollers }) return@mapNotNull null
+        if (node.right() > width + EDGE_SLACK_DP || node.bounds.x < -EDGE_SLACK_DP) {
+          return@mapNotNull null
+        }
+        val box = node.layout ?: node.bounds
+        val parent = node.parent?.let(byId::get)?.takeIf { it.isLaidOut }
+        val parentBox = parent?.let { it.layout ?: it.bounds }
+        val pastParent = parentBox?.let { box.right() - it.right() } ?: 0f
+        val beforeParent = parentBox?.let { it.x - box.x } ?: 0f
+        val pastView = box.right() - width
+        when {
+          pastParent > OVERFLOW_SLACK_DP -> node to "ends ${dp(pastParent)} dp past ${parent?.id}"
+          beforeParent > OVERFLOW_SLACK_DP ->
+            node to "starts ${dp(beforeParent)} dp before ${parent?.id}"
+          pastView > OVERFLOW_SLACK_DP -> node to "ends ${dp(pastView)} dp past the view"
+          else -> null
+        }
+      }
+    val flaggedIds = flagged.map { it.first.id }.toSet()
+    return flagged
+      .filter { (node, _) -> node.parent == null || node.parent !in flaggedIds }
+      .take(MAX_OFFSCREEN)
+      .map { (node, detail) -> errorFinding(node, FindingRule.Overflow, detail) }
+  }
+
+  private fun Bounds.right(): Float = x + width
 
   // endregion
 

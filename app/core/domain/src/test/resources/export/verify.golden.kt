@@ -2312,11 +2312,8 @@ fun InputsScreen(
               modifier = Modifier.requiredHeightIn(max = Dp.Infinity),
             )
             LinearWavyProgressIndicator(modifier = Modifier.requiredHeightIn(max = Dp.Infinity))
-            CircularProgressIndicator(
-              progress = { 0.7f },
-              modifier = Modifier.requiredHeightIn(max = Dp.Infinity),
-            )
-            CircularWavyProgressIndicator(modifier = Modifier.requiredHeightIn(max = Dp.Infinity))
+            CircularProgressIndicator(progress = { 0.7f })
+            CircularWavyProgressIndicator()
           }
           VerticalFloatingToolbar(
             expanded = true,

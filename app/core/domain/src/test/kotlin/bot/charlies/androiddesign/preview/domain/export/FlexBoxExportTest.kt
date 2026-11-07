@@ -78,4 +78,15 @@ class FlexBoxExportTest {
       )
     lacks(source, unbounded)
   }
+
+  @Test
+  fun `a circular progress indicator in a flex box is left as it is`() {
+    val source =
+      export(
+        """{"id":"flex","component":"FlexBox","wrap":true,"children":["a","b"]}""",
+        """{"id":"a","component":"ProgressIndicator","shape":"circular"}""",
+        """{"id":"b","component":"ProgressIndicator","shape":"circular","wavy":true}""",
+      )
+    lacks(source, unbounded)
+  }
 }

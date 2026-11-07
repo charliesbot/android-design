@@ -1,5 +1,6 @@
 package bot.charlies.androiddesign.preview.domain.export
 
+import bot.charlies.androiddesign.preview.domain.layout.childIds as sharedChildIds
 import bot.charlies.androiddesign.preview.domain.navigation.NavigationGraph
 import bot.charlies.androiddesign.preview.model.ActionFunction
 import bot.charlies.androiddesign.preview.model.Catalog
@@ -334,10 +335,9 @@ internal abstract class ScreenEmitterBase(
   /**
    * The height a `FlexBox` item is measured with, unbounded again. FlexBox hands a wrapped item the
    * largest height `Constraints` can hold, and a Material component that grows its semantics bounds
-   * (material3's `IncreaseVerticalSemanticsBounds`: progress indicators and vertical sliders) adds
-   * to that and throws. The previewer restores the same height for every flex item
-   * (`restoreUnboundedHeight`); the exported code does it for the items that need it, so the others
-   * stay plain.
+   * (material3's `IncreaseVerticalSemanticsBounds`: linear progress indicators and vertical
+   * sliders) adds to that and throws. The previewer and the exporter restore the height for the
+   * same items, those [growsSemanticsBounds] names; the others stay plain.
    */
   fun unboundedHeight(): String {
     file.use(Sym.Dp)
@@ -438,23 +438,7 @@ internal abstract class ScreenEmitterBase(
   }
 
   /** Ids of the components [node] references through child props, templates included. */
-  fun childIds(node: ComponentNode): List<String> {
-    val def = catalog.find(node.component) ?: return emptyList()
-    return def.props.flatMap { prop ->
-      val value = node.props[prop.name]
-      when {
-        prop.kind == PropKind.Child ->
-          listOfNotNull((value as? JsonPrimitive)?.takeIf { it.isString }?.content)
-        prop.kind == PropKind.ChildList ->
-          when (val items = value.childItems()) {
-            is ChildItems.Listed -> items.ids
-            is ChildItems.Template -> listOf(items.componentId)
-            null -> emptyList()
-          }
-        else -> emptyList()
-      }
-    }
-  }
+  fun childIds(node: ComponentNode): List<String> = sharedChildIds(node, catalog)
 
   // endregion
 

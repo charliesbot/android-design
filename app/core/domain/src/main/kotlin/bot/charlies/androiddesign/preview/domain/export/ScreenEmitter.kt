@@ -2,6 +2,7 @@ package bot.charlies.androiddesign.preview.domain.export
 
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.SearchBars
+import bot.charlies.androiddesign.preview.domain.layout.growsSemanticsBounds
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
@@ -383,19 +384,11 @@ internal class ScreenEmitter(
     return listOf(IfStmt(visible.map { (props, sizes) -> condition(sizes) to draw(props) }, null))
   }
 
-  /** True when [node] or anything under it grows its semantics bounds vertically. */
-  fun growsSemanticsBounds(
-    node: ComponentNode,
-    seen: MutableSet<String> = mutableSetOf(),
-  ): Boolean {
-    if (!seen.add(node.id)) return false
-    val vertical =
-      node.component == "Slider" &&
-        SizeClass.entries.any { effectiveProps(node, it).literal("orientation") == "vertical" }
-    return vertical ||
-      node.component == "ProgressIndicator" ||
-      childIds(node).mapNotNull(byId::get).any { growsSemanticsBounds(it, seen) }
-  }
+  /** True when [node] or anything under it grows its semantics bounds at some size class. */
+  fun needsUnboundedHeight(node: ComponentNode): Boolean =
+    growsSemanticsBounds(node, byId, catalog) { current ->
+      SizeClass.entries.map { effectiveProps(current, it) }
+    }
 
   fun condition(sizes: Set<SizeClass>): String {
     val medium = SizeClass.Medium in sizes

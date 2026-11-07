@@ -35,6 +35,30 @@ class MenuSheetExportTest {
     )
   }
 
+  private val picks = """{"plates":[{"name":"Ramen","on":true},{"name":"Udon","on":false}]}"""
+
+  private fun templatedRole(role: String) =
+    export(
+      """{"id":"o","component":"Menu","anchor":"open","items":{"componentId":"item","path":"/plates"}}""",
+      """{"id":"item","component":"MenuItem","label":{"@path":"name"},"role":"$role","selected":{"@path":"on"},"action":{"functionCall":{"@call":"navigate","args":{"screen":"main"}}}}""",
+      dataModel = picks,
+    )
+
+  @Test
+  fun `a templated single item shows its bound selection and declares no state`() {
+    val source = templatedRole("single")
+    has(source, "SelectableDropdownMenuItem( selected = plate.on,")
+    lacks(source, "var itemSelected")
+    lacks(source, "var itemChecked")
+  }
+
+  @Test
+  fun `a templated multi item shows its bound selection and runs its action`() {
+    val source = templatedRole("multi")
+    has(source, "CheckableDropdownMenuItem( checked = plate.on, onCheckedChange = {")
+    lacks(source, "var itemChecked")
+  }
+
   @Test
   fun `templated items in a menu group export inside that group`() {
     val source =

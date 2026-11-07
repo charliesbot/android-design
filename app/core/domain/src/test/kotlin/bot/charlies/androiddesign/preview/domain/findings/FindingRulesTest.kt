@@ -716,6 +716,68 @@ class FindingRulesTest {
 
   // endregion
 
+  // region overflow
+
+  private fun overflow(vararg nodes: bot.charlies.androiddesign.preview.model.LayoutNode) =
+    evaluate(tree(Views.Light, *nodes)).of(FindingRule.Overflow)
+
+  @Test
+  fun `overflow names a node whose layout box runs past the view though its bounds fit`() {
+    val grid = node("grid", "Grid", x = 32f, w = 379f, h = 100f)
+    val row =
+      node(
+        "row",
+        "Row",
+        x = 32f,
+        w = 379f,
+        h = 48f,
+        parent = "grid",
+        layout = Bounds(32f, 0f, 395f, 48f),
+      )
+    val finding = overflow(grid, row).single()
+    assertEquals("row", finding.id)
+    assertEquals(Severity.Error, finding.severity)
+    assertEquals("ends 16 dp past grid", finding.detail)
+  }
+
+  @Test
+  fun `overflow names a child wider than its parent inside the view`() {
+    val card = node("card", "Card", w = 150f, h = 100f)
+    val row = node("row", "Row", w = 200f, h = 48f, parent = "card")
+    assertEquals("ends 50 dp past card", overflow(card, row).single().detail)
+  }
+
+  @Test
+  fun `overflow tolerates half a dp and leaves fitting children alone`() {
+    val card = node("card", "Card", w = 150f, h = 100f)
+    assertEquals(
+      emptyList(),
+      overflow(card, node("row", "Row", w = 150.5f, h = 48f, parent = "card")),
+    )
+  }
+
+  @Test
+  fun `overflow leaves what offscreen already reports to it`() {
+    assertEquals(emptyList(), overflow(node("hero", "Box", w = 600f, h = 100f)))
+  }
+
+  @Test
+  fun `overflow exempts the children of a carousel`() {
+    val carousel = node("carousel", "Carousel", w = 411f, h = 200f)
+    val item = node("item", "Card", x = 300f, w = 300f, h = 200f, parent = "carousel")
+    assertEquals(emptyList(), overflow(carousel, item))
+  }
+
+  @Test
+  fun `overflow names the parent before its children`() {
+    val card = node("card", "Card", w = 150f, h = 100f)
+    val row = node("row", "Row", w = 200f, h = 48f, parent = "card")
+    val last = node("last", "Button", x = 150f, w = 50f, h = 48f, parent = "row")
+    assertEquals(listOf("row"), overflow(card, row, last).map { it.id })
+  }
+
+  // endregion
+
   // region panes
 
   /**

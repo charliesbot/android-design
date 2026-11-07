@@ -250,7 +250,8 @@ internal val LocalRenderEnv =
  * because that would push its siblings out (use `weight` there).
  *
  * @property flexItem The parent is a FlexBox, which measures its items with a finite stand-in for
- *   an unbounded height (see [restoreUnboundedHeight]).
+ *   an unbounded height; an item that grows its semantics bounds gets it back (see
+ *   [NodeContext.modifier]).
  * @property groupIndex The child's position among its siblings, when the parent is a group.
  * @property groupCount How many siblings there are.
  */
