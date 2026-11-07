@@ -15,6 +15,7 @@ import bot.charlies.androiddesign.preview.domain.export.lambdaOf
 import bot.charlies.androiddesign.preview.domain.export.pos
 import bot.charlies.androiddesign.preview.domain.export.stmt
 import bot.charlies.androiddesign.preview.model.ComponentNode
+import bot.charlies.androiddesign.preview.model.WearComponent
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -36,37 +37,39 @@ internal fun WearScreenEmitter.emitComponent(
   p: JsonObject,
   place: WearPlace,
 ): List<Stmt> =
-  when (node.component) {
-    "Screen" -> screenFrame(node, p, place)
-    "Column" -> column(node, p, place)
-    "Row" -> row(node, p, place)
-    "Box" -> box(node, p, place)
-    "Spacer" -> spacer(p, place)
-    "ListHeader" -> listHeader(node, p, place)
-    "ListSubHeader" -> listSubHeader(node, p, place)
-    "Button" -> button(node, p, place)
-    "CompactButton" -> compactButton(node, p, place)
-    "IconButton" -> iconButton(node, p, place)
-    "TextButton" -> textButton(node, p, place)
-    "EdgeButton" -> edgeButton(node, p, place)
-    "ButtonGroup" -> buttonGroup(node, p, place)
-    "IconToggleButton" -> iconToggleButton(node, p, place)
-    "TextToggleButton" -> textToggleButton(node, p, place)
-    "SwitchButton" -> rowToggle(node, p, place, "SwitchButton")
-    "CheckboxButton" -> rowToggle(node, p, place, "CheckboxButton")
-    "RadioButton" -> radioButton(node, p, place)
-    "Text" -> text(node, p, place)
-    "Icon" -> iconComponent(node, p, place)
-    "Image" -> image(node, p, place)
-    "Card" -> card(node, p, place)
-    "TitleCard" -> titleCard(node, p, place)
-    "AppCard" -> appCard(node, p, place)
-    "Slider" -> slider(node, p, place)
-    "Stepper" -> stepper(node, p, place)
-    "CircularProgressIndicator" -> circularProgress(node, p, place)
-    "LinearProgressIndicator" -> linearProgress(node, p, place)
-    "SegmentedCircularProgressIndicator" -> segmentedProgress(node, p, place)
-    else -> emptyList() // AlertDialog and ConfirmationDialog are written at the end of the screen.
+  when (WearComponent.of(node.component)) {
+    WearComponent.Screen -> screenFrame(node, p, place)
+    WearComponent.Column -> column(node, p, place)
+    WearComponent.Row -> row(node, p, place)
+    WearComponent.Box -> box(node, p, place)
+    WearComponent.Spacer -> spacer(p, place)
+    WearComponent.ListHeader -> listHeader(node, p, place)
+    WearComponent.ListSubHeader -> listSubHeader(node, p, place)
+    WearComponent.Button -> button(node, p, place)
+    WearComponent.CompactButton -> compactButton(node, p, place)
+    WearComponent.IconButton -> iconButton(node, p, place)
+    WearComponent.TextButton -> textButton(node, p, place)
+    WearComponent.EdgeButton -> edgeButton(node, p, place)
+    WearComponent.ButtonGroup -> buttonGroup(node, p, place)
+    WearComponent.IconToggleButton -> iconToggleButton(node, p, place)
+    WearComponent.TextToggleButton -> textToggleButton(node, p, place)
+    WearComponent.SwitchButton -> rowToggle(node, p, place, "SwitchButton")
+    WearComponent.CheckboxButton -> rowToggle(node, p, place, "CheckboxButton")
+    WearComponent.RadioButton -> radioButton(node, p, place)
+    WearComponent.Text -> text(node, p, place)
+    WearComponent.Icon -> iconComponent(node, p, place)
+    WearComponent.Image -> image(node, p, place)
+    WearComponent.Card -> card(node, p, place)
+    WearComponent.TitleCard -> titleCard(node, p, place)
+    WearComponent.AppCard -> appCard(node, p, place)
+    WearComponent.Slider -> slider(node, p, place)
+    WearComponent.Stepper -> stepper(node, p, place)
+    WearComponent.CircularProgressIndicator -> circularProgress(node, p, place)
+    WearComponent.LinearProgressIndicator -> linearProgress(node, p, place)
+    WearComponent.SegmentedCircularProgressIndicator -> segmentedProgress(node, p, place)
+    // Dialogs are written at the end of the screen.
+    WearComponent.AlertDialog,
+    WearComponent.ConfirmationDialog -> emptyList()
   }
 
 // region shared pieces

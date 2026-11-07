@@ -27,6 +27,17 @@ import bot.charlies.androiddesign.preview.feature.preview.render.textReporter
 import bot.charlies.androiddesign.preview.feature.preview.theme.toHex
 import bot.charlies.androiddesign.preview.model.NodeColors
 import bot.charlies.androiddesign.preview.model.NodeRoles
+import bot.charlies.androiddesign.preview.model.WearComponent
+import java.util.EnumMap
+
+/**
+ * How one Wear component draws, and the look the layout tree records for it, like the phone's
+ * `RenderKit`.
+ */
+internal class WearRenderKit(
+  val render: @Composable (NodeContext) -> Unit,
+  val look: NodeContext.(WearAmbient) -> WearLook,
+)
 
 /**
  * Draws one Wear component with its upstream Wear Compose Material 3 composable. [RenderNode] calls
@@ -34,40 +45,62 @@ import bot.charlies.androiddesign.preview.model.NodeRoles
  */
 @Composable
 internal fun RenderWearComponent(ctx: NodeContext) {
-  when (ctx.component) {
-    "Column" -> RenderColumn(ctx)
-    "Row" -> RenderRow(ctx)
-    "Box" -> RenderBox(ctx)
-    "Spacer" -> RenderSpacer(ctx)
-    "Screen" -> RenderWearScreen(ctx)
-    "ListHeader" -> RenderWearListHeader(ctx)
-    "ListSubHeader" -> RenderWearListSubHeader(ctx)
-    "Button" -> RenderWearButton(ctx)
-    "CompactButton" -> RenderWearCompactButton(ctx)
-    "IconButton" -> RenderWearIconButton(ctx)
-    "TextButton" -> RenderWearTextButton(ctx)
-    "EdgeButton" -> RenderWearEdgeButton(ctx)
-    "ButtonGroup" -> RenderWearButtonGroup(ctx)
-    "IconToggleButton" -> RenderWearIconToggleButton(ctx)
-    "TextToggleButton" -> RenderWearTextToggleButton(ctx)
-    "SwitchButton" -> RenderWearSwitchButton(ctx)
-    "CheckboxButton" -> RenderWearCheckboxButton(ctx)
-    "RadioButton" -> RenderWearRadioButton(ctx)
-    "Text" -> RenderWearText(ctx)
-    "Icon" -> RenderWearIcon(ctx)
-    "Image" -> RenderImage(ctx)
-    "Card" -> RenderWearCard(ctx)
-    "TitleCard" -> RenderWearTitleCard(ctx)
-    "AppCard" -> RenderWearAppCard(ctx)
-    "Slider" -> RenderWearSlider(ctx)
-    "Stepper" -> RenderWearStepper(ctx)
-    "CircularProgressIndicator" -> RenderWearCircularProgress(ctx)
-    "LinearProgressIndicator" -> RenderWearLinearProgress(ctx)
-    "SegmentedCircularProgressIndicator" -> RenderWearSegmentedProgress(ctx)
-    "AlertDialog" -> RenderWearAlertDialog(ctx)
-    "ConfirmationDialog" -> RenderWearConfirmationDialog(ctx)
-  }
+  wearKitOf(ctx.component).render(ctx)
 }
+
+private fun wearKitOf(component: String): WearRenderKit =
+  wearKits.getValue(WearComponent.of(component))
+
+private val wearKits: Map<WearComponent, WearRenderKit> =
+  WearComponent.entries.associateWithTo(EnumMap(WearComponent::class.java), ::wearKit)
+
+private fun wearKit(component: WearComponent): WearRenderKit =
+  when (component) {
+    WearComponent.Column -> WearRenderKit({ RenderColumn(it) }) { layoutLook(it) }
+    WearComponent.Row -> WearRenderKit({ RenderRow(it) }) { layoutLook(it) }
+    WearComponent.Box -> WearRenderKit({ RenderBox(it) }) { layoutLook(it) }
+    WearComponent.Spacer -> WearRenderKit({ RenderSpacer(it) }) { layoutLook(it) }
+    WearComponent.Screen -> WearRenderKit({ RenderWearScreen(it) }) { _ -> screenLook() }
+    WearComponent.ListHeader -> WearRenderKit({ RenderWearListHeader(it) }) { listHeaderLook(it) }
+    WearComponent.ListSubHeader ->
+      WearRenderKit({ RenderWearListSubHeader(it) }) { listSubHeaderLook(it) }
+    WearComponent.Button -> WearRenderKit({ RenderWearButton(it) }) { buttonLook(it) }
+    WearComponent.CompactButton -> WearRenderKit({ RenderWearCompactButton(it) }) { buttonLook(it) }
+    WearComponent.IconButton -> WearRenderKit({ RenderWearIconButton(it) }) { iconButtonLook(it) }
+    WearComponent.TextButton -> WearRenderKit({ RenderWearTextButton(it) }) { textButtonLook(it) }
+    WearComponent.EdgeButton ->
+      WearRenderKit({ RenderWearEdgeButton(it) }) { _ -> edgeButtonLook() }
+    WearComponent.ButtonGroup ->
+      WearRenderKit({ RenderWearButtonGroup(it) }) { buttonGroupLook(it) }
+    WearComponent.IconToggleButton ->
+      WearRenderKit({ RenderWearIconToggleButton(it) }) { _ -> toggleButtonLook() }
+    WearComponent.TextToggleButton ->
+      WearRenderKit({ RenderWearTextToggleButton(it) }) { _ -> toggleButtonLook() }
+    WearComponent.SwitchButton ->
+      WearRenderKit({ RenderWearSwitchButton(it) }) { _ -> rowToggleLook() }
+    WearComponent.CheckboxButton ->
+      WearRenderKit({ RenderWearCheckboxButton(it) }) { _ -> rowToggleLook() }
+    WearComponent.RadioButton ->
+      WearRenderKit({ RenderWearRadioButton(it) }) { _ -> rowToggleLook() }
+    WearComponent.Text -> WearRenderKit({ RenderWearText(it) }) { textLook(it) }
+    WearComponent.Icon -> WearRenderKit({ RenderWearIcon(it) }) { iconLook(it) }
+    WearComponent.Image -> WearRenderKit({ RenderImage(it) }) { imageLook(it) }
+    WearComponent.Card -> WearRenderKit({ RenderWearCard(it) }) { _ -> cardLook() }
+    WearComponent.TitleCard -> WearRenderKit({ RenderWearTitleCard(it) }) { _ -> cardLook() }
+    WearComponent.AppCard -> WearRenderKit({ RenderWearAppCard(it) }) { _ -> cardLook() }
+    WearComponent.Slider -> WearRenderKit({ RenderWearSlider(it) }) { _ -> sliderLook() }
+    WearComponent.Stepper -> WearRenderKit({ RenderWearStepper(it) }) { _ -> sliderLook() }
+    WearComponent.CircularProgressIndicator ->
+      WearRenderKit({ RenderWearCircularProgress(it) }) { progressLook(it) }
+    WearComponent.LinearProgressIndicator ->
+      WearRenderKit({ RenderWearLinearProgress(it) }) { progressLook(it) }
+    WearComponent.SegmentedCircularProgressIndicator ->
+      WearRenderKit({ RenderWearSegmentedProgress(it) }) { progressLook(it) }
+    WearComponent.AlertDialog ->
+      WearRenderKit({ RenderWearAlertDialog(it) }) { _ -> alertDialogLook() }
+    WearComponent.ConfirmationDialog ->
+      WearRenderKit({ RenderWearConfirmationDialog(it) }) { _ -> confirmationDialogLook() }
+  }
 
 // region ambient and looks
 
@@ -101,7 +134,7 @@ internal class WearLook(
 /** What the tree says about [ctx], the Wear counterpart of the phone's `describe`. */
 internal fun describeWear(ctx: NodeContext, ambient: WearAmbient): NodeMeta {
   val wear = ctx.env.wear
-  val look = wearLook(ctx, ambient)
+  val look = wearKitOf(ctx.component).look(ctx, ambient)
   val label = ctx.string("label") ?: ctx.string("contentDescription") ?: look.text
   val interactive = ctx.def.interactive
   return NodeMeta(
@@ -201,45 +234,6 @@ internal fun NodeContext.transformation(): SurfaceTransformation? =
   item(LocalWearItem.current)?.let { with(it.scope) { SurfaceTransformation(it.spec) } }
 
 // endregion
-
-/**
- * The look of [ctx] from its family, one branch per catalog component like [RenderWearComponent].
- */
-private fun wearLook(ctx: NodeContext, ambient: WearAmbient): WearLook =
-  when (ctx.component) {
-    "Column",
-    "Row",
-    "Box",
-    "Spacer" -> ctx.layoutLook(ambient)
-    "Screen" -> ctx.screenLook()
-    "ListHeader" -> ctx.listHeaderLook(ambient)
-    "ListSubHeader" -> ctx.listSubHeaderLook(ambient)
-    "Button",
-    "CompactButton" -> ctx.buttonLook(ambient)
-    "IconButton" -> ctx.iconButtonLook(ambient)
-    "TextButton" -> ctx.textButtonLook(ambient)
-    "EdgeButton" -> ctx.edgeButtonLook()
-    "ButtonGroup" -> ctx.buttonGroupLook(ambient)
-    "IconToggleButton",
-    "TextToggleButton" -> ctx.toggleButtonLook()
-    "SwitchButton",
-    "CheckboxButton",
-    "RadioButton" -> ctx.rowToggleLook()
-    "Text" -> ctx.textLook(ambient)
-    "Icon" -> ctx.iconLook(ambient)
-    "Image" -> ctx.imageLook(ambient)
-    "Card",
-    "TitleCard",
-    "AppCard" -> ctx.cardLook()
-    "Slider",
-    "Stepper" -> ctx.sliderLook()
-    "CircularProgressIndicator",
-    "LinearProgressIndicator",
-    "SegmentedCircularProgressIndicator" -> ctx.progressLook(ambient)
-    "AlertDialog" -> ctx.alertDialogLook()
-    "ConfirmationDialog" -> ctx.confirmationDialogLook()
-    else -> error("no look for ${ctx.component}")
-  }
 
 // region style on layouts
 

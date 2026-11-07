@@ -90,7 +90,8 @@ object CatalogSummary {
 
   private fun kind(kind: PropKind): String =
     when (kind) {
-      PropKind.Child -> "child"
+      PropKind.Child,
+      PropKind.Anchor -> "child"
       PropKind.ChildList -> "childList"
       PropKind.Text -> "string"
       PropKind.Bool -> "boolean"

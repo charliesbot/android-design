@@ -272,7 +272,9 @@ object CatalogJson {
     val refs = scope.refs
     val fields = linkedMapOf<String, JsonElement>()
     when (val kind = prop.kind) {
-      PropKind.Child -> fields["\$ref"] = JsonPrimitive(refs.common + "Child")
+      // An anchor is written like a child: the id of one component.
+      PropKind.Child,
+      PropKind.Anchor -> fields["\$ref"] = JsonPrimitive(refs.common + "Child")
       PropKind.ChildList -> fields["\$ref"] = JsonPrimitive(refs.common + "ChildList")
       PropKind.Text,
       PropKind.Icon,

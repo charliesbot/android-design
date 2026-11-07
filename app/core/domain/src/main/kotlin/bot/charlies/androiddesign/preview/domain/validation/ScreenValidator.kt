@@ -9,8 +9,9 @@ import bot.charlies.androiddesign.preview.domain.SearchBars
 import bot.charlies.androiddesign.preview.domain.SearchSpec
 import bot.charlies.androiddesign.preview.domain.TimePickerSpec
 import bot.charlies.androiddesign.preview.domain.TooltipSpec
-import bot.charlies.androiddesign.preview.domain.export.ChildItems
-import bot.charlies.androiddesign.preview.domain.export.childItems
+import bot.charlies.androiddesign.preview.domain.node.ChildGraph
+import bot.charlies.androiddesign.preview.domain.node.ChildItems
+import bot.charlies.androiddesign.preview.domain.node.childItems
 import bot.charlies.androiddesign.preview.domain.validation.Dynamic.asString
 import bot.charlies.androiddesign.preview.domain.validation.Dynamic.isBoolean
 import bot.charlies.androiddesign.preview.domain.validation.Dynamic.isDynamic
@@ -262,7 +263,7 @@ internal class ScreenValidator(
         }
       }
       def.name == "Tooltip" -> {
-        if (effective.string("variant") != "rich") {
+        if (effective.string("variant")?.let(TooltipSpec::variant) != TooltipSpec.Variant.Rich) {
           for (key in listOf("title", "actions")) {
             if (key in effective && touched(key, "variant")) {
               sink.add(
@@ -467,7 +468,7 @@ internal class ScreenValidator(
                 .joinToString()
             sink.add(path.child(key), "unknown prop '$key' on ${def.name} (known: $known)")
           } else {
-            if (overrides && key == ANCHOR && def.name in ANCHORED_OVERLAYS) {
+            if (overrides && prop.kind == PropKind.Anchor) {
               sink.add(
                 path.child(key),
                 "the anchor of a ${def.name} is part of where it is drawn, so it goes in the " +
@@ -654,7 +655,8 @@ internal class ScreenValidator(
 
   private fun validateValue(path: String, prop: PropDef, value: JsonElement) {
     when (val kind = prop.kind) {
-      PropKind.Child -> validateReference(path, prop, value)
+      PropKind.Child,
+      PropKind.Anchor -> validateReference(path, prop, value)
       PropKind.ChildList -> validateChildList(path, prop, value)
       PropKind.Text,
       PropKind.Icon,
@@ -850,8 +852,8 @@ internal class ScreenValidator(
   }
 
   /**
-   * A component that contains itself would make the renderer recurse forever. A `Menu.anchor` names
-   * the component the menu hangs off; it is a reference, not a child, so it never forms a cycle.
+   * A component that contains itself would make the renderer recurse forever. An anchor is a
+   * reference, not a child, so it never forms a cycle.
    */
   private fun detectCycles() {
     val childIds = screen.components.associate { node -> node.id to referencedIds(node) }
@@ -877,51 +879,17 @@ internal class ScreenValidator(
     screen.components.forEach { visit(it.id, emptyList()) }
   }
 
-  private fun referencedIds(node: ComponentNode): List<String> {
-    val def = catalog.find(node.component) ?: return emptyList()
-    val sources = buildList {
-      add(node.props)
-      (node.props[Catalog.SIZE_CLASS] as? JsonObject)?.values?.forEach {
-        (it as? JsonObject)?.let(::add)
-      }
-    }
-    return sources
-      .flatMap { props ->
-        def.props.flatMap { prop ->
-          if ((node.component == MENU || node.component == TOOLTIP) && prop.name == ANCHOR) {
-            return@flatMap emptyList()
-          }
-          val value = props[prop.name] ?: return@flatMap emptyList()
-          when (prop.kind) {
-            PropKind.Child -> listOfNotNull(value.asString())
-            PropKind.ChildList ->
-              when (value) {
-                is JsonArray -> value.mapNotNull { it.asString() }
-                is JsonObject -> listOfNotNull(value.string("componentId"))
-                else -> emptyList()
-              }
-            else -> emptyList()
-          }
-        }
-      }
-      .filter { it in byId }
-  }
+  private fun referencedIds(node: ComponentNode): List<String> =
+    ChildGraph.childIds(node, catalog, withSizeOverrides = true).filter { it in byId }
 
   companion object {
     val IDENTIFIER = Regex("^[A-Za-z_][A-Za-z0-9_]*$")
     private val ICON_NAME = Regex("^[a-z0-9_]+$")
     /** Components whose `value` and `range` props must agree. */
     private val RANGE_COMPONENTS = setOf("Slider", "RangeSlider", "Stepper")
-    /**
-     * Overlays drawn beside the component their `anchor` names, which the tree records as parent.
-     */
-    val ANCHORED_OVERLAYS = setOf("Menu", "Tooltip", "DatePicker")
     private val PICKER_OVERLAYS = setOf("Dialog", "DatePicker", "TimePicker")
     private const val DATE_MESSAGE =
       "a date must be written as YYYY-MM-DD, a real day from 1900 to 2100, not bound to data"
     private const val CAROUSEL = "Carousel"
-    private const val MENU = "Menu"
-    private const val TOOLTIP = "Tooltip"
-    private const val ANCHOR = "anchor"
   }
 }

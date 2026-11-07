@@ -9,6 +9,13 @@ sealed interface PropKind {
   /** The id of one component. */
   data object Child : PropKind
 
+  /**
+   * The id of the component this one is drawn beside or below: a menu's button, a tooltip's target,
+   * a docked date picker's text field. A reference, not a child: the anchor is drawn where its own
+   * parent puts it. On the wire it is written like a [Child].
+   */
+  data object Anchor : PropKind
+
   /** An array of component ids, or a template `{componentId, path}`. */
   data object ChildList : PropKind
 
@@ -85,8 +92,9 @@ data class NumberBounds(val min: Double, val max: Double, val whole: Boolean = f
 }
 
 /**
- * One prop of a component. For [PropKind.Child] and [PropKind.ChildList], [allowedChildren] lists
- * the component names it may reference, or is null when any component is allowed.
+ * One prop of a component. For [PropKind.Child], [PropKind.Anchor] and [PropKind.ChildList],
+ * [allowedChildren] lists the component names it may reference, or is null when any component is
+ * allowed.
  *
  * @property default The value the renderer and the exporter use when a proposal leaves the prop
  *   out, or null when the prop has no fixed default. This is the only place a default is written
@@ -488,6 +496,13 @@ internal fun child(
   required: Boolean = false,
   description: String = "",
 ) = PropDef(name, PropKind.Child, required, description, allowed.toSet().ifEmpty { null })
+
+internal fun anchor(
+  name: String,
+  vararg allowed: String,
+  required: Boolean = false,
+  description: String = "",
+) = PropDef(name, PropKind.Anchor, required, description, allowed.toSet().ifEmpty { null })
 
 internal fun children(
   name: String,
@@ -1410,7 +1425,7 @@ private fun overlays(): List<ComponentDef> =
           description = "A range's first date, ISO (YYYY-MM-DD). Required for a range.",
         ),
         text("end", description = "A range's last date, ISO, on or after `start`."),
-        child(
+        anchor(
           "anchor",
           "TextField",
           description = "The text field a docked picker opens below. Required when docked.",
@@ -1444,7 +1459,7 @@ private fun overlays(): List<ComponentDef> =
       "A popup menu anchored to a component.",
       "DropdownMenuPopup with DropdownMenuGroup and DropdownMenuItem",
       listOf(
-        child("anchor"),
+        anchor("anchor"),
         oneOf(
           "colors",
           "standard",
@@ -1542,7 +1557,7 @@ private fun overlays(): List<ComponentDef> =
         "subhead and up to two text buttons.",
       "TooltipBox with PlainTooltip or RichTooltip",
       listOf(
-        child("anchor", required = true),
+        anchor("anchor", required = true),
         oneOf("variant", "plain", "rich", default = "plain"),
         text("text", required = true),
         text("title", description = "Rich only: a one-line subhead."),

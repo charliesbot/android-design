@@ -1,5 +1,8 @@
 package bot.charlies.androiddesign.preview.feature.preview.render
 
+import bot.charlies.androiddesign.preview.domain.node.ChildItems
+import bot.charlies.androiddesign.preview.domain.node.childId
+import bot.charlies.androiddesign.preview.domain.node.childItems
 import bot.charlies.androiddesign.preview.model.ActionFunction
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -99,24 +102,19 @@ internal class Props(private val json: JsonObject, private val scope: DataScope)
     return if (numbers.size == 2) numbers[0] to numbers[1] else null
   }
 
-  /** The id a `Child` prop points at. */
-  fun childId(key: String): String? = (json[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
+  /** The id a `Child` or `Anchor` prop points at. */
+  fun childId(key: String): String? = json[key].childId()
 
   /** The children of a `ChildList` prop: listed ids, or one per item of a template's array. */
-  fun children(key: String): List<ChildRef> {
-    return when (val raw = json[key]) {
-      is JsonArray ->
-        raw
-          .mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
-          .map { ChildRef(it, scope) }
-      is JsonObject -> {
-        val id = (raw["componentId"] as? JsonPrimitive)?.content ?: return emptyList()
-        val path = (raw["path"] as? JsonPrimitive)?.content ?: return emptyList()
-        (0 until scope.itemCount(path)).map { ChildRef(id, scope.itemScope(path, it)) }
-      }
-      else -> emptyList()
+  fun children(key: String): List<ChildRef> =
+    when (val items = json[key].childItems()) {
+      is ChildItems.Listed -> items.ids.map { ChildRef(it, scope) }
+      is ChildItems.Template ->
+        (0 until scope.itemCount(items.path)).map {
+          ChildRef(items.componentId, scope.itemScope(items.path, it))
+        }
+      null -> emptyList()
     }
-  }
 
   fun action(key: String): ActionCall? {
     val call = (json[key] as? JsonObject)?.get("functionCall") as? JsonObject ?: return null

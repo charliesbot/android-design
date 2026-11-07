@@ -1,10 +1,8 @@
 package bot.charlies.androiddesign.preview.domain.layout
 
-import bot.charlies.androiddesign.preview.domain.export.ChildItems
-import bot.charlies.androiddesign.preview.domain.export.childItems
+import bot.charlies.androiddesign.preview.domain.node.ChildGraph
 import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.ComponentNode
-import bot.charlies.androiddesign.preview.model.PropKind
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -36,28 +34,9 @@ fun growsSemanticsBounds(
         "Slider" -> props.any { it.literal("orientation") == "vertical" }
         else -> false
       }
-    return own || childIds(current, catalog).mapNotNull(byId::get).any(::visit)
+    return own || ChildGraph.childIds(current, catalog).mapNotNull(byId::get).any(::visit)
   }
   return visit(node)
-}
-
-/** Ids of the components [node] references through child props, templates included. */
-fun childIds(node: ComponentNode, catalog: Catalog): List<String> {
-  val def = catalog.find(node.component) ?: return emptyList()
-  return def.props.flatMap { prop ->
-    val value = node.props[prop.name]
-    when {
-      prop.kind == PropKind.Child ->
-        listOfNotNull((value as? JsonPrimitive)?.takeIf { it.isString }?.content)
-      prop.kind == PropKind.ChildList ->
-        when (val items = value.childItems()) {
-          is ChildItems.Listed -> items.ids
-          is ChildItems.Template -> listOf(items.componentId)
-          null -> emptyList()
-        }
-      else -> emptyList()
-    }
-  }
 }
 
 private fun JsonObject.literal(key: String): String? =

@@ -24,6 +24,18 @@ object CarouselSpec {
 
   /** What a hero reserves of the available width: both paddings, the small item and one gap. */
   const val HERO_RESERVED_DP = PADDING_DP * 2 + SMALL_ITEM_DP + GAP_DP
+
+  /** The carousel layouts, by the `variant` wire names the catalog lists. */
+  enum class Variant(val wire: String) {
+    MultiBrowse("multi-browse"),
+    Hero("hero"),
+    CenteredHero("centered-hero"),
+    Uncontained("uncontained"),
+    FullScreen("full-screen"),
+  }
+
+  /** The variant named [wire], or null when it names none. */
+  fun variant(wire: String): Variant? = Variant.entries.firstOrNull { it.wire == wire }
 }
 
 /**

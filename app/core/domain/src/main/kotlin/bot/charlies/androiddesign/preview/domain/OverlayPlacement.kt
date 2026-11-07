@@ -1,10 +1,8 @@
 package bot.charlies.androiddesign.preview.domain
 
-import bot.charlies.androiddesign.preview.domain.export.ChildItems
-import bot.charlies.androiddesign.preview.domain.export.childItems
+import bot.charlies.androiddesign.preview.domain.node.ChildGraph
 import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.ComponentNode
-import bot.charlies.androiddesign.preview.model.PropKind
 import bot.charlies.androiddesign.preview.model.Screen
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -61,23 +59,7 @@ class OverlayPlacement(private val screen: Screen) {
 
   private val parents: Map<String, String> = buildMap {
     for (node in screen.components) {
-      val def = Catalogs.of(screen).find(node.component) ?: continue
-      for (prop in def.props) {
-        val ids =
-          when (prop.kind) {
-            PropKind.Child -> listOfNotNull(node.stringProp(prop.name))
-            PropKind.ChildList ->
-              when (val items = node.props[prop.name].childItems()) {
-                is ChildItems.Listed -> items.ids
-                is ChildItems.Template -> listOf(items.componentId)
-                null -> emptyList()
-              }
-            else -> emptyList()
-          }
-        // An anchor names the component a tooltip or menu hangs off; it is not a child.
-        if (prop.name == ANCHOR) continue
-        ids.forEach { putIfAbsent(it, node.id) }
-      }
+      ChildGraph.childIds(node, Catalogs.of(screen)).forEach { putIfAbsent(it, node.id) }
     }
   }
 
@@ -180,6 +162,5 @@ class OverlayPlacement(private val screen: Screen) {
     private const val SEARCH_BAR = "SearchBar"
     private const val SEARCH_VIEW = "SearchView"
     private const val TOP_APP_BAR = "TopAppBar"
-    private const val ANCHOR = "anchor"
   }
 }

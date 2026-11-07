@@ -80,14 +80,15 @@ private fun requiredValue(
     PropKind.Image -> JsonPrimitive("missing.png")
     is PropKind.Enum -> JsonPrimitive(kind.values.first())
     PropKind.Child,
+    PropKind.Anchor,
     PropKind.ChildList -> {
       val allowed = prop.allowedChildren?.minOrNull()
       val childId = if (allowed == null) "t1" else "${id}_${prop.name}"
       if (allowed != null) {
         extra += requiredNode(checkNotNull(M3ExpressiveCatalog.find(allowed)), childId, extra)
       }
-      if (prop.kind == PropKind.Child) JsonPrimitive(childId)
-      else JsonArray(listOf(JsonPrimitive(childId)))
+      if (prop.kind == PropKind.ChildList) JsonArray(listOf(JsonPrimitive(childId)))
+      else JsonPrimitive(childId)
     }
     else -> error("${prop.name}: no required value for $kind")
   }
