@@ -219,6 +219,7 @@ class TreeRecorder {
       scrolls = meta.scrolls,
       variant = meta.variant,
       bounds = bounds.toDp(density),
+      layout = layout?.takeIf { it.reachesPastHorizontally(bounds, density) }?.toDp(density),
       touch = touchPx?.toDp(density),
       text = textInfo(meta, bounds, density),
       ring = rings[meta.id],
@@ -285,6 +286,12 @@ class TreeRecorder {
     )
   }
 
+  /** Whether this layout box extends past [bounds] on the left or the right by more than 0.5 dp. */
+  private fun Rect.reachesPastHorizontally(bounds: Rect, density: Float): Boolean {
+    val slack = OVERFLOW_SLACK_DP * density
+    return left < bounds.left - slack || right > bounds.right + slack
+  }
+
   /** This rectangle made at least [height] tall, growing down. */
   private fun Rect.growTo(height: Float?): Rect =
     if (height == null || this.height >= height) this else Rect(left, top, right, top + height)
@@ -329,5 +336,6 @@ class TreeRecorder {
 
     /** Rounding slack when comparing a semantics size with a layout size. */
     private const val SIZE_TOLERANCE_PX = 0.5f
+    private const val OVERFLOW_SLACK_DP = 0.5f
   }
 }

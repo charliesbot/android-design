@@ -26,6 +26,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import bot.charlies.androiddesign.preview.domain.layout.growsSemanticsBounds
 import bot.charlies.androiddesign.preview.feature.preview.record.NodeMeta
 import bot.charlies.androiddesign.preview.feature.preview.record.TextReport
 import bot.charlies.androiddesign.preview.feature.preview.render.wear.LocalWearAmbient
@@ -279,7 +280,9 @@ internal fun NodeContext.modifier(
   scroll: Boolean = false,
 ): Modifier {
   var modifier: Modifier = Modifier
-  if (host.flexItem) modifier = modifier.restoreUnboundedHeight()
+  if (host.flexItem && growsSemanticsBounds(node, env.nodes, env.catalog, ::flexProps)) {
+    modifier = modifier.restoreUnboundedHeight()
+  }
   val weight = number("weight")
   if (weight != null) {
     host.column?.let { modifier = modifier.then(with(it) { Modifier.weight(weight) }) }
@@ -293,6 +296,10 @@ internal fun NodeContext.modifier(
   padding?.let { modifier = modifier.padding(it) }
   return modifier.then(tagged())
 }
+
+/** The props [node] is drawn with in this context's frame, as [growsSemanticsBounds] asks. */
+private fun NodeContext.flexProps(other: ComponentNode): List<JsonObject> =
+  listOf(effectiveProps(other, env))
 
 /**
  * FlexBox measures a wrapped item with the largest height Constraints can hold instead of an

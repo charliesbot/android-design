@@ -204,7 +204,7 @@ The skill checks that the server is connected before it starts and, if not, tell
 
 The agent reads a flat list of nodes plus findings. Each node carries:
 - its proposal id, type, and parent
-- its bounds and touch bounds in dp
+- its bounds and touch bounds in dp, plus the unclipped layout box when it reaches past the bounds
 - for text: the line count, overflow, and whether it was truncated
 - the color, type, and shape roles it used
 - its accessibility role, label, and actions
@@ -234,7 +234,8 @@ The finding rules carry over from v2's runtime checks, with v2's thresholds:
 - contrast of each text and background pair
 - the primary action as the largest interactive element in its pane
 - at most one FAB per pane
-- nothing wider than the view
+- nothing wider than the view (`offscreen`)
+- nothing laid out wider than its parent or past the view's edge (`overflow`): bounds come from semantics and clip to the window, so the tree adds a node's unclipped `layout` box when it reaches past `bounds`; the children of a carousel or tab row, which scroll sideways, are exempt
 
 A view passes when it has no error findings. Intentional truncation is reported as information, not an error.
 

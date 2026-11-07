@@ -66,7 +66,7 @@ For a proposal, this step replaces the rendering in `android-design`'s screen ch
 
 1. Call `open_proposal` with the proposal's absolute path. It loads the file, watches it, shows the window, and returns validation errors. Fix them and call `status` until it reports none.
 2. Call `check_proposal`. One call checks every screen at every view and returns each view's errors and `layout` summary; its tool description gives the format.
-3. Fix every error once, then call `check_proposal` again. Report anything still failing instead of looping.
+3. Fix every error once, then call `check_proposal` again. An `overflow` error names a node laid out wider than its parent or the view (a row that needs more width than its cell); narrow it, wrap it, or let it scroll. Report anything still failing instead of looping.
 4. Confirm the adaptation from the `layout` summaries: each larger view reveals what your section 0 adaptation answer promised, such as a second pane, a rail, or more regions. Google: "Additional space doesn't just mean making the same thing bigger." A larger view with the phone's regions only spread wider fails.
 5. Call `get_tree` only when a summary or an error is not enough; its tool description says what it returns.
 

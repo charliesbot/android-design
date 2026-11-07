@@ -886,7 +886,10 @@ internal class ScreenValidator(
     private val ICON_NAME = Regex("^[a-z0-9_]+$")
     /** Components whose `value` and `range` props must agree. */
     private val RANGE_COMPONENTS = setOf("Slider", "RangeSlider", "Stepper")
-    private val ANCHORED_OVERLAYS = setOf("Menu", "Tooltip", "DatePicker")
+    /**
+     * Overlays drawn beside the component their `anchor` names, which the tree records as parent.
+     */
+    val ANCHORED_OVERLAYS = setOf("Menu", "Tooltip", "DatePicker")
     private val PICKER_OVERLAYS = setOf("Dialog", "DatePicker", "TimePicker")
     private const val DATE_MESSAGE =
       "a date must be written as YYYY-MM-DD, a real day from 1900 to 2100, not bound to data"

@@ -43,6 +43,12 @@ data class LayoutNode(
    */
   val scrolls: Boolean = false,
   val bounds: Bounds,
+  /**
+   * The layout box, when it reaches past [bounds] horizontally. [bounds] come from semantics, which
+   * clip to the window, so a node laid out wider than the window reports a clipped box there; the
+   * layout box is not clipped. Omitted when the two agree.
+   */
+  val layout: Bounds? = null,
   /** The touch area, which is at least 48 x 48 dp for interactive components. */
   val touch: Bounds? = null,
   val text: TextInfo? = null,
@@ -130,6 +136,7 @@ enum class FindingRule(val wire: String) {
   @SerialName("primary-largest") PrimaryLargest("primary-largest"),
   @SerialName("one-fab") OneFab("one-fab"),
   @SerialName("offscreen") Offscreen("offscreen"),
+  @SerialName("overflow") Overflow("overflow"),
   @SerialName("round-edge-clipped") RoundEdgeClipped("round-edge-clipped"),
   @SerialName("carousel-items") CarouselItems("carousel-items"),
   @SerialName("nav-destinations") NavDestinations("nav-destinations"),

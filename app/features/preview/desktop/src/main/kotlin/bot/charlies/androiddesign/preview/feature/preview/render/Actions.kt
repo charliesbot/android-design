@@ -425,7 +425,16 @@ internal fun RenderIconButton(ctx: NodeContext) {
       "extra-large" -> IconButtonDefaults.extraLargeSelectedSquareShape
       else -> IconButtonDefaults.smallSelectedSquareShape
     }
-  val modifier = ctx.modifier().size(container.width, container.height).then(ctx.describedBy())
+  // The default size sets no size modifier, as in the exported code: material3 then pads the 40dp
+  // container to 48dp in layout (`minimumInteractiveComponentSize`). A size modifier from outside
+  // would pin the layout to 40dp and sit 8dp tighter than on a phone.
+  val sized =
+    size != null && size != "small" || width != IconButtonDefaults.IconButtonWidthOption.Uniform
+  val modifier =
+    ctx
+      .modifier()
+      .let { if (sized) it.size(container.width, container.height) else it }
+      .then(ctx.describedBy())
   val enabled = ctx.enabled
   val variant = ctx.enum("variant")
   // Inside a toolbar the icon takes the toolbar's content color, which differs by its style.

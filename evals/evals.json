@@ -332,6 +332,111 @@
       ]
     },
     {
+      "id": 8,
+      "name": "recipes",
+      "surface": "phone",
+      "prompt": "The discover screen of a recipe app called \"Simmer\". Use the provided photos: assets/shakshuka.jpg (Shakshuka, 30 min, 4.8 stars), assets/ramen.jpg (Miso mushroom ramen, 45 min, 4.7 stars), assets/salad.jpg (Peach and burrata salad, 15 min, 4.9 stars), assets/tacos.jpg (Crispy fish tacos, 35 min, 4.6 stars), assets/pasta.jpg (Lemon basil spaghetti, 20 min, 4.5 stars), and assets/cake.jpg (Olive oil citrus cake, 60 min, 4.8 stars). Show this week's featured recipes with their photos, a way to search all recipes (the search field hint is \"Search 2,400 recipes\"), browsing by category (For you, Quick, Vegetarian, Desserts), and a list of recipes in the selected category with cook time and rating. Opening a recipe shows its photo, time, servings (4), the ingredients (at least 6), and the steps (at least 4), with a way to save it. It must work and adapt across phone (411x923), foldable (704x933), tablet (1280x800), and desktop (1920x1080) windows; light and dark should both work. In-memory state only.",
+      "expected_output": "Photo-led discovery with featured recipes, category browsing, and search at the top, and a recipe detail that adapts to wide windows",
+      "files": [
+        {
+          "from": "assets/recipe_shakshuka.jpg",
+          "to": "assets/shakshuka.jpg"
+        },
+        {
+          "from": "assets/recipe_ramen.jpg",
+          "to": "assets/ramen.jpg"
+        },
+        {
+          "from": "assets/recipe_salad.jpg",
+          "to": "assets/salad.jpg"
+        },
+        {
+          "from": "assets/recipe_tacos.jpg",
+          "to": "assets/tacos.jpg"
+        },
+        {
+          "from": "assets/recipe_pasta.jpg",
+          "to": "assets/pasta.jpg"
+        },
+        {
+          "from": "assets/recipe_cake.jpg",
+          "to": "assets/cake.jpg"
+        }
+      ],
+      "assertions": [
+        {
+          "id": "C-valid",
+          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
+          "type": "code"
+        },
+        {
+          "id": "C-review",
+          "text": "Every render in report.json passes the app's finding rules; no renders counts as a failure",
+          "type": "code"
+        },
+        {
+          "id": "C-palette",
+          "text": "The merged theme variant in report.json is not expressive or vibrant",
+          "type": "code"
+        },
+        {
+          "id": "R-hierarchy",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-fill",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-surfaces",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-controls",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-font",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-platform",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-text",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-dark",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-adaptive",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-idea",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-recipes-browse",
+          "text": "Featured recipes, categories, and search each use a form Material recommends for them (for example a carousel of photos for the featured set, tabs or chips for categories, a search bar at the top), the photos lead, and titles over photos stay readable.",
+          "type": "rubric"
+        }
+      ]
+    },
+    {
       "id": 5,
       "name": "workout",
       "surface": "wear",
