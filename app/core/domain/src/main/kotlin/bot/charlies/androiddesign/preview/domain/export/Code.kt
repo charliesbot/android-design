@@ -313,8 +313,8 @@ internal object CodePrinter {
     return -1
   }
 
-  /** [text] split at the commas that are not inside brackets or string literals. */
-  private fun topLevelArguments(text: String): List<String> {
+  /** [text] split at the [separator]s that are not inside brackets or string literals. */
+  private fun topLevelArguments(text: String, separator: Char = ','): List<String> {
     val parts = mutableListOf<String>()
     var depth = 0
     var inString = false
@@ -326,9 +326,9 @@ internal object CodePrinter {
         inString && c == '\\' -> i++
         c == '"' -> inString = !inString
         inString -> {}
-        c == '(' || c == '[' -> depth++
-        c == ')' || c == ']' -> depth--
-        c == ',' && depth == 0 -> {
+        c == '(' || c == '[' || c == '{' -> depth++
+        c == ')' || c == ']' || c == '}' -> depth--
+        c == separator && depth == 0 -> {
           parts += text.substring(start, i).trim()
           start = i + 1
         }
@@ -363,8 +363,47 @@ internal object CodePrinter {
     }
     out += "${pad(indent)}$first"
     rest.forEachIndexed { i, call ->
-      out += "${pad(indent + INDENT)}.$call${if (i == rest.lastIndex) suffix else ""}"
+      printChainCall(call, if (i == rest.lastIndex) suffix else "", indent + INDENT, out)
     }
+  }
+
+  /**
+   * `.call(...)` on one line, or one argument per line with a trailing comma when it is too long.
+   */
+  private fun printChainCall(call: String, suffix: String, indent: Int, out: MutableList<String>) {
+    val line = "${pad(indent)}.$call$suffix"
+    val open = call.indexOf('(')
+    val args =
+      if (line.length > WIDTH && open > 0 && call.endsWith(")")) {
+        topLevelArguments(call.substring(open + 1, call.length - 1))
+      } else {
+        null
+      }
+    if (args == null || args.size < 2) {
+      out += line
+      return
+    }
+    out += "${pad(indent)}.${call.substring(0, open)}("
+    args.forEach { printChainArg(it, indent + INDENT, out) }
+    out += "${pad(indent)})$suffix"
+  }
+
+  /**
+   * One argument of a wrapped chain call, with a lambda of several statements opened over lines:
+   * `onClick = { a; b }` becomes a block of `a` and `b`.
+   */
+  private fun printChainArg(arg: String, indent: Int, out: MutableList<String>) {
+    val head = arg.substringBefore("{", "")
+    val body = arg.substringAfter("{", "").removeSuffix("}").trim()
+    val statements =
+      if (head.endsWith("= ") && arg.endsWith("}")) topLevelArguments(body, ';') else emptyList()
+    if (statements.size < 2) {
+      out += "${pad(indent)}$arg,"
+      return
+    }
+    out += "${pad(indent)}${head}{"
+    statements.forEach { out += "${pad(indent + INDENT)}$it" }
+    out += "${pad(indent)}},"
   }
 
   private fun printCall(

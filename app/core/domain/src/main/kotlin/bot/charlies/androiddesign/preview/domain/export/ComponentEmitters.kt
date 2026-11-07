@@ -3,9 +3,13 @@ package bot.charlies.androiddesign.preview.domain.export
 import bot.charlies.androiddesign.preview.domain.BadgeContent
 import bot.charlies.androiddesign.preview.domain.CarouselSpec
 import bot.charlies.androiddesign.preview.domain.CollapsingAppBars
+import bot.charlies.androiddesign.preview.domain.MenuSpec
+import bot.charlies.androiddesign.preview.domain.RadioSpec
 import bot.charlies.androiddesign.preview.domain.SearchBars
 import bot.charlies.androiddesign.preview.domain.SearchSpec
 import bot.charlies.androiddesign.preview.domain.SideSheetSpec
+import bot.charlies.androiddesign.preview.domain.SliderSpec
+import bot.charlies.androiddesign.preview.domain.SwitchSpec
 import bot.charlies.androiddesign.preview.domain.TooltipSpec
 import bot.charlies.androiddesign.preview.model.ActionFunction
 import bot.charlies.androiddesign.preview.model.ComponentNode
@@ -160,6 +164,7 @@ private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Pl
     "NavigationRail" -> navigationRail(p, place)
     "NavigationRailItem" -> navigationItem(node, p, place, "WideNavigationRailItem", true)
     "FloatingToolbar" -> floatingToolbar(p, place)
+    "DockedToolbar" -> dockedToolbar(p, place)
     "Card" -> card(node, p, place)
     "List" -> list(p, place)
     "ListItem" -> listItem(node, p, place)
@@ -178,6 +183,8 @@ private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Pl
     "ChipGroup" -> chipGroup(node, p, place)
     "Switch" -> switch(node, p, place)
     "Checkbox" -> checkbox(node, p, place)
+    "RadioGroup" -> radioGroup(node, p, place)
+    "RadioButton" -> radioButton(node, p, place)
     "Slider" -> slider(node, p, place)
     "RangeSlider" -> rangeSlider(node, p, place)
     "TextField" -> textField(node, p, place)
@@ -1001,6 +1008,20 @@ private fun ScreenEmitter.floatingToolbar(p: JsonObject, place: Place): List<Stm
   )
 }
 
+private fun ScreenEmitter.dockedToolbar(p: JsonObject, place: Place): List<Stmt> {
+  expressive()
+  val vibrant = p.literal("colors") == "vibrant"
+  return one(
+    m3("FlexibleBottomAppBar"),
+    listOf(
+      modifier(place, p),
+      if (vibrant) arg("containerColor", colorRole("primaryContainer")) else null,
+      if (vibrant) arg("contentColor", colorRole("onPrimaryContainer")) else null,
+    ),
+    children(p, "children", place, "DockedToolbar"),
+  )
+}
+
 private fun ScreenEmitter.card(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val callee =
     when (p.literal("variant")) {
@@ -1620,32 +1641,144 @@ private fun ScreenEmitter.switch(node: ComponentNode, p: JsonObject, place: Plac
         arg("onCheckedChange", change),
         modifier(place, p, semantics(p)),
         enabled(p, place),
+        switchThumb(p, name),
       ),
     )
 }
 
+/**
+ * The `thumbContent` of a switch: a check when on (`selected`), and a close when off (`both`),
+ * sized `SwitchDefaults.IconSize`, as [SwitchSpec] says.
+ */
+private fun ScreenEmitter.switchThumb(p: JsonObject, checked: String): Arg? {
+  val size = sizeModifier("${m3("SwitchDefaults")}.IconSize")
+  val check = IconName.Literal(SwitchSpec.CHECK)
+  val close = IconName.Literal(SwitchSpec.CLOSE)
+  return when (p.choice("Switch", "icons")) {
+    "selected" -> arg("thumbContent", IfValue(checked, lambdaOf(icon(check, null, size)), "null"))
+    "both" ->
+      arg("thumbContent", lambdaOf(iconOf(togglePainter(checked, check, close), null, size)))
+    else -> null
+  }
+}
+
 private fun ScreenEmitter.checkbox(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val (name, declaration) = state(node, "Checked", p.boolExpr("checked", place) ?: "false")
-  val change = assignIt(name, actionStatements(p["action"], node.id))
+  val partly = p.boolExpr("indeterminate", place)?.takeIf { it != "false" }
+  val statements = mutableListOf(declaration)
   val label = p.text("label", place)
+  val action = actionStatements(p["action"], node.id)
   val box =
-    calls(
-      m3("Checkbox"),
-      listOf(
-        arg("checked", name),
-        arg("onCheckedChange", change),
-        if (label == null) modifier(place, p, semantics(p)) else null,
-        enabled(p, place),
-      ),
-    )
-  if (label == null) return listOf(declaration, stmt(box))
+    if (partly == null) {
+      calls(
+        m3("Checkbox"),
+        listOf(
+          arg("checked", name),
+          arg("onCheckedChange", assignIt(name, action)),
+          if (label == null) modifier(place, p, semantics(p)) else null,
+          enabled(p, place),
+        ),
+      )
+    } else {
+      // An indeterminate box shows a dash until it is tapped, which checks it.
+      val (partlyName, partlyDeclaration) = state(node, "Indeterminate", partly)
+      statements += partlyDeclaration
+      val toggleable = file.use(Sym.ToggleableState)
+      val state =
+        "if ($partlyName) $toggleable.Indeterminate else if ($name) $toggleable.On " +
+          "else $toggleable.Off"
+      calls(
+        m3("TriStateCheckbox"),
+        listOf(
+          arg("state", state),
+          arg(
+            "onClick",
+            lambda(
+              listOf<Stmt>(
+                Assign(name, "=", Raw("$partlyName || !$name")),
+                Assign(partlyName, "=", Raw("false")),
+              ) + action,
+            ),
+          ),
+          if (label == null) modifier(place, p, semantics(p)) else null,
+          enabled(p, place),
+        ),
+      )
+    }
+  if (label == null) return statements + stmt(box)
   val alignment = "${file.use(Sym.Alignment)}.CenterVertically"
-  return listOf(declaration) +
+  return statements +
     one(
       file.use(Sym.Row),
       listOf(modifier(place, p), arg("verticalAlignment", alignment)),
       listOf(stmt(box), stmt(textOf(label))),
     )
+}
+
+/** The initial selected child of a group: the first listed child whose `selected` is set. */
+internal fun ScreenEmitter.initiallySelected(ids: List<String>, place: Place): String =
+  ids.firstOrNull { byId[it]?.props?.sampleFlag("selected", place) == true }.orEmpty()
+
+private fun ScreenEmitter.radioGroup(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
+  val ids = (p["children"].childItems() as? ChildItems.Listed)?.ids.orEmpty()
+  val (name, declaration) = state(node, "Selected", kotlinString(initiallySelected(ids, place)))
+  val inner = place.copy(chipSelection = ChipSelection(name))
+  return listOf(declaration) +
+    one(
+      file.use(Sym.Column),
+      listOf(modifier(place, p, "selectableGroup()")),
+      children(p, "children", inner, "RadioGroup") { pl, _, _ ->
+        pl.copy(chipSelection = inner.chipSelection)
+      },
+    )
+}
+
+/** A row of a `RadioButton` and its label; the whole row is the touch target. */
+private fun ScreenEmitter.radioButton(
+  node: ComponentNode,
+  p: JsonObject,
+  place: Place,
+): List<Stmt> {
+  val selection = place.chipSelection
+  val selected =
+    selection?.let { "${it.state} == ${kotlinString(node.id)}" }
+      ?: (p.boolExpr("selected", place) ?: "false")
+  val action = actionStatements(p["action"], node.id)
+  val onClickBody =
+    (selection?.let { listOf<Stmt>(Assign(it.state, "=", Raw(kotlinString(node.id)))) }
+      ?: emptyList()) + action
+  val enabledValue = p.boolExpr("enabled", place)?.takeIf { it != "true" }
+  val onClick =
+    onClickBody
+      .mapNotNull { it.flat() }
+      .joinToString("; ")
+      .let { if (it.isEmpty()) "{}" else "{ $it }" }
+  val role = "${file.use(Sym.Role)}.RadioButton"
+  val selectable =
+    useModifier(
+      "selectable(selected = $selected, " +
+        (enabledValue?.let { "enabled = $it, " } ?: "") +
+        "role = $role, onClick = $onClick)",
+    )
+  val min = "${useModifier("heightIn")}(min = ${dp(RadioSpec.MIN_HEIGHT_DP)})"
+  val label = p.text("label", place) ?: Raw("\"\"")
+  val button =
+    calls(
+      m3("RadioButton"),
+      listOf(arg("selected", selected), arg("onClick", "null"), enabled(p, place)),
+    )
+  return one(
+    file.use(Sym.Row),
+    listOf(
+      modifier(place, p, min, selectable),
+      arg(
+        "horizontalArrangement",
+        "${file.use(Sym.Arrangement)}.spacedBy(${dp(RadioSpec.GAP_DP)})",
+      ),
+      arg("verticalAlignment", "${file.use(Sym.Alignment)}.CenterVertically"),
+    ),
+    listOf(stmt(button), stmt(textOf(label))),
+  )
 }
 
 private fun ScreenEmitter.range(p: JsonObject): Pair<Double, Double> {
@@ -1671,16 +1804,64 @@ private fun ScreenEmitter.rangeArgs(
 private fun ScreenEmitter.slider(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val (min, max) = range(p)
   val initial = p.floatExpr("value", place) ?: floatLiteral(min)
-  val (name, declaration) = state(node, "Value", initial, Sym.mutableFloatStateOf)
-  return listOf(declaration) +
+  val vertical = p.choice("Slider", "orientation") == "vertical"
+  val centered = p.choice("Slider", "variant") == "centered"
+  if (!vertical && !centered) {
+    val (name, declaration) = state(node, "Value", initial, Sym.mutableFloatStateOf)
+    return listOf(declaration) +
+      one(
+        m3("Slider"),
+        listOf(
+          arg("value", name),
+          arg("onValueChange", assignIt(name)),
+          modifier(place, p),
+          enabled(p, place),
+        ) + rangeArgs("Slider", p, place, min, max),
+      )
+  }
+  // The centered track and the vertical slider take a SliderState, which holds the value; the
+  // slider reports a drag to onValueChange and the caller stores it.
+  val name = stateName(node.id, "State")
+  val steps = p.sampleNumber("Slider", "steps", place)?.toInt()?.takeIf { it > 0 }
+  val stateDeclaration =
+    Assign(
+      "val $name",
+      "=",
+      Call(
+        m3("rememberSliderState"),
+        listOfNotNull(
+          arg("value", initial),
+          steps?.let { arg("steps", it.toString()) },
+          if (p["range"] != null) arg("trackRange", "${floatLiteral(min)}..${floatLiteral(max)}")
+          else null,
+        ),
+      ),
+    )
+  val track =
+    if (centered) {
+      arg(
+        "track",
+        lambdaOf(
+          Call(
+            "${m3("SliderDefaults")}.CenteredTrack",
+            listOf(arg("sliderState", "it")),
+          ),
+        ),
+      )
+    } else {
+      null
+    }
+  val height = if (vertical) "height(${dp(SliderSpec.VERTICAL_HEIGHT_DP)})" else null
+  return listOf<Stmt>(stateDeclaration) +
     one(
-      m3("Slider"),
+      m3(if (vertical) "VerticalSlider" else "Slider"),
       listOf(
-        arg("value", name),
-        arg("onValueChange", assignIt(name)),
-        modifier(place, p),
+        arg("state", name),
+        arg("onValueChange", lambda(Assign("$name.value", "=", Raw("it")))),
+        modifier(place, p, height),
         enabled(p, place),
-      ) + rangeArgs("Slider", p, place, min, max),
+        track,
+      ),
     )
 }
 
@@ -2043,27 +2224,77 @@ internal fun ScreenEmitter.menuStatements(menu: ComponentNode): List<Stmt> {
   expressive()
   val p = effectiveProps(menu, SizeClass.Compact)
   val shown = overlayVar(menu.id)
-  val items = (p["items"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty()
+  val vibrant = p.literal("colors") == MenuSpec.COLORS_VIBRANT
   val defaults = m3("MenuDefaults")
-  val group =
-    Call(
-      m3("DropdownMenuGroup"),
-      listOf(
-        arg("shapes", "$defaults.groupShape(0, 1)"),
-        arg("containerColor", colorRole("surfaceContainer")),
-      ),
-      lambda(
-        items.flatMapIndexed { i, id ->
-          emit(
-            id,
-            Place(
-              parentType = "Menu",
-              listPosition = ListPosition(false, i.toString(), items.size.toString()),
+  val members = (p["items"].childItems() as? ChildItems.Listed)?.ids.orEmpty()
+  val grouped = members.any { byId[it]?.component == "MenuGroup" }
+  // A menu of items is one group; a menu of groups holds each group, a gap apart.
+  val groups: List<Pair<ComponentNode, List<String>>> =
+    if (grouped) {
+      members.mapNotNull(byId::get).map { group ->
+        group to
+          (effectiveProps(group, SizeClass.Compact)["items"].childItems() as? ChildItems.Listed)
+            ?.ids
+            .orEmpty()
+      }
+    } else {
+      listOf(menu to members)
+    }
+  val container =
+    if (vibrant) "$defaults.groupVibrantContainerColor" else colorRole("surfaceContainer")
+  val declarations = mutableListOf<Stmt>()
+  val drawn = mutableListOf<Stmt>()
+  groups.forEachIndexed { groupIndex, (group, ids) ->
+    val items = ids.mapNotNull(byId::get)
+    // The state of the items lives above the popup, so it survives the menu closing.
+    val singles = items.filter { MenuSpec.role(it.props.literalRole()) == MenuSpec.Role.Single }
+    var inner = Place(parentType = "Menu", menuVibrant = vibrant)
+    if (singles.isNotEmpty()) {
+      val initial = initiallySelected(singles.map { it.id }, Place())
+      val (name, declaration) = state(group, "Selected", kotlinString(initial))
+      declarations += declaration
+      inner = inner.copy(chipSelection = ChipSelection(name))
+    }
+    items
+      .filter { MenuSpec.role(it.props.literalRole()) == MenuSpec.Role.Multi }
+      .forEach { item ->
+        declarations +=
+          state(item, "Checked", item.props.boolExpr("selected", Place()) ?: "false").second
+      }
+    val content = items.flatMapIndexed { i, item ->
+      emit(
+        item.id,
+        inner.copy(listPosition = ListPosition(false, i.toString(), items.size.toString())),
+      )
+    }
+    if (grouped && groupIndex > 0) {
+      drawn +=
+        stmt(
+          Call(
+            file.use(Sym.Spacer),
+            listOf(
+              pos(
+                Chain(
+                  file.use(Sym.Modifier),
+                  listOf(useModifier("height($defaults.GroupSpacing)")),
+                ),
+              ),
             ),
-          )
-        },
-      ),
-    )
+          ),
+        )
+    }
+    drawn +=
+      stmt(
+        Call(
+          m3("DropdownMenuGroup"),
+          listOf(
+            arg("shapes", "$defaults.groupShape($groupIndex, ${groups.size})"),
+            arg("containerColor", container),
+          ),
+          lambda(content),
+        ),
+      )
+  }
   val popup =
     Call(
       m3("DropdownMenuPopup"),
@@ -2071,31 +2302,73 @@ internal fun ScreenEmitter.menuStatements(menu: ComponentNode): List<Stmt> {
         arg("expanded", shown),
         arg("onDismissRequest", lambda(Assign(shown, "=", Raw("false")))),
       ),
-      lambda(stmt(group)),
+      lambda(drawn),
     )
-  return listOf(stmt(popup))
+  return declarations + stmt(popup)
 }
+
+/** The `role` of a menu item as it is written, or null. */
+private fun JsonObject.literalRole(): String? =
+  (this["role"] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
 private fun ScreenEmitter.menuItem(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val defaults = m3("MenuDefaults")
   val position = place.listPosition
+  val role = MenuSpec.role(p.choice("MenuItem", "role"))
+  val vibrant = place.menuVibrant
   val label = p.text("label", place) ?: Raw("\"\"")
-  val close =
-    byId.values
-      .firstOrNull { it.component == "Menu" && node.id in childIds(it) }
-      ?.let { overlayVar(it.id) }
+  val close = enclosingOverlay(node.id)?.let { overlayVar(it) }
   val action =
     actionStatements(p["action"], node.id) +
-      listOfNotNull(close?.let { Assign(it, "=", Raw("false")) })
-  return one(
-    m3("DropdownMenuItem"),
-    listOf(
-      arg("text", lambdaOf(textOf(label))),
-      arg("onClick", lambda(action)),
-      position?.let { arg("shape", "$defaults.itemShape(${it.index}, ${it.count}).shape") },
-      p.iconName("icon", place)?.let { arg("leadingIcon", lambdaOf(icon(it))) },
-    ),
-  )
+      listOfNotNull(close?.takeIf { role.closesMenu }?.let { Assign(it, "=", Raw("false")) })
+  val text = arg("text", lambdaOf(textOf(label)))
+  val leading = p.iconName("icon", place)?.let { arg("leadingIcon", lambdaOf(icon(it))) }
+  val shapes = position?.let { "$defaults.itemShape(${it.index}, ${it.count})" }
+  return when (role) {
+    MenuSpec.Role.Action ->
+      one(
+        m3("DropdownMenuItem"),
+        listOf(
+          text,
+          arg("onClick", lambda(action)),
+          shapes?.let { arg("shape", "$it.shape") },
+          leading,
+          if (vibrant) arg("colors", "$defaults.itemVibrantColors()") else null,
+        ),
+      )
+    MenuSpec.Role.Single -> {
+      val selection = place.chipSelection
+      val picked = selection?.let { "${it.state} == ${kotlinString(node.id)}" } ?: "false"
+      val choose =
+        selection?.let { listOf<Stmt>(Assign(it.state, "=", Raw(kotlinString(node.id)))) }
+          ?: emptyList()
+      one(
+        m3("SelectableDropdownMenuItem"),
+        listOf(
+          arg("selected", picked),
+          arg("onClick", lambda(choose + action)),
+          text,
+          shapes?.let { arg("shapes", it) },
+          leading,
+          if (vibrant) arg("colors", "$defaults.selectableItemVibrantColors()") else null,
+        ),
+      )
+    }
+    MenuSpec.Role.Multi -> {
+      val checked = stateName(node.id, "Checked")
+      one(
+        m3("CheckableDropdownMenuItem"),
+        listOf(
+          arg("checked", checked),
+          arg("onCheckedChange", assignIt(checked, action)),
+          text,
+          shapes?.let { arg("shapes", it) },
+          leading,
+          if (vibrant) arg("colors", "$defaults.selectableItemVibrantColors()") else null,
+        ),
+      )
+    }
+  }
 }
 
 // endregion

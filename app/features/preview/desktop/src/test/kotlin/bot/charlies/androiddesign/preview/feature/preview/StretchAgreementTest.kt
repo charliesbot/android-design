@@ -43,6 +43,7 @@ class StretchAgreementTest {
         "Tab",
         "FabMenuItem",
         "MenuItem",
+        "MenuGroup",
       )
 
   /** Props that change whether a component stretches, besides its required ones. */

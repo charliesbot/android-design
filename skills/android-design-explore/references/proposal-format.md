@@ -80,7 +80,7 @@ Parents refer to children by id, never by nesting objects:
 - A **`Child`** prop (a named slot such as `topBar`, `content`, `leading`, `anchor`) takes one id: `"topBar": "bar"`.
 - A **`ChildList`** prop (`children`, `actions`, `items`, a card's `content`) takes an array of ids, `["title", "body"]`, or a **template** that repeats one component per array item: `{"componentId": "plate_row", "path": "/plates"}`.
 
-A slot may restrict what it holds (a `Scaffold`'s `bottomBar` takes a `NavigationBar` or `FloatingToolbar`); `get_catalog` lists those limits and the validator enforces them.
+A slot may restrict what it holds (a `Scaffold`'s `bottomBar` takes a `NavigationBar`, `FloatingToolbar` or `DockedToolbar`); `get_catalog` lists those limits and the validator enforces them.
 
 ## Writing it compactly
 

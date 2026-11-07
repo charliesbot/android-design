@@ -36,3 +36,7 @@ internal fun NodeContext.isPickedIn(group: String): Boolean =
 internal fun NodeContext.selectInGroup(group: String) {
   env.host.interaction[env.stateKey("selection:$group")] = host.groupIndex
 }
+
+/** A stored `local` boolean read outside composition, such as when the tree is described. */
+internal fun NodeContext.storedBool(key: String): Boolean =
+  env.host.interaction.get<Boolean>(env.stateKey("$id:$key")) ?: bool(key)

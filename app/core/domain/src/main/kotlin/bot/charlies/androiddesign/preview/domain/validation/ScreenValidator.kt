@@ -61,8 +61,90 @@ internal class ScreenValidator(
     }
     validateSnackbarHost()
     validateSearch()
+    validateSelections()
     detectCycles()
   }
+
+  /**
+   * The selection rules of radio groups and single-select menu items ([SelectionRules]), checked on
+   * the props in effect at each size class: a child hidden at a size does not count there, and a
+   * `sizeClass` override of `selected`, `role` or the child list counts where it applies. A group
+   * with a child whose value comes from data cannot be judged, so it is skipped.
+   */
+  private fun validateSelections() {
+    screen.components.forEachIndexed { index, node ->
+      val path = componentsPath.child(index)
+      when (node.component) {
+        "RadioGroup" ->
+          reportBySize(path.child("children")) { size ->
+            val members = membersAt(node, "children", size) ?: return@reportBySize null
+            val selected = members.map { selectedAt(it, size) ?: return@reportBySize null }
+            SelectionRules.radioGroupProblem(selected.count { it })
+          }
+        "Menu",
+        "MenuGroup" ->
+          reportBySize(path.child("items")) { size ->
+            val members = membersAt(node, "items", size) ?: return@reportBySize null
+            // A menu's own items are one group; its MenuGroups are checked on their own.
+            val singles = members.filter {
+              it.component == "MenuItem" && roleAt(it, size) == "single"
+            }
+            if (singles.isEmpty()) return@reportBySize null
+            val selected = singles.map { selectedAt(it, size) ?: return@reportBySize null }
+            SelectionRules.singleSelectProblem(selected.count { it })
+          }
+      }
+      if (node.component == "Menu") validateMenuLayout(path, node)
+    }
+  }
+
+  /** A menu holds items or groups, not both: items beside groups would sit outside any group. */
+  private fun validateMenuLayout(path: String, node: ComponentNode) {
+    for (size in SizeClass.entries) {
+      val members = membersAt(node, "items", size) ?: continue
+      if (
+        members.any { it.component == "MenuGroup" } && members.any { it.component != "MenuGroup" }
+      ) {
+        sink.add(path.child("items"), "a Menu holds MenuItems or MenuGroups, not both")
+        return
+      }
+    }
+  }
+
+  /** Runs [problem] at every size class and reports each distinct message once at [path]. */
+  private fun reportBySize(path: String, problem: (SizeClass) -> String?) {
+    val sizes = linkedMapOf<String, MutableList<SizeClass>>()
+    SizeClass.entries.forEach { size ->
+      problem(size)?.let { sizes.getOrPut(it) { mutableListOf() } += size }
+    }
+    for ((message, at) in sizes) {
+      val where =
+        if (at.size == SizeClass.entries.size) "" else " at ${at.joinToString { it.wire }}"
+      sink.add(path, message + where)
+    }
+  }
+
+  /** The props of [node] at [size]: the base ones with the size class overrides laid on top. */
+  private fun propsAt(node: ComponentNode, size: SizeClass): Map<String, JsonElement> =
+    node.props + node.sizeOverridesAt(size)
+
+  /**
+   * The children of [key] of [node] that show at [size], or null when the list is a template or
+   * names something that is not a component.
+   */
+  private fun membersAt(node: ComponentNode, key: String, size: SizeClass): List<ComponentNode>? {
+    val items = propsAt(node, size)[key].childItems() as? ChildItems.Listed ?: return null
+    return items.ids.map { byId[it] ?: return null }.filter { it.isShownAt(size) }
+  }
+
+  /** Whether [node] is selected at [size], or null when its `selected` comes from data. */
+  private fun selectedAt(node: ComponentNode, size: SizeClass): Boolean? {
+    val value = propsAt(node, size)["selected"] ?: return false
+    return (value as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toBooleanStrictOrNull()
+  }
+
+  private fun roleAt(node: ComponentNode, size: SizeClass): String? =
+    (propsAt(node, size)["role"] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
   /** How many components a listed `ChildList` prop holds; null for a template or no value. */
   private fun listedCount(props: JsonObject, key: String): Int? =

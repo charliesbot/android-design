@@ -626,6 +626,9 @@
           "$ref": "#/$defs/component.FloatingToolbar"
         },
         {
+          "$ref": "#/$defs/component.DockedToolbar"
+        },
+        {
           "$ref": "#/$defs/component.Card"
         },
         {
@@ -686,6 +689,12 @@
           "$ref": "#/$defs/component.RangeSlider"
         },
         {
+          "$ref": "#/$defs/component.RadioGroup"
+        },
+        {
+          "$ref": "#/$defs/component.RadioButton"
+        },
+        {
           "$ref": "#/$defs/component.TextField"
         },
         {
@@ -705,6 +714,9 @@
         },
         {
           "$ref": "#/$defs/component.Menu"
+        },
+        {
+          "$ref": "#/$defs/component.MenuGroup"
         },
         {
           "$ref": "#/$defs/component.MenuItem"
@@ -1469,7 +1481,8 @@
           "$ref": "#/$defs/Child",
           "x-allowedComponents": [
             "NavigationBar",
-            "FloatingToolbar"
+            "FloatingToolbar",
+            "DockedToolbar"
           ]
         },
         "floatingActionButton": {
@@ -1856,6 +1869,37 @@
             "vertical"
           ],
           "default": "horizontal"
+        },
+        "colors": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "vibrant"
+          ],
+          "default": "standard"
+        },
+        "children": {
+          "$ref": "#/$defs/ChildList"
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "component.DockedToolbar": {
+      "type": "object",
+      "description": "A toolbar docked to the bottom of the window, full width, in the Scaffold's bottomBar slot. It replaces the bottom app bar and is never shown with a navigation bar.",
+      "x-compose": "FlexibleBottomAppBar",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "DockedToolbar"
         },
         "colors": {
           "type": "string",
@@ -2763,6 +2807,16 @@
           "$ref": "#/$defs/DynamicBoolean",
           "default": false
         },
+        "icons": {
+          "type": "string",
+          "enum": [
+            "none",
+            "selected",
+            "both"
+          ],
+          "description": "The icon in the thumb: a check when on (`selected`), plus a close when off (`both`).",
+          "default": "none"
+        },
         "action": {
           "$ref": "#/$defs/Action",
           "description": "What a tap does."
@@ -2802,6 +2856,11 @@
         },
         "checked": {
           "$ref": "#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "indeterminate": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Partly selected, such as a parent whose children are only partly checked. It shows a dash and takes the place of `checked`; a tap checks the box.",
           "default": false
         },
         "label": {
@@ -2861,6 +2920,24 @@
           "$ref": "#/$defs/DynamicNumber",
           "description": "Must be a whole number from 0 to 100.",
           "default": 0
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "centered"
+          ],
+          "description": "Centered fills from the middle of the range to the handle, for a range that crosses zero.",
+          "default": "standard"
+        },
+        "orientation": {
+          "type": "string",
+          "enum": [
+            "horizontal",
+            "vertical"
+          ],
+          "description": "A vertical slider has a fixed height, so it never stretches across the width.",
+          "default": "horizontal"
         },
         "primary": {
           "$ref": "#/$defs/DynamicBoolean",
@@ -2934,6 +3011,77 @@
       },
       "required": [
         "component"
+      ],
+      "unevaluatedProperties": false
+    },
+    "component.RadioGroup": {
+      "type": "object",
+      "description": "A vertical list of radio buttons. Exactly one is selected, and a tap moves the selection.",
+      "x-compose": "Column with Modifier.selectableGroup()",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "RadioGroup"
+        },
+        "children": {
+          "$ref": "#/$defs/ChildList",
+          "x-allowedComponents": [
+            "RadioButton"
+          ]
+        }
+      },
+      "required": [
+        "component",
+        "children"
+      ],
+      "unevaluatedProperties": false
+    },
+    "component.RadioButton": {
+      "type": "object",
+      "description": "One option of a RadioGroup, with its label. The whole row is the touch target.",
+      "x-compose": "RadioButton in a Row with Modifier.selectable(role = Role.RadioButton)",
+      "x-interactive": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "RadioButton"
+        },
+        "label": {
+          "$ref": "#/$defs/DynamicString"
+        },
+        "selected": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": false
+        },
+        "action": {
+          "$ref": "#/$defs/Action",
+          "description": "What a tap does."
+        },
+        "primary": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Marks the screen's primary action. Exactly one is expected per screen.",
+          "default": false
+        },
+        "contentDescription": {
+          "$ref": "#/$defs/DynamicString",
+          "description": "Accessibility label when it differs from the label."
+        },
+        "enabled": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "default": true
+        }
+      },
+      "required": [
+        "component",
+        "label"
       ],
       "unevaluatedProperties": false
     },
@@ -3215,6 +3363,43 @@
         "anchor": {
           "$ref": "#/$defs/Child"
         },
+        "colors": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "vibrant"
+          ],
+          "description": "Vibrant is tertiary-based and more prominent: use it sparingly.",
+          "default": "standard"
+        },
+        "items": {
+          "$ref": "#/$defs/ChildList",
+          "x-allowedComponents": [
+            "MenuItem",
+            "MenuGroup"
+          ],
+          "description": "MenuItems, or MenuGroups of MenuItems (not both)."
+        }
+      },
+      "required": [
+        "component",
+        "items"
+      ],
+      "unevaluatedProperties": false
+    },
+    "component.MenuGroup": {
+      "type": "object",
+      "description": "A group of a Menu, set apart from its neighbors by a gap. Single-select items select within their group.",
+      "x-compose": "DropdownMenuGroup with MenuDefaults.groupShape(index, count)",
+      "allOf": [
+        {
+          "$ref": "#/$defs/ComponentCommon"
+        }
+      ],
+      "properties": {
+        "component": {
+          "const": "MenuGroup"
+        },
         "items": {
           "$ref": "#/$defs/ChildList",
           "x-allowedComponents": [
@@ -3231,7 +3416,7 @@
     "component.MenuItem": {
       "type": "object",
       "description": "One entry of a Menu.",
-      "x-compose": "DropdownMenuItem",
+      "x-compose": "DropdownMenuItem, SelectableDropdownMenuItem or CheckableDropdownMenuItem",
       "x-interactive": true,
       "allOf": [
         {
@@ -3248,6 +3433,21 @@
         "icon": {
           "$ref": "#/$defs/DynamicString",
           "description": "Material Symbols name, such as \"home\"."
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "action",
+            "single",
+            "multi"
+          ],
+          "description": "Action runs and closes the menu. Single is one choice of its group: the selection moves and the menu closes. Multi toggles and the menu stays open.",
+          "default": "action"
+        },
+        "selected": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Single and multi only: the initial selection.",
+          "default": false
         },
         "action": {
           "$ref": "#/$defs/Action",

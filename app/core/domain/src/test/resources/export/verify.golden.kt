@@ -49,7 +49,9 @@
 //   R.drawable.search_bar
 //   R.drawable.select
 //   R.drawable.send
+//   R.drawable.settings
 //   R.drawable.share
+//   R.drawable.sort
 //   R.drawable.star
 //   R.drawable.top
 //   R.drawable.touch_app
@@ -97,6 +99,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -112,6 +116,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CheckableDropdownMenuItem
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CircularWavyProgressIndicator
@@ -138,6 +143,7 @@ import androidx.compose.material3.FilledTonalIconToggleButton
 import androidx.compose.material3.FilledTonalToggleButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FlexibleBottomAppBar
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.FloatingActionButtonMenu
@@ -177,6 +183,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedToggleButton
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.Scaffold
@@ -185,11 +192,13 @@ import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.SearchBarValue
 import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.SegmentedListItem
+import androidx.compose.material3.SelectableDropdownMenuItem
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.ShortNavigationBar
 import androidx.compose.material3.ShortNavigationBarArrangement
 import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -198,6 +207,7 @@ import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -210,9 +220,11 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.material3.Typography
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.VerticalFloatingToolbar
+import androidx.compose.material3.VerticalSlider
 import androidx.compose.material3.WideNavigationRail
 import androidx.compose.material3.WideNavigationRailItem
 import androidx.compose.material3.WideNavigationRailValue
@@ -227,6 +239,7 @@ import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.material3.rememberContainedSearchBarState
 import androidx.compose.material3.rememberSearchBarWithGapState
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.material3.toShape
@@ -245,8 +258,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -2035,12 +2050,29 @@ fun InputsScreen(
               checked = switchOnChecked,
               onCheckedChange = { switchOnChecked = it },
               modifier = Modifier.semantics { contentDescription = "Wi-Fi" },
+              thumbContent = {
+                Icon(
+                  painterResource(if (switchOnChecked) R.drawable.check else R.drawable.close),
+                  contentDescription = null,
+                  modifier = Modifier.size(SwitchDefaults.IconSize),
+                )
+              },
             )
             var switchOffChecked by remember { mutableStateOf(false) }
             Switch(
               checked = switchOffChecked,
               onCheckedChange = { switchOffChecked = it },
               modifier = Modifier.semantics { contentDescription = "Bluetooth" },
+              thumbContent =
+                if (switchOffChecked) {
+                  {
+                    Icon(
+                      painterResource(R.drawable.check),
+                      contentDescription = null,
+                      modifier = Modifier.size(SwitchDefaults.IconSize),
+                    )
+                  }
+                } else null,
             )
             TooltipBox(
               positionProvider =
@@ -2077,6 +2109,20 @@ fun InputsScreen(
               Text("Unchecked")
             }
           }
+          var checkPartialChecked by remember { mutableStateOf(false) }
+          var checkPartialIndeterminate by remember { mutableStateOf(true) }
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            TriStateCheckbox(
+              state =
+                if (checkPartialIndeterminate) ToggleableState.Indeterminate
+                else if (checkPartialChecked) ToggleableState.On else ToggleableState.Off,
+              onClick = {
+                checkPartialChecked = checkPartialIndeterminate || !checkPartialChecked
+                checkPartialIndeterminate = false
+              },
+            )
+            Text("Partly")
+          }
           var sliderValue by remember { mutableFloatStateOf(40f) }
           Slider(
             value = sliderValue,
@@ -2092,6 +2138,73 @@ fun InputsScreen(
             valueRange = 0f..100f,
             steps = 9,
           )
+          val sliderCenteredState = rememberSliderState(value = 0f, trackRange = -50f..50f)
+          Slider(
+            state = sliderCenteredState,
+            onValueChange = { sliderCenteredState.value = it },
+            modifier = Modifier.fillMaxWidth(),
+            track = { SliderDefaults.CenteredTrack(sliderState = it) },
+          )
+          val sliderVerticalState = rememberSliderState(value = 60f, trackRange = 0f..100f)
+          VerticalSlider(
+            state = sliderVerticalState,
+            onValueChange = { sliderVerticalState.value = it },
+            modifier = Modifier.height(200.dp),
+          )
+          var radioGroupSelected by remember { mutableStateOf("radio_medium") }
+          Column(modifier = Modifier.fillMaxWidth().selectableGroup()) {
+            Row(
+              modifier =
+                Modifier.fillMaxWidth()
+                  .heightIn(min = 48.dp)
+                  .selectable(
+                    selected = radioGroupSelected == "radio_small",
+                    role = Role.RadioButton,
+                    onClick = { radioGroupSelected = "radio_small" },
+                  ),
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              RadioButton(selected = radioGroupSelected == "radio_small", onClick = null)
+              Text("Small")
+            }
+            Row(
+              modifier =
+                Modifier.fillMaxWidth()
+                  .heightIn(min = 48.dp)
+                  .selectable(
+                    selected = radioGroupSelected == "radio_medium",
+                    role = Role.RadioButton,
+                    onClick = {
+                      radioGroupSelected = "radio_medium"
+                      coroutineScope.launch { searchBarSearchState.animateToCollapsed() }
+                      coroutineScope.launch { searchDockedSearchState.animateToCollapsed() }
+                      coroutineScope.launch { tipPlainTooltipState.dismiss() }
+                      coroutineScope.launch { tipRichTooltipState.dismiss() }
+                    },
+                  ),
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              RadioButton(selected = radioGroupSelected == "radio_medium", onClick = null)
+              Text("Medium")
+            }
+            Row(
+              modifier =
+                Modifier.fillMaxWidth()
+                  .heightIn(min = 48.dp)
+                  .selectable(
+                    selected = radioGroupSelected == "radio_large",
+                    role = Role.RadioButton,
+                    onClick = { radioGroupSelected = "radio_large" },
+                  ),
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              RadioButton(selected = radioGroupSelected == "radio_large", onClick = null)
+              Text("Large")
+            }
+          }
           Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -2417,6 +2530,7 @@ fun OverlaysScreen(
   var showSheet by remember { mutableStateOf(false) }
   var showDialog by remember { mutableStateOf(false) }
   var showMenu by remember { mutableStateOf(false) }
+  var showMenuVibrant by remember { mutableStateOf(false) }
   val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
   val atLeastMedium =
     windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
@@ -2610,6 +2724,89 @@ fun OverlaysScreen(
         TextButton(onClick = { onNavigateToFabs() }) { Text("All floating action buttons") }
         TextButton(onClick = { onNavigateToCollections() }) { Text("Tabs and carousels") }
         TextButton(onClick = { onNavigateToFeedback() }) { Text("Side sheet, snackbar, badges") }
+        Box {
+          IconButton(
+            onClick = { showMenuVibrant = true },
+            colors =
+              IconButtonDefaults.iconButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+              ),
+          ) {
+            Icon(painterResource(R.drawable.sort), contentDescription = "Sort and filter")
+          }
+          var menuGroupSortSelected by remember { mutableStateOf("menu_sort_newest") }
+          var menuUnreadChecked by remember { mutableStateOf(true) }
+          var menuStarredChecked by remember { mutableStateOf(false) }
+          DropdownMenuPopup(
+            expanded = showMenuVibrant,
+            onDismissRequest = { showMenuVibrant = false },
+          ) {
+            DropdownMenuGroup(
+              shapes = MenuDefaults.groupShape(0, 3),
+              containerColor = MenuDefaults.groupVibrantContainerColor,
+            ) {
+              SelectableDropdownMenuItem(
+                selected = menuGroupSortSelected == "menu_sort_newest",
+                onClick = {
+                  menuGroupSortSelected = "menu_sort_newest"
+                  showMenuVibrant = false
+                  showMenuVibrant = false
+                },
+                text = { Text("Newest") },
+                shapes = MenuDefaults.itemShape(0, 2),
+                colors = MenuDefaults.selectableItemVibrantColors(),
+              )
+              SelectableDropdownMenuItem(
+                selected = menuGroupSortSelected == "menu_sort_oldest",
+                onClick = {
+                  menuGroupSortSelected = "menu_sort_oldest"
+                  showMenuVibrant = false
+                },
+                text = { Text("Oldest") },
+                shapes = MenuDefaults.itemShape(1, 2),
+                colors = MenuDefaults.selectableItemVibrantColors(),
+              )
+            }
+            Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+            DropdownMenuGroup(
+              shapes = MenuDefaults.groupShape(1, 3),
+              containerColor = MenuDefaults.groupVibrantContainerColor,
+            ) {
+              CheckableDropdownMenuItem(
+                checked = menuUnreadChecked,
+                onCheckedChange = { menuUnreadChecked = it },
+                text = { Text("Unread") },
+                shapes = MenuDefaults.itemShape(0, 2),
+                colors = MenuDefaults.selectableItemVibrantColors(),
+              )
+              CheckableDropdownMenuItem(
+                checked = menuStarredChecked,
+                onCheckedChange = { menuStarredChecked = it },
+                text = { Text("Starred") },
+                shapes = MenuDefaults.itemShape(1, 2),
+                colors = MenuDefaults.selectableItemVibrantColors(),
+              )
+            }
+            Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+            DropdownMenuGroup(
+              shapes = MenuDefaults.groupShape(2, 3),
+              containerColor = MenuDefaults.groupVibrantContainerColor,
+            ) {
+              DropdownMenuItem(
+                text = { Text("Settings") },
+                onClick = {
+                  showMenuVibrant = false
+                  showMenuVibrant = false
+                },
+                shape = MenuDefaults.itemShape(0, 1).shape,
+                leadingIcon = {
+                  Icon(painterResource(R.drawable.settings), contentDescription = null)
+                },
+                colors = MenuDefaults.itemVibrantColors(),
+              )
+            }
+          }
+        }
       }
     }
   }
@@ -2836,6 +3033,40 @@ fun CollectionsScreen(
         },
         scrollBehavior = scrollBehavior,
       )
+    },
+    bottomBar = {
+      FlexibleBottomAppBar(
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+      ) {
+        IconButton(
+          onClick = {},
+          colors =
+            IconButtonDefaults.iconButtonColors(
+              contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        ) {
+          Icon(painterResource(R.drawable.edit), contentDescription = "Edit")
+        }
+        IconButton(
+          onClick = {},
+          colors =
+            IconButtonDefaults.iconButtonColors(
+              contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        ) {
+          Icon(painterResource(R.drawable.share), contentDescription = "Share")
+        }
+        IconButton(
+          onClick = {},
+          colors =
+            IconButtonDefaults.iconButtonColors(
+              contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        ) {
+          Icon(painterResource(R.drawable.more_vert), contentDescription = "More")
+        }
+      }
     },
   ) { innerPadding ->
     Column(

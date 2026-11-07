@@ -841,6 +841,169 @@ internal val componentCases: List<ComponentCase> =
       reject = listOf("rootSelected"),
     ),
     // Inputs
+    // Radio buttons, indeterminate checkboxes, switch icons, centered and vertical sliders
+    case(
+      "RadioGroup",
+      "RadioButton",
+      components =
+        listOf(
+          """{"id":"root","component":"RadioGroup","children":["a","b"]}""",
+          """{"id":"a","component":"RadioButton","label":"Small"}""",
+          """{"id":"b","component":"RadioButton","label":"Large","selected":true,"action":{"functionCall":{"@call":"back"}}}""",
+        ),
+      expect =
+        listOf(
+          "var rootSelected by remember { mutableStateOf(\"b\") }",
+          "Column(modifier = modifier.fillMaxWidth().selectableGroup())",
+          "Row(",
+          "heightIn(min = 48.dp)",
+          "selectable(selected = rootSelected == \"a\"",
+          "role = Role.RadioButton",
+          "onClick = { rootSelected = \"a\" }",
+          "rootSelected = \"b\"",
+          "onBack()",
+          "RadioButton(selected = rootSelected == \"a\", onClick = null)",
+          "horizontalArrangement = Arrangement.spacedBy(12.dp)",
+          "Text(\"Small\")",
+        ),
+      reject = listOf("var aSelected"),
+    ),
+    case(
+      "DockedToolbar",
+      components =
+        listOf(
+          """{"id":"root","component":"Scaffold","bottomBar":"x","content":"c"}""",
+          """{"id":"x","component":"DockedToolbar","colors":"vibrant","children":["i"]}""",
+          """{"id":"i","component":"IconButton","icon":"edit","contentDescription":"Edit"}""",
+          """{"id":"c","component":"Column","children":[]}""",
+        ),
+      expect =
+        listOf(
+          "bottomBar = {",
+          "FlexibleBottomAppBar(",
+          "containerColor = MaterialTheme.colorScheme.primaryContainer",
+          "contentColor = MaterialTheme.colorScheme.onPrimaryContainer",
+        ),
+    ),
+    case(
+      "DockedToolbar",
+      components =
+        listOf(
+          """{"id":"root","component":"Scaffold","bottomBar":"x","content":"c"}""",
+          """{"id":"x","component":"DockedToolbar","children":[]}""",
+          """{"id":"c","component":"Column","children":[]}""",
+        ),
+      expect = listOf("bottomBar = { FlexibleBottomAppBar {} }"),
+      reject = listOf("containerColor", "HorizontalFloatingToolbar"),
+    ),
+    case(
+      "Switch",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"Switch","checked":true,"icons":"both"}""",
+        ),
+      expect =
+        listOf(
+          "thumbContent = {",
+          "painterResource(if (xChecked) R.drawable.check else R.drawable.close)",
+          "Modifier.size(SwitchDefaults.IconSize)",
+        ),
+    ),
+    case(
+      "Switch",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"Switch","icons":"selected"}""",
+        ),
+      expect = listOf("thumbContent = if (xChecked) {", "R.drawable.check"),
+      reject = listOf("R.drawable.close"),
+    ),
+    case(
+      "Checkbox",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"Checkbox","indeterminate":true,"label":"All"}""",
+        ),
+      expect =
+        listOf(
+          "var xIndeterminate by remember { mutableStateOf(true) }",
+          "TriStateCheckbox(",
+          "state = if (xIndeterminate) ToggleableState.Indeterminate else if (xChecked) ToggleableState.On else ToggleableState.Off",
+          "xChecked = xIndeterminate || !xChecked",
+          "xIndeterminate = false",
+        ),
+      reject = listOf("Checkbox(checked"),
+    ),
+    case(
+      "Slider",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"Slider","variant":"centered","value":0,"range":[-1,1]}""",
+        ),
+      expect =
+        listOf(
+          "val xState = rememberSliderState(value = 0f, trackRange = -1f..1f)",
+          "Slider(state = xState, onValueChange = { xState.value = it }",
+          "track = { SliderDefaults.CenteredTrack(sliderState = it) }",
+        ),
+    ),
+    case(
+      "Slider",
+      components =
+        listOf(
+          ROOT_COLUMN,
+          """{"id":"x","component":"Slider","orientation":"vertical","value":0.5}""",
+        ),
+      expect =
+        listOf(
+          "val xState = rememberSliderState(value = 0.5f)",
+          "VerticalSlider(",
+          "state = xState",
+          "VerticalSlider(state = xState, onValueChange = { xState.value = it }, modifier = Modifier.height(200.dp))",
+        ),
+      reject = listOf("CenteredTrack"),
+    ),
+    case(
+      "Menu",
+      "MenuGroup",
+      "MenuItem",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","colors":"vibrant","items":["g1","g2"]}""",
+          """{"id":"g1","component":"MenuGroup","items":["s1","s2"]}""",
+          """{"id":"g2","component":"MenuGroup","items":["k1","a1"]}""",
+          """{"id":"s1","component":"MenuItem","label":"Newest","role":"single","selected":true}""",
+          """{"id":"s2","component":"MenuItem","label":"Oldest","role":"single"}""",
+          """{"id":"k1","component":"MenuItem","label":"Unread","role":"multi","selected":true}""",
+          """{"id":"a1","component":"MenuItem","label":"Settings","icon":"settings"}""",
+        ),
+      expect =
+        listOf(
+          "var g1Selected by remember { mutableStateOf(\"s1\") }",
+          "var k1Checked by remember { mutableStateOf(true) }",
+          "shapes = MenuDefaults.groupShape(0, 2)",
+          "shapes = MenuDefaults.groupShape(1, 2)",
+          "Spacer(Modifier.height(MenuDefaults.GroupSpacing))",
+          "containerColor = MenuDefaults.groupVibrantContainerColor",
+          "SelectableDropdownMenuItem(",
+          "selected = g1Selected == \"s1\"",
+          "onClick = { g1Selected = \"s1\" showM = false }",
+          "shapes = MenuDefaults.itemShape(0, 2)",
+          "colors = MenuDefaults.selectableItemVibrantColors()",
+          "CheckableDropdownMenuItem(",
+          "checked = k1Checked",
+          "onCheckedChange = { k1Checked = it }",
+          "DropdownMenuItem(",
+          "colors = MenuDefaults.itemVibrantColors()",
+        ),
+      reject = listOf("surfaceContainer", "k1Checked = it showM"),
+    ),
     case(
       "Switch",
       components = listOf(ROOT_COLUMN, """{"id":"x","component":"Switch","checked":true}"""),

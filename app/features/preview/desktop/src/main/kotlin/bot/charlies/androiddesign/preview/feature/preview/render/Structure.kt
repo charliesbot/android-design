@@ -14,6 +14,7 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FlexibleBottomAppBar
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.LargeFlexibleTopAppBar
@@ -412,6 +413,29 @@ internal fun RenderFloatingToolbar(ctx: NodeContext) {
           },
         )
       }
+    }
+  }
+}
+
+private fun NodeContext.dockedToolbarAmbient() = floatingToolbarAmbient()
+
+internal fun NodeContext.dockedToolbarLook() = Look(dockedToolbarAmbient(), shape = "none")
+
+/**
+ * The docked toolbar at the bottom of the window: `FlexibleBottomAppBar`, standard in surface
+ * container and vibrant in primary container, as the floating toolbar is.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun RenderDockedToolbar(ctx: NodeContext) {
+  val ambient = ctx.dockedToolbarAmbient()
+  CompositionLocalProvider(LocalAmbient provides ambient) {
+    FlexibleBottomAppBar(
+      modifier = ctx.modifier(),
+      containerColor = ctx.env.color(ambient.container),
+      contentColor = ctx.env.color(ambient.content),
+    ) {
+      ctx.Children("children", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, row = this))
     }
   }
 }
