@@ -410,14 +410,23 @@ internal abstract class ScreenEmitterBase(
    * `var name by remember { mutableStateOf(value) }`; [factory] is `mutableStateOf`,
    * `mutableFloatStateOf` or `mutableIntStateOf`.
    */
-  fun stateVar(name: String, value: String, factory: String = Sym.mutableStateOf): Stmt {
+  fun stateVar(
+    name: String,
+    value: String,
+    factory: String = Sym.mutableStateOf,
+    key: String? = null,
+  ): Stmt {
     file.use(Sym.getValue)
     file.use(Sym.setValue)
     val state = file.use(factory)
     return Assign(
       "var $name",
       "by",
-      Call(file.use(Sym.remember), lambda = lambda(stmt(Raw("$state($value)")))),
+      Call(
+        file.use(Sym.remember),
+        listOfNotNull(key?.let(::pos)),
+        lambda(stmt(Raw("$state($value)"))),
+      ),
     )
   }
 

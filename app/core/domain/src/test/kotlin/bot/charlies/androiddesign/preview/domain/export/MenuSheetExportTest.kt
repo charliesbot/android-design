@@ -48,7 +48,7 @@ class MenuSheetExportTest {
     val source = templatedRole("single")
     has(
       source,
-      "var oPicked by remember { mutableIntStateOf(plates.indexOfFirst { plate -> plate.on }) }",
+      "var oPicked by remember(plates) { mutableIntStateOf(plates.indexOfFirst { plate -> plate.on }) }",
     )
     has(source, "SelectableDropdownMenuItem( selected = oPicked == index,")
     has(source, "onClick = { oPicked = index")
@@ -60,7 +60,7 @@ class MenuSheetExportTest {
     val source = templatedRole("multi")
     has(
       source,
-      "val itemChecked = remember { plates.map { plate -> plate.on }.toMutableStateList() }",
+      "val itemChecked = remember(plates) { plates.map { plate -> plate.on }.toMutableStateList() }",
     )
     has(source, "CheckableDropdownMenuItem( checked = itemChecked[index], onCheckedChange = {")
     has(source, "itemChecked[index] = it")
@@ -155,7 +155,7 @@ class MenuSheetExportTest {
     has(source, "section.opts.forEachIndexed { index2, opt ->")
     has(
       source,
-      "val itemChecked = remember { sections.map { section -> section.opts.map { opt -> opt.on }.toMutableStateList() } }",
+      "val itemChecked = remember(sections) { sections.map { section -> section.opts.map { opt -> opt.on }.toMutableStateList() } }",
     )
     has(source, "checked = itemChecked[index][index2]")
     has(source, "itemChecked[index][index2] = it")
@@ -170,7 +170,7 @@ class MenuSheetExportTest {
       )
     has(
       source,
-      "val gPicked = remember { sections.map { section -> section.opts.indexOfFirst { opt -> opt.on } }.toMutableStateList() }",
+      "val gPicked = remember(sections) { sections.map { section -> section.opts.indexOfFirst { opt -> opt.on } }.toMutableStateList() }",
     )
     has(source, "selected = gPicked[index] == index2")
     has(source, "gPicked[index] = index2")
@@ -187,11 +187,11 @@ class MenuSheetExportTest {
       )
     has(
       source,
-      "val gSelected = remember { sections.map { _ -> \"s1\" }.toMutableStateList() }",
+      "val gSelected = remember(sections) { sections.map { _ -> \"s1\" }.toMutableStateList() }",
     )
     has(source, "selected = gSelected[index] == \"s1\"")
     has(source, "gSelected[index] = \"s2\"")
-    has(source, "val kChecked = remember { sections.map { section ->")
+    has(source, "val kChecked = remember(sections) { sections.map { section ->")
     has(source, "checked = kChecked[index]")
   }
 }

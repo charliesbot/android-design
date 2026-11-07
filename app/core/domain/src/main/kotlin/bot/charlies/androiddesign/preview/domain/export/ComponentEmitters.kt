@@ -2299,14 +2299,14 @@ private fun lambdaParam(variable: String, body: String) =
   if (Regex("\\b${Regex.escape(variable)}\\b").containsMatchIn(body)) variable else "_"
 
 /**
- * `remember { [value] }` bound to the plain `val` [name]: state that is a collection, not a
- * delegate.
+ * `remember([key]) { [value] }` bound to the plain `val` [name]: state that is a collection, not a
+ * delegate. It holds an entry for each row of the list [key] names, so a new list rebuilds it.
  */
-private fun ScreenEmitter.rememberedVal(name: String, value: String): Stmt =
+private fun ScreenEmitter.rememberedVal(name: String, key: String, value: String): Stmt =
   Assign(
     "val $name",
     "=",
-    Call(file.use(Sym.remember), lambda = lambda(stmt(Raw(value)))),
+    Call(file.use(Sym.remember), listOf(pos(key)), lambda(stmt(Raw(value)))),
   )
 
 /**
@@ -2338,6 +2338,8 @@ private fun ScreenEmitter.menuState(menu: ComponentNode, unit: ComponentNode): L
   fun perGroupRow(element: String) = groupRows?.let { g ->
     "${g.list.expr}.map { ${lambdaParam(g.scope.variable, element)} -> $element }"
   }
+  // The list the state has an entry per row of, which a new list must rebuild it for.
+  val groupKey = groupRows?.list?.expr
   val declarations = mutableListOf<Stmt>()
   if (items.any { MenuSpec.Role.Single in menuRoles(it) }) {
     if (itemRows != null) {
@@ -2356,9 +2358,9 @@ private fun ScreenEmitter.menuState(menu: ComponentNode, unit: ComponentNode): L
       val name = stateName(unit.id, "Picked")
       declarations +=
         if (groupRows == null) {
-          stateVar(name, row, Sym.mutableIntStateOf)
+          stateVar(name, row, Sym.mutableIntStateOf, key = itemRows.list.expr)
         } else {
-          rememberedVal(name, perGroupRow(row) + toState)
+          rememberedVal(name, groupRows.list.expr, perGroupRow(row) + toState)
         }
     } else {
       val initial =
@@ -2369,7 +2371,11 @@ private fun ScreenEmitter.menuState(menu: ComponentNode, unit: ComponentNode): L
         if (groupRows == null) {
           state(unit, "Selected", initial).second
         } else {
-          rememberedVal(stateName(unit.id, "Selected"), perGroupRow(initial) + toState)
+          rememberedVal(
+            stateName(unit.id, "Selected"),
+            groupRows.list.expr,
+            perGroupRow(initial) + toState,
+          )
         }
     }
   }
@@ -2386,9 +2392,9 @@ private fun ScreenEmitter.menuState(menu: ComponentNode, unit: ComponentNode): L
           itemRows != null -> {
             val row =
               "${itemRows.list.expr}.map { ${lambdaParam(itemRows.scope.variable, checked)} -> $checked }$toState"
-            rememberedVal(name, perGroupRow(row) ?: row)
+            rememberedVal(name, groupKey ?: itemRows.list.expr, perGroupRow(row) ?: row)
           }
-          groupRows != null -> rememberedVal(name, perGroupRow(checked) + toState)
+          groupKey != null -> rememberedVal(name, groupKey, perGroupRow(checked) + toState)
           else -> state(item, "Checked", checked).second
         }
     }
