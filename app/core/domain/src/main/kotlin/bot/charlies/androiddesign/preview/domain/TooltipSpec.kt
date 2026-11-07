@@ -11,6 +11,15 @@ object TooltipSpec {
   /** The gap between a rich tooltip's text buttons, which sit side by side. */
   const val ACTION_GAP_DP = 8f
 
+  /** The tooltip kinds, by the `variant` wire names the catalog lists. */
+  enum class Variant(val wire: String) {
+    Plain("plain"),
+    Rich("rich"),
+  }
+
+  /** The variant named [wire], or null when it names none. */
+  fun variant(wire: String): Variant? = Variant.entries.firstOrNull { it.wire == wire }
+
   /** The side of its anchor a tooltip opens on; [compose] names the `TooltipAnchorPosition`. */
   enum class Side(val compose: String) {
     Above("Above"),

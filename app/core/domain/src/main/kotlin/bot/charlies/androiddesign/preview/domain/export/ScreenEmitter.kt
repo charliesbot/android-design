@@ -4,7 +4,10 @@ import bot.charlies.androiddesign.preview.domain.CarouselItemGate
 import bot.charlies.androiddesign.preview.domain.CarouselSpec
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.SearchBars
+import bot.charlies.androiddesign.preview.domain.TooltipSpec
 import bot.charlies.androiddesign.preview.domain.layout.growsSemanticsBounds
+import bot.charlies.androiddesign.preview.domain.node.ChildItems
+import bot.charlies.androiddesign.preview.domain.node.childItems
 import bot.charlies.androiddesign.preview.model.CarouselItemSize
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.DesignSystem
@@ -14,7 +17,6 @@ import bot.charlies.androiddesign.preview.model.PropKind
 import bot.charlies.androiddesign.preview.model.Screen
 import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.SizeClass
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -78,25 +80,6 @@ internal sealed interface IconName {
 
   class Bound(val expr: String, val names: Set<String>) : IconName
 }
-
-/** The value of a `ChildList` prop: listed component ids, or a template over a data array. */
-internal sealed interface ChildItems {
-  class Listed(val ids: List<String>) : ChildItems
-
-  class Template(val componentId: String, val path: String) : ChildItems
-}
-
-/** This prop value as [ChildItems], or null when it is neither a list nor a complete template. */
-internal fun JsonElement?.childItems(): ChildItems? =
-  when (this) {
-    is JsonArray -> ChildItems.Listed(mapNotNull { (it as? JsonPrimitive)?.content })
-    is JsonObject -> {
-      val componentId = (this["componentId"] as? JsonPrimitive)?.content
-      val path = (this["path"] as? JsonPrimitive)?.content
-      if (componentId != null && path != null) ChildItems.Template(componentId, path) else null
-    }
-    else -> null
-  }
 
 /** What a component needs to know about where it is emitted. */
 internal data class Place(
@@ -281,7 +264,8 @@ internal class ScreenEmitter(
     val persistent =
       SizeClass.entries.any { size ->
         val p = effectiveProps(tooltip, size)
-        p.choice("Tooltip", "variant") == "rich" && hasChildren(p, "actions")
+        p.reader("Tooltip").enum("variant", TooltipSpec::variant) == TooltipSpec.Variant.Rich &&
+          hasChildren(p, "actions")
       }
     return Assign(
       "val ${tooltipState(tooltip.id)}",
@@ -501,10 +485,7 @@ internal class ScreenEmitter(
 
   /** A number prop of [component]: its sample value as the previewer reads it, else its default. */
   fun JsonObject.number(component: String, key: String, place: Place): Double =
-    sampleNumber(component, key, place)
-      ?: checkNotNull(catalogDefault(component, key)?.toDoubleOrNull()) {
-        "$component.$key has no default"
-      }
+    sampleReader(component, place).numberOrDefault(key)
 
   /** A boolean prop of [component]: the stated literal, else its catalog default. */
   fun JsonObject.option(component: String, key: String): Boolean =

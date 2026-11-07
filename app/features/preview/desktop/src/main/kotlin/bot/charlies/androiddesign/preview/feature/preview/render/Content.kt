@@ -176,8 +176,8 @@ internal fun RenderCarousel(ctx: NodeContext) {
   val state = rememberCarouselState { refs.size }
   val items = ctx.carouselItems(refs)
   val itemWidth = ctx.numberOrDefault("itemWidth").dp
-  when (ctx.enum("variant")) {
-    "centered-hero" ->
+  when (ctx.reader.enum("variant", CarouselSpec::variant)) {
+    CarouselSpec.Variant.CenteredHero ->
       HorizontalCenteredHeroCarousel(
         state = state,
         modifier = ctx.modifier(),
@@ -185,7 +185,7 @@ internal fun RenderCarousel(ctx: NodeContext) {
         contentPadding = CarouselPadding,
         content = items,
       )
-    "uncontained" ->
+    CarouselSpec.Variant.Uncontained ->
       HorizontalUncontainedCarousel(
         state = state,
         itemWidth = itemWidth,
@@ -195,7 +195,7 @@ internal fun RenderCarousel(ctx: NodeContext) {
         contentPadding = CarouselPadding,
         content = items,
       )
-    "hero" ->
+    CarouselSpec.Variant.Hero ->
       BoxWithConstraints(ctx.modifier()) {
         HorizontalMultiBrowseCarousel(
           state = state,
@@ -206,7 +206,7 @@ internal fun RenderCarousel(ctx: NodeContext) {
           content = items,
         )
       }
-    "full-screen" ->
+    CarouselSpec.Variant.FullScreen ->
       BoxWithConstraints(ctx.modifier()) {
         HorizontalUncontainedCarousel(
           state = state,
@@ -217,7 +217,7 @@ internal fun RenderCarousel(ctx: NodeContext) {
           content = items,
         )
       }
-    else ->
+    CarouselSpec.Variant.MultiBrowse ->
       HorizontalMultiBrowseCarousel(
         state = state,
         preferredItemWidth = itemWidth,

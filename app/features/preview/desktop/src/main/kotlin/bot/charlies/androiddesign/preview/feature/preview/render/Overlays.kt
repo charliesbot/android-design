@@ -61,6 +61,7 @@ import bot.charlies.androiddesign.preview.domain.FullScreenSpec
 import bot.charlies.androiddesign.preview.domain.MenuSpec
 import bot.charlies.androiddesign.preview.domain.SideSheetSpec
 import bot.charlies.androiddesign.preview.domain.TooltipSpec
+import bot.charlies.androiddesign.preview.domain.node.PropReader
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.TypeRole
 
@@ -541,8 +542,12 @@ private val LocalTooltipScope = compositionLocalOf<TooltipScope?> { null }
 private val PlainTooltipAmbient = Ambient(ColorRole.InverseSurface, ColorRole.InverseOnSurface)
 private val RichTooltipAmbient = Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurfaceVariant)
 
+/** Whether this tooltip is a rich one. */
+private fun NodeContext.isRichTooltip(): Boolean =
+  reader.enum("variant", TooltipSpec::variant) == TooltipSpec.Variant.Rich
+
 internal fun NodeContext.tooltipLook(): Look =
-  if (enum("variant") == "rich") {
+  if (isRichTooltip()) {
     Look(RichTooltipAmbient, TypeRole.BodyMedium, "medium", string("text"))
   } else {
     Look(PlainTooltipAmbient, TypeRole.BodySmall, "extraSmall", string("text"))
@@ -580,11 +585,13 @@ internal fun TooltipAnchor(
     }
   }
   // The variant at this width: the overrides over the prop, else the catalog default.
-  val variant = node?.let {
-    Props(effectiveProps(it, env), scope).string("variant")
-      ?: env.catalog.find(it.component)?.defaultOf("variant")?.content
-  }
-  val rich = variant == "rich"
+  val rich =
+    node?.let {
+      val def = env.catalog.find(it.component) ?: return@let false
+      val props = Props(effectiveProps(it, env), scope)
+      PropReader(def, props::value).enum("variant", TooltipSpec::variant) ==
+        TooltipSpec.Variant.Rich
+    } == true
   val side = env.placement.tooltipSide(tooltipId, rich) ?: TooltipSpec.Side.Above
   val hasAction =
     node?.let { Props(effectiveProps(it, env), scope).children("actions").isNotEmpty() } == true
@@ -622,7 +629,7 @@ internal fun TooltipAnchor(
 internal fun RenderTooltip(ctx: NodeContext) {
   val scope = LocalTooltipScope.current ?: return
   val text = ctx.string("text").orEmpty()
-  if (ctx.enum("variant") != "rich") {
+  if (!ctx.isRichTooltip()) {
     with(scope) { PlainTooltip(modifier = ctx.modifier()) { ctx.PartText(text, "text") } }
     return
   }

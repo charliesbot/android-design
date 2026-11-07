@@ -1,7 +1,7 @@
 package bot.charlies.androiddesign.preview.domain
 
-import bot.charlies.androiddesign.preview.domain.export.ChildItems
-import bot.charlies.androiddesign.preview.domain.export.childItems
+import bot.charlies.androiddesign.preview.domain.node.ChildItems
+import bot.charlies.androiddesign.preview.domain.node.childItems
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.SizeClass
 

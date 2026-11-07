@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import bot.charlies.androiddesign.preview.domain.CarouselItemGate
 import bot.charlies.androiddesign.preview.domain.layout.growsSemanticsBounds
+import bot.charlies.androiddesign.preview.domain.node.PropReader
 import bot.charlies.androiddesign.preview.feature.preview.record.NodeMeta
 import bot.charlies.androiddesign.preview.feature.preview.record.TextReport
 import bot.charlies.androiddesign.preview.feature.preview.render.wear.LocalWearAmbient
@@ -48,8 +49,6 @@ import bot.charlies.androiddesign.preview.model.StyleDef
 import bot.charlies.androiddesign.preview.model.TypeRole
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.float
 
 /** A node's named style, read from `material.styles`. Explicit props win over it. */
 internal class ResolvedStyle(
@@ -89,11 +88,14 @@ internal class NodeContext(
 
   fun string(key: String) = props.string(key)
 
+  /** This node's props read with their catalog defaults and bounds. */
+  val reader: PropReader = PropReader(def, props::value)
+
   /** A boolean prop: its value, else the catalog default, else false. */
-  fun bool(key: String): Boolean = props.bool(key) ?: def.defaultOf(key)?.booleanOrNull ?: false
+  fun bool(key: String): Boolean = reader.bool(key)
 
   /** An enum prop: its value, else the catalog default, which every enum read here has. */
-  fun enum(key: String): String = props.string(key) ?: requiredDefault(key).content
+  fun enum(key: String): String = reader.enum(key)
 
   val primary: Boolean
     get() = bool("primary")
@@ -101,29 +103,20 @@ internal class NodeContext(
   val enabled: Boolean
     get() = bool("enabled")
 
-  private fun requiredDefault(key: String): JsonPrimitive =
-    def.defaultOf(key) ?: error("${def.name}.$key has no catalog default")
-
   /** The padding around the component: the `padding` prop, else its style. */
   val padding: Dp?
     get() = env.spacing(props.string("padding") ?: style.padding)
 
   fun spacing(key: String): Dp? = env.spacing(props.string(key))
 
-  /**
-   * A number prop, moved into the bounds the catalog gives it. A bound value skips validation, so
-   * this is what keeps one that is out of range from reaching a Compose API that throws on it.
-   */
-  fun number(key: String): Float? {
-    val value = props.float(key) ?: return null
-    return def.coerceNumber(key, value.toDouble()).toFloat()
-  }
+  /** A number prop, moved into the bounds the catalog gives it (see [PropReader.number]). */
+  fun number(key: String): Float? = reader.number(key)?.toFloat()
 
   /** A whole-number prop, moved into its bounds like [number]. */
   fun whole(key: String): Int? = number(key)?.toInt()
 
   /** A number prop with a catalog default: [number], else the default. */
-  fun numberOrDefault(key: String): Float = number(key) ?: requiredDefault(key).float
+  fun numberOrDefault(key: String): Float = reader.numberOrDefault(key).toFloat()
 
   /** A whole-number prop with a catalog default: [whole], else the default. */
   fun wholeOrDefault(key: String): Int = numberOrDefault(key).toInt()

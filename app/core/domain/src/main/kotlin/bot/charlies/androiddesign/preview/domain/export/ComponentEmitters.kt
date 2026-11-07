@@ -12,8 +12,11 @@ import bot.charlies.androiddesign.preview.domain.SideSheetSpec
 import bot.charlies.androiddesign.preview.domain.SliderSpec
 import bot.charlies.androiddesign.preview.domain.SwitchSpec
 import bot.charlies.androiddesign.preview.domain.TooltipSpec
+import bot.charlies.androiddesign.preview.domain.node.ChildItems
+import bot.charlies.androiddesign.preview.domain.node.childItems
 import bot.charlies.androiddesign.preview.model.ActionFunction
 import bot.charlies.androiddesign.preview.model.ComponentNode
+import bot.charlies.androiddesign.preview.model.M3Component
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.SizeClass
 import kotlinx.serialization.json.JsonArray
@@ -102,7 +105,7 @@ private fun ScreenEmitter.tooltipBox(
   anchor: List<Stmt>,
 ): List<Stmt> {
   experimental()
-  val rich = p.choice("Tooltip", "variant") == "rich"
+  val rich = p.reader("Tooltip").enum("variant", TooltipSpec::variant) == TooltipSpec.Variant.Rich
   val place = Place()
   val text = textOf(p.text("text", place) ?: Raw("\"\""))
   val side = checkNotNull(placement.tooltipSide(tooltip.id, rich)).compose
@@ -158,60 +161,68 @@ private fun ScreenEmitter.besideMenu(menu: ComponentNode, own: List<Stmt>): List
 }
 
 private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> =
-  when (node.component) {
-    "Column" -> column(p, place)
-    "Row" -> row(p, place)
-    "Box" -> box(p, place)
-    "Grid" -> grid(p, place)
-    "FlexBox" -> flexBox(p, place)
-    "Spacer" -> spacer(p, place)
-    "Divider" -> divider(p, place)
-    "Shape" -> shape(p, place)
-    "Text" -> textComponent(p, place)
-    "Icon" -> iconComponent(p, place)
-    "Image" -> image(node, p, place)
-    "Carousel" -> carousel(node, p, place)
-    "Scaffold" -> scaffold(node, p, place)
-    "TopAppBar" -> topAppBar(node, p, place)
-    "NavigationBar" -> navigationBar(p, place)
-    "NavigationBarItem" -> navigationItem(node, p, place, "ShortNavigationBarItem", false)
-    "Tabs" -> tabs(p, place)
-    "Tab" -> tab(node, p, place)
-    "NavigationRail" -> navigationRail(p, place)
-    "NavigationRailItem" -> navigationItem(node, p, place, "WideNavigationRailItem", true)
-    "FloatingToolbar" -> floatingToolbar(p, place)
-    "DockedToolbar" -> dockedToolbar(p, place)
-    "Card" -> card(node, p, place)
-    "List" -> list(p, place)
-    "ListItem" -> listItem(node, p, place)
-    "Button" -> button(node, p, place)
-    "ToggleButton" -> toggleButton(node, p, place)
-    "ButtonGroup" -> buttonGroup(p, place)
-    "IconButton" -> iconButton(node, p, place)
-    "SplitButton" -> splitButton(node, p, place)
-    "FloatingActionButton" -> floatingActionButton(node, p, place)
-    "FabMenu" -> fabMenu(node, p, place)
-    "FabMenuItem" -> fabMenuItem(node, p, place)
-    "AssistChip",
-    "FilterChip",
-    "InputChip",
-    "SuggestionChip" -> chip(node, p, place)
-    "ChipGroup" -> chipGroup(node, p, place)
-    "Switch" -> switch(node, p, place)
-    "Checkbox" -> checkbox(node, p, place)
-    "RadioGroup" -> radioGroup(node, p, place)
-    "RadioButton" -> radioButton(node, p, place)
-    "MenuGroup" -> menuGroup(node, p, place)
-    "Slider" -> slider(node, p, place)
-    "RangeSlider" -> rangeSlider(node, p, place)
-    "TextField" -> textField(node, p, place)
-    "SearchBar" -> searchBar(node, p, place)
-    "LoadingIndicator" -> loadingIndicator(p, place)
-    "ProgressIndicator" -> progressIndicator(p, place)
-    "MenuItem" -> menuItem(node, p, place)
-    "SearchView" -> searchView(node, p)
-    // Sheets, dialogs, menus and snackbars are written at the end of the screen.
-    else -> emptyList()
+  when (M3Component.of(node.component)) {
+    M3Component.Column -> column(p, place)
+    M3Component.Row -> row(p, place)
+    M3Component.Box -> box(p, place)
+    M3Component.Grid -> grid(p, place)
+    M3Component.FlexBox -> flexBox(p, place)
+    M3Component.Spacer -> spacer(p, place)
+    M3Component.Divider -> divider(p, place)
+    M3Component.Shape -> shape(p, place)
+    M3Component.Text -> textComponent(p, place)
+    M3Component.Icon -> iconComponent(p, place)
+    M3Component.Image -> image(node, p, place)
+    M3Component.Carousel -> carousel(node, p, place)
+    M3Component.Scaffold -> scaffold(node, p, place)
+    M3Component.TopAppBar -> topAppBar(node, p, place)
+    M3Component.NavigationBar -> navigationBar(p, place)
+    M3Component.NavigationBarItem -> navigationItem(node, p, place, "ShortNavigationBarItem", false)
+    M3Component.Tabs -> tabs(p, place)
+    M3Component.Tab -> tab(node, p, place)
+    M3Component.NavigationRail -> navigationRail(p, place)
+    M3Component.NavigationRailItem -> navigationItem(node, p, place, "WideNavigationRailItem", true)
+    M3Component.FloatingToolbar -> floatingToolbar(p, place)
+    M3Component.DockedToolbar -> dockedToolbar(p, place)
+    M3Component.Card -> card(node, p, place)
+    M3Component.List -> list(p, place)
+    M3Component.ListItem -> listItem(node, p, place)
+    M3Component.Button -> button(node, p, place)
+    M3Component.ToggleButton -> toggleButton(node, p, place)
+    M3Component.ButtonGroup -> buttonGroup(p, place)
+    M3Component.IconButton -> iconButton(node, p, place)
+    M3Component.SplitButton -> splitButton(node, p, place)
+    M3Component.FloatingActionButton -> floatingActionButton(node, p, place)
+    M3Component.FabMenu -> fabMenu(node, p, place)
+    M3Component.FabMenuItem -> fabMenuItem(node, p, place)
+    M3Component.AssistChip,
+    M3Component.FilterChip,
+    M3Component.InputChip,
+    M3Component.SuggestionChip -> chip(node, p, place)
+    M3Component.ChipGroup -> chipGroup(node, p, place)
+    M3Component.Switch -> switch(node, p, place)
+    M3Component.Checkbox -> checkbox(node, p, place)
+    M3Component.RadioGroup -> radioGroup(node, p, place)
+    M3Component.RadioButton -> radioButton(node, p, place)
+    M3Component.MenuGroup -> menuGroup(node, p, place)
+    M3Component.Slider -> slider(node, p, place)
+    M3Component.RangeSlider -> rangeSlider(node, p, place)
+    M3Component.TextField -> textField(node, p, place)
+    M3Component.SearchBar -> searchBar(node, p, place)
+    M3Component.LoadingIndicator -> loadingIndicator(p, place)
+    M3Component.ProgressIndicator -> progressIndicator(p, place)
+    M3Component.MenuItem -> menuItem(node, p, place)
+    M3Component.SearchView -> searchView(node, p)
+    // Sheets, dialogs, menus and snackbars are written at the end of the screen, and a tooltip
+    // beside its anchor.
+    M3Component.BottomSheet,
+    M3Component.Dialog,
+    M3Component.DatePicker,
+    M3Component.TimePicker,
+    M3Component.Menu,
+    M3Component.SideSheet,
+    M3Component.Tooltip,
+    M3Component.Snackbar -> emptyList()
   }
 
 // region shared pieces
@@ -585,7 +596,7 @@ private fun ScreenEmitter.image(node: ComponentNode, p: JsonObject, place: Place
 
 private fun ScreenEmitter.carousel(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   experimental()
-  val variant = p.choice("Carousel", "variant")
+  val variant = p.reader("Carousel").enum("variant", CarouselSpec::variant)
   val items =
     childrenByIndex(p, "children", place, "Carousel") {
       // maskClip is a member of the item scope, so the children clip to the carousel's shape.
@@ -624,9 +635,9 @@ private fun ScreenEmitter.carousel(node: ComponentNode, p: JsonObject, place: Pl
   val modifier = modifier(place, p)
   val body =
     when (variant) {
-      "centered-hero" ->
+      CarouselSpec.Variant.CenteredHero ->
         carousel("HorizontalCenteredHeroCarousel", modifier, gap, padding(CarouselSpec.PADDING_DP))
-      "uncontained" ->
+      CarouselSpec.Variant.Uncontained ->
         carousel(
           "HorizontalUncontainedCarousel",
           modifier,
@@ -635,7 +646,7 @@ private fun ScreenEmitter.carousel(node: ComponentNode, p: JsonObject, place: Pl
           arg("flingBehavior", "$defaults.noSnapFlingBehavior()"),
           padding(CarouselSpec.PADDING_DP),
         )
-      "hero" ->
+      CarouselSpec.Variant.Hero ->
         wrapWidth(
           modifier,
           carousel(
@@ -647,7 +658,7 @@ private fun ScreenEmitter.carousel(node: ComponentNode, p: JsonObject, place: Pl
             padding(CarouselSpec.PADDING_DP),
           ),
         )
-      "full-screen" ->
+      CarouselSpec.Variant.FullScreen ->
         wrapWidth(
           modifier,
           carousel(
@@ -659,7 +670,7 @@ private fun ScreenEmitter.carousel(node: ComponentNode, p: JsonObject, place: Pl
             padding(null),
           ),
         )
-      else ->
+      CarouselSpec.Variant.MultiBrowse ->
         carousel(
           "HorizontalMultiBrowseCarousel",
           modifier,
@@ -1985,16 +1996,24 @@ private fun ScreenEmitter.progressIndicator(p: JsonObject, place: Place): List<S
 
 // region overlays
 
-/** The statements that draw an overlay when it is not placed beside an anchor. */
+/**
+ * The statements that draw an overlay when it is not placed beside an anchor. [node] is always an
+ * overlay, so any other component is a caller bug.
+ */
 internal fun ScreenEmitter.overlayStatements(node: ComponentNode): List<Stmt> {
-  return when (node.component) {
-    "BottomSheet" -> perSize(node) { sized -> bottomSheetStatements(node, sized) }
-    "Dialog" -> perSize(node) { sized -> dialogStatements(node, sized) }
-    "DatePicker" -> perSize(node) { sized -> datePickerStatements(node, sized) }
-    "TimePicker" -> perSize(node) { sized -> timePickerStatements(node, sized) }
-    "Menu" -> menuStatements(node)
-    "SideSheet" -> perSize(node) { sized -> sideSheetStatements(node, sized) }
-    else -> emptyList()
+  return when (M3Component.of(node.component)) {
+    M3Component.BottomSheet -> perSize(node) { sized -> bottomSheetStatements(node, sized) }
+    M3Component.Dialog -> perSize(node) { sized -> dialogStatements(node, sized) }
+    M3Component.DatePicker -> perSize(node) { sized -> datePickerStatements(node, sized) }
+    M3Component.TimePicker -> perSize(node) { sized -> timePickerStatements(node, sized) }
+    M3Component.Menu -> menuStatements(node)
+    M3Component.SideSheet -> perSize(node) { sized -> sideSheetStatements(node, sized) }
+    // A search view draws inside its search bar, a tooltip beside its anchor, and a snackbar
+    // from its own statements.
+    M3Component.SearchView,
+    M3Component.Tooltip,
+    M3Component.Snackbar -> emptyList()
+    else -> error("${node.component} is not an overlay")
   }
 }
 

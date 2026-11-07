@@ -1,7 +1,8 @@
 package bot.charlies.androiddesign.preview.domain.export
 
-import bot.charlies.androiddesign.preview.domain.layout.childIds as sharedChildIds
 import bot.charlies.androiddesign.preview.domain.navigation.NavigationGraph
+import bot.charlies.androiddesign.preview.domain.node.ChildGraph
+import bot.charlies.androiddesign.preview.domain.node.PropReader
 import bot.charlies.androiddesign.preview.model.ActionFunction
 import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.ComponentNode
@@ -57,10 +58,14 @@ internal abstract class ScreenEmitterBase(
   fun JsonObject.literal(key: String): String? =
     (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
+  /** These props of [component], read with its catalog defaults and bounds. */
+  fun JsonObject.reader(component: String): PropReader = PropReader(def(component), ::get)
+
+  private fun def(component: String) =
+    checkNotNull(catalog.find(component)) { "$component is not a ${catalog.key} component" }
+
   /** An enum prop of [component]: the stated value, else its catalog default. */
-  fun JsonObject.choice(component: String, key: String): String =
-    literal(key)
-      ?: checkNotNull(catalogDefault(component, key)) { "$component.$key has no default" }
+  fun JsonObject.choice(component: String, key: String): String = reader(component).enum(key)
 
   fun JsonObject.flag(key: String): Boolean? =
     (this[key] as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toBooleanStrictOrNull()
@@ -116,14 +121,12 @@ internal abstract class ScreenEmitterBase(
    * it, a finite `Float` moved into the catalog's bounds
    * ([bot.charlies.androiddesign.preview.model.ComponentDef.coerceNumber]).
    */
-  fun JsonObject.sampleNumber(component: String, key: String, place: Scoped): Double? {
-    val value =
-      (sampleValue(key, place) as? JsonPrimitive)?.content?.toDoubleOrNull()?.takeIf {
-        it.isFinite()
-      } ?: return null
-    val def = catalog.find(component) ?: return value
-    return def.coerceNumber(key, value.toFloat().toDouble())
-  }
+  fun JsonObject.sampleNumber(component: String, key: String, place: Scoped): Double? =
+    sampleReader(component, place).number(key)
+
+  /** These props of [component] read with their sample values, as the previewer reads them. */
+  fun JsonObject.sampleReader(component: String, place: Scoped): PropReader =
+    PropReader(def(component)) { sampleValue(it, place) }
 
   /** A string prop as a Kotlin expression: a literal, a bound value, or the loop index. */
   fun JsonObject.text(key: String, place: Scoped): Expr? = textOf(this[key], place)
@@ -447,7 +450,7 @@ internal abstract class ScreenEmitterBase(
   }
 
   /** Ids of the components [node] references through child props, templates included. */
-  fun childIds(node: ComponentNode): List<String> = sharedChildIds(node, catalog)
+  fun childIds(node: ComponentNode): List<String> = ChildGraph.childIds(node, catalog)
 
   // endregion
 

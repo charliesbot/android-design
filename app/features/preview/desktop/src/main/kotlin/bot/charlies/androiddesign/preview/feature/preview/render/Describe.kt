@@ -36,7 +36,7 @@ internal class Look(
  */
 internal fun describe(ctx: NodeContext, ambient: Ambient): NodeMeta {
   val env = ctx.env
-  val look = look(ctx, ambient)
+  val look = renderKitOf(ctx.component).look(ctx, ambient)
   val label = ctx.string("label") ?: ctx.string("contentDescription") ?: look.text
   val interactive =
     ctx.def.interactive || (ctx.component in ACTION_HOSTS && ctx.props.action("action") != null)
@@ -72,68 +72,3 @@ internal fun describe(ctx: NodeContext, ambient: Ambient): NodeMeta {
 }
 
 private val ACTION_HOSTS = setOf("Card", "ListItem")
-
-/** The look of [ctx] from its family, one branch per catalog component like `RenderComponent`. */
-private fun look(ctx: NodeContext, ambient: Ambient): Look =
-  when (ctx.component) {
-    "Column",
-    "Row",
-    "Box",
-    "Grid",
-    "FlexBox",
-    "Spacer",
-    "Divider" -> ctx.layoutLook(ambient)
-    "Shape" -> ctx.shapeLook(ambient)
-    "Text" -> ctx.textLook(ambient)
-    "Icon" -> ctx.iconLook(ambient)
-    "Image" -> ctx.imageLook(ambient)
-    "Carousel" -> ctx.carouselLook(ambient)
-    "Scaffold" -> ctx.scaffoldLook()
-    "TopAppBar" -> ctx.topAppBarLook()
-    "NavigationBar" -> ctx.navigationBarLook()
-    "NavigationBarItem" -> ctx.navigationBarItemLook()
-    "Tabs" -> ctx.tabsLook()
-    "Tab" -> ctx.tabLook()
-    "NavigationRail" -> ctx.navigationRailLook()
-    "NavigationRailItem" -> ctx.navigationRailItemLook()
-    "FloatingToolbar" -> ctx.floatingToolbarLook()
-    "DockedToolbar" -> ctx.dockedToolbarLook()
-    "Card" -> ctx.cardLook()
-    "List" -> ctx.layoutLook(ambient)
-    "ListItem" -> ctx.listItemLook()
-    "Button" -> ctx.buttonLook(ambient)
-    "ToggleButton" -> ctx.toggleButtonLook(ambient)
-    "ButtonGroup" -> ctx.buttonGroupLook(ambient)
-    "IconButton" -> ctx.iconButtonLook(ambient)
-    "SplitButton" -> ctx.splitButtonLook(ambient)
-    "FloatingActionButton" -> ctx.fabLook()
-    "FabMenu" -> ctx.fabMenuLook()
-    "FabMenuItem" -> ctx.fabMenuItemLook()
-    "AssistChip",
-    "SuggestionChip" -> ctx.actionChipLook(ambient)
-    "FilterChip",
-    "InputChip" -> ctx.selectableChipLook(ambient)
-    "ChipGroup" -> ctx.chipGroupLook(ambient)
-    "Switch" -> ctx.switchLook()
-    "Checkbox" -> ctx.checkboxLook(ambient)
-    "RadioGroup" -> ctx.radioGroupLook(ambient)
-    "RadioButton" -> ctx.radioButtonLook(ambient)
-    "Slider",
-    "RangeSlider" -> ctx.sliderLook(ambient)
-    "TextField" -> ctx.textFieldLook(ambient)
-    "SearchBar" -> ctx.searchBarLook()
-    "LoadingIndicator" -> ctx.loadingIndicatorLook(ambient)
-    "ProgressIndicator" -> ctx.progressIndicatorLook(ambient)
-    "BottomSheet" -> ctx.bottomSheetLook()
-    "Dialog" -> ctx.dialogLook()
-    "DatePicker" -> ctx.datePickerLook()
-    "TimePicker" -> ctx.timePickerLook()
-    "Menu" -> ctx.menuLook()
-    "MenuGroup" -> ctx.menuGroupLook()
-    "MenuItem" -> ctx.menuItemLook()
-    "SideSheet" -> ctx.sideSheetLook()
-    "SearchView" -> ctx.searchViewLook()
-    "Tooltip" -> ctx.tooltipLook()
-    "Snackbar" -> ctx.snackbarLook()
-    else -> error("no look for ${ctx.component}")
-  }

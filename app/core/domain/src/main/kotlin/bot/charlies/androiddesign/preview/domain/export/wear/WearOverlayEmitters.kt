@@ -10,6 +10,7 @@ import bot.charlies.androiddesign.preview.domain.export.lambda
 import bot.charlies.androiddesign.preview.domain.export.lambdaOf
 import bot.charlies.androiddesign.preview.domain.export.stmt
 import bot.charlies.androiddesign.preview.model.ComponentNode
+import bot.charlies.androiddesign.preview.model.WearComponent
 import kotlinx.serialization.json.JsonObject
 
 /** The size of an `AlertDialog` icon, as the previewer draws it. */
@@ -22,10 +23,10 @@ private const val DIALOG_ICON_DP = 32f
 internal fun WearScreenEmitter.overlayStatements(node: ComponentNode): List<Stmt> {
   val p = effectiveProps(node, large = false)
   val close = lambda(Assign(overlayVar(node.id), "=", Raw("false")))
-  return when (node.component) {
-    "AlertDialog" -> alertDialog(node, p, close)
-    "ConfirmationDialog" -> confirmationDialog(node, p, close)
-    else -> emptyList()
+  return when (WearComponent.of(node.component)) {
+    WearComponent.AlertDialog -> alertDialog(node, p, close)
+    WearComponent.ConfirmationDialog -> confirmationDialog(node, p, close)
+    else -> error("${node.component} is not an overlay")
   }
 }
 

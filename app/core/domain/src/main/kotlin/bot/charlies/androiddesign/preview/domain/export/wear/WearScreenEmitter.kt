@@ -5,7 +5,6 @@ import bot.charlies.androiddesign.preview.domain.export.Arg
 import bot.charlies.androiddesign.preview.domain.export.Assign
 import bot.charlies.androiddesign.preview.domain.export.Call
 import bot.charlies.androiddesign.preview.domain.export.Chain
-import bot.charlies.androiddesign.preview.domain.export.ChildItems
 import bot.charlies.androiddesign.preview.domain.export.Decl
 import bot.charlies.androiddesign.preview.domain.export.Expr
 import bot.charlies.androiddesign.preview.domain.export.FileContext
@@ -20,12 +19,13 @@ import bot.charlies.androiddesign.preview.domain.export.ScreenEmitterBase
 import bot.charlies.androiddesign.preview.domain.export.Stmt
 import bot.charlies.androiddesign.preview.domain.export.Sym
 import bot.charlies.androiddesign.preview.domain.export.arg
-import bot.charlies.androiddesign.preview.domain.export.childItems
 import bot.charlies.androiddesign.preview.domain.export.kotlinString
 import bot.charlies.androiddesign.preview.domain.export.lambda
 import bot.charlies.androiddesign.preview.domain.export.number
 import bot.charlies.androiddesign.preview.domain.export.pos
 import bot.charlies.androiddesign.preview.domain.export.stmt
+import bot.charlies.androiddesign.preview.domain.node.ChildItems
+import bot.charlies.androiddesign.preview.domain.node.childItems
 import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.DesignSystem
