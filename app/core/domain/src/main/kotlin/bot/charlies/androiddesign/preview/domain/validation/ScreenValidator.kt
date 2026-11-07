@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.domain.validation
 
 import bot.charlies.androiddesign.preview.domain.BadgeContent
+import bot.charlies.androiddesign.preview.domain.MenuSpec
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.SearchBars
 import bot.charlies.androiddesign.preview.domain.SearchSpec
@@ -87,7 +88,7 @@ internal class ScreenValidator(
             val members = membersAt(node, "items", size) ?: return@reportBySize null
             // A menu's own items are one group; its MenuGroups are checked on their own.
             val singles = members.filter {
-              it.component == "MenuItem" && roleAt(it, size) == "single"
+              it.component == "MenuItem" && roleAt(it, size) == MenuSpec.Role.Single
             }
             if (singles.isEmpty()) return@reportBySize null
             val selected = singles.map { selectedAt(it, size) ?: return@reportBySize null }
@@ -143,8 +144,8 @@ internal class ScreenValidator(
     return (value as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toBooleanStrictOrNull()
   }
 
-  private fun roleAt(node: ComponentNode, size: SizeClass): String? =
-    (propsAt(node, size)["role"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+  private fun roleAt(node: ComponentNode, size: SizeClass): MenuSpec.Role =
+    MenuSpec.role((propsAt(node, size)["role"] as? JsonPrimitive)?.takeIf { it.isString }?.content)
 
   /** How many components a listed `ChildList` prop holds; null for a template or no value. */
   private fun listedCount(props: JsonObject, key: String): Int? =

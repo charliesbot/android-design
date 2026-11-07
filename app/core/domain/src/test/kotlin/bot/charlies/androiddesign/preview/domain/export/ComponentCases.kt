@@ -1029,7 +1029,7 @@ internal val componentCases: List<ComponentCase> =
         ),
       expect =
         listOf(
-          "var iChecked by remember { mutableStateOf(true) }",
+          "var iChecked by remember { mutableStateOf(if (!atLeastMedium) false else true) }",
           "CheckableDropdownMenuItem(",
           "DropdownMenuItem(",
         ),
@@ -1049,8 +1049,44 @@ internal val componentCases: List<ComponentCase> =
           """{"id":"a3","component":"MenuItem","label":"Three"}""",
         ),
       expect =
-        listOf("MenuDefaults.groupShape(0, 2)", "MenuDefaults.groupShape(1, 2)", "Text(\"Two\")"),
-      reject = listOf("groupShape(2", "Text(\"One\")"),
+        listOf(
+          "groupShape(0, 3)",
+          "groupShape(if (!atLeastMedium) 0 else 1, if (!atLeastMedium) 2 else 3)",
+          "groupShape(if (!atLeastMedium) 1 else 2, if (!atLeastMedium) 2 else 3)",
+          "Text(\"One\")",
+          "Text(\"Two\")",
+          "Text(\"Three\")",
+        ),
+    ),
+    case(
+      "MenuItem",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","items":["a","c"]}""",
+          """{"id":"a","component":"MenuItem","label":"A"}""",
+          """{"id":"c","component":"MenuItem","label":"C","showIn":["medium","expanded"],"action":{"functionCall":{"@call":"back"}}}""",
+        ),
+      expect =
+        listOf(
+          "itemShape(0, if (!atLeastMedium) 1 else 2)",
+          "itemShape(1, 2)",
+          "Text(\"C\")",
+          "onBack()",
+        ),
+    ),
+    case(
+      "MenuItem",
+      components =
+        listOf(
+          """{"id":"root","component":"Column","children":["b"]}""",
+          """{"id":"b","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"m"}}}}""",
+          """{"id":"m","component":"Menu","anchor":"b","items":["i"]}""",
+          """{"id":"i","component":"MenuItem","label":"Unread","role":"multi","selected":false,"sizeClass":{"medium":{"selected":true}}}""",
+        ),
+      expect =
+        listOf("var iChecked by remember { mutableStateOf(if (!atLeastMedium) false else true) }"),
     ),
     case(
       "RadioGroup",

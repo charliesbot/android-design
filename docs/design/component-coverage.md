@@ -12,9 +12,9 @@ The audit compares the 36 component pages in `sources/m3.material.io/pages/compo
 
 | Status | Components |
 |---|---|
-| Covered | Buttons, button groups (standard and connected), split button, icon buttons, FAB, extended FAB, FAB menu, app bars (except the search app bar), bottom sheets, cards, chips, divider, lists, loading indicator, navigation bar, navigation rail, progress indicators, radio buttons, text fields, toolbars (floating and docked), sliders (including centered and vertical), checkbox (including indeterminate), switch (including thumb icons), menus (groups, vibrant colors, selectable items) |
+| Covered | Tabs, search, carousel, snackbar, badges, tooltips, side sheets, buttons, button groups (standard and connected), split button, icon buttons, FAB, extended FAB, FAB menu, app bars (except the search app bar), bottom sheets, cards, chips, divider, lists, loading indicator, navigation bar, navigation rail, progress indicators, radio buttons, text fields, toolbars (floating and docked), sliders (including centered and vertical), checkbox (including indeterminate), switch (including thumb icons), menus (groups, vibrant colors, selectable items) |
 | Covered, variants missing | Dialogs (full-screen) |
-| Missing | Tabs, search, carousel, snackbar, badges, tooltips, date pickers, time pickers, side sheets |
+| Missing | Date pickers, time pickers |
 | Left out on purpose | Navigation drawer, segmented buttons |
 
 Both omissions are Material's own retirements:
