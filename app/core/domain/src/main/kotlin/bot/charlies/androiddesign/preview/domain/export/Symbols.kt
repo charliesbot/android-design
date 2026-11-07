@@ -22,6 +22,8 @@ internal object Sym {
   const val launch = "kotlinx.coroutines.launch"
   const val rememberTextFieldState = "androidx.compose.foundation.text.input.rememberTextFieldState"
 
+  const val LocalDensity = "androidx.compose.ui.platform.LocalDensity"
+
   // foundation
   const val Image = "androidx.compose.foundation.Image"
   const val BorderStroke = "androidx.compose.foundation.BorderStroke"

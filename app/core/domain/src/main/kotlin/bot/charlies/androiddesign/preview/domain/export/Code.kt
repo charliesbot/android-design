@@ -200,7 +200,7 @@ internal object CodePrinter {
       is Assign -> printWithPrefix("${stmt.lhs} ${stmt.op}", stmt.rhs, "", indent, out)
       is IfStmt -> {
         stmt.branches.forEachIndexed { i, (condition, body) ->
-          out += "${pad(indent)}${if (i == 0) "" else "} else "}if ($condition) {"
+          out += ifHead("${pad(indent)}${if (i == 0) "" else "} else "}", condition, indent)
           body.forEach { printStmt(it, indent + INDENT, out) }
         }
         if (stmt.orElse != null) {
@@ -210,6 +210,22 @@ internal object CodePrinter {
         out += "${pad(indent)}}"
       }
     }
+  }
+
+  /**
+   * The `if (condition) {` line, or lines when it does not fit: ktfmt puts the condition on its own
+   * lines and breaks it after each top-level `||`, the later operands indented a step further.
+   */
+  private fun ifHead(prefix: String, condition: String, indent: Int): List<String> {
+    val line = "${prefix}if ($condition) {"
+    val operands = condition.split(" || ")
+    if (line.length <= WIDTH || operands.size < 2) return listOf(line)
+    return listOf("${prefix}if (") +
+      operands.mapIndexed { i, operand ->
+        val lead = pad(indent + if (i == 0) INDENT else 2 * INDENT)
+        if (i < operands.lastIndex) "$lead$operand ||" else "$lead$operand"
+      } +
+      "${pad(indent)}) {"
   }
 
   /**

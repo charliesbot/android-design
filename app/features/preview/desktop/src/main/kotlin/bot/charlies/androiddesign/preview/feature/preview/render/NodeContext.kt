@@ -21,11 +21,13 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import bot.charlies.androiddesign.preview.domain.CarouselItemGate
 import bot.charlies.androiddesign.preview.domain.layout.growsSemanticsBounds
 import bot.charlies.androiddesign.preview.feature.preview.record.NodeMeta
 import bot.charlies.androiddesign.preview.feature.preview.record.TextReport
@@ -180,6 +182,18 @@ internal class NodeContext(
   }
 }
 
+/**
+ * Whether [node]'s `itemSize` lets it show on the carousel item it is in, at the item's size right
+ * now. It reads the item's size state, so the node appears and goes as the item scrolls.
+ */
+@Composable
+private fun shownOnCarouselItem(node: ComponentNode): Boolean {
+  val minimum = node.carouselItemSize ?: return true
+  val info = LocalCarouselItemDrawInfo.current ?: return true
+  val density = LocalDensity.current.density
+  return CarouselItemGate.isShown(minimum, info.size, info.maxSize, density)
+}
+
 /** The props of [node] in the frame of [env], with its size class overrides applied. */
 internal fun effectiveProps(node: ComponentNode, env: RenderEnv): JsonObject {
   val overrides = node.sizeOverridesAt(env.catalog.sizeBreakpoints, env.widthDp)
@@ -217,6 +231,7 @@ internal fun RenderNode(
   val node = env.nodes[ref.id] ?: return
   val def = env.catalog.find(node.component) ?: return
   if (!node.isShownAt(env.sizeClass)) return
+  if (!shownOnCarouselItem(node)) return
   val ctx =
     NodeContext(
       env = env,

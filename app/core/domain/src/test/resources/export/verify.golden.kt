@@ -272,6 +272,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -3426,13 +3427,15 @@ fun CollectionsScreen(
             modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
             contentScale = ContentScale.Crop,
           )
-          Text(
-            item.name,
-            modifier = Modifier.padding(12.dp),
-            overflow = TextOverflow.Ellipsis,
-            maxLines = 1,
-            style = MaterialTheme.typography.titleSmall,
-          )
+          if (carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f) {
+            Text(
+              item.name,
+              modifier = Modifier.padding(12.dp),
+              overflow = TextOverflow.Ellipsis,
+              maxLines = 1,
+              style = MaterialTheme.typography.titleSmall,
+            )
+          }
         }
       }
       val carouselHeroState = rememberCarouselState { items.size }
@@ -3452,13 +3455,18 @@ fun CollectionsScreen(
               modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
               contentScale = ContentScale.Crop,
             )
-            Text(
-              item.name,
-              modifier = Modifier.padding(12.dp),
-              overflow = TextOverflow.Ellipsis,
-              maxLines = 1,
-              style = MaterialTheme.typography.titleSmall,
-            )
+            if (
+              carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f ||
+                carouselItemDrawInfo.size > with(LocalDensity.current) { 56.dp.toPx() }
+            ) {
+              Text(
+                item.name,
+                modifier = Modifier.padding(12.dp),
+                overflow = TextOverflow.Ellipsis,
+                maxLines = 1,
+                style = MaterialTheme.typography.titleSmall,
+              )
+            }
           }
         }
       }

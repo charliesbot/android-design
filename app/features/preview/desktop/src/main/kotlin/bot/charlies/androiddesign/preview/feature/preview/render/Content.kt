@@ -11,12 +11,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.carousel.CarouselDefaults
+import androidx.compose.material3.carousel.CarouselItemDrawInfo
 import androidx.compose.material3.carousel.CarouselItemScope
 import androidx.compose.material3.carousel.HorizontalCenteredHeroCarousel
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -128,6 +131,9 @@ private val CarouselGap = CarouselSpec.GAP_DP.dp
 private val CarouselFullScreenGap = CarouselSpec.FULL_SCREEN_GAP_DP.dp
 private val CarouselHeroReserved = CarouselSpec.HERO_RESERVED_DP.dp
 
+/** The draw info of the carousel item being composed, or null outside one. */
+internal val LocalCarouselItemDrawInfo = compositionLocalOf<CarouselItemDrawInfo?> { null }
+
 internal fun NodeContext.carouselLook(ambient: Ambient) = Look(ambient)
 
 /**
@@ -142,7 +148,10 @@ private fun NodeContext.carouselItems(
       fillWidth = def.stretchesChildren,
       scopeModifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge),
     )
-  RenderNode(env, refs[index], id, order + listOf(0, index), host.at(index, refs.size))
+  // The nodes inside the item read its current size from this, to apply `itemSize`.
+  CompositionLocalProvider(LocalCarouselItemDrawInfo provides carouselItemDrawInfo) {
+    RenderNode(env, refs[index], id, order + listOf(0, index), host.at(index, refs.size))
+  }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

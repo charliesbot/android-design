@@ -1,5 +1,7 @@
 package bot.charlies.androiddesign.preview.domain.export
 
+import bot.charlies.androiddesign.preview.domain.CarouselItemGate
+import bot.charlies.androiddesign.preview.domain.CarouselSpec
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.SearchBars
 import bot.charlies.androiddesign.preview.domain.layout.growsSemanticsBounds
@@ -370,7 +372,15 @@ internal class ScreenEmitter(
   /** The statements that draw component [id] in [place], or none when it is not in this screen. */
   fun emit(id: String, place: Place): List<Stmt> {
     val node = byId[id] ?: return emptyList()
-    return perSize(node) { props -> emitComponent(node, props, place) }
+    val body = perSize(node) { props -> emitComponent(node, props, place) }
+    // A node inside a carousel item that shows only at larger item sizes: the item scope's draw
+    // info says which size the item is at, so the check sits inside the item lambda.
+    val minimum = node.carouselItemSize
+    if (minimum == null || body.isEmpty()) return body
+    val density = file.use(Sym.LocalDensity)
+    val smallItemPx = "with($density.current) { ${dp(CarouselSpec.SMALL_ITEM_DP)}.toPx() }"
+    val condition = CarouselItemGate.expression(minimum, "carouselItemDrawInfo", smallItemPx)
+    return listOf(IfStmt(listOf(condition to body), null))
   }
 
   /**

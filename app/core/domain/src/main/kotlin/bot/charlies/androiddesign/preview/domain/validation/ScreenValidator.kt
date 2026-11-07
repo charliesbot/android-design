@@ -52,6 +52,19 @@ internal class ScreenValidator(
   private val byId: Map<String, ComponentNode> =
     screen.components.filter { it.id.isNotEmpty() }.reversed().associateBy { it.id }
 
+  /** The ids of the components inside a carousel item: the carousel's children and all below. */
+  private val carouselItemIds: Set<String> by lazy {
+    val inside = mutableSetOf<String>()
+    fun add(id: String) {
+      val node = byId[id] ?: return
+      if (inside.add(id)) referencedIds(node).forEach(::add)
+    }
+    screen.components
+      .filter { it.component == CAROUSEL }
+      .forEach { carousel -> referencedIds(carousel).forEach(::add) }
+    inside
+  }
+
   fun validate() {
     if (!IDENTIFIER.matches(screenId)) {
       sink.add(root, "screen id '$screenId' must match ${IDENTIFIER.pattern}")
@@ -62,6 +75,13 @@ internal class ScreenValidator(
       val def = catalog.find(node.component) ?: return@forEachIndexed
       val path = componentsPath.child(index)
       validateProps(path, def, node.props, overrides = false)
+      if (Catalog.ITEM_SIZE in node.props && node.id !in carouselItemIds) {
+        sink.add(
+          path.child(Catalog.ITEM_SIZE),
+          "itemSize only applies to a component inside a carousel item (a child of a Carousel " +
+            "or anything under one)",
+        )
+      }
     }
     validateSnackbarHost()
     validateSearch()
@@ -429,6 +449,12 @@ internal class ScreenValidator(
         key == Catalog.SIZE_CLASS && !overrides ->
           validateSizeClass(path.child(key), def, value, props)
         key == Catalog.STYLE -> validateStyleName(path.child(key), value)
+        key == Catalog.ITEM_SIZE && overrides ->
+          sink.add(
+            path.child(key),
+            "itemSize does not change with the window width, so it goes in the base props, " +
+              "not in a size class",
+          )
         else -> {
           val prop = declared[key]
           if (prop == null) {
@@ -893,6 +919,7 @@ internal class ScreenValidator(
     private val PICKER_OVERLAYS = setOf("Dialog", "DatePicker", "TimePicker")
     private const val DATE_MESSAGE =
       "a date must be written as YYYY-MM-DD, a real day from 1900 to 2100, not bound to data"
+    private const val CAROUSEL = "Carousel"
     private const val MENU = "Menu"
     private const val TOOLTIP = "Tooltip"
     private const val ANCHOR = "anchor"

@@ -4,12 +4,14 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.LayoutNode
+import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.Views
 import java.io.ByteArrayInputStream
 import javax.imageio.ImageIO
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** What the tree says about tabs and carousels matches what is drawn. */
@@ -117,6 +119,39 @@ class TabsAndCarouselRenderTest {
     val finding = carousel(items = 6, itemWidth = 90).items.single()
     assertEquals("gallery", finding.id)
     assertTrue(finding.detail.orEmpty().startsWith("5 items with text show at 411 dp"))
+  }
+
+  /** Three cards in a multi-browse carousel: each has a `large`-gated title and a plain label. */
+  private fun gatedCarousel(gate: String): LayoutTree {
+    val cards =
+      (1..3).joinToString(",") {
+        """{"id":"c$it","component":"Card","content":["col$it"]},""" +
+          """{"id":"col$it","component":"Column","children":["title$it","label$it"]},""" +
+          """{"id":"title$it","component":"Text","text":"Title $it","maxLines":1,"itemSize":"$gate"},""" +
+          """{"id":"label$it","component":"Text","text":"Label $it","maxLines":1}"""
+      }
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"stage"},""" +
+          """{"id":"stage","component":"Column","children":["gallery"]},""" +
+          """{"id":"gallery","component":"Carousel","itemWidth":186,"children":["c1","c2","c3"]},$cards""",
+      )
+    return render(proposal, view = Views.Light).tree
+  }
+
+  @Test
+  fun `a large-gated node shows on the large item and not on the small one`() {
+    val tree = gatedCarousel("large")
+    assertTrue(tree.has("title1"), "the first item is large: ${tree.nodes.map { it.id }}")
+    assertTrue(tree.has("label3"), "the small item still draws its ungated label")
+    assertFalse(tree.has("title3"), "the small item hides the title: ${tree.nodes.map { it.id }}")
+  }
+
+  @Test
+  fun `a medium-gated node shows on the large item and not on the small one`() {
+    val tree = gatedCarousel("medium")
+    assertTrue(tree.has("title1"))
+    assertFalse(tree.has("title3"), "the small item hides the title: ${tree.nodes.map { it.id }}")
   }
 
   private fun androidx.compose.ui.test.ComposeUiTest.settleForTest() {

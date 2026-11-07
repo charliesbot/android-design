@@ -3291,7 +3291,8 @@
           "type": "titleSmall",
           "padding": "md",
           "maxLines": 1,
-          "overflow": "ellipsis"
+          "overflow": "ellipsis",
+          "itemSize": "large"
         },
         {
           "id": "item_hero",
@@ -3320,7 +3321,8 @@
           "type": "titleSmall",
           "padding": "md",
           "maxLines": 1,
-          "overflow": "ellipsis"
+          "overflow": "ellipsis",
+          "itemSize": "medium"
         },
         {
           "id": "item_centered",

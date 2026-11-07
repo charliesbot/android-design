@@ -99,6 +99,11 @@ data class ComponentNode(val id: String, val component: String, val props: JsonO
     return listed.any { (it as? JsonPrimitive)?.content == size.wire }
   }
 
+  /** The `itemSize` of a node inside a Carousel item, or null when it shows at every size. */
+  val carouselItemSize: CarouselItemSize?
+    get() =
+      CarouselItemSize.fromWire((props[M3ExpressiveCatalog.ITEM_SIZE] as? JsonPrimitive)?.content)
+
   companion object {
     const val ID_KEY = "id"
     const val COMPONENT_KEY = "component"
