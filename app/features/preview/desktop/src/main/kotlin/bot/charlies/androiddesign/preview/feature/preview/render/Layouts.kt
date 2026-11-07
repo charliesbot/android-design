@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.columns
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -88,8 +86,7 @@ internal fun RenderColumn(ctx: NodeContext) {
       "end" -> Alignment.End
       else -> Alignment.Start
     }
-  var modifier = ctx.modifier(fillHeight = true, container = true)
-  if (ctx.bool("scroll")) modifier = modifier.verticalScroll(rememberScrollState())
+  val modifier = ctx.modifier(fillHeight = true, container = true, scroll = ctx.bool("scroll"))
   ctx.StyledAmbient {
     Column(
       modifier = modifier,

@@ -48,7 +48,7 @@ class StyleExportTest {
       )
     assertTrue(
       source.contains(
-        "Text(\"Hi\", modifier = Modifier.padding(72.dp), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.displaySmall)",
+        "Text(\"Hi\", modifier = Modifier.clip(MaterialTheme.shapes.large).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(72.dp), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.displaySmall)",
       ),
       source,
     )
@@ -63,7 +63,7 @@ class StyleExportTest {
       )
     has(source, "color = MaterialTheme.colorScheme.error")
     has(source, "style = MaterialTheme.typography.titleSmall")
-    has(source, "Modifier.padding(3.dp)")
+    has(source, ".padding(3.dp)")
     lacks(source, "style = MaterialTheme.typography.displaySmall")
   }
 
@@ -90,6 +90,19 @@ class StyleExportTest {
     has(source, "shape = MaterialTheme.shapes.large")
     has(source, "import androidx.compose.ui.draw.clip")
     has(source, "import androidx.compose.foundation.background")
+  }
+
+  @Test
+  fun `a styled text carries its container behind its padding`() {
+    val source =
+      export(
+        """{"id":"root","component":"Column","children":["t"]}""",
+        """{"id":"t","component":"Text","style":"hero","text":"Hi"}""",
+      )
+    has(
+      source,
+      "Modifier.clip(MaterialTheme.shapes.large).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(72.dp)",
+    )
   }
 
   @Test

@@ -4,8 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.toShape
@@ -262,15 +264,19 @@ internal fun RenderNode(
 }
 
 /**
- * The modifier of a component: weight, stretch, its style's container when [container] is set,
- * padding, then its id for the tree. The container goes before the padding so the padding sits
- * inside it, as the exporter writes it. It stretches across the width when the catalog says the
- * component does and the parent lets it. The tree reports the box inside the padding.
+ * The modifier of a component, in the order the exporter writes it (`ScreenEmitter.modifier`):
+ * weight, stretch, its style's container when [container] is set, a vertical scroll when [scroll]
+ * is set, padding, then its id for the tree. The container comes before the padding so the padding
+ * sits inside it, and the scroll comes before the padding so the padding scrolls with the content
+ * rather than cropping it. It stretches across the width when the catalog says the component does
+ * and the parent lets it. The tree reports the box inside the padding, which for a scrolling
+ * component is its whole content, not the viewport.
  */
 @Composable
 internal fun NodeContext.modifier(
   fillHeight: Boolean = false,
   container: Boolean = false,
+  scroll: Boolean = false,
 ): Modifier {
   var modifier: Modifier = Modifier
   if (host.flexItem) modifier = modifier.restoreUnboundedHeight()
@@ -283,6 +289,7 @@ internal fun NodeContext.modifier(
   if (host.fillWidth && def.fillsWidth(props::value)) modifier = modifier.fillMaxWidth()
   if (fillHeight && host.fillHeight) modifier = modifier.fillMaxHeight()
   if (container) modifier = modifier.then(styleBackground())
+  if (scroll) modifier = modifier.verticalScroll(rememberScrollState())
   padding?.let { modifier = modifier.padding(it) }
   return modifier.then(tagged())
 }

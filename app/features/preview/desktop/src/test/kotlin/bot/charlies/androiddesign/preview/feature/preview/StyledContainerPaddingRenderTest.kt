@@ -1,5 +1,8 @@
 package bot.charlies.androiddesign.preview.feature.preview
 
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import bot.charlies.androiddesign.preview.feature.preview.theme.ThemeResolver
 import bot.charlies.androiddesign.preview.feature.preview.theme.toHex
 import bot.charlies.androiddesign.preview.model.ColorRole
@@ -73,5 +76,48 @@ class StyledContainerPaddingRenderTest {
       distance(color, pixel(image, t.bounds.x - 2f, t.bounds.y + t.bounds.height / 2)) <= 12,
       "$layout: the child is inset from the container edge",
     )
+  }
+
+  /**
+   * A scrolling column's padding scrolls with its content, as the exporter writes it (`clip`,
+   * `background`, `verticalScroll`, then `padding`): rows scroll through the padding band instead
+   * of being cut off at its inner edge.
+   */
+  @Test
+  fun `a scrolling column's padding scrolls with its content`() {
+    val ids = (0 until 60).map { "t$it" }
+    val proposal =
+      proposalOf(
+        "home" to
+          screenJson(
+            """{"id":"root","component":"Scaffold","content":"col"},""" +
+              """{"id":"col","component":"Column","style":"pane","scroll":true,"children":[${ids.joinToString(",") { "\"$it\"" }}]},""" +
+              ids.joinToString(",") { """{"id":"$it","component":"Text","text":"Row $it"}""" },
+          ),
+        theme = theme,
+      )
+    val result =
+      render(proposal) {
+        settleForTest()
+        repeat(12) {
+          onNodeWithTag("col", useUnmergedTree = true).performTouchInput { swipeUp() }
+          settleForTest()
+        }
+      }
+    // Rows scroll through the top padding band: some pixel there is text, not the container color.
+    val image = ImageIO.read(ByteArrayInputStream(result.png))
+    val color = containerRgb()
+    val inkInBand =
+      (0 until (padding * scale).toInt()).any { y ->
+        // Past the rounded corners, across the row labels.
+        (60 * scale until 90 * scale).any { x ->
+          distance(color, image.getRGB(x, y) and 0xFFFFFF) > 60
+        }
+      }
+    assertTrue(inkInBand, "the scrolled content reaches into the top padding band")
+  }
+
+  private fun androidx.compose.ui.test.ComposeUiTest.settleForTest() {
+    with(bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessRenderer) { settle() }
   }
 }

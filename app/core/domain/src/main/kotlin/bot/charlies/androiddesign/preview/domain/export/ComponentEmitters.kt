@@ -519,7 +519,7 @@ private fun ScreenEmitter.textComponent(p: JsonObject, place: Place): List<Stmt>
     stmt(
       textOf(
         text,
-        modifier(place, p),
+        modifier(place, p, *containerBackground(p)),
         opt("color", p.literal("color")?.let(::colorRole)),
         opt("textAlign", align),
         opt("overflow", overflow),
