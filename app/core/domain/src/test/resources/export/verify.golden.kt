@@ -260,6 +260,7 @@ import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -3427,7 +3428,10 @@ fun CollectionsScreen(
             modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
             contentScale = ContentScale.Crop,
           )
-          if (carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f) {
+          val itemMultiNameShown by remember {
+            derivedStateOf { carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f }
+          }
+          if (itemMultiNameShown) {
             Text(
               item.name,
               modifier = Modifier.padding(12.dp),
@@ -3455,10 +3459,14 @@ fun CollectionsScreen(
               modifier = Modifier.fillMaxWidth().aspectRatio(1.25f),
               contentScale = ContentScale.Crop,
             )
-            if (
-              carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f ||
-                carouselItemDrawInfo.size > with(LocalDensity.current) { 56.dp.toPx() }
-            ) {
+            val itemHeroNameSmallPx = with(LocalDensity.current) { 56.dp.toPx() }
+            val itemHeroNameShown by remember {
+              derivedStateOf {
+                carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f ||
+                  carouselItemDrawInfo.size > itemHeroNameSmallPx
+              }
+            }
+            if (itemHeroNameShown) {
               Text(
                 item.name,
                 modifier = Modifier.padding(12.dp),

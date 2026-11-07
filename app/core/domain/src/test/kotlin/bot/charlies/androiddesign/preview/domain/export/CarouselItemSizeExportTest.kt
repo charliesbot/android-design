@@ -4,7 +4,11 @@ import bot.charlies.androiddesign.preview.domain.export.ExportFixtures.has
 import bot.charlies.androiddesign.preview.domain.export.ExportFixtures.lacks
 import kotlin.test.Test
 
-/** `itemSize` becomes an `if` on `carouselItemDrawInfo` inside the carousel item. */
+/**
+ * `itemSize` becomes a check on `carouselItemDrawInfo` inside the carousel item. The size changes
+ * every scroll frame, so the check is a `derivedStateOf`: the item recomposes only when the answer
+ * flips, not on every frame.
+ */
 class CarouselItemSizeExportTest {
   private fun export(titleProps: String, caption: String = ""): String =
     ExportFixtures.export(
@@ -16,30 +20,39 @@ class CarouselItemSizeExportTest {
     )
 
   @Test
-  fun `a large node is written under a check for the item at full size`() {
+  fun `a large node is written under a derived check for the item at full size`() {
     val source = export(""","itemSize":"large"""")
-    has(source, "if (carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f) {")
+    has(
+      source,
+      "val titleShown by remember { derivedStateOf { " +
+        "carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f } }",
+    )
+    has(source, "if (titleShown) {")
     has(source, "Text(\"Dinner\"")
+    has(source, "import androidx.compose.runtime.derivedStateOf")
+    has(source, "import androidx.compose.runtime.getValue")
     lacks(source, "itemSize")
     lacks(source, "LocalDensity")
   }
 
   @Test
-  fun `a medium node is written under a check that the item is not the smallest`() {
+  fun `a medium node reads the small item width once, outside the derived state`() {
     val source = export(""","itemSize":"medium"""")
-    // The condition is long, so it breaks after the `||`.
+    has(source, "val titleSmallPx = with(LocalDensity.current) { 56.dp.toPx() }")
     has(
       source,
-      "carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f || " +
-        "carouselItemDrawInfo.size > with(LocalDensity.current) { 56.dp.toPx() }",
+      "val titleShown by remember { derivedStateOf { " +
+        "carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f || " +
+        "carouselItemDrawInfo.size > titleSmallPx } }",
     )
+    has(source, "if (titleShown) {")
     has(source, "import androidx.compose.ui.platform.LocalDensity")
   }
 
   @Test
   fun `only the gated node sits under the check`() {
     val source = export(""","itemSize":"large"""")
-    val gated = source.substringAfter("maxSize * 0.85f) {").substringBefore("}")
+    val gated = source.substringAfter("if (titleShown) {").substringBefore("}")
     has(gated, "Text(\"Dinner\"")
     lacks(gated, "Ready in 20 min")
   }

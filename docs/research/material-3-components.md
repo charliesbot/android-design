@@ -508,7 +508,7 @@ None of the six source files has an "M3 Expressive update" section. Their Overvi
 
 - **Item text and sizing:**
   - "Text should always be understandable at each size. Consider adapting the text to use brief labels on smaller carousel items." The large item shows the full title and label, the medium item hides the title, and the small item abbreviates the label.
-  - Item text is brief and "adapts to the item size", and "Text is hidden on the small item." So text goes on the large item first: a title on every item of a multi-browse or hero carousel is wrong, because the medium and small items are narrower than the title and cut it. Show the full title on the large item, hide it on the medium item or shorten it to a label, and keep at most an abbreviated label (or nothing) on the small item. The item is as wide as the image; text is never what sets its size.
+  - Item text is brief and "adapts to the item size", and "Text is hidden on the small item." The page's example shows the large item with the full title and label, the medium item hiding the title, and the small item abbreviating the label, so the narrower items carry less text than the large one.
   - A center-aligned hero "adds an additional previewed item on the leading edge, making the large carousel item centered" (two small items around a centered large item).
   - The large item's max width is adjustable. "When the large item's max width is narrow enough, more items can be shown on screen at once. At compact breakpoints, this is only recommended for carousels with simple imagery."
 

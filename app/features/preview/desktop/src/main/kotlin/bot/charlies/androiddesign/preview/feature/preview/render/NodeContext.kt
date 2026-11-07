@@ -15,6 +15,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
@@ -184,14 +187,20 @@ internal class NodeContext(
 
 /**
  * Whether [node]'s `itemSize` lets it show on the carousel item it is in, at the item's size right
- * now. It reads the item's size state, so the node appears and goes as the item scrolls.
+ * now. The size changes every scroll frame, so the answer is derived state: the node recomposes
+ * only when it flips, as in the exported code.
  */
 @Composable
 private fun shownOnCarouselItem(node: ComponentNode): Boolean {
-  val minimum = node.carouselItemSize ?: return true
-  val info = LocalCarouselItemDrawInfo.current ?: return true
+  val minimum = node.carouselItemSize
+  val info = LocalCarouselItemDrawInfo.current
   val density = LocalDensity.current.density
-  return CarouselItemGate.isShown(minimum, info.size, info.maxSize, density)
+  if (minimum == null || info == null) return true
+  val shown by
+    remember(minimum, info, density) {
+      derivedStateOf { CarouselItemGate.isShown(minimum, info.size, info.maxSize, density) }
+    }
+  return shown
 }
 
 /** The props of [node] in the frame of [env], with its size class overrides applied. */

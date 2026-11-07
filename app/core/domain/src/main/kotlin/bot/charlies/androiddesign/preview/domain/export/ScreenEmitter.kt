@@ -5,6 +5,7 @@ import bot.charlies.androiddesign.preview.domain.CarouselSpec
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.SearchBars
 import bot.charlies.androiddesign.preview.domain.layout.growsSemanticsBounds
+import bot.charlies.androiddesign.preview.model.CarouselItemSize
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
@@ -373,14 +374,41 @@ internal class ScreenEmitter(
   fun emit(id: String, place: Place): List<Stmt> {
     val node = byId[id] ?: return emptyList()
     val body = perSize(node) { props -> emitComponent(node, props, place) }
-    // A node inside a carousel item that shows only at larger item sizes: the item scope's draw
-    // info says which size the item is at, so the check sits inside the item lambda.
+    // A node inside a carousel item that shows only at larger item sizes. The item scope's draw
+    // info says which size the item is at, but it changes on every scroll frame: the check is a
+    // derivedStateOf, so the item recomposes only when the answer flips.
     val minimum = node.carouselItemSize
     if (minimum == null || body.isEmpty()) return body
-    val density = file.use(Sym.LocalDensity)
-    val smallItemPx = "with($density.current) { ${dp(CarouselSpec.SMALL_ITEM_DP)}.toPx() }"
-    val condition = CarouselItemGate.expression(minimum, "carouselItemDrawInfo", smallItemPx)
-    return listOf(IfStmt(listOf(condition to body), null))
+    val shown = stateName(node.id, "Shown")
+    val smallPx = stateName(node.id, "SmallPx")
+    val needsSmall = minimum == CarouselItemSize.Medium
+    val smallItem =
+      if (needsSmall) {
+        val density = file.use(Sym.LocalDensity)
+        listOf<Stmt>(
+          Assign(
+            "val $smallPx",
+            "=",
+            Raw("with($density.current) { ${dp(CarouselSpec.SMALL_ITEM_DP)}.toPx() }"),
+          ),
+        )
+      } else {
+        emptyList()
+      }
+    val condition = CarouselItemGate.expression(minimum, "carouselItemDrawInfo", smallPx)
+    file.use(Sym.getValue)
+    val derived = file.use(Sym.derivedStateOf)
+    val check =
+      Assign(
+        "val $shown",
+        "by",
+        Call(
+          file.use(Sym.remember),
+          emptyList(),
+          lambda(stmt(Call(derived, lambda = lambda(stmt(Or(condition.split(" || "))))))),
+        ),
+      )
+    return smallItem + check + IfStmt(listOf(shown to body), null)
   }
 
   /**

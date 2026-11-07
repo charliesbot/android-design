@@ -15,6 +15,14 @@ internal data class Raw(val text: String) : Expr {
   override fun flat() = text
 }
 
+/**
+ * Operands joined by `||`. Too long for its line, it breaks after each `||` and indents the later
+ * operands a step, as ktfmt does.
+ */
+internal data class Or(val operands: List<String>) : Expr {
+  override fun flat() = operands.joinToString(" || ")
+}
+
 /** `receiver.call().call()`. Each call is written whole, such as `padding(16.dp)`. */
 internal data class Chain(val receiver: String, val calls: List<String>) : Expr {
   override fun flat() = receiver + calls.joinToString("") { ".$it" }
@@ -200,7 +208,7 @@ internal object CodePrinter {
       is Assign -> printWithPrefix("${stmt.lhs} ${stmt.op}", stmt.rhs, "", indent, out)
       is IfStmt -> {
         stmt.branches.forEachIndexed { i, (condition, body) ->
-          out += ifHead("${pad(indent)}${if (i == 0) "" else "} else "}", condition, indent)
+          out += "${pad(indent)}${if (i == 0) "" else "} else "}if ($condition) {"
           body.forEach { printStmt(it, indent + INDENT, out) }
         }
         if (stmt.orElse != null) {
@@ -210,22 +218,6 @@ internal object CodePrinter {
         out += "${pad(indent)}}"
       }
     }
-  }
-
-  /**
-   * The `if (condition) {` line, or lines when it does not fit: ktfmt puts the condition on its own
-   * lines and breaks it after each top-level `||`, the later operands indented a step further.
-   */
-  private fun ifHead(prefix: String, condition: String, indent: Int): List<String> {
-    val line = "${prefix}if ($condition) {"
-    val operands = condition.split(" || ")
-    if (line.length <= WIDTH || operands.size < 2) return listOf(line)
-    return listOf("${prefix}if (") +
-      operands.mapIndexed { i, operand ->
-        val lead = pad(indent + if (i == 0) INDENT else 2 * INDENT)
-        if (i < operands.lastIndex) "$lead$operand ||" else "$lead$operand"
-      } +
-      "${pad(indent)}) {"
   }
 
   /**
@@ -253,6 +245,12 @@ internal object CodePrinter {
     }
     when (expr) {
       is Raw -> printRaw(head, expr.text, suffix, indent, out)
+      is Or ->
+        expr.operands.forEachIndexed { i, operand ->
+          val lead = pad(if (i == 0) indent else indent + INDENT)
+          val last = i == expr.operands.lastIndex
+          out += "$lead${if (i == 0) head else ""}$operand${if (last) suffix else " ||"}"
+        }
       is Chain -> printChain(head, expr, suffix, indent, out)
       is Call -> printCall(head, expr, suffix, indent, out)
       is Lambda -> {

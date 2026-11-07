@@ -11,6 +11,7 @@ internal object Sym {
   // runtime
   const val Composable = "$RUNTIME.Composable"
   const val remember = "$RUNTIME.remember"
+  const val derivedStateOf = "$RUNTIME.derivedStateOf"
   const val mutableStateOf = "$RUNTIME.mutableStateOf"
   const val mutableFloatStateOf = "$RUNTIME.mutableFloatStateOf"
   const val mutableIntStateOf = "$RUNTIME.mutableIntStateOf"
