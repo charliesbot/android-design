@@ -1,5 +1,6 @@
 package bot.charlies.androiddesign.preview.feature.preview.record
 
+import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
@@ -27,7 +28,8 @@ import bot.charlies.androiddesign.preview.model.ViewSpec
  * @property id The test tag and tree id. Components under a template carry the item indices
  *   (`plate_row[0]`), and components of a pane other than the one asked for carry `screen/`.
  * @property order The pre-order position: the tree lists nodes by this key.
- * @property scrolls Whether it scrolls its children, as a Wear Screen with `scroll` on does.
+ * @property scrolls Whether it scrolls its children, as a Wear Screen with `scroll` on or an
+ *   AlertDialog does.
  * @property text The text the node shows, when it shows any.
  * @property font The family name of its type role, when it shows text.
  */
@@ -118,6 +120,12 @@ class TreeRecorder {
   private val designHeights = HashMap<String, Float>()
   private val rings = HashMap<String, RingInset>()
   private var frame: LayoutCoordinates? = null
+
+  /**
+   * The state of the screen's scrolling list, while it is composed. A headless render scrolls it
+   * from top to end to record the items a lazy list composes only when they are on screen.
+   */
+  @get:Synchronized @set:Synchronized var scrollable: ScrollableState? = null
 
   /** Called by the preview frame: bounds are measured relative to this. */
   @Synchronized

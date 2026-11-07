@@ -1,15 +1,17 @@
 package bot.charlies.androiddesign.preview.feature.preview.headless
 
+import androidx.compose.foundation.gestures.ScrollableState
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.SkikoComposeUiTest
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.text.font.createFontFamilyResolver
 import androidx.compose.ui.unit.Density
+import bot.charlies.androiddesign.preview.domain.findings.ScrolledTree
 import bot.charlies.androiddesign.preview.feature.preview.nav.ProposalPreview
 import bot.charlies.androiddesign.preview.feature.preview.record.SemanticsIndex
 import bot.charlies.androiddesign.preview.feature.preview.record.TreeRecorder
@@ -19,13 +21,24 @@ import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import java.nio.file.Path
+import kotlinx.coroutines.runBlocking
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
 
-/** One headless render: the layout tree in dp, and a PNG at [HeadlessRenderer.DENSITY]. */
-class HeadlessResult(val tree: LayoutTree, val png: ByteArray) {
+/**
+ * One headless render: the layout tree in dp, and a PNG at [HeadlessRenderer.DENSITY]. A scrolling
+ * Wear screen is drawn at the top of its list and its [tree] covers the whole list (the render
+ * scrolls it); [end] is the list scrolled to its end, and null for every other screen.
+ */
+class HeadlessResult(val tree: LayoutTree, val png: ByteArray, val end: HeadlessEnd? = null) {
   override fun toString() = "HeadlessResult(${tree.screen}/${tree.view.name}, ${png.size} bytes)"
 }
+
+/** A scrolling list drawn at its end: the tree of what is on screen there, and its picture. */
+class HeadlessEnd(val tree: LayoutTree, val png: ByteArray)
+
+/** What a draw produced; the picture and the end are there only when an image was wanted. */
+private class Drawn(val tree: LayoutTree, val png: ByteArray?, val end: HeadlessEnd?)
 
 /**
  * What a render draws from: the [proposal], the [design] system it is styled with, and [dir], the
@@ -65,6 +78,7 @@ object HeadlessRenderer {
    *
    * @param replay A running host whose back stack and local state (open overlays, toggles, typed
    *   text) are taken over before the tree is read, so the result shows what that host shows.
+   * @param overlay The id of an overlay of [screen] to draw open, on top of the replayed state.
    */
   @OptIn(ExperimentalTestApi::class)
   fun image(
@@ -73,20 +87,18 @@ object HeadlessRenderer {
     view: ViewSpec,
     afterLaunch: (ComposeUiTest.(ProposalHostState) -> Unit)? = null,
     replay: ProposalHostState? = null,
+    overlay: String? = null,
   ): HeadlessResult {
-    var png: ByteArray? = null
-    val tree =
-      draw(source, screen, view, afterLaunch, replay) { test ->
-        png = test.captureToImage().asSkiaBitmap().toPng()
-      }
-    return HeadlessResult(tree, checkNotNull(png))
+    val drawn = draw(source, screen, view, afterLaunch, replay, overlay, imageWanted = true)
+    return HeadlessResult(drawn.tree, checkNotNull(drawn.png), drawn.end)
   }
 
   /**
    * Renders only the layout tree of [screen] at [view], for `get_tree` and for checking that a
    * proposal draws. No image is captured or encoded, and the clock advances only as far as the tree
-   * needs: not at all for a fresh screen, and for a [replay] only the time its open overlays and
-   * its scene change take to come to rest. See [image] for the parameters.
+   * needs: not at all for a fresh screen that does not scroll, for a scrolling Wear list the time
+   * each scroll position takes to settle, and for a [replay] or an [overlay] the time its open
+   * overlays and its scene change take to come to rest. See [image] for the parameters.
    */
   @OptIn(ExperimentalTestApi::class)
   fun tree(
@@ -94,19 +106,22 @@ object HeadlessRenderer {
     screen: String,
     view: ViewSpec,
     replay: ProposalHostState? = null,
-  ): LayoutTree = draw(source, screen, view, null, replay, capture = null)
+    overlay: String? = null,
+  ): LayoutTree = draw(source, screen, view, null, replay, overlay, imageWanted = false).tree
 
-  /** Draws, and calls [capture] with the test when the caller wants the image as well. */
-  @OptIn(ExperimentalTestApi::class)
+  /** Draws, and captures the image as well when [imageWanted]. */
   private fun draw(
     source: RenderSource,
     screen: String,
     view: ViewSpec,
     afterLaunch: (ComposeUiTest.(ProposalHostState) -> Unit)?,
     replay: ProposalHostState?,
-    capture: ((SkikoComposeUiTest) -> Unit)?,
-  ): LayoutTree =
-    synchronized(renderLock) { drawLocked(source, screen, view, afterLaunch, replay, capture) }
+    overlay: String?,
+    imageWanted: Boolean,
+  ): Drawn =
+    synchronized(renderLock) {
+      drawLocked(source, screen, view, afterLaunch, replay, overlay, imageWanted)
+    }
 
   /** The work of [draw], done while holding [renderLock]. */
   @OptIn(ExperimentalTestApi::class)
@@ -116,8 +131,9 @@ object HeadlessRenderer {
     view: ViewSpec,
     afterLaunch: (ComposeUiTest.(ProposalHostState) -> Unit)?,
     replay: ProposalHostState?,
-    capture: ((SkikoComposeUiTest) -> Unit)?,
-  ): LayoutTree {
+    overlay: String?,
+    imageWanted: Boolean,
+  ): Drawn {
     val (proposal, design, proposalDir) = source
     require(screen in proposal.screens) { "no screen '$screen' in this proposal" }
     val density = Density(DENSITY)
@@ -130,8 +146,9 @@ object HeadlessRenderer {
       )
     val host = ProposalHostState(proposal, proposalDir, screen)
     val recorder = TreeRecorder()
-    val imageWanted = capture != null
     lateinit var tree: LayoutTree
+    var png: ByteArray? = null
+    var end: HeadlessEnd? = null
     test.runTest {
       setContent {
         CompositionLocalProvider(LocalFontFamilyResolver provides fontResolver) {
@@ -148,15 +165,60 @@ object HeadlessRenderer {
         hook(this, host)
         settle(SETTLE_MS)
       }
-      val semantics =
-        SemanticsIndex.of(
-          mergedRoots = onAllNodes(isRoot(), useUnmergedTree = false).fetchSemanticsNodes(),
-          unmergedRoots = onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes(),
-        )
-      tree = recorder.snapshot(host.current, view, density.density, semantics)
-      capture?.invoke(this)
+      overlay?.let {
+        host.interaction.open(host.current, it)
+        settle(if (imageWanted) SETTLE_MS else OVERLAY_SETTLE_MS)
+      }
+      fun snapshot(): LayoutTree {
+        val semantics =
+          SemanticsIndex.of(
+            mergedRoots = onAllNodes(isRoot(), useUnmergedTree = false).fetchSemanticsNodes(),
+            unmergedRoots = onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes(),
+          )
+        return recorder.snapshot(host.current, view, density.density, semantics)
+      }
+      fun capture(): ByteArray = captureToImage().asSkiaBitmap().toPng()
+      tree = snapshot()
+      if (imageWanted) png = capture()
+      // A lazy list composes only the items on screen, so the top of a long list is all that one
+      // tree holds. Scroll it to its end and merge what each position showed. Nothing scrolls
+      // behind an open overlay, which covers the list.
+      val list = recorder.scrollable
+      if (list != null && host.interaction.openOverlay(host.current) == null) {
+        val positions = mutableListOf(tree)
+        scrollToEnd(list, view.height * density.density / 2f) { positions += snapshot() }
+        // A list that fits the screen does not move and has no other end.
+        if (positions.size > 1) {
+          tree = ScrolledTree.merge(positions)
+          if (imageWanted) end = HeadlessEnd(positions.last(), capture())
+        }
+      }
     }
-    return tree
+    return Drawn(tree, png, end)
+  }
+
+  /**
+   * Scrolls [list] forward by [stepPx] at a time until it cannot go further, calling [record] at
+   * each position after the list has come to rest, and once more at the end, where an edge button
+   * has had time to take its full size. A list that cannot move records nothing. Half a viewport
+   * per step shows every item whole at some position. It runs in the list's public scroll API, as a
+   * wheel or a finger would drive it.
+   */
+  @OptIn(ExperimentalTestApi::class)
+  private fun ComposeUiTest.scrollToEnd(list: ScrollableState, stepPx: Float, record: () -> Unit) {
+    var steps = 0
+    var moved = false
+    while (runOnIdle { list.canScrollForward } && steps++ < MAX_SCROLL_STEPS) {
+      val consumed = runOnIdle { runBlocking { list.scrollBy(stepPx) } }
+      if (consumed == 0f) break
+      moved = true
+      settle(SCROLL_SETTLE_MS)
+      record()
+    }
+    if (moved) {
+      settle(SETTLE_MS)
+      record()
+    }
   }
 
   /**
@@ -195,6 +257,10 @@ object HeadlessRenderer {
   private const val OVERLAY_SETTLE_MS = 600L
   private const val VALUE_SETTLE_MS = 600L
   private const val SCENE_SETTLE_MS = 200L
+  private const val SCROLL_SETTLE_MS = 500L
+
+  /** Bounds a list that never reports its end, such as one that grows as it scrolls. */
+  private const val MAX_SCROLL_STEPS = 60
 
   private fun org.jetbrains.skia.Bitmap.toPng(): ByteArray =
     Image.makeFromBitmap(this).use { image ->

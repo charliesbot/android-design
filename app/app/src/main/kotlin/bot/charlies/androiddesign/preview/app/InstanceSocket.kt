@@ -41,6 +41,21 @@ object InstanceSocket {
       "mcp.sock",
     )
 
+  /**
+   * The longest socket path macOS accepts: `sun_path` in `sockaddr_un` holds 104 bytes, one of them
+   * the terminating NUL.
+   */
+  const val MAX_PATH_BYTES = 103
+
+  /** Fails at once when [path] is longer than [MAX_PATH_BYTES], instead of letting bind fail. */
+  private fun requireFits(path: Path) {
+    val bytes = path.toString().toByteArray(Charsets.UTF_8).size
+    check(bytes <= MAX_PATH_BYTES) {
+      "the instance socket path is $bytes bytes, longer than the $MAX_PATH_BYTES macOS allows: " +
+        "$path; set $SOCKET_ENV to a shorter path"
+    }
+  }
+
   /** Connects to the instance listening on [path], or returns null when there is none. */
   fun connect(path: Path): SocketChannel? =
     try {
@@ -51,6 +66,7 @@ object InstanceSocket {
 
   /** Polls [connect] every 50 ms for up to 10 s, for an instance that is still starting. */
   fun awaitConnect(path: Path): SocketChannel {
+    requireFits(path)
     val deadline = System.nanoTime() + CONNECT_TIMEOUT_NANOS
     while (System.nanoTime() < deadline) {
       connect(path)?.let {
@@ -67,6 +83,7 @@ object InstanceSocket {
    * A live socket is never deleted, so racing processes cannot bind two instances.
    */
   fun bind(path: Path): ServerSocketChannel? {
+    requireFits(path)
     Files.createDirectories(path.parent)
     tryBind(path)?.let {
       return it

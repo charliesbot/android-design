@@ -13,12 +13,14 @@ interface TreeRenderer {
   /**
    * @param live A running host whose back stack and local state the render takes over, so the tree
    *   shows what that host shows; null renders the screen fresh.
+   * @param overlay The id of an overlay of [screen] to draw open.
    */
   suspend fun render(
     source: RenderSource,
     screen: String,
     view: ViewSpec,
     live: ProposalHostState? = null,
+    overlay: String? = null,
   ): LayoutTree
 }
 
@@ -32,8 +34,9 @@ class HeadlessTreeRenderer : TreeRenderer {
     screen: String,
     view: ViewSpec,
     live: ProposalHostState?,
+    overlay: String?,
   ): LayoutTree =
     withContext(Dispatchers.Default) {
-      HeadlessRenderer.tree(source, screen, view, live)
+      HeadlessRenderer.tree(source, screen, view, live, overlay)
     }
 }

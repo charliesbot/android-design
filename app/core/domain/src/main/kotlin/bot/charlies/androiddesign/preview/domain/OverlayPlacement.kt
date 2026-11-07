@@ -106,6 +106,9 @@ class OverlayPlacement(private val screen: Screen) {
       node.component in overlayNames && !isBesideComponent(node) && !isSnackbarInScaffold(node)
     }
 
+  /** Every overlay component of the screen, in document order. */
+  val overlays: List<ComponentNode> = screen.components.filter { it.component in overlayNames }
+
   /** The id of the menu anchored to [componentId] by `Menu.anchor`, or null. */
   fun menuAt(componentId: String): String? = anchored[componentId]
 
@@ -161,16 +164,22 @@ class OverlayPlacement(private val screen: Screen) {
       else -> false
     }
 
-  private companion object {
-    const val MENU = "Menu"
-    const val SPLIT_BUTTON = "SplitButton"
-    const val SCAFFOLD = "Scaffold"
-    const val SNACKBAR = "Snackbar"
-    const val TOOLTIP = "Tooltip"
-    const val DATE_PICKER = "DatePicker"
-    const val SEARCH_BAR = "SearchBar"
-    const val SEARCH_VIEW = "SearchView"
-    const val TOP_APP_BAR = "TopAppBar"
-    const val ANCHOR = "anchor"
+  companion object {
+    /**
+     * The name a render of [screen] with [overlay] open goes by in `check_proposal` and in the
+     * `render` report: `home+sheet`.
+     */
+    fun renderName(screen: String, overlay: String) = "$screen+$overlay"
+
+    private const val MENU = "Menu"
+    private const val SPLIT_BUTTON = "SplitButton"
+    private const val SCAFFOLD = "Scaffold"
+    private const val SNACKBAR = "Snackbar"
+    private const val TOOLTIP = "Tooltip"
+    private const val DATE_PICKER = "DatePicker"
+    private const val SEARCH_BAR = "SearchBar"
+    private const val SEARCH_VIEW = "SearchView"
+    private const val TOP_APP_BAR = "TopAppBar"
+    private const val ANCHOR = "anchor"
   }
 }

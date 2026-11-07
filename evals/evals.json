@@ -496,7 +496,7 @@
         },
         {
           "id": "R-workout-hero",
-          "text": "The elapsed time (24:18) is the hero of the run screen, clearly larger than distance, heart rate, and pace, and the screen shows all four values without crowding. Renders show screens, not dialogs, so the end-run confirmation is not judged here.",
+          "text": "The elapsed time (24:18) is the hero of the run screen, clearly larger than distance, heart rate, and pace, and the screen shows all four values without crowding. Judge the hero on the screen's own renders, not on the renders with a dialog open (named `screen+dialog`), where the dialog covers it.",
           "type": "rubric"
         }
       ]
@@ -626,7 +626,7 @@
         },
         {
           "id": "R-reminder-list",
-          "text": "Each reminder row is one tappable item and the done state of 'Pick up laundry' is visible at a glance by more than color alone (for example a check, a strikethrough, or a switch). The add screen, when rendered, is its own screen. FAIL when the done state is only a slight color change or does not show. Renders show screens, not dialogs, so a confirmation dialog is not judged here.",
+          "text": "Each reminder row is one tappable item and the done state of 'Pick up laundry' is visible at a glance by more than color alone (for example a check, a strikethrough, or a switch). The add screen, when rendered, is its own screen. FAIL when the done state is only a slight color change or does not show. Judge the list on the screen's own renders, not on the renders with a dialog open (named `screen+dialog`), which cover it.",
           "type": "rubric"
         }
       ]

@@ -8,8 +8,11 @@ import kotlinx.serialization.Serializable
 @Serializable data class ReportTheme(val seed: String, val variant: String, val contrast: Double)
 
 /**
- * One screen at one view. [png] and [tree] are file names relative to the output folder, or null
- * when the render threw (its [failures] then start with `render-error`).
+ * One screen at one view. [screen] is `home+sheet` for the render with overlay `sheet` open. [png]
+ * and [tree] are file names relative to the output folder, or null when the render threw (its
+ * [failures] then start with `render-error`). [tree] covers a scrolling Wear screen's whole list
+ * while [png] shows its top; [endPng] and [endTree] are the list scrolled to its end, and null for
+ * any other screen.
  */
 @Serializable
 data class RenderEntry(
@@ -19,13 +22,21 @@ data class RenderEntry(
   val tree: String?,
   val pass: Boolean,
   val failures: List<String>,
+  val endPng: String? = null,
+  val endTree: String? = null,
 ) {
   companion object {
     /**
      * The entry for [check]; [files] is the base name of the files the render wrote, null when it
-     * threw.
+     * threw, and [endFiles] the base name of the end-of-list files, when it wrote any.
      */
-    fun of(screen: String, view: String, files: String?, check: ViewCheck) =
+    fun of(
+      screen: String,
+      view: String,
+      files: String?,
+      check: ViewCheck,
+      endFiles: String? = null,
+    ) =
       RenderEntry(
         screen = screen,
         view = view,
@@ -33,6 +44,8 @@ data class RenderEntry(
         tree = files?.let { "$it.tree.json" },
         pass = check.pass,
         failures = check.failures(),
+        endPng = endFiles?.let { "$it.png" },
+        endTree = endFiles?.let { "$it.tree.json" },
       )
   }
 }

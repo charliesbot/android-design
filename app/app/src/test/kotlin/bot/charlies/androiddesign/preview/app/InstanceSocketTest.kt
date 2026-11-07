@@ -11,6 +11,7 @@ import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -26,6 +27,21 @@ class InstanceSocketTest {
     val unset = InstanceSocket.defaultPath(emptyMap())
     assertTrue(unset.endsWith("AndroidDesignPreview/mcp.sock"), unset.toString())
     assertEquals(unset, InstanceSocket.defaultPath(mapOf(InstanceSocket.SOCKET_ENV to " ")))
+  }
+
+  @Test
+  fun `a path longer than sun_path fails at once with the cause and the way out`() {
+    val tooLong = Path.of("/tmp", "a".repeat(InstanceSocket.MAX_PATH_BYTES), "s.sock")
+    val started = System.nanoTime()
+    val bindError = assertFailsWith<IllegalStateException> { InstanceSocket.bind(tooLong) }
+    val awaitError = assertFailsWith<IllegalStateException> { InstanceSocket.awaitConnect(tooLong) }
+    assertTrue(System.nanoTime() - started < TimeUnit.SECONDS.toNanos(2), "no connect wait")
+    for (error in listOf(bindError, awaitError)) {
+      val message = error.message.orEmpty()
+      assertTrue("${InstanceSocket.MAX_PATH_BYTES}" in message, message)
+      assertTrue(tooLong.toString() in message, message)
+      assertTrue(InstanceSocket.SOCKET_ENV in message, message)
+    }
   }
 
   @Test

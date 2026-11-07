@@ -2,7 +2,10 @@
 
 The judge sees the renders of one case and answers each applicable item PASS or FAIL with a one-sentence reason. Judge only what is visible. When unsure, FAIL and say why.
 
-Every case has one render per screen and view of the proposal, each named `screen/view`. A case's `surface` decides the views.
+Every case has one render per screen and view of the proposal, each named `screen/view`. A case's `surface` decides the views. Two kinds of render come on top of those:
+
+- **Overlays:** each sheet, dialog, menu, search view, tooltip, snackbar, or picker of a screen has its own render of that screen with it open, named `screen+overlay/view`. Judge the overlay in it as part of the design: text, controls, contrast, and the Material shape of the component. Items about the whole screen (hierarchy, layout, adaptation) look at the plain `screen/view` renders, because an open overlay covers or dims what is behind it.
+- **End of list:** a scrolling Wear screen is drawn at the top of its list, and again as `screen/view (end of list)`, the list scrolled to its end, so the last rows and the edge button are visible. The two renders are one screen: judge the list across both, and do not fail the top render for a row or button that only the end render shows.
 
 - **Phone** (the previewer's Material 3 Expressive catalog): `light` and `dark` at phone size (411x923), and three larger windows in light: `foldable` (704x933, medium), `tablet` (1280x800, large), and `desktop` (1920x1080, extra large). Items about dark look at the `dark` renders; the rest look at all of them.
 - **Wear** (the Wear OS catalog): `watch` (204x204, the smallest round screen) and `watch-large` (227x227, past Google's 225dp breakpoint). Both are round and dark, and the corners outside the circle are not part of the screen. Judge every item against both renders unless it names one.

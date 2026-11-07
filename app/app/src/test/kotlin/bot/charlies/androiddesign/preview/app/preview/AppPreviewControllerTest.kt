@@ -322,7 +322,7 @@ class AppPreviewControllerTest {
 
     val check = controller.checkProposal()
 
-    assertEquals(listOf("plates", "plate_detail"), check.screens.keys.toList())
+    assertEquals(listOf("plates", "plates+new_sheet", "plate_detail"), check.screens.keys.toList())
     for ((screen, views) in check.screens) {
       assertEquals(Views.all.map { it.name }, views.keys.toList(), screen)
     }
@@ -406,7 +406,8 @@ class AppPreviewControllerTest {
     assertEquals(listOf("detail"), layout("detail", "foldable").panes.keys.toList())
     assertEquals(listOf("home", "detail"), layout("detail", "tablet").panes.keys.toList())
     val region = Regex("""[A-Z]\w+ \S+ \d+|\+\d+ more""")
-    for ((screen, views) in check.screens) {
+    // An overlay render is the screen's with the overlay open, and has no summary of its own.
+    for ((screen, views) in check.screens.filterKeys { '+' !in it }) {
       for ((view, result) in views) {
         val summary = assertNotNull(result.layout, "$screen/$view")
         val json = PreviewJson.compact.encodeToString(ViewLayout.serializer(), summary)
@@ -414,6 +415,50 @@ class AppPreviewControllerTest {
         assertTrue(summary.panes.values.flatten().all(region::matches), json)
       }
     }
+  }
+
+  @Test
+  fun `check_proposal adds a render per overlay, named screen+overlay, at every view`() =
+    runBlocking {
+      controller.openProposal(verifyProposal.toString())
+
+      val check =
+        controller.checkProposal(screens = listOf("overlays"), views = listOf("light", "tablet"))
+
+      assertEquals("overlays", check.screens.keys.first())
+      for (overlay in listOf("sheet", "dialog", "menu", "time_dial", "dialog_full")) {
+        val views = assertNotNull(check.screens["overlays+$overlay"], "overlays+$overlay")
+        assertEquals(listOf("light", "tablet"), views.keys.toList())
+        assertNull(
+          views.getValue("light").layout,
+          "an overlay render leaves out the layout summary",
+        )
+      }
+      assertNotNull(check.screens.getValue("overlays").getValue("light").layout)
+      val baseRules = check.screens.getValue("overlays").getValue("light").errors.map { it.rule }
+      assertTrue(baseRules.isNotEmpty(), "the base screen has errors for the overlays to repeat")
+      for (overlay in listOf("sheet", "dialog", "menu")) {
+        val light = check.screens.getValue("overlays+$overlay").getValue("light")
+        assertTrue(
+          light.pass,
+          "overlays+$overlay repeats the base screen's errors: ${light.errors}",
+        )
+      }
+      val json = PreviewJson.compact.encodeToString(ProposalCheck.serializer(), check)
+      assertTrue(json.length < 9_000, "twelve overlays by two views: ${json.length} characters")
+    }
+
+  @Test
+  fun `check_proposal covers a whole Wear list and the Wear dialogs`() = runBlocking {
+    controller.openProposal(
+      Path.of(System.getProperty("repo.dir"))
+        .resolve("evals/verify/wear.verify.proposal.json")
+        .toString(),
+    )
+
+    val check = controller.checkProposal(screens = listOf("home"), views = listOf("watch"))
+
+    assertEquals(listOf("home", "home+sure", "home+done"), check.screens.keys.toList())
   }
 
   @Test

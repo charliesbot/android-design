@@ -95,8 +95,11 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
           "labels, one FAB, primary action). A view passes when no finding has severity error. " +
           "With no arguments it describes what the window shows: its screen, device, brightness, " +
           "color overrides, open overlays and selections. With screen or view it renders that " +
-          "screen at that view without a window. A Wear list is lazy: only the items on screen at " +
-          "the current scroll are in the tree. Read this instead of looking at screenshots.",
+          "screen at that view without a window. A scrolling Wear list is scrolled from top to end " +
+          "and every row and the edge button are in the tree, each with its bounds at the scroll " +
+          "position where it showed whole, so do not compare positions of rows that are not on " +
+          "screen together; an open overlay keeps the list at the top. Read this instead of " +
+          "looking at screenshots.",
       schema =
         schema(
           string("screen", "Screen id to render. Defaults to the screen the window is on."),
@@ -188,8 +191,11 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
           "need for get_tree. No other geometry; call get_tree for a failing view's bounds. With " +
           "no arguments it checks every screen at every view of the proposal's catalog: light, " +
           "dark, foldable, tablet and desktop for a phone proposal, watch and watch-large for a " +
-          "Wear proposal. A Wear list is lazy, so its findings cover only the items on screen at " +
-          "the top of the list. Call this after each edit instead of get_tree per view.",
+          "Wear proposal. A scrolling Wear list is scrolled from top to end, so its findings " +
+          "cover every item and the edge button. Each overlay (sheet, dialog, menu, search " +
+          "view, tooltip, snackbar, picker) is one more entry per view under \"screen+overlayId\", " +
+          "drawn with it open and checked the same way, but listing only the errors the plain screen at that view does not already report (matched by rule and component id), and no layout summary. Call this " +
+          "after each edit instead of get_tree per view.",
       schema =
         schema(
           stringList("screens", "Screen ids to check. Defaults to every screen."),

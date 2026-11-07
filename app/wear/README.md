@@ -26,11 +26,21 @@ and `Build.VERSION.withSdk` raises `SDK_INT` to 35 on the calling thread for the
 
 ## Lazy lists and the layout tree
 
-A scrolling Wear screen is a `TransformingLazyColumn`, which composes only the items on screen. The layout
-tree (`get_tree`) and its findings (`check_proposal`, `render`) therefore cover only the items visible at
-the current scroll, which for a fresh render is the top of the list; items below, and an edge button that
-only appears at the end of a long list, are not checked. Scroll the window (mouse wheel) to look further. `round-edge-clipped` skips every node under a
-scrolling `Screen` (`docs/design/wear-os-previewer.md`).
+A scrolling Wear screen is a `TransformingLazyColumn`, which composes only the items on screen, so one
+layout tree covers one scroll position. The headless render (`get_tree`, `check_proposal`, `render`)
+therefore scrolls the list itself: `ScrollingScreen` hands the list state to the `TreeRecorder`, and
+`HeadlessRenderer` drives it with the state's public `canScrollForward` and `scrollBy`, half a viewport at
+a time from the top to the end, taking a tree at each position. `ScrolledTree.merge` (core/domain) joins
+them into one tree: a node seen at several positions is kept once, from the position where it lies fully
+inside the view and is tallest (else its first appearance; an edge item is shrunk and the edge button
+grows as the list ends), and the findings are evaluated again over the merged nodes,
+so they cover every row and the edge button. The PNG stays at the top of the list; `render` also writes
+`<screen>-<view>-end.png` and `-end.tree.json`, the list scrolled to its end, and lists them as `endPng`
+and `endTree`. A list that fits the screen does not scroll and has no end render, and nothing scrolls
+behind an open overlay. The window (not the headless render) still scrolls with the mouse wheel. Merged
+bounds are screen coordinates of different scroll positions, so do not read distances between nodes
+seen at different positions. `round-edge-clipped` skips every node under a scrolling `Screen` or an
+`AlertDialog`, whose content is a scrolling list too (`docs/design/wear-os-previewer.md`).
 
 ## Rule: upstream stays byte-identical
 

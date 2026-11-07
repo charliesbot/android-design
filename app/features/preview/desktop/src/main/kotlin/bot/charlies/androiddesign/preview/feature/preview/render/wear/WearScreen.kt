@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.ScrollInfoProvider
@@ -55,6 +56,11 @@ internal fun RenderWearScreen(ctx: NodeContext) {
 @Composable
 private fun ScrollingScreen(ctx: NodeContext, edgeButton: String?) {
   val state = rememberTransformingLazyColumnState()
+  val recorder = ctx.env.recorder
+  DisposableEffect(state, recorder) {
+    recorder?.scrollable = state
+    onDispose { if (recorder?.scrollable === state) recorder.scrollable = null }
+  }
   val content:
     @Composable
     androidx.compose.foundation.layout.BoxScope.(

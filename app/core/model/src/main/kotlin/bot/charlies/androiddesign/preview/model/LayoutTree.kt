@@ -38,8 +38,8 @@ data class LayoutNode(
   val parent: String? = null,
   val primary: Boolean = false,
   /**
-   * True for a container that scrolls its children, such as a Wear Screen with `scroll` on: its
-   * descendants move and are transformed at the display's edge by design.
+   * True for a container that scrolls its children, such as a Wear Screen with `scroll` on or an
+   * AlertDialog: its descendants move and are transformed at the display's edge by design.
    */
   val scrolls: Boolean = false,
   val bounds: Bounds,

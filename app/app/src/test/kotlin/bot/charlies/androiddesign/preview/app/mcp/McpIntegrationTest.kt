@@ -170,7 +170,10 @@ class McpIntegrationTest {
     val check = call("check_proposal").json()
     assertTrue(check.getValue("pass").jsonPrimitive.boolean, check.toString())
     val screens = check.getValue("screens").jsonObject
-    assertEquals(listOf("home", "settings", "adjust", "progress"), screens.keys.toList())
+    assertEquals(
+      listOf("home", "settings", "settings+sure", "adjust", "progress"),
+      screens.keys.toList(),
+    )
     for ((screen, views) in screens) {
       assertEquals(
         listOf("watch", "watch-large"),
@@ -245,7 +248,7 @@ class McpIntegrationTest {
     val check = call("check_proposal").json()
     assertTrue(check.getValue("pass").jsonPrimitive.boolean, check.toString())
     assertEquals(
-      listOf("plates", "plate_detail"),
+      listOf("plates", "plates+new_sheet", "plate_detail"),
       check.getValue("screens").jsonObject.keys.toList(),
     )
     assertEquals(

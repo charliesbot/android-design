@@ -37,6 +37,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorType
@@ -301,6 +302,44 @@ class WearRenderTest {
   }
 
   @Test
+  fun `the tree of a scrolling screen covers the whole list, not the top of it`() {
+    val tree = HeadlessRenderer.tree(source, "settings", Views.Watch)
+    assertTrue(tree.has("goal"), "an item below the first screenful: ${tree.nodes.map { it.id }}")
+    assertTrue(tree.has("done"), "the edge button at the end of the list")
+    val edge = tree.node("done").bounds
+    assertTrue(
+      edge.y + edge.height > 180,
+      "the edge button is kept where it is shown in full: $edge",
+    )
+    val ids = tree.nodes.map { it.id }
+    assertEquals(ids.distinct(), ids, "a node seen at several positions is kept once")
+  }
+
+  @Test
+  fun `a scrolling screen's picture stays at the top and an end picture shows the last row`() {
+    val result = draw("settings")
+    val end = assertNotNull(result.end, "a scrolling screen has an end render")
+    assertTrue(end.tree.has("done"), "the end shows the edge button")
+    assertTrue(end.tree.has("goal"), "and the last rows")
+    assertTrue(
+      !end.tree.has("mode"),
+      "the top of the list is scrolled away: ${end.tree.nodes.map { it.id }}",
+    )
+    assertTrue(!result.png.contentEquals(end.png), "the end picture differs from the top one")
+    assertNull(draw("adjust").end, "a screen that does not scroll has none")
+  }
+
+  @Test
+  fun `an overlay render opens that overlay and does not scroll the list behind it`() {
+    val opened = HeadlessRenderer.image(source, "settings", Views.Watch, overlay = "sure")
+    assertTrue(opened.tree.has("sure") && opened.tree.has("yes"), "the dialog is drawn")
+    assertNull(opened.end, "nothing scrolls behind a dialog")
+    val tree = HeadlessRenderer.tree(source, "settings", Views.Watch, overlay = "sure")
+    assertTrue(tree.has("sure"))
+    assertTrue(!tree.has("goal"), "the list behind it stays at the top")
+  }
+
+  @Test
   fun `an overlay opened by open shows in the tree`() {
     val live =
       ProposalHostState(proposal, null, "settings").also {
@@ -311,6 +350,18 @@ class WearRenderTest {
     assertTrue(tree.has("yes") && tree.has("no"), "its buttons are drawn")
     val closed = HeadlessRenderer.tree(source, "settings", Views.Watch)
     assertTrue(!closed.has("sure"), "closed, the dialog is not drawn")
+  }
+
+  @Test
+  fun `an AlertDialog is recorded as scrolling, so its pills past the circle are not clipped`() {
+    val tree = HeadlessRenderer.tree(source, "settings", Views.Watch, overlay = "sure")
+    assertTrue(tree.node("sure").scrolls, "the dialog's content is a scrolling list")
+    assertTrue(!tree.node("done").scrolls, "the screen behind it is unchanged")
+    assertEquals(
+      emptyList(),
+      tree.findings.filter { it.rule == FindingRule.RoundEdgeClipped },
+      "${tree.nodes.filter { it.id in listOf("yes", "no") }.map { it.bounds }}",
+    )
   }
 
   @Test

@@ -23,6 +23,28 @@ data class ViewCheck(
   val errors: List<CheckError> = emptyList(),
   val layout: ViewLayout? = null,
 ) {
+  /**
+   * The verdict on a render of a screen with an overlay open, given [base], the verdict on the same
+   * screen at the same view without it: only the errors [base] does not already report, matched by
+   * rule and component id (a whole-view error by rule), so a repeat is dropped and what the overlay
+   * causes stays. It has no [layout], which is the screen's, and counts only the info findings
+   * beyond the base's.
+   */
+  fun overlaying(base: ViewCheck): ViewCheck {
+    val known =
+      base.errors.flatMap { e -> e.ids.ifEmpty { listOf(null) }.map { e.rule to it } }.toSet()
+    val errors = errors.mapNotNull { e ->
+      val ids = e.ids.filter { (e.rule to it) !in known }
+      val wholeView = e.ids.isEmpty() && (e.rule to null) !in known
+      if (ids.isEmpty() && !wholeView) null else e.copy(ids = ids)
+    }
+    return ViewCheck(
+      pass = errors.isEmpty(),
+      info = (info - base.info).coerceAtLeast(0),
+      errors = errors,
+    )
+  }
+
   companion object {
     /** The rule of a view whose render threw. */
     const val RENDER_ERROR = "render-error"
