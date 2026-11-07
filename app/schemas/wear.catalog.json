@@ -1342,6 +1342,7 @@
       "unevaluatedProperties": false
     }
   },
+  "x-m3-omissions": [],
   "functions": {
     "navigate": {
       "type": "object",

@@ -116,6 +116,8 @@ Selection counts and the compact-only full-screen dialog are validator rules ins
 
 ## Staying current
 
+Implemented: `ComponentDef.m3Pages`, `Catalog.m3Omissions` and `scripts/test_m3_page_coverage.py`. The `all-buttons` chooser is the only page the test exempts. Today the omissions are `navigation-drawer` and `segmented-buttons` (both `retired`); no whole page is `no-compose-api`, because the carousel gaps below are layouts inside the claimed `carousel` page.
+
 Material and Compose change on separate schedules, so coverage can drift in three ways, and each has its own signal.
 
 ### Material adds or retires a component
