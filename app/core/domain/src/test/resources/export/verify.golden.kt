@@ -3460,12 +3460,13 @@ fun CollectionsScreen(
               contentScale = ContentScale.Crop,
             )
             val itemHeroNameSmallPx = with(LocalDensity.current) { 56.dp.toPx() }
-            val itemHeroNameShown by remember {
-              derivedStateOf {
-                carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f ||
-                  carouselItemDrawInfo.size > itemHeroNameSmallPx
+            val itemHeroNameShown by
+              remember(itemHeroNameSmallPx) {
+                derivedStateOf {
+                  carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f ||
+                    carouselItemDrawInfo.size > itemHeroNameSmallPx
+                }
               }
-            }
             if (itemHeroNameShown) {
               Text(
                 item.name,

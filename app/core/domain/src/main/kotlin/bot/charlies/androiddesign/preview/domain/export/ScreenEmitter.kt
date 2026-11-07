@@ -404,7 +404,7 @@ internal class ScreenEmitter(
         "by",
         Call(
           file.use(Sym.remember),
-          emptyList(),
+          if (needsSmall) listOf(pos(smallPx)) else emptyList(),
           lambda(stmt(Call(derived, lambda = lambda(stmt(Or(condition.split(" || "))))))),
         ),
       )

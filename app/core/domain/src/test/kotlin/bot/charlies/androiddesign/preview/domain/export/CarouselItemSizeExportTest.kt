@@ -41,7 +41,7 @@ class CarouselItemSizeExportTest {
     has(source, "val titleSmallPx = with(LocalDensity.current) { 56.dp.toPx() }")
     has(
       source,
-      "val titleShown by remember { derivedStateOf { " +
+      "val titleShown by remember(titleSmallPx) { derivedStateOf { " +
         "carouselItemDrawInfo.size >= carouselItemDrawInfo.maxSize * 0.85f || " +
         "carouselItemDrawInfo.size > titleSmallPx } }",
     )

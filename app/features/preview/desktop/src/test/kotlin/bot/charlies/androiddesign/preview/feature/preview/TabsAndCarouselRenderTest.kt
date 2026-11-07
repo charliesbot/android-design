@@ -155,10 +155,10 @@ class TabsAndCarouselRenderTest {
   }
 
   /** A multi-browse carousel whose items are a Column holding one Text with [textProps]. */
-  private fun croppedCarousel(textProps: String): LayoutTree {
+  private fun croppedCarousel(textProps: String, itemProps: String = ""): LayoutTree {
     val items =
       (1..3).joinToString(",") {
-        """{"id":"col$it","component":"Column","children":["name$it"]},""" +
+        """{"id":"col$it","component":"Column","children":["name$it"]$itemProps},""" +
           """{"id":"name$it","component":"Text","text":"Shakshuka $it","maxLines":1$textProps}"""
       }
     val proposal =
@@ -191,6 +191,24 @@ class TabsAndCarouselRenderTest {
   @Test
   fun `text padded in from the edge of a carousel item is not reported`() {
     assertEquals(emptyList(), croppedCarousel(""","padding":"md"""").cropped())
+  }
+
+  @Test
+  fun `an item with its own padding is placed by its outer box, not its padded content`() {
+    val tree = croppedCarousel("", itemProps = ""","padding":"md"""")
+    val item = tree.node("col1")
+    val gallery = tree.node("gallery")
+    assertTrue(
+      kotlin.math.abs(item.bounds.y - gallery.bounds.y) < 1f,
+      "item ${item.bounds} should start at the carousel's top ${gallery.bounds}",
+    )
+    // The text sits inside the padding, so the mask does not crop it.
+    assertEquals(emptyList(), tree.cropped())
+  }
+
+  @Test
+  fun `a centered text whose glyphs are inside the item is not reported`() {
+    assertEquals(emptyList(), croppedCarousel(""","align":"center"""").cropped())
   }
 
   private fun androidx.compose.ui.test.ComposeUiTest.settleForTest() {

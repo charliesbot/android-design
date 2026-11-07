@@ -238,7 +238,10 @@ internal object CodePrinter {
       out += "${pad(indent)}$head$flat$suffix"
       return
     }
-    if (prefix.endsWith("=") && expr !is Lambda) {
+    // ktfmt breaks after `by` before a call that has both arguments and a trailing lambda.
+    val keyedDelegate =
+      prefix.endsWith(" by") && expr is Call && expr.args.isNotEmpty() && expr.lambda != null
+    if ((prefix.endsWith("=") && expr !is Lambda) || keyedDelegate) {
       out += "${pad(indent)}$prefix"
       printWithPrefix("", expr, suffix, indent + INDENT, out)
       return

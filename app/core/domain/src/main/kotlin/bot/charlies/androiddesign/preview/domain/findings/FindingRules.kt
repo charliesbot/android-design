@@ -243,15 +243,16 @@ object FindingRules {
   /**
    * A text in a carousel item that extends past the item's visible edges. The carousel's mask crops
    * an item on both sides (a large item is laid out wider than it shows), and the tree records the
-   * item as the mask shows it, so a text that starts or ends outside it is cut off. The text's box
-   * is its unclipped layout box where there is one.
+   * item as the mask shows it, so a text that starts or ends outside it is cut off. A text is
+   * judged by the glyphs it drew, as the round-edge rule does, since a centered text's box spans
+   * the item while its glyphs do not; without them, by its unclipped layout box.
    */
   private fun croppedByCarouselItem(view: View): List<Finding> =
     view.nodes.mapNotNull { node ->
       if (node.text == null || !node.isLaidOut || view.isBehindModal(node)) return@mapNotNull null
       val item = view.carouselItem(node) ?: return@mapNotNull null
       if (!item.isLaidOut) return@mapNotNull null
-      val box = node.layout ?: node.bounds
+      val box = node.text?.ink ?: node.layout ?: node.bounds
       val before = item.bounds.x - box.x
       val past = box.right() - item.right()
       val detail =
