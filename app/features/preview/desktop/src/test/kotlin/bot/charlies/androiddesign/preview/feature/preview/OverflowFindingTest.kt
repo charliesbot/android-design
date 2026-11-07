@@ -37,4 +37,21 @@ class OverflowFindingTest {
     val tree = render(singleScreen(gridOfRow("Row", 3))).tree
     assertEquals(emptyList(), tree.findings.filter { it.rule == FindingRule.Overflow })
   }
+
+  /** An open menu is wider than the icon button it is anchored to, and is meant to be. */
+  @Test
+  fun `an open menu anchored to an icon button is not reported against its anchor`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Scaffold","content":"stage"},""" +
+          """{"id":"stage","component":"Row","padding":"lg","children":["more"]},""" +
+          """{"id":"more","component":"IconButton","icon":"home","contentDescription":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"menu"}}}},""" +
+          """{"id":"menu","component":"Menu","anchor":"more","items":["a","b"]},""" +
+          """{"id":"a","component":"MenuItem","label":"Share this plate with a friend"},""" +
+          """{"id":"b","component":"MenuItem","label":"Delete"}""",
+      )
+    val tree = render(proposal) { it.interaction.open("home", "menu") }.tree
+    assertTrue(tree.has("menu"), "the menu is open: ${tree.nodes.map { it.id }}")
+    assertEquals(emptyList(), tree.findings.filter { it.rule == FindingRule.Overflow })
+  }
 }

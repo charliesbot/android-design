@@ -769,6 +769,24 @@ class FindingRulesTest {
   }
 
   @Test
+  fun `overflow measures an anchored menu against the view, not its anchor`() {
+    val anchor = node("more", "IconButton", x = 300f, w = 48f, h = 48f)
+    val menu = node("menu", "Menu", x = 200f, w = 200f, h = 120f, parent = "more")
+    assertEquals(emptyList(), overflow(anchor, menu))
+    val past =
+      node(
+        "menu",
+        "Menu",
+        x = 200f,
+        w = 211f,
+        h = 120f,
+        parent = "more",
+        layout = Bounds(200f, 0f, 300f, 120f),
+      )
+    assertEquals("ends 89 dp past the view", overflow(anchor, past).single().detail)
+  }
+
+  @Test
   fun `overflow names the parent before its children`() {
     val card = node("card", "Card", w = 150f, h = 100f)
     val row = node("row", "Row", w = 200f, h = 48f, parent = "card")

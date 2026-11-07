@@ -2,6 +2,7 @@ package bot.charlies.androiddesign.preview.domain.findings
 
 import bot.charlies.androiddesign.preview.domain.DatePickerSpec
 import bot.charlies.androiddesign.preview.domain.design.TypeScale
+import bot.charlies.androiddesign.preview.domain.validation.ScreenValidator
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.BundledFont
 import bot.charlies.androiddesign.preview.model.Catalog
@@ -375,9 +376,11 @@ object FindingRules {
    * A node laid out wider than its parent or past the edge of the view. The tree's bounds clip to
    * the window, so this reads the unclipped layout box ([LayoutNode.layout]) where there is one: a
    * row of icon buttons that needs more width than its cell gets is cut off, and the bounds alone
-   * show a box that fits. What [offscreen] already reports is left to it. Children of a carousel or
-   * a tab row scroll sideways and are exempt, as is anything behind an open modal. A child of a
-   * flagged node is left out, so the cause is named first, and at most five are reported.
+   * show a box that fits. What [offscreen] already reports is left to it. An anchored overlay (a
+   * menu, tooltip or docked picker) is measured against the view only, not the anchor it opens
+   * beside. Children of a carousel or a tab row scroll sideways and are exempt, as is anything
+   * behind an open modal. A child of a flagged node is left out, so the cause is named first, and
+   * at most five are reported.
    */
   private fun overflow(view: View): List<Finding> {
     val width = view.tree.view.width.toFloat()
@@ -390,7 +393,12 @@ object FindingRules {
           return@mapNotNull null
         }
         val box = node.layout ?: node.bounds
-        val parent = node.parent?.let(byId::get)?.takeIf { it.isLaidOut }
+        // An anchored overlay is the anchor's tree child but not inside it: only the view bounds
+        // it.
+        val parent =
+          node.parent?.let(byId::get)?.takeIf {
+            it.isLaidOut && node.type !in ScreenValidator.ANCHORED_OVERLAYS
+          }
         val parentBox = parent?.let { it.layout ?: it.bounds }
         val pastParent = parentBox?.let { box.right() - it.right() } ?: 0f
         val beforeParent = parentBox?.let { it.x - box.x } ?: 0f
