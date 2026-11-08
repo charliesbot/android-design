@@ -18,7 +18,7 @@ The through-line: **a screen feels designed when emphasis is spent deliberately.
 
 Quotes and rules marked **(Google)** come from Google's guidance. Rules marked **(default)** are this skill's starting points: follow them unless the screen's direction gives a reason not to.
 
-**Surfaces.** This skill targets phone, tablet, desktop, and Wear OS apps. For a Wear OS screen read [references/wear-os.md](references/wear-os.md) first; it wins over this file where they differ. Use the `wear-compose-m3` skill for scaffolding and migration. Tiles and home screen widgets are not yet in scope: their references hold distilled Google guidance but have not reached this skill's quality bar. When building or reviewing one anyway, read its reference first and check the result yourself (widgets use `GlanceTheme` and Glance components, [references/widgets.md](references/widgets.md)).
+**Surfaces.** This skill targets phone, tablet, desktop, and Wear OS app screens. For a Wear OS screen read [references/wear-os.md](references/wear-os.md) first; it wins over this file where they differ. Use the `wear-compose-m3` skill for scaffolding and migration. Wear tiles, watch faces, and home screen widgets are outside this skill: use the `wear-widgets` skill for Wear widgets and tiles, and the Glance skills for home screen widgets.
 
 ## Visual tooling
 
@@ -276,9 +276,7 @@ Material says how components look; Android's own design guides say how an app be
 | SF Symbols | Material Symbols, one style (outlined, rounded, or sharp) app-wide |
 
 - **Edge-to-edge:** backgrounds, images, and scrolling content draw behind the system bars; text and controls stay inset. The gesture bar stays transparent. The status bar is transparent unless content scrolls under it, then it gets one protection (Material top app bars already provide it). No tap targets inside the system gesture insets. Pin text inputs above the keyboard. Implementation: the `edge-to-edge` skill.
-- **Settings:** only infrequent preferences; frequent ones sit next to their feature. App version, licenses, and account management get their own destinations, not settings rows. The overview shows each setting's current value; 15 or more settings means subscreens whose titles match the row that opened them. Labels lead with the important word and avoid generic verbs (Set, Change, Manage, Use). A switch for on/off, never a lone radio button. Place "Settings" in secondary navigation, after everything except "Help & feedback."
-- **Onboarding and sign-in:** show value before asking for permissions or an account; ask for a permission at the moment it's needed, after explaining why; every intro step is skippable. Passkeys first ("Create a passkey," "Sign in"), with recovery always visible.
-- **Notifications:** only timely value (never promotions, "we miss you," or rating requests). Title under 30 characters, text under 40, up to three actions, a large icon only when it adds content (circular for a person, square otherwise), never for branding. Pick channel importance honestly (HIGH only for time-critical messages, calls, alarms), and a tap must open the screen that notification is about.
+- **Settings, onboarding and sign-in, permissions, notifications:** read [references/android-conventions.md](references/android-conventions.md) when the work touches a settings screen or where Settings sits in navigation, onboarding, sign-in, a permission request, or a notification.
 - **Support landscape, window resizing, and both light and dark themes** on every screen; never lock orientation or theme.
 
 ## Screen check
