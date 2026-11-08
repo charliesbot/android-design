@@ -9,6 +9,7 @@ import bot.charlies.androiddesign.preview.domain.layout.growsSemanticsBounds
 import bot.charlies.androiddesign.preview.domain.node.ChildItems
 import bot.charlies.androiddesign.preview.domain.node.childItems
 import bot.charlies.androiddesign.preview.model.CarouselItemSize
+import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
@@ -553,6 +554,9 @@ internal class ScreenEmitter(
     parts += place.leading.map(::useModifier)
     if (place.parentType == "Row" || place.parentType == "Column") {
       props.floatExpr("weight", place)?.let { parts += "weight($it)" }
+    }
+    props.floatExpr(Catalog.MAX_WIDTH, place)?.let {
+      parts += "${useModifier("widthIn")}(max = ${it.removeSuffix("f")}.${file.use(Sym.dp)})"
     }
     if (place.fillWidth) parts += useModifier("fillMaxWidth()")
     if (fillHeight) parts += useModifier("fillMaxHeight()")

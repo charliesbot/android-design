@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,6 +40,7 @@ import bot.charlies.androiddesign.preview.feature.preview.render.wear.LocalWearA
 import bot.charlies.androiddesign.preview.feature.preview.render.wear.WearStyledAmbient
 import bot.charlies.androiddesign.preview.feature.preview.render.wear.describeWear
 import bot.charlies.androiddesign.preview.feature.preview.render.wear.wearStyleBackground
+import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.ComponentNode
@@ -306,6 +308,7 @@ internal fun NodeContext.modifier(
     host.row?.let { modifier = modifier.then(with(it) { Modifier.weight(weight) }) }
   }
   modifier = modifier.then(host.scopeModifier)
+  number(Catalog.MAX_WIDTH)?.let { modifier = modifier.widthIn(max = it.dp) }
   if (host.fillWidth && def.fillsWidth(props::value)) modifier = modifier.fillMaxWidth()
   if (fillHeight && host.fillHeight) modifier = modifier.fillMaxHeight()
   if (container) modifier = modifier.then(styleBackground())

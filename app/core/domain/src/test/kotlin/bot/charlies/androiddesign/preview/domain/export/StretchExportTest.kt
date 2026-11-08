@@ -57,6 +57,17 @@ class StretchExportTest {
   }
 
   @Test
+  fun `a max width caps the stretch before it fills`() {
+    val source =
+      ExportFixtures.export(
+        column("card"),
+        """{"id":"card","component":"Card","maxWidth":480,"content":["t"]}""",
+        text("t"),
+      )
+    has(source, "Modifier.widthIn(max = 480.dp).fillMaxWidth()")
+  }
+
+  @Test
   fun `weight comes first and padding last`() {
     val source =
       ExportFixtures.export(
