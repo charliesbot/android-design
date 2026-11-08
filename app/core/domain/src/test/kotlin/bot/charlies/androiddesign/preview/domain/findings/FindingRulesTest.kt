@@ -1040,6 +1040,19 @@ class FindingRulesTest {
   }
 
   @Test
+  fun `round-edge-clipped leaves a fixed AlertDialog's full-screen box alone but checks its buttons`() {
+    // The dialog fills the display by design; what it places inside must still fit the circle.
+    val dialog =
+      tree(
+        Views.Watch,
+        node("sure", "AlertDialog", 0f, 0f, 204f, 204f, text = text("End run?")),
+        iconButton("minus", 0f, parent = "sure"),
+        iconButton("plus", 76f, parent = "sure"),
+      )
+    assertEquals(listOf("minus"), evaluate(dialog).of(FindingRule.RoundEdgeClipped).map { it.id })
+  }
+
+  @Test
   fun `round-edge-clipped passes for the same row inside the circle`() {
     val row = tree(Views.Watch, iconButton("minus", 30f), iconButton("plus", 122f))
     assertEquals(emptyList(), evaluate(row).of(FindingRule.RoundEdgeClipped))

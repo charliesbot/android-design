@@ -35,8 +35,8 @@ private fun WearScreenEmitter.alertDialog(
   p: JsonObject,
   close: bot.charlies.androiddesign.preview.domain.export.Lambda,
 ): List<Stmt> {
-  // A dialog's two buttons share its width, like the upstream confirm and dismiss buttons do.
-  val buttons = WearPlace(parentType = "AlertDialog", parentStretches = false, scopeWeight = true)
+  // A dialog's buttons keep their own size in upstream's centered row, as its defaults do.
+  val buttons = WearPlace(parentType = "AlertDialog", parentStretches = false)
   val place = WearPlace()
   val confirm =
     p.literal("confirm")?.let { emit(it, buttons) }

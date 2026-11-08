@@ -28,8 +28,8 @@ import bot.charlies.androiddesign.preview.model.ViewSpec
  * @property id The test tag and tree id. Components under a template carry the item indices
  *   (`plate_row[0]`), and components of a pane other than the one asked for carry `screen/`.
  * @property order The pre-order position: the tree lists nodes by this key.
- * @property scrolls Whether it scrolls its children, as a Wear Screen with `scroll` on or an
- *   AlertDialog does.
+ * @property scrolls Whether it scrolls its children, as a Wear Screen with `scroll` on does. An
+ *   AlertDialog's scrolling depends on its layout, so [TreeRecorder.snapshot] decides it.
  * @property text The text the node shows, when it shows any.
  * @property font The family name of its type role, when it shows text.
  */
@@ -253,11 +253,47 @@ class TreeRecorder {
       metas.values
         .sortedWith { a, b -> compareOrder(a.order, b.order) }
         .mapNotNull { meta -> node(meta, density, semantics) }
+        .let(::withDialogScrolling)
     val withoutFindings = LayoutTree(screen, view, nodes, emptyList())
     return withoutFindings.copy(
       findings =
         FindingRules.evaluate(withoutFindings, emptyDetailLists = emptyDetailLists.toList()),
     )
+  }
+
+  /**
+   * Marks an AlertDialog as scrolling when its content did not fit. Upstream measures the content
+   * and lays it out fixed when it fits, in a list otherwise; the list leaves content unplaced,
+   * scrolled out of the window, or below the dialog, while the fixed layout places all of it
+   * inside.
+   */
+  private fun withDialogScrolling(nodes: List<LayoutNode>): List<LayoutNode> {
+    val byId = nodes.associateBy { it.id }
+    return nodes.map { dialog ->
+      if (dialog.type != "AlertDialog") return@map dialog
+      val inside = dialog.bounds
+      val overflows =
+        metas.values
+          .filter { meta -> descendsFrom(meta, dialog.id) }
+          .any { meta ->
+            val node = byId[meta.id] ?: return@any true
+            // A node scrolled out of the window is clipped to an empty box.
+            node.bounds.width <= 0f ||
+              node.bounds.height <= 0f ||
+              node.bounds.y < inside.y - DIALOG_FIT_SLACK_DP ||
+              node.bounds.y + node.bounds.height > inside.y + inside.height + DIALOG_FIT_SLACK_DP
+          }
+      if (overflows) dialog.copy(scrolls = true) else dialog
+    }
+  }
+
+  private fun descendsFrom(meta: NodeMeta, ancestor: String): Boolean {
+    var parent = meta.parent
+    while (parent != null) {
+      if (parent == ancestor) return true
+      parent = metas[parent]?.parent
+    }
+    return false
   }
 
   private fun node(meta: NodeMeta, density: Float, semantics: SemanticsIndex?): LayoutNode? {
@@ -405,3 +441,6 @@ class TreeRecorder {
     private const val OVERFLOW_SLACK_DP = 0.5f
   }
 }
+
+/** Rounding slack, in dp, when checking that a dialog placed its content inside itself. */
+private const val DIALOG_FIT_SLACK_DP = 0.5f
