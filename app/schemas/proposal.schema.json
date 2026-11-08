@@ -791,6 +791,10 @@
           "x-token": "spacing",
           "description": "Padding around the component. A name from the design system's spacing scale (default: none, xxs, xs, sm, md, lg, xl, xxl, xxxl)."
         },
+        "maxWidth": {
+          "$ref": "#/$defs/DynamicNumber",
+          "description": "The widest the component draws, in dp. It still stretches up to that width where it would fill; the parent's alignment places it. Material: \"Set a max width on content and components to prevent stretching full width.\" Must be a whole number from 120 to 1600."
+        },
         "itemSize": {
           "type": "string",
           "enum": [

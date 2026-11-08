@@ -136,7 +136,7 @@ Panes fill the window's height (`android-design`, layout reference). In a propos
 
 ## Common props
 
-- Every component accepts `weight` (its share of a `Row` or `Column`) and `padding` (a spacing name), besides `showIn`, `sizeClass`, and `style`. A component inside a `Carousel` item also accepts `itemSize`.
+- Every component accepts `weight` (its share of a `Row` or `Column`), `padding` (a spacing name), and `maxWidth` (the widest it draws, in dp: it still stretches up to that width, and its parent's alignment places it), besides `showIn`, `sizeClass`, and `style`. A component inside a `Carousel` item also accepts `itemSize`.
 - Interactive components accept `primary`, `contentDescription`, and `enabled`. Set `"primary": true` on the screen's one primary action. Give every icon-only control a `contentDescription` that states its purpose.
 - `Text` truncates with `maxLines` and `"overflow": "ellipsis"`; without `overflow` it clips.
 
@@ -150,6 +150,7 @@ These are design rules, not syntax: the validator checks some of them, and the r
 - A `DockedToolbar` goes in the `Scaffold`'s `bottomBar` for global actions that stay the same across pages, never with a `NavigationBar` (the check flags both drawn at once); use a `FloatingToolbar` for actions of the current page. A `Menu` of several kinds of items is `MenuGroup`s, each a gap apart; `MenuItem` `role: "single"` selects one item per group and closes the menu, `"multi"` toggles and stays open, and `colors: "vibrant"` is for use sparingly.
 - A `TopAppBar` of `size: "medium"` or `"large"` is a flexible app bar that collapses to the small bar as the content scrolls (it draws expanded at rest), so it suits long scrolling screens with a prominent title.
 - A `badge` keeps its default colors and leaves room at the edge so it is not cut off.
+- Text keeps 40 to 60 characters per line at every size. `check_proposal` reports `line-length` for a card, a list item, or a paragraph wide enough for more. Fix it the way Material does: give the content a `maxWidth` (in a single pane, often on the pane's `Column` with `horizontalAlignment` set), make a list pane a fixed pane beside a flexible one, or move to more columns.
 
 ## Wear OS
 

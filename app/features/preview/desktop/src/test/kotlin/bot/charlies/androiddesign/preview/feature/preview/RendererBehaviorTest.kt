@@ -86,6 +86,21 @@ class RendererBehaviorTest {
   }
 
   @Test
+  fun `a max width caps a stretched card and the parent's alignment places it`() {
+    val proposal =
+      singleScreen(
+        """{"id":"root","component":"Column","horizontalAlignment":"center","children":["card"]},""" +
+          """{"id":"card","component":"Card","maxWidth":480,"content":["t"]},""" +
+          """{"id":"t","component":"Text","text":"Auto sync"}""",
+      )
+    val foldable = render(proposal, view = Views.Foldable).tree.node("card").bounds
+    assertEquals(480f, foldable.width, "$foldable")
+    assertEquals((704f - 480f) / 2, foldable.x, "$foldable")
+    val phone = render(proposal, view = Views.Light).tree.node("card").bounds
+    assertEquals(411f, phone.width, "below its max width the card still fills: $phone")
+  }
+
+  @Test
   fun `sizeClass overrides apply from medium up using the frame width`() {
     val proposal =
       singleScreen(

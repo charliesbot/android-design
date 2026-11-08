@@ -331,6 +331,7 @@ interface Catalog {
     const val SIZE_CLASS = "sizeClass"
     const val STYLE = "style"
     const val ITEM_SIZE = "itemSize"
+    const val MAX_WIDTH = "maxWidth"
   }
 }
 
@@ -376,6 +377,14 @@ object M3ExpressiveCatalog : Catalog {
 
   override val commonProps: List<PropDef> =
     COMMON_PROPS +
+      PropDef(
+        Catalog.MAX_WIDTH,
+        PropKind.Number(NumberBounds(120.0, 1600.0, whole = true)),
+        description =
+          "The widest the component draws, in dp. It still stretches up to that width where it " +
+            "would fill; the parent's alignment places it. Material: \"Set a max width on " +
+            "content and components to prevent stretching full width.\"",
+      ) +
       oneOf(
         Catalog.ITEM_SIZE,
         *CarouselItemSize.entries.map { it.wire }.toTypedArray(),

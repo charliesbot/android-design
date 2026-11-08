@@ -130,6 +130,7 @@ object FindingRules {
       navDestinations(view) +
       dockedToolbarWithNavBar(view) +
       fullScreenDatePicker(view) +
+      lineLength(view) +
       emptyDetailPane(emptyDetailLists)
   }
 
@@ -157,6 +158,10 @@ object FindingRules {
       get() = modals.isNotEmpty()
 
     /** The parents of [node], nearest first. Stops on a cycle or a missing parent. */
+    /** Every node below [node], at any depth. */
+    fun descendants(node: LayoutNode): Sequence<LayoutNode> =
+      nodes.asSequence().filter { other -> ancestors(other).any { it.id == node.id } }
+
     fun ancestors(node: LayoutNode): Sequence<LayoutNode> = sequence {
       val seen = mutableSetOf(node.id)
       var parent = node.parent?.let(byId::get)
@@ -697,6 +702,79 @@ object FindingRules {
         )
       }
   }
+
+  // region line-length
+
+  /**
+   * Material: "Across all breakpoints, adjust margins and type styles to keep text between 40–60
+   * characters per line," and "Adapt the width of the list container based on a line's length." A
+   * card, a list item, or a paragraph wide enough for a line past [MAX_LINE_CHARACTERS] fails. A
+   * character's width is measured from the single-line text drawn: the container's own text, else
+   * the median of the view's, else [BODY_CHARACTER_WIDTH]. Only the outermost such container is
+   * reported.
+   */
+  private fun lineLength(view: View): List<Finding> {
+    val viewWidth = medianCharacterWidth(view.nodes) ?: BODY_CHARACTER_WIDTH
+    val candidates =
+      view.nodes.filter { node ->
+        node.isLaidOut &&
+          when (node.type) {
+            CARD,
+            LIST_ITEM -> node.text != null || view.descendants(node).any { it.text != null }
+            TEXT -> (node.text?.lines ?: 0) > 1
+            else -> false
+          }
+      }
+    val wide = candidates.mapNotNull { node ->
+      val own = medianCharacterWidth(listOf(node) + view.descendants(node).toList())
+      val characters = node.bounds.width / (own ?: viewWidth)
+      if (characters > MAX_LINE_CHARACTERS) node to characters else null
+    }
+    val wideIds = wide.map { it.first.id }.toSet()
+    return wide
+      .filter { (node, _) -> view.ancestors(node).none { it.id in wideIds } }
+      .map { (node, characters) ->
+        errorFinding(
+          node,
+          FindingRule.LineLength,
+          "${dp(node.bounds.width)} dp wide fits about ${characters.toInt()} characters a line; " +
+            "Material keeps text at 40 to 60, so give it a maxWidth, a fixed pane, or more columns",
+        )
+      }
+  }
+
+  /**
+   * The median width of one character across [nodes]' drawn single-line text of a few words or
+   * more. Wrapped and truncated text is skipped: its ink is the widest or the visible part of a
+   * line, which no character count matches.
+   */
+  private fun medianCharacterWidth(nodes: List<LayoutNode>): Float? {
+    val widths =
+      nodes
+        .mapNotNull { node ->
+          val text = node.text ?: return@mapNotNull null
+          val ink = text.ink ?: return@mapNotNull null
+          val partial = text.lines != 1 || text.truncated || text.overflow
+          if (partial || text.value.length < MIN_MEASURED_CHARACTERS) null
+          else ink.width / text.value.length
+        }
+        .sorted()
+    return if (widths.isEmpty()) null else widths[widths.size / 2]
+  }
+
+  private const val MAX_LINE_CHARACTERS = 60
+  private const val MIN_MEASURED_CHARACTERS = 8
+
+  /**
+   * The dp a character of Material body text takes when nothing on the view can be measured; the
+   * previewer draws bodyMedium and bodyLarge at about 6 to 7.
+   */
+  private const val BODY_CHARACTER_WIDTH = 7f
+  private const val CARD = "Card"
+  private const val LIST_ITEM = "ListItem"
+  private const val TEXT = "Text"
+
+  // endregion
 
   /**
    * Material: "A single-pane layout shows a list view, while a two-pane layout shows placeholder
