@@ -44,6 +44,7 @@ import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.ComponentNode
+import bot.charlies.androiddesign.preview.model.CornerClip
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.MaterialShape
 import bot.charlies.androiddesign.preview.model.ShapeToken
@@ -313,7 +314,10 @@ internal fun NodeContext.modifier(
   number(Catalog.MAX_WIDTH)?.let { modifier = modifier.widthIn(max = it.dp) }
   if (host.fillWidth && def.fillsWidth(props::value)) modifier = modifier.fillMaxWidth()
   if (fillHeight && host.fillHeight) modifier = modifier.fillMaxHeight()
-  if (container) modifier = modifier.then(styleBackground())
+  if (container) {
+    modifier = modifier.then(styleBackground())
+    ReportClip(styleClip(scroll, padded))
+  }
   if (scroll) modifier = modifier.verticalScroll(rememberScrollState())
   if (padded) padding?.let { modifier = modifier.padding(it) }
   return modifier.then(tagged())
@@ -377,6 +381,26 @@ internal fun NodeContext.styleBackground(): Modifier {
   return Modifier.clip(shape).background(env.color(container), shape)
 }
 
+/**
+ * The rounded shape a style's `container` clips this node to, for the tree. The shape is drawn
+ * around the padding, so the padding is its outset. Null on Wear, for a scrolling container (the
+ * tree reports its whole content, not the shape's box), and for a shape with no single corner
+ * radius.
+ */
+private fun NodeContext.styleClip(scroll: Boolean, padded: Boolean): CornerClip? {
+  if (env.isWear || scroll || style.container == null) return null
+  val radius = shapeName()?.let(env::cornerRadius) ?: return null
+  return CornerClip(radius, outset = if (padded) padding?.value ?: 0f else 0f)
+}
+
+/** Reports to the recorder the rounded shape this node clips its content to, or none. */
+@Composable
+internal fun NodeContext.ReportClip(clip: CornerClip?) {
+  val recorder = env.recorder ?: return
+  val tagId = id
+  SideEffect { recorder.reportClip(tagId, clip) }
+}
+
 /** Draws [content] with the style's container and content colors as the ambient ones. */
 @Composable
 internal fun NodeContext.StyledAmbient(content: @Composable () -> Unit) {
@@ -392,6 +416,21 @@ internal fun NodeContext.StyledAmbient(content: @Composable () -> Unit) {
     ) {
       content()
     }
+  }
+}
+
+/**
+ * The corner radius in dp of the shape [name], as [shapeFor] draws it: a token's, infinite for a
+ * full shape (the tree caps it at half the shorter side), and null for a square or a
+ * `MaterialShapes` polygon, which has no single corner radius.
+ */
+internal fun RenderEnv.cornerRadius(name: String): Float? {
+  val token = ShapeToken.fromWire(name) ?: return null
+  val dp = design.rounded[token] ?: 0f
+  return when {
+    token == ShapeToken.Full || dp >= 1000f -> Float.POSITIVE_INFINITY
+    token == ShapeToken.None || dp <= 0f -> null
+    else -> dp
   }
 }
 
