@@ -237,6 +237,7 @@ The finding rules carry over from v2's runtime checks, with v2's thresholds:
 - nothing wider than the view (`offscreen`)
 - nothing laid out wider than its parent or past the view's edge (`overflow`): bounds come from semantics and clip to the window, so the tree adds a node's unclipped `layout` box when it reaches past `bounds`; the children of a carousel or tab row, which scroll sideways, are exempt
 - no text past the visible edges of its carousel item (`text-clipped`): the item's mask crops it, which the unmasked layout box would hide, so a text at the item's edge with no padding is reported with the distance it is cut by
+- no text or control past the arc of a rounded corner that clips it (`corner-clipped`): a Card, or a container its style gives a `container` and a corner `shape`, records `clip: {radius, outset}` in the tree (the outset is a styled container's padding, since its bounds are the box inside that padding), and a text is judged by its drawn lines and a control by its bounds, as on Wear's round edge
 
 A view passes when it has no error findings. Intentional truncation is reported as information, not an error.
 

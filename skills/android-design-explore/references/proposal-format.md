@@ -136,7 +136,7 @@ Panes fill the window's height (`android-design`, layout reference). In a propos
 
 ## Common props
 
-- Every component accepts `weight` (its share of a `Row` or `Column`), `padding` (a spacing name: it surrounds the component, except on a `Card` or a component whose style gives it a `container`, where it sits inside the container around the content), and `maxWidth` (the widest it draws, in dp: it still stretches up to that width, and its parent's alignment places it), besides `showIn`, `sizeClass`, and `style`. A component inside a `Carousel` item also accepts `itemSize`.
+- Every component accepts `weight` (its share of a `Row` or `Column`), `padding` (a spacing name: it surrounds the component, except on a `Card` or a component whose style gives it a `container`, where it sits inside the container around the content, and without it the rounded corners cut content flush against the edge, which `check_proposal` reports as `corner-clipped`), and `maxWidth` (the widest it draws, in dp: it still stretches up to that width, and its parent's alignment places it), besides `showIn`, `sizeClass`, and `style`. A component inside a `Carousel` item also accepts `itemSize`.
 - Interactive components accept `primary`, `contentDescription`, and `enabled`. Set `"primary": true` on the screen's one primary action. Give every icon-only control a `contentDescription` that states its purpose.
 - `Text` truncates with `maxLines` and `"overflow": "ellipsis"`; without `overflow` it clips.
 

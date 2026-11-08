@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import bot.charlies.androiddesign.preview.domain.CollapsingAppBars
 import bot.charlies.androiddesign.preview.domain.ColorStyle
 import bot.charlies.androiddesign.preview.model.ColorRole
+import bot.charlies.androiddesign.preview.model.CornerClip
 import bot.charlies.androiddesign.preview.model.TypeRole
 
 /** The scroll behavior of the Scaffold whose top bar this is, if its bar collapses. */
@@ -470,6 +471,7 @@ internal fun RenderCard(ctx: NodeContext) {
   // The padding sits inside the card, around its content, as the exporter writes it, so the
   // card's corners never cut the content.
   val modifier = ctx.modifier(padded = false)
+  ctx.ReportClip(ctx.env.cornerRadius(ctx.shapeName() ?: "medium")?.let { CornerClip(it) })
   val padding = ctx.padding
   val children: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
     ctx.Children("content", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))

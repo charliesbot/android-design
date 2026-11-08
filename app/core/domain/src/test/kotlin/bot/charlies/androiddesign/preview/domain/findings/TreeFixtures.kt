@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.domain.findings
 
 import bot.charlies.androiddesign.preview.model.Bounds
+import bot.charlies.androiddesign.preview.model.CornerClip
 import bot.charlies.androiddesign.preview.model.Finding
 import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.LayoutNode
@@ -35,6 +36,7 @@ internal fun node(
   content: String? = null,
   container: String? = null,
   ring: RingInset? = null,
+  clip: CornerClip? = null,
   variant: String? = null,
 ) =
   LayoutNode(
@@ -48,6 +50,7 @@ internal fun node(
     touch = touch,
     text = text,
     ring = ring,
+    clip = clip,
     variant = variant,
     roles = typeRole?.let { NodeRoles(type = it) },
     colors = if (content != null || container != null) NodeColors(container, content) else null,

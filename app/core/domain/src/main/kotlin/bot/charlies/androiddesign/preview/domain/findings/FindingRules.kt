@@ -126,6 +126,7 @@ object FindingRules {
       offscreen(view) +
       overflow(view) +
       roundEdgeClipped(view) +
+      cornerClipped(view) +
       carouselItems(view) +
       navDestinations(view) +
       dockedToolbarWithNavBar(view) +
@@ -570,6 +571,80 @@ object FindingRules {
           band = checkNotNull(node.ring).inset,
         )
       }
+
+  // endregion
+
+  // region corner-clipped
+
+  /**
+   * A control or a text that reaches into the rounded corner of a shape that clips it: a Card, or a
+   * container its style gives a `container` and a corner `shape` (the tree records both as
+   * [LayoutNode.clip], and a text's own style can clip it too). The corner cuts off what lies past
+   * its arc, so content flush against an unpadded card loses its first letters. As on the round
+   * edge, a text is judged by the lines it drew and a control by its bounds; a text whose lines
+   * were not measured is skipped, since a component that draws its text inside its own padding (a
+   * list item) has a box that says nothing about where the glyphs are. The deepest reach into any
+   * clipping shape is reported.
+   */
+  private fun cornerClipped(view: View): List<Finding> =
+    view.nodes
+      .filter { node ->
+        node.isLaidOut && (node.type in view.facets.actionTypes || node.text != null)
+      }
+      .mapNotNull { node ->
+        val b =
+          if (node.type in view.facets.actionTypes) node.bounds
+          else node.text?.ink ?: return@mapNotNull null
+        val (shape, reach) =
+          (sequenceOf(node) + view.ancestors(node))
+            .filter { it.clip != null && it.isLaidOut }
+            .map { it to cornerReach(it, b) }
+            .maxByOrNull { it.second } ?: return@mapNotNull null
+        if (reach <= EDGE_SLACK_DP) return@mapNotNull null
+        errorFinding(
+          node,
+          FindingRule.CornerClipped,
+          "reaches ${dp(reach)} dp into the ${dp(cornerRadius(shape))} dp corner of ${shape.id}",
+        )
+      }
+
+  /** The shape [node] clips to: its bounds grown by the clip's outset. */
+  private fun clipBox(node: LayoutNode): Bounds {
+    val outset = checkNotNull(node.clip).outset
+    val b = node.bounds
+    return Bounds(b.x - outset, b.y - outset, b.width + 2 * outset, b.height + 2 * outset)
+  }
+
+  /** The corner radius of [node]'s clip, at most half its shape's shorter side. */
+  private fun cornerRadius(node: LayoutNode): Float {
+    val box = clipBox(node)
+    return minOf(checkNotNull(node.clip).radius, box.width / 2, box.height / 2)
+  }
+
+  /**
+   * How far [b] reaches past the arcs of [shape]'s rounded corners: for each corner of [b] that
+   * lies in a corner square of the shape, its distance from that corner's arc center less the
+   * radius. A point past the shape's straight edges is measured from the edge it crossed, which the
+   * overflow rule reports on its own.
+   */
+  private fun cornerReach(shape: LayoutNode, b: Bounds): Float {
+    val box = clipBox(shape)
+    val r = cornerRadius(shape)
+    if (r <= 0f) return 0f
+    val left = box.x + r
+    val right = box.right() - r
+    val top = box.y + r
+    val bottom = box.y + box.height - r
+    return listOf(b.x, b.right()).maxOf { x ->
+      listOf(b.y, b.y + b.height).maxOf { y ->
+        val px = x.coerceIn(box.x, box.right())
+        val py = y.coerceIn(box.y, box.y + box.height)
+        val cx = if (px < left) left else if (px > right) right else return@maxOf 0f
+        val cy = if (py < top) top else if (py > bottom) bottom else return@maxOf 0f
+        maxOf(0f, hypot(px - cx, py - cy) - r)
+      }
+    }
+  }
 
   // endregion
 

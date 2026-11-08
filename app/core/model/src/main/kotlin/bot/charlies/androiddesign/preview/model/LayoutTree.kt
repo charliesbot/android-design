@@ -59,6 +59,13 @@ data class LayoutNode(
    */
   val ring: RingInset? = null,
   /**
+   * The rounded shape this node clips its content to, when it is a Card or its style gives it a
+   * `container` with a corner `shape`, and its bounds are its whole laid-out box. Omitted for every
+   * other node, and for one the window, a scroll viewport or a carousel mask cuts off, whose bounds
+   * end where no corner is drawn.
+   */
+  val clip: CornerClip? = null,
+  /**
    * The `variant` of a component whose variant changes how the layout checks treat it, which is a
    * date picker (a docked one is a dropdown, the rest are modal). Omitted for every other node.
    */
@@ -102,6 +109,14 @@ data class RingInset(val padding: Float, val stroke: Float) {
     get() = padding + stroke
 }
 
+/**
+ * The rounded shape a container clips its content to: its corner [radius] in dp, at most half the
+ * shape's shorter side as Compose draws it, and how far the shape reaches past the node's bounds on
+ * every side ([outset]). A styled container draws its shape around its own padding while the tree
+ * reports the box inside that padding, so its outset is the padding; a Card's is 0.
+ */
+@Serializable data class CornerClip(val radius: Float, val outset: Float = 0f)
+
 @Serializable
 data class NodeRoles(
   val container: String? = null,
@@ -139,6 +154,7 @@ enum class FindingRule(val wire: String) {
   @SerialName("offscreen") Offscreen("offscreen"),
   @SerialName("overflow") Overflow("overflow"),
   @SerialName("round-edge-clipped") RoundEdgeClipped("round-edge-clipped"),
+  @SerialName("corner-clipped") CornerClipped("corner-clipped"),
   @SerialName("carousel-items") CarouselItems("carousel-items"),
   @SerialName("nav-destinations") NavDestinations("nav-destinations"),
   @SerialName("docked-toolbar-nav-bar") DockedToolbarNavBar("docked-toolbar-nav-bar"),

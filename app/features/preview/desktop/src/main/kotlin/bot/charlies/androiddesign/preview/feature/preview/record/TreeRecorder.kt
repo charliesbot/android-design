@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.IntSize
 import bot.charlies.androiddesign.preview.domain.findings.FindingRules
 import bot.charlies.androiddesign.preview.model.A11yInfo
 import bot.charlies.androiddesign.preview.model.Bounds
+import bot.charlies.androiddesign.preview.model.CornerClip
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.NodeColors
@@ -22,6 +23,7 @@ import bot.charlies.androiddesign.preview.model.NodeRoles
 import bot.charlies.androiddesign.preview.model.RingInset
 import bot.charlies.androiddesign.preview.model.TextInfo
 import bot.charlies.androiddesign.preview.model.ViewSpec
+import kotlin.math.abs
 
 /**
  * What the renderer knows about a component it drew, set when the component enters the composition.
@@ -124,6 +126,7 @@ class TreeRecorder {
   private val masks = HashMap<String, () -> Rect>()
   private val maskBoxes = HashMap<String, Rect>()
   private val rings = HashMap<String, RingInset>()
+  private val clips = HashMap<String, CornerClip>()
   private val emptyDetailLists = LinkedHashSet<String>()
   private var frame: LayoutCoordinates? = null
 
@@ -152,6 +155,7 @@ class TreeRecorder {
     texts.remove(id)
     designHeights.remove(id)
     rings.remove(id)
+    clips.remove(id)
   }
 
   /**
@@ -191,6 +195,16 @@ class TreeRecorder {
   @Synchronized
   fun reportRing(id: String, band: RingInset?) {
     if (band == null) rings.remove(id) else rings[id] = band
+  }
+
+  /**
+   * A Card or a styled container reports the rounded shape it clips its content to, with a full
+   * shape's radius as infinite: the tree caps it at half the shape's shorter side. Null when it
+   * clips to no rounded shape.
+   */
+  @Synchronized
+  fun reportClip(id: String, clip: CornerClip?) {
+    if (clip == null) clips.remove(id) else clips[id] = clip
   }
 
   /**
@@ -321,6 +335,7 @@ class TreeRecorder {
         unmerged != null -> unmerged.touchBoundsInRoot.union(layout)
         else -> expandToMinimumTouch(bounds, density)
       }?.growTo(designHeights[meta.id])
+    val dp = bounds.toDp(density)
     return LayoutNode(
       id = meta.id,
       type = meta.type,
@@ -328,11 +343,15 @@ class TreeRecorder {
       primary = meta.primary,
       scrolls = meta.scrolls,
       variant = meta.variant,
-      bounds = bounds.toDp(density),
+      bounds = dp,
       layout = layout?.takeIf { it.reachesPastHorizontally(bounds, density) }?.toDp(density),
       touch = touchPx?.toDp(density),
       text = textInfo(meta, bounds, density),
       ring = rings[meta.id],
+      // A box the window, a scroll viewport or a carousel mask cuts has an edge where no corner
+      // is drawn, so its clip would be measured from the wrong place. Only the measured size is
+      // never clipped: an overlay's position is clipped by the window too.
+      clip = clips[meta.id]?.takeIf { bounds.isWhole(measuredSizes[meta.id]) }?.fitTo(dp),
       roles = meta.roles,
       colors = meta.colors,
       a11y = a11y(meta, merged),
@@ -430,6 +449,16 @@ class TreeRecorder {
     val dy = ((min - bounds.height) / 2f).coerceAtLeast(0f)
     return Rect(bounds.left - dx, bounds.top - dy, bounds.right + dx, bounds.bottom + dy)
   }
+
+  /** Whether this box is as large as the component measured, within rounding. */
+  private fun Rect.isWhole(measured: IntSize?) =
+    measured != null &&
+      abs(width - measured.width) <= SIZE_TOLERANCE_PX &&
+      abs(height - measured.height) <= SIZE_TOLERANCE_PX
+
+  /** The clip with its radius capped at half the shorter side of its shape around [bounds]. */
+  private fun CornerClip.fitTo(bounds: Bounds) =
+    copy(radius = minOf(radius, bounds.width / 2 + outset, bounds.height / 2 + outset))
 
   private fun Rect.toDp(density: Float) =
     Bounds(left / density, top / density, width / density, height / density)

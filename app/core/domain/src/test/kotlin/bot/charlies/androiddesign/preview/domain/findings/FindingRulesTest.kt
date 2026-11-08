@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.domain.findings
 
 import bot.charlies.androiddesign.preview.model.Bounds
+import bot.charlies.androiddesign.preview.model.CornerClip
 import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
@@ -1238,6 +1239,115 @@ class FindingRulesTest {
   fun `round-edge-clipped does not apply to a phone view`() {
     val wide = tree(Views.Light, iconButton("a", 0f, y = 0f), iconButton("b", 359f, y = 871f))
     assertEquals(emptyList(), evaluate(wide).of(FindingRule.RoundEdgeClipped))
+  }
+
+  // endregion
+
+  // region corner-clipped
+
+  /** A Card 300 x 80 dp at (16, 100) with Material's medium 12 dp corner. */
+  private fun card(radius: Float = 12f) =
+    node("card", "Card", 16f, 100f, 300f, 80f, clip = CornerClip(radius))
+
+  @Test
+  fun `corner-clipped fails for text flush against a card with no padding`() {
+    val title =
+      node(
+        "title",
+        "Text",
+        16f,
+        100f,
+        300f,
+        24f,
+        parent = "card",
+        text = text("Notifications", ink = Bounds(16f, 100f, 120f, 24f)),
+      )
+    for (view in listOf(Views.Light, Views.Tablet, Views.Desktop)) {
+      val finding = evaluate(tree(view, card(), title)).of(FindingRule.CornerClipped).single()
+      assertEquals("title", finding.id)
+      assertEquals(Severity.Error, finding.severity)
+      assertEquals("reaches 5 dp into the 12 dp corner of card", finding.detail)
+    }
+  }
+
+  @Test
+  fun `corner-clipped passes for text inside a padded card`() {
+    val title =
+      node(
+        "title",
+        "Text",
+        32f,
+        116f,
+        268f,
+        24f,
+        parent = "card",
+        text = text("Notifications", ink = Bounds(32f, 116f, 120f, 24f)),
+      )
+    assertEquals(
+      emptyList(),
+      evaluate(tree(Views.Light, card(), title)).of(FindingRule.CornerClipped),
+    )
+  }
+
+  @Test
+  fun `corner-clipped judges a control by its bounds, at any depth`() {
+    val row = node("row", "Row", 16f, 100f, 300f, 48f, parent = "card")
+    val close = node("close", "IconButton", 268f, 100f, 48f, 48f, parent = "row")
+    assertEquals(
+      listOf("close"),
+      evaluate(tree(Views.Light, card(), row, close)).of(FindingRule.CornerClipped).map { it.id },
+    )
+  }
+
+  @Test
+  fun `corner-clipped skips a text whose drawn lines were not measured`() {
+    // A list item draws its text inside its own padding; its box alone says nothing about the ink.
+    val item = node("item", "ListItem", 16f, 100f, 300f, 56f, parent = "card", text = text())
+    assertEquals(
+      emptyList(),
+      evaluate(tree(Views.Light, card(), item)).of(FindingRule.CornerClipped),
+    )
+  }
+
+  @Test
+  fun `corner-clipped measures a styled container's shape around its padding`() {
+    // A full pill with 4 dp of padding: the tree reports the box inside the padding, so the shape
+    // is 48 dp tall and its corners are 24 dp, which the 40 dp tall text reaches into.
+    val pill = node("pill", "Column", 24f, 100f, 280f, 40f, clip = CornerClip(9999f, outset = 4f))
+    val label =
+      node(
+        "label",
+        "Text",
+        24f,
+        100f,
+        280f,
+        40f,
+        parent = "pill",
+        text = text("Today", ink = Bounds(24f, 100f, 100f, 40f)),
+      )
+    assertEquals(
+      listOf("reaches 4.3 dp into the 24 dp corner of pill"),
+      evaluate(tree(Views.Light, pill, label)).of(FindingRule.CornerClipped).map { it.detail },
+    )
+  }
+
+  @Test
+  fun `corner-clipped checks a styled text against its own shape`() {
+    val chip =
+      node(
+        "chip",
+        "Text",
+        20f,
+        100f,
+        80f,
+        24f,
+        clip = CornerClip(9999f),
+        text = text("New", ink = Bounds(20f, 100f, 80f, 24f)),
+      )
+    assertEquals(
+      listOf("chip"),
+      evaluate(tree(Views.Light, chip)).of(FindingRule.CornerClipped).map { it.id },
+    )
   }
 
   // endregion
