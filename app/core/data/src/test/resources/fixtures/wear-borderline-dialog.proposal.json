@@ -1,0 +1,67 @@
+{
+  "format": 1,
+  "name": "Wear dialog just too long to fit",
+  "navigation": {
+    "start": "home"
+  },
+  "screens": {
+    "home": {
+      "catalogId": "https://github.com/charliesbot/android-design/catalogs/wear-m3-expressive/v1",
+      "components": [
+        {
+          "id": "root",
+          "component": "Screen",
+          "scroll": false,
+          "timeText": false,
+          "children": [
+            "open"
+          ]
+        },
+        {
+          "id": "open",
+          "component": "Button",
+          "label": "Delete",
+          "action": {
+            "functionCall": {
+              "@call": "open",
+              "args": {
+                "overlay": "sure"
+              }
+            }
+          }
+        },
+        {
+          "id": "sure",
+          "component": "AlertDialog",
+          "icon": "delete",
+          "title": "Delete this workout?",
+          "text": "Your route, splits, and heart rate leave this watch and your phone for good.",
+          "confirm": "yes",
+          "dismiss": "no"
+        },
+        {
+          "id": "yes",
+          "component": "IconButton",
+          "variant": "filled",
+          "icon": "check",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        },
+        {
+          "id": "no",
+          "component": "IconButton",
+          "variant": "filledTonal",
+          "icon": "close",
+          "action": {
+            "functionCall": {
+              "@call": "dismiss"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

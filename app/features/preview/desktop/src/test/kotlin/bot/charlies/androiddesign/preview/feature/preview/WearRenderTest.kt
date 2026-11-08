@@ -353,10 +353,69 @@ class WearRenderTest {
   }
 
   @Test
-  fun `an AlertDialog is recorded as scrolling, so its pills past the circle are not clipped`() {
+  fun `an AlertDialog whose content fits is not recorded as scrolling`() {
+    // Upstream measures the content and uses a fixed layout when it fits, a list only when not.
     val tree = HeadlessRenderer.tree(source, "settings", Views.Watch, overlay = "sure")
-    assertTrue(tree.node("sure").scrolls, "the dialog's content is a scrolling list")
+    assertTrue(!tree.node("sure").scrolls, "the dialog's content fits, so it is fixed")
     assertTrue(!tree.node("done").scrolls, "the screen behind it is unchanged")
+  }
+
+  @Test
+  fun `an AlertDialog whose content does not fit is recorded as scrolling`() {
+    val long =
+      assertIs<ProposalParse.Parsed>(
+          ProposalCodec.parse(
+            Files.readString(
+              Path.of(System.getProperty("fixtures.dir"), "wear-long-dialog.proposal.json"),
+            ),
+          ),
+        )
+        .proposal
+    val tree =
+      HeadlessRenderer.tree(
+        RenderSource(long, design(long.theme), null),
+        "home",
+        Views.Watch,
+        overlay = "sure",
+      )
+    assertTrue(tree.node("sure").scrolls, "${tree.nodes.map { it.id to it.bounds }}")
+  }
+
+  @Test
+  fun `an AlertDialog that only just overflows is recorded as scrolling`() {
+    // Its buttons are partly on screen, so their clipped box ends at the dialog's bottom edge.
+    val borderline =
+      assertIs<ProposalParse.Parsed>(
+          ProposalCodec.parse(
+            Files.readString(
+              Path.of(System.getProperty("fixtures.dir"), "wear-borderline-dialog.proposal.json"),
+            ),
+          ),
+        )
+        .proposal
+    val tree =
+      HeadlessRenderer.tree(
+        RenderSource(borderline, design(borderline.theme), null),
+        "home",
+        Views.Watch,
+        overlay = "sure",
+      )
+    val shown = tree.nodes.map { it.id to it.bounds }
+    assertTrue(tree.node("sure").scrolls, "$shown")
+    assertEquals(
+      emptyList(),
+      tree.findings.filter { it.rule == FindingRule.RoundEdgeClipped },
+      "$shown",
+    )
+  }
+
+  @Test
+  fun `an AlertDialog's own buttons keep their size and stay inside the circle`() {
+    // Upstream places the buttons at their own size in a centered row; they never share it.
+    val tree = HeadlessRenderer.tree(source, "settings", Views.Watch, overlay = "sure")
+    for (id in listOf("yes", "no")) {
+      assertTrue(tree.node(id).bounds.width <= 60f, "$id is ${tree.node(id).bounds}")
+    }
     assertEquals(
       emptyList(),
       tree.findings.filter { it.rule == FindingRule.RoundEdgeClipped },

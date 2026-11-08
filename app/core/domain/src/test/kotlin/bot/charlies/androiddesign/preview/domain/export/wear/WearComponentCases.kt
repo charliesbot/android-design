@@ -406,9 +406,9 @@ internal val wearCases: List<WearCase> =
         listOf(
           "var showSure by remember { mutableStateOf(false) }",
           "onClick = { showSure = true }",
-          "AlertDialog(visible = showSure, onDismissRequest = { showSure = false }, confirmButton = { FilledIconButton(onClick = { showSure = false }, modifier = Modifier.weight(1f).size(IconButtonDefaults.DefaultButtonSize))",
+          "AlertDialog(visible = showSure, onDismissRequest = { showSure = false }, confirmButton = { FilledIconButton(onClick = { showSure = false }, modifier = Modifier.size(IconButtonDefaults.DefaultButtonSize))",
           "title = { Text(\"Reset?\") }",
-          "dismissButton = { FilledTonalIconButton(onClick = { showSure = false }, modifier = Modifier.weight(1f).size(IconButtonDefaults.DefaultButtonSize))",
+          "dismissButton = { FilledTonalIconButton(onClick = { showSure = false }, modifier = Modifier.size(IconButtonDefaults.DefaultButtonSize))",
           "icon = { ${icon("restart_alt", "32.dp")} }",
           "text = { Text(\"Starts over.\") }",
         ),

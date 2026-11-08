@@ -3,7 +3,6 @@ package bot.charlies.androiddesign.preview.feature.preview.render.wear
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.AlertDialog
 import androidx.wear.compose.material3.AlertDialogDefaults
@@ -54,10 +53,8 @@ internal fun RenderWearAlertDialog(ctx: NodeContext) {
   }
 }
 
-/** A dialog's two buttons share its width, like the upstream confirm and dismiss buttons do. */
-@Composable
-private fun RowScope.rowMember() =
-  ChildHost(fillWidth = false, row = this, scopeModifier = Modifier.weight(1f))
+/** A dialog's buttons keep their own size in upstream's centered row, as its defaults do. */
+@Composable private fun RowScope.rowMember() = ChildHost(fillWidth = false, row = this)
 
 internal fun NodeContext.confirmationDialogLook() =
   WearLook(DialogAmbient, type = "titleMedium", shape = "full", text = string("text"))

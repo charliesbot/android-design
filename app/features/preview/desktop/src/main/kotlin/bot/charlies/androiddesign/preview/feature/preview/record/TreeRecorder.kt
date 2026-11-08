@@ -11,6 +11,7 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.IntSize
 import bot.charlies.androiddesign.preview.domain.findings.FindingRules
 import bot.charlies.androiddesign.preview.model.A11yInfo
 import bot.charlies.androiddesign.preview.model.Bounds
@@ -28,8 +29,8 @@ import bot.charlies.androiddesign.preview.model.ViewSpec
  * @property id The test tag and tree id. Components under a template carry the item indices
  *   (`plate_row[0]`), and components of a pane other than the one asked for carry `screen/`.
  * @property order The pre-order position: the tree lists nodes by this key.
- * @property scrolls Whether it scrolls its children, as a Wear Screen with `scroll` on or an
- *   AlertDialog does.
+ * @property scrolls Whether it scrolls its children, as a Wear Screen with `scroll` on does. An
+ *   AlertDialog's scrolling depends on its layout, so [TreeRecorder.snapshot] decides it.
  * @property text The text the node shows, when it shows any.
  * @property font The family name of its type role, when it shows text.
  */
@@ -115,6 +116,8 @@ class SemanticsIndex(
  */
 class TreeRecorder {
   private val metas = HashMap<String, NodeMeta>()
+  /** Each node's measured size in pixels, before any clipping or list transform. */
+  private val measuredSizes = HashMap<String, IntSize>()
   private val positions = HashMap<String, Rect>()
   private val texts = HashMap<String, MutableMap<String, TextReport>>()
   private val designHeights = HashMap<String, Float>()
@@ -144,6 +147,7 @@ class TreeRecorder {
   @Synchronized
   fun unregister(id: String) {
     metas.remove(id)
+    measuredSizes.remove(id)
     positions.remove(id)
     texts.remove(id)
     designHeights.remove(id)
@@ -203,6 +207,7 @@ class TreeRecorder {
   fun reportPosition(id: String, coordinates: LayoutCoordinates) {
     if (!coordinates.isAttached) return
     positions[id] = frameRect(coordinates)
+    measuredSizes[id] = coordinates.size
   }
 
   /** [coordinates] as a rect in the preview frame's pixels. */
@@ -253,11 +258,50 @@ class TreeRecorder {
       metas.values
         .sortedWith { a, b -> compareOrder(a.order, b.order) }
         .mapNotNull { meta -> node(meta, density, semantics) }
+        .let(::withDialogScrolling)
     val withoutFindings = LayoutTree(screen, view, nodes, emptyList())
     return withoutFindings.copy(
       findings =
         FindingRules.evaluate(withoutFindings, emptyDetailLists = emptyDetailLists.toList()),
     )
+  }
+
+  /**
+   * Marks an AlertDialog as scrolling when its content did not fit. Upstream measures the content
+   * and lays it out fixed when it fits, placing every button whole at its measured size. When it
+   * does not fit, upstream shows a list instead: a button below the window is not placed (the
+   * measure pass composed it, so its id is known) or is clipped by the window, and one near the
+   * edge is scaled down by the list. So the dialog scrolls when a button is unplaced, or its drawn
+   * box is smaller than the size it was measured at.
+   */
+  private fun withDialogScrolling(nodes: List<LayoutNode>): List<LayoutNode> {
+    val placed = nodes.associateBy { it.id }
+    return nodes.map { dialog ->
+      if (dialog.type != "AlertDialog") return@map dialog
+      val overflows =
+        metas.values
+          .filter { meta -> descendsFrom(meta, dialog.id) }
+          .any { meta ->
+            val node = placed[meta.id]
+            val drawn = positions[meta.id]
+            val measured = measuredSizes[meta.id]
+            node == null ||
+              drawn == null ||
+              measured == null ||
+              drawn.width < measured.width - DIALOG_FIT_SLACK_PX ||
+              drawn.height < measured.height - DIALOG_FIT_SLACK_PX
+          }
+      if (overflows) dialog.copy(scrolls = true) else dialog
+    }
+  }
+
+  private fun descendsFrom(meta: NodeMeta, ancestor: String): Boolean {
+    var parent = meta.parent
+    while (parent != null) {
+      if (parent == ancestor) return true
+      parent = metas[parent]?.parent
+    }
+    return false
   }
 
   private fun node(meta: NodeMeta, density: Float, semantics: SemanticsIndex?): LayoutNode? {
@@ -405,3 +449,6 @@ class TreeRecorder {
     private const val OVERFLOW_SLACK_DP = 0.5f
   }
 }
+
+/** Rounding slack, in pixels, when comparing a drawn box with its measured size. */
+private const val DIALOG_FIT_SLACK_PX = 1f

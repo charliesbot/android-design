@@ -102,7 +102,8 @@ object WearCatalog : Catalog {
 
   /**
    * Components designed to meet the round edge: `TimeText` is the screen's clock (a `Screen`
-   * option, not a component), the ring hugs the display and the edge button follows its curve.
+   * option, not a component), the ring hugs the display, the edge button follows its curve, and a
+   * dialog fills the display (upstream pads its title and text; the buttons it holds are checked).
    */
   override val roundEdgeNames: Set<String> =
     setOf(
@@ -110,6 +111,8 @@ object WearCatalog : Catalog {
       "TimeText",
       "CircularProgressIndicator",
       "SegmentedCircularProgressIndicator",
+      "AlertDialog",
+      "ConfirmationDialog",
     )
 
   /** Wear Compose sets its type scale in Roboto Flex. */
