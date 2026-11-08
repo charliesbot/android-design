@@ -1,3 +1,5 @@
+> Archived from `skills/android-design/references/` while widgets are out of the skill's scope. Restore it when widgets get eval cases and a widget catalog.
+
 # Widgets
 
 Home screen widget design from developer.android.com/design/ui/mobile/guides/widgets and Google's widget quality tiers, with Jetpack Glance APIs (glance-appwidget 1.2.0 stable, checked September 2026). Glance renders RemoteViews, so Compose Material components and `MaterialTheme` don't apply inside a widget; use Glance's own theme and components.

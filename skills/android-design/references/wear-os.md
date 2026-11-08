@@ -1,6 +1,6 @@
 # Wear OS
 
-Material 3 Expressive for Wear OS app screens, from the Wear OS design guide and androidx sources (Wear compose-material3 1.6.2 stable, checked September 2026). The phone guidance on emphasis, hero moments, and restraint still applies; this file covers what changes on a round, glanceable, battery-bound screen. Tiles, watch faces, and complications are outside this skill: their research is in `docs/research/material-3-wear-os.md`. For scaffolding (`AppScaffold`, `ScreenScaffold`), navigation, and migration, use the `wear-compose-m3` skill.
+Material 3 Expressive for Wear OS app screens, from the Wear OS design guide and androidx sources (Wear compose-material3 1.6.2 stable, checked September 2026). The phone guidance on emphasis, hero moments, and restraint still applies; this file covers what changes on a round, glanceable, battery-bound screen. Tiles, watch faces, and complications are outside this skill: use the `wear-widgets` skill for tiles and Wear widgets. For scaffolding (`AppScaffold`, `ScreenScaffold`), navigation, and migration, use the `wear-compose-m3` skill.
 
 ## Levels of expression
 

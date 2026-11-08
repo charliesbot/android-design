@@ -3,13 +3,13 @@ name: android-design-explore
 description: >
   Explore Android app ideas as live Compose proposals in the previewer app before implementation, without
   changing app code. Use to brainstorm phone, tablet, desktop, or Wear OS app screens, mock up redesign
-  alternatives, or compare and iterate on visual directions in chat. Not for Wear tiles or watch faces.
+  alternatives, or compare and iterate on visual directions in chat. Not for Wear tiles, watch faces, or widgets.
   Builds on the android-design skill, which owns every design decision.
 ---
 
 # Visual design exploration
 
-Follow the `android-design` skill for every design decision: its section 0 answers, components, theming, layout, and the screen check's questions. This skill owns the workflow. Each run is one shot: brief in, one proposal written, checked, shown, then stop. Phone, foldable, tablet, desktop, and Wear OS app screens are in scope; Wear tiles and widgets are not. Where Wear differs, the **Wear OS** section below says how.
+Follow the `android-design` skill for every design decision: its section 0 answers, components, theming, layout, and the screen check's questions. This skill owns the workflow. Each run is one shot: brief in, one proposal written, checked, shown, then stop. Phone, foldable, tablet, desktop, and Wear OS app screens are in scope; Wear tiles, watch faces, and widgets are not. Where Wear differs, the **Wear OS** section below says how.
 
 A proposal is a data file that the previewer app, a native macOS window, draws with real Compose Material 3 components and redraws on every save. You check it through the app's layout tree; the user judges taste in the window.
 
@@ -48,16 +48,10 @@ Both are ordinary tracked files; committing them follows the project's own workf
 1. Call `get_catalog` (its tool description says what it returns). It is the only component vocabulary: a component it lacks is out of reach, so build the idea from `Box`, `Row`, `Column`, `Text`, and `Shape`, or leave it out.
 2. Read `references/proposal-format.md`, then write `DESIGN.md` and the proposal, compactly as its "Writing it compactly" section says.
 
-The proposal carries these design rules; `proposal-format.md` gives the syntax for each:
+The proposal carries these design rules; `proposal-format.md` gives the syntax for each, and its [Component rules](references/proposal-format.md#component-rules) section holds the rules for tabs, carousels, overlays, choices, toolbars, menus, app bars, and badges:
 
 - The screen has one primary action, marked as primary, and it leads its peers as `android-design` section 2 describes.
 - It adapts at 600 and 840 dp: a navigation bar in compact becomes a rail from medium up, and a list's detail screen opens beside the list at expanded widths.
-- Related content at the same level of hierarchy is `Tabs`, each `Tab` navigating to its screen, scrollable when the tabs do not fit; fewer than three destinations are tabs, not a `NavigationBar`. A visual collection is a `Carousel`: at most three items with text show at compact widths, item text stays brief (at most two lines at compact widths unless the background is simple). Item text adapts to the item size: `"itemSize": "large"` on a title shows it only on the large item, and `"medium"` hides a node only on the small item.
-- Overlays (`BottomSheet`, `SideSheet`, `Dialog`, `DatePicker`, `TimePicker`, `Menu`, `SearchView`, `Tooltip`, `Snackbar`) open from a control. A modal bottom sheet opens at about half the window height and scrolls inside, so its key action sits near the top. A `SideSheet` is the modal side sheet, preferred in compact windows, and always carries its close icon button; the standard side sheet, which stays beside the main content at medium and expanded widths, is a screen with pane role `supporting` whose first element is a header with a title and a close icon button. A full-screen `Dialog` is for tasks with several steps or keyboard input and changes that are not saved at once, labels its confirm button by its outcome (Save, Send, Create) and never disables it; it is for compact windows only, so from medium up use a basic one. A date picker is a modal one in a dialog on compact windows (full-screen is recommended there) and a docked one below its text field from medium up; use modal input for dates that need no calendar. A time picker is always modal. A `Snackbar` is brief and low priority, with at most one action and no icon, and draws above the FAB and never in front of navigation.
-- A single choice from a short list is a `RadioGroup` of `RadioButton`s with exactly one `selected` (the validator checks it, since radio buttons always have one option selected), not switches. Several choices are `Checkbox`es, and a `Checkbox` with `indeterminate` is a parent whose children are only partly checked. A `Switch` takes `icons` (a check, or a check and a close) when on and off need to read at a glance. A `Slider` is `variant: "centered"` when the range crosses zero, and `orientation: "vertical"` is for a vertical slider; a `RangeSlider` stays horizontal.
-- A `DockedToolbar` goes in the `Scaffold`'s `bottomBar` for global actions that stay the same across pages, never with a `NavigationBar` (the check flags both drawn at once); use a `FloatingToolbar` for actions of the current page. A `Menu` of several kinds of items is `MenuGroup`s, each a gap apart; `MenuItem` `role: "single"` selects one item per group and closes the menu, `"multi"` toggles and stays open, and `colors: "vibrant"` is for use sparingly.
-- A `TopAppBar` of `size: "medium"` or `"large"` is a flexible app bar that collapses to the small bar as the content scrolls (it draws expanded at rest), so it suits long scrolling screens with a prominent title.
-- A `badge` on a navigation item, tab, or icon button is `true` for a small dot or a number or text of at most four characters (such as `99+`) for a large badge. It keeps its default colors, and it leaves room at the edge so it is not cut off.
 - Text truncates on purpose, with an ellipsis. Button, chip, and navigation labels fit on one line.
 
 ## Check

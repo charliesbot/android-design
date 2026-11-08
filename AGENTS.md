@@ -2,7 +2,7 @@
 
 This is the home of the `android-design` and `android-design-explore` agent skills: Material 3 Expressive design judgment for Jetpack Compose, and exploration built on it in a native previewer app. The repository holds the skills, the previewer app, the research the skills are distilled from, and the evals that check them.
 
-**Scope status:** phone, tablet, desktop, and Wear OS app screens are the validated target, with Wear eval cases. Wear tiles, watch faces, and widgets are out of scope: the guidance exists (references and research) but its results do not yet meet the quality bar, so the skills mark it out of scope, with no eval cases and no widget catalog. The previewer draws and exports Wear proposals (`docs/design/wear-os-previewer.md`). Widen the skills' descriptions to tiles and widgets only once they have eval cases and a widget catalog whose renders pass.
+**Scope status:** phone, tablet, desktop, and Wear OS app screens are the validated target, with Wear eval cases. Wear tiles, watch faces, and widgets are out of scope: the guidance exists (`docs/research/`, `docs/archive/widgets-reference.md`) but its results do not yet meet the quality bar, so the skills mark it out of scope, with no eval cases and no widget catalog. The previewer draws and exports Wear proposals (`docs/design/wear-os-previewer.md`). Widen the skills' descriptions to tiles and widgets only once they have eval cases and a widget catalog whose renders pass.
 
 It is charliesbot's personal repository. Optimize for the owner's workflow, not broad applicability.
 
