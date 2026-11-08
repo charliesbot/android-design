@@ -276,7 +276,7 @@ Material says how components look; Android's own design guides say how an app be
 | SF Symbols | Material Symbols, one style (outlined, rounded, or sharp) app-wide |
 
 - **Edge-to-edge:** backgrounds, images, and scrolling content draw behind the system bars; text and controls stay inset. The gesture bar stays transparent. The status bar is transparent unless content scrolls under it, then it gets one protection (Material top app bars already provide it). No tap targets inside the system gesture insets. Pin text inputs above the keyboard. Implementation: the `edge-to-edge` skill.
-- **Settings, onboarding and sign-in, notifications:** read [references/android-conventions.md](references/android-conventions.md) when the screen is one of these.
+- **Settings, onboarding and sign-in, permissions, notifications:** read [references/android-conventions.md](references/android-conventions.md) when the work touches a settings screen or where Settings sits in navigation, onboarding, sign-in, a permission request, or a notification.
 - **Support landscape, window resizing, and both light and dark themes** on every screen; never lock orientation or theme.
 
 ## Screen check
