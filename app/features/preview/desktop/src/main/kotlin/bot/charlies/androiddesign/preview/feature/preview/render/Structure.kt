@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.feature.preview.render
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -466,10 +467,16 @@ internal fun RenderCard(ctx: NodeContext) {
   val ambient = ctx.cardAmbient()
   val container = ctx.env.color(ambient.container)
   val action = ctx.props.action("action")
-  val modifier = ctx.modifier()
+  // The padding sits inside the card, around its content, as the exporter writes it, so the
+  // card's corners never cut the content.
+  val modifier = ctx.modifier(padded = false)
+  val padding = ctx.padding
+  val children: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
+    ctx.Children("content", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))
+  }
   val content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
     CompositionLocalProvider(LocalAmbient provides ambient) {
-      ctx.Children("content", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))
+      if (padding == null) children() else Column(Modifier.padding(padding), content = children)
     }
   }
   val colors =

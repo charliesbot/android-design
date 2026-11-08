@@ -542,13 +542,15 @@ internal class ScreenEmitter(
   /**
    * The `modifier` argument: the place's leading calls, the weight inside a row or column, the
    * stretch to the parent's width, the stretch to its height when [fillHeight] says so, any [extra]
-   * calls, and the padding last. Null when there is nothing to say.
+   * calls, and the padding last. Null when there is nothing to say. A component that pads its own
+   * content inside its container (a Card) sets [padded] to false and writes the padding there.
    */
   fun modifier(
     place: Place,
     props: JsonObject,
     vararg extra: String?,
     fillHeight: Boolean = false,
+    padded: Boolean = true,
   ): Arg? {
     val parts = mutableListOf<String>()
     parts += place.leading.map(::useModifier)
@@ -561,7 +563,9 @@ internal class ScreenEmitter(
     if (place.fillWidth) parts += useModifier("fillMaxWidth()")
     if (fillHeight) parts += useModifier("fillMaxHeight()")
     parts += extra.filterNotNull().map(::useModifier)
-    props.literal("padding")?.let { parts += "${useModifier("padding")}(${spacing(it)})" }
+    if (padded) {
+      props.literal("padding")?.let { parts += "${useModifier("padding")}(${spacing(it)})" }
+    }
     return modifierArg(place, parts)
   }
 

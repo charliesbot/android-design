@@ -79,6 +79,38 @@ class StyledContainerPaddingRenderTest {
   }
 
   /**
+   * A card's padding sits inside the card, around its content, so the rounded corners never cut the
+   * content. The tree reports the card itself, the box a tap lands on.
+   */
+  @Test
+  fun `a card's container surrounds its padding`() {
+    val proposal =
+      proposalOf(
+        "home" to
+          screenJson(
+            """{"id":"root","component":"Scaffold","content":"c"},""" +
+              """{"id":"c","component":"Card","style":"pane","content":["t"]},""" +
+              """{"id":"t","component":"Text","text":"Hello"}""",
+          ),
+        theme = theme,
+      )
+    val result = render(proposal)
+    val c = result.tree.node("c")
+    val t = result.tree.node("t")
+    val image = ImageIO.read(ByteArrayInputStream(result.png))
+    val color = containerRgb()
+
+    assertEquals(c.bounds.x + padding, t.bounds.x, "the content starts inside the padding")
+    assertEquals(c.bounds.y + padding, t.bounds.y, "the content starts below the top padding")
+    // In the padding band, level with the content: the card color, not the page.
+    val midY = t.bounds.y + t.bounds.height / 2
+    assertTrue(
+      distance(color, pixel(image, c.bounds.x + 2f, midY)) <= 12,
+      "padding is drawn on the card, got #%06X".format(pixel(image, c.bounds.x + 2f, midY)),
+    )
+  }
+
+  /**
    * A scrolling column's padding scrolls with its content, as the exporter writes it (`clip`,
    * `background`, `verticalScroll`, then `padding`): rows scroll through the padding band instead
    * of being cut off at its inner edge.
