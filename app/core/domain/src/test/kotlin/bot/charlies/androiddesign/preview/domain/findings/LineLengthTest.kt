@@ -146,4 +146,31 @@ class LineLengthTest {
       )
     assertEquals(listOf("card"), findings.map { it.id })
   }
+
+  @Test
+  fun `a truncated line is not measured, so an ellipsized phone card passes`() {
+    // 137 characters cut to one 398 dp line: the ink shows only part of the text.
+    val preview =
+      "Hey, are we still on for Saturday? I was thinking we could grab coffee first, then walk " +
+        "to the market before the honey stand sells out."
+    val findings =
+      evaluate(
+          tree(
+            Views.Light,
+            node("card", "Card", x = 0f, w = 411f, h = 96f),
+            node(
+              "preview",
+              "Text",
+              x = 6f,
+              w = 398f,
+              h = 20f,
+              parent = "card",
+              text =
+                text(preview, overflow = true, truncated = true, ink = Bounds(6f, 0f, 398f, 20f)),
+            ),
+          ),
+        )
+        .filter { it.rule == FindingRule.LineLength }
+    assertEquals(emptyList(), findings.map { it.id })
+  }
 }

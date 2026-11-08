@@ -744,7 +744,8 @@ object FindingRules {
 
   /**
    * The median width of one character across [nodes]' drawn single-line text of a few words or
-   * more. Wrapped text is skipped: its ink is the widest line, which no character count matches.
+   * more. Wrapped and truncated text is skipped: its ink is the widest or the visible part of a
+   * line, which no character count matches.
    */
   private fun medianCharacterWidth(nodes: List<LayoutNode>): Float? {
     val widths =
@@ -752,7 +753,8 @@ object FindingRules {
         .mapNotNull { node ->
           val text = node.text ?: return@mapNotNull null
           val ink = text.ink ?: return@mapNotNull null
-          if (text.lines != 1 || text.value.length < MIN_MEASURED_CHARACTERS) null
+          val partial = text.lines != 1 || text.truncated || text.overflow
+          if (partial || text.value.length < MIN_MEASURED_CHARACTERS) null
           else ink.width / text.value.length
         }
         .sorted()
