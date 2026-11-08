@@ -382,6 +382,34 @@ class WearRenderTest {
   }
 
   @Test
+  fun `an AlertDialog that only just overflows is recorded as scrolling`() {
+    // Its buttons are partly on screen, so their clipped box ends at the dialog's bottom edge.
+    val borderline =
+      assertIs<ProposalParse.Parsed>(
+          ProposalCodec.parse(
+            Files.readString(
+              Path.of(System.getProperty("fixtures.dir"), "wear-borderline-dialog.proposal.json"),
+            ),
+          ),
+        )
+        .proposal
+    val tree =
+      HeadlessRenderer.tree(
+        RenderSource(borderline, design(borderline.theme), null),
+        "home",
+        Views.Watch,
+        overlay = "sure",
+      )
+    val shown = tree.nodes.map { it.id to it.bounds }
+    assertTrue(tree.node("sure").scrolls, "$shown")
+    assertEquals(
+      emptyList(),
+      tree.findings.filter { it.rule == FindingRule.RoundEdgeClipped },
+      "$shown",
+    )
+  }
+
+  @Test
   fun `an AlertDialog's own buttons keep their size and stay inside the circle`() {
     // Upstream places the buttons at their own size in a centered row; they never share it.
     val tree = HeadlessRenderer.tree(source, "settings", Views.Watch, overlay = "sure")

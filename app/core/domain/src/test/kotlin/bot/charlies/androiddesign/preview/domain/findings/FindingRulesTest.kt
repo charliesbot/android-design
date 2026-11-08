@@ -1053,6 +1053,14 @@ class FindingRulesTest {
   }
 
   @Test
+  fun `round-edge-clipped leaves a ConfirmationDialog that fills the display alone`() {
+    // Its text ink is reported at the dialog's own corner, which lies outside the circle.
+    val dialog =
+      tree(Views.Watch, node("ok", "ConfirmationDialog", 0f, 0f, 204f, 204f, text = text("Saved")))
+    assertEquals(emptyList(), evaluate(dialog).of(FindingRule.RoundEdgeClipped))
+  }
+
+  @Test
   fun `round-edge-clipped passes for the same row inside the circle`() {
     val row = tree(Views.Watch, iconButton("minus", 30f), iconButton("plus", 122f))
     assertEquals(emptyList(), evaluate(row).of(FindingRule.RoundEdgeClipped))
