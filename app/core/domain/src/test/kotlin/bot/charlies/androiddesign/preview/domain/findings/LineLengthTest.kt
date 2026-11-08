@@ -92,4 +92,58 @@ class LineLengthTest {
       )
     assertEquals(listOf("card"), findings.map { it.id })
   }
+
+  @Test
+  fun `a screen of list items with no measured text still fails when stretched`() {
+    val findings =
+      evaluate(
+          tree(
+            Views.Desktop,
+            node("list", "Column", x = 96f, w = 1800f, h = 400f),
+            node(
+              "a",
+              "ListItem",
+              x = 96f,
+              w = 1800f,
+              h = 72f,
+              parent = "list",
+              text = text("Sync"),
+            ),
+            node(
+              "b",
+              "ListItem",
+              x = 96f,
+              y = 72f,
+              w = 1800f,
+              h = 72f,
+              parent = "list",
+              text = text("Theme"),
+            ),
+          ),
+        )
+        .filter { it.rule == FindingRule.LineLength }
+    assertEquals(listOf("a", "b"), findings.map { it.id })
+  }
+
+  @Test
+  fun `a wrapped paragraph with a short last line does not inflate the character width`() {
+    // 106 characters wrapped to two lines; the widest line spans 702.6 dp.
+    val value =
+      "Your notes back up over Wi-Fi after each edit, and the last sync finished two minutes " +
+        "ago without a problem."
+    val findings =
+      lineLength(
+        node("card", "Card", x = 24f, w = 704f, h = 120f),
+        node(
+          "body",
+          "Text",
+          x = 24f,
+          w = 704f,
+          h = 48f,
+          parent = "card",
+          text = text(value, lines = 2, ink = Bounds(24f, 0f, 702.6f, 48f)),
+        ),
+      )
+    assertEquals(listOf("card"), findings.map { it.id })
+  }
 }

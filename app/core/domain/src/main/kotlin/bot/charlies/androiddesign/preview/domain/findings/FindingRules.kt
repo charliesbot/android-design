@@ -708,11 +708,12 @@ object FindingRules {
    * Material: "Across all breakpoints, adjust margins and type styles to keep text between 40–60
    * characters per line," and "Adapt the width of the list container based on a line's length." A
    * card, a list item, or a paragraph wide enough for a line past [MAX_LINE_CHARACTERS] fails. A
-   * character's width is measured from the text drawn: the container's own text, else the median of
-   * the view's. Only the outermost such container is reported.
+   * character's width is measured from the single-line text drawn: the container's own text, else
+   * the median of the view's, else [BODY_CHARACTER_WIDTH]. Only the outermost such container is
+   * reported.
    */
   private fun lineLength(view: View): List<Finding> {
-    val viewWidth = medianCharacterWidth(view.nodes) ?: return emptyList()
+    val viewWidth = medianCharacterWidth(view.nodes) ?: BODY_CHARACTER_WIDTH
     val candidates =
       view.nodes.filter { node ->
         node.isLaidOut &&
@@ -741,15 +742,18 @@ object FindingRules {
       }
   }
 
-  /** The median width of one character across [nodes]' drawn text of a few words or more. */
+  /**
+   * The median width of one character across [nodes]' drawn single-line text of a few words or
+   * more. Wrapped text is skipped: its ink is the widest line, which no character count matches.
+   */
   private fun medianCharacterWidth(nodes: List<LayoutNode>): Float? {
     val widths =
       nodes
         .mapNotNull { node ->
           val text = node.text ?: return@mapNotNull null
           val ink = text.ink ?: return@mapNotNull null
-          val perLine = text.value.length.toFloat() / text.lines
-          if (perLine < MIN_MEASURED_CHARACTERS) null else ink.width / perLine
+          if (text.lines != 1 || text.value.length < MIN_MEASURED_CHARACTERS) null
+          else ink.width / text.value.length
         }
         .sorted()
     return if (widths.isEmpty()) null else widths[widths.size / 2]
@@ -757,6 +761,12 @@ object FindingRules {
 
   private const val MAX_LINE_CHARACTERS = 60
   private const val MIN_MEASURED_CHARACTERS = 8
+
+  /**
+   * The dp a character of Material body text takes when nothing on the view can be measured; the
+   * previewer draws bodyMedium and bodyLarge at about 6 to 7.
+   */
+  private const val BODY_CHARACTER_WIDTH = 7f
   private const val CARD = "Card"
   private const val LIST_ITEM = "ListItem"
   private const val TEXT = "Text"
