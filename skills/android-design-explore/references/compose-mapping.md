@@ -52,7 +52,7 @@ The first cell is the catalog component and the prop values that select the patt
 | `Carousel variant="centered-hero"` | `HorizontalCenteredHeroCarousel(itemSpacing = 8.dp, 16dp horizontal contentPadding)` | verified | Matches the previewer on phone and tablet. |
 | `Carousel variant="uncontained"` | `HorizontalUncontainedCarousel(itemWidth, itemSpacing = 8.dp, flingBehavior = CarouselDefaults.noSnapFlingBehavior(), 16dp horizontal contentPadding)` | verified | Matches the previewer on phone and tablet. |
 | `Carousel variant="full-screen"` | `HorizontalUncontainedCarousel` with `itemWidth` = available width, `itemSpacing = 16.dp`, `no contentPadding`, `flingBehavior = CarouselDefaults.singleAdvanceFlingBehavior(state)` | verified | No composable of its own: one edge-to-edge item with snapping. Read the width from `BoxWithConstraints`. `itemWidth` is ignored. Matches the previewer on phone and tablet. |
-| `Card variant="filled"` with `action` | `Card(onClick = ..., shape = MaterialTheme.shapes.large)` | verified | The corner is the proposal's `shape` token. The card's `content` is a `Column` inside it. |
+| `Card variant="filled"` with `action` | `Card(onClick = ..., shape = MaterialTheme.shapes.large)` | verified | The corner is the proposal's `shape` token. The card's `content` is a `Column` inside it, and the card's `padding` is that `Column`'s `Modifier.padding`, so the corners never cut the content. |
 | `Card variant="filled"` | `Card` | unverified | No `action`: no `onClick`. |
 | `Card variant="elevated"` | `ElevatedCard` | unverified | |
 | `Card variant="outlined"` | `OutlinedCard` | unverified | |

@@ -93,6 +93,18 @@ class StyleExportTest {
   }
 
   @Test
+  fun `a card pads its content inside the card`() {
+    val source =
+      export(
+        """{"id":"root","component":"Column","children":["card"]}""",
+        """{"id":"card","component":"Card","style":"hero","content":["t"]}""",
+        """{"id":"t","component":"Text","text":"Hi"}""",
+      )
+    has(source, "Card(modifier = Modifier.fillMaxWidth(),")
+    has(source, "{ Column(modifier = Modifier.padding(72.dp)) { Text(\"Hi\")")
+  }
+
+  @Test
   fun `a styled text carries its container behind its padding`() {
     val source =
       export(

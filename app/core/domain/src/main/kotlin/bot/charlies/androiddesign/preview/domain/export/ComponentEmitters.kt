@@ -1028,15 +1028,26 @@ private fun ScreenEmitter.card(node: ComponentNode, p: JsonObject, place: Place)
       Call("${m3("CardDefaults")}.cardColors", listOf(arg("containerColor", colorRole(it))))
     }
   val hasAction = p["action"] != null
+  // The padding sits inside the card, around its content, so the card's corners never cut it.
+  val content = children(p, "content", place, "Card")
+  val padded =
+    p.literal("padding")?.let {
+      val padding = listOf("${useModifier("padding")}(${spacing(it)})")
+      one(
+        file.use(Sym.Column),
+        listOf(arg("modifier", modifierChain(place.forChild("Card"), padding))),
+        content,
+      )
+    }
   return one(
     m3(callee),
     listOf(
       if (hasAction) arg("onClick", actionLambda(p["action"], node.id)) else null,
-      modifier(place, p),
+      modifier(place, p, padded = false),
       opt("shape", p.literal("shape")?.let(::shapeToken)),
       opt("colors", container),
     ),
-    children(p, "content", place, "Card"),
+    padded ?: content,
   )
 }
 

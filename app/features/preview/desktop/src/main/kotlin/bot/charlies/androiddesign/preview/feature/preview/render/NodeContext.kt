@@ -290,13 +290,15 @@ internal fun RenderNode(
  * sits inside it, and the scroll comes before the padding so the padding scrolls with the content
  * rather than cropping it. It stretches across the width when the catalog says the component does
  * and the parent lets it. The tree reports the box inside the padding, which for a scrolling
- * component is its whole content, not the viewport.
+ * component is its whole content, not the viewport. A component that pads its own content inside
+ * its container (a Card) sets [padded] to false and applies [padding] there.
  */
 @Composable
 internal fun NodeContext.modifier(
   fillHeight: Boolean = false,
   container: Boolean = false,
   scroll: Boolean = false,
+  padded: Boolean = true,
 ): Modifier {
   var modifier: Modifier = Modifier
   if (host.flexItem && growsSemanticsBounds(node, env.nodes, env.catalog, ::flexProps)) {
@@ -313,7 +315,7 @@ internal fun NodeContext.modifier(
   if (fillHeight && host.fillHeight) modifier = modifier.fillMaxHeight()
   if (container) modifier = modifier.then(styleBackground())
   if (scroll) modifier = modifier.verticalScroll(rememberScrollState())
-  padding?.let { modifier = modifier.padding(it) }
+  if (padded) padding?.let { modifier = modifier.padding(it) }
   return modifier.then(tagged())
 }
 
