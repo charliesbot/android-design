@@ -3,6 +3,7 @@ package bot.charlies.androiddesign.preview.domain.layout
 import bot.charlies.androiddesign.preview.domain.node.ChildGraph
 import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.ComponentNode
+import bot.charlies.androiddesign.preview.model.M3Component
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -30,8 +31,8 @@ fun growsSemanticsBounds(
     val props = propsOf(current)
     val own =
       when (current.component) {
-        "ProgressIndicator" -> props.any { it.literal("shape") != "circular" }
-        "Slider" -> props.any { it.literal("orientation") == "vertical" }
+        M3Component.ProgressIndicator.wire -> props.any { it.literal("shape") != "circular" }
+        M3Component.Slider.wire -> props.any { it.literal("orientation") == "vertical" }
         else -> false
       }
     return own || ChildGraph.childIds(current, catalog).mapNotNull(byId::get).any(::visit)

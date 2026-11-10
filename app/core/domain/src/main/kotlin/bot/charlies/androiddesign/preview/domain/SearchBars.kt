@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.domain
 
 import bot.charlies.androiddesign.preview.model.ComponentNode
+import bot.charlies.androiddesign.preview.model.M3Component
 import bot.charlies.androiddesign.preview.model.SizeClass
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -11,7 +12,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * override can make a bar a search bar at some widths only.
  */
 object SearchBars {
-  private const val TOP_APP_BAR = "TopAppBar"
+  private val TOP_APP_BAR = M3Component.TopAppBar.wire
   private const val SEARCH = "search"
 
   /** Whether [component] with [props] (already laid over by the size class overrides) is one. */

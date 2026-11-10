@@ -92,11 +92,17 @@ object WearCatalog : Catalog {
 
   override val supportsPanes = false
 
-  override val overlayNames: Set<String> = setOf("AlertDialog", "ConfirmationDialog")
+  override val overlayNames: Set<String> by lazy {
+    components.filter { it.overlay }.map { it.name }.toSet()
+  }
 
-  override val modalNames: Set<String> = overlayNames
+  override val modalNames: Set<String> by lazy {
+    components.filter { it.modal }.map { it.name }.toSet()
+  }
 
-  override val fabNames: Set<String> = emptySet()
+  override val fabNames: Set<String> by lazy {
+    components.filter { it.fab }.map { it.name }.toSet()
+  }
 
   override val navigationNames: List<String> = emptyList()
 
@@ -107,12 +113,12 @@ object WearCatalog : Catalog {
    */
   override val roundEdgeNames: Set<String> =
     setOf(
-      "EdgeButton",
+      WearComponent.EdgeButton.wire,
       "TimeText",
-      "CircularProgressIndicator",
-      "SegmentedCircularProgressIndicator",
-      "AlertDialog",
-      "ConfirmationDialog",
+      WearComponent.CircularProgressIndicator.wire,
+      WearComponent.SegmentedCircularProgressIndicator.wire,
+      WearComponent.AlertDialog.wire,
+      WearComponent.ConfirmationDialog.wire,
     )
 
   /** Wear Compose sets its type scale in Roboto Flex. */
@@ -466,6 +472,7 @@ private fun wearInputs(): List<ComponentDef> =
       ) + wearInteractiveProps,
       interactive = true,
       width = WidthFill.Always,
+      rangeValued = true,
     ),
     ComponentDef(
       "Stepper",
@@ -481,6 +488,7 @@ private fun wearInputs(): List<ComponentDef> =
       ) + wearInteractiveProps,
       interactive = true,
       width = WidthFill.Always,
+      rangeValued = true,
     ),
   )
 
@@ -528,6 +536,7 @@ private fun wearOverlays(): List<ComponentDef> =
         child("dismiss", "Button", "IconButton"),
       ),
       overlay = true,
+      modal = true,
     ),
     ComponentDef(
       "ConfirmationDialog",
@@ -536,6 +545,7 @@ private fun wearOverlays(): List<ComponentDef> =
       "ConfirmationDialog",
       listOf(icon(required = true), text("text")),
       overlay = true,
+      modal = true,
     ),
   )
 

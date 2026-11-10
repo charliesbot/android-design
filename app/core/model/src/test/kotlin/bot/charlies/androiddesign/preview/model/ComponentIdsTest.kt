@@ -23,6 +23,29 @@ class ComponentIdsTest {
   }
 
   @Test
+  fun `the two enums share exactly these names`() {
+    assertEquals(
+      setOf(
+        "Slider",
+        "ButtonGroup",
+        "Column",
+        "Button",
+        "Row",
+        "Image",
+        "Icon",
+        "Box",
+        "RadioButton",
+        "IconButton",
+        "Text",
+        "Spacer",
+        "Card",
+      ),
+      M3Component.entries.map { it.wire }.toSet() intersect
+        WearComponent.entries.map { it.wire }.toSet(),
+    )
+  }
+
+  @Test
   fun `an unknown wire name is null from fromWire and an error from of`() {
     assertNull(M3Component.fromWire("TabRow"))
     assertFailsWith<IllegalStateException> { WearComponent.of("Carousel") }

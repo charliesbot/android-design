@@ -3,6 +3,7 @@ package bot.charlies.androiddesign.preview.feature.preview.render
 import bot.charlies.androiddesign.preview.feature.preview.record.NodeMeta
 import bot.charlies.androiddesign.preview.feature.preview.theme.toHex
 import bot.charlies.androiddesign.preview.model.ColorRole
+import bot.charlies.androiddesign.preview.model.M3Component
 import bot.charlies.androiddesign.preview.model.NodeColors
 import bot.charlies.androiddesign.preview.model.NodeRoles
 import bot.charlies.androiddesign.preview.model.TypeRole
@@ -46,7 +47,7 @@ internal fun describe(ctx: NodeContext, ambient: Ambient): NodeMeta {
     parent = ctx.parentId,
     order = ctx.order,
     primary = ctx.primary,
-    variant = if (ctx.component == "DatePicker") ctx.enum("variant") else null,
+    variant = if (ctx.component == M3Component.DatePicker.wire) ctx.enum("variant") else null,
     interactive = interactive,
     roles =
       NodeRoles(
@@ -71,4 +72,4 @@ internal fun describe(ctx: NodeContext, ambient: Ambient): NodeMeta {
   )
 }
 
-private val ACTION_HOSTS = setOf("Card", "ListItem")
+private val ACTION_HOSTS = setOf(M3Component.Card.wire, M3Component.ListItem.wire)

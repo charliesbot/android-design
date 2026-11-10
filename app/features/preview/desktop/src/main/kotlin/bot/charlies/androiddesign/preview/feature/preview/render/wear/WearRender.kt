@@ -145,7 +145,7 @@ internal fun describeWear(ctx: NodeContext, ambient: WearAmbient): NodeMeta {
     primary = ctx.primary,
     // An AlertDialog scrolls only when its content does not fit, which the recorder learns from
     // the layout (TreeRecorder.snapshot).
-    scrolls = ctx.component == "Screen" && ctx.bool("scroll"),
+    scrolls = ctx.component == WearComponent.Screen.wire && ctx.bool("scroll"),
     interactive = interactive,
     roles =
       NodeRoles(

@@ -142,6 +142,11 @@ enum class ComponentGroup {
  *   docs.
  * @property interactive True when the user taps it, so the touch target rule applies.
  * @property overlay True for components that stay closed until an `open(id)` action.
+ * @property modal True for an overlay that dims and disables the screen behind it while open.
+ * @property fab True for a floating action button component; a pane may hold only one.
+ * @property scrollsSideways True when its children scroll sideways, so they are meant to run past
+ *   it.
+ * @property rangeValued True when its `value` and `range` props must agree.
  * @property width When the component stretches to its parent's width, if the parent allows it.
  * @property stretchesChildren True when the parent lets its children stretch to its width (a Column
  *   does; a Row does not, since that would push its siblings out: they use `weight`). The renderer
@@ -160,6 +165,10 @@ data class ComponentDef(
   val props: List<PropDef>,
   val interactive: Boolean = false,
   val overlay: Boolean = false,
+  val modal: Boolean = false,
+  val fab: Boolean = false,
+  val scrollsSideways: Boolean = false,
+  val rangeValued: Boolean = false,
   val width: WidthFill = WidthFill.Never,
   val stretchesChildren: Boolean = false,
   val m3Pages: List<String> = emptyList(),
@@ -447,14 +456,24 @@ object M3ExpressiveCatalog : Catalog {
     components.filter { it.overlay }.map { it.name }.toSet()
   }
 
-  override val modalNames: Set<String> =
-    setOf("BottomSheet", "Dialog", "SideSheet", "SearchView", "DatePicker", "TimePicker")
+  /** Overlays that dim and disable the screen behind them while open. */
+  override val modalNames: Set<String> by lazy {
+    components.filter { it.modal }.map { it.name }.toSet()
+  }
 
-  override val fabNames: Set<String> = setOf("FloatingActionButton", "FabMenu")
+  /** Names of the floating action button components; a pane may hold only one. */
+  override val fabNames: Set<String> by lazy {
+    components.filter { it.fab }.map { it.name }.toSet()
+  }
 
   /** Names of the navigation components, in the order a view lists them. */
   override val navigationNames: List<String> =
-    listOf("NavigationBar", "NavigationRail", "FloatingToolbar", "DockedToolbar")
+    listOf(
+      M3Component.NavigationBar.wire,
+      M3Component.NavigationRail.wire,
+      M3Component.FloatingToolbar.wire,
+      M3Component.DockedToolbar.wire,
+    )
 }
 
 // region registry definitions
@@ -785,6 +804,7 @@ private fun content(): List<ComponentDef> =
       stretchesChildren = true,
       width = WidthFill.Always,
       m3Pages = listOf("carousel"),
+      scrollsSideways = true,
     ),
   )
 
@@ -880,6 +900,7 @@ private fun structure(): List<ComponentDef> =
       ),
       width = WidthFill.Always,
       m3Pages = listOf("tabs"),
+      scrollsSideways = true,
     ),
     ComponentDef(
       "Tab",
@@ -1094,6 +1115,7 @@ private fun actions(): List<ComponentDef> =
       ) + interactiveProps,
       interactive = true,
       m3Pages = listOf("floating-action-button", "extended-fab"),
+      fab = true,
     ),
     ComponentDef(
       "FabMenu",
@@ -1107,6 +1129,7 @@ private fun actions(): List<ComponentDef> =
       ) + interactiveProps,
       interactive = true,
       m3Pages = listOf("fab-menu"),
+      fab = true,
     ),
     ComponentDef(
       "FabMenuItem",
@@ -1254,6 +1277,7 @@ private fun inputs(): List<ComponentDef> =
       interactive = true,
       width = WidthFill.UnlessIs("orientation", "vertical"),
       m3Pages = listOf("sliders"),
+      rangeValued = true,
     ),
     ComponentDef(
       "RangeSlider",
@@ -1268,6 +1292,7 @@ private fun inputs(): List<ComponentDef> =
       interactive = true,
       width = WidthFill.Always,
       m3Pages = listOf("sliders"),
+      rangeValued = true,
     ),
     ComponentDef(
       "RadioGroup",
@@ -1389,6 +1414,7 @@ private fun overlays(): List<ComponentDef> =
       overlay = true,
       stretchesChildren = true,
       m3Pages = listOf("bottom-sheets"),
+      modal = true,
     ),
     ComponentDef(
       "Dialog",
@@ -1415,6 +1441,7 @@ private fun overlays(): List<ComponentDef> =
       overlay = true,
       stretchesChildren = true,
       m3Pages = listOf("dialogs"),
+      modal = true,
     ),
     ComponentDef(
       "DatePicker",
@@ -1442,6 +1469,7 @@ private fun overlays(): List<ComponentDef> =
       ),
       overlay = true,
       m3Pages = listOf("date-pickers"),
+      modal = true,
     ),
     ComponentDef(
       "TimePicker",
@@ -1461,6 +1489,7 @@ private fun overlays(): List<ComponentDef> =
       ),
       overlay = true,
       m3Pages = listOf("time-pickers"),
+      modal = true,
     ),
     ComponentDef(
       "Menu",
@@ -1542,6 +1571,7 @@ private fun overlays(): List<ComponentDef> =
       overlay = true,
       stretchesChildren = true,
       m3Pages = listOf("side-sheets"),
+      modal = true,
     ),
     ComponentDef(
       "SearchView",
@@ -1558,6 +1588,7 @@ private fun overlays(): List<ComponentDef> =
       overlay = true,
       stretchesChildren = true,
       m3Pages = listOf("search"),
+      modal = true,
     ),
     ComponentDef(
       "Tooltip",
