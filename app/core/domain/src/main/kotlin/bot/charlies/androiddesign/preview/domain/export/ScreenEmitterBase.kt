@@ -15,9 +15,13 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** Where an emitter is in the template loops, which decides what a relative binding reads. */
-internal interface Scoped {
+/** What every place a component is emitted at has: its template scope and its modifier base. */
+internal interface Placement {
+  /** Where the emitter is in the template loops, which decides what a relative binding reads. */
   val scope: Scope?
+
+  /** `Modifier`, or `modifier` for the screen's root. */
+  val modifierBase: String
 }
 
 /**
@@ -105,7 +109,7 @@ internal abstract class ScreenEmitterBase(
    * value no width rule reads. A template body is written once, so a binding inside it reads the
    * sample of the first item.
    */
-  fun JsonObject.sampleValue(key: String, place: Scoped): JsonElement? {
+  fun JsonObject.sampleValue(key: String, place: Placement): JsonElement? {
     val element = this[key] ?: return null
     if (isIndex(element)) return place.scope?.let { JsonPrimitive(0) }
     val path = bindingPath(element) ?: return element
@@ -113,7 +117,7 @@ internal abstract class ScreenEmitterBase(
   }
 
   /** A flag that picks the Compose call or the modifier: its [sampleValue] as a boolean. */
-  fun JsonObject.sampleFlag(key: String, place: Scoped): Boolean? =
+  fun JsonObject.sampleFlag(key: String, place: Placement): Boolean? =
     (sampleValue(key, place) as? JsonPrimitive)?.content?.toBooleanStrictOrNull()
 
   /**
@@ -121,17 +125,17 @@ internal abstract class ScreenEmitterBase(
    * it, a finite `Float` moved into the catalog's bounds
    * ([bot.charlies.androiddesign.preview.model.ComponentDef.coerceNumber]).
    */
-  fun JsonObject.sampleNumber(component: String, key: String, place: Scoped): Double? =
+  fun JsonObject.sampleNumber(component: String, key: String, place: Placement): Double? =
     sampleReader(component, place).number(key)
 
   /** These props of [component] read with their sample values, as the previewer reads them. */
-  fun JsonObject.sampleReader(component: String, place: Scoped): PropReader =
+  fun JsonObject.sampleReader(component: String, place: Placement): PropReader =
     PropReader(def(component)) { sampleValue(it, place) }
 
   /** A string prop as a Kotlin expression: a literal, a bound value, or the loop index. */
-  fun JsonObject.text(key: String, place: Scoped): Expr? = textOf(this[key], place)
+  fun JsonObject.text(key: String, place: Placement): Expr? = textOf(this[key], place)
 
-  fun textOf(element: JsonElement?, place: Scoped): Expr? =
+  fun textOf(element: JsonElement?, place: Placement): Expr? =
     when {
       element == null || element is JsonNull -> null
       element is JsonPrimitive -> Raw(kotlinString(element.content))
@@ -149,7 +153,7 @@ internal abstract class ScreenEmitterBase(
   class BoundText(val expr: String, val values: Set<String>)
 
   /** [key] as a [BoundText] with the values it takes across the sample data, or null if unbound. */
-  fun JsonObject.boundText(key: String, place: Scoped): BoundText? {
+  fun JsonObject.boundText(key: String, place: Placement): BoundText? {
     val path = this[key]?.let(::bindingPath) ?: return null
     val values =
       resolveAll(path, place.scope).mapNotNullTo(linkedSetOf()) {
@@ -159,12 +163,12 @@ internal abstract class ScreenEmitterBase(
   }
 
   /** The Material Symbol name of [key]: a binding, else its literal, or null when it is absent. */
-  fun JsonObject.iconName(key: String, place: Scoped): IconName? =
+  fun JsonObject.iconName(key: String, place: Placement): IconName? =
     boundText(key, place)?.let { IconName.Bound(it.expr, it.values) }
       ?: literal(key)?.let { IconName.Literal(it) }
 
   /** A boolean prop: its literal, or the bound value. */
-  fun JsonObject.boolExpr(key: String, place: Scoped): String? {
+  fun JsonObject.boolExpr(key: String, place: Placement): String? {
     val element = this[key] ?: return null
     flag(key)?.let {
       return it.toString()
@@ -240,7 +244,7 @@ internal abstract class ScreenEmitterBase(
   fun templateScope(
     componentId: String,
     path: String,
-    place: Scoped,
+    place: Placement,
     indexed: Boolean,
   ): TemplateScope {
     val list = resolve(path, place.scope)
@@ -295,7 +299,7 @@ internal abstract class ScreenEmitterBase(
   fun imageDrawable(
     node: ComponentNode,
     p: JsonObject,
-    place: Scoped,
+    place: Placement,
     key: String = "src",
     asImages: Boolean = false,
   ): String {
@@ -318,6 +322,18 @@ internal abstract class ScreenEmitterBase(
   // endregion
 
   // region tokens
+
+  /** The `modifier = ...` argument for [parts], where each part is a call such as `size(40.dp)`. */
+  fun modifierArg(place: Placement, parts: List<String>): Arg? {
+    if (parts.isEmpty())
+      return if (place.modifierBase == "modifier") arg("modifier", "modifier") else null
+    return arg("modifier", modifierChain(place, parts))
+  }
+
+  fun modifierChain(place: Placement, parts: List<String>): Expr {
+    val base = if (place.modifierBase == "modifier") "modifier" else file.use(Sym.Modifier)
+    return Chain(base, parts)
+  }
 
   /** A spacing token as dp: `lg` is `16.dp` when the design system says 16. */
   fun spacing(name: String): String = dp(design.spacing[name] ?: 0f)

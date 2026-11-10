@@ -103,7 +103,7 @@ internal data class Place(
    */
   val fillHeight: Boolean = false,
   /** `Modifier`, or `modifier` for the screen's root. */
-  val modifierBase: String = "Modifier",
+  override val modifierBase: String = "Modifier",
   /** Modifier calls to put first, such as `padding(innerPadding)`. */
   val leading: List<String> = emptyList(),
   val listPosition: ListPosition? = null,
@@ -122,7 +122,7 @@ internal data class Place(
    * color. Kept when a tooltip or menu wraps the child, which makes [parentType] a `Box`.
    */
   val inToolbar: Boolean = false,
-) : Scoped {
+) : Placement {
   fun forChild(parentType: String) =
     copy(
       parentType = parentType,
@@ -567,18 +567,6 @@ internal class ScreenEmitter(
       props.literal("padding")?.let { parts += "${useModifier("padding")}(${spacing(it)})" }
     }
     return modifierArg(place, parts)
-  }
-
-  /** The `modifier = ...` argument for [parts], where each part is a call such as `size(40.dp)`. */
-  fun modifierArg(place: Place, parts: List<String>): Arg? {
-    if (parts.isEmpty())
-      return if (place.modifierBase == "modifier") arg("modifier", "modifier") else null
-    return arg("modifier", modifierChain(place, parts))
-  }
-
-  fun modifierChain(place: Place, parts: List<String>): Expr {
-    val base = if (place.modifierBase == "modifier") "modifier" else file.use(Sym.Modifier)
-    return Chain(base, parts)
   }
 
   // endregion

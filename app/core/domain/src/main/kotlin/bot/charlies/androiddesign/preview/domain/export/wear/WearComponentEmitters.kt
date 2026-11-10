@@ -10,22 +10,21 @@ import bot.charlies.androiddesign.preview.domain.export.Raw
 import bot.charlies.androiddesign.preview.domain.export.Stmt
 import bot.charlies.androiddesign.preview.domain.export.Sym
 import bot.charlies.androiddesign.preview.domain.export.arg
-import bot.charlies.androiddesign.preview.domain.export.lambda
+import bot.charlies.androiddesign.preview.domain.export.arrangement
+import bot.charlies.androiddesign.preview.domain.export.contentScale
+import bot.charlies.androiddesign.preview.domain.export.horizontalAlignment
 import bot.charlies.androiddesign.preview.domain.export.lambdaOf
+import bot.charlies.androiddesign.preview.domain.export.one
+import bot.charlies.androiddesign.preview.domain.export.opt
 import bot.charlies.androiddesign.preview.domain.export.pos
+import bot.charlies.androiddesign.preview.domain.export.spacer
 import bot.charlies.androiddesign.preview.domain.export.stmt
+import bot.charlies.androiddesign.preview.domain.export.textAlign
+import bot.charlies.androiddesign.preview.domain.export.verticalAlignment
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.WearComponent
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-
-internal fun opt(name: String, value: String?): Arg? = value?.let { arg(name, it) }
-
-internal fun opt(name: String, value: Expr?): Arg? = value?.let { arg(name, it) }
-
-/** `Component(args) { body }` as a one-statement list. */
-internal fun one(callee: String, args: List<Arg?>, body: List<Stmt>? = null): List<Stmt> =
-  listOf(stmt(Call(callee, args.filterNotNull(), body?.let { lambda(it) })))
 
 internal fun WearScreenEmitter.wear(name: String): String = file.use(WearSym.m3(name))
 
@@ -160,12 +159,7 @@ private fun WearScreenEmitter.column(
   p: JsonObject,
   place: WearPlace,
 ): List<Stmt> {
-  val alignment =
-    when (p.literal("horizontalAlignment")) {
-      "center" -> "${file.use(Sym.Alignment)}.CenterHorizontally"
-      "end" -> "${file.use(Sym.Alignment)}.End"
-      else -> null
-    }
+  val alignment = horizontalAlignment(p)
   val scroll =
     if (p.option("Column", "scroll")) {
       file.use(Sym.verticalScroll)
@@ -191,12 +185,7 @@ private fun WearScreenEmitter.row(
   p: JsonObject,
   place: WearPlace,
 ): List<Stmt> {
-  val alignment =
-    when (p.literal("verticalAlignment")) {
-      "center" -> "${file.use(Sym.Alignment)}.CenterVertically"
-      "bottom" -> "${file.use(Sym.Alignment)}.Bottom"
-      else -> null
-    }
+  val alignment = verticalAlignment(p)
   // Stretch offers the row's height to its Column and Box children, the full-height panes.
   val childPlace =
     place.forChild("Row").copy(fillHeight = p.literal("verticalAlignment") == "stretch")
@@ -213,33 +202,6 @@ private fun WearScreenEmitter.row(
       children.prelude + children.body,
     ),
   )
-}
-
-/** `Arrangement` for a column's `verticalArrangement` or a row's `horizontalArrangement`. */
-private fun WearScreenEmitter.arrangement(p: JsonObject, vertical: Boolean): String? {
-  val arrangement = file.use(Sym.Arrangement)
-  val spacing = p.literal("spacing")?.let(::spacing)
-  val kind = p.literal("arrangement")
-  val distribution =
-    mapOf(
-      "spaceBetween" to "SpaceBetween",
-      "spaceAround" to "SpaceAround",
-      "spaceEvenly" to "SpaceEvenly",
-    )
-  distribution[kind]?.let {
-    return "$arrangement.$it"
-  }
-  val alignment = file.use(Sym.Alignment)
-  val end = if (vertical) "Bottom" else "End"
-  val centered = if (vertical) "CenterVertically" else "CenterHorizontally"
-  return when {
-    spacing != null && kind == "center" -> "$arrangement.spacedBy($spacing, $alignment.$centered)"
-    spacing != null && kind == "end" -> "$arrangement.spacedBy($spacing, $alignment.$end)"
-    spacing != null -> "$arrangement.spacedBy($spacing)"
-    kind == "center" -> "$arrangement.Center"
-    kind == "end" -> "$arrangement.$end"
-    else -> null
-  }
 }
 
 private fun WearScreenEmitter.box(
@@ -260,12 +222,6 @@ private fun WearScreenEmitter.box(
       children.prelude + children.body,
     ),
   )
-}
-
-private fun WearScreenEmitter.spacer(p: JsonObject, place: WearPlace): List<Stmt> {
-  val width = p.literal("width")?.let { "${useModifier("width")}(${spacing(it)})" }
-  val height = p.literal("height")?.let { "${useModifier("height")}(${spacing(it)})" }
-  return one(file.use(Sym.Spacer), listOf(pos(modifierChain(place, listOfNotNull(width, height)))))
 }
 
 // endregion
@@ -306,13 +262,7 @@ private fun WearScreenEmitter.text(
   val style = styleOf(node)
   val overflow =
     if (p.literal("overflow") == "ellipsis") "${file.use(Sym.TextOverflow)}.Ellipsis" else null
-  val align =
-    when (p.literal("align")) {
-      "start" -> "${file.use(Sym.TextAlign)}.Start"
-      "center" -> "${file.use(Sym.TextAlign)}.Center"
-      "end" -> "${file.use(Sym.TextAlign)}.End"
-      else -> null
-    }
+  val align = textAlign(p)
   // The theme sets bodyLarge; inside a card or a stepper the upstream component sets another, and
   // the previewer draws the stated role there, so the export states it too.
   val type = p.literal("type") ?: style?.type ?: "bodyLarge"
@@ -364,15 +314,7 @@ private fun WearScreenEmitter.image(
   p: JsonObject,
   place: WearPlace,
 ): List<Stmt> {
-  val scale =
-    when (p.choice("Image", "fit")) {
-      "crop" -> "Crop"
-      "fillBounds" -> "FillBounds"
-      "fillWidth" -> "FillWidth"
-      "fillHeight" -> "FillHeight"
-      "inside" -> "Inside"
-      else -> "Fit"
-    }
+  val scale = contentScale(p)
   val aspect =
     p.numberProp("Image", "aspectRatio")?.let {
       "${useModifier("aspectRatio")}(${floatLiteral(it)})"
@@ -398,7 +340,7 @@ private fun WearScreenEmitter.image(
 
 private fun clickable(action: JsonElement?): Boolean = action is JsonObject
 
-private fun WearScreenEmitter.onClick(node: ComponentNode, p: JsonObject): Arg? =
+private fun WearScreenEmitter.onClickOrNull(node: ComponentNode, p: JsonObject): Arg? =
   if (clickable(p["action"])) arg("onClick", actionLambda(p["action"], node.id)) else null
 
 private fun WearScreenEmitter.card(
@@ -411,7 +353,7 @@ private fun WearScreenEmitter.card(
     one(
       wear("Card"),
       listOf(
-        onClick(node, p),
+        onClickOrNull(node, p),
         modifier(node, p, place, describe = true, item = true),
         if (clickable(p["action"])) enabledArg(p, place) else null,
         transformation(place),
@@ -428,7 +370,7 @@ private fun WearScreenEmitter.titleCard(
   one(
     wear("TitleCard"),
     listOf(
-      onClick(node, p),
+      onClickOrNull(node, p),
       arg("title", lambdaOf(textCall(p.textOrEmpty("title", place)))),
       modifier(node, p, place, describe = true, item = true),
       textSlot(p, "time", place),
@@ -448,7 +390,7 @@ private fun WearScreenEmitter.appCard(
   return one(
     wear("AppCard"),
     listOf(
-      onClick(node, p),
+      onClickOrNull(node, p),
       arg("appName", lambdaOf(textCall(p.textOrEmpty("appName", place)))),
       arg("title", lambdaOf(textCall(p.textOrEmpty("title", place)))),
       modifier(node, p, place, describe = true, item = true),

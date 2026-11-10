@@ -34,16 +34,8 @@ internal fun ScreenEmitter.expressive() = file.optIn(Sym.ExperimentalMaterial3Ex
 
 internal fun ScreenEmitter.experimental() = file.optIn(Sym.ExperimentalMaterial3Api)
 
-private fun opt(name: String, value: String?): Arg? = value?.let { arg(name, it) }
-
-private fun opt(name: String, value: Expr?): Arg? = value?.let { arg(name, it) }
-
 internal fun ScreenEmitter.calls(callee: String, args: List<Arg?>, body: List<Stmt>? = null): Expr =
   Call(callee, args.filterNotNull(), body?.let { lambda(it) })
-
-/** `Component(args) { body }` as a one-statement list. */
-internal fun ScreenEmitter.one(callee: String, args: List<Arg?>, body: List<Stmt>? = null) =
-  listOf(stmt(calls(callee, args, body)))
 
 internal fun ScreenEmitter.emitComponent(
   node: ComponentNode,
@@ -367,69 +359,30 @@ private fun ScreenEmitter.column(p: JsonObject, place: Place): List<Stmt> {
     if (p.sampleFlag("scroll", place) == true)
       "verticalScroll(${file.use(Sym.rememberScrollState)}())"
     else null
-  val alignment =
-    when (p.literal("horizontalAlignment")) {
-      "center" -> "${file.use(Sym.Alignment)}.CenterHorizontally"
-      "end" -> "${file.use(Sym.Alignment)}.End"
-      else -> null
-    }
   return one(
     file.use(Sym.Column),
     listOf(
       modifier(place, p, *containerBackground(p), scroll, fillHeight = place.fillHeight),
       opt("verticalArrangement", arrangement(p, vertical = true)),
-      opt("horizontalAlignment", alignment),
+      opt("horizontalAlignment", horizontalAlignment(p)),
     ),
     children(p, "children", place, "Column"),
   )
 }
 
 private fun ScreenEmitter.row(p: JsonObject, place: Place): List<Stmt> {
-  val alignment =
-    when (p.literal("verticalAlignment")) {
-      "center" -> "${file.use(Sym.Alignment)}.CenterVertically"
-      "bottom" -> "${file.use(Sym.Alignment)}.Bottom"
-      else -> null
-    }
   return one(
     file.use(Sym.Row),
     listOf(
       modifier(place, p, *containerBackground(p), fillHeight = place.fillHeight),
       opt("horizontalArrangement", arrangement(p, vertical = false)),
-      opt("verticalAlignment", alignment),
+      opt("verticalAlignment", verticalAlignment(p)),
     ),
     // Stretch is the row's height offered to its Column and Box children, the full-height panes.
     children(p, "children", place, "Row") { child, _, _ ->
       child.copy(fillHeight = p.literal("verticalAlignment") == "stretch")
     },
   )
-}
-
-/** `Arrangement` for a column's `verticalArrangement` or a row's `horizontalArrangement`. */
-private fun ScreenEmitter.arrangement(p: JsonObject, vertical: Boolean): String? {
-  val arrangement = file.use(Sym.Arrangement)
-  val spacing = p.literal("spacing")?.let(::spacing)
-  val kind = p.literal("arrangement")
-  val distribution =
-    mapOf(
-      "spaceBetween" to "SpaceBetween",
-      "spaceAround" to "SpaceAround",
-      "spaceEvenly" to "SpaceEvenly",
-    )
-  distribution[kind]?.let {
-    return "$arrangement.$it"
-  }
-  val alignment = file.use(Sym.Alignment)
-  val end = if (vertical) "Bottom" else "End"
-  val centered = if (vertical) "CenterVertically" else "CenterHorizontally"
-  return when {
-    spacing != null && kind == "center" -> "$arrangement.spacedBy($spacing, $alignment.$centered)"
-    spacing != null && kind == "end" -> "$arrangement.spacedBy($spacing, $alignment.$end)"
-    spacing != null -> "$arrangement.spacedBy($spacing)"
-    kind == "center" -> "$arrangement.Center"
-    kind == "end" -> "$arrangement.$end"
-    else -> null
-  }
 }
 
 private fun ScreenEmitter.box(p: JsonObject, place: Place): List<Stmt> {
@@ -487,13 +440,6 @@ private fun ScreenEmitter.flexBox(p: JsonObject, place: Place): List<Stmt> {
   )
 }
 
-private fun ScreenEmitter.spacer(p: JsonObject, place: Place): List<Stmt> {
-  val width = p.literal("width")?.let { "${useModifier("width")}(${spacing(it)})" }
-  val height = p.literal("height")?.let { "${useModifier("height")}(${spacing(it)})" }
-  val chain = modifierChain(place, listOfNotNull(width, height))
-  return one(file.use(Sym.Spacer), listOf(pos(chain)))
-}
-
 private fun ScreenEmitter.divider(p: JsonObject, place: Place): List<Stmt> =
   one(
     m3(if (p.sampleFlag("vertical", place) == true) "VerticalDivider" else "HorizontalDivider"),
@@ -523,13 +469,7 @@ private fun ScreenEmitter.textComponent(p: JsonObject, place: Place): List<Stmt>
       "clip" -> "${file.use(Sym.TextOverflow)}.Clip"
       else -> null
     }
-  val align =
-    when (p.literal("align")) {
-      "start" -> "${file.use(Sym.TextAlign)}.Start"
-      "center" -> "${file.use(Sym.TextAlign)}.Center"
-      "end" -> "${file.use(Sym.TextAlign)}.End"
-      else -> null
-    }
+  val align = textAlign(p)
   val text = p.text("text", place) ?: Raw("\"\"")
   return listOf(
     stmt(
@@ -572,15 +512,7 @@ private fun ScreenEmitter.iconComponent(p: JsonObject, place: Place): List<Stmt>
 
 private fun ScreenEmitter.image(node: ComponentNode, p: JsonObject, place: Place): List<Stmt> {
   val drawable = imageDrawable(node, p, place)
-  val scale =
-    when (p.choice("Image", "fit")) {
-      "crop" -> "Crop"
-      "fillBounds" -> "FillBounds"
-      "fillWidth" -> "FillWidth"
-      "fillHeight" -> "FillHeight"
-      "inside" -> "Inside"
-      else -> "Fit"
-    }
+  val scale = contentScale(p)
   val shape = p.literal("shape")?.let { "${useModifier("clip")}(${shapeToken(it)})" }
   val aspect = p.floatExpr("aspectRatio", place)?.let { "${useModifier("aspectRatio")}($it)" }
   return one(
