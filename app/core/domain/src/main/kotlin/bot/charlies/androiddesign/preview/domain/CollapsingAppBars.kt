@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.domain
 
 import bot.charlies.androiddesign.preview.model.ComponentNode
+import bot.charlies.androiddesign.preview.model.M3Component
 import bot.charlies.androiddesign.preview.model.SizeClass
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -11,7 +12,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * flexible app bars collapse to the small bar; the other sizes do not.
  */
 object CollapsingAppBars {
-  private const val TOP_APP_BAR = "TopAppBar"
+  private val TOP_APP_BAR = M3Component.TopAppBar.wire
   private val COLLAPSING_SIZES = setOf("medium", "large")
 
   /** Whether [component] with [props] (already laid over by the size class overrides) collapses. */

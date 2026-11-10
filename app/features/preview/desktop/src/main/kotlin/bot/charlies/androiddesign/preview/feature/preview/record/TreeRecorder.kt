@@ -23,6 +23,7 @@ import bot.charlies.androiddesign.preview.model.NodeRoles
 import bot.charlies.androiddesign.preview.model.RingInset
 import bot.charlies.androiddesign.preview.model.TextInfo
 import bot.charlies.androiddesign.preview.model.ViewSpec
+import bot.charlies.androiddesign.preview.model.WearComponent
 import kotlin.math.abs
 
 /**
@@ -291,7 +292,7 @@ class TreeRecorder {
   private fun withDialogScrolling(nodes: List<LayoutNode>): List<LayoutNode> {
     val placed = nodes.associateBy { it.id }
     return nodes.map { dialog ->
-      if (dialog.type != "AlertDialog") return@map dialog
+      if (dialog.type != WearComponent.AlertDialog.wire) return@map dialog
       val overflows =
         metas.values
           .filter { meta -> descendsFrom(meta, dialog.id) }

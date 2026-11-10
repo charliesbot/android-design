@@ -11,7 +11,7 @@ import bot.charlies.androiddesign.preview.model.Finding
 import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
-import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
+import bot.charlies.androiddesign.preview.model.M3Component
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.SizeClass
 import bot.charlies.androiddesign.preview.model.TypeGroup
@@ -49,12 +49,6 @@ object FindingRules {
   /** Slack on a child reaching past its parent or the window. */
   private const val OVERFLOW_SLACK_DP = 0.5f
 
-  /** Components whose children scroll sideways, so they are meant to run past their parent. */
-  private val horizontalScrollers = setOf(CAROUSEL, TABS)
-
-  internal val fabTypes = M3ExpressiveCatalog.fabNames
-  internal val modalTypes = M3ExpressiveCatalog.modalNames
-
   /** The component sets the rules read, derived once per catalog. */
   private class Facets(val catalog: Catalog) {
     /**
@@ -66,10 +60,14 @@ object FindingRules {
           it.interactive && it.group in setOf(ComponentGroup.Actions, ComponentGroup.Chips)
         }
         .map { it.name }
-        .toSet() - "FabMenuItem"
+        .toSet() - M3Component.FabMenuItem.wire
 
     val interactiveTypes: Set<String> =
       catalog.components.filter { it.interactive }.map { it.name }.toSet()
+
+    /** Components whose children scroll sideways, so they are meant to run past their parent. */
+    val horizontalScrollers: Set<String> =
+      catalog.components.filter { it.scrollsSideways }.map { it.name }.toSet()
 
     /**
      * Controls whose label must stay on one line (Google: "Don't truncate or wrap label text"):
@@ -444,7 +442,8 @@ object FindingRules {
     val flagged =
       view.nodes.mapNotNull { node ->
         if (!node.isLaidOut || view.isBehindModal(node)) return@mapNotNull null
-        if (view.ancestors(node).any { it.type in horizontalScrollers }) return@mapNotNull null
+        if (view.ancestors(node).any { it.type in view.facets.horizontalScrollers })
+          return@mapNotNull null
         if (node.right() > width + EDGE_SLACK_DP || node.bounds.x < -EDGE_SLACK_DP) {
           return@mapNotNull null
         }
@@ -700,8 +699,7 @@ object FindingRules {
   private fun holdsText(node: LayoutNode, children: Map<String?, List<LayoutNode>>): Boolean =
     node.text != null || children[node.id].orEmpty().any { holdsText(it, children) }
 
-  private const val CAROUSEL = "Carousel"
-  private const val TABS = "Tabs"
+  private val CAROUSEL = M3Component.Carousel.wire
   private const val MAX_COMPACT_CAROUSEL_ITEMS = 3
 
   // endregion
@@ -845,9 +843,9 @@ object FindingRules {
    * previewer draws bodyMedium and bodyLarge at about 6 to 7.
    */
   private const val BODY_CHARACTER_WIDTH = 7f
-  private const val CARD = "Card"
-  private const val LIST_ITEM = "ListItem"
-  private const val TEXT = "Text"
+  private val CARD = M3Component.Card.wire
+  private val LIST_ITEM = M3Component.ListItem.wire
+  private val TEXT = M3Component.Text.wire
 
   // endregion
 
@@ -868,10 +866,10 @@ object FindingRules {
       )
     }
 
-  private const val DATE_PICKER = "DatePicker"
-  private const val DOCKED_TOOLBAR = "DockedToolbar"
-  private const val NAVIGATION_BAR = "NavigationBar"
-  private const val NAVIGATION_BAR_ITEM = "NavigationBarItem"
+  private val DATE_PICKER = M3Component.DatePicker.wire
+  private val DOCKED_TOOLBAR = M3Component.DockedToolbar.wire
+  private val NAVIGATION_BAR = M3Component.NavigationBar.wire
+  private val NAVIGATION_BAR_ITEM = M3Component.NavigationBarItem.wire
   private const val MIN_DESTINATIONS = 3
 
   // endregion

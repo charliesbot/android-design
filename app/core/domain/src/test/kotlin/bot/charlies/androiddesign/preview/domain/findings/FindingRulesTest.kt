@@ -4,7 +4,6 @@ import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.CornerClip
 import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.LayoutNode
-import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.RingInset
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.ViewSpec
@@ -12,7 +11,6 @@ import bot.charlies.androiddesign.preview.model.Views
 import bot.charlies.androiddesign.preview.model.WearCatalog
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FindingRulesTest {
@@ -1384,15 +1382,6 @@ class FindingRulesTest {
     val clean = tree(nodes = arrayOf(button("cook", primary = true)))
     assertEquals(emptyList(), evaluate(clean))
     assertTrue(clean.pass)
-  }
-
-  @Test
-  fun `every rule that needs the catalog names a real component`() {
-    FindingRules.fabTypes.forEach { assertTrue(M3ExpressiveCatalog.find(it) != null, it) }
-    FindingRules.modalTypes.forEach {
-      assertTrue(M3ExpressiveCatalog.find(it)?.overlay == true, it)
-    }
-    assertNull(M3ExpressiveCatalog.find("NotAComponent"))
   }
 
   // endregion

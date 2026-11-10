@@ -5,6 +5,7 @@ import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.M3Component
 import bot.charlies.androiddesign.preview.model.Proposal
 import kotlin.math.roundToInt
 import kotlinx.serialization.Serializable
@@ -78,7 +79,7 @@ object LayoutSummary {
   /** The id of a scaffold's content, or of the root itself for any other root. */
   private fun contentRootOf(components: List<ComponentNode>): String? {
     val root = components.firstOrNull { it.id == ComponentNode.ROOT_ID } ?: return null
-    if (root.component != "Scaffold") return root.id
+    if (root.component != M3Component.Scaffold.wire) return root.id
     return (root.props["content"] as? JsonPrimitive)?.takeIf { it.isString }?.content
   }
 

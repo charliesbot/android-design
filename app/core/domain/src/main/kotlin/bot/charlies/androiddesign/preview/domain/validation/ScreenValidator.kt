@@ -24,11 +24,13 @@ import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.DesignSystem
+import bot.charlies.androiddesign.preview.model.M3Component
 import bot.charlies.androiddesign.preview.model.PropDef
 import bot.charlies.androiddesign.preview.model.PropKind
 import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.Screen
 import bot.charlies.androiddesign.preview.model.SizeClass
+import bot.charlies.androiddesign.preview.model.WearComponent
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -101,26 +103,26 @@ internal class ScreenValidator(
     screen.components.forEachIndexed { index, node ->
       val path = componentsPath.child(index)
       when (node.component) {
-        "RadioGroup" ->
+        M3Component.RadioGroup.wire ->
           reportBySize(path.child("children")) { size ->
             val members = membersAt(node, "children", size) ?: return@reportBySize null
             val selected = members.map { selectedAt(it, size) ?: return@reportBySize null }
             SelectionRules.radioGroupProblem(selected.count { it })
           }
-        "Menu",
-        "MenuGroup" ->
+        M3Component.Menu.wire,
+        M3Component.MenuGroup.wire ->
           reportBySize(path.child("items")) { size ->
             val members = membersAt(node, "items", size) ?: return@reportBySize null
             // A menu's own items are one group; its MenuGroups are checked on their own.
             val singles = members.filter {
-              it.component == "MenuItem" && roleAt(it, size) == MenuSpec.Role.Single
+              it.component == M3Component.MenuItem.wire && roleAt(it, size) == MenuSpec.Role.Single
             }
             if (singles.isEmpty()) return@reportBySize null
             val selected = singles.map { selectedAt(it, size) ?: return@reportBySize null }
             SelectionRules.singleSelectProblem(selected.count { it })
           }
       }
-      if (node.component == "Menu") validateMenuLayout(path, node)
+      if (node.component == M3Component.Menu.wire) validateMenuLayout(path, node)
     }
   }
 
@@ -185,14 +187,16 @@ internal class ScreenValidator(
       val path = componentsPath.child(index)
       val props = node.props
       when (node.component) {
-        "TopAppBar" -> validateSearchOnlyProps(path, node)
+        M3Component.TopAppBar.wire -> validateSearchOnlyProps(path, node)
       }
-      if (node.component == "SearchBar" || node.component == "TopAppBar") {
+      if (
+        node.component == M3Component.SearchBar.wire || node.component == M3Component.TopAppBar.wire
+      ) {
         props.string("expanded")?.let { holders.getOrPut(it) { mutableListOf() }.add(node.id) }
       }
     }
     screen.components.forEachIndexed { index, node ->
-      if (node.component != "SearchView") return@forEachIndexed
+      if (node.component != M3Component.SearchView.wire) return@forEachIndexed
       val bars = holders[node.id].orEmpty()
       val path = componentsPath.child(index).child("component")
       when {
@@ -236,7 +240,7 @@ internal class ScreenValidator(
   ) {
     fun touched(vararg keys: String) = changed == null || keys.any { it in changed }
     when {
-      def.name == "SearchBar" && touched("trailing", "avatar") -> {
+      def.name == M3Component.SearchBar.wire && touched("trailing", "avatar") -> {
         val trailing =
           (listedCount(effective, "trailing") ?: 0) + if ("avatar" in effective) 1 else 0
         if (trailing > SearchSpec.MAX_BAR_TRAILING) {
@@ -262,7 +266,7 @@ internal class ScreenValidator(
           )
         }
       }
-      def.name == "Tooltip" -> {
+      def.name == M3Component.Tooltip.wire -> {
         if (effective.string("variant")?.let(TooltipSpec::variant) != TooltipSpec.Variant.Rich) {
           for (key in listOf("title", "actions")) {
             if (key in effective && touched(key, "variant")) {
@@ -288,7 +292,7 @@ internal class ScreenValidator(
   private fun validateSnackbarHost() {
     if (OverlayPlacement(screen).snackbarScaffold != null) return
     screen.components.forEachIndexed { index, node ->
-      if (node.component == "Snackbar") {
+      if (node.component == M3Component.Snackbar.wire) {
         sink.add(
           componentsPath.child(index).child("component"),
           "a Snackbar draws in a Scaffold's snackbar slot, and this screen has no Scaffold",
@@ -338,7 +342,7 @@ internal class ScreenValidator(
     val variant = text("variant")
     val compact = size == SizeClass.Compact
     when (node.component) {
-      "Dialog" -> {
+      M3Component.Dialog.wire -> {
         val full = DialogSpec.variant(variant) == DialogSpec.Variant.FullScreen
         if (full && !compact) {
           add(
@@ -355,7 +359,7 @@ internal class ScreenValidator(
           add("content" to "content is for a full-screen dialog")
         }
       }
-      "DatePicker" -> {
+      M3Component.DatePicker.wire -> {
         val range = (props["range"] as? JsonPrimitive)?.content == "true"
         if (variant == DatePickerSpec.Variant.Docked.wire && !has("anchor")) {
           add("variant" to "a docked date picker opens below a TextField, named in anchor")
@@ -378,7 +382,7 @@ internal class ScreenValidator(
           add("end" to "end must not be before start")
         }
       }
-      "TimePicker" -> {
+      M3Component.TimePicker.wire -> {
         val value = props["time"]
         if (
           value != null &&
@@ -506,14 +510,14 @@ internal class ScreenValidator(
     fun touched(vararg keys: String) = changed == null || keys.any { it in changed }
     /** Where to report a problem between [first] and the range: the first if it is set here. */
     fun at(first: String) = path.child(if (touched(first)) first else "range")
-    if (def.name == "EdgeButton") validateEdgeButtonContent(path, props, changed)
-    if (def.name !in RANGE_COMPONENTS) return
+    if (def.name == WearComponent.EdgeButton.wire) validateEdgeButtonContent(path, props, changed)
+    if (!def.rangeValued) return
     val (min, max) = rangeOf(props) ?: return
     if (min >= max) {
       if (touched("range")) sink.add(path.child("range"), rangeOrderMessage(min, max))
       return
     }
-    if (def.name != "RangeSlider") {
+    if (def.name != M3Component.RangeSlider.wire) {
       val value = props["value"]?.number() ?: return
       if (value !in min..max && touched("value", "range")) {
         sink.add(
@@ -885,11 +889,10 @@ internal class ScreenValidator(
   companion object {
     val IDENTIFIER = Regex("^[A-Za-z_][A-Za-z0-9_]*$")
     private val ICON_NAME = Regex("^[a-z0-9_]+$")
-    /** Components whose `value` and `range` props must agree. */
-    private val RANGE_COMPONENTS = setOf("Slider", "RangeSlider", "Stepper")
-    private val PICKER_OVERLAYS = setOf("Dialog", "DatePicker", "TimePicker")
+    private val PICKER_OVERLAYS =
+      setOf(M3Component.Dialog.wire, M3Component.DatePicker.wire, M3Component.TimePicker.wire)
     private const val DATE_MESSAGE =
       "a date must be written as YYYY-MM-DD, a real day from 1900 to 2100, not bound to data"
-    private const val CAROUSEL = "Carousel"
+    private val CAROUSEL = M3Component.Carousel.wire
   }
 }

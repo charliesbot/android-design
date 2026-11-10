@@ -142,20 +142,6 @@ class ModelTest {
         }
       }
     }
-    assertEquals(
-      setOf(
-        "BottomSheet",
-        "Dialog",
-        "Menu",
-        "SideSheet",
-        "SearchView",
-        "Tooltip",
-        "Snackbar",
-        "DatePicker",
-        "TimePicker",
-      ),
-      M3ExpressiveCatalog.overlayNames,
-    )
   }
 
   @Test
@@ -197,6 +183,42 @@ class ModelTest {
     assertEquals(tree, PreviewJson.compact.decodeFromString(LayoutTree.serializer(), text))
     assertTrue(tree.pass)
   }
+
+  @Test
+  fun `the registry flags pin each trait per catalog`() {
+    assertEquals(
+      setOf(
+        "BottomSheet",
+        "Dialog",
+        "Menu",
+        "SideSheet",
+        "SearchView",
+        "Tooltip",
+        "Snackbar",
+        "DatePicker",
+        "TimePicker",
+      ),
+      M3ExpressiveCatalog.overlayNames,
+    )
+    assertEquals(
+      setOf("BottomSheet", "Dialog", "SideSheet", "SearchView", "DatePicker", "TimePicker"),
+      M3ExpressiveCatalog.modalNames,
+    )
+    assertEquals(setOf("FloatingActionButton", "FabMenu"), M3ExpressiveCatalog.fabNames)
+    assertEquals(setOf("Carousel", "Tabs"), flagged(M3ExpressiveCatalog) { it.scrollsSideways })
+    assertEquals(setOf("Slider", "RangeSlider"), flagged(M3ExpressiveCatalog) { it.rangeValued })
+    assertTrue(M3ExpressiveCatalog.overlayNames.containsAll(M3ExpressiveCatalog.modalNames))
+
+    assertEquals(setOf("AlertDialog", "ConfirmationDialog"), WearCatalog.overlayNames)
+    assertEquals(setOf("AlertDialog", "ConfirmationDialog"), WearCatalog.modalNames)
+    assertEquals(emptySet(), WearCatalog.fabNames)
+    assertEquals(emptySet(), flagged(WearCatalog) { it.scrollsSideways })
+    assertEquals(setOf("Slider", "Stepper"), flagged(WearCatalog) { it.rangeValued })
+    assertTrue(WearCatalog.overlayNames.containsAll(WearCatalog.modalNames))
+  }
+
+  private fun flagged(catalog: Catalog, trait: (ComponentDef) -> Boolean): Set<String> =
+    catalog.components.filter(trait).map { it.name }.toSet()
 
   @Test
   fun `a tree with an error finding does not pass`() {

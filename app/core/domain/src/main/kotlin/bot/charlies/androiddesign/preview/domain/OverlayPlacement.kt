@@ -3,6 +3,7 @@ package bot.charlies.androiddesign.preview.domain
 import bot.charlies.androiddesign.preview.domain.node.ChildGraph
 import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.ComponentNode
+import bot.charlies.androiddesign.preview.model.M3Component
 import bot.charlies.androiddesign.preview.model.Screen
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -153,14 +154,14 @@ class OverlayPlacement(private val screen: Screen) {
      */
     fun renderName(screen: String, overlay: String) = "$screen+$overlay"
 
-    private const val MENU = "Menu"
-    private const val SPLIT_BUTTON = "SplitButton"
-    private const val SCAFFOLD = "Scaffold"
-    private const val SNACKBAR = "Snackbar"
-    private const val TOOLTIP = "Tooltip"
-    private const val DATE_PICKER = "DatePicker"
-    private const val SEARCH_BAR = "SearchBar"
-    private const val SEARCH_VIEW = "SearchView"
-    private const val TOP_APP_BAR = "TopAppBar"
+    private val MENU = M3Component.Menu.wire
+    private val SPLIT_BUTTON = M3Component.SplitButton.wire
+    private val SCAFFOLD = M3Component.Scaffold.wire
+    private val SNACKBAR = M3Component.Snackbar.wire
+    private val TOOLTIP = M3Component.Tooltip.wire
+    private val DATE_PICKER = M3Component.DatePicker.wire
+    private val SEARCH_BAR = M3Component.SearchBar.wire
+    private val SEARCH_VIEW = M3Component.SearchView.wire
+    private val TOP_APP_BAR = M3Component.TopAppBar.wire
   }
 }
