@@ -4,16 +4,15 @@ import bot.charlies.androiddesign.preview.domain.PreviewException
 import bot.charlies.androiddesign.preview.domain.export.Arg
 import bot.charlies.androiddesign.preview.domain.export.Assign
 import bot.charlies.androiddesign.preview.domain.export.Call
-import bot.charlies.androiddesign.preview.domain.export.Chain
 import bot.charlies.androiddesign.preview.domain.export.Decl
 import bot.charlies.androiddesign.preview.domain.export.Expr
 import bot.charlies.androiddesign.preview.domain.export.FileContext
 import bot.charlies.androiddesign.preview.domain.export.FunDecl
 import bot.charlies.androiddesign.preview.domain.export.IfStmt
 import bot.charlies.androiddesign.preview.domain.export.Lambda
+import bot.charlies.androiddesign.preview.domain.export.Placement
 import bot.charlies.androiddesign.preview.domain.export.Raw
 import bot.charlies.androiddesign.preview.domain.export.Scope
-import bot.charlies.androiddesign.preview.domain.export.Scoped
 import bot.charlies.androiddesign.preview.domain.export.ScreenData
 import bot.charlies.androiddesign.preview.domain.export.ScreenEmitterBase
 import bot.charlies.androiddesign.preview.domain.export.Stmt
@@ -63,8 +62,8 @@ internal data class WearPlace(
   val bodyLarge: Boolean = true,
   val radio: WearRadio? = null,
   /** `Modifier`, or `modifier` for the screen's root. */
-  val modifierBase: String = "Modifier",
-) : Scoped {
+  override val modifierBase: String = "Modifier",
+) : Placement {
   fun forChild(parentType: String) =
     WearPlace(
       scope = scope,
@@ -334,18 +333,6 @@ internal class WearScreenEmitter(
   fun transformation(place: WearPlace): Arg? {
     if (!place.item) return null
     return arg("transformation", "${file.use(WearSym.SurfaceTransformation)}(transformationSpec)")
-  }
-
-  fun modifierArg(place: WearPlace, parts: List<String>): Arg? {
-    if (parts.isEmpty()) {
-      return if (place.modifierBase == "modifier") arg("modifier", "modifier") else null
-    }
-    return arg("modifier", modifierChain(place, parts))
-  }
-
-  fun modifierChain(place: WearPlace, parts: List<String>): Expr {
-    val base = if (place.modifierBase == "modifier") "modifier" else file.use(Sym.Modifier)
-    return Chain(base, parts)
   }
 
   // endregion
