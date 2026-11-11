@@ -51,7 +51,7 @@ val colorScheme = rememberDynamicColorScheme(
 )
 ```
 
-Keep the generator's default style. `TonalSpot` is what Material and Theme Builder generate; `Fidelity` keeps tones close to the seed, like Theme Builder's "match color." The other styles are scheme variants, not M3 Expressive: `Vibrant` pushes primary chroma to the maximum, and `Expressive` shifts hues away from the seed (in testing, a teal brand gained brown and orange roles) and tints surfaces. Palette variants are color-generation choices, not levels of M3 Expressive. For more color on a screen, use content-based color or give accent roles to more elements that have a job.
+Keep the generator's default style. `TonalSpot` is what Material and Theme Builder generate; `Fidelity` keeps primary and secondary tones close to the seed, like Theme Builder's "match color" (observed with MaterialKolor, not a Google rule: its tertiary, like `Content`'s, moves far from the seed's hue). The other styles are scheme variants, not M3 Expressive: `Vibrant` pushes primary chroma to the maximum, and `Expressive` shifts hues away from the seed (in testing, a teal brand gained brown and orange roles) and tints surfaces. Palette variants are color-generation choices, not levels of M3 Expressive. For more color on a screen, use content-based color or give accent roles to more elements that have a job.
 
 A common pattern: brand scheme by default, dynamic color as a user setting.
 
@@ -140,7 +140,7 @@ The brand and content-based snippets above already pass it. For a static Theme B
 
 ### Google Sans Flex
 
-Open source on [Google Fonts](https://fonts.google.com/specimen/Google+Sans+Flex) (since November 2025) and this skill's default family: plain text always uses it, and so does every Display and Headline unless you choose a brand face (below). Axes: `wght` 1 to 1000, `wdth` 25 to 151, `opsz` 6 to 144, `slnt` -10 to 0, `GRAD` 0 to 100, `ROND` 0 to 100.
+Open source on [Google Fonts](https://fonts.google.com/specimen/Google+Sans+Flex) (since November 2025) and this skill's default family: plain text always uses it, and so does every Display, Headline, and Title Large unless you choose a brand face (below). Axes: `wght` 1 to 1000, `wdth` 25 to 151, `opsz` 6 to 144, `slnt` -10 to 0, `GRAD` 0 to 100, `ROND` 0 to 100.
 
 Bundle the variable TTF in `res/font/` (downloadable Google Fonts don't carry variation settings).
 
@@ -156,9 +156,9 @@ Voice starting points (tune them to the screen's direction; they are not presets
 | Loud expressive | width 151, weight 900, slant -10 | Celebrations and the user's own voice; rare |
 | Text | default axes, weight 400 to 500 | Body and labels; don't vary it |
 
-### Brand faces (Display and Headline only)
+### Brand faces (Display, Headline, and Title Large only)
 
-Optional: one face from the set below on Display and Headline styles, with everything else on Google Sans Flex. The face set, one face per proposal, Doto's display-only limit, and keeping Title on Google Sans Flex are this skill's choices, not Google's. All are OFL and bundled as variable TTFs with the previewer app that `android-design-explore` drives, so an exploration never fetches fonts. A real app bundles the variable TTF of each face it uses in `res/font/`. Material calls this the brand typeface (larger styles, "to focus on expression") against the plain typeface (smaller styles, "to focus on readability"); do not use a brand face on Body or Label.
+Optional: one face from the set below on Display, Headline, and Title Large styles, with everything else on Google Sans Flex. A small app bar title and a side sheet title draw in `titleLarge`, so a brand face set only on Display and Headline leaves those headers in the plain face. The face set, one face per proposal, Doto's display-only limit, and keeping Title Medium and Small on Google Sans Flex are this skill's choices, not Google's. All are OFL and bundled as variable TTFs with the previewer app that `android-design-explore` drives, so an exploration never fetches fonts. A real app bundles the variable TTF of each face it uses in `res/font/`. Material calls this the brand typeface (larger styles, "to focus on expression") against the plain typeface (smaller styles, "to focus on readability"); do not use a brand face on Title Medium, Title Small, Body, or Label.
 
 | Face | File | Axes | Use for | Starting point |
 | --- | --- | --- | --- | --- |
@@ -201,7 +201,7 @@ private val base = Typography()
 private val soft = arrayOf(FontVariation.Setting("SOFT", 100f), FontVariation.Setting("WONK", 1f))
 
 val AppTypography = base.copy(
-    // Display and Headline: one brand face (Fraunces here) or a Google Sans Flex voice,
+    // Display, Headline, and Title Large: one brand face (Fraunces here) or a Google Sans Flex voice,
     // such as base.displayLarge.voice(R.font.google_sans_flex, 850, FontVariation.Setting("ROND", 100f)).
     // Set all six, plus their *Emphasized styles: components read them internally
     // (a large app bar's title is displaySmall), so a skipped one falls back to the default face.
@@ -211,12 +211,14 @@ val AppTypography = base.copy(
     headlineLarge = base.headlineLarge.voice(R.font.fraunces, 600, *soft),
     headlineMedium = base.headlineMedium.voice(R.font.fraunces, 600, *soft),
     headlineSmall = base.headlineSmall.voice(R.font.fraunces, 600, *soft),
-    // Title, Body, and Label: always Google Sans Flex at default axes.
-    titleLarge = base.titleLarge.voice(R.font.google_sans_flex, 500),
+    // Title Large is read by small app bars and side sheets, so it takes the brand face too.
+    titleLarge = base.titleLarge.voice(R.font.fraunces, 600, *soft),
+    // Title Medium and Small, Body, and Label: always Google Sans Flex at default axes.
+    titleMedium = base.titleMedium.voice(R.font.google_sans_flex, 500),
     bodyLarge = base.bodyLarge.voice(R.font.google_sans_flex, 400),
     bodyMedium = base.bodyMedium.voice(R.font.google_sans_flex, 400),
     labelLarge = base.labelLarge.voice(R.font.google_sans_flex, 500),
-    // ...the remaining Title, Body, and Label styles, and every *Emphasized style one weight step heavier
+    // ...the remaining Title, Body, and Label styles (titleLargeEmphasized takes the brand face), and every *Emphasized style one weight step heavier
 )
 
 // Voices outside the type scale: tall numerals with state, and numbers and data.

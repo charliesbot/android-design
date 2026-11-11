@@ -1,8 +1,10 @@
 """Checks that every Material 3 component page in sources/ is drawn or deliberately omitted by the previewer catalog.
 
-The registry (app/core/model/.../Catalog.kt) names the pages each component implements (x-m3-pages) and the pages it
-omits with a reason (x-m3-omissions), both written to app/schemas/m3-expressive.catalog.json. A page that is neither
-fails here, so a monthly fetch that brings a new component turns into a decision: implement it or omit it with a reason.
+The registry (app/core/model/.../Catalog.kt) names the pages each component implements (x-m3-pages), the pages a
+proposal field draws instead of a component (x-m3-declarations, such as navigation.destinations for the navigation bar
+and rail) and the pages it omits with a reason (x-m3-omissions), all written to app/schemas/m3-expressive.catalog.json.
+A page that is none of these fails here, so a monthly fetch that brings a new component turns into a decision:
+implement it or omit it with a reason.
 
 Needs no JDK: it reads the committed schema. Run: python3 -m unittest discover scripts
 """
@@ -28,6 +30,7 @@ def source_pages():
 def problems(catalog, pages):
     """Returns what is wrong with the catalog's claims and omissions against the set of source [pages]."""
     claims = {page for comp in catalog["components"].values() for page in comp.get("x-m3-pages", [])}
+    claims |= {item["page"] for item in catalog.get("x-m3-declarations", [])}
     omissions = {item["page"]: item for item in catalog.get("x-m3-omissions", [])}
     found = []
     for page in sorted(pages - set(CHOOSERS) - claims - set(omissions)):
@@ -63,6 +66,22 @@ class M3PageCoverageTest(unittest.TestCase):
         found = problems(catalog, source_pages() - {"carousel", "navigation-drawer"})
         self.assertIn("a component claims 'carousel', which is not a page in sources/", found)
         self.assertIn("an omission names 'navigation-drawer', which is not a page in sources/", found)
+
+    def test_a_page_drawn_by_a_proposal_field_counts_as_claimed(self):
+        catalog = json.loads(CATALOG.read_text())
+        declared = {item["page"]: item["by"] for item in catalog["x-m3-declarations"]}
+        self.assertEqual(declared, {"navigation-bar": "navigation.destinations", "navigation-rail": "navigation.destinations"})
+        without = {**catalog, "x-m3-declarations": []}
+        found = problems(without, source_pages())
+        self.assertEqual(
+            found,
+            [f"page '{page}' is neither claimed by a component (m3Pages) nor omitted (m3Omissions)" for page in sorted(declared)],
+        )
+
+    def test_a_declared_page_that_no_longer_exists_fails(self):
+        catalog = json.loads(CATALOG.read_text())
+        found = problems(catalog, source_pages() - {"navigation-rail"})
+        self.assertIn("a component claims 'navigation-rail', which is not a page in sources/", found)
 
     def test_an_omission_needs_a_known_reason_and_a_why(self):
         catalog = {"components": {}, "x-m3-omissions": [{"page": "x", "reason": "boring", "why": " "}]}

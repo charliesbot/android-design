@@ -168,12 +168,8 @@ private fun ScreenEmitter.dispatch(node: ComponentNode, p: JsonObject, place: Pl
     M3Component.Carousel -> carousel(node, p, place)
     M3Component.Scaffold -> scaffold(node, p, place)
     M3Component.TopAppBar -> topAppBar(node, p, place)
-    M3Component.NavigationBar -> navigationBar(p, place)
-    M3Component.NavigationBarItem -> navigationItem(node, p, place, "ShortNavigationBarItem", false)
     M3Component.Tabs -> tabs(p, place)
     M3Component.Tab -> tab(node, p, place)
-    M3Component.NavigationRail -> navigationRail(p, place)
-    M3Component.NavigationRailItem -> navigationItem(node, p, place, "WideNavigationRailItem", true)
     M3Component.FloatingToolbar -> floatingToolbar(p, place)
     M3Component.DockedToolbar -> dockedToolbar(p, place)
     M3Component.Card -> card(node, p, place)
@@ -399,13 +395,16 @@ private fun ScreenEmitter.box(p: JsonObject, place: Place): List<Stmt> {
 
 private fun ScreenEmitter.grid(p: JsonObject, place: Place): List<Stmt> {
   file.optIn(Sym.ExperimentalGridApi)
-  // `fr` is a member extension of the Grid configuration scope, so it needs no import.
+  // `fr` and `minmax` are members of the Grid configuration scope, so they need no import. A bare
+  // `1.fr` track is `minmax(min-content, 1fr)`, which grows with an image's bitmap width, so the
+  // minimum is 0 to keep the columns equal.
+  val track = "column(minmax(${dp(0f)}, 1.fr))"
   val config = mutableListOf<Stmt>()
   val columns = p.sampleNumber("Grid", "columns", place)?.toInt()
   val minWidth = p.sampleNumber("Grid", "minColumnWidth", place)
   when {
     columns != null ->
-      config += stmt(Call("repeat", listOf(pos("$columns")), lambda(stmt(Raw("column(1.fr)")))))
+      config += stmt(Call("repeat", listOf(pos("$columns")), lambda(stmt(Raw(track)))))
     minWidth != null -> {
       // The previewer's count: the gap is added to the width and to each column's width.
       val gap = p.literal("spacing")?.let(::spacing)
@@ -414,9 +413,9 @@ private fun ScreenEmitter.grid(p: JsonObject, place: Place): List<Stmt> {
         else "(constraints.maxWidth.toDp() + $gap) / (${dp(minWidth.toFloat())} + $gap)"
       val most = M3ExpressiveCatalog.MAX_GRID_COLUMNS
       config += Assign("val columns", "=", Raw("($fit).toInt().coerceIn(1, $most)"))
-      config += stmt(Call("repeat", listOf(pos("columns")), lambda(stmt(Raw("column(1.fr)")))))
+      config += stmt(Call("repeat", listOf(pos("columns")), lambda(stmt(Raw(track)))))
     }
-    else -> config += stmt(Raw("column(1.fr)"))
+    else -> config += stmt(Raw(track))
   }
   p.literal("spacing")?.let { config += stmt(Raw("gap(${spacing(it)})")) }
   return one(
@@ -648,8 +647,6 @@ private fun ScreenEmitter.scaffold(node: ComponentNode, p: JsonObject, place: Pl
   val bottomId = p.literal("bottomBar")
   val bottom = bottomId?.let(byId::get)
   val toolbarOverContent = bottom?.component == "FloatingToolbar"
-  val rail = p.literal("navigationRail")
-  val inRow = rail != null
 
   val nested =
     when {
@@ -664,15 +661,7 @@ private fun ScreenEmitter.scaffold(node: ComponentNode, p: JsonObject, place: Pl
       else -> useModifier("nestedScroll(scrollBehavior.nestedScrollConnection)")
     }
   val scaffoldModifier =
-    when {
-      inRow ->
-        modifierArg(
-          place.copy(modifierBase = "Modifier"),
-          listOfNotNull("weight(1f)", nested),
-        )
-      nested != null -> modifierArg(place, listOf(nested))
-      else -> modifierArg(place, emptyList())
-    }
+    if (nested != null) modifierArg(place, listOf(nested)) else modifierArg(place, emptyList())
 
   val args =
     listOf(
@@ -707,13 +696,7 @@ private fun ScreenEmitter.scaffold(node: ComponentNode, p: JsonObject, place: Pl
       args.filterNotNull(),
       Lambda("innerPadding", scaffoldContent(p, place, if (toolbarOverContent) bottomId else null)),
     )
-  if (!inRow) return statements + stmt(scaffold)
-  return statements +
-    one(
-      file.use(Sym.Row),
-      listOf(modifierArg(place, emptyList())),
-      emit(rail!!, place.forChild("Row").copy(railExpanded = false)) + stmt(scaffold),
-    )
+  return statements + stmt(scaffold)
 }
 
 private fun ScreenEmitter.scaffoldContent(
@@ -787,16 +770,6 @@ private fun ScreenEmitter.topAppBar(node: ComponentNode, p: JsonObject, place: P
   )
 }
 
-private fun ScreenEmitter.navigationBar(p: JsonObject, place: Place): List<Stmt> {
-  expressive()
-  val arrangement = "${m3("ShortNavigationBarArrangement")}.EqualWeight"
-  return one(
-    m3("ShortNavigationBar"),
-    listOf(modifier(place, p), arg("arrangement", arrangement)),
-    children(p, "children", place, "NavigationBar"),
-  )
-}
-
 private fun ScreenEmitter.tabs(p: JsonObject, place: Place): List<Stmt> {
   val secondary = p.literal("variant") == "secondary"
   val scrollable = p.sampleFlag("scrollable", place) == true
@@ -856,53 +829,6 @@ private fun ScreenEmitter.tab(node: ComponentNode, p: JsonObject, place: Place):
       iconName?.let { arg("icon", lambdaOf(badged(p, place, icon(it)))) },
       // Material's inactive tab token; the selected color is the row's own.
       arg("unselectedContentColor", colorRole("onSurfaceVariant")),
-    ),
-  )
-}
-
-private fun ScreenEmitter.navigationRail(p: JsonObject, place: Place): List<Stmt> {
-  expressive()
-  val expanded = p.sampleFlag("expanded", place) == true
-  val state =
-    if (expanded)
-      "${m3("rememberWideNavigationRailState")}(${m3("WideNavigationRailValue")}.Expanded)"
-    else "${m3("rememberWideNavigationRailState")}()"
-  return one(
-    m3("WideNavigationRail"),
-    listOf(modifier(place, p), arg("state", state)),
-    children(p, "children", place.copy(railExpanded = expanded), "NavigationRail"),
-  )
-}
-
-private fun ScreenEmitter.navigationItem(
-  node: ComponentNode,
-  p: JsonObject,
-  place: Place,
-  callee: String,
-  rail: Boolean,
-): List<Stmt> {
-  expressive()
-  val selected = p.boolExpr("selected", place) ?: "false"
-  val symbol = p.iconName("icon", place) ?: IconName.Literal("help")
-  val selectedSymbol = p.iconName("selectedIcon", place)
-  val label = p.text("label", place) ?: Raw("\"\"")
-  val painter =
-    when {
-      selectedSymbol == null -> painter(symbol)
-      selected == "true" -> painter(selectedSymbol)
-      selected == "false" -> painter(symbol)
-      else -> togglePainter(selected, selectedSymbol, symbol)
-    }
-  val icon = badged(p, place, iconOf(painter))
-  return one(
-    m3(callee),
-    listOf(
-      if (rail) arg("railExpanded", place.railExpanded.toString()) else null,
-      arg("selected", selected),
-      arg("onClick", actionLambda(p["action"], node.id)),
-      arg("icon", lambdaOf(icon)),
-      arg("label", lambdaOf(textOf(label))),
-      modifier(place, p),
     ),
   )
 }

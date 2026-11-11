@@ -13,8 +13,13 @@ internal fun NodeContext.badgeContent(): BadgeContent? =
 
 /** Draws [content] in a `BadgedBox` holding the node's badge, or alone when it has none. */
 @Composable
-internal fun NodeContext.WithBadge(content: @Composable () -> Unit) {
-  when (val badge = badgeContent()) {
+internal fun NodeContext.WithBadge(content: @Composable () -> Unit) =
+  WithBadge(badgeContent(), content)
+
+/** Draws [content] in a `BadgedBox` holding [badge], or alone when it is null. */
+@Composable
+internal fun WithBadge(badge: BadgeContent?, content: @Composable () -> Unit) {
+  when (badge) {
     null -> content()
     BadgeContent.Small -> BadgedBox(badge = { Badge() }) { content() }
     is BadgeContent.Large -> BadgedBox(badge = { Badge { Text(badge.label) } }) { content() }

@@ -51,15 +51,15 @@ Both are ordinary tracked files; committing them follows the project's own workf
 The proposal carries these design rules; `proposal-format.md` gives the syntax for each, and its [Component rules](references/proposal-format.md#component-rules) section holds the rules for tabs, carousels, overlays, choices, toolbars, menus, app bars, and badges:
 
 - The screen has one primary action, marked as primary, and it leads its peers as `android-design` section 2 describes.
-- It adapts at 600 and 840 dp: a navigation bar in compact becomes a rail from medium up, and a list's detail screen opens beside the list at expanded widths.
+- It adapts at 600 and 840 dp: `navigation.destinations` draws a bar at compact and a rail from medium up, and a list's detail screen opens beside the list at expanded widths.
 - Text truncates on purpose, with an ellipsis. Button, chip, and navigation labels fit on one line.
 
 ## Check
 
 For a proposal, this step replaces the rendering in `android-design`'s screen check. Answer its questions from the `check_proposal` layout summaries and errors (and `get_tree` when they are not enough), never from a render or pixels. Screenshots stay out of this loop: never take one or ask for one.
 
-1. Call `open_proposal` with the proposal's absolute path. It loads the file, watches it, shows the window, and returns validation errors. Fix them and call `status` until it reports none.
-2. Call `check_proposal`. One call checks every screen at every view and returns each view's errors and `layout` summary; its tool description gives the format.
+1. Call `open_proposal` with the proposal's absolute path. It loads the file, watches it, shows the window, and returns validation errors. Fix them and call `status`, which reports validation errors only, never render findings: an empty `errors` with the proposal open means the file is valid.
+2. Call `check_proposal`. One call checks every screen at every view and returns each view's errors and `layout` summary; its tool description gives the format. A view equal to an earlier one is `{"same": "<view>"}`: read the earlier one. `notes` are info findings that never fail a view; read them. `colors` gives each role's hex for light and dark: judge fills from it (`android-design` section 4's one-strong-fill cap), not from role names.
 3. Fix every error once, then call `check_proposal` again. An `overflow` error names a node laid out wider than its parent or the view (a row that needs more width than its cell); narrow it, wrap it, or let it scroll. A `corner-clipped` error names a text or control that reaches into the rounded corner of a `Card` or a styled container, which cuts it off; give the container `padding`. Report anything still failing instead of looping.
 4. Confirm the adaptation from the `layout` summaries: each larger view reveals what your section 0 adaptation answer promised, such as a second pane, a rail, or more regions. Google: "Additional space doesn't just mean making the same thing bigger." A larger view with the phone's regions only spread wider fails.
 5. Call `get_tree` only when a summary or an error is not enough; its tool description says what it returns.
@@ -68,7 +68,7 @@ The step is done when `check_proposal` passes or each remaining error is on the 
 
 ## Show
 
-Call `show_preview`. Say in one line what the proposal is, name the tactics a hero layers, list any unresolved findings, and report "visual quality judged from the layout tree only". Then stop and wait for the user's reply.
+Call `show_preview`: `open_proposal` already showed the window, so this brings it back and to the front if the user closed it since. Say in one line what the proposal is, name the tactics a hero layers, list any unresolved findings, what the proposal could not express ([Limits](references/proposal-format.md#limits)), and report "visual quality judged from the layout tree only". Then stop and wait for the user's reply.
 
 ## Revise
 

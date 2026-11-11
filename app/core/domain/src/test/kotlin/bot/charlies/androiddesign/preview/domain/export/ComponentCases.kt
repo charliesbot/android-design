@@ -80,7 +80,7 @@ internal val componentCases: List<ComponentCase> =
         listOf(
           "Grid(",
           "config = {",
-          "repeat(3) { column(1.fr) }",
+          "repeat(3) { column(minmax(0.dp, 1.fr)) }",
           "gap(8.dp)",
           "ExperimentalGridApi::class",
         ),
@@ -187,8 +187,8 @@ internal val componentCases: List<ComponentCase> =
           """{"id":"bar","component":"TopAppBar","size":"center","title":"Home","subtitle":"Sub","navigationIcon":"back","actions":["more"]}""",
           """{"id":"back","component":"IconButton","icon":"arrow_back","contentDescription":"Back"}""",
           """{"id":"more","component":"IconButton","icon":"more_vert","contentDescription":"More"}""",
-          """{"id":"nav","component":"NavigationBar","children":["n1"]}""",
-          """{"id":"n1","component":"NavigationBarItem","label":"Home","icon":"home","selected":true}""",
+          """{"id":"nav","component":"DockedToolbar","children":["n1"]}""",
+          """{"id":"n1","component":"IconButton","icon":"home","contentDescription":"Home"}""",
           """{"id":"fab","component":"FloatingActionButton","icon":"add"}""",
           """{"id":"x","component":"Text","text":"Body"}""",
         ),
@@ -222,47 +222,6 @@ internal val componentCases: List<ComponentCase> =
           "scrollBehavior = scrollBehavior",
           "val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()",
           "nestedScroll(scrollBehavior.nestedScrollConnection)",
-        ),
-    ),
-    case(
-      "NavigationBar",
-      "NavigationBarItem",
-      components =
-        listOf(
-          """{"id":"root","component":"Scaffold","bottomBar":"x","content":"c"}""",
-          """{"id":"x","component":"NavigationBar","children":["a","b"]}""",
-          """{"id":"a","component":"NavigationBarItem","label":"Home","icon":"home","selectedIcon":"home_filled","selected":true,"action":{"functionCall":{"@call":"back"}}}""",
-          """{"id":"b","component":"NavigationBarItem","label":"Saved","icon":"favorite"}""",
-          """{"id":"c","component":"Column","children":[]}""",
-        ),
-      expect =
-        listOf(
-          "ShortNavigationBar(arrangement = ShortNavigationBarArrangement.EqualWeight) {",
-          "ShortNavigationBarItem(",
-          "selected = true",
-          "icon = { Icon(painterResource(R.drawable.home_filled), contentDescription = null) }",
-          "label = { Text(\"Home\") }",
-          "onClick = { onBack() }",
-          "selected = false",
-        ),
-    ),
-    case(
-      "NavigationRail",
-      "NavigationRailItem",
-      components =
-        listOf(
-          """{"id":"root","component":"Scaffold","navigationRail":"x","content":"c"}""",
-          """{"id":"x","component":"NavigationRail","expanded":true,"children":["a"]}""",
-          """{"id":"a","component":"NavigationRailItem","label":"Home","icon":"home","selected":true}""",
-          """{"id":"c","component":"Column","children":[]}""",
-        ),
-      expect =
-        listOf(
-          "Row(modifier = modifier) {",
-          "WideNavigationRail(state = rememberWideNavigationRailState(WideNavigationRailValue.Expanded)) {",
-          "WideNavigationRailItem(",
-          "railExpanded = true",
-          "Scaffold(modifier = Modifier.weight(1f))",
         ),
     ),
     case(
@@ -1544,38 +1503,6 @@ internal val componentCases: List<ComponentCase> =
           "showRestored = true",
           "LaunchedEffect(showRestored) {",
           "snackbarHostState.showSnackbar(message = \"Restored\")",
-        ),
-    ),
-    case(
-      "NavigationBarItem",
-      components =
-        listOf(
-          """{"id":"root","component":"Scaffold","content":"body","bottomBar":"bar"}""",
-          """{"id":"body","component":"Column","children":[]}""",
-          """{"id":"bar","component":"NavigationBar","children":["a","b","c"]}""",
-          """{"id":"a","component":"NavigationBarItem","label":"Inbox","icon":"mail","badge":true}""",
-          """{"id":"b","component":"NavigationBarItem","label":"Chat","icon":"chat","badge":12}""",
-          """{"id":"c","component":"NavigationBarItem","label":"Saved","icon":"bookmark","badge":false}""",
-        ),
-      expect =
-        listOf(
-          "BadgedBox(badge = { Badge() }) { Icon(painterResource(R.drawable.mail), contentDescription = null) }",
-          "BadgedBox(badge = { Badge { Text(\"12\") } }) { Icon(painterResource(R.drawable.chat), contentDescription = null) }",
-        ),
-      reject = listOf("BadgedBox(badge = { Badge() }) { Icon(painterResource(R.drawable.bookmark)"),
-    ),
-    case(
-      "NavigationRailItem",
-      components =
-        listOf(
-          """{"id":"root","component":"Scaffold","content":"body","navigationRail":"rail"}""",
-          """{"id":"body","component":"Column","children":[]}""",
-          """{"id":"rail","component":"NavigationRail","children":["a"]}""",
-          """{"id":"a","component":"NavigationRailItem","label":"Inbox","icon":"mail","badge":"99+"}""",
-        ),
-      expect =
-        listOf(
-          "BadgedBox(badge = { Badge { Text(\"99+\") } }) { Icon(painterResource(R.drawable.mail)",
         ),
     ),
     case(

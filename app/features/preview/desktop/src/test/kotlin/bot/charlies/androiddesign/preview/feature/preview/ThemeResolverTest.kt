@@ -112,6 +112,21 @@ class ThemeResolverTest {
   }
 
   @Test
+  fun `a brand face resolves on title-large and leaves the other title roles alone`() {
+    val theme =
+      ThemeResolver.resolve(
+        design(
+          ThemeOverride(
+            typography = mapOf("title-large" to TypographyOverride(fontFamily = "Fraunces")),
+          ),
+        ),
+        dark = false,
+      )
+    assertEquals("Fraunces", theme.fontFamilies.getValue(TypeRole.TitleLarge))
+    assertEquals("Google Sans Flex", theme.fontFamilies.getValue(TypeRole.TitleMedium))
+  }
+
+  @Test
   fun `font variation strings parse into axes`() {
     assertEquals(
       listOf(FontAxis("opsz", 72f), FontAxis("SOFT", 50f)),

@@ -227,6 +227,14 @@ data class M3Omission(
   val waitsFor: String? = null,
 )
 
+/**
+ * A Material 3 component page that a proposal field draws, so no catalog component implements it.
+ *
+ * @property page The page slug, as in [ComponentDef.m3Pages].
+ * @property by The proposal field that draws it, such as `navigation.destinations`.
+ */
+data class M3Declaration(val page: String, val by: String)
+
 /** Renderer-only functions an `action` may call. */
 enum class ActionFunction(val wire: String, val argument: String?, val description: String) {
   Navigate("navigate", "screen", "Opens the screen with this id."),
@@ -319,6 +327,21 @@ interface Catalog {
   val navigationNames: List<String>
 
   /**
+   * Node types of the items in the navigation a view draws outside its screens ([NavigationNodes]).
+   * They are interactive and carry a label, so the touch target and label rules cover them though
+   * no component of the catalog is one. Empty when the catalog has none.
+   */
+  val navigationItemNames: Set<String>
+    get() = emptySet()
+
+  /**
+   * Material 3 pages drawn by a proposal-level declaration instead of by a component. A page is
+   * claimed here or by a component's `m3Pages`, or omitted; a script test enforces it.
+   */
+  val m3Declarations: List<M3Declaration>
+    get() = emptyList()
+
+  /**
    * Components made for the round display's edge: a full-screen ring, an edge button, the clock.
    * The round-edge rule leaves them alone. Empty on a catalog with no round views.
    */
@@ -388,7 +411,7 @@ object M3ExpressiveCatalog : Catalog {
     COMMON_PROPS +
       PropDef(
         Catalog.MAX_WIDTH,
-        PropKind.Number(NumberBounds(120.0, 1600.0, whole = true)),
+        PropKind.Number(NumberBounds(24.0, 1600.0, whole = true)),
         description =
           "The widest the component draws, in dp. It still stretches up to that width where it " +
             "would fill; the parent's alignment places it. Material: \"Set a max width on " +
@@ -466,11 +489,19 @@ object M3ExpressiveCatalog : Catalog {
     components.filter { it.fab }.map { it.name }.toSet()
   }
 
+  override val navigationItemNames = NavigationNodes.itemTypes
+
+  override val m3Declarations =
+    listOf(
+      M3Declaration("navigation-bar", NavigationNodes.DECLARATION),
+      M3Declaration("navigation-rail", NavigationNodes.DECLARATION),
+    )
+
   /** Names of the navigation components, in the order a view lists them. */
   override val navigationNames: List<String> =
     listOf(
-      M3Component.NavigationBar.wire,
-      M3Component.NavigationRail.wire,
+      NavigationNodes.BAR,
+      NavigationNodes.RAIL,
       M3Component.FloatingToolbar.wire,
       M3Component.DockedToolbar.wire,
     )
@@ -813,14 +844,15 @@ private fun structure(): List<ComponentDef> =
     ComponentDef(
       "Scaffold",
       ComponentGroup.Structure,
-      "The screen frame: bars, floating action button and content.",
+      "The screen frame: top bar, bottom toolbar, floating action button and content. " +
+        "Navigation is not a slot of it: a bottom bar or a rail is declared once for the whole " +
+        "proposal in navigation.destinations.",
       "Scaffold",
       listOf(
         child("topBar", "TopAppBar"),
-        child("bottomBar", "NavigationBar", "FloatingToolbar", "DockedToolbar"),
+        child("bottomBar", "FloatingToolbar", "DockedToolbar"),
         child("floatingActionButton", "FloatingActionButton", "FabMenu"),
         child("content", required = true),
-        child("navigationRail", "NavigationRail"),
       ),
     ),
     ComponentDef(
@@ -865,30 +897,6 @@ private fun structure(): List<ComponentDef> =
       m3Pages = listOf("app-bars"),
     ),
     ComponentDef(
-      "NavigationBar",
-      ComponentGroup.Structure,
-      "Bottom navigation for compact windows.",
-      "ShortNavigationBar",
-      listOf(children("children", "NavigationBarItem", required = true)),
-      m3Pages = listOf("navigation-bar"),
-    ),
-    ComponentDef(
-      "NavigationBarItem",
-      ComponentGroup.Structure,
-      "One destination of a NavigationBar.",
-      "ShortNavigationBarItem",
-      listOf(
-        text("label", required = true),
-        icon(required = true),
-        icon("selectedIcon"),
-        bool("selected"),
-        badge(),
-        action(),
-      ),
-      interactive = true,
-      m3Pages = listOf("navigation-bar", "badges"),
-    ),
-    ComponentDef(
       "Tabs",
       ComponentGroup.Structure,
       "A row of tabs that switches between sibling views at the same level of hierarchy.",
@@ -910,30 +918,6 @@ private fun structure(): List<ComponentDef> =
       listOf(text("label", required = true), icon(), bool("selected"), badge(), action()),
       interactive = true,
       m3Pages = listOf("tabs", "badges"),
-    ),
-    ComponentDef(
-      "NavigationRail",
-      ComponentGroup.Structure,
-      "Side navigation for medium and expanded windows.",
-      "WideNavigationRail",
-      listOf(children("children", "NavigationRailItem", required = true), bool("expanded")),
-      m3Pages = listOf("navigation-rail"),
-    ),
-    ComponentDef(
-      "NavigationRailItem",
-      ComponentGroup.Structure,
-      "One destination of a NavigationRail.",
-      "WideNavigationRailItem",
-      listOf(
-        text("label", required = true),
-        icon(required = true),
-        icon("selectedIcon"),
-        bool("selected"),
-        badge(),
-        action(),
-      ),
-      interactive = true,
-      m3Pages = listOf("navigation-rail", "badges"),
     ),
     ComponentDef(
       "FloatingToolbar",

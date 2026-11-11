@@ -92,14 +92,18 @@ data class ViewState(
 )
 
 /**
- * What `check_proposal` returns: small enough to read after every edit. [screens] maps a screen id
- * to its views by name, and a screen with its overlay `id` open as `screen+id`; [ms] is the time
- * the renders took.
+ * What `check_proposal` returns: small enough to read after every edit. [pass] is computed from
+ * every view's own verdict, before equal views are collapsed. [colors] maps each brightness checked
+ * to the `#RRGGBB` of the color roles the checked renders draw with ([CheckedColors]). [screens]
+ * maps a screen id to its views by name, and a screen with its overlay `id` open as `screen+id`; a
+ * view with the same verdict as an earlier one is its `same` ([ViewCheck.collapse]). [ms] is the
+ * time the renders took.
  */
 @Serializable
 data class ProposalCheck(
   val pass: Boolean,
   val ms: Long,
+  val colors: Map<String, Map<String, String>> = emptyMap(),
   val screens: Map<String, Map<String, ViewCheck>>,
 )
 

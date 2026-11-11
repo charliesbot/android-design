@@ -169,23 +169,6 @@ class CatalogSmokeTest {
         ),
       ),
       Case(
-        "NavigationBar",
-        inScaffold(
-          "bottomBar",
-          """{"id":"subject","component":"NavigationBar","children":["n1","n2","n3"]}""",
-          """,{"id":"n1","component":"NavigationBarItem","label":"Home","icon":"home","selected":true},{"id":"n2","component":"NavigationBarItem","label":"Search","icon":"search"},{"id":"n3","component":"NavigationBarItem","label":"Saved","icon":"bookmark","selectedIcon":"bookmark"}""",
-        ),
-      ),
-      Case(
-        "NavigationBarItem",
-        inScaffold(
-            "bottomBar",
-            """{"id":"bar","component":"NavigationBar","children":["subject","n2"]},{"id":"subject","component":"NavigationBarItem","label":"Home","icon":"home","selected":true}""",
-            """,{"id":"n2","component":"NavigationBarItem","label":"Search","icon":"search"}""",
-          )
-          .replace(""""bottomBar":"subject"""", """"bottomBar":"bar""""),
-      ),
-      Case(
         "Tabs",
         inStage(
           """{"id":"subject","component":"Tabs","children":["tab1","tab2"]}""",
@@ -216,14 +199,6 @@ class CatalogSmokeTest {
       Case(
         "Tab",
         """{"id":"root","component":"Scaffold","content":"tabs"},{"id":"tabs","component":"Tabs","children":["subject"]},{"id":"subject","component":"Tab","label":"Plates","icon":"restaurant","selected":true}""",
-      ),
-      Case(
-        "NavigationRail",
-        """{"id":"root","component":"Scaffold","navigationRail":"subject","content":"t1"},{"id":"subject","component":"NavigationRail","expanded":true,"children":["n1","n2"]},{"id":"n1","component":"NavigationRailItem","label":"Home","icon":"home","selected":true},{"id":"n2","component":"NavigationRailItem","label":"Search","icon":"search"},$text""",
-      ),
-      Case(
-        "NavigationRailItem",
-        """{"id":"root","component":"Scaffold","navigationRail":"rail","content":"t1"},{"id":"rail","component":"NavigationRail","children":["subject"]},{"id":"subject","component":"NavigationRailItem","label":"Home","icon":"home","selected":true},$text""",
       ),
       Case(
         "FloatingToolbar",

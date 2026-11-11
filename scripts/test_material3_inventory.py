@@ -21,8 +21,10 @@ ALLOWED_ROOTS = {
     "RectangleShape", "CircleShape", "ZeroCornerSize", "Color", "TextStyle", "FontFamily", "Font", "FontVariation", "FontWeight",
     "Dialog", "DialogProperties", "RoundedCornerShape", "LaunchedEffect", "Image", "ContentScale", "TextOverflow", "TextAlign", "Grid", "FlexBox", "FlowRow", "LazyVerticalGrid",
     "GridCells", "ToggleableState", "Role", "Popup", "LocalDensity",
-    # Navigation 3 and its Material 3 adaptive scenes.
+    # Navigation 3 and its Material 3 adaptive scenes, and the navigation suite (material3-adaptive-navigation-suite,
+    # a separate artifact from the one the inventory covers).
     "NavDisplay", "ListDetailSceneStrategy", "SupportingPaneSceneStrategy",
+    "NavigationSuiteScaffold", "NavigationSuiteItem", "NavigationSuiteType",
     # MaterialKolor, the Kotlin port of Google's color utilities.
     "PaletteStyle", "ColorSpec",
     # The app's generated resource class (R.font.google_sans_flex).

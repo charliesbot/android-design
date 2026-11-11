@@ -97,4 +97,30 @@ class NavigationGraphTest {
     val graph = NavigationGraph(TestProposal.valid().build())
     assertEquals(setOf("plates", "plate_detail"), graph.backStacks.keys)
   }
+
+  @Test
+  fun `a screen reached through a destination starts its back stack at that destination`() {
+    val screen =
+      """{"id":"root","component":"Scaffold","content":"t"},{"id":"t","component":"Text","text":"x"}"""
+    val p =
+      TestProposal.valid()
+        .withScreen(
+          "saved",
+          """{"id":"root","component":"Button","label":"Open","action":${navigate("saved_detail")}}""",
+        )
+        .withScreen("saved_detail", screen)
+        .withScreen("profile", screen)
+        .withNavigation(
+          """{"start":"plates","destinations":[
+            {"screen":"plates","label":"Plates","icon":"restaurant"},
+            {"screen":"saved","label":"Saved","icon":"favorite"},
+            {"screen":"profile","label":"Profile","icon":"person"}]}""",
+        )
+        .build()
+    val graph = NavigationGraph(p)
+    // Not [plates, saved, saved_detail]: a tap on a destination leaves just that destination.
+    assertEquals(listOf("saved", "saved_detail"), graph.backStack("saved_detail"))
+    assertEquals(listOf("profile"), graph.backStack("profile"))
+    assertEquals(listOf("plates"), graph.backStack("plates"))
+  }
 }

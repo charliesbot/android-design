@@ -156,7 +156,6 @@ enum class FindingRule(val wire: String) {
   @SerialName("round-edge-clipped") RoundEdgeClipped("round-edge-clipped"),
   @SerialName("corner-clipped") CornerClipped("corner-clipped"),
   @SerialName("carousel-items") CarouselItems("carousel-items"),
-  @SerialName("nav-destinations") NavDestinations("nav-destinations"),
   @SerialName("docked-toolbar-nav-bar") DockedToolbarNavBar("docked-toolbar-nav-bar"),
   @SerialName("full-screen-date-picker") FullScreenDatePicker("full-screen-date-picker"),
   @SerialName("empty-detail-pane") EmptyDetailPane("empty-detail-pane"),

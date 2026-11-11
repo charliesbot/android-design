@@ -1,6 +1,5 @@
 package bot.charlies.androiddesign.preview.domain.validation
 
-import bot.charlies.androiddesign.preview.domain.BadgeContent
 import bot.charlies.androiddesign.preview.domain.DatePickerSpec
 import bot.charlies.androiddesign.preview.domain.DialogSpec
 import bot.charlies.androiddesign.preview.domain.MenuSpec
@@ -25,6 +24,8 @@ import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.M3Component
+import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
+import bot.charlies.androiddesign.preview.model.NavigationNodes
 import bot.charlies.androiddesign.preview.model.PropDef
 import bot.charlies.androiddesign.preview.model.PropKind
 import bot.charlies.androiddesign.preview.model.Proposal
@@ -432,7 +433,14 @@ internal class ScreenValidator(
         node.component.isEmpty() ->
           sink.add(path.child("component"), "component is missing its type")
         catalog.find(node.component) == null ->
-          sink.add(path.child("component"), "unknown component '${node.component}'")
+          sink.add(
+            path.child("component"),
+            if (replacedNavigation(node.component)) {
+              "${node.component} no longer exists: $NAVIGATION_MOVED"
+            } else {
+              "unknown component '${node.component}'"
+            },
+          )
       }
     }
     if (screen.components.none { it.id == ComponentNode.ROOT_ID }) {
@@ -462,7 +470,13 @@ internal class ScreenValidator(
           )
         else -> {
           val prop = declared[key]
-          if (prop == null) {
+          if (prop == null && def.name == M3Component.Scaffold.wire && replacedRail(key)) {
+            sink.add(
+              path.child(key),
+              "a Scaffold has no $key slot: the rail is not part of a screen, so " +
+                NAVIGATION_MOVED,
+            )
+          } else if (prop == null) {
             val known =
               (declared.keys +
                   listOfNotNull(Catalog.SHOW_IN.takeIf { showIn }) +
@@ -711,22 +725,15 @@ internal class ScreenValidator(
 
   private fun validateBadge(path: String, value: JsonElement) {
     if (isDynamic(value)) return
-    val primitive = value as? JsonPrimitive
-    if (
-      primitive == null || (!value.isBoolean() && !value.isNumber() && value.asString() == null)
-    ) {
-      sink.add(path, "must be true, false, a number, a string or a binding")
-      return
-    }
-    val label = (BadgeContent.of(primitive) as? BadgeContent.Large)?.label ?: return
-    if (label.length > PropKind.BADGE_MAX_CHARACTERS) {
-      sink.add(
-        path,
-        "a badge label holds at most ${PropKind.BADGE_MAX_CHARACTERS} characters, " +
-          "a + included (such as \"99+\"), got '$label'",
-      )
-    }
+    BadgeRules.problem(value)?.let { sink.add(path, it) }
   }
+
+  /** Whether [component] is a navigation component that `navigation.destinations` replaced. */
+  private fun replacedNavigation(component: String) =
+    catalog === M3ExpressiveCatalog && component in NavigationNodes.replacedComponents
+
+  private fun replacedRail(key: String) =
+    catalog === M3ExpressiveCatalog && key == NavigationNodes.REPLACED_RAIL_SLOT
 
   private fun validateText(path: String, kind: PropKind, value: JsonElement) {
     val text = value.asString()
@@ -770,6 +777,8 @@ internal class ScreenValidator(
     val allowed = prop.allowedChildren
     when {
       target == null -> sink.add(path, "references unknown component '$id'")
+      // The component itself is reported as replaced; a second error here would repeat it.
+      replacedNavigation(target.component) -> Unit
       allowed != null && target.component !in allowed ->
         sink.add(
           path,
@@ -888,7 +897,12 @@ internal class ScreenValidator(
 
   companion object {
     val IDENTIFIER = Regex("^[A-Za-z_][A-Za-z0-9_]*$")
-    private val ICON_NAME = Regex("^[a-z0-9_]+$")
+    internal val ICON_NAME = Regex("^[a-z0-9_]+$")
+    /** The tail of the message about a bottom bar, a rail or a rail slot that moved. */
+    private const val NAVIGATION_MOVED =
+      "declare the bottom bar and the rail once for the whole proposal in " +
+        "${NavigationNodes.DECLARATION} (3 to 5 entries of {screen, label, icon, selectedIcon, " +
+        "badge}), which draws a bar at compact widths and a rail from medium up, outside the panes"
     private val PICKER_OVERLAYS =
       setOf(M3Component.Dialog.wire, M3Component.DatePicker.wire, M3Component.TimePicker.wire)
     private const val DATE_MESSAGE =

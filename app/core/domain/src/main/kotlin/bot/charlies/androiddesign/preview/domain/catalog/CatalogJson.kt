@@ -11,6 +11,7 @@ import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.M3Omission
 import bot.charlies.androiddesign.preview.model.MaterialShape
+import bot.charlies.androiddesign.preview.model.Navigation
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.PaneRole
 import bot.charlies.androiddesign.preview.model.PreviewJson
@@ -56,26 +57,40 @@ object CatalogJson {
   /** The catalog an agent reads through `get_catalog`, written to its [catalogFile]. */
   fun catalog(catalog: Catalog = M3ExpressiveCatalog): JsonObject {
     val scope = Scope(catalog, Refs.Catalog, prefix = "")
-    return obj(
-      "\$schema" to DRAFT,
-      "\$id" to catalogUrl(catalog),
-      "protocolVersion" to Catalog.PROTOCOL_VERSION,
-      "title" to catalog.title,
-      "description" to catalog.description,
-      "catalogId" to catalog.id,
-      "instructions" to instructions(catalog),
-      "components" to JsonObject(catalog.components.associate { it.name to component(it, scope) }),
-      "x-m3-omissions" to JsonArray(catalog.m3Omissions.map(::omission)),
-      "functions" to JsonObject(ActionFunction.entries.associate { it.wire to function(it) }),
-      "\$defs" to
-        JsonObject(
-          mapOf(
-            "anyComponent" to anyComponent(catalog) { "#/components/$it" },
-            "anyFunction" to anyFunction("#/functions/"),
-            "Action" to actionDef(),
-            "ComponentCommon" to componentCommon(scope),
-          ) + tokenDefs(catalog, prefix = ""),
-        ),
+    val base =
+      obj(
+        "\$schema" to DRAFT,
+        "\$id" to catalogUrl(catalog),
+        "protocolVersion" to Catalog.PROTOCOL_VERSION,
+        "title" to catalog.title,
+        "description" to catalog.description,
+        "catalogId" to catalog.id,
+        "instructions" to instructions(catalog),
+        "components" to
+          JsonObject(catalog.components.associate { it.name to component(it, scope) }),
+        "x-m3-omissions" to JsonArray(catalog.m3Omissions.map(::omission)),
+        "functions" to JsonObject(ActionFunction.entries.associate { it.wire to function(it) }),
+        "\$defs" to
+          JsonObject(
+            mapOf(
+              "anyComponent" to anyComponent(catalog) { "#/components/$it" },
+              "anyFunction" to anyFunction("#/functions/"),
+              "Action" to actionDef(),
+              "ComponentCommon" to componentCommon(scope),
+            ) + tokenDefs(catalog, prefix = ""),
+          ),
+      )
+    if (catalog.m3Declarations.isEmpty()) return base
+    // The Material 3 pages that a proposal field draws, right after the ones it omits.
+    val declarations =
+      JsonArray(catalog.m3Declarations.map { obj("page" to it.page, "by" to it.by) })
+    return JsonObject(
+      buildMap {
+        base.forEach { (key, value) ->
+          put(key, value)
+          if (key == "x-m3-omissions") put("x-m3-declarations", declarations)
+        }
+      },
     )
   }
 
@@ -135,6 +150,7 @@ object CatalogJson {
           mapOf(
             "Theme" to themeDef(),
             "Navigation" to navigationDef(),
+            "Destination" to destinationDef(),
             "Screen" to
               obj(
                 "oneOf" to JsonArray(Catalogs.all.map { ref("#/\$defs/${screenDefName(it)}") }),
@@ -603,8 +619,69 @@ object CatalogJson {
                   "is selected. The placeholder is a screen in no pane that nothing navigates to.",
               "additionalProperties" to obj("type" to "string"),
             ),
+          "destinations" to
+            obj(
+              "type" to "array",
+              "description" to
+                "The app's top-level destinations, ${Navigation.MIN_DESTINATIONS} to " +
+                  "${Navigation.MAX_DESTINATIONS}, drawn once around the screens and outside " +
+                  "every pane: a bottom bar at compact widths, a rail at medium and expanded " +
+                  "widths. Leave it out for a proposal with no app-level navigation. Phone " +
+                  "catalog only.",
+              "minItems" to Navigation.MIN_DESTINATIONS,
+              "maxItems" to Navigation.MAX_DESTINATIONS,
+              "items" to ref("#/\$defs/Destination"),
+            ),
+          "railExpanded" to
+            obj(
+              "type" to "boolean",
+              "description" to
+                "Show the rail expanded where the window is expanded (840 dp and up); it is " +
+                  "collapsed at medium either way. Default false. Phone catalog only.",
+            ),
         ),
       "required" to strings("start"),
+      "additionalProperties" to false,
+    )
+
+  private fun destinationDef(): JsonObject =
+    obj(
+      "type" to "object",
+      "description" to
+        "One top-level destination: the screen it opens, with its label and icon. A tap makes " +
+          "that screen the whole back stack.",
+      "properties" to
+        obj(
+          "screen" to
+            obj(
+              "type" to "string",
+              "description" to
+                "The screen it opens: a screen of the proposal that is no detail, supporting or " +
+                  "extra pane and no placeholder, and that no other destination opens.",
+            ),
+          "label" to obj("type" to "string", "minLength" to 1),
+          "icon" to obj("type" to "string", "description" to "A Material Symbols name."),
+          "selectedIcon" to
+            obj(
+              "type" to "string",
+              "description" to "A Material Symbols name drawn while it is selected.",
+            ),
+          "badge" to
+            obj(
+              "description" to
+                "true draws a small badge; a number or a string of at most " +
+                  "${PropKind.BADGE_MAX_CHARACTERS} characters draws a large one. A literal only.",
+              "oneOf" to
+                JsonArray(
+                  listOf(
+                    obj("type" to "boolean"),
+                    obj("type" to "number", "maximum" to BADGE_MAX_NUMBER),
+                    obj("type" to "string", "maxLength" to PropKind.BADGE_MAX_CHARACTERS),
+                  ),
+                ),
+            ),
+        ),
+      "required" to strings("screen", "label", "icon"),
       "additionalProperties" to false,
     )
 
@@ -667,6 +744,7 @@ object CatalogJson {
     4. Interaction is renderer-only: `navigate`, `back`, `open` and `dismiss`. Event actions do not exist.
     5. Mark the screen's main action with `primary: true` on one component, and give every icon-only control a `contentDescription`.
     6. Use `showIn` and `sizeClass` to adapt a component at 600 dp (medium) and 840 dp (expanded).
+    7. Navigation is declared once, not drawn in a screen: `navigation.destinations` holds 3 to 5 `{screen, label, icon, selectedIcon?, badge?}` entries and the previewer draws a bar at compact widths and a rail from medium up, outside the panes. A destination is a top-level screen (pane role list or none). The bar or rail shows on a destination, and beside a destination when two panes fit; a screen that covers the whole window shows none. `navigation.railExpanded: true` expands the rail from 840 dp.
     """
       .trimIndent()
 

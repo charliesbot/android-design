@@ -97,6 +97,32 @@ class CatalogSummaryTest {
   }
 
   @Test
+  fun `the summary says where navigation is declared and its fields`() {
+    val navigation = summary.substringAfter("NAVIGATION").substringBefore("TOKENS")
+    for (field in
+      listOf(
+        "destinations",
+        "railExpanded",
+        "screen*",
+        "label*",
+        "icon*",
+        "selectedIcon",
+        "badge",
+      )) {
+      assertTrue(field in navigation, field)
+    }
+    assertTrue("3 to 5" in navigation && "never in a screen" in navigation, navigation)
+    // The removed components and slot are named only to say they no longer exist.
+    assertTrue(M3ExpressiveCatalog.find("NavigationBar") == null)
+    assertTrue(M3ExpressiveCatalog.find("Scaffold")!!.prop("navigationRail") == null)
+    assertTrue("navigation.destinations" in line("Scaffold"), line("Scaffold"))
+    assertTrue("destinations" in CatalogJson.instructions(M3ExpressiveCatalog))
+    assertTrue(
+      "NAVIGATION" !in CatalogSummary.render(bot.charlies.androiddesign.preview.model.WearCatalog),
+    )
+  }
+
+  @Test
   fun `the action functions are listed`() {
     for (function in ActionFunction.entries) {
       assertTrue(summary.lines().any { it.startsWith("${function.wire}(") }, function.wire)

@@ -107,7 +107,6 @@ internal data class Place(
   /** Modifier calls to put first, such as `padding(innerPadding)`. */
   val leading: List<String> = emptyList(),
   val listPosition: ListPosition? = null,
-  val railExpanded: Boolean = false,
   /** `ButtonGroupDefaults.connectedMiddleButtonShapes()` for a child of a connected group. */
   val groupShapes: String? = null,
   val chipSelection: ChipSelection? = null,

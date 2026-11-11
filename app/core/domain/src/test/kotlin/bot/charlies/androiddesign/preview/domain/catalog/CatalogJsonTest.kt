@@ -48,7 +48,7 @@ class CatalogJsonTest {
   fun `catalog covers the components the brief names`() {
     val names = M3ExpressiveCatalog.components.map { it.name }.toSet()
     val brief =
-      "Column Row Box Grid FlexBox Spacer Divider Shape Text Icon Image Scaffold TopAppBar NavigationBar NavigationBarItem NavigationRail NavigationRailItem FloatingToolbar Card List ListItem Button ToggleButton ButtonGroup IconButton SplitButton FloatingActionButton FabMenu FabMenuItem AssistChip FilterChip InputChip SuggestionChip ChipGroup Switch Checkbox Slider RangeSlider TextField LoadingIndicator ProgressIndicator BottomSheet Dialog Menu MenuItem"
+      "Column Row Box Grid FlexBox Spacer Divider Shape Text Icon Image Scaffold TopAppBar FloatingToolbar Card List ListItem Button ToggleButton ButtonGroup IconButton SplitButton FloatingActionButton FabMenu FabMenuItem AssistChip FilterChip InputChip SuggestionChip ChipGroup Switch Checkbox Slider RangeSlider TextField LoadingIndicator ProgressIndicator BottomSheet Dialog Menu MenuItem"
         .split(" ")
     assertEquals(emptyList(), brief.filterNot { it in names })
   }

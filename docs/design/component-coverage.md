@@ -17,7 +17,7 @@ The audit compares the 36 component pages in `sources/m3.material.io/pages/compo
 
 Both omissions are Material's own retirements:
 
-- **Navigation drawer:** the M3 Expressive update says it "is no longer recommended" and points to the expanded navigation rail, which the catalog has (`NavigationRail` with `expanded`).
+- **Navigation drawer:** the M3 Expressive update says it "is no longer recommended" and points to the expanded navigation rail, which the proposal has as `navigation.destinations` with `railExpanded`.
 - **Segmented buttons:** replaced by the connected button group, which the catalog has (`ButtonGroup` with `variant: connected`).
 
 ## Rules every addition follows
@@ -32,7 +32,7 @@ Both omissions are Material's own retirements:
 
 ### Tabs
 
-`Tabs` holds `Tab` children, with `variant: primary | secondary` and `scrollable`. They export to `PrimaryTabRow`, `SecondaryTabRow` and their scrollable forms, and each `Tab` to `Tab`. `Tab` takes `label`, `icon`, `selected`, `badge` and an `action`, mirroring `NavigationBarItem`. A tab's content is another screen reached with `navigate`, not a child of the row, because that is how the catalog already models destinations. Tabs swapping content in place would need a second content model for one component.
+`Tabs` holds `Tab` children, with `variant: primary | secondary` and `scrollable`. They export to `PrimaryTabRow`, `SecondaryTabRow` and their scrollable forms, and each `Tab` to `Tab`. `Tab` takes `label`, `icon`, `selected`, `badge` and an `action`, as a `navigation.destinations` entry does. A tab's content is another screen reached with `navigate`, not a child of the row, because that is how the catalog already models destinations. Tabs swapping content in place would need a second content model for one component.
 
 ### Search
 
@@ -72,7 +72,7 @@ They sit inside the claimed `carousel` page, so no page-level omission records t
 
 ### Badges
 
-A badge is a `badge` prop, not a component: `true` draws a small badge, and a number or short string draws a large one. The prop is on `NavigationBarItem`, `NavigationRailItem`, `Tab` and `IconButton`, and exports to `BadgedBox` with `Badge`. Material says badges anchor to an icon's upper trailing corner and live "within other components", so a free-standing `Badge` component would only add a way to place one wrongly.
+A badge is a `badge` prop, not a component: `true` draws a small badge, and a number or short string draws a large one. The prop is on `Tab`, `IconButton` and each `navigation.destinations` entry (a literal there), and exports to `BadgedBox` with `Badge`. Material says badges anchor to an icon's upper trailing corner and live "within other components", so a free-standing `Badge` component would only add a way to place one wrongly.
 
 ### Tooltips
 
@@ -110,7 +110,7 @@ The skill's guidance ("bottom sheet on phones, side sheet on medium and up") sta
 
 ## Findings that come with the new components
 
-Several skill rules become checkable once the components exist, and the checks belong in the finding rules beside the components: at most one snackbar open, at most three carousel items with text at compact widths, no docked toolbar together with a navigation bar, a full-screen date picker at medium and wider (a note), and no navigation bar with fewer than three destinations (tabs instead). Each traces to the component's source page in `docs/research/material-3-components.md`.
+Several skill rules become checkable once the components exist, and the checks belong in the finding rules beside the components: at most one snackbar open, at most three carousel items with text at compact widths, no docked toolbar together with a navigation bar, a full-screen date picker at medium and wider (a note), and three to five `navigation.destinations`, a validation error otherwise (tabs for fewer). Each traces to the component's source page in `docs/research/material-3-components.md`.
 
 Selection counts and the compact-only full-screen dialog are validator rules instead: exactly one selected radio button per group, and at most one selected single-select menu item per group. A selection is authored in props (a `selected` flag per button or item), and a finding sees only the rendered tree, where the group's own selection state has already picked one. The validator reads the authored props at each size class, so it reports the proposal that is wrong, not the render.
 

@@ -102,10 +102,26 @@ class FindingRulesTest {
   }
 
   @Test
-  fun `font rejects brand faces on title body and label roles`() {
-    listOf("titleLarge", "bodyMedium", "labelLarge").forEach { role ->
+  fun `font allows brand faces on the large title roles`() {
+    listOf("Fraunces", "Bricolage Grotesque", "Big Shoulders Display").forEach { family ->
+      listOf("titleLarge", "titleLargeEmphasized").forEach { role ->
+        assertEquals(emptyList(), fontFindings(family, role), "$family $role")
+      }
+    }
+    assertEquals(
+      "Doto is for display text, not titleLarge",
+      fontFindings("Doto", "titleLarge").single().detail,
+    )
+  }
+
+  @Test
+  fun `font rejects brand faces on other title body and label roles`() {
+    listOf("titleMedium", "titleSmallEmphasized", "bodyMedium", "labelLarge").forEach { role ->
       val finding = fontFindings("Fraunces", role).single()
-      assertEquals("Fraunces is for display and headline text, not $role", finding.detail)
+      assertEquals(
+        "Fraunces is for display, headline and large title text, not $role",
+        finding.detail,
+      )
     }
   }
 
@@ -558,7 +574,7 @@ class FindingRulesTest {
 
   // endregion
 
-  // region nav-destinations
+  // region navigation drawn outside the screens
 
   private fun destinations(bar: String, count: Int) =
     Array(count) { i ->
@@ -575,31 +591,27 @@ class FindingRulesTest {
     }
 
   @Test
-  fun `nav-destinations passes for three destinations`() {
-    val bar = node("bar", "NavigationBar", y = 800f, w = 411f, h = 80f)
-    val findings = evaluate(tree(nodes = arrayOf(bar, *destinations("bar", 3))))
-    assertEquals(emptyList(), findings.of(FindingRule.NavDestinations))
+  fun `the number of destinations is a validation error, not a finding`() {
+    val bar = node("@navigation", "NavigationBar", y = 800f, w = 411f, h = 80f)
+    val findings = evaluate(tree(nodes = arrayOf(bar, *destinations("@navigation", 2))))
+    assertEquals(emptyList(), findings)
   }
 
   @Test
-  fun `nav-destinations fails for fewer than three and points at tabs`() {
-    val bar = node("bar", "NavigationBar", y = 800f, w = 411f, h = 80f)
-    val finding =
-      evaluate(tree(nodes = arrayOf(bar, *destinations("bar", 2))))
-        .of(FindingRule.NavDestinations)
-        .single()
-    assertEquals("bar", finding.id)
-    assertEquals(Severity.Error, finding.severity)
-    assertEquals(
-      "2 destinations; a navigation bar needs at least 3, use tabs for fewer",
-      finding.detail,
-    )
-  }
-
-  @Test
-  fun `nav-destinations ignores a bar that is not drawn`() {
-    val bar = node("bar", "NavigationBar", w = 0f, h = 0f)
-    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(bar))).of(FindingRule.NavDestinations))
+  fun `a navigation item under the touch target fails the touch target rule`() {
+    val bar = node("@navigation", "NavigationBar", y = 800f, w = 411f, h = 80f)
+    val small =
+      node(
+        "@navigation[0]",
+        "NavigationBarItem",
+        parent = "@navigation",
+        y = 800f,
+        w = 40f,
+        h = 40f,
+        touch = Bounds(0f, 800f, 40f, 40f),
+      )
+    val finding = evaluate(tree(nodes = arrayOf(bar, small))).of(FindingRule.TouchTarget).single()
+    assertEquals("@navigation[0]", finding.id)
   }
 
   // endregion

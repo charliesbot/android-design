@@ -24,7 +24,7 @@ Write only those two files. The previewer app is connected to you over MCP as th
 
 ## Review (the android-design screen check)
 
-1. Call `check_proposal`. It checks every screen at {{VIEWS}} in one call and lists only the errors. A proposal that does not validate returns its validation errors instead.
+1. Call `check_proposal`. It checks every screen at {{VIEWS}} in one call and lists the errors, plus `notes` that never fail a view. A proposal that does not validate returns its validation errors instead.
 2. Fix every error once, then call `check_proposal` again. Report anything still failing or unresolved.
 3. {{LAYOUT}}
 

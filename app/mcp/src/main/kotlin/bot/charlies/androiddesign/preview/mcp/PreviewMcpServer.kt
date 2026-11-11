@@ -92,7 +92,10 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
         "Returns the layout tree: every proposal component with its bounds and touch bounds in dp " +
           "(relative to the preview frame), text lines and truncation, color and type roles, " +
           "accessibility role and label, plus findings (touch targets, fonts, contrast, truncated " +
-          "labels, one FAB, primary action). A view passes when no finding has severity error. " +
+          "labels, one FAB, primary action). The bottom bar or rail of navigation.destinations is " +
+          "in the tree as @navigation (NavigationBar or NavigationRail) with one " +
+          "@navigation[index] item per destination, outside every screen's components. A view " +
+          "passes when no finding has severity error. " +
           "With no arguments it describes what the window shows: its screen, device, brightness, " +
           "color overrides, open overlays and selections. With screen or view it renders that " +
           "screen at that view without a window. A scrolling Wear list is scrolled from top to end " +
@@ -183,19 +186,26 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
       title = "Check every screen and view",
       description =
         "Renders each screen at each view without a window, tree only, and returns whether the " +
-          "proposal passes: per screen and view, pass plus every error finding (rule, component " +
-          "id, detail), a count of info findings, and a layout summary: the navigation component " +
-          "shown (NavigationBar, NavigationRail, FloatingToolbar or none) and the screens shown " +
-          "left to right, each with the direct children of its content root as \"Type id width\" " +
-          "(dp). Compare the layout of two views to see that a wider one reveals more, with no " +
-          "need for get_tree. No other geometry; call get_tree for a failing view's bounds. With " +
-          "no arguments it checks every screen at every view of the proposal's catalog: light, " +
-          "dark, foldable, tablet and desktop for a phone proposal, watch and watch-large for a " +
-          "Wear proposal. A scrolling Wear list is scrolled from top to end, so its findings " +
-          "cover every item and the edge button. Each overlay (sheet, dialog, menu, search " +
-          "view, tooltip, snackbar, picker) is one more entry per view under \"screen+overlayId\", " +
-          "drawn with it open and checked the same way, but listing only the errors the plain screen at that view does not already report (matched by rule and component id), and no layout summary. Call this " +
-          "after each edit instead of get_tree per view.",
+          "proposal passes: per screen and view, pass, every error finding (rule, component ids, " +
+          "detail), notes, and a layout summary. Notes are the info findings, never a failure, " +
+          "grouped by rule with their component ids and no detail. The layout is the navigation " +
+          "component shown (NavigationBar, NavigationRail, FloatingToolbar or none, from " +
+          "navigation.destinations) and the screens shown left to right, each with the direct " +
+          "children of its content root as \"Type id width\" (dp). A view whose result equals an " +
+          "earlier view's of the same screen is only {\"same\": \"<that view>\"}: read the first. " +
+          "Compare the layout of two views to see that a wider one reveals more, with no need for " +
+          "get_tree. Top-level colors give, for light and dark as checked (Wear is dark only), the " +
+          "#RRGGBB of each color role the renders draw with, by role name, so contrast can be " +
+          "judged without get_tree. No other geometry; call get_tree for a failing view's bounds. " +
+          "With no arguments it checks every screen at every view of the proposal's catalog: " +
+          "light, dark, foldable, tablet and desktop for a phone proposal, watch and watch-large " +
+          "for a Wear proposal. A scrolling Wear list is scrolled from top to end, so its " +
+          "findings cover every item and the edge button. Each overlay (sheet, dialog, menu, " +
+          "search view, tooltip, snackbar, picker) is one more entry per view under " +
+          "\"screen+overlayId\", drawn with it open and checked the same way, but listing only the " +
+          "errors and notes the plain screen at that view does not already report (matched by " +
+          "rule and component id), and no layout summary. Call this after each edit instead of " +
+          "get_tree per view.",
       schema =
         schema(
           stringList("screens", "Screen ids to check. Defaults to every screen."),
@@ -217,7 +227,9 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
       description =
         "With no arguments, returns a compact catalog: every component with its purpose and its " +
           "props as name: kind (enum values inline, child slots and required props marked), then " +
-          "the color, type, shape and spacing tokens and the action functions. With component, " +
+          "the navigation field (destinations and railExpanded: the bottom bar and the rail are " +
+          "declared there once, never as components of a screen), the color, type, shape and " +
+          "spacing tokens and the action functions. With component, " +
           "returns the full JSON Schema entries of those components. A proposal may only use " +
           "what its catalog declares.",
       schema =
@@ -242,7 +254,9 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
       title = "Export to Jetpack Compose",
       description =
         "Returns Kotlin source for one screen, or for every screen with the Navigation 3 host when " +
-          "screen is omitted: Material 3 components, the theme, sample data and previews. A Wear " +
+          "screen is omitted: Material 3 components, the theme, sample data and previews. The " +
+          "host wraps the NavDisplay in a NavigationSuiteScaffold when navigation.destinations is " +
+          "declared. A Wear " +
           "proposal exports as Wear Compose Material 3: the scaffolds, the scrolling list, the " +
           "theme with the exact colors the previewer draws, and previews. The proposal must be " +
           "valid.",

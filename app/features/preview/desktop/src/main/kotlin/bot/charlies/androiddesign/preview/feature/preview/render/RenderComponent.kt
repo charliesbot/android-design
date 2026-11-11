@@ -46,15 +46,8 @@ private fun kit(component: M3Component): RenderKit =
     M3Component.Carousel -> RenderKit({ RenderCarousel(it) }) { carouselLook(it) }
     M3Component.Scaffold -> RenderKit({ RenderScaffold(it) }) { _ -> scaffoldLook() }
     M3Component.TopAppBar -> RenderKit({ RenderTopAppBar(it) }) { _ -> topAppBarLook() }
-    M3Component.NavigationBar -> RenderKit({ RenderNavigationBar(it) }) { _ -> navigationBarLook() }
-    M3Component.NavigationBarItem ->
-      RenderKit({ RenderNavigationBarItem(it) }) { _ -> navigationBarItemLook() }
     M3Component.Tabs -> RenderKit({ RenderTabs(it) }) { _ -> tabsLook() }
     M3Component.Tab -> RenderKit({ RenderTab(it) }) { _ -> tabLook() }
-    M3Component.NavigationRail ->
-      RenderKit({ RenderNavigationRail(it) }) { _ -> navigationRailLook() }
-    M3Component.NavigationRailItem ->
-      RenderKit({ RenderNavigationRailItem(it) }) { _ -> navigationRailItemLook() }
     M3Component.FloatingToolbar ->
       RenderKit({ RenderFloatingToolbar(it) }) { _ -> floatingToolbarLook() }
     M3Component.DockedToolbar -> RenderKit({ RenderDockedToolbar(it) }) { _ -> dockedToolbarLook() }

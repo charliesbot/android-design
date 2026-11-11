@@ -1,13 +1,22 @@
 package bot.charlies.androiddesign.preview.domain.export
 
+import bot.charlies.androiddesign.preview.domain.BadgeContent
+import bot.charlies.androiddesign.preview.domain.navigation.AppNavigation
 import bot.charlies.androiddesign.preview.domain.navigation.DetailPlaceholders
+import bot.charlies.androiddesign.preview.model.Destination
 import bot.charlies.androiddesign.preview.model.PaneRole
 import bot.charlies.androiddesign.preview.model.Proposal
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * The Navigation 3 host for a full export: one `@Serializable` route key per screen, and a
  * `NavDisplay` whose entries carry the pane roles as `ListDetailSceneStrategy` and
  * `SupportingPaneSceneStrategy` metadata.
+ *
+ * When the proposal declares `navigation.destinations`, the `NavDisplay` sits inside one
+ * `NavigationSuiteScaffold`, so the bar or rail is drawn once around the panes and never by a
+ * screen. The code it writes makes the decisions of [AppNavigation]: which destination is selected,
+ * whether the navigation shows, and which component draws.
  */
 internal class NavigationEmitter(
   private val file: FileContext,
@@ -21,7 +30,10 @@ internal class NavigationEmitter(
   private val supporting = roles.values.any { it == PaneRole.Supporting }
   private val listDetail = !supporting && roles.isNotEmpty()
 
-  fun declarations(): List<Decl> = NavRoutes.declarations(file, proposal) + listOf(app())
+  private val destinations: List<Destination> = AppNavigation.destinations(proposal)
+
+  fun declarations(): List<Decl> =
+    NavRoutes.declarations(file, proposal) + listOfNotNull(suiteTypeFunction()) + listOf(app())
 
   private fun strategies(): List<Pair<String, String>> {
     val key = file.use(Sym.NavKey)
@@ -71,6 +83,153 @@ internal class NavigationEmitter(
       ),
     )
 
+  /**
+   * The navigation suite around [display]: the routes of the destinations, the selected one,
+   * whether the navigation shows, and `NavigationSuiteScaffold` with one item per destination.
+   */
+  private fun suiteScaffold(display: Call): List<Stmt> {
+    val key = file.use(Sym.NavKey)
+    val adaptiveInfo = "${file.use(Sym.currentWindowAdaptiveInfoV2)}()"
+    val routes = destinations.map { NavRoutes.name(it.screen) }
+    fun routeList(names: List<String>) = Call("listOf<$key>", names.map { pos(it) })
+    val statements = mutableListOf<Stmt>()
+    statements += Assign("val destinations", "=", routeList(routes))
+    statements += Assign("val topRoute", "=", Raw("backStack.lastOrNull()"))
+    statements +=
+      Assign("val selectedRoute", "=", Raw("backStack.lastOrNull { it in destinations }"))
+    if (roles.isEmpty()) {
+      statements += Assign("val showNavigation", "=", Raw("topRoute in destinations"))
+    } else {
+      // A pane beside a destination: the scaffold has room for two panes, and the selected
+      // destination is a pane too.
+      val directive = file.use(Sym.calculatePaneScaffoldDirective)
+      statements += Assign("val paneRoutes", "=", routeList(roles.keys.map(NavRoutes::name)))
+      statements +=
+        Assign(
+          "val twoPanes",
+          "=",
+          Raw("$directive($adaptiveInfo).maxHorizontalPartitions >= 2"),
+        )
+      statements +=
+        Assign(
+          "val showNavigation",
+          "=",
+          Or(
+            listOf(
+              "topRoute in destinations",
+              "(topRoute in paneRoutes && twoPanes && selectedRoute in paneRoutes)",
+            ),
+          ),
+        )
+    }
+    statements +=
+      Assign(
+        "val navigationSuiteType",
+        "=",
+        Raw("$SUITE_TYPE_FUNCTION(showNavigation, $adaptiveInfo.windowSizeClass)"),
+      )
+    val items = destinations.map { stmt(suiteItem(it)) }
+    val scaffold =
+      Call(
+        file.use(Sym.NavigationSuiteScaffold),
+        listOf(
+          arg("navigationItems", lambda(items)),
+          arg("navigationSuiteType", "navigationSuiteType"),
+        ),
+        lambdaOf(display),
+      )
+    return statements + stmt(scaffold)
+  }
+
+  /** `NavigationSuiteItem(...)` for [destination]: a tap makes it the whole back stack. */
+  private fun suiteItem(destination: Destination): Call {
+    val route = NavRoutes.name(destination.screen)
+    val icon = painter(destination.icon, destination.selectedIcon, "selectedRoute == $route")
+    val badge =
+      BadgeContent.of(destination.badge as? JsonPrimitive)?.let { content ->
+        val badgeName = file.use(Sym.m3("Badge"))
+        when (content) {
+          BadgeContent.Small -> lambdaOf(Call(badgeName))
+          is BadgeContent.Large ->
+            lambdaOf(
+              Call(
+                badgeName,
+                emptyList(),
+                lambdaOf(Call(file.use(Sym.Text), listOf(pos(kotlinString(content.label))))),
+              ),
+            )
+        }
+      }
+    return Call(
+      file.use(Sym.NavigationSuiteItem),
+      listOfNotNull(
+        arg("selected", "selectedRoute == $route"),
+        arg(
+          "onClick",
+          lambda(stmt(Raw("backStack.clear()")), stmt(Raw("backStack.add($route)"))),
+        ),
+        arg(
+          "icon",
+          lambdaOf(
+            Call(
+              file.use(Sym.Icon),
+              listOf(pos(icon), arg("contentDescription", "null")),
+            ),
+          ),
+        ),
+        arg(
+          "label",
+          lambdaOf(Call(file.use(Sym.Text), listOf(pos(kotlinString(destination.label))))),
+        ),
+        arg("navigationSuiteType", "navigationSuiteType"),
+        badge?.let { arg("badge", it) },
+      ),
+    )
+  }
+
+  /** The icon's painter: its own drawable, or the selected one while the item is selected. */
+  private fun painter(icon: String, selectedIcon: String?, selected: String): String {
+    val painterResource = file.use(Sym.painterResource)
+    val normal = file.drawable(Naming.snake(icon))
+    if (selectedIcon == null || selectedIcon == icon) return "$painterResource($normal)"
+    val chosen = file.drawable(Naming.snake(selectedIcon))
+    return "$painterResource(if ($selected) $chosen else $normal)"
+  }
+
+  /**
+   * `navigationSuiteTypeFor`, the function that picks what the suite draws, as the previewer does:
+   * nothing while a screen covers the window, a short bar below 600 dp, else a wide rail, expanded
+   * from 840 dp when the proposal asks for `railExpanded`. Null without destinations.
+   */
+  private fun suiteTypeFunction(): Decl? {
+    if (destinations.isEmpty()) return null
+    val type = file.use(Sym.NavigationSuiteType)
+    val windowSizeClass = file.use(Sym.WindowSizeClass)
+    val expanded = proposal.navigation.railExpanded == true
+    return RawDecl(
+      buildList {
+        add("private fun $SUITE_TYPE_FUNCTION(")
+        add("  showNavigation: Boolean,")
+        add("  windowSizeClass: $windowSizeClass,")
+        add("): $type =")
+        add("  when {")
+        add("    !showNavigation -> $type.None")
+        add(
+          "    !windowSizeClass.isWidthAtLeastBreakpoint($windowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) ->",
+        )
+        add("      $type.ShortNavigationBarCompact")
+        if (expanded) {
+          add(
+            "    windowSizeClass.isWidthAtLeastBreakpoint($windowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND) ->",
+          )
+          add("      $type.WideNavigationRailExpanded")
+        }
+        add("    else -> $type.WideNavigationRailCollapsed")
+        add("  }")
+      },
+    )
+  }
+
   private fun app(): Decl {
     file.optIn(Sym.ExperimentalMaterial3AdaptiveApi)
     file.use(Sym.Composable)
@@ -95,7 +254,7 @@ internal class NavigationEmitter(
     val body = buildList {
       add(Assign("val backStack", "=", Call(backStack, listOf(pos(start)))))
       strategies.forEach { (name, expr) -> add(Assign("val $name", "=", Raw(expr))) }
-      add(stmt(display))
+      if (destinations.isEmpty()) add(stmt(display)) else addAll(suiteScaffold(display))
     }
     return FunDecl(
       annotations = listOf("@Composable"),
@@ -106,6 +265,8 @@ internal class NavigationEmitter(
     )
   }
 }
+
+private const val SUITE_TYPE_FUNCTION = "navigationSuiteTypeFor"
 
 /** What the phone and Wear navigation hosts share: the route keys and the `entry` calls. */
 internal object NavRoutes {
