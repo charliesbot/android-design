@@ -11,7 +11,6 @@
 //   R.drawable.bookmark_filled
 //   R.drawable.calendar_today
 //   R.drawable.cast
-//   R.drawable.chat
 //   R.drawable.check
 //   R.drawable.close
 //   R.drawable.delete
@@ -201,9 +200,6 @@ import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.SelectableDropdownMenuItem
 import androidx.compose.material3.Shapes
-import androidx.compose.material3.ShortNavigationBar
-import androidx.compose.material3.ShortNavigationBarArrangement
-import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
@@ -237,13 +233,14 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.VerticalFloatingToolbar
 import androidx.compose.material3.VerticalSlider
-import androidx.compose.material3.WideNavigationRail
-import androidx.compose.material3.WideNavigationRailItem
-import androidx.compose.material3.WideNavigationRailValue
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.material3.carousel.CarouselDefaults
 import androidx.compose.material3.carousel.HorizontalCenteredHeroCarousel
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
@@ -256,7 +253,6 @@ import androidx.compose.material3.rememberSearchBarWithGapState
 import androidx.compose.material3.rememberSliderState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.rememberTooltipState
-import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -488,72 +484,120 @@ fun VerifyTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable
 
 @Serializable private data object SearchRoute : NavKey
 
+private fun navigationSuiteTypeFor(
+  showNavigation: Boolean,
+  windowSizeClass: WindowSizeClass,
+): NavigationSuiteType =
+  when {
+    !showNavigation -> NavigationSuiteType.None
+    !windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) ->
+      NavigationSuiteType.ShortNavigationBarCompact
+    windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND) ->
+      NavigationSuiteType.WideNavigationRailExpanded
+    else -> NavigationSuiteType.WideNavigationRailCollapsed
+  }
+
 @Composable
 fun VerifyApp() {
   VerifyTheme {
     val backStack = rememberNavBackStack(HomeRoute)
     val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>()
-    NavDisplay(
-      backStack = backStack,
-      onBack = { backStack.removeLastOrNull() },
-      sceneStrategies = listOf(listDetailStrategy),
-      entryProvider =
-        entryProvider {
-          entry<HomeRoute>(
-            metadata = ListDetailSceneStrategy.listPane(detailPlaceholder = { PickScreen() }),
-          ) {
-            HomeScreen(
-              onNavigateToHome = { backStack.add(HomeRoute) },
-              onNavigateToActions = { backStack.add(ActionsRoute) },
-              onNavigateToInputs = { backStack.add(InputsRoute) },
-              onNavigateToOverlays = { backStack.add(OverlaysRoute) },
-              onNavigateToDetail = { backStack.add(DetailRoute) },
-            )
-          }
-          entry<DetailRoute>(metadata = ListDetailSceneStrategy.detailPane()) {
-            DetailScreen(onBack = { backStack.removeLastOrNull() })
-          }
-          entry<ActionsRoute> {
-            ActionsScreen(
-              onNavigateToHome = { backStack.add(HomeRoute) },
-              onNavigateToActions = { backStack.add(ActionsRoute) },
-              onNavigateToInputs = { backStack.add(InputsRoute) },
-              onNavigateToOverlays = { backStack.add(OverlaysRoute) },
-            )
-          }
-          entry<InputsRoute> {
-            InputsScreen(
-              onNavigateToHome = { backStack.add(HomeRoute) },
-              onNavigateToActions = { backStack.add(ActionsRoute) },
-              onNavigateToInputs = { backStack.add(InputsRoute) },
-              onNavigateToOverlays = { backStack.add(OverlaysRoute) },
-              onNavigateToSearch = { backStack.add(SearchRoute) },
-            )
-          }
-          entry<OverlaysRoute> {
-            OverlaysScreen(
-              onNavigateToHome = { backStack.add(HomeRoute) },
-              onNavigateToActions = { backStack.add(ActionsRoute) },
-              onNavigateToInputs = { backStack.add(InputsRoute) },
-              onNavigateToOverlays = { backStack.add(OverlaysRoute) },
-              onNavigateToFabs = { backStack.add(FabsRoute) },
-              onNavigateToCollections = { backStack.add(CollectionsRoute) },
-              onNavigateToFeedback = { backStack.add(FeedbackRoute) },
-            )
-          }
-          entry<FabsRoute> { FabsScreen(onBack = { backStack.removeLastOrNull() }) }
-          entry<CollectionsRoute> {
-            CollectionsScreen(
-              onBack = { backStack.removeLastOrNull() },
-              onNavigateToCollections = { backStack.add(CollectionsRoute) },
-              onNavigateToHome = { backStack.add(HomeRoute) },
-              onNavigateToDetail = { backStack.add(DetailRoute) },
-            )
-          }
-          entry<FeedbackRoute> { FeedbackScreen(onBack = { backStack.removeLastOrNull() }) }
-          entry<SearchRoute> { SearchScreen(onBack = { backStack.removeLastOrNull() }) }
-        },
-    )
+    val destinations = listOf<NavKey>(HomeRoute, ActionsRoute, InputsRoute, OverlaysRoute)
+    val topRoute = backStack.lastOrNull()
+    val selectedRoute = backStack.lastOrNull { it in destinations }
+    val paneRoutes = listOf<NavKey>(HomeRoute, DetailRoute)
+    val twoPanes =
+      calculatePaneScaffoldDirective(currentWindowAdaptiveInfoV2()).maxHorizontalPartitions >= 2
+    val showNavigation =
+      topRoute in destinations ||
+        (topRoute in paneRoutes && twoPanes && selectedRoute in paneRoutes)
+    val navigationSuiteType =
+      navigationSuiteTypeFor(showNavigation, currentWindowAdaptiveInfoV2().windowSizeClass)
+    NavigationSuiteScaffold(
+      navigationItems = {
+        NavigationSuiteItem(
+          selected = selectedRoute == HomeRoute,
+          onClick = {
+            backStack.clear()
+            backStack.add(HomeRoute)
+          },
+          icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
+          label = { Text("Home") },
+          navigationSuiteType = navigationSuiteType,
+        )
+        NavigationSuiteItem(
+          selected = selectedRoute == ActionsRoute,
+          onClick = {
+            backStack.clear()
+            backStack.add(ActionsRoute)
+          },
+          icon = { Icon(painterResource(R.drawable.touch_app), contentDescription = null) },
+          label = { Text("Actions") },
+          navigationSuiteType = navigationSuiteType,
+          badge = { Badge { Text("12") } },
+        )
+        NavigationSuiteItem(
+          selected = selectedRoute == InputsRoute,
+          onClick = {
+            backStack.clear()
+            backStack.add(InputsRoute)
+          },
+          icon = { Icon(painterResource(R.drawable.tune), contentDescription = null) },
+          label = { Text("Inputs") },
+          navigationSuiteType = navigationSuiteType,
+          badge = { Badge() },
+        )
+        NavigationSuiteItem(
+          selected = selectedRoute == OverlaysRoute,
+          onClick = {
+            backStack.clear()
+            backStack.add(OverlaysRoute)
+          },
+          icon = { Icon(painterResource(R.drawable.layers), contentDescription = null) },
+          label = { Text("Overlays") },
+          navigationSuiteType = navigationSuiteType,
+          badge = { Badge { Text("9+") } },
+        )
+      },
+      navigationSuiteType = navigationSuiteType,
+    ) {
+      NavDisplay(
+        backStack = backStack,
+        onBack = { backStack.removeLastOrNull() },
+        sceneStrategies = listOf(listDetailStrategy),
+        entryProvider =
+          entryProvider {
+            entry<HomeRoute>(
+              metadata = ListDetailSceneStrategy.listPane(detailPlaceholder = { PickScreen() }),
+            ) {
+              HomeScreen(onNavigateToDetail = { backStack.add(DetailRoute) })
+            }
+            entry<DetailRoute>(metadata = ListDetailSceneStrategy.detailPane()) {
+              DetailScreen(onBack = { backStack.removeLastOrNull() })
+            }
+            entry<ActionsRoute> { ActionsScreen() }
+            entry<InputsRoute> { InputsScreen(onNavigateToSearch = { backStack.add(SearchRoute) }) }
+            entry<OverlaysRoute> {
+              OverlaysScreen(
+                onNavigateToFabs = { backStack.add(FabsRoute) },
+                onNavigateToCollections = { backStack.add(CollectionsRoute) },
+                onNavigateToFeedback = { backStack.add(FeedbackRoute) },
+              )
+            }
+            entry<FabsRoute> { FabsScreen(onBack = { backStack.removeLastOrNull() }) }
+            entry<CollectionsRoute> {
+              CollectionsScreen(
+                onBack = { backStack.removeLastOrNull() },
+                onNavigateToCollections = { backStack.add(CollectionsRoute) },
+                onNavigateToHome = { backStack.add(HomeRoute) },
+                onNavigateToDetail = { backStack.add(DetailRoute) },
+              )
+            }
+            entry<FeedbackRoute> { FeedbackScreen(onBack = { backStack.removeLastOrNull() }) }
+            entry<SearchRoute> { SearchScreen(onBack = { backStack.removeLastOrNull() }) }
+          },
+      )
+    }
   }
 }
 
@@ -561,10 +605,6 @@ fun VerifyApp() {
 fun HomeScreen(
   modifier: Modifier = Modifier,
   rows: List<HomeRow> = HomeSample.rows,
-  onNavigateToHome: () -> Unit = {},
-  onNavigateToActions: () -> Unit = {},
-  onNavigateToInputs: () -> Unit = {},
-  onNavigateToOverlays: () -> Unit = {},
   onNavigateToDetail: () -> Unit = {},
 ) {
   val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
@@ -573,437 +613,337 @@ fun HomeScreen(
   val atLeastExpanded =
     windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
   val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-  Row(modifier = modifier) {
-    if (atLeastMedium && !atLeastExpanded) {
-      WideNavigationRail(state = rememberWideNavigationRailState()) {
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = true,
-          onClick = { onNavigateToHome() },
-          icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
-          label = { Text("Home") },
-        )
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = false,
-          onClick = { onNavigateToActions() },
-          icon = { Icon(painterResource(R.drawable.touch_app), contentDescription = null) },
-          label = { Text("Actions") },
-        )
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = false,
-          onClick = { onNavigateToInputs() },
-          icon = { Icon(painterResource(R.drawable.tune), contentDescription = null) },
-          label = { Text("Inputs") },
-        )
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = false,
-          onClick = { onNavigateToOverlays() },
-          icon = { Icon(painterResource(R.drawable.layers), contentDescription = null) },
-          label = { Text("Overlays") },
-        )
-      }
-    } else if (atLeastExpanded) {
-      WideNavigationRail(
-        state = rememberWideNavigationRailState(WideNavigationRailValue.Expanded),
-      ) {
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = true,
-          onClick = { onNavigateToHome() },
-          icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
-          label = { Text("Home") },
-        )
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = false,
-          onClick = { onNavigateToActions() },
-          icon = { Icon(painterResource(R.drawable.touch_app), contentDescription = null) },
-          label = { Text("Actions") },
-        )
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = false,
-          onClick = { onNavigateToInputs() },
-          icon = { Icon(painterResource(R.drawable.tune), contentDescription = null) },
-          label = { Text("Inputs") },
-        )
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = false,
-          onClick = { onNavigateToOverlays() },
-          icon = { Icon(painterResource(R.drawable.layers), contentDescription = null) },
-          label = { Text("Overlays") },
-        )
-      }
-    }
-    Scaffold(
-      modifier = Modifier.weight(1f).nestedScroll(scrollBehavior.nestedScrollConnection),
-      topBar = {
-        LargeFlexibleTopAppBar(
-          title = { Text("Verify") },
-          subtitle = { Text("Every catalog component") },
-          navigationIcon = {
-            IconButton(
-              onClick = {},
-              colors =
-                IconButtonDefaults.iconButtonColors(
-                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            ) {
-              Icon(painterResource(R.drawable.menu), contentDescription = "Open menu")
-            }
-          },
-          actions = {
-            IconButton(
-              onClick = {},
-              colors =
-                IconButtonDefaults.iconButtonColors(
-                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            ) {
-              Icon(painterResource(R.drawable.search), contentDescription = "Search")
-            }
-            IconButton(
-              onClick = {},
-              colors =
-                IconButtonDefaults.iconButtonColors(
-                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            ) {
-              Icon(painterResource(R.drawable.more_vert), contentDescription = "More options")
-            }
-          },
-          scrollBehavior = scrollBehavior,
-        )
-      },
-      bottomBar = {
-        if (!atLeastMedium) {
-          ShortNavigationBar(arrangement = ShortNavigationBarArrangement.EqualWeight) {
-            ShortNavigationBarItem(
-              selected = true,
-              onClick = { onNavigateToHome() },
-              icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
-              label = { Text("Home") },
-            )
-            ShortNavigationBarItem(
-              selected = false,
-              onClick = { onNavigateToActions() },
-              icon = { Icon(painterResource(R.drawable.touch_app), contentDescription = null) },
-              label = { Text("Actions") },
-            )
-            ShortNavigationBarItem(
-              selected = false,
-              onClick = { onNavigateToInputs() },
-              icon = { Icon(painterResource(R.drawable.tune), contentDescription = null) },
-              label = { Text("Inputs") },
-            )
-            ShortNavigationBarItem(
-              selected = false,
-              onClick = { onNavigateToOverlays() },
-              icon = { Icon(painterResource(R.drawable.layers), contentDescription = null) },
-              label = { Text("Overlays") },
-            )
-          }
-        }
-      },
-      floatingActionButton = {
-        if (!atLeastExpanded) {
-          ExtendedFloatingActionButton(
+  Scaffold(
+    modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+    topBar = {
+      LargeFlexibleTopAppBar(
+        title = { Text("Verify") },
+        subtitle = { Text("Every catalog component") },
+        navigationIcon = {
+          IconButton(
             onClick = {},
-            icon = { Icon(painterResource(R.drawable.add), contentDescription = null) },
-            text = { Text("Create") },
-          )
-        } else if (atLeastExpanded) {
-          LargeExtendedFloatingActionButton(
-            onClick = {},
-            icon = {
-              Icon(
-                painterResource(R.drawable.add),
-                contentDescription = null,
-                modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
-              )
-            },
-            text = { Text("Create") },
-          )
-        }
-      },
-    ) { innerPadding ->
-      Column(
-        modifier =
-          Modifier.fillMaxSize()
-            .padding(innerPadding)
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-      ) {
-        Text("Material 3 Expressive")
-        Column(
-          modifier = Modifier.fillMaxWidth(),
-          verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-          Text(
-            "Headline medium",
-            color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.headlineMedium,
-          )
-          Text("Title medium emphasized", style = MaterialTheme.typography.titleMediumEmphasized)
-          Text(
-            "Body large text that wraps onto more than one line when the window is narrow.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            overflow = TextOverflow.Ellipsis,
-            maxLines = 2,
-            style = MaterialTheme.typography.bodyLarge,
-          )
-          Text(
-            "LABEL SMALL",
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall,
-          )
-          Text(
-            "Clipped single line",
-            overflow = TextOverflow.Clip,
-            maxLines = 1,
-            style = MaterialTheme.typography.bodyMedium,
-          )
-        }
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(12.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Icon(
-            painterResource(R.drawable.favorite),
-            contentDescription = "Favorite",
-            modifier = Modifier.size(24.dp),
-            tint = MaterialTheme.colorScheme.primary,
-          )
-          Icon(
-            painterResource(R.drawable.favorite_filled),
-            contentDescription = null,
-            modifier = Modifier.size(32.dp),
-            tint = MaterialTheme.colorScheme.tertiary,
-          )
-          Spacer(Modifier.width(16.dp))
-          Image(
-            painter = painterResource(R.drawable.image),
-            contentDescription = "Sample image",
-            modifier = Modifier.weight(1f).aspectRatio(1.5f).clip(MaterialTheme.shapes.large),
-            contentScale = ContentScale.Crop,
-          )
-          Box(
-            modifier =
-              Modifier.clip(MaterialShapes.Cookie9Sided.toShape())
-                .background(MaterialTheme.colorScheme.tertiaryContainer),
+            colors =
+              IconButtonDefaults.iconButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+              ),
           ) {
+            Icon(painterResource(R.drawable.menu), contentDescription = "Open menu")
+          }
+        },
+        actions = {
+          IconButton(
+            onClick = {},
+            colors =
+              IconButtonDefaults.iconButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+              ),
+          ) {
+            Icon(painterResource(R.drawable.search), contentDescription = "Search")
+          }
+          IconButton(
+            onClick = {},
+            colors =
+              IconButtonDefaults.iconButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+              ),
+          ) {
+            Icon(painterResource(R.drawable.more_vert), contentDescription = "More options")
+          }
+        },
+        scrollBehavior = scrollBehavior,
+      )
+    },
+    floatingActionButton = {
+      if (!atLeastExpanded) {
+        ExtendedFloatingActionButton(
+          onClick = {},
+          icon = { Icon(painterResource(R.drawable.add), contentDescription = null) },
+          text = { Text("Create") },
+        )
+      } else if (atLeastExpanded) {
+        LargeExtendedFloatingActionButton(
+          onClick = {},
+          icon = {
             Icon(
-              painterResource(R.drawable.star),
+              painterResource(R.drawable.add),
               contentDescription = null,
-              modifier = Modifier.size(40.dp),
-              tint = MaterialTheme.colorScheme.onTertiaryContainer,
+              modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
             )
-          }
-        }
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomEnd) {
-          Card(shape = MaterialTheme.shapes.extraLarge) { Spacer(Modifier.height(48.dp)) }
-          Text(
-            "Box, bottom end",
-            modifier = Modifier.padding(12.dp),
-            style = MaterialTheme.typography.labelLarge,
+          },
+          text = { Text("Create") },
+        )
+      }
+    },
+  ) { innerPadding ->
+    Column(
+      modifier =
+        Modifier.fillMaxSize()
+          .padding(innerPadding)
+          .verticalScroll(rememberScrollState())
+          .padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+      Text("Material 3 Expressive")
+      Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+          "Headline medium",
+          color = MaterialTheme.colorScheme.primary,
+          style = MaterialTheme.typography.headlineMedium,
+        )
+        Text("Title medium emphasized", style = MaterialTheme.typography.titleMediumEmphasized)
+        Text(
+          "Body large text that wraps onto more than one line when the window is narrow.",
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          overflow = TextOverflow.Ellipsis,
+          maxLines = 2,
+          style = MaterialTheme.typography.bodyLarge,
+        )
+        Text(
+          "LABEL SMALL",
+          modifier = Modifier.fillMaxWidth(),
+          textAlign = TextAlign.Center,
+          style = MaterialTheme.typography.labelSmall,
+        )
+        Text(
+          "Clipped single line",
+          overflow = TextOverflow.Clip,
+          maxLines = 1,
+          style = MaterialTheme.typography.bodyMedium,
+        )
+      }
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Icon(
+          painterResource(R.drawable.favorite),
+          contentDescription = "Favorite",
+          modifier = Modifier.size(24.dp),
+          tint = MaterialTheme.colorScheme.primary,
+        )
+        Icon(
+          painterResource(R.drawable.favorite_filled),
+          contentDescription = null,
+          modifier = Modifier.size(32.dp),
+          tint = MaterialTheme.colorScheme.tertiary,
+        )
+        Spacer(Modifier.width(16.dp))
+        Image(
+          painter = painterResource(R.drawable.image),
+          contentDescription = "Sample image",
+          modifier = Modifier.weight(1f).aspectRatio(1.5f).clip(MaterialTheme.shapes.large),
+          contentScale = ContentScale.Crop,
+        )
+        Box(
+          modifier =
+            Modifier.clip(MaterialShapes.Cookie9Sided.toShape())
+              .background(MaterialTheme.colorScheme.tertiaryContainer),
+        ) {
+          Icon(
+            painterResource(R.drawable.star),
+            contentDescription = null,
+            modifier = Modifier.size(40.dp),
+            tint = MaterialTheme.colorScheme.onTertiaryContainer,
           )
         }
-        HorizontalDivider(modifier = Modifier.fillMaxWidth())
-        if (!atLeastMedium) {
-          Grid(
-            config = {
-              repeat(1) { column(1.fr) }
-              gap(12.dp)
-            },
-            modifier = Modifier.fillMaxWidth(),
-          ) {
-            Card(
-              onClick = { onNavigateToDetail() },
-              modifier = Modifier.fillMaxWidth(),
-              shape = MaterialTheme.shapes.large,
-            ) {
-              Text(
-                "Filled card",
-                modifier = Modifier.padding(16.dp),
-                style = MaterialTheme.typography.titleMedium,
-              )
-              Text(
-                "Opens the detail pane",
-                modifier = Modifier.padding(16.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-              )
-            }
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-              Text(
-                "Elevated card",
-                modifier = Modifier.padding(16.dp),
-                style = MaterialTheme.typography.titleMedium,
-              )
-            }
-            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-              Text(
-                "Outlined card",
-                modifier = Modifier.padding(16.dp),
-                style = MaterialTheme.typography.titleMedium,
-              )
-            }
-          }
-        } else if (atLeastMedium && !atLeastExpanded) {
-          Grid(
-            config = {
-              repeat(2) { column(1.fr) }
-              gap(12.dp)
-            },
-            modifier = Modifier.fillMaxWidth(),
-          ) {
-            Card(
-              onClick = { onNavigateToDetail() },
-              modifier = Modifier.fillMaxWidth(),
-              shape = MaterialTheme.shapes.large,
-            ) {
-              Text(
-                "Filled card",
-                modifier = Modifier.padding(16.dp),
-                style = MaterialTheme.typography.titleMedium,
-              )
-              Text(
-                "Opens the detail pane",
-                modifier = Modifier.padding(16.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-              )
-            }
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-              Text(
-                "Elevated card",
-                modifier = Modifier.padding(16.dp),
-                style = MaterialTheme.typography.titleMedium,
-              )
-            }
-            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-              Text(
-                "Outlined card",
-                modifier = Modifier.padding(16.dp),
-                style = MaterialTheme.typography.titleMedium,
-              )
-            }
-          }
-        } else if (atLeastExpanded) {
-          Grid(
-            config = {
-              repeat(3) { column(1.fr) }
-              gap(12.dp)
-            },
-            modifier = Modifier.fillMaxWidth(),
-          ) {
-            Card(
-              onClick = { onNavigateToDetail() },
-              modifier = Modifier.fillMaxWidth(),
-              shape = MaterialTheme.shapes.large,
-            ) {
-              Text(
-                "Filled card",
-                modifier = Modifier.padding(16.dp),
-                style = MaterialTheme.typography.titleMedium,
-              )
-              Text(
-                "Opens the detail pane",
-                modifier = Modifier.padding(16.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-              )
-            }
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-              Text(
-                "Elevated card",
-                modifier = Modifier.padding(16.dp),
-                style = MaterialTheme.typography.titleMedium,
-              )
-            }
-            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-              Text(
-                "Outlined card",
-                modifier = Modifier.padding(16.dp),
-                style = MaterialTheme.typography.titleMedium,
-              )
-            }
-          }
-        }
-        FlexBox(
+      }
+      Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomEnd) {
+        Card(shape = MaterialTheme.shapes.extraLarge) { Spacer(Modifier.height(48.dp)) }
+        Text(
+          "Box, bottom end",
+          modifier = Modifier.padding(12.dp),
+          style = MaterialTheme.typography.labelLarge,
+        )
+      }
+      HorizontalDivider(modifier = Modifier.fillMaxWidth())
+      if (!atLeastMedium) {
+        Grid(
           config = {
-            wrap(FlexWrap.Wrap)
-            gap(8.dp)
+            repeat(1) { column(minmax(0.dp, 1.fr)) }
+            gap(12.dp)
           },
           modifier = Modifier.fillMaxWidth(),
         ) {
-          SuggestionChip(onClick = {}, label = { Text("Layout") })
-          SuggestionChip(onClick = {}, label = { Text("Content") })
-          SuggestionChip(onClick = {}, label = { Text("Structure") })
-          VerticalDivider()
-          ElevatedSuggestionChip(onClick = {}, label = { Text("Lists") })
-        }
-        Column(modifier = Modifier.fillMaxWidth()) {
-          rows.forEach { row ->
-            ListItem(
-              modifier = Modifier.fillMaxWidth().clickable { onNavigateToDetail() },
-              overlineContent = { Text(row.kind) },
-              supportingContent = { Text(row.detail) },
-              leadingContent = {
-                Icon(painterResource(R.drawable.article), contentDescription = null)
-              },
-              trailingContent = { Text(row.meta, style = MaterialTheme.typography.labelSmall) },
-            ) {
-              Text(row.name)
-            }
-          }
-        }
-        Column(
-          modifier = Modifier.fillMaxWidth(),
-          verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
-        ) {
-          SegmentedListItem(
-            selected = true,
-            onClick = {},
-            shapes = ListItemDefaults.segmentedShapes(0, 3),
-            modifier = Modifier.fillMaxWidth(),
-            colors = ListItemDefaults.segmentedColors(),
-            supportingContent = { Text("selected is true") },
-          ) {
-            Text("Segmented, selected")
-          }
-          SegmentedListItem(
+          Card(
             onClick = { onNavigateToDetail() },
-            shapes = ListItemDefaults.segmentedShapes(1, 3),
             modifier = Modifier.fillMaxWidth(),
-            colors = ListItemDefaults.segmentedColors(),
-            supportingContent = { Text("Opens the detail pane") },
+            shape = MaterialTheme.shapes.large,
           ) {
-            Text("Segmented, actionable")
+            Text(
+              "Filled card",
+              modifier = Modifier.padding(16.dp),
+              style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+              "Opens the detail pane",
+              modifier = Modifier.padding(16.dp),
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              style = MaterialTheme.typography.bodyMedium,
+            )
           }
-          SegmentedListItem(
-            onClick = {},
-            shapes = ListItemDefaults.segmentedShapes(2, 3),
+          ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Text(
+              "Elevated card",
+              modifier = Modifier.padding(16.dp),
+              style = MaterialTheme.typography.titleMedium,
+            )
+          }
+          OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+            Text(
+              "Outlined card",
+              modifier = Modifier.padding(16.dp),
+              style = MaterialTheme.typography.titleMedium,
+            )
+          }
+        }
+      } else if (atLeastMedium && !atLeastExpanded) {
+        Grid(
+          config = {
+            repeat(2) { column(minmax(0.dp, 1.fr)) }
+            gap(12.dp)
+          },
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Card(
+            onClick = { onNavigateToDetail() },
             modifier = Modifier.fillMaxWidth(),
-            colors = ListItemDefaults.segmentedColors(),
-            trailingContent = {
-              var segSwitchChecked by remember { mutableStateOf(true) }
-              Switch(
-                checked = segSwitchChecked,
-                onCheckedChange = { segSwitchChecked = it },
-                modifier = Modifier.semantics { contentDescription = "Plain item toggle" },
-              )
+            shape = MaterialTheme.shapes.large,
+          ) {
+            Text(
+              "Filled card",
+              modifier = Modifier.padding(16.dp),
+              style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+              "Opens the detail pane",
+              modifier = Modifier.padding(16.dp),
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              style = MaterialTheme.typography.bodyMedium,
+            )
+          }
+          ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Text(
+              "Elevated card",
+              modifier = Modifier.padding(16.dp),
+              style = MaterialTheme.typography.titleMedium,
+            )
+          }
+          OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+            Text(
+              "Outlined card",
+              modifier = Modifier.padding(16.dp),
+              style = MaterialTheme.typography.titleMedium,
+            )
+          }
+        }
+      } else if (atLeastExpanded) {
+        Grid(
+          config = {
+            repeat(3) { column(minmax(0.dp, 1.fr)) }
+            gap(12.dp)
+          },
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Card(
+            onClick = { onNavigateToDetail() },
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+          ) {
+            Text(
+              "Filled card",
+              modifier = Modifier.padding(16.dp),
+              style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+              "Opens the detail pane",
+              modifier = Modifier.padding(16.dp),
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              style = MaterialTheme.typography.bodyMedium,
+            )
+          }
+          ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Text(
+              "Elevated card",
+              modifier = Modifier.padding(16.dp),
+              style = MaterialTheme.typography.titleMedium,
+            )
+          }
+          OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+            Text(
+              "Outlined card",
+              modifier = Modifier.padding(16.dp),
+              style = MaterialTheme.typography.titleMedium,
+            )
+          }
+        }
+      }
+      FlexBox(
+        config = {
+          wrap(FlexWrap.Wrap)
+          gap(8.dp)
+        },
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        SuggestionChip(onClick = {}, label = { Text("Layout") })
+        SuggestionChip(onClick = {}, label = { Text("Content") })
+        SuggestionChip(onClick = {}, label = { Text("Structure") })
+        VerticalDivider()
+        ElevatedSuggestionChip(onClick = {}, label = { Text("Lists") })
+      }
+      Column(modifier = Modifier.fillMaxWidth()) {
+        rows.forEach { row ->
+          ListItem(
+            modifier = Modifier.fillMaxWidth().clickable { onNavigateToDetail() },
+            overlineContent = { Text(row.kind) },
+            supportingContent = { Text(row.detail) },
+            leadingContent = {
+              Icon(painterResource(R.drawable.article), contentDescription = null)
             },
+            trailingContent = { Text(row.meta, style = MaterialTheme.typography.labelSmall) },
           ) {
-            Text("Segmented, plain")
+            Text(row.name)
           }
+        }
+      }
+      Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+      ) {
+        SegmentedListItem(
+          selected = true,
+          onClick = {},
+          shapes = ListItemDefaults.segmentedShapes(0, 3),
+          modifier = Modifier.fillMaxWidth(),
+          colors = ListItemDefaults.segmentedColors(),
+          supportingContent = { Text("selected is true") },
+        ) {
+          Text("Segmented, selected")
+        }
+        SegmentedListItem(
+          onClick = { onNavigateToDetail() },
+          shapes = ListItemDefaults.segmentedShapes(1, 3),
+          modifier = Modifier.fillMaxWidth(),
+          colors = ListItemDefaults.segmentedColors(),
+          supportingContent = { Text("Opens the detail pane") },
+        ) {
+          Text("Segmented, actionable")
+        }
+        SegmentedListItem(
+          onClick = {},
+          shapes = ListItemDefaults.segmentedShapes(2, 3),
+          modifier = Modifier.fillMaxWidth(),
+          colors = ListItemDefaults.segmentedColors(),
+          trailingContent = {
+            var segSwitchChecked by remember { mutableStateOf(true) }
+            Switch(
+              checked = segSwitchChecked,
+              onCheckedChange = { segSwitchChecked = it },
+              modifier = Modifier.semantics { contentDescription = "Plain item toggle" },
+            )
+          },
+        ) {
+          Text("Segmented, plain")
         }
       }
     }
@@ -1091,768 +1031,636 @@ private fun PickScreenPreview() {
 }
 
 @Composable
-fun ActionsScreen(
-  modifier: Modifier = Modifier,
-  onNavigateToHome: () -> Unit = {},
-  onNavigateToActions: () -> Unit = {},
-  onNavigateToInputs: () -> Unit = {},
-  onNavigateToOverlays: () -> Unit = {},
-) {
+fun ActionsScreen(modifier: Modifier = Modifier) {
   var showSplitMenuFilled by remember { mutableStateOf(false) }
   var showSplitMenuTonal by remember { mutableStateOf(false) }
   var showSplitMenuElevated by remember { mutableStateOf(false) }
   var showSplitMenuOutlined by remember { mutableStateOf(false) }
-  val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
-  val atLeastMedium =
-    windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
-  val atLeastExpanded =
-    windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
-  Row(modifier = modifier) {
-    if (atLeastMedium && !atLeastExpanded) {
-      WideNavigationRail(state = rememberWideNavigationRailState()) {
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = false,
-          onClick = { onNavigateToHome() },
-          icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
-          label = { Text("Home") },
-        )
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = true,
-          onClick = { onNavigateToActions() },
-          icon = { Icon(painterResource(R.drawable.touch_app), contentDescription = null) },
-          label = { Text("Actions") },
-        )
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = false,
-          onClick = { onNavigateToInputs() },
-          icon = { Icon(painterResource(R.drawable.tune), contentDescription = null) },
-          label = { Text("Inputs") },
-        )
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = false,
-          onClick = { onNavigateToOverlays() },
-          icon = { Icon(painterResource(R.drawable.layers), contentDescription = null) },
-          label = { Text("Overlays") },
-        )
-      }
-    } else if (atLeastExpanded) {
-      WideNavigationRail(
-        state = rememberWideNavigationRailState(WideNavigationRailValue.Expanded),
+  Scaffold(
+    modifier = modifier,
+    topBar = { CenterAlignedTopAppBar(title = { Text("Actions") }) },
+  ) { innerPadding ->
+    Column(
+      modifier =
+        Modifier.fillMaxSize()
+          .padding(innerPadding)
+          .verticalScroll(rememberScrollState())
+          .padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+      FlexBox(
+        config = {
+          wrap(FlexWrap.Wrap)
+          gap(8.dp)
+        },
+        modifier = Modifier.fillMaxWidth(),
       ) {
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = false,
-          onClick = { onNavigateToHome() },
-          icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
-          label = { Text("Home") },
-        )
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = true,
-          onClick = { onNavigateToActions() },
-          icon = { Icon(painterResource(R.drawable.touch_app), contentDescription = null) },
-          label = { Text("Actions") },
-        )
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = false,
-          onClick = { onNavigateToInputs() },
-          icon = { Icon(painterResource(R.drawable.tune), contentDescription = null) },
-          label = { Text("Inputs") },
-        )
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = false,
-          onClick = { onNavigateToOverlays() },
-          icon = { Icon(painterResource(R.drawable.layers), contentDescription = null) },
-          label = { Text("Overlays") },
-        )
+        Button(onClick = {}) {
+          Icon(
+            painterResource(R.drawable.check),
+            contentDescription = null,
+            modifier = Modifier.size(ButtonDefaults.IconSize),
+          )
+          Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+          Text("Filled")
+        }
+        FilledTonalButton(onClick = {}) { Text("Tonal") }
+        ElevatedButton(onClick = {}) { Text("Elevated") }
+        OutlinedButton(onClick = {}) { Text("Outlined") }
+        TextButton(onClick = {}) { Text("Text") }
       }
-    }
-    Scaffold(
-      modifier = Modifier.weight(1f),
-      topBar = { CenterAlignedTopAppBar(title = { Text("Actions") }) },
-      bottomBar = {
-        if (!atLeastMedium) {
-          ShortNavigationBar(arrangement = ShortNavigationBarArrangement.EqualWeight) {
-            ShortNavigationBarItem(
-              selected = false,
-              onClick = { onNavigateToHome() },
-              icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
-              label = { Text("Home") },
-            )
-            ShortNavigationBarItem(
-              selected = true,
-              onClick = { onNavigateToActions() },
-              icon = { Icon(painterResource(R.drawable.touch_app), contentDescription = null) },
-              label = { Text("Actions") },
-            )
-            ShortNavigationBarItem(
-              selected = false,
-              onClick = { onNavigateToInputs() },
-              icon = { Icon(painterResource(R.drawable.tune), contentDescription = null) },
-              label = { Text("Inputs") },
-            )
-            ShortNavigationBarItem(
-              selected = false,
-              onClick = { onNavigateToOverlays() },
-              icon = { Icon(painterResource(R.drawable.layers), contentDescription = null) },
-              label = { Text("Overlays") },
-            )
-          }
-        }
-      },
-    ) { innerPadding ->
-      Column(
-        modifier =
-          Modifier.fillMaxSize()
-            .padding(innerPadding)
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-      ) {
-        FlexBox(
-          config = {
-            wrap(FlexWrap.Wrap)
-            gap(8.dp)
-          },
-          modifier = Modifier.fillMaxWidth(),
-        ) {
-          Button(onClick = {}) {
-            Icon(
-              painterResource(R.drawable.check),
-              contentDescription = null,
-              modifier = Modifier.size(ButtonDefaults.IconSize),
-            )
-            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text("Filled")
-          }
-          FilledTonalButton(onClick = {}) { Text("Tonal") }
-          ElevatedButton(onClick = {}) { Text("Elevated") }
-          OutlinedButton(onClick = {}) { Text("Outlined") }
-          TextButton(onClick = {}) { Text("Text") }
-        }
-        Column(
-          modifier = Modifier.fillMaxWidth(),
-          verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          Button(
-            onClick = {},
-            modifier = Modifier.heightIn(min = ButtonDefaults.ExtraSmallContainerHeight),
-            shapes = ButtonDefaults.shapesFor(ButtonDefaults.ExtraSmallContainerHeight),
-            contentPadding =
-              ButtonDefaults.contentPaddingFor(ButtonDefaults.ExtraSmallContainerHeight),
-          ) {
-            Icon(
-              painterResource(R.drawable.bolt),
-              contentDescription = null,
-              modifier =
-                Modifier.size(ButtonDefaults.iconSizeFor(ButtonDefaults.ExtraSmallContainerHeight)),
-            )
-            Spacer(
-              Modifier.width(
-                ButtonDefaults.iconSpacingFor(ButtonDefaults.ExtraSmallContainerHeight),
-              ),
-            )
-            Text(
-              "Extra small",
-              style = ButtonDefaults.textStyleFor(ButtonDefaults.ExtraSmallContainerHeight),
-            )
-          }
-          Button(onClick = {}) {
-            Icon(
-              painterResource(R.drawable.bolt),
-              contentDescription = null,
-              modifier = Modifier.size(ButtonDefaults.IconSize),
-            )
-            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text("Small")
-          }
-          Button(
-            onClick = {},
-            modifier = Modifier.heightIn(min = ButtonDefaults.MediumContainerHeight),
-            shapes = ButtonDefaults.shapesFor(ButtonDefaults.MediumContainerHeight),
-            contentPadding = ButtonDefaults.contentPaddingFor(ButtonDefaults.MediumContainerHeight),
-          ) {
-            Icon(
-              painterResource(R.drawable.bolt),
-              contentDescription = null,
-              modifier =
-                Modifier.size(ButtonDefaults.iconSizeFor(ButtonDefaults.MediumContainerHeight)),
-            )
-            Spacer(
-              Modifier.width(ButtonDefaults.iconSpacingFor(ButtonDefaults.MediumContainerHeight)),
-            )
-            Text(
-              "Medium",
-              style = ButtonDefaults.textStyleFor(ButtonDefaults.MediumContainerHeight),
-            )
-          }
-          Button(
-            onClick = {},
-            modifier = Modifier.heightIn(min = ButtonDefaults.LargeContainerHeight),
-            shapes = ButtonDefaults.shapesFor(ButtonDefaults.LargeContainerHeight),
-            contentPadding = ButtonDefaults.contentPaddingFor(ButtonDefaults.LargeContainerHeight),
-          ) {
-            Icon(
-              painterResource(R.drawable.bolt),
-              contentDescription = null,
-              modifier =
-                Modifier.size(ButtonDefaults.iconSizeFor(ButtonDefaults.LargeContainerHeight)),
-            )
-            Spacer(
-              Modifier.width(ButtonDefaults.iconSpacingFor(ButtonDefaults.LargeContainerHeight)),
-            )
-            Text("Large", style = ButtonDefaults.textStyleFor(ButtonDefaults.LargeContainerHeight))
-          }
-          Button(
-            onClick = {},
-            modifier = Modifier.heightIn(min = ButtonDefaults.ExtraLargeContainerHeight),
-            shapes = ButtonDefaults.shapesFor(ButtonDefaults.ExtraLargeContainerHeight),
-            contentPadding =
-              ButtonDefaults.contentPaddingFor(ButtonDefaults.ExtraLargeContainerHeight),
-          ) {
-            Icon(
-              painterResource(R.drawable.bolt),
-              contentDescription = null,
-              modifier =
-                Modifier.size(ButtonDefaults.iconSizeFor(ButtonDefaults.ExtraLargeContainerHeight)),
-            )
-            Spacer(
-              Modifier.width(
-                ButtonDefaults.iconSpacingFor(ButtonDefaults.ExtraLargeContainerHeight),
-              ),
-            )
-            Text(
-              "Extra large",
-              style = ButtonDefaults.textStyleFor(ButtonDefaults.ExtraLargeContainerHeight),
-            )
-          }
-        }
-        FilledTonalButton(
+      Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
           onClick = {},
-          shapes = ButtonDefaults.shapes(shape = ButtonDefaults.squareShape),
+          modifier = Modifier.heightIn(min = ButtonDefaults.ExtraSmallContainerHeight),
+          shapes = ButtonDefaults.shapesFor(ButtonDefaults.ExtraSmallContainerHeight),
+          contentPadding =
+            ButtonDefaults.contentPaddingFor(ButtonDefaults.ExtraSmallContainerHeight),
         ) {
-          Text("Square shape")
-        }
-        FlexBox(
-          config = {
-            wrap(FlexWrap.Wrap)
-            gap(8.dp)
-          },
-          modifier = Modifier.fillMaxWidth(),
-        ) {
-          var toggleFilledChecked by remember { mutableStateOf(true) }
-          ToggleButton(
-            checked = toggleFilledChecked,
-            onCheckedChange = { toggleFilledChecked = it },
-            shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight),
-          ) {
-            Text("Filled")
-          }
-          var toggleTonalChecked by remember { mutableStateOf(true) }
-          FilledTonalToggleButton(
-            checked = toggleTonalChecked,
-            onCheckedChange = { toggleTonalChecked = it },
-            shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight),
-          ) {
-            Text("Tonal")
-          }
-          var toggleElevatedChecked by remember { mutableStateOf(false) }
-          ElevatedToggleButton(
-            checked = toggleElevatedChecked,
-            onCheckedChange = { toggleElevatedChecked = it },
-            shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight),
-          ) {
-            Text("Elevated")
-          }
-          var toggleOutlinedChecked by remember { mutableStateOf(false) }
-          OutlinedToggleButton(
-            checked = toggleOutlinedChecked,
-            onCheckedChange = { toggleOutlinedChecked = it },
-            shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight),
-          ) {
-            Text("Outlined")
-          }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-          FilledTonalButton(onClick = {}) { Text("One") }
-          FilledTonalButton(onClick = {}) { Text("Two") }
-          FilledTonalIconButton(onClick = {}) {
-            Icon(painterResource(R.drawable.more_horiz), contentDescription = "More")
-          }
-        }
-        Row(
-          horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-        ) {
-          var conDayChecked by remember { mutableStateOf(true) }
-          FilledTonalToggleButton(
-            checked = conDayChecked,
-            onCheckedChange = { conDayChecked = it },
-            modifier = Modifier.weight(1f).heightIn(min = ButtonDefaults.MediumContainerHeight),
-            shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-            contentPadding =
-              ToggleButtonDefaults.contentPaddingFor(ButtonDefaults.MediumContainerHeight),
-          ) {
-            Text("Day", style = ButtonDefaults.textStyleFor(ButtonDefaults.MediumContainerHeight))
-          }
-          var conWeekChecked by remember { mutableStateOf(false) }
-          FilledTonalToggleButton(
-            checked = conWeekChecked,
-            onCheckedChange = { conWeekChecked = it },
-            modifier = Modifier.weight(1f).heightIn(min = ButtonDefaults.MediumContainerHeight),
-            shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
-            contentPadding =
-              ToggleButtonDefaults.contentPaddingFor(ButtonDefaults.MediumContainerHeight),
-          ) {
-            Text("Week", style = ButtonDefaults.textStyleFor(ButtonDefaults.MediumContainerHeight))
-          }
-          var conMonthChecked by remember { mutableStateOf(false) }
-          FilledTonalToggleButton(
-            checked = conMonthChecked,
-            onCheckedChange = { conMonthChecked = it },
-            modifier = Modifier.weight(1f).heightIn(min = ButtonDefaults.MediumContainerHeight),
-            shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-            contentPadding =
-              ToggleButtonDefaults.contentPaddingFor(ButtonDefaults.MediumContainerHeight),
-          ) {
-            Text("Month", style = ButtonDefaults.textStyleFor(ButtonDefaults.MediumContainerHeight))
-          }
-        }
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          IconButton(
-            onClick = {},
-            colors =
-              IconButtonDefaults.iconButtonColors(
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-              ),
-          ) {
-            Icon(painterResource(R.drawable.edit), contentDescription = "Edit, standard")
-          }
-          FilledIconButton(onClick = {}) {
-            Icon(painterResource(R.drawable.edit), contentDescription = "Edit, filled")
-          }
-          FilledTonalIconButton(onClick = {}) {
-            Icon(painterResource(R.drawable.edit), contentDescription = "Edit, tonal")
-          }
-          OutlinedIconButton(
-            onClick = {},
-            colors =
-              IconButtonDefaults.outlinedIconButtonColors(
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-              ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-          ) {
-            Icon(painterResource(R.drawable.edit), contentDescription = "Edit, outlined")
-          }
-          FilledIconButton(
-            onClick = {},
-            shapes =
-              IconButtonDefaults.shapes(
-                IconButtonDefaults.smallSquareShape,
-                IconButtonDefaults.smallPressedShape,
-              ),
-          ) {
-            Icon(painterResource(R.drawable.edit), contentDescription = "Edit, filled square")
-          }
-        }
-        FlexBox(
-          config = {
-            wrap(FlexWrap.Wrap)
-            gap(8.dp)
-          },
-          modifier = Modifier.fillMaxWidth(),
-        ) {
-          FilledTonalIconButton(
-            onClick = {},
-            modifier = Modifier.size(IconButtonDefaults.extraSmallContainerSize()),
-            shapes = IconButtonDefaults.shapes(IconButtonDefaults.extraSmallRoundShape),
-          ) {
-            Icon(
-              painterResource(R.drawable.play_arrow),
-              contentDescription = "Play, extra-small",
-              modifier = Modifier.size(IconButtonDefaults.extraSmallIconSize),
-            )
-          }
-          FilledTonalIconButton(onClick = {}) {
-            Icon(painterResource(R.drawable.play_arrow), contentDescription = "Play, small")
-          }
-          FilledTonalIconButton(
-            onClick = {},
-            modifier = Modifier.size(IconButtonDefaults.mediumContainerSize()),
-            shapes = IconButtonDefaults.shapes(IconButtonDefaults.mediumRoundShape),
-          ) {
-            Icon(
-              painterResource(R.drawable.play_arrow),
-              contentDescription = "Play, medium",
-              modifier = Modifier.size(IconButtonDefaults.mediumIconSize),
-            )
-          }
-          FilledTonalIconButton(
-            onClick = {},
-            modifier = Modifier.size(IconButtonDefaults.largeContainerSize()),
-            shapes = IconButtonDefaults.shapes(IconButtonDefaults.largeRoundShape),
-          ) {
-            Icon(
-              painterResource(R.drawable.play_arrow),
-              contentDescription = "Play, large",
-              modifier = Modifier.size(IconButtonDefaults.largeIconSize),
-            )
-          }
-          FilledTonalIconButton(
-            onClick = {},
-            modifier = Modifier.size(IconButtonDefaults.extraLargeContainerSize()),
-            shapes = IconButtonDefaults.shapes(IconButtonDefaults.extraLargeRoundShape),
-          ) {
-            Icon(
-              painterResource(R.drawable.play_arrow),
-              contentDescription = "Play, extra-large",
-              modifier = Modifier.size(IconButtonDefaults.extraLargeIconSize),
-            )
-          }
-        }
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          FilledIconButton(
-            onClick = {},
+          Icon(
+            painterResource(R.drawable.bolt),
+            contentDescription = null,
             modifier =
-              Modifier.size(IconButtonDefaults.smallContainerSize(IconButtonWidthOption.Narrow)),
-          ) {
-            Icon(painterResource(R.drawable.mic), contentDescription = "Record, narrow")
-          }
-          FilledIconButton(onClick = {}) {
-            Icon(painterResource(R.drawable.mic), contentDescription = "Record, uniform")
-          }
-          FilledIconButton(
-            onClick = {},
+              Modifier.size(ButtonDefaults.iconSizeFor(ButtonDefaults.ExtraSmallContainerHeight)),
+          )
+          Spacer(
+            Modifier.width(ButtonDefaults.iconSpacingFor(ButtonDefaults.ExtraSmallContainerHeight)),
+          )
+          Text(
+            "Extra small",
+            style = ButtonDefaults.textStyleFor(ButtonDefaults.ExtraSmallContainerHeight),
+          )
+        }
+        Button(onClick = {}) {
+          Icon(
+            painterResource(R.drawable.bolt),
+            contentDescription = null,
+            modifier = Modifier.size(ButtonDefaults.IconSize),
+          )
+          Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+          Text("Small")
+        }
+        Button(
+          onClick = {},
+          modifier = Modifier.heightIn(min = ButtonDefaults.MediumContainerHeight),
+          shapes = ButtonDefaults.shapesFor(ButtonDefaults.MediumContainerHeight),
+          contentPadding = ButtonDefaults.contentPaddingFor(ButtonDefaults.MediumContainerHeight),
+        ) {
+          Icon(
+            painterResource(R.drawable.bolt),
+            contentDescription = null,
             modifier =
-              Modifier.size(IconButtonDefaults.smallContainerSize(IconButtonWidthOption.Wide)),
+              Modifier.size(ButtonDefaults.iconSizeFor(ButtonDefaults.MediumContainerHeight)),
+          )
+          Spacer(
+            Modifier.width(ButtonDefaults.iconSpacingFor(ButtonDefaults.MediumContainerHeight)),
+          )
+          Text("Medium", style = ButtonDefaults.textStyleFor(ButtonDefaults.MediumContainerHeight))
+        }
+        Button(
+          onClick = {},
+          modifier = Modifier.heightIn(min = ButtonDefaults.LargeContainerHeight),
+          shapes = ButtonDefaults.shapesFor(ButtonDefaults.LargeContainerHeight),
+          contentPadding = ButtonDefaults.contentPaddingFor(ButtonDefaults.LargeContainerHeight),
+        ) {
+          Icon(
+            painterResource(R.drawable.bolt),
+            contentDescription = null,
+            modifier =
+              Modifier.size(ButtonDefaults.iconSizeFor(ButtonDefaults.LargeContainerHeight)),
+          )
+          Spacer(Modifier.width(ButtonDefaults.iconSpacingFor(ButtonDefaults.LargeContainerHeight)))
+          Text("Large", style = ButtonDefaults.textStyleFor(ButtonDefaults.LargeContainerHeight))
+        }
+        Button(
+          onClick = {},
+          modifier = Modifier.heightIn(min = ButtonDefaults.ExtraLargeContainerHeight),
+          shapes = ButtonDefaults.shapesFor(ButtonDefaults.ExtraLargeContainerHeight),
+          contentPadding =
+            ButtonDefaults.contentPaddingFor(ButtonDefaults.ExtraLargeContainerHeight),
+        ) {
+          Icon(
+            painterResource(R.drawable.bolt),
+            contentDescription = null,
+            modifier =
+              Modifier.size(ButtonDefaults.iconSizeFor(ButtonDefaults.ExtraLargeContainerHeight)),
+          )
+          Spacer(
+            Modifier.width(ButtonDefaults.iconSpacingFor(ButtonDefaults.ExtraLargeContainerHeight)),
+          )
+          Text(
+            "Extra large",
+            style = ButtonDefaults.textStyleFor(ButtonDefaults.ExtraLargeContainerHeight),
+          )
+        }
+      }
+      FilledTonalButton(
+        onClick = {},
+        shapes = ButtonDefaults.shapes(shape = ButtonDefaults.squareShape),
+      ) {
+        Text("Square shape")
+      }
+      FlexBox(
+        config = {
+          wrap(FlexWrap.Wrap)
+          gap(8.dp)
+        },
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        var toggleFilledChecked by remember { mutableStateOf(true) }
+        ToggleButton(
+          checked = toggleFilledChecked,
+          onCheckedChange = { toggleFilledChecked = it },
+          shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight),
+        ) {
+          Text("Filled")
+        }
+        var toggleTonalChecked by remember { mutableStateOf(true) }
+        FilledTonalToggleButton(
+          checked = toggleTonalChecked,
+          onCheckedChange = { toggleTonalChecked = it },
+          shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight),
+        ) {
+          Text("Tonal")
+        }
+        var toggleElevatedChecked by remember { mutableStateOf(false) }
+        ElevatedToggleButton(
+          checked = toggleElevatedChecked,
+          onCheckedChange = { toggleElevatedChecked = it },
+          shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight),
+        ) {
+          Text("Elevated")
+        }
+        var toggleOutlinedChecked by remember { mutableStateOf(false) }
+        OutlinedToggleButton(
+          checked = toggleOutlinedChecked,
+          onCheckedChange = { toggleOutlinedChecked = it },
+          shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight),
+        ) {
+          Text("Outlined")
+        }
+      }
+      Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        FilledTonalButton(onClick = {}) { Text("One") }
+        FilledTonalButton(onClick = {}) { Text("Two") }
+        FilledTonalIconButton(onClick = {}) {
+          Icon(painterResource(R.drawable.more_horiz), contentDescription = "More")
+        }
+      }
+      Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
+        var conDayChecked by remember { mutableStateOf(true) }
+        FilledTonalToggleButton(
+          checked = conDayChecked,
+          onCheckedChange = { conDayChecked = it },
+          modifier = Modifier.weight(1f).heightIn(min = ButtonDefaults.MediumContainerHeight),
+          shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
+          contentPadding =
+            ToggleButtonDefaults.contentPaddingFor(ButtonDefaults.MediumContainerHeight),
+        ) {
+          Text("Day", style = ButtonDefaults.textStyleFor(ButtonDefaults.MediumContainerHeight))
+        }
+        var conWeekChecked by remember { mutableStateOf(false) }
+        FilledTonalToggleButton(
+          checked = conWeekChecked,
+          onCheckedChange = { conWeekChecked = it },
+          modifier = Modifier.weight(1f).heightIn(min = ButtonDefaults.MediumContainerHeight),
+          shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
+          contentPadding =
+            ToggleButtonDefaults.contentPaddingFor(ButtonDefaults.MediumContainerHeight),
+        ) {
+          Text("Week", style = ButtonDefaults.textStyleFor(ButtonDefaults.MediumContainerHeight))
+        }
+        var conMonthChecked by remember { mutableStateOf(false) }
+        FilledTonalToggleButton(
+          checked = conMonthChecked,
+          onCheckedChange = { conMonthChecked = it },
+          modifier = Modifier.weight(1f).heightIn(min = ButtonDefaults.MediumContainerHeight),
+          shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
+          contentPadding =
+            ToggleButtonDefaults.contentPaddingFor(ButtonDefaults.MediumContainerHeight),
+        ) {
+          Text("Month", style = ButtonDefaults.textStyleFor(ButtonDefaults.MediumContainerHeight))
+        }
+      }
+      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        IconButton(
+          onClick = {},
+          colors =
+            IconButtonDefaults.iconButtonColors(
+              contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        ) {
+          Icon(painterResource(R.drawable.edit), contentDescription = "Edit, standard")
+        }
+        FilledIconButton(onClick = {}) {
+          Icon(painterResource(R.drawable.edit), contentDescription = "Edit, filled")
+        }
+        FilledTonalIconButton(onClick = {}) {
+          Icon(painterResource(R.drawable.edit), contentDescription = "Edit, tonal")
+        }
+        OutlinedIconButton(
+          onClick = {},
+          colors =
+            IconButtonDefaults.outlinedIconButtonColors(
+              contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+          border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+          Icon(painterResource(R.drawable.edit), contentDescription = "Edit, outlined")
+        }
+        FilledIconButton(
+          onClick = {},
+          shapes =
+            IconButtonDefaults.shapes(
+              IconButtonDefaults.smallSquareShape,
+              IconButtonDefaults.smallPressedShape,
+            ),
+        ) {
+          Icon(painterResource(R.drawable.edit), contentDescription = "Edit, filled square")
+        }
+      }
+      FlexBox(
+        config = {
+          wrap(FlexWrap.Wrap)
+          gap(8.dp)
+        },
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        FilledTonalIconButton(
+          onClick = {},
+          modifier = Modifier.size(IconButtonDefaults.extraSmallContainerSize()),
+          shapes = IconButtonDefaults.shapes(IconButtonDefaults.extraSmallRoundShape),
+        ) {
+          Icon(
+            painterResource(R.drawable.play_arrow),
+            contentDescription = "Play, extra-small",
+            modifier = Modifier.size(IconButtonDefaults.extraSmallIconSize),
+          )
+        }
+        FilledTonalIconButton(onClick = {}) {
+          Icon(painterResource(R.drawable.play_arrow), contentDescription = "Play, small")
+        }
+        FilledTonalIconButton(
+          onClick = {},
+          modifier = Modifier.size(IconButtonDefaults.mediumContainerSize()),
+          shapes = IconButtonDefaults.shapes(IconButtonDefaults.mediumRoundShape),
+        ) {
+          Icon(
+            painterResource(R.drawable.play_arrow),
+            contentDescription = "Play, medium",
+            modifier = Modifier.size(IconButtonDefaults.mediumIconSize),
+          )
+        }
+        FilledTonalIconButton(
+          onClick = {},
+          modifier = Modifier.size(IconButtonDefaults.largeContainerSize()),
+          shapes = IconButtonDefaults.shapes(IconButtonDefaults.largeRoundShape),
+        ) {
+          Icon(
+            painterResource(R.drawable.play_arrow),
+            contentDescription = "Play, large",
+            modifier = Modifier.size(IconButtonDefaults.largeIconSize),
+          )
+        }
+        FilledTonalIconButton(
+          onClick = {},
+          modifier = Modifier.size(IconButtonDefaults.extraLargeContainerSize()),
+          shapes = IconButtonDefaults.shapes(IconButtonDefaults.extraLargeRoundShape),
+        ) {
+          Icon(
+            painterResource(R.drawable.play_arrow),
+            contentDescription = "Play, extra-large",
+            modifier = Modifier.size(IconButtonDefaults.extraLargeIconSize),
+          )
+        }
+      }
+      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilledIconButton(
+          onClick = {},
+          modifier =
+            Modifier.size(IconButtonDefaults.smallContainerSize(IconButtonWidthOption.Narrow)),
+        ) {
+          Icon(painterResource(R.drawable.mic), contentDescription = "Record, narrow")
+        }
+        FilledIconButton(onClick = {}) {
+          Icon(painterResource(R.drawable.mic), contentDescription = "Record, uniform")
+        }
+        FilledIconButton(
+          onClick = {},
+          modifier =
+            Modifier.size(IconButtonDefaults.smallContainerSize(IconButtonWidthOption.Wide)),
+        ) {
+          Icon(painterResource(R.drawable.mic), contentDescription = "Record, wide")
+        }
+      }
+      FlexBox(
+        config = {
+          wrap(FlexWrap.Wrap)
+          gap(8.dp)
+        },
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        var iconToggleStandardOffChecked by remember { mutableStateOf(false) }
+        IconToggleButton(
+          checked = iconToggleStandardOffChecked,
+          onCheckedChange = { iconToggleStandardOffChecked = it },
+          shapes = IconButtonDefaults.toggleableShapes(),
+        ) {
+          Icon(
+            painterResource(
+              if (iconToggleStandardOffChecked) R.drawable.bookmark_filled else R.drawable.bookmark,
+            ),
+            contentDescription = "Bookmark, standard",
+          )
+        }
+        var iconToggleStandardOnChecked by remember { mutableStateOf(true) }
+        IconToggleButton(
+          checked = iconToggleStandardOnChecked,
+          onCheckedChange = { iconToggleStandardOnChecked = it },
+          shapes = IconButtonDefaults.toggleableShapes(),
+        ) {
+          Icon(
+            painterResource(
+              if (iconToggleStandardOnChecked) R.drawable.bookmark_filled else R.drawable.bookmark,
+            ),
+            contentDescription = "Bookmark, standard",
+          )
+        }
+        var iconToggleFilledOffChecked by remember { mutableStateOf(false) }
+        FilledIconToggleButton(
+          checked = iconToggleFilledOffChecked,
+          onCheckedChange = { iconToggleFilledOffChecked = it },
+          shapes = IconButtonDefaults.toggleableShapes(),
+        ) {
+          Icon(
+            painterResource(
+              if (iconToggleFilledOffChecked) R.drawable.bookmark_filled else R.drawable.bookmark,
+            ),
+            contentDescription = "Bookmark, filled",
+          )
+        }
+        var iconToggleFilledOnChecked by remember { mutableStateOf(true) }
+        FilledIconToggleButton(
+          checked = iconToggleFilledOnChecked,
+          onCheckedChange = { iconToggleFilledOnChecked = it },
+          shapes = IconButtonDefaults.toggleableShapes(),
+        ) {
+          Icon(
+            painterResource(
+              if (iconToggleFilledOnChecked) R.drawable.bookmark_filled else R.drawable.bookmark,
+            ),
+            contentDescription = "Bookmark, filled",
+          )
+        }
+        var iconToggleTonalOffChecked by remember { mutableStateOf(false) }
+        FilledTonalIconToggleButton(
+          checked = iconToggleTonalOffChecked,
+          onCheckedChange = { iconToggleTonalOffChecked = it },
+          shapes = IconButtonDefaults.toggleableShapes(),
+        ) {
+          Icon(
+            painterResource(
+              if (iconToggleTonalOffChecked) R.drawable.bookmark_filled else R.drawable.bookmark,
+            ),
+            contentDescription = "Bookmark, tonal",
+          )
+        }
+        var iconToggleTonalOnChecked by remember { mutableStateOf(true) }
+        FilledTonalIconToggleButton(
+          checked = iconToggleTonalOnChecked,
+          onCheckedChange = { iconToggleTonalOnChecked = it },
+          shapes = IconButtonDefaults.toggleableShapes(),
+        ) {
+          Icon(
+            painterResource(
+              if (iconToggleTonalOnChecked) R.drawable.bookmark_filled else R.drawable.bookmark,
+            ),
+            contentDescription = "Bookmark, tonal",
+          )
+        }
+        var iconToggleOutlinedOffChecked by remember { mutableStateOf(false) }
+        OutlinedIconToggleButton(
+          checked = iconToggleOutlinedOffChecked,
+          onCheckedChange = { iconToggleOutlinedOffChecked = it },
+          shapes = IconButtonDefaults.toggleableShapes(),
+        ) {
+          Icon(
+            painterResource(
+              if (iconToggleOutlinedOffChecked) R.drawable.bookmark_filled else R.drawable.bookmark,
+            ),
+            contentDescription = "Bookmark, outlined",
+          )
+        }
+        var iconToggleOutlinedOnChecked by remember { mutableStateOf(true) }
+        OutlinedIconToggleButton(
+          checked = iconToggleOutlinedOnChecked,
+          onCheckedChange = { iconToggleOutlinedOnChecked = it },
+          shapes = IconButtonDefaults.toggleableShapes(),
+        ) {
+          Icon(
+            painterResource(
+              if (iconToggleOutlinedOnChecked) R.drawable.bookmark_filled else R.drawable.bookmark,
+            ),
+            contentDescription = "Bookmark, outlined",
+          )
+        }
+      }
+      FlexBox(
+        config = {
+          wrap(FlexWrap.Wrap)
+          gap(8.dp)
+        },
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Box {
+          SplitButtonLayout(
+            leadingButton = {
+              SplitButtonDefaults.LeadingButton(onClick = {}) {
+                Icon(
+                  painterResource(R.drawable.send),
+                  contentDescription = null,
+                  modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
+                )
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text("Send")
+              }
+            },
+            trailingButton = {
+              SplitButtonDefaults.TrailingButton(
+                checked = showSplitMenuFilled,
+                onCheckedChange = { showSplitMenuFilled = it },
+              ) {
+                Icon(
+                  painterResource(R.drawable.keyboard_arrow_down),
+                  contentDescription = null,
+                  modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
+                )
+              }
+            },
+          )
+          DropdownMenuPopup(
+            expanded = showSplitMenuFilled,
+            onDismissRequest = { showSplitMenuFilled = false },
           ) {
-            Icon(painterResource(R.drawable.mic), contentDescription = "Record, wide")
+            DropdownMenuGroup(
+              shapes = MenuDefaults.groupShape(0, 1),
+              containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ) {
+              DropdownMenuItem(
+                text = { Text("Send later") },
+                onClick = {
+                  showSplitMenuFilled = false
+                  showSplitMenuFilled = false
+                },
+                shape = MenuDefaults.itemShape(0, 1).shape,
+                leadingIcon = {
+                  Icon(painterResource(R.drawable.schedule), contentDescription = null)
+                },
+              )
+            }
           }
         }
-        FlexBox(
-          config = {
-            wrap(FlexWrap.Wrap)
-            gap(8.dp)
-          },
-          modifier = Modifier.fillMaxWidth(),
-        ) {
-          var iconToggleStandardOffChecked by remember { mutableStateOf(false) }
-          IconToggleButton(
-            checked = iconToggleStandardOffChecked,
-            onCheckedChange = { iconToggleStandardOffChecked = it },
-            shapes = IconButtonDefaults.toggleableShapes(),
+        Box {
+          SplitButtonLayout(
+            leadingButton = {
+              SplitButtonDefaults.TonalLeadingButton(onClick = {}) {
+                Icon(
+                  painterResource(R.drawable.send),
+                  contentDescription = null,
+                  modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
+                )
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text("Send")
+              }
+            },
+            trailingButton = {
+              SplitButtonDefaults.TonalTrailingButton(
+                checked = showSplitMenuTonal,
+                onCheckedChange = { showSplitMenuTonal = it },
+              ) {
+                Icon(
+                  painterResource(R.drawable.keyboard_arrow_down),
+                  contentDescription = null,
+                  modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
+                )
+              }
+            },
+          )
+          DropdownMenuPopup(
+            expanded = showSplitMenuTonal,
+            onDismissRequest = { showSplitMenuTonal = false },
           ) {
-            Icon(
-              painterResource(
-                if (iconToggleStandardOffChecked) R.drawable.bookmark_filled
-                else R.drawable.bookmark,
-              ),
-              contentDescription = "Bookmark, standard",
-            )
-          }
-          var iconToggleStandardOnChecked by remember { mutableStateOf(true) }
-          IconToggleButton(
-            checked = iconToggleStandardOnChecked,
-            onCheckedChange = { iconToggleStandardOnChecked = it },
-            shapes = IconButtonDefaults.toggleableShapes(),
-          ) {
-            Icon(
-              painterResource(
-                if (iconToggleStandardOnChecked) R.drawable.bookmark_filled
-                else R.drawable.bookmark,
-              ),
-              contentDescription = "Bookmark, standard",
-            )
-          }
-          var iconToggleFilledOffChecked by remember { mutableStateOf(false) }
-          FilledIconToggleButton(
-            checked = iconToggleFilledOffChecked,
-            onCheckedChange = { iconToggleFilledOffChecked = it },
-            shapes = IconButtonDefaults.toggleableShapes(),
-          ) {
-            Icon(
-              painterResource(
-                if (iconToggleFilledOffChecked) R.drawable.bookmark_filled else R.drawable.bookmark,
-              ),
-              contentDescription = "Bookmark, filled",
-            )
-          }
-          var iconToggleFilledOnChecked by remember { mutableStateOf(true) }
-          FilledIconToggleButton(
-            checked = iconToggleFilledOnChecked,
-            onCheckedChange = { iconToggleFilledOnChecked = it },
-            shapes = IconButtonDefaults.toggleableShapes(),
-          ) {
-            Icon(
-              painterResource(
-                if (iconToggleFilledOnChecked) R.drawable.bookmark_filled else R.drawable.bookmark,
-              ),
-              contentDescription = "Bookmark, filled",
-            )
-          }
-          var iconToggleTonalOffChecked by remember { mutableStateOf(false) }
-          FilledTonalIconToggleButton(
-            checked = iconToggleTonalOffChecked,
-            onCheckedChange = { iconToggleTonalOffChecked = it },
-            shapes = IconButtonDefaults.toggleableShapes(),
-          ) {
-            Icon(
-              painterResource(
-                if (iconToggleTonalOffChecked) R.drawable.bookmark_filled else R.drawable.bookmark,
-              ),
-              contentDescription = "Bookmark, tonal",
-            )
-          }
-          var iconToggleTonalOnChecked by remember { mutableStateOf(true) }
-          FilledTonalIconToggleButton(
-            checked = iconToggleTonalOnChecked,
-            onCheckedChange = { iconToggleTonalOnChecked = it },
-            shapes = IconButtonDefaults.toggleableShapes(),
-          ) {
-            Icon(
-              painterResource(
-                if (iconToggleTonalOnChecked) R.drawable.bookmark_filled else R.drawable.bookmark,
-              ),
-              contentDescription = "Bookmark, tonal",
-            )
-          }
-          var iconToggleOutlinedOffChecked by remember { mutableStateOf(false) }
-          OutlinedIconToggleButton(
-            checked = iconToggleOutlinedOffChecked,
-            onCheckedChange = { iconToggleOutlinedOffChecked = it },
-            shapes = IconButtonDefaults.toggleableShapes(),
-          ) {
-            Icon(
-              painterResource(
-                if (iconToggleOutlinedOffChecked) R.drawable.bookmark_filled
-                else R.drawable.bookmark,
-              ),
-              contentDescription = "Bookmark, outlined",
-            )
-          }
-          var iconToggleOutlinedOnChecked by remember { mutableStateOf(true) }
-          OutlinedIconToggleButton(
-            checked = iconToggleOutlinedOnChecked,
-            onCheckedChange = { iconToggleOutlinedOnChecked = it },
-            shapes = IconButtonDefaults.toggleableShapes(),
-          ) {
-            Icon(
-              painterResource(
-                if (iconToggleOutlinedOnChecked) R.drawable.bookmark_filled
-                else R.drawable.bookmark,
-              ),
-              contentDescription = "Bookmark, outlined",
-            )
+            DropdownMenuGroup(
+              shapes = MenuDefaults.groupShape(0, 1),
+              containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ) {
+              DropdownMenuItem(
+                text = { Text("Send later") },
+                onClick = {
+                  showSplitMenuTonal = false
+                  showSplitMenuTonal = false
+                },
+                shape = MenuDefaults.itemShape(0, 1).shape,
+                leadingIcon = {
+                  Icon(painterResource(R.drawable.schedule), contentDescription = null)
+                },
+              )
+            }
           }
         }
-        FlexBox(
-          config = {
-            wrap(FlexWrap.Wrap)
-            gap(8.dp)
-          },
-          modifier = Modifier.fillMaxWidth(),
-        ) {
-          Box {
-            SplitButtonLayout(
-              leadingButton = {
-                SplitButtonDefaults.LeadingButton(onClick = {}) {
-                  Icon(
-                    painterResource(R.drawable.send),
-                    contentDescription = null,
-                    modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
-                  )
-                  Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                  Text("Send")
-                }
-              },
-              trailingButton = {
-                SplitButtonDefaults.TrailingButton(
-                  checked = showSplitMenuFilled,
-                  onCheckedChange = { showSplitMenuFilled = it },
-                ) {
-                  Icon(
-                    painterResource(R.drawable.keyboard_arrow_down),
-                    contentDescription = null,
-                    modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
-                  )
-                }
-              },
-            )
-            DropdownMenuPopup(
-              expanded = showSplitMenuFilled,
-              onDismissRequest = { showSplitMenuFilled = false },
-            ) {
-              DropdownMenuGroup(
-                shapes = MenuDefaults.groupShape(0, 1),
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        Box {
+          SplitButtonLayout(
+            leadingButton = {
+              SplitButtonDefaults.ElevatedLeadingButton(onClick = {}) {
+                Icon(
+                  painterResource(R.drawable.send),
+                  contentDescription = null,
+                  modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
+                )
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text("Send")
+              }
+            },
+            trailingButton = {
+              SplitButtonDefaults.ElevatedTrailingButton(
+                checked = showSplitMenuElevated,
+                onCheckedChange = { showSplitMenuElevated = it },
               ) {
-                DropdownMenuItem(
-                  text = { Text("Send later") },
-                  onClick = {
-                    showSplitMenuFilled = false
-                    showSplitMenuFilled = false
-                  },
-                  shape = MenuDefaults.itemShape(0, 1).shape,
-                  leadingIcon = {
-                    Icon(painterResource(R.drawable.schedule), contentDescription = null)
-                  },
+                Icon(
+                  painterResource(R.drawable.keyboard_arrow_down),
+                  contentDescription = null,
+                  modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
                 )
               }
+            },
+          )
+          DropdownMenuPopup(
+            expanded = showSplitMenuElevated,
+            onDismissRequest = { showSplitMenuElevated = false },
+          ) {
+            DropdownMenuGroup(
+              shapes = MenuDefaults.groupShape(0, 1),
+              containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ) {
+              DropdownMenuItem(
+                text = { Text("Send later") },
+                onClick = {
+                  showSplitMenuElevated = false
+                  showSplitMenuElevated = false
+                },
+                shape = MenuDefaults.itemShape(0, 1).shape,
+                leadingIcon = {
+                  Icon(painterResource(R.drawable.schedule), contentDescription = null)
+                },
+              )
             }
           }
-          Box {
-            SplitButtonLayout(
-              leadingButton = {
-                SplitButtonDefaults.TonalLeadingButton(onClick = {}) {
-                  Icon(
-                    painterResource(R.drawable.send),
-                    contentDescription = null,
-                    modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
-                  )
-                  Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                  Text("Send")
-                }
-              },
-              trailingButton = {
-                SplitButtonDefaults.TonalTrailingButton(
-                  checked = showSplitMenuTonal,
-                  onCheckedChange = { showSplitMenuTonal = it },
-                ) {
-                  Icon(
-                    painterResource(R.drawable.keyboard_arrow_down),
-                    contentDescription = null,
-                    modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
-                  )
-                }
-              },
-            )
-            DropdownMenuPopup(
-              expanded = showSplitMenuTonal,
-              onDismissRequest = { showSplitMenuTonal = false },
-            ) {
-              DropdownMenuGroup(
-                shapes = MenuDefaults.groupShape(0, 1),
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        }
+        Box {
+          SplitButtonLayout(
+            leadingButton = {
+              SplitButtonDefaults.OutlinedLeadingButton(onClick = {}) {
+                Icon(
+                  painterResource(R.drawable.send),
+                  contentDescription = null,
+                  modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
+                )
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text("Send")
+              }
+            },
+            trailingButton = {
+              SplitButtonDefaults.OutlinedTrailingButton(
+                checked = showSplitMenuOutlined,
+                onCheckedChange = { showSplitMenuOutlined = it },
               ) {
-                DropdownMenuItem(
-                  text = { Text("Send later") },
-                  onClick = {
-                    showSplitMenuTonal = false
-                    showSplitMenuTonal = false
-                  },
-                  shape = MenuDefaults.itemShape(0, 1).shape,
-                  leadingIcon = {
-                    Icon(painterResource(R.drawable.schedule), contentDescription = null)
-                  },
+                Icon(
+                  painterResource(R.drawable.keyboard_arrow_down),
+                  contentDescription = null,
+                  modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
                 )
               }
-            }
-          }
-          Box {
-            SplitButtonLayout(
-              leadingButton = {
-                SplitButtonDefaults.ElevatedLeadingButton(onClick = {}) {
-                  Icon(
-                    painterResource(R.drawable.send),
-                    contentDescription = null,
-                    modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
-                  )
-                  Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                  Text("Send")
-                }
-              },
-              trailingButton = {
-                SplitButtonDefaults.ElevatedTrailingButton(
-                  checked = showSplitMenuElevated,
-                  onCheckedChange = { showSplitMenuElevated = it },
-                ) {
-                  Icon(
-                    painterResource(R.drawable.keyboard_arrow_down),
-                    contentDescription = null,
-                    modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
-                  )
-                }
-              },
-            )
-            DropdownMenuPopup(
-              expanded = showSplitMenuElevated,
-              onDismissRequest = { showSplitMenuElevated = false },
+            },
+          )
+          DropdownMenuPopup(
+            expanded = showSplitMenuOutlined,
+            onDismissRequest = { showSplitMenuOutlined = false },
+          ) {
+            DropdownMenuGroup(
+              shapes = MenuDefaults.groupShape(0, 1),
+              containerColor = MaterialTheme.colorScheme.surfaceContainer,
             ) {
-              DropdownMenuGroup(
-                shapes = MenuDefaults.groupShape(0, 1),
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-              ) {
-                DropdownMenuItem(
-                  text = { Text("Send later") },
-                  onClick = {
-                    showSplitMenuElevated = false
-                    showSplitMenuElevated = false
-                  },
-                  shape = MenuDefaults.itemShape(0, 1).shape,
-                  leadingIcon = {
-                    Icon(painterResource(R.drawable.schedule), contentDescription = null)
-                  },
-                )
-              }
-            }
-          }
-          Box {
-            SplitButtonLayout(
-              leadingButton = {
-                SplitButtonDefaults.OutlinedLeadingButton(onClick = {}) {
-                  Icon(
-                    painterResource(R.drawable.send),
-                    contentDescription = null,
-                    modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
-                  )
-                  Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                  Text("Send")
-                }
-              },
-              trailingButton = {
-                SplitButtonDefaults.OutlinedTrailingButton(
-                  checked = showSplitMenuOutlined,
-                  onCheckedChange = { showSplitMenuOutlined = it },
-                ) {
-                  Icon(
-                    painterResource(R.drawable.keyboard_arrow_down),
-                    contentDescription = null,
-                    modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize),
-                  )
-                }
-              },
-            )
-            DropdownMenuPopup(
-              expanded = showSplitMenuOutlined,
-              onDismissRequest = { showSplitMenuOutlined = false },
-            ) {
-              DropdownMenuGroup(
-                shapes = MenuDefaults.groupShape(0, 1),
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-              ) {
-                DropdownMenuItem(
-                  text = { Text("Send later") },
-                  onClick = {
-                    showSplitMenuOutlined = false
-                    showSplitMenuOutlined = false
-                  },
-                  shape = MenuDefaults.itemShape(0, 1).shape,
-                  leadingIcon = {
-                    Icon(painterResource(R.drawable.schedule), contentDescription = null)
-                  },
-                )
-              }
+              DropdownMenuItem(
+                text = { Text("Send later") },
+                onClick = {
+                  showSplitMenuOutlined = false
+                  showSplitMenuOutlined = false
+                },
+                shape = MenuDefaults.itemShape(0, 1).shape,
+                leadingIcon = {
+                  Icon(painterResource(R.drawable.schedule), contentDescription = null)
+                },
+              )
             }
           }
         }
@@ -1868,674 +1676,590 @@ private fun ActionsScreenPreview() {
 }
 
 @Composable
-fun InputsScreen(
-  modifier: Modifier = Modifier,
-  onNavigateToHome: () -> Unit = {},
-  onNavigateToActions: () -> Unit = {},
-  onNavigateToInputs: () -> Unit = {},
-  onNavigateToOverlays: () -> Unit = {},
-  onNavigateToSearch: () -> Unit = {},
-) {
+fun InputsScreen(modifier: Modifier = Modifier, onNavigateToSearch: () -> Unit = {}) {
   val coroutineScope = rememberCoroutineScope()
-  val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
-  val atLeastMedium =
-    windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
-  val atLeastExpanded =
-    windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
   val searchBarSearchState = rememberContainedSearchBarState()
   val searchDockedSearchState = rememberSearchBarWithGapState()
   val tipPlainTooltipState = rememberTooltipState()
   val tipRichTooltipState = rememberTooltipState(isPersistent = true)
-  Row(modifier = modifier) {
-    if (atLeastMedium && !atLeastExpanded) {
-      WideNavigationRail(state = rememberWideNavigationRailState()) {
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = false,
-          onClick = { onNavigateToHome() },
-          icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
-          label = { Text("Home") },
-        )
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = false,
-          onClick = { onNavigateToActions() },
-          icon = { Icon(painterResource(R.drawable.touch_app), contentDescription = null) },
-          label = { Text("Actions") },
-        )
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = true,
-          onClick = { onNavigateToInputs() },
-          icon = { Icon(painterResource(R.drawable.tune), contentDescription = null) },
-          label = { Text("Inputs") },
-        )
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = false,
-          onClick = { onNavigateToOverlays() },
-          icon = { Icon(painterResource(R.drawable.layers), contentDescription = null) },
-          label = { Text("Overlays") },
-        )
-      }
-    } else if (atLeastExpanded) {
-      WideNavigationRail(
-        state = rememberWideNavigationRailState(WideNavigationRailValue.Expanded),
+  Scaffold(
+    modifier = modifier,
+    topBar = { TopAppBar(title = { Text("Inputs and feedback") }) },
+  ) { innerPadding ->
+    Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+      Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = false,
-          onClick = { onNavigateToHome() },
-          icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
-          label = { Text("Home") },
-        )
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = false,
-          onClick = { onNavigateToActions() },
-          icon = { Icon(painterResource(R.drawable.touch_app), contentDescription = null) },
-          label = { Text("Actions") },
-        )
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = true,
-          onClick = { onNavigateToInputs() },
-          icon = { Icon(painterResource(R.drawable.tune), contentDescription = null) },
-          label = { Text("Inputs") },
-        )
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = false,
-          onClick = { onNavigateToOverlays() },
-          icon = { Icon(painterResource(R.drawable.layers), contentDescription = null) },
-          label = { Text("Overlays") },
-        )
-      }
-    }
-    Scaffold(
-      modifier = Modifier.weight(1f),
-      topBar = { TopAppBar(title = { Text("Inputs and feedback") }) },
-    ) { innerPadding ->
-      Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-        Column(
-          modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-          verticalArrangement = Arrangement.spacedBy(16.dp),
+        FlexBox(
+          config = {
+            wrap(FlexWrap.Wrap)
+            gap(8.dp)
+          },
+          modifier = Modifier.fillMaxWidth(),
         ) {
-          FlexBox(
-            config = {
-              wrap(FlexWrap.Wrap)
-              gap(8.dp)
+          AssistChip(
+            onClick = {},
+            label = { Text("Assist") },
+            leadingIcon = {
+              Icon(
+                painterResource(R.drawable.event),
+                contentDescription = null,
+                modifier = Modifier.size(AssistChipDefaults.IconSize),
+              )
             },
-            modifier = Modifier.fillMaxWidth(),
+          )
+          ElevatedAssistChip(onClick = {}, label = { Text("Assist elevated") })
+          var filterOutlinedSelected by remember { mutableStateOf(true) }
+          FilterChip(
+            selected = filterOutlinedSelected,
+            onClick = { filterOutlinedSelected = !filterOutlinedSelected },
+            label = { Text("Filter") },
+            leadingIcon =
+              if (filterOutlinedSelected) {
+                {
+                  Icon(
+                    painterResource(R.drawable.check),
+                    contentDescription = null,
+                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                  )
+                }
+              } else null,
+          )
+          var filterElevatedSelected by remember { mutableStateOf(false) }
+          ElevatedFilterChip(
+            selected = filterElevatedSelected,
+            onClick = { filterElevatedSelected = !filterElevatedSelected },
+            label = { Text("Filter elevated") },
+            leadingIcon = {
+              Icon(
+                painterResource(if (filterElevatedSelected) R.drawable.check else R.drawable.tune),
+                contentDescription = null,
+                modifier = Modifier.size(FilterChipDefaults.IconSize),
+              )
+            },
+          )
+          var inputChipSelected by remember { mutableStateOf(false) }
+          InputChip(
+            selected = inputChipSelected,
+            onClick = { inputChipSelected = !inputChipSelected },
+            label = { Text("Input") },
+            leadingIcon = {
+              Icon(
+                painterResource(R.drawable.person),
+                contentDescription = null,
+                modifier = Modifier.size(InputChipDefaults.IconSize),
+              )
+            },
+          )
+          SuggestionChip(onClick = {}, label = { Text("Suggestion") })
+          ElevatedSuggestionChip(onClick = {}, label = { Text("Suggestion elevated") })
+        }
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = FilterChipDefaults.horizontalArrangement(),
+        ) {
+          var groupQuickSelected by remember { mutableStateOf(true) }
+          FilterChip(
+            selected = groupQuickSelected,
+            onClick = { groupQuickSelected = !groupQuickSelected },
+            label = { Text("Quick") },
+            leadingIcon =
+              if (groupQuickSelected) {
+                {
+                  Icon(
+                    painterResource(R.drawable.check),
+                    contentDescription = null,
+                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                  )
+                }
+              } else null,
+          )
+          var groupVeganSelected by remember { mutableStateOf(true) }
+          FilterChip(
+            selected = groupVeganSelected,
+            onClick = { groupVeganSelected = !groupVeganSelected },
+            label = { Text("Vegan") },
+            leadingIcon =
+              if (groupVeganSelected) {
+                {
+                  Icon(
+                    painterResource(R.drawable.check),
+                    contentDescription = null,
+                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                  )
+                }
+              } else null,
+          )
+          var groupDessertSelected by remember { mutableStateOf(false) }
+          FilterChip(
+            selected = groupDessertSelected,
+            onClick = { groupDessertSelected = !groupDessertSelected },
+            label = { Text("Dessert") },
+            leadingIcon =
+              if (groupDessertSelected) {
+                {
+                  Icon(
+                    painterResource(R.drawable.check),
+                    contentDescription = null,
+                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                  )
+                }
+              } else null,
+          )
+        }
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(16.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          var switchOnChecked by remember { mutableStateOf(true) }
+          Switch(
+            checked = switchOnChecked,
+            onCheckedChange = { switchOnChecked = it },
+            modifier = Modifier.semantics { contentDescription = "Wi-Fi" },
+            thumbContent = {
+              Icon(
+                painterResource(if (switchOnChecked) R.drawable.check else R.drawable.close),
+                contentDescription = null,
+                modifier = Modifier.size(SwitchDefaults.IconSize),
+              )
+            },
+          )
+          var switchOffChecked by remember { mutableStateOf(false) }
+          Switch(
+            checked = switchOffChecked,
+            onCheckedChange = { switchOffChecked = it },
+            modifier = Modifier.semantics { contentDescription = "Bluetooth" },
+            thumbContent =
+              if (switchOffChecked) {
+                {
+                  Icon(
+                    painterResource(R.drawable.check),
+                    contentDescription = null,
+                    modifier = Modifier.size(SwitchDefaults.IconSize),
+                  )
+                }
+              } else null,
+          )
+          TooltipBox(
+            positionProvider =
+              TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below),
+            tooltip = {
+              RichTooltip(
+                title = { Text("Why this matters") },
+                action = {
+                  Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                      onClick = { coroutineScope.launch { tipRichTooltipState.dismiss() } },
+                    ) {
+                      Text("Got it")
+                    }
+                    TextButton(onClick = {}) { Text("Learn more") }
+                  }
+                },
+              ) {
+                Text("Checked items stay in your plan.")
+              }
+            },
+            state = tipRichTooltipState,
+            hasAction = true,
           ) {
-            AssistChip(
-              onClick = {},
-              label = { Text("Assist") },
-              leadingIcon = {
-                Icon(
-                  painterResource(R.drawable.event),
-                  contentDescription = null,
-                  modifier = Modifier.size(AssistChipDefaults.IconSize),
-                )
-              },
-            )
-            ElevatedAssistChip(onClick = {}, label = { Text("Assist elevated") })
-            var filterOutlinedSelected by remember { mutableStateOf(true) }
-            FilterChip(
-              selected = filterOutlinedSelected,
-              onClick = { filterOutlinedSelected = !filterOutlinedSelected },
-              label = { Text("Filter") },
-              leadingIcon =
-                if (filterOutlinedSelected) {
-                  {
-                    Icon(
-                      painterResource(R.drawable.check),
-                      contentDescription = null,
-                      modifier = Modifier.size(FilterChipDefaults.IconSize),
-                    )
-                  }
-                } else null,
-            )
-            var filterElevatedSelected by remember { mutableStateOf(false) }
-            ElevatedFilterChip(
-              selected = filterElevatedSelected,
-              onClick = { filterElevatedSelected = !filterElevatedSelected },
-              label = { Text("Filter elevated") },
-              leadingIcon = {
-                Icon(
-                  painterResource(
-                    if (filterElevatedSelected) R.drawable.check else R.drawable.tune,
-                  ),
-                  contentDescription = null,
-                  modifier = Modifier.size(FilterChipDefaults.IconSize),
-                )
-              },
-            )
-            var inputChipSelected by remember { mutableStateOf(false) }
-            InputChip(
-              selected = inputChipSelected,
-              onClick = { inputChipSelected = !inputChipSelected },
-              label = { Text("Input") },
-              leadingIcon = {
-                Icon(
-                  painterResource(R.drawable.person),
-                  contentDescription = null,
-                  modifier = Modifier.size(InputChipDefaults.IconSize),
-                )
-              },
-            )
-            SuggestionChip(onClick = {}, label = { Text("Suggestion") })
-            ElevatedSuggestionChip(onClick = {}, label = { Text("Suggestion elevated") })
+            var checkOnChecked by remember { mutableStateOf(true) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Checkbox(checked = checkOnChecked, onCheckedChange = { checkOnChecked = it })
+              Text("Checked")
+            }
           }
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = FilterChipDefaults.horizontalArrangement(),
-          ) {
-            var groupQuickSelected by remember { mutableStateOf(true) }
-            FilterChip(
-              selected = groupQuickSelected,
-              onClick = { groupQuickSelected = !groupQuickSelected },
-              label = { Text("Quick") },
-              leadingIcon =
-                if (groupQuickSelected) {
-                  {
-                    Icon(
-                      painterResource(R.drawable.check),
-                      contentDescription = null,
-                      modifier = Modifier.size(FilterChipDefaults.IconSize),
-                    )
-                  }
-                } else null,
-            )
-            var groupVeganSelected by remember { mutableStateOf(true) }
-            FilterChip(
-              selected = groupVeganSelected,
-              onClick = { groupVeganSelected = !groupVeganSelected },
-              label = { Text("Vegan") },
-              leadingIcon =
-                if (groupVeganSelected) {
-                  {
-                    Icon(
-                      painterResource(R.drawable.check),
-                      contentDescription = null,
-                      modifier = Modifier.size(FilterChipDefaults.IconSize),
-                    )
-                  }
-                } else null,
-            )
-            var groupDessertSelected by remember { mutableStateOf(false) }
-            FilterChip(
-              selected = groupDessertSelected,
-              onClick = { groupDessertSelected = !groupDessertSelected },
-              label = { Text("Dessert") },
-              leadingIcon =
-                if (groupDessertSelected) {
-                  {
-                    Icon(
-                      painterResource(R.drawable.check),
-                      contentDescription = null,
-                      modifier = Modifier.size(FilterChipDefaults.IconSize),
-                    )
-                  }
-                } else null,
-            )
+          var checkOffChecked by remember { mutableStateOf(false) }
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = checkOffChecked, onCheckedChange = { checkOffChecked = it })
+            Text("Unchecked")
           }
+        }
+        var checkPartialChecked by remember { mutableStateOf(false) }
+        var checkPartialIndeterminate by remember { mutableStateOf(true) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          TriStateCheckbox(
+            state =
+              if (checkPartialIndeterminate) ToggleableState.Indeterminate
+              else if (checkPartialChecked) ToggleableState.On else ToggleableState.Off,
+            onClick = {
+              checkPartialChecked = checkPartialIndeterminate || !checkPartialChecked
+              checkPartialIndeterminate = false
+            },
+          )
+          Text("Partly")
+        }
+        var sliderValue by remember { mutableFloatStateOf(40f) }
+        Slider(
+          value = sliderValue,
+          onValueChange = { sliderValue = it },
+          modifier = Modifier.fillMaxWidth(),
+          valueRange = 0f..100f,
+        )
+        var rangeSliderValue by remember { mutableStateOf(20f..60f) }
+        RangeSlider(
+          value = rangeSliderValue,
+          onValueChange = { rangeSliderValue = it },
+          modifier = Modifier.fillMaxWidth(),
+          valueRange = 0f..100f,
+          steps = 9,
+        )
+        val sliderCenteredState = rememberSliderState(value = 0f, trackRange = -50f..50f)
+        Slider(
+          state = sliderCenteredState,
+          onValueChange = { sliderCenteredState.value = it },
+          modifier = Modifier.fillMaxWidth(),
+          track = { SliderDefaults.CenteredTrack(sliderState = it) },
+        )
+        val sliderVerticalState = rememberSliderState(value = 60f, trackRange = 0f..100f)
+        VerticalSlider(
+          state = sliderVerticalState,
+          onValueChange = { sliderVerticalState.value = it },
+          modifier = Modifier.height(200.dp),
+          topToBottom = false,
+        )
+        var radioGroupSelected by remember { mutableStateOf("radio_medium") }
+        Column(modifier = Modifier.fillMaxWidth().selectableGroup()) {
           Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier =
+              Modifier.fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .selectable(
+                  selected = radioGroupSelected == "radio_small",
+                  role = Role.RadioButton,
+                  onClick = { radioGroupSelected = "radio_small" },
+                ),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
           ) {
-            var switchOnChecked by remember { mutableStateOf(true) }
-            Switch(
-              checked = switchOnChecked,
-              onCheckedChange = { switchOnChecked = it },
-              modifier = Modifier.semantics { contentDescription = "Wi-Fi" },
-              thumbContent = {
-                Icon(
-                  painterResource(if (switchOnChecked) R.drawable.check else R.drawable.close),
-                  contentDescription = null,
-                  modifier = Modifier.size(SwitchDefaults.IconSize),
-                )
-              },
-            )
-            var switchOffChecked by remember { mutableStateOf(false) }
-            Switch(
-              checked = switchOffChecked,
-              onCheckedChange = { switchOffChecked = it },
-              modifier = Modifier.semantics { contentDescription = "Bluetooth" },
-              thumbContent =
-                if (switchOffChecked) {
-                  {
-                    Icon(
-                      painterResource(R.drawable.check),
-                      contentDescription = null,
-                      modifier = Modifier.size(SwitchDefaults.IconSize),
-                    )
-                  }
-                } else null,
-            )
-            TooltipBox(
-              positionProvider =
-                TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below),
-              tooltip = {
-                RichTooltip(
-                  title = { Text("Why this matters") },
-                  action = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                      TextButton(
-                        onClick = { coroutineScope.launch { tipRichTooltipState.dismiss() } },
-                      ) {
-                        Text("Got it")
-                      }
-                      TextButton(onClick = {}) { Text("Learn more") }
-                    }
-                  },
-                ) {
-                  Text("Checked items stay in your plan.")
-                }
-              },
-              state = tipRichTooltipState,
-              hasAction = true,
-            ) {
-              var checkOnChecked by remember { mutableStateOf(true) }
-              Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = checkOnChecked, onCheckedChange = { checkOnChecked = it })
-                Text("Checked")
-              }
-            }
-            var checkOffChecked by remember { mutableStateOf(false) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-              Checkbox(checked = checkOffChecked, onCheckedChange = { checkOffChecked = it })
-              Text("Unchecked")
-            }
+            RadioButton(selected = radioGroupSelected == "radio_small", onClick = null)
+            Text("Small")
           }
-          var checkPartialChecked by remember { mutableStateOf(false) }
-          var checkPartialIndeterminate by remember { mutableStateOf(true) }
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            TriStateCheckbox(
-              state =
-                if (checkPartialIndeterminate) ToggleableState.Indeterminate
-                else if (checkPartialChecked) ToggleableState.On else ToggleableState.Off,
-              onClick = {
-                checkPartialChecked = checkPartialIndeterminate || !checkPartialChecked
-                checkPartialIndeterminate = false
-              },
-            )
-            Text("Partly")
-          }
-          var sliderValue by remember { mutableFloatStateOf(40f) }
-          Slider(
-            value = sliderValue,
-            onValueChange = { sliderValue = it },
-            modifier = Modifier.fillMaxWidth(),
-            valueRange = 0f..100f,
-          )
-          var rangeSliderValue by remember { mutableStateOf(20f..60f) }
-          RangeSlider(
-            value = rangeSliderValue,
-            onValueChange = { rangeSliderValue = it },
-            modifier = Modifier.fillMaxWidth(),
-            valueRange = 0f..100f,
-            steps = 9,
-          )
-          val sliderCenteredState = rememberSliderState(value = 0f, trackRange = -50f..50f)
-          Slider(
-            state = sliderCenteredState,
-            onValueChange = { sliderCenteredState.value = it },
-            modifier = Modifier.fillMaxWidth(),
-            track = { SliderDefaults.CenteredTrack(sliderState = it) },
-          )
-          val sliderVerticalState = rememberSliderState(value = 60f, trackRange = 0f..100f)
-          VerticalSlider(
-            state = sliderVerticalState,
-            onValueChange = { sliderVerticalState.value = it },
-            modifier = Modifier.height(200.dp),
-            topToBottom = false,
-          )
-          var radioGroupSelected by remember { mutableStateOf("radio_medium") }
-          Column(modifier = Modifier.fillMaxWidth().selectableGroup()) {
-            Row(
-              modifier =
-                Modifier.fillMaxWidth()
-                  .heightIn(min = 48.dp)
-                  .selectable(
-                    selected = radioGroupSelected == "radio_small",
-                    role = Role.RadioButton,
-                    onClick = { radioGroupSelected = "radio_small" },
-                  ),
-              horizontalArrangement = Arrangement.spacedBy(12.dp),
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              RadioButton(selected = radioGroupSelected == "radio_small", onClick = null)
-              Text("Small")
-            }
-            Row(
-              modifier =
-                Modifier.fillMaxWidth()
-                  .heightIn(min = 48.dp)
-                  .selectable(
-                    selected = radioGroupSelected == "radio_medium",
-                    role = Role.RadioButton,
-                    onClick = {
-                      radioGroupSelected = "radio_medium"
-                      coroutineScope.launch { searchBarSearchState.animateToCollapsed() }
-                      coroutineScope.launch { searchDockedSearchState.animateToCollapsed() }
-                      coroutineScope.launch { tipPlainTooltipState.dismiss() }
-                      coroutineScope.launch { tipRichTooltipState.dismiss() }
-                    },
-                  ),
-              horizontalArrangement = Arrangement.spacedBy(12.dp),
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              RadioButton(selected = radioGroupSelected == "radio_medium", onClick = null)
-              Text("Medium")
-            }
-            Row(
-              modifier =
-                Modifier.fillMaxWidth()
-                  .heightIn(min = 48.dp)
-                  .selectable(
-                    selected = radioGroupSelected == "radio_large",
-                    role = Role.RadioButton,
-                    onClick = { radioGroupSelected = "radio_large" },
-                  ),
-              horizontalArrangement = Arrangement.spacedBy(12.dp),
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              RadioButton(selected = radioGroupSelected == "radio_large", onClick = null)
-              Text("Large")
-            }
-          }
-          Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-          ) {
-            var fieldFilledValue by remember { mutableStateOf("Value") }
-            TextField(
-              value = fieldFilledValue,
-              onValueChange = { fieldFilledValue = it },
-              modifier = Modifier.fillMaxWidth(),
-              label = { Text("Filled") },
-              singleLine = true,
-            )
-            var fieldOutlinedValue by remember { mutableStateOf("Value") }
-            OutlinedTextField(
-              value = fieldOutlinedValue,
-              onValueChange = { fieldOutlinedValue = it },
-              modifier = Modifier.fillMaxWidth(),
-              label = { Text("Outlined") },
-              singleLine = true,
-            )
-            var fieldSupportingValue by remember { mutableStateOf("Value") }
-            TextField(
-              value = fieldSupportingValue,
-              onValueChange = { fieldSupportingValue = it },
-              modifier = Modifier.fillMaxWidth(),
-              label = { Text("With supporting") },
-              supportingText = { Text("Supporting text") },
-              singleLine = true,
-            )
-            var fieldErrorValue by remember { mutableStateOf("Value") }
-            OutlinedTextField(
-              value = fieldErrorValue,
-              onValueChange = { fieldErrorValue = it },
-              modifier = Modifier.fillMaxWidth(),
-              label = { Text("With error") },
-              supportingText = { Text("Error text") },
-              isError = true,
-              singleLine = true,
-            )
-            var fieldIconsValue by remember { mutableStateOf("") }
-            TextField(
-              value = fieldIconsValue,
-              onValueChange = { fieldIconsValue = it },
-              modifier = Modifier.fillMaxWidth(),
-              label = { Text("Search") },
-              leadingIcon = { Icon(painterResource(R.drawable.search), contentDescription = null) },
-              trailingIcon = { Icon(painterResource(R.drawable.close), contentDescription = null) },
-              singleLine = true,
-            )
-            var fieldPrefixValue by remember { mutableStateOf("120.00") }
-            OutlinedTextField(
-              value = fieldPrefixValue,
-              onValueChange = { fieldPrefixValue = it },
-              modifier = Modifier.fillMaxWidth(),
-              label = { Text("Amount") },
-              prefix = { Text("\$") },
-              singleLine = true,
-            )
-            var fieldPlaceholderValue by remember { mutableStateOf("") }
-            TextField(
-              value = fieldPlaceholderValue,
-              onValueChange = { fieldPlaceholderValue = it },
-              modifier = Modifier.fillMaxWidth(),
-              placeholder = { Text("Placeholder only") },
-              singleLine = true,
-            )
-            var fieldMultilineValue by remember { mutableStateOf("Three lines") }
-            TextField(
-              value = fieldMultilineValue,
-              onValueChange = { fieldMultilineValue = it },
-              modifier = Modifier.fillMaxWidth(),
-              label = { Text("Notes") },
-              minLines = 3,
-            )
-          }
-          FlexBox(
-            config = {
-              wrap(FlexWrap.Wrap)
-              gap(12.dp)
-            },
-            modifier = Modifier.fillMaxWidth(),
-          ) {
-            LoadingIndicator()
-            ContainedLoadingIndicator()
-            LinearProgressIndicator(
-              progress = { 0.4f },
-              modifier = Modifier.requiredHeightIn(max = Dp.Infinity),
-            )
-            LinearWavyProgressIndicator(modifier = Modifier.requiredHeightIn(max = Dp.Infinity))
-            CircularProgressIndicator(progress = { 0.7f })
-            CircularWavyProgressIndicator()
-          }
-          VerticalFloatingToolbar(
-            expanded = true,
-            colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
-          ) {
-            TooltipBox(
-              positionProvider =
-                TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-              tooltip = { PlainTooltip { Text("Undo") } },
-              state = tipPlainTooltipState,
-            ) {
-              IconButton(onClick = {}) {
-                Icon(painterResource(R.drawable.undo), contentDescription = "Undo")
-              }
-            }
-            IconButton(onClick = {}) {
-              Icon(painterResource(R.drawable.redo), contentDescription = "Redo")
-            }
-          }
-          Box {
-            val searchBarQuery = rememberTextFieldState()
-            val searchBarSearchColors =
-              SearchBarDefaults.containedColors(state = searchBarSearchState)
-            val searchBarInput =
-              @Composable {
-                SearchBarDefaults.InputField(
-                  textFieldState = searchBarQuery,
-                  searchBarState = searchBarSearchState,
-                  onSearch = {
+          Row(
+            modifier =
+              Modifier.fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .selectable(
+                  selected = radioGroupSelected == "radio_medium",
+                  role = Role.RadioButton,
+                  onClick = {
+                    radioGroupSelected = "radio_medium"
                     coroutineScope.launch { searchBarSearchState.animateToCollapsed() }
-                  },
-                  colors = searchBarSearchColors.inputFieldColors,
-                  placeholder = { Text("Search recipes") },
-                  leadingIcon = {
-                    if (searchBarSearchState.currentValue == SearchBarValue.Expanded) {
-                      IconButton(
-                        onClick = {
-                          coroutineScope.launch { searchBarSearchState.animateToCollapsed() }
-                        },
-                      ) {
-                        Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
-                      }
-                    } else {
-                      IconButton(
-                        onClick = {},
-                        colors =
-                          IconButtonDefaults.iconButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                          ),
-                      ) {
-                        Icon(painterResource(R.drawable.menu), contentDescription = "Menu")
-                      }
-                    }
-                  },
-                  trailingIcon = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                      IconButton(
-                        onClick = {},
-                        colors =
-                          IconButtonDefaults.iconButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                          ),
-                      ) {
-                        Icon(painterResource(R.drawable.mic), contentDescription = "Voice search")
-                      }
-                      Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                        Image(
-                          painter = painterResource(R.drawable.search_bar),
-                          contentDescription = null,
-                          modifier = Modifier.size(30.dp).clip(CircleShape),
-                          contentScale = ContentScale.Crop,
-                        )
-                      }
-                    }
-                  },
-                )
-              }
-            SearchBar(
-              state = searchBarSearchState,
-              inputField = searchBarInput,
-              modifier = Modifier.fillMaxWidth(),
-              colors = searchBarSearchColors,
-            )
-            ExpandedFullScreenContainedSearchBar(
-              state = searchBarSearchState,
-              inputField = searchBarInput,
-              colors = searchBarSearchColors,
-            ) {
-              ListItem(modifier = Modifier.fillMaxWidth()) { Text("Mexican dishes") }
-              ListItem(modifier = Modifier.fillMaxWidth()) { Text("Quick dinners") }
-            }
-          }
-          Box {
-            val searchDockedQuery = rememberTextFieldState()
-            val searchDockedSearchColors = SearchBarDefaults.colors()
-            val searchDockedInput =
-              @Composable {
-                SearchBarDefaults.InputField(
-                  textFieldState = searchDockedQuery,
-                  searchBarState = searchDockedSearchState,
-                  onSearch = {
                     coroutineScope.launch { searchDockedSearchState.animateToCollapsed() }
+                    coroutineScope.launch { tipPlainTooltipState.dismiss() }
+                    coroutineScope.launch { tipRichTooltipState.dismiss() }
                   },
-                  colors = searchDockedSearchColors.inputFieldColors,
-                  placeholder = { Text("Search your messages") },
-                  leadingIcon = {
-                    if (searchDockedSearchState.currentValue == SearchBarValue.Expanded) {
-                      IconButton(
-                        onClick = {
-                          coroutineScope.launch { searchDockedSearchState.animateToCollapsed() }
-                        },
-                      ) {
-                        Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
-                      }
-                    } else {
-                      Icon(painterResource(R.drawable.search), contentDescription = null)
-                    }
-                  },
-                  trailingIcon = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                      IconButton(
-                        onClick = {},
-                        colors =
-                          IconButtonDefaults.iconButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                          ),
-                      ) {
-                        Icon(
-                          painterResource(R.drawable.more_vert),
-                          contentDescription = "More options",
-                        )
-                      }
-                    }
-                  },
-                )
-              }
-            SearchBar(
-              state = searchDockedSearchState,
-              inputField = searchDockedInput,
-              modifier = Modifier.fillMaxWidth(),
-              colors = searchDockedSearchColors,
-            )
-            ExpandedDockedSearchBarWithGap(
-              state = searchDockedSearchState,
-              inputField = searchDockedInput,
-            ) {
-              ListItem(modifier = Modifier.fillMaxWidth()) { Text("Recent: invoices") }
+                ),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            RadioButton(selected = radioGroupSelected == "radio_medium", onClick = null)
+            Text("Medium")
+          }
+          Row(
+            modifier =
+              Modifier.fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .selectable(
+                  selected = radioGroupSelected == "radio_large",
+                  role = Role.RadioButton,
+                  onClick = { radioGroupSelected = "radio_large" },
+                ),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            RadioButton(selected = radioGroupSelected == "radio_large", onClick = null)
+            Text("Large")
+          }
+        }
+        Column(
+          modifier = Modifier.fillMaxWidth(),
+          verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+          var fieldFilledValue by remember { mutableStateOf("Value") }
+          TextField(
+            value = fieldFilledValue,
+            onValueChange = { fieldFilledValue = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Filled") },
+            singleLine = true,
+          )
+          var fieldOutlinedValue by remember { mutableStateOf("Value") }
+          OutlinedTextField(
+            value = fieldOutlinedValue,
+            onValueChange = { fieldOutlinedValue = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Outlined") },
+            singleLine = true,
+          )
+          var fieldSupportingValue by remember { mutableStateOf("Value") }
+          TextField(
+            value = fieldSupportingValue,
+            onValueChange = { fieldSupportingValue = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("With supporting") },
+            supportingText = { Text("Supporting text") },
+            singleLine = true,
+          )
+          var fieldErrorValue by remember { mutableStateOf("Value") }
+          OutlinedTextField(
+            value = fieldErrorValue,
+            onValueChange = { fieldErrorValue = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("With error") },
+            supportingText = { Text("Error text") },
+            isError = true,
+            singleLine = true,
+          )
+          var fieldIconsValue by remember { mutableStateOf("") }
+          TextField(
+            value = fieldIconsValue,
+            onValueChange = { fieldIconsValue = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Search") },
+            leadingIcon = { Icon(painterResource(R.drawable.search), contentDescription = null) },
+            trailingIcon = { Icon(painterResource(R.drawable.close), contentDescription = null) },
+            singleLine = true,
+          )
+          var fieldPrefixValue by remember { mutableStateOf("120.00") }
+          OutlinedTextField(
+            value = fieldPrefixValue,
+            onValueChange = { fieldPrefixValue = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Amount") },
+            prefix = { Text("\$") },
+            singleLine = true,
+          )
+          var fieldPlaceholderValue by remember { mutableStateOf("") }
+          TextField(
+            value = fieldPlaceholderValue,
+            onValueChange = { fieldPlaceholderValue = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Placeholder only") },
+            singleLine = true,
+          )
+          var fieldMultilineValue by remember { mutableStateOf("Three lines") }
+          TextField(
+            value = fieldMultilineValue,
+            onValueChange = { fieldMultilineValue = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Notes") },
+            minLines = 3,
+          )
+        }
+        FlexBox(
+          config = {
+            wrap(FlexWrap.Wrap)
+            gap(12.dp)
+          },
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          LoadingIndicator()
+          ContainedLoadingIndicator()
+          LinearProgressIndicator(
+            progress = { 0.4f },
+            modifier = Modifier.requiredHeightIn(max = Dp.Infinity),
+          )
+          LinearWavyProgressIndicator(modifier = Modifier.requiredHeightIn(max = Dp.Infinity))
+          CircularProgressIndicator(progress = { 0.7f })
+          CircularWavyProgressIndicator()
+        }
+        VerticalFloatingToolbar(
+          expanded = true,
+          colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
+        ) {
+          TooltipBox(
+            positionProvider =
+              TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+            tooltip = { PlainTooltip { Text("Undo") } },
+            state = tipPlainTooltipState,
+          ) {
+            IconButton(onClick = {}) {
+              Icon(painterResource(R.drawable.undo), contentDescription = "Undo")
             }
           }
-          Button(onClick = { onNavigateToSearch() }) { Text("Search app bar") }
+          IconButton(onClick = {}) {
+            Icon(painterResource(R.drawable.redo), contentDescription = "Redo")
+          }
         }
-        HorizontalFloatingToolbar(
-          expanded = true,
-          modifier =
-            Modifier.align(Alignment.BottomCenter)
-              .offset(y = -FloatingToolbarDefaults.ScreenOffset),
+        Box {
+          val searchBarQuery = rememberTextFieldState()
+          val searchBarSearchColors =
+            SearchBarDefaults.containedColors(state = searchBarSearchState)
+          val searchBarInput =
+            @Composable {
+              SearchBarDefaults.InputField(
+                textFieldState = searchBarQuery,
+                searchBarState = searchBarSearchState,
+                onSearch = { coroutineScope.launch { searchBarSearchState.animateToCollapsed() } },
+                colors = searchBarSearchColors.inputFieldColors,
+                placeholder = { Text("Search recipes") },
+                leadingIcon = {
+                  if (searchBarSearchState.currentValue == SearchBarValue.Expanded) {
+                    IconButton(
+                      onClick = {
+                        coroutineScope.launch { searchBarSearchState.animateToCollapsed() }
+                      },
+                    ) {
+                      Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+                    }
+                  } else {
+                    IconButton(
+                      onClick = {},
+                      colors =
+                        IconButtonDefaults.iconButtonColors(
+                          contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    ) {
+                      Icon(painterResource(R.drawable.menu), contentDescription = "Menu")
+                    }
+                  }
+                },
+                trailingIcon = {
+                  Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                      onClick = {},
+                      colors =
+                        IconButtonDefaults.iconButtonColors(
+                          contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    ) {
+                      Icon(painterResource(R.drawable.mic), contentDescription = "Voice search")
+                    }
+                    Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                      Image(
+                        painter = painterResource(R.drawable.search_bar),
+                        contentDescription = null,
+                        modifier = Modifier.size(30.dp).clip(CircleShape),
+                        contentScale = ContentScale.Crop,
+                      )
+                    }
+                  }
+                },
+              )
+            }
+          SearchBar(
+            state = searchBarSearchState,
+            inputField = searchBarInput,
+            modifier = Modifier.fillMaxWidth(),
+            colors = searchBarSearchColors,
+          )
+          ExpandedFullScreenContainedSearchBar(
+            state = searchBarSearchState,
+            inputField = searchBarInput,
+            colors = searchBarSearchColors,
+          ) {
+            ListItem(modifier = Modifier.fillMaxWidth()) { Text("Mexican dishes") }
+            ListItem(modifier = Modifier.fillMaxWidth()) { Text("Quick dinners") }
+          }
+        }
+        Box {
+          val searchDockedQuery = rememberTextFieldState()
+          val searchDockedSearchColors = SearchBarDefaults.colors()
+          val searchDockedInput =
+            @Composable {
+              SearchBarDefaults.InputField(
+                textFieldState = searchDockedQuery,
+                searchBarState = searchDockedSearchState,
+                onSearch = {
+                  coroutineScope.launch { searchDockedSearchState.animateToCollapsed() }
+                },
+                colors = searchDockedSearchColors.inputFieldColors,
+                placeholder = { Text("Search your messages") },
+                leadingIcon = {
+                  if (searchDockedSearchState.currentValue == SearchBarValue.Expanded) {
+                    IconButton(
+                      onClick = {
+                        coroutineScope.launch { searchDockedSearchState.animateToCollapsed() }
+                      },
+                    ) {
+                      Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+                    }
+                  } else {
+                    Icon(painterResource(R.drawable.search), contentDescription = null)
+                  }
+                },
+                trailingIcon = {
+                  Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                      onClick = {},
+                      colors =
+                        IconButtonDefaults.iconButtonColors(
+                          contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    ) {
+                      Icon(
+                        painterResource(R.drawable.more_vert),
+                        contentDescription = "More options",
+                      )
+                    }
+                  }
+                },
+              )
+            }
+          SearchBar(
+            state = searchDockedSearchState,
+            inputField = searchDockedInput,
+            modifier = Modifier.fillMaxWidth(),
+            colors = searchDockedSearchColors,
+          )
+          ExpandedDockedSearchBarWithGap(
+            state = searchDockedSearchState,
+            inputField = searchDockedInput,
+          ) {
+            ListItem(modifier = Modifier.fillMaxWidth()) { Text("Recent: invoices") }
+          }
+        }
+        Button(onClick = { onNavigateToSearch() }) { Text("Search app bar") }
+      }
+      HorizontalFloatingToolbar(
+        expanded = true,
+        modifier =
+          Modifier.align(Alignment.BottomCenter).offset(y = -FloatingToolbarDefaults.ScreenOffset),
+      ) {
+        var tbDrawChecked by remember { mutableStateOf(true) }
+        ToggleButton(
+          checked = tbDrawChecked,
+          onCheckedChange = { tbDrawChecked = it },
+          shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight),
         ) {
-          var tbDrawChecked by remember { mutableStateOf(true) }
-          ToggleButton(
-            checked = tbDrawChecked,
-            onCheckedChange = { tbDrawChecked = it },
-            shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight),
-          ) {
-            Icon(
-              painterResource(R.drawable.draw),
-              contentDescription = null,
-              modifier = Modifier.size(ToggleButtonDefaults.IconSize),
-            )
-            Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
-            Text("Draw")
-          }
-          var tbEraseChecked by remember { mutableStateOf(false) }
-          ToggleButton(
-            checked = tbEraseChecked,
-            onCheckedChange = { tbEraseChecked = it },
-            shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight),
-          ) {
-            Icon(
-              painterResource(R.drawable.ink_eraser),
-              contentDescription = null,
-              modifier = Modifier.size(ToggleButtonDefaults.IconSize),
-            )
-            Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
-            Text("Erase")
-          }
-          var tbSelectChecked by remember { mutableStateOf(false) }
-          ToggleButton(
-            checked = tbSelectChecked,
-            onCheckedChange = { tbSelectChecked = it },
-            shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight),
-          ) {
-            Icon(
-              painterResource(R.drawable.select),
-              contentDescription = null,
-              modifier = Modifier.size(ToggleButtonDefaults.IconSize),
-            )
-            Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
-            Text("Select")
-          }
+          Icon(
+            painterResource(R.drawable.draw),
+            contentDescription = null,
+            modifier = Modifier.size(ToggleButtonDefaults.IconSize),
+          )
+          Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
+          Text("Draw")
+        }
+        var tbEraseChecked by remember { mutableStateOf(false) }
+        ToggleButton(
+          checked = tbEraseChecked,
+          onCheckedChange = { tbEraseChecked = it },
+          shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight),
+        ) {
+          Icon(
+            painterResource(R.drawable.ink_eraser),
+            contentDescription = null,
+            modifier = Modifier.size(ToggleButtonDefaults.IconSize),
+          )
+          Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
+          Text("Erase")
+        }
+        var tbSelectChecked by remember { mutableStateOf(false) }
+        ToggleButton(
+          checked = tbSelectChecked,
+          onCheckedChange = { tbSelectChecked = it },
+          shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight),
+        ) {
+          Icon(
+            painterResource(R.drawable.select),
+            contentDescription = null,
+            modifier = Modifier.size(ToggleButtonDefaults.IconSize),
+          )
+          Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
+          Text("Select")
         }
       }
     }
@@ -2551,10 +2275,6 @@ private fun InputsScreenPreview() {
 @Composable
 fun OverlaysScreen(
   modifier: Modifier = Modifier,
-  onNavigateToHome: () -> Unit = {},
-  onNavigateToActions: () -> Unit = {},
-  onNavigateToInputs: () -> Unit = {},
-  onNavigateToOverlays: () -> Unit = {},
   onNavigateToFabs: () -> Unit = {},
   onNavigateToCollections: () -> Unit = {},
   onNavigateToFeedback: () -> Unit = {},
@@ -2576,319 +2296,222 @@ fun OverlaysScreen(
     windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
   val atLeastExpanded =
     windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
-  Row(modifier = modifier) {
-    if (atLeastMedium && !atLeastExpanded) {
-      WideNavigationRail(state = rememberWideNavigationRailState()) {
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = false,
-          onClick = { onNavigateToHome() },
-          icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
-          label = { Text("Home") },
-        )
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = false,
-          onClick = { onNavigateToActions() },
-          icon = { Icon(painterResource(R.drawable.touch_app), contentDescription = null) },
-          label = { Text("Actions") },
-        )
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = false,
-          onClick = { onNavigateToInputs() },
-          icon = { Icon(painterResource(R.drawable.tune), contentDescription = null) },
-          label = { Text("Inputs") },
-        )
-        WideNavigationRailItem(
-          railExpanded = false,
-          selected = true,
-          onClick = { onNavigateToOverlays() },
-          icon = { Icon(painterResource(R.drawable.layers), contentDescription = null) },
-          label = { Text("Overlays") },
-        )
-      }
-    } else if (atLeastExpanded) {
-      WideNavigationRail(
-        state = rememberWideNavigationRailState(WideNavigationRailValue.Expanded),
-      ) {
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = false,
-          onClick = { onNavigateToHome() },
-          icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
-          label = { Text("Home") },
-        )
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = false,
-          onClick = { onNavigateToActions() },
-          icon = { Icon(painterResource(R.drawable.touch_app), contentDescription = null) },
-          label = { Text("Actions") },
-        )
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = false,
-          onClick = { onNavigateToInputs() },
-          icon = { Icon(painterResource(R.drawable.tune), contentDescription = null) },
-          label = { Text("Inputs") },
-        )
-        WideNavigationRailItem(
-          railExpanded = true,
-          selected = true,
-          onClick = { onNavigateToOverlays() },
-          icon = { Icon(painterResource(R.drawable.layers), contentDescription = null) },
-          label = { Text("Overlays") },
-        )
-      }
-    }
-    Scaffold(
-      modifier = Modifier.weight(1f),
-      topBar = {
-        TopAppBar(
-          title = { Text("Overlays") },
-          actions = {
-            Box {
-              IconButton(
-                onClick = { showMenu = true },
-                colors =
-                  IconButtonDefaults.iconButtonColors(
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                  ),
+  Scaffold(
+    modifier = modifier,
+    topBar = {
+      TopAppBar(
+        title = { Text("Overlays") },
+        actions = {
+          Box {
+            IconButton(
+              onClick = { showMenu = true },
+              colors =
+                IconButtonDefaults.iconButtonColors(
+                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+              Icon(painterResource(R.drawable.more_vert), contentDescription = "More options")
+            }
+            DropdownMenuPopup(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+              DropdownMenuGroup(
+                shapes = MenuDefaults.groupShape(0, 1),
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
               ) {
-                Icon(painterResource(R.drawable.more_vert), contentDescription = "More options")
-              }
-              DropdownMenuPopup(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                DropdownMenuGroup(
-                  shapes = MenuDefaults.groupShape(0, 1),
-                  containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                ) {
-                  DropdownMenuItem(
-                    text = { Text("Edit") },
-                    onClick = {
-                      showMenu = false
-                      showMenu = false
-                    },
-                    shape = MenuDefaults.itemShape(0, 3).shape,
-                  )
-                  DropdownMenuItem(
-                    text = { Text("Share") },
-                    onClick = {
-                      showMenu = false
-                      showMenu = false
-                    },
-                    shape = MenuDefaults.itemShape(1, 3).shape,
-                    leadingIcon = {
-                      Icon(painterResource(R.drawable.share), contentDescription = null)
-                    },
-                  )
-                  DropdownMenuItem(
-                    text = { Text("Delete") },
-                    onClick = {
-                      showMenu = false
-                      showMenu = false
-                    },
-                    shape = MenuDefaults.itemShape(2, 3).shape,
-                    leadingIcon = {
-                      Icon(painterResource(R.drawable.delete), contentDescription = null)
-                    },
-                  )
-                }
+                DropdownMenuItem(
+                  text = { Text("Edit") },
+                  onClick = {
+                    showMenu = false
+                    showMenu = false
+                  },
+                  shape = MenuDefaults.itemShape(0, 3).shape,
+                )
+                DropdownMenuItem(
+                  text = { Text("Share") },
+                  onClick = {
+                    showMenu = false
+                    showMenu = false
+                  },
+                  shape = MenuDefaults.itemShape(1, 3).shape,
+                  leadingIcon = {
+                    Icon(painterResource(R.drawable.share), contentDescription = null)
+                  },
+                )
+                DropdownMenuItem(
+                  text = { Text("Delete") },
+                  onClick = {
+                    showMenu = false
+                    showMenu = false
+                  },
+                  shape = MenuDefaults.itemShape(2, 3).shape,
+                  leadingIcon = {
+                    Icon(painterResource(R.drawable.delete), contentDescription = null)
+                  },
+                )
               }
             }
-          },
-        )
-      },
-      bottomBar = {
-        if (!atLeastMedium) {
-          ShortNavigationBar(arrangement = ShortNavigationBarArrangement.EqualWeight) {
-            ShortNavigationBarItem(
-              selected = false,
-              onClick = { onNavigateToHome() },
-              icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
-              label = { Text("Home") },
-            )
-            ShortNavigationBarItem(
-              selected = false,
-              onClick = { onNavigateToActions() },
-              icon = { Icon(painterResource(R.drawable.touch_app), contentDescription = null) },
-              label = { Text("Actions") },
-            )
-            ShortNavigationBarItem(
-              selected = false,
-              onClick = { onNavigateToInputs() },
-              icon = { Icon(painterResource(R.drawable.tune), contentDescription = null) },
-              label = { Text("Inputs") },
-            )
-            ShortNavigationBarItem(
-              selected = true,
-              onClick = { onNavigateToOverlays() },
-              icon = { Icon(painterResource(R.drawable.layers), contentDescription = null) },
-              label = { Text("Overlays") },
-            )
           }
-        }
-      },
-      floatingActionButton = {
-        var fabMenuExpanded by remember { mutableStateOf(false) }
-        FloatingActionButtonMenu(
-          expanded = fabMenuExpanded,
-          button = {
-            ToggleFloatingActionButton(
-              checked = fabMenuExpanded,
-              onCheckedChange = { fabMenuExpanded = it },
-            ) {
-              Icon(painterResource(R.drawable.add), contentDescription = null)
-            }
-          },
-        ) {
-          FloatingActionButtonMenuItem(
-            onClick = { showSheet = true },
-            text = { Text("Note") },
-            icon = { Icon(painterResource(R.drawable.note), contentDescription = null) },
-          )
-          FloatingActionButtonMenuItem(
-            onClick = {},
-            text = { Text("Photo") },
-            icon = { Icon(painterResource(R.drawable.photo_camera), contentDescription = null) },
-          )
-        }
-      },
-    ) { innerPadding ->
-      Column(
-        modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        },
+      )
+    },
+    floatingActionButton = {
+      var fabMenuExpanded by remember { mutableStateOf(false) }
+      FloatingActionButtonMenu(
+        expanded = fabMenuExpanded,
+        button = {
+          ToggleFloatingActionButton(
+            checked = fabMenuExpanded,
+            onCheckedChange = { fabMenuExpanded = it },
+          ) {
+            Icon(painterResource(R.drawable.add), contentDescription = null)
+          }
+        },
       ) {
-        FilledTonalButton(onClick = { showSheet = true }) { Text("Open bottom sheet") }
-        OutlinedButton(onClick = { showDialog = true }) { Text("Open dialog") }
-        TextButton(onClick = { onNavigateToFabs() }) { Text("All floating action buttons") }
-        TextButton(onClick = { onNavigateToCollections() }) { Text("Tabs and carousels") }
-        TextButton(onClick = { onNavigateToFeedback() }) { Text("Side sheet, snackbar, badges") }
-        Box {
-          IconButton(
-            onClick = { showMenuVibrant = true },
-            colors =
-              IconButtonDefaults.iconButtonColors(
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-              ),
+        FloatingActionButtonMenuItem(
+          onClick = { showSheet = true },
+          text = { Text("Note") },
+          icon = { Icon(painterResource(R.drawable.note), contentDescription = null) },
+        )
+        FloatingActionButtonMenuItem(
+          onClick = {},
+          text = { Text("Photo") },
+          icon = { Icon(painterResource(R.drawable.photo_camera), contentDescription = null) },
+        )
+      }
+    },
+  ) { innerPadding ->
+    Column(
+      modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+      FilledTonalButton(onClick = { showSheet = true }) { Text("Open bottom sheet") }
+      OutlinedButton(onClick = { showDialog = true }) { Text("Open dialog") }
+      TextButton(onClick = { onNavigateToFabs() }) { Text("All floating action buttons") }
+      TextButton(onClick = { onNavigateToCollections() }) { Text("Tabs and carousels") }
+      TextButton(onClick = { onNavigateToFeedback() }) { Text("Side sheet, snackbar, badges") }
+      Box {
+        IconButton(
+          onClick = { showMenuVibrant = true },
+          colors =
+            IconButtonDefaults.iconButtonColors(
+              contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        ) {
+          Icon(painterResource(R.drawable.sort), contentDescription = "Sort and filter")
+        }
+        var menuGroupSortSelected by remember { mutableStateOf("menu_sort_newest") }
+        var menuUnreadChecked by remember { mutableStateOf(true) }
+        var menuStarredChecked by remember { mutableStateOf(false) }
+        DropdownMenuPopup(
+          expanded = showMenuVibrant,
+          onDismissRequest = { showMenuVibrant = false },
+        ) {
+          DropdownMenuGroup(
+            shapes = MenuDefaults.groupShape(0, 3),
+            containerColor = MenuDefaults.groupVibrantContainerColor,
           ) {
-            Icon(painterResource(R.drawable.sort), contentDescription = "Sort and filter")
+            SelectableDropdownMenuItem(
+              selected = menuGroupSortSelected == "menu_sort_newest",
+              onClick = {
+                menuGroupSortSelected = "menu_sort_newest"
+                showMenuVibrant = false
+                showMenuVibrant = false
+              },
+              text = { Text("Newest") },
+              shapes = MenuDefaults.itemShape(0, 2),
+              colors = MenuDefaults.selectableItemVibrantColors(),
+            )
+            SelectableDropdownMenuItem(
+              selected = menuGroupSortSelected == "menu_sort_oldest",
+              onClick = {
+                menuGroupSortSelected = "menu_sort_oldest"
+                showMenuVibrant = false
+              },
+              text = { Text("Oldest") },
+              shapes = MenuDefaults.itemShape(1, 2),
+              colors = MenuDefaults.selectableItemVibrantColors(),
+            )
           }
-          var menuGroupSortSelected by remember { mutableStateOf("menu_sort_newest") }
-          var menuUnreadChecked by remember { mutableStateOf(true) }
-          var menuStarredChecked by remember { mutableStateOf(false) }
-          DropdownMenuPopup(
-            expanded = showMenuVibrant,
-            onDismissRequest = { showMenuVibrant = false },
+          Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+          DropdownMenuGroup(
+            shapes = MenuDefaults.groupShape(1, 3),
+            containerColor = MenuDefaults.groupVibrantContainerColor,
           ) {
-            DropdownMenuGroup(
-              shapes = MenuDefaults.groupShape(0, 3),
-              containerColor = MenuDefaults.groupVibrantContainerColor,
-            ) {
-              SelectableDropdownMenuItem(
-                selected = menuGroupSortSelected == "menu_sort_newest",
-                onClick = {
-                  menuGroupSortSelected = "menu_sort_newest"
-                  showMenuVibrant = false
-                  showMenuVibrant = false
-                },
-                text = { Text("Newest") },
-                shapes = MenuDefaults.itemShape(0, 2),
-                colors = MenuDefaults.selectableItemVibrantColors(),
-              )
-              SelectableDropdownMenuItem(
-                selected = menuGroupSortSelected == "menu_sort_oldest",
-                onClick = {
-                  menuGroupSortSelected = "menu_sort_oldest"
-                  showMenuVibrant = false
-                },
-                text = { Text("Oldest") },
-                shapes = MenuDefaults.itemShape(1, 2),
-                colors = MenuDefaults.selectableItemVibrantColors(),
-              )
-            }
-            Spacer(Modifier.height(MenuDefaults.GroupSpacing))
-            DropdownMenuGroup(
-              shapes = MenuDefaults.groupShape(1, 3),
-              containerColor = MenuDefaults.groupVibrantContainerColor,
-            ) {
-              CheckableDropdownMenuItem(
-                checked = menuUnreadChecked,
-                onCheckedChange = { menuUnreadChecked = it },
-                text = { Text("Unread") },
-                shapes = MenuDefaults.itemShape(0, 2),
-                colors = MenuDefaults.selectableItemVibrantColors(),
-              )
-              CheckableDropdownMenuItem(
-                checked = menuStarredChecked,
-                onCheckedChange = { menuStarredChecked = it },
-                text = { Text("Starred") },
-                shapes = MenuDefaults.itemShape(1, 2),
-                colors = MenuDefaults.selectableItemVibrantColors(),
-              )
-            }
-            Spacer(Modifier.height(MenuDefaults.GroupSpacing))
-            DropdownMenuGroup(
-              shapes = MenuDefaults.groupShape(2, 3),
-              containerColor = MenuDefaults.groupVibrantContainerColor,
-            ) {
-              DropdownMenuItem(
-                text = { Text("Settings") },
-                onClick = {
-                  showMenuVibrant = false
-                  showMenuVibrant = false
-                },
-                shape = MenuDefaults.itemShape(0, 1).shape,
-                leadingIcon = {
-                  Icon(painterResource(R.drawable.settings), contentDescription = null)
-                },
-                colors = MenuDefaults.itemVibrantColors(),
-              )
-            }
+            CheckableDropdownMenuItem(
+              checked = menuUnreadChecked,
+              onCheckedChange = { menuUnreadChecked = it },
+              text = { Text("Unread") },
+              shapes = MenuDefaults.itemShape(0, 2),
+              colors = MenuDefaults.selectableItemVibrantColors(),
+            )
+            CheckableDropdownMenuItem(
+              checked = menuStarredChecked,
+              onCheckedChange = { menuStarredChecked = it },
+              text = { Text("Starred") },
+              shapes = MenuDefaults.itemShape(1, 2),
+              colors = MenuDefaults.selectableItemVibrantColors(),
+            )
+          }
+          Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+          DropdownMenuGroup(
+            shapes = MenuDefaults.groupShape(2, 3),
+            containerColor = MenuDefaults.groupVibrantContainerColor,
+          ) {
+            DropdownMenuItem(
+              text = { Text("Settings") },
+              onClick = {
+                showMenuVibrant = false
+                showMenuVibrant = false
+              },
+              shape = MenuDefaults.itemShape(0, 1).shape,
+              leadingIcon = {
+                Icon(painterResource(R.drawable.settings), contentDescription = null)
+              },
+              colors = MenuDefaults.itemVibrantColors(),
+            )
           }
         }
-        Box {
-          var dateFieldValue by remember { mutableStateOf("Nov 6, 2026") }
-          OutlinedTextField(
-            value = dateFieldValue,
-            onValueChange = { dateFieldValue = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Date") },
-            trailingIcon = {
-              Icon(painterResource(R.drawable.calendar_today), contentDescription = null)
-            },
-            singleLine = true,
-          )
-          val dateDockedDatePickerState =
-            rememberDatePickerState(initialSelectedDateMillis = 1793923200000L)
-          if (showDateDocked) {
-            Box(modifier = Modifier.align(Alignment.BottomStart)) {
-              Popup(alignment = Alignment.TopStart, onDismissRequest = { showDateDocked = false }) {
-                Surface(
-                  modifier = Modifier.width(360.dp),
-                  shape = DatePickerDefaults.shape,
-                  color = DatePickerDefaults.colors().containerColor,
-                ) {
-                  DatePicker(
-                    state = dateDockedDatePickerState,
-                    title = null,
-                    headline = null,
-                    showModeToggle = false,
-                  )
-                }
+      }
+      Box {
+        var dateFieldValue by remember { mutableStateOf("Nov 6, 2026") }
+        OutlinedTextField(
+          value = dateFieldValue,
+          onValueChange = { dateFieldValue = it },
+          modifier = Modifier.fillMaxWidth(),
+          label = { Text("Date") },
+          trailingIcon = {
+            Icon(painterResource(R.drawable.calendar_today), contentDescription = null)
+          },
+          singleLine = true,
+        )
+        val dateDockedDatePickerState =
+          rememberDatePickerState(initialSelectedDateMillis = 1793923200000L)
+        if (showDateDocked) {
+          Box(modifier = Modifier.align(Alignment.BottomStart)) {
+            Popup(alignment = Alignment.TopStart, onDismissRequest = { showDateDocked = false }) {
+              Surface(
+                modifier = Modifier.width(360.dp),
+                shape = DatePickerDefaults.shape,
+                color = DatePickerDefaults.colors().containerColor,
+              ) {
+                DatePicker(
+                  state = dateDockedDatePickerState,
+                  title = null,
+                  headline = null,
+                  showModeToggle = false,
+                )
               }
             }
           }
         }
-        OutlinedButton(onClick = { showDateDocked = true }) { Text("Docked date") }
-        OutlinedButton(onClick = { showDateModal = true }) { Text("Modal date") }
-        OutlinedButton(onClick = { showDateInput = true }) { Text("Date input") }
-        OutlinedButton(onClick = { showDateRange = true }) { Text("Date range") }
-        OutlinedButton(onClick = { showDateFull = true }) { Text("Full-screen date") }
-        OutlinedButton(onClick = { showTimeDial = true }) { Text("Time dial") }
-        OutlinedButton(onClick = { showTimeInput = true }) { Text("Time input") }
-        OutlinedButton(onClick = { showDialogFull = true }) { Text("Full-screen dialog") }
       }
+      OutlinedButton(onClick = { showDateDocked = true }) { Text("Docked date") }
+      OutlinedButton(onClick = { showDateModal = true }) { Text("Modal date") }
+      OutlinedButton(onClick = { showDateInput = true }) { Text("Date input") }
+      OutlinedButton(onClick = { showDateRange = true }) { Text("Date range") }
+      OutlinedButton(onClick = { showDateFull = true }) { Text("Full-screen date") }
+      OutlinedButton(onClick = { showTimeDial = true }) { Text("Time dial") }
+      OutlinedButton(onClick = { showTimeInput = true }) { Text("Time input") }
+      OutlinedButton(onClick = { showDialogFull = true }) { Text("Full-screen dialog") }
     }
   }
   if (showSheet) {
@@ -3573,142 +3196,83 @@ fun FeedbackScreen(modifier: Modifier = Modifier, onBack: () -> Unit = {}) {
   var showDeleted by remember { mutableStateOf(false) }
   var showRestored by remember { mutableStateOf(false) }
   val snackbarHostState = remember { SnackbarHostState() }
-  val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
-  val atLeastMedium =
-    windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
-  val atLeastExpanded =
-    windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
-  Row(modifier = modifier) {
-    if (atLeastMedium) {
-      WideNavigationRail(state = rememberWideNavigationRailState()) {
-        WideNavigationRailItem(
-          railExpanded = false,
+  Scaffold(
+    modifier = modifier,
+    topBar = {
+      TopAppBar(
+        title = { Text("Side sheet, snackbar, badges") },
+        navigationIcon = {
+          IconButton(
+            onClick = { onBack() },
+            colors =
+              IconButtonDefaults.iconButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+              ),
+          ) {
+            Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
+          }
+        },
+        actions = {
+          IconButton(
+            onClick = {},
+            colors =
+              IconButtonDefaults.iconButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+              ),
+          ) {
+            BadgedBox(badge = { Badge() }) {
+              Icon(painterResource(R.drawable.notifications), contentDescription = "Alerts")
+            }
+          }
+          IconButton(
+            onClick = {},
+            colors =
+              IconButtonDefaults.iconButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+              ),
+          ) {
+            BadgedBox(badge = { Badge { Text("99+") } }) {
+              Icon(painterResource(R.drawable.mail), contentDescription = "Mail")
+            }
+          }
+        },
+      )
+    },
+    snackbarHost = { SnackbarHost(snackbarHostState) },
+    floatingActionButton = {
+      FloatingActionButton(
+        onClick = {},
+        modifier = Modifier.semantics { contentDescription = "New plate" },
+      ) {
+        Icon(painterResource(R.drawable.add), contentDescription = "New plate")
+      }
+    },
+  ) { innerPadding ->
+    Column(
+      modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+      PrimaryTabRow(selectedTabIndex = 0, modifier = Modifier.fillMaxWidth()) {
+        Tab(
           selected = true,
           onClick = {},
-          icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
-          label = { Text("Home") },
+          text = { Text("All") },
+          icon = {
+            BadgedBox(badge = { Badge { Text("3") } }) {
+              Icon(painterResource(R.drawable.inbox), contentDescription = null)
+            }
+          },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        WideNavigationRailItem(
-          railExpanded = false,
+        Tab(
           selected = false,
           onClick = {},
-          icon = {
-            BadgedBox(badge = { Badge { Text("9+") } }) {
-              Icon(painterResource(R.drawable.chat), contentDescription = null)
-            }
-          },
-          label = { Text("Chat") },
+          text = { BadgedBox(badge = { Badge() }) { Text("Unread") } },
+          unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
-    }
-    Scaffold(
-      modifier = Modifier.weight(1f),
-      topBar = {
-        TopAppBar(
-          title = { Text("Side sheet, snackbar, badges") },
-          navigationIcon = {
-            IconButton(
-              onClick = { onBack() },
-              colors =
-                IconButtonDefaults.iconButtonColors(
-                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            ) {
-              Icon(painterResource(R.drawable.arrow_back), contentDescription = "Back")
-            }
-          },
-          actions = {
-            IconButton(
-              onClick = {},
-              colors =
-                IconButtonDefaults.iconButtonColors(
-                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            ) {
-              BadgedBox(badge = { Badge() }) {
-                Icon(painterResource(R.drawable.notifications), contentDescription = "Alerts")
-              }
-            }
-            IconButton(
-              onClick = {},
-              colors =
-                IconButtonDefaults.iconButtonColors(
-                  contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            ) {
-              BadgedBox(badge = { Badge { Text("99+") } }) {
-                Icon(painterResource(R.drawable.mail), contentDescription = "Mail")
-              }
-            }
-          },
-        )
-      },
-      bottomBar = {
-        ShortNavigationBar(arrangement = ShortNavigationBarArrangement.EqualWeight) {
-          ShortNavigationBarItem(
-            selected = true,
-            onClick = {},
-            icon = { Icon(painterResource(R.drawable.home), contentDescription = null) },
-            label = { Text("Home") },
-          )
-          ShortNavigationBarItem(
-            selected = false,
-            onClick = {},
-            icon = {
-              BadgedBox(badge = { Badge { Text("12") } }) {
-                Icon(painterResource(R.drawable.chat), contentDescription = null)
-              }
-            },
-            label = { Text("Chat") },
-          )
-          ShortNavigationBarItem(
-            selected = false,
-            onClick = {},
-            icon = {
-              BadgedBox(badge = { Badge() }) {
-                Icon(painterResource(R.drawable.favorite), contentDescription = null)
-              }
-            },
-            label = { Text("Saved") },
-          )
-        }
-      },
-      snackbarHost = { SnackbarHost(snackbarHostState) },
-      floatingActionButton = {
-        FloatingActionButton(
-          onClick = {},
-          modifier = Modifier.semantics { contentDescription = "New plate" },
-        ) {
-          Icon(painterResource(R.drawable.add), contentDescription = "New plate")
-        }
-      },
-    ) { innerPadding ->
-      Column(
-        modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-      ) {
-        PrimaryTabRow(selectedTabIndex = 0, modifier = Modifier.fillMaxWidth()) {
-          Tab(
-            selected = true,
-            onClick = {},
-            text = { Text("All") },
-            icon = {
-              BadgedBox(badge = { Badge { Text("3") } }) {
-                Icon(painterResource(R.drawable.inbox), contentDescription = null)
-              }
-            },
-            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-          Tab(
-            selected = false,
-            onClick = {},
-            text = { BadgedBox(badge = { Badge() }) { Text("Unread") } },
-            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
-        Button(onClick = { showFilters = true }) { Text("Open side sheet") }
-        FilledTonalButton(onClick = { showDeleted = true }) { Text("Delete plate") }
-      }
+      Button(onClick = { showFilters = true }) { Text("Open side sheet") }
+      FilledTonalButton(onClick = { showDeleted = true }) { Text("Delete plate") }
     }
   }
   if (showFilters) {

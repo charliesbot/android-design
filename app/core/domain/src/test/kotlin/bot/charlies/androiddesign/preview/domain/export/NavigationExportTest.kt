@@ -6,6 +6,7 @@ import bot.charlies.androiddesign.preview.domain.export.ExportFixtures.has
 import bot.charlies.androiddesign.preview.domain.export.ExportFixtures.lacks
 import bot.charlies.androiddesign.preview.model.Proposal
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -130,4 +131,138 @@ class NavigationExportTest {
       }
     assertTrue(error.message!!.contains("plates"), error.message)
   }
+
+  // region navigation.destinations
+
+  private val extraScreen =
+    """{"id":"root","component":"Scaffold","content":"t"},{"id":"t","component":"Text","text":"x"}"""
+
+  private fun withDestinations(
+    destinations: String =
+      """[{"screen":"plates","label":"Plates","icon":"restaurant"},""" +
+        """{"screen":"saved","label":"Saved","icon":"favorite"},""" +
+        """{"screen":"profile","label":"Profile","icon":"person"}]""",
+    panes: String = """{"plates":"list","plate_detail":"detail"}""",
+    extra: String = "",
+  ) =
+    TestProposal.valid()
+      .withScreen("saved", extraScreen)
+      .withScreen("profile", extraScreen)
+      .withNavigation(
+        """{"start":"plates","panes":$panes,"destinations":$destinations$extra}""",
+      )
+      .build()
+
+  @Test
+  fun `destinations wrap the NavDisplay in one NavigationSuiteScaffold`() {
+    val source = export(withDestinations())
+    has(source, "NavigationSuiteScaffold( navigationItems = {")
+    has(source, "navigationSuiteType = navigationSuiteType, ) { NavDisplay(")
+    assertEquals(1, Regex("NavigationSuiteScaffold\\(").findAll(source).count())
+    assertEquals(1, Regex("NavDisplay\\(").findAll(source).count())
+    has(source, "val navigationSuiteType = navigationSuiteTypeFor(showNavigation,")
+    has(
+      source,
+      "import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold",
+    )
+  }
+
+  @Test
+  fun `each destination is one item that selects, taps and draws as the previewer does`() {
+    val source = export(withDestinations())
+    has(source, "val destinations = listOf<NavKey>(PlatesRoute, SavedRoute, ProfileRoute)")
+    has(source, "val selectedRoute = backStack.lastOrNull { it in destinations }")
+    has(
+      source,
+      "NavigationSuiteItem( selected = selectedRoute == SavedRoute, " +
+        "onClick = { backStack.clear() backStack.add(SavedRoute) }, " +
+        "icon = { Icon(painterResource(R.drawable.favorite), contentDescription = null) }, " +
+        "label = { Text(\"Saved\") }, navigationSuiteType = navigationSuiteType, )",
+    )
+    lacks(source, "ShortNavigationBar(")
+    lacks(source, "WideNavigationRail(")
+  }
+
+  @Test
+  fun `the suite type is a compact bar, a collapsed rail from medium and none when hidden`() {
+    val source = export(withDestinations())
+    has(
+      source,
+      "private fun navigationSuiteTypeFor( showNavigation: Boolean, windowSizeClass: WindowSizeClass, )",
+    )
+    has(source, "!showNavigation -> NavigationSuiteType.None")
+    has(source, "WIDTH_DP_MEDIUM_LOWER_BOUND) -> NavigationSuiteType.ShortNavigationBarCompact")
+    has(source, "else -> NavigationSuiteType.WideNavigationRailCollapsed")
+    lacks(source, "WideNavigationRailExpanded")
+  }
+
+  @Test
+  fun `railExpanded adds the expanded rail from the expanded width`() {
+    val source = export(withDestinations(extra = ""","railExpanded":true"""))
+    has(
+      source,
+      "WIDTH_DP_EXPANDED_LOWER_BOUND) -> NavigationSuiteType.WideNavigationRailExpanded",
+    )
+  }
+
+  @Test
+  fun `the navigation shows on a destination and beside one where two panes fit`() {
+    val source = export(withDestinations())
+    has(source, "val paneRoutes = listOf<NavKey>(PlatesRoute, PlateDetailRoute)")
+    has(
+      source,
+      "calculatePaneScaffoldDirective(currentWindowAdaptiveInfoV2()).maxHorizontalPartitions >= 2",
+    )
+    has(
+      source,
+      "val showNavigation = topRoute in destinations || " +
+        "(topRoute in paneRoutes && twoPanes && selectedRoute in paneRoutes)",
+    )
+  }
+
+  @Test
+  fun `without pane roles the navigation shows on a destination only`() {
+    val source = export(withDestinations(panes = "{}"))
+    has(source, "val showNavigation = topRoute in destinations")
+    lacks(source, "paneRoutes")
+    lacks(source, "calculatePaneScaffoldDirective")
+  }
+
+  @Test
+  fun `a selected icon and a badge reach the item`() {
+    val source =
+      export(
+        withDestinations(
+          """[{"screen":"plates","label":"Plates","icon":"restaurant","selectedIcon":"restaurant_menu","badge":3},""" +
+            """{"screen":"saved","label":"Saved","icon":"favorite","badge":true},""" +
+            """{"screen":"profile","label":"Profile","icon":"person","badge":"99+"}]""",
+        ),
+      )
+    has(
+      source,
+      "painterResource(if (selectedRoute == PlatesRoute) R.drawable.restaurant_menu else R.drawable.restaurant)",
+    )
+    has(source, "badge = { Badge { Text(\"3\") } }")
+    has(source, "badge = { Badge() }")
+    has(source, "badge = { Badge { Text(\"99+\") } }")
+  }
+
+  @Test
+  fun `a proposal without destinations exports no navigation suite`() {
+    val source = export(TestProposal.valid().build())
+    lacks(source, "NavigationSuite")
+    lacks(source, "navigationSuiteTypeFor")
+    lacks(source, "selectedRoute")
+    has(source, "NavDisplay(")
+  }
+
+  @Test
+  fun `screens draw no bar or rail of their own`() {
+    val source = export(withDestinations())
+    lacks(source, "bottomBar")
+    lacks(source, "WideNavigationRailItem")
+    lacks(source, "ShortNavigationBarItem")
+  }
+
+  // endregion
 }

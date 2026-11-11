@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
+import bot.charlies.androiddesign.preview.domain.navigation.AppNavigation
 import bot.charlies.androiddesign.preview.domain.navigation.NavigationGraph
 import bot.charlies.androiddesign.preview.feature.preview.record.TreeRecorder
 import bot.charlies.androiddesign.preview.feature.preview.theme.PreviewTheme
@@ -150,6 +151,14 @@ class ProposalHostState(proposal: Proposal, proposalDir: Path? = null, screen: S
     backStack.add(screen)
   }
 
+  /** A tap on a destination of the app-level navigation: that screen is the whole back stack. */
+  fun openDestination(screen: String) {
+    if (screen !in proposal.screens) return
+    val stack = AppNavigation.stackAfterTap(screen)
+    backStack.clear()
+    backStack.addAll(stack)
+  }
+
   fun back() {
     if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
   }
@@ -267,7 +276,6 @@ internal data class ChildHost(
   val groupCount: Int = 1,
   val connected: Boolean = false,
   val segmented: Boolean = false,
-  val railExpanded: Boolean = false,
   /** The parent is a toolbar, whose content color its icon buttons take. */
   val toolbar: Boolean = false,
   /** The parent is, or sits in, a vibrant `Menu`. */

@@ -7,9 +7,9 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * The tree's bounds come from semantics, which clip to the window, so a row laid out wider than the
- * window looks like it fits. The overflow finding reads the layout box the recorder keeps beside
- * them.
+ * The tree's bounds come from semantics, which clip to the window, so icons laid out past the end
+ * of their row look like they fit. The overflow finding reads the layout box the recorder keeps
+ * beside them.
  */
 class OverflowFindingTest {
   private fun icons(count: Int) = (1..count).joinToString(",") { "\"i$it\"" }
@@ -24,12 +24,16 @@ class OverflowFindingTest {
       """{"id":"r","component":"$parent","children":[${icons(count)}]},""" +
       iconDefs(count)
 
+  /**
+   * A grid column holds its row to the window (its track has a zero minimum), so the icons that do
+   * not fit run past the row; the first of them is the one reported.
+   */
   @Test
-  fun `a row laid out wider than the window is reported with its overflow`() {
+  fun `icons laid out wider than their row are reported with their overflow`() {
     val tree = render(singleScreen(gridOfRow("Row", 10))).tree
-    val finding = tree.findings.single { it.rule == FindingRule.Overflow && it.id == "r" }
-    assertTrue(finding.detail.orEmpty().contains("dp"), finding.detail)
-    assertNotNull(tree.node("r").layout, "the unclipped layout box is recorded")
+    val finding = tree.findings.single { it.rule == FindingRule.Overflow && it.id == "i9" }
+    assertTrue(finding.detail.orEmpty().contains("dp past r"), finding.detail)
+    assertNotNull(tree.node("i9").layout, "the unclipped layout box is recorded")
   }
 
   @Test

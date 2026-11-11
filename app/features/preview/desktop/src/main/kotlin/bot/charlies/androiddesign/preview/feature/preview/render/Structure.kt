@@ -3,9 +3,7 @@ package bot.charlies.androiddesign.preview.feature.preview.render
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -27,18 +25,11 @@ import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.SecondaryTabRow
-import androidx.compose.material3.ShortNavigationBar
-import androidx.compose.material3.ShortNavigationBarArrangement
-import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.VerticalFloatingToolbar
-import androidx.compose.material3.WideNavigationRail
-import androidx.compose.material3.WideNavigationRailItem
-import androidx.compose.material3.WideNavigationRailValue
-import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -64,7 +55,6 @@ internal fun NodeContext.scaffoldLook() = Look(ScaffoldAmbient)
 @Composable
 internal fun RenderScaffold(ctx: NodeContext) {
   val env = ctx.env
-  val rail = ctx.props.childId("navigationRail")
   val topBar = ctx.props.childId("topBar")?.let(env.nodes::get)
   // Like the export, a medium or large bar collapses as the content scrolls. At rest it is
   // expanded.
@@ -73,11 +63,12 @@ internal fun RenderScaffold(ctx: NodeContext) {
       CollapsingAppBars.collapsesAt(topBar, env.sizeClass, effectiveProps(topBar, env))
   val scrollBehavior =
     if (collapsing) TopAppBarDefaults.exitUntilCollapsedScrollBehavior() else null
-  val scaffold: @Composable (Modifier) -> Unit = { modifier ->
+  CompositionLocalProvider(LocalAmbient provides ScaffoldAmbient) {
+    val frame = ctx.modifier().fillMaxSize()
     Scaffold(
       modifier =
-        if (scrollBehavior != null) modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
-        else modifier,
+        if (scrollBehavior != null) frame.nestedScroll(scrollBehavior.nestedScrollConnection)
+        else frame,
       topBar = {
         CompositionLocalProvider(LocalTopBarScroll provides scrollBehavior) {
           ctx.Child("topBar", 1, ChildHost.Wrap)
@@ -92,17 +83,6 @@ internal fun RenderScaffold(ctx: NodeContext) {
       contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
       Box(Modifier.padding(padding).fillMaxSize()) { ctx.Child("content", 2, ChildHost.Fill) }
-    }
-  }
-  CompositionLocalProvider(LocalAmbient provides ScaffoldAmbient) {
-    val frame = ctx.modifier().fillMaxSize()
-    if (rail == null) {
-      scaffold(frame)
-    } else {
-      Row(frame) {
-        ctx.Child("navigationRail", 0, ChildHost.Wrap)
-        scaffold(Modifier.weight(1f).fillMaxHeight())
-      }
     }
   }
 }
@@ -185,49 +165,6 @@ internal fun RenderTopAppBar(ctx: NodeContext) {
         )
       }
   }
-}
-
-private val NavigationBarAmbient = Ambient(ColorRole.SurfaceContainer, ColorRole.OnSurfaceVariant)
-
-internal fun NodeContext.navigationBarLook() = Look(NavigationBarAmbient)
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-internal fun RenderNavigationBar(ctx: NodeContext) {
-  CompositionLocalProvider(LocalAmbient provides NavigationBarAmbient) {
-    // The bar fills its parent by itself; a size modifier on it breaks EqualWeight.
-    ShortNavigationBar(
-      modifier = ctx.modifier(),
-      arrangement = ShortNavigationBarArrangement.EqualWeight,
-    ) {
-      ctx.Children(
-        "children",
-        0,
-        ChildHost(fillWidth = ctx.def.stretchesChildren, groupKey = ctx.id),
-      )
-    }
-  }
-}
-
-internal fun NodeContext.navigationBarItemLook() =
-  Look(
-    NavigationBarAmbient,
-    TypeRole.LabelMedium,
-    text = string("label"),
-    a11yRole = "Tab",
-  )
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-internal fun RenderNavigationBarItem(ctx: NodeContext) {
-  val selected = ctx.rememberSelection()
-  ShortNavigationBarItem(
-    selected = selected,
-    onClick = { ctx.select() },
-    icon = { ctx.WithBadge { IconSlot(selectedIcon(ctx, selected), filled = selected) } },
-    label = { ctx.PartText(ctx.string("label").orEmpty(), maxLines = 1) },
-    modifier = ctx.modifier(),
-  )
 }
 
 private val TabsAmbient = Ambient(ColorRole.Surface, ColorRole.OnSurface)
@@ -316,58 +253,6 @@ internal fun RenderTab(ctx: NodeContext) {
     unselectedContentColor = ctx.env.color(ColorRole.OnSurfaceVariant),
   )
 }
-
-private val NavigationRailAmbient = Ambient(ColorRole.Surface, ColorRole.OnSurfaceVariant)
-
-internal fun NodeContext.navigationRailLook() = Look(NavigationRailAmbient)
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-internal fun RenderNavigationRail(ctx: NodeContext) {
-  val state =
-    rememberWideNavigationRailState(
-      if (ctx.bool("expanded")) WideNavigationRailValue.Expanded
-      else WideNavigationRailValue.Collapsed,
-    )
-  CompositionLocalProvider(LocalAmbient provides NavigationRailAmbient) {
-    WideNavigationRail(modifier = ctx.modifier(), state = state) {
-      ctx.Children(
-        "children",
-        0,
-        ChildHost(
-          fillWidth = ctx.def.stretchesChildren,
-          groupKey = ctx.id,
-          railExpanded = ctx.bool("expanded"),
-        ),
-      )
-    }
-  }
-}
-
-internal fun NodeContext.navigationRailItemLook() =
-  Look(
-    NavigationRailAmbient,
-    TypeRole.LabelMedium,
-    text = string("label"),
-    a11yRole = "Tab",
-  )
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-internal fun RenderNavigationRailItem(ctx: NodeContext) {
-  val selected = ctx.rememberSelection()
-  WideNavigationRailItem(
-    selected = selected,
-    onClick = { ctx.select() },
-    icon = { ctx.WithBadge { IconSlot(selectedIcon(ctx, selected), filled = selected) } },
-    label = { ctx.PartText(ctx.string("label").orEmpty(), maxLines = 1) },
-    railExpanded = ctx.host.railExpanded,
-    modifier = ctx.modifier(),
-  )
-}
-
-private fun selectedIcon(ctx: NodeContext, selected: Boolean): String? =
-  if (selected) ctx.string("selectedIcon") ?: ctx.string("icon") else ctx.string("icon")
 
 private val NodeContext.vibrant: Boolean
   get() = enum("colors") == ColorStyle.VIBRANT

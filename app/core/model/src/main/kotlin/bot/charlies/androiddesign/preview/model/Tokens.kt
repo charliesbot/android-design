@@ -79,17 +79,36 @@ enum class TypeGroup {
 }
 
 /**
- * The typefaces the app bundles, in schema order. [family] is the name a DESIGN.md uses and
- * [groups] the type groups the face may set: Google Sans Flex and Google Sans Code serve every
- * role, brand faces take display and headline, and Doto is for display sizes only.
+ * The typefaces the app bundles, in schema order. [family] is the name a DESIGN.md uses, [groups]
+ * the type groups the face may set and [roles] the single roles it may set beyond them. Google Sans
+ * Flex and Google Sans Code serve every role, brand faces take display, headline and the large
+ * title roles (a small top app bar or side sheet title draws in title large), and Doto is for
+ * display sizes only. [scope] names what the face may set, for messages.
  */
-enum class BundledFont(val family: String, val groups: Set<TypeGroup>) {
-  GoogleSansFlex("Google Sans Flex", TypeGroup.entries.toSet()),
-  GoogleSansCode("Google Sans Code", TypeGroup.entries.toSet()),
-  Fraunces("Fraunces", setOf(TypeGroup.Display, TypeGroup.Headline)),
-  BricolageGrotesque("Bricolage Grotesque", setOf(TypeGroup.Display, TypeGroup.Headline)),
-  BigShouldersDisplay("Big Shoulders Display", setOf(TypeGroup.Display, TypeGroup.Headline)),
-  Doto("Doto", setOf(TypeGroup.Display));
+enum class BundledFont(
+  val family: String,
+  private val groups: Set<TypeGroup>,
+  private val roles: Set<TypeRole>,
+  val scope: String,
+) {
+  GoogleSansFlex("Google Sans Flex", TypeGroup.entries.toSet(), emptySet(), "any"),
+  GoogleSansCode("Google Sans Code", TypeGroup.entries.toSet(), emptySet(), "any"),
+  Fraunces("Fraunces", BRAND_GROUPS, BRAND_ROLES, BRAND_SCOPE),
+  BricolageGrotesque("Bricolage Grotesque", BRAND_GROUPS, BRAND_ROLES, BRAND_SCOPE),
+  BigShouldersDisplay("Big Shoulders Display", BRAND_GROUPS, BRAND_ROLES, BRAND_SCOPE),
+  Doto("Doto", setOf(TypeGroup.Display), emptySet(), "display");
+
+  /** Whether the face may set text that has no type role, which only a face for every role may. */
+  val setsAnyText: Boolean
+    get() = groups.size == TypeGroup.entries.size
+
+  /**
+   * Whether the face may set a role of [group]. [role] is the Material role itself when the
+   * catalog's roles are `TypeRole`s, which lets a face take a role its group does not; it is null
+   * for a role only another catalog has.
+   */
+  fun allows(group: TypeGroup, role: TypeRole? = null): Boolean =
+    group in groups || (role != null && role in roles)
 
   companion object {
     /** The face named [family], matching the exact case unless [ignoreCase]. */
@@ -98,6 +117,10 @@ enum class BundledFont(val family: String, val groups: Set<TypeGroup>) {
     }
   }
 }
+
+private val BRAND_GROUPS = setOf(TypeGroup.Display, TypeGroup.Headline)
+private val BRAND_ROLES = setOf(TypeRole.TitleLarge, TypeRole.TitleLargeEmphasized)
+private const val BRAND_SCOPE = "display, headline and large title"
 
 /** `androidx.compose.material3.Typography` roles, including the Emphasized set. */
 enum class TypeRole(val group: TypeGroup) {

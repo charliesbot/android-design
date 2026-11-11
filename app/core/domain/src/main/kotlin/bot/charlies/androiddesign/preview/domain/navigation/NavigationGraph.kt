@@ -19,7 +19,12 @@ import kotlinx.serialization.json.JsonPrimitive
 class NavigationGraph(private val proposal: Proposal) {
   val edges: List<NavigationEdge> = extractEdges()
 
-  /** For every screen, the shortest `navigate` path from the start screen to it, start first. */
+  /**
+   * For every screen, the shortest `navigate` path to it, from the start screen or from a
+   * destination of `navigation.destinations`, whichever is nearer (the start wins a tie), the
+   * origin first. A tap on a destination makes the back stack just that destination, so a screen
+   * reached through a destination starts its path there.
+   */
   val backStacks: Map<String, List<String>> = computeBackStacks()
 
   /** The back stack to render [screen] with; a screen the start cannot reach shows alone. */
@@ -40,9 +45,13 @@ class NavigationGraph(private val proposal: Proposal) {
     val adjacency = edges.groupBy({ it.from }, { it.to })
     val start = proposal.navigation.start
     val parents = linkedMapOf<String, String?>()
-    if (start in proposal.screens) {
-      parents[start] = null
-      val queue = ArrayDeque(listOf(start))
+    val origins =
+      (listOf(start) + AppNavigation.destinations(proposal).map { it.screen })
+        .filter { it in proposal.screens }
+        .distinct()
+    if (origins.isNotEmpty()) {
+      origins.forEach { parents[it] = null }
+      val queue = ArrayDeque(origins)
       while (queue.isNotEmpty()) {
         val current = queue.removeFirst()
         for (next in adjacency[current].orEmpty()) {

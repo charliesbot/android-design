@@ -31,22 +31,15 @@ class CatalogDefaultsTest {
     M3ExpressiveCatalog.components.filter { def -> def.props.any { it.default != null } }
 
   /** Components that only make sense inside another one. */
-  private val hostOf =
-    mapOf(
-      "NavigationBarItem" to "NavigationBar",
-      "NavigationRailItem" to "NavigationRail",
-      "FabMenuItem" to "FabMenu",
-    )
+  private val hostOf = mapOf("FabMenuItem" to "FabMenu")
 
   /** The Scaffold slot a component fills; every other component goes in the content column. */
   private val slotOf =
     mapOf(
       "TopAppBar" to "topBar",
-      "NavigationBar" to "bottomBar",
       "FloatingToolbar" to "bottomBar",
       "FloatingActionButton" to "floatingActionButton",
       "FabMenu" to "floatingActionButton",
-      "NavigationRail" to "navigationRail",
     )
 
   private val text = node("t1", "Text") { put("text", "Hello") }

@@ -98,17 +98,12 @@ class BindingExportTest {
         Case("4", """{"id":"root","component":"Slider","steps":%s}"""),
         Case("4", """{"id":"root","component":"RangeSlider","steps":%s}"""),
         Case("3", """{"id":"root","component":"TextField","lines":%s}"""),
-        Case(
-          "true",
-          """{"id":"root","component":"NavigationRail","expanded":%s,"children":["rail"]}""",
-        ),
       )
     val rest =
       arrayOf(
         """{"id":"t","component":"Text","text":"t"}""",
         """{"id":"a","component":"FilterChip","label":"A"}""",
         """{"id":"b","component":"FilterChip","label":"B"}""",
-        """{"id":"rail","component":"NavigationRailItem","label":"Home","icon":"home"}""",
       )
     cases.forEach { case ->
       fun body(value: String, data: String? = null) =
@@ -210,22 +205,20 @@ class BindingExportTest {
   }
 
   @Test
-  fun `a bound icon name on a button, chip, field, menu item and nav item uses the helper`() {
+  fun `a bound icon name on a button, chip, field and menu item uses the helper`() {
     val source =
       ExportFixtures.export(
-        """{"id":"root","component":"Column","children":["b","c","t","m","n"]}""",
+        """{"id":"root","component":"Column","children":["b","c","t","m"]}""",
         """{"id":"b","component":"Button","label":"x","icon":{"@path":"/i"}}""",
         """{"id":"c","component":"SuggestionChip","label":"x","icon":{"@path":"/i"}}""",
         """{"id":"t","component":"TextField","leadingIcon":{"@path":"/i"}}""",
         """{"id":"m","component":"MenuItem","label":"x","icon":{"@path":"/i"}}""",
-        """{"id":"n","component":"NavigationBarItem","label":"x","icon":{"@path":"/i"},"selectedIcon":{"@path":"/j"},"selected":{"@path":"/on"}}""",
-        dataModel = """{"i":"home","j":"star","on":true}""",
+        dataModel = """{"i":"home"}""",
       )
     assertEquals(4, Regex("painterResource\\(symbolDrawable\\(i\\)\\)").findAll(source).count())
     assertHas(
       source,
       "leadingIcon = { Icon(painterResource(symbolDrawable(i)), contentDescription = null) }",
-      "painterResource(if (on) symbolDrawable(j) else symbolDrawable(i))",
     )
   }
 
@@ -414,6 +407,7 @@ class BindingExportTest {
     assertHas(
       source(""""spacing":"sm","""),
       "val columns = ((constraints.maxWidth.toDp() + 8.dp) / (160.dp + 8.dp)).toInt().coerceIn(1, 24)",
+      "repeat(columns) { column(minmax(0.dp, 1.fr)) }",
       "gap(8.dp)",
     )
     assertHas(

@@ -378,6 +378,156 @@ class ProposalValidatorTest {
     errors(p).assertHas("/navigation/placeholders", "supporting")
   }
 
+  // region navigation.destinations
+
+  private val withScreens =
+    base
+      .withScreen(
+        "saved",
+        """{"id":"root","component":"Scaffold","content":"t"},{"id":"t","component":"Text","text":"Saved"}""",
+      )
+      .withScreen(
+        "profile",
+        """{"id":"root","component":"Scaffold","content":"t"},{"id":"t","component":"Text","text":"Me"}""",
+      )
+
+  private val threeDestinations =
+    """[{"screen":"plates","label":"Plates","icon":"restaurant"},""" +
+      """{"screen":"saved","label":"Saved","icon":"favorite"},""" +
+      """{"screen":"profile","label":"Profile","icon":"person"}]"""
+
+  private fun destinations(
+    json: String,
+    panes: String = """{"plates":"list","plate_detail":"detail"}""",
+    extra: String = "",
+    proposal: TestProposal = withScreens,
+  ) =
+    proposal.withNavigation(
+      """{"start":"plates","panes":$panes,"destinations":$json$extra}""",
+    )
+
+  @Test
+  fun `three destinations with icons badges and an expanded rail are valid`() {
+    val full =
+      """[{"screen":"plates","label":"Plates","icon":"restaurant","selectedIcon":"restaurant","badge":3},""" +
+        """{"screen":"saved","label":"Saved","icon":"favorite","badge":true},""" +
+        """{"screen":"profile","label":"Profile","icon":"person","badge":"99+"}]"""
+    assertEquals(emptyList(), errors(destinations(full, extra = ""","railExpanded":true""")))
+    assertEquals(emptyList(), errors(destinations(threeDestinations)))
+  }
+
+  @Test
+  fun `destinations are three to five`() {
+    val two =
+      """[{"screen":"plates","label":"A","icon":"a"},{"screen":"saved","label":"B","icon":"b"}]"""
+    errors(destinations(two)).assertHas("/navigation/destinations", "3 to 5 destinations, got 2")
+    val six =
+      (0 until 6).joinToString(",", "[", "]") {
+        """{"screen":"plates","label":"L$it","icon":"home"}"""
+      }
+    errors(destinations(six)).assertHas("/navigation/destinations", "3 to 5 destinations, got 6")
+  }
+
+  @Test
+  fun `a destination screen must be a screen of the proposal`() {
+    val ghost = threeDestinations.replace(""""screen":"saved"""", """"screen":"ghost"""")
+    errors(destinations(ghost))
+      .assertHas("/navigation/destinations/1/screen", "'ghost' is not a screen")
+  }
+
+  @Test
+  fun `a screen is a destination once`() {
+    val repeated = threeDestinations.replace(""""screen":"profile"""", """"screen":"plates"""")
+    errors(destinations(repeated))
+      .assertHas("/navigation/destinations/2/screen", "already destination 0")
+  }
+
+  @Test
+  fun `a destination has pane role list or none`() {
+    val detail = threeDestinations.replace(""""screen":"profile"""", """"screen":"plate_detail"""")
+    errors(destinations(detail)).assertHas("/navigation/destinations/2/screen", "pane role detail")
+    val panes =
+      """{"plates":"list","plate_detail":"detail","saved":"extra","profile":"supporting"}"""
+    errors(destinations(threeDestinations, panes = panes)).apply {
+      assertHas("/navigation/destinations/1/screen", "pane role extra")
+      assertHas("/navigation/destinations/2/screen", "pane role supporting")
+    }
+  }
+
+  @Test
+  fun `a detail placeholder is not a destination`() {
+    val pick = threeDestinations.replace(""""screen":"profile"""", """"screen":"pick"""")
+    val proposal =
+      destinations(
+        pick,
+        proposal = withScreens.withPickScreen(),
+        extra = ""","placeholders":{"plates":"pick"}""",
+      )
+    errors(proposal).assertHas("/navigation/destinations/2/screen", "placeholder")
+  }
+
+  @Test
+  fun `a destination needs a label a symbol name and a short literal badge`() {
+    val blank = threeDestinations.replace(""""label":"Saved"""", """"label":" """")
+    errors(destinations(blank)).assertHas("/navigation/destinations/1/label", "empty")
+    val icon = threeDestinations.replace(""""icon":"favorite"""", """"icon":"Favorite!"""")
+    errors(destinations(icon)).assertHas("/navigation/destinations/1/icon", "Material Symbols")
+    val selected =
+      threeDestinations.replace(""""icon":"person"""", """"icon":"person","selectedIcon":"No"""")
+    errors(destinations(selected))
+      .assertHas("/navigation/destinations/2/selectedIcon", "Material Symbols")
+    val long =
+      threeDestinations.replace(""""icon":"person"""", """"icon":"person","badge":"12345"""")
+    errors(destinations(long)).assertHas("/navigation/destinations/2/badge", "at most 4")
+    val bound =
+      threeDestinations.replace(""""icon":"person"""", """"icon":"person","badge":{"@path":"/n"}""")
+    errors(destinations(bound)).assertHas("/navigation/destinations/2/badge", "no binding")
+  }
+
+  @Test
+  fun `a proposal that leaves destinations out has no navigation to check`() {
+    assertEquals(emptyList(), errors(withScreens))
+  }
+
+  @Test
+  fun `a bottom bar and a rail in a screen get an error that points at destinations`() {
+    val migrated =
+      base
+        .with(
+          "root",
+          """{"id":"root","component":"Scaffold","topBar":"bar","bottomBar":"nav","navigationRail":"rail","content":"body"}""",
+        )
+        .with("nav", """{"id":"nav","component":"NavigationBar","children":["n1"]}""")
+        .with("n1", """{"id":"n1","component":"NavigationBarItem","label":"Home","icon":"home"}""")
+        .with("rail", """{"id":"rail","component":"NavigationRail","children":["r1"]}""")
+        .with(
+          "r1",
+          """{"id":"r1","component":"NavigationRailItem","label":"Home","icon":"home"}""",
+        )
+    val found = errors(migrated)
+    for ((id, old) in
+      listOf(
+        "nav" to "NavigationBar",
+        "n1" to "NavigationBarItem",
+        "rail" to "NavigationRail",
+        "r1" to "NavigationRailItem",
+      )) {
+      val at = found.filter { it.path == plates("${migrated.indexOf(id)}") + "/component" }
+      assertEquals(1, at.size, "one error for $id: $found")
+      assertTrue(old in at.single().message && "navigation.destinations" in at.single().message)
+      assertTrue("unknown component" !in at.single().message, at.single().message)
+    }
+    val slot = found.filter { it.path == plates("0") + "/navigationRail" }
+    assertEquals(1, slot.size, "$found")
+    assertTrue("navigation.destinations" in slot.single().message, slot.single().message)
+    assertTrue("unknown prop" !in slot.single().message, slot.single().message)
+    // The bottomBar reference is not reported a second time.
+    assertEquals(emptyList(), found.filter { it.path == plates("0") + "/bottomBar" })
+    assertEquals(5, found.size, "$found")
+  }
+
+  // endregion
+
   @Test
   fun `showIn must list size classes`() {
     val p =
@@ -471,9 +621,13 @@ class ProposalValidatorTest {
     fun typography(entry: String) = base.withTheme("""{"typography":{$entry}}""")
     val ok =
       typography(
-        """"display-large":{"fontFamily":"Fraunces"},"headline-small":{"fontFamily":"Bricolage Grotesque"},"display-small":{"fontFamily":"Doto"},"body-large":{"fontFamily":"Google Sans Code"},"label-large":{"fontFamily":"Google Sans Flex"}""",
+        """"display-large":{"fontFamily":"Fraunces"},"headline-small":{"fontFamily":"Bricolage Grotesque"},"display-small":{"fontFamily":"Doto"},"body-large":{"fontFamily":"Google Sans Code"},"label-large":{"fontFamily":"Google Sans Flex"},"title-large":{"fontFamily":"Fraunces"},"title-large-emphasized":{"fontFamily":"Big Shoulders Display"}""",
       )
     assertEquals(emptyList(), errors(ok))
+    errors(typography(""""title-medium":{"fontFamily":"Fraunces"}"""))
+      .assertHas("/theme/typography/title-medium/fontFamily", "Fraunces")
+    errors(typography(""""title-large":{"fontFamily":"Doto"}"""))
+      .assertHas("/theme/typography/title-large/fontFamily", "Doto")
     errors(typography(""""body-large":{"fontFamily":"Fraunces"}"""))
       .assertHas("/theme/typography/body-large/fontFamily", "Fraunces")
     errors(typography(""""headline-large":{"fontFamily":"Doto"}"""))
@@ -599,6 +753,16 @@ class ProposalValidatorTest {
         """{"id":"probe","component":"Slider","steps":{"@path":"/n"},"value":{"@path":"/v"}}""",
       )
     for (json in ok) assertEquals(emptyList(), probe(json), json)
+  }
+
+  @Test
+  fun `maxWidth sizes an image down to an avatar and rejects widths below 24`() {
+    assertEquals(
+      emptyList(),
+      probe("""{"id":"probe","component":"Image","src":"a.png","aspectRatio":1,"maxWidth":88}"""),
+    )
+    probe("""{"id":"probe","component":"Image","src":"a.png","aspectRatio":1,"maxWidth":23}""")
+      .assertHasProbe("/maxWidth", "from 24 to 1600")
   }
 
   @Test

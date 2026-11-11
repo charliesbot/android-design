@@ -11,6 +11,7 @@ import bot.charlies.androiddesign.preview.feature.preview.theme.toHex
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.LayoutNode
+import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.Views
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
@@ -144,16 +145,16 @@ class SheetsSnackbarBadgesRenderTest {
   private val snackbar =
     """{"id":"root","component":"Scaffold","content":"stage","bottomBar":"bar","floatingActionButton":"fab"},""" +
       """{"id":"stage","component":"Text","text":"Page"},""" +
-      """{"id":"bar","component":"NavigationBar","children":["a","b","c"]},""" +
-      """{"id":"a","component":"NavigationBarItem","label":"Home","icon":"home","selected":true},""" +
-      """{"id":"b","component":"NavigationBarItem","label":"Saved","icon":"favorite"},""" +
-      """{"id":"c","component":"NavigationBarItem","label":"Profile","icon":"person"},""" +
+      """{"id":"bar","component":"DockedToolbar","children":["a","b","c"]},""" +
+      """{"id":"a","component":"IconButton","icon":"home","contentDescription":"Home"},""" +
+      """{"id":"b","component":"IconButton","icon":"favorite","contentDescription":"Saved"},""" +
+      """{"id":"c","component":"IconButton","icon":"person","contentDescription":"Profile"},""" +
       """{"id":"fab","component":"FloatingActionButton","icon":"add","contentDescription":"New"},""" +
       """{"id":"saved","component":"Snackbar","message":"Plate saved","actionLabel":"Undo","dismiss":true,"action":{"functionCall":{"@call":"open","args":{"overlay":"other"}}}},""" +
       """{"id":"other","component":"Snackbar","message":"Restored"}"""
 
   @Test
-  fun `a snackbar draws in the scaffold's slot above the fab and the navigation bar`() {
+  fun `a snackbar draws in the scaffold's slot above the fab and the bottom bar`() {
     for (view in listOf(Views.Light, Views.Tablet)) {
       val tree =
         render(singleScreen(snackbar), view = view) { it.interaction.open("home", "saved") }.tree
@@ -209,12 +210,19 @@ class SheetsSnackbarBadgesRenderTest {
     assertFalse(tree.has("saved"), "the first snackbar is gone when another opens")
   }
 
-  private fun navBar(badges: String) =
-    """{"id":"root","component":"Scaffold","content":"stage","bottomBar":"bar"},""" +
-      """{"id":"stage","component":"Text","text":"Page"},""" +
-      """{"id":"bar","component":"NavigationBar","children":["a","b"]},""" +
-      """{"id":"a","component":"NavigationBarItem","label":"Home","icon":"home"$badges},""" +
-      """{"id":"b","component":"NavigationBarItem","label":"Chat","icon":"chat"}"""
+  /** Three destinations on a compact window; the first carries [badges]. */
+  private fun navProposal(badges: String): Proposal {
+    val screen = screenJson("""{"id":"root","component":"Text","text":"Page"}""")
+    return proposalOf(
+      "home" to screen,
+      "saved" to screen,
+      "profile" to screen,
+      destinations =
+        """[{"screen":"home","label":"Home","icon":"home"$badges},""" +
+          """{"screen":"saved","label":"Chat","icon":"chat"},""" +
+          """{"screen":"profile","label":"Profile","icon":"person"}]""",
+    )
+  }
 
   /** How many pixels in [region] (dp) are close to [color]. */
   private fun count(png: ByteArray, region: Bounds, color: Int): Int {
@@ -236,16 +244,16 @@ class SheetsSnackbarBadgesRenderTest {
 
   @Test
   fun `a badge draws in the error color on the icon, small for true and large for a text`() {
-    val none = render(singleScreen(navBar("")))
-    val small = render(singleScreen(navBar(""","badge":true""")))
-    val large = render(singleScreen(navBar(""","badge":"99+"""")))
+    val none = render(navProposal(""))
+    val small = render(navProposal(""","badge":true"""))
+    val large = render(navProposal(""","badge":"99+""""))
     val color = error()
-    val region = itemRegion(none.tree.node("a"))
+    val region = itemRegion(none.tree.node("@navigation[0]"))
     val dot = count(small.png, region, color)
     assertEquals(0, count(none.png, region, color), "no badge, no error color")
     assertTrue(dot > 0, "a small badge draws in the error color")
     assertTrue(count(large.png, region, color) > dot, "a large badge is bigger than the dot")
-    val chat = itemRegion(small.tree.node("b"))
+    val chat = itemRegion(small.tree.node("@navigation[1]"))
     assertEquals(0, count(small.png, chat, color), "the other item has none")
   }
 

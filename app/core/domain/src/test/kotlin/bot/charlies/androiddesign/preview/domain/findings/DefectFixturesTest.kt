@@ -199,7 +199,7 @@ class DefectFixturesTest {
     assertOnly(
       FindingRule.Font,
       findings(Views.Light, replace = mapOf("supporting" to small)),
-      Regex("Fraunces is for display and headline text"),
+      Regex("Fraunces is for display, headline and large title text"),
     )
   }
 

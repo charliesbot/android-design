@@ -5,7 +5,7 @@
   "title": "Material 3 Expressive for Android",
   "description": "Material 3 Expressive components that map one to one onto Jetpack Compose material3.",
   "catalogId": "https://github.com/charliesbot/android-design/catalogs/m3-expressive/v1",
-  "instructions": "Design guidelines for the m3-expressive catalog.\n\n1. Every prop that names a color, type, shape or spacing takes a token name, never a hex value or a raw dimension. Use a `style` from the design system's `material.styles` to bundle tokens.\n2. Components reference children by id. Named slots (`topBar`, `content`, `floatingActionButton`) take one id; lists (`children`, `actions`, `items`) take an array of ids.\n3. A screen is a flat component list with exactly one `root`. Overlays (`BottomSheet`, `Dialog`, `Menu`) stay closed until an `open` action names them.\n4. Interaction is renderer-only: `navigate`, `back`, `open` and `dismiss`. Event actions do not exist.\n5. Mark the screen's main action with `primary: true` on one component, and give every icon-only control a `contentDescription`.\n6. Use `showIn` and `sizeClass` to adapt a component at 600 dp (medium) and 840 dp (expanded).",
+  "instructions": "Design guidelines for the m3-expressive catalog.\n\n1. Every prop that names a color, type, shape or spacing takes a token name, never a hex value or a raw dimension. Use a `style` from the design system's `material.styles` to bundle tokens.\n2. Components reference children by id. Named slots (`topBar`, `content`, `floatingActionButton`) take one id; lists (`children`, `actions`, `items`) take an array of ids.\n3. A screen is a flat component list with exactly one `root`. Overlays (`BottomSheet`, `Dialog`, `Menu`) stay closed until an `open` action names them.\n4. Interaction is renderer-only: `navigate`, `back`, `open` and `dismiss`. Event actions do not exist.\n5. Mark the screen's main action with `primary: true` on one component, and give every icon-only control a `contentDescription`.\n6. Use `showIn` and `sizeClass` to adapt a component at 600 dp (medium) and 840 dp (expanded).\n7. Navigation is declared once, not drawn in a screen: `navigation.destinations` holds 3 to 5 `{screen, label, icon, selectedIcon?, badge?}` entries and the previewer draws a bar at compact widths and a rail from medium up, outside the panes. A destination is a top-level screen (pane role list or none). The bar or rail shows on a destination, and beside a destination when two panes fit; a screen that covers the whole window shows none. `navigation.railExpanded: true` expands the rail from 840 dp.",
   "components": {
     "Column": {
       "type": "object",
@@ -523,7 +523,7 @@
     },
     "Scaffold": {
       "type": "object",
-      "description": "The screen frame: bars, floating action button and content.",
+      "description": "The screen frame: top bar, bottom toolbar, floating action button and content. Navigation is not a slot of it: a bottom bar or a rail is declared once for the whole proposal in navigation.destinations.",
       "x-compose": "Scaffold",
       "allOf": [
         {
@@ -543,7 +543,6 @@
         "bottomBar": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
           "x-allowedComponents": [
-            "NavigationBar",
             "FloatingToolbar",
             "DockedToolbar"
           ]
@@ -557,12 +556,6 @@
         },
         "content": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/Child"
-        },
-        "navigationRail": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/Child",
-          "x-allowedComponents": [
-            "NavigationRail"
-          ]
         }
       },
       "required": [
@@ -633,102 +626,6 @@
       "required": [
         "component",
         "title"
-      ],
-      "unevaluatedProperties": false
-    },
-    "NavigationBar": {
-      "type": "object",
-      "description": "Bottom navigation for compact windows.",
-      "x-compose": "ShortNavigationBar",
-      "x-m3-pages": [
-        "navigation-bar"
-      ],
-      "allOf": [
-        {
-          "$ref": "#/$defs/ComponentCommon"
-        }
-      ],
-      "properties": {
-        "component": {
-          "const": "NavigationBar"
-        },
-        "children": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
-          "x-allowedComponents": [
-            "NavigationBarItem"
-          ]
-        }
-      },
-      "required": [
-        "component",
-        "children"
-      ],
-      "unevaluatedProperties": false
-    },
-    "NavigationBarItem": {
-      "type": "object",
-      "description": "One destination of a NavigationBar.",
-      "x-compose": "ShortNavigationBarItem",
-      "x-m3-pages": [
-        "navigation-bar",
-        "badges"
-      ],
-      "x-interactive": true,
-      "allOf": [
-        {
-          "$ref": "#/$defs/ComponentCommon"
-        }
-      ],
-      "properties": {
-        "component": {
-          "const": "NavigationBarItem"
-        },
-        "label": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
-        },
-        "icon": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
-          "description": "Material Symbols name, such as \"home\"."
-        },
-        "selectedIcon": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
-          "description": "Material Symbols name, such as \"home\"."
-        },
-        "selected": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "default": false
-        },
-        "badge": {
-          "oneOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "number",
-              "maximum": 9999
-            },
-            {
-              "type": "string",
-              "maxLength": 4
-            },
-            {
-              "$ref": "a2ui-v1_0/common_types.json#/$defs/DataBinding"
-            },
-            {
-              "$ref": "#/$defs/IndexCall"
-            }
-          ],
-          "description": "A badge on the icon's upper trailing corner: true draws a small one, a number or a string of at most 4 characters (such as \"99+\") draws a large one with that text."
-        },
-        "action": {
-          "$ref": "#/$defs/Action",
-          "description": "What a tap does."
-        }
-      },
-      "required": [
-        "component",
-        "label",
-        "icon"
       ],
       "unevaluatedProperties": false
     },
@@ -833,106 +730,6 @@
       "required": [
         "component",
         "label"
-      ],
-      "unevaluatedProperties": false
-    },
-    "NavigationRail": {
-      "type": "object",
-      "description": "Side navigation for medium and expanded windows.",
-      "x-compose": "WideNavigationRail",
-      "x-m3-pages": [
-        "navigation-rail"
-      ],
-      "allOf": [
-        {
-          "$ref": "#/$defs/ComponentCommon"
-        }
-      ],
-      "properties": {
-        "component": {
-          "const": "NavigationRail"
-        },
-        "children": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/ChildList",
-          "x-allowedComponents": [
-            "NavigationRailItem"
-          ]
-        },
-        "expanded": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "default": false
-        }
-      },
-      "required": [
-        "component",
-        "children"
-      ],
-      "unevaluatedProperties": false
-    },
-    "NavigationRailItem": {
-      "type": "object",
-      "description": "One destination of a NavigationRail.",
-      "x-compose": "WideNavigationRailItem",
-      "x-m3-pages": [
-        "navigation-rail",
-        "badges"
-      ],
-      "x-interactive": true,
-      "allOf": [
-        {
-          "$ref": "#/$defs/ComponentCommon"
-        }
-      ],
-      "properties": {
-        "component": {
-          "const": "NavigationRailItem"
-        },
-        "label": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString"
-        },
-        "icon": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
-          "description": "Material Symbols name, such as \"home\"."
-        },
-        "selectedIcon": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicString",
-          "description": "Material Symbols name, such as \"home\"."
-        },
-        "selected": {
-          "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicBoolean",
-          "default": false
-        },
-        "badge": {
-          "oneOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "number",
-              "maximum": 9999
-            },
-            {
-              "type": "string",
-              "maxLength": 4
-            },
-            {
-              "$ref": "a2ui-v1_0/common_types.json#/$defs/DataBinding"
-            },
-            {
-              "$ref": "#/$defs/IndexCall"
-            }
-          ],
-          "description": "A badge on the icon's upper trailing corner: true draws a small one, a number or a string of at most 4 characters (such as \"99+\") draws a large one with that text."
-        },
-        "action": {
-          "$ref": "#/$defs/Action",
-          "description": "What a tap does."
-        }
-      },
-      "required": [
-        "component",
-        "label",
-        "icon"
       ],
       "unevaluatedProperties": false
     },
@@ -2934,6 +2731,16 @@
       "why": "Material 3 Expressive no longer recommends it; use a connected button group."
     }
   ],
+  "x-m3-declarations": [
+    {
+      "page": "navigation-bar",
+      "by": "navigation.destinations"
+    },
+    {
+      "page": "navigation-rail",
+      "by": "navigation.destinations"
+    }
+  ],
   "functions": {
     "navigate": {
       "type": "object",
@@ -3060,22 +2867,10 @@
           "$ref": "#/components/TopAppBar"
         },
         {
-          "$ref": "#/components/NavigationBar"
-        },
-        {
-          "$ref": "#/components/NavigationBarItem"
-        },
-        {
           "$ref": "#/components/Tabs"
         },
         {
           "$ref": "#/components/Tab"
-        },
-        {
-          "$ref": "#/components/NavigationRail"
-        },
-        {
-          "$ref": "#/components/NavigationRailItem"
         },
         {
           "$ref": "#/components/FloatingToolbar"
@@ -3270,7 +3065,7 @@
         },
         "maxWidth": {
           "$ref": "a2ui-v1_0/common_types.json#/$defs/DynamicNumber",
-          "description": "The widest the component draws, in dp. It still stretches up to that width where it would fill; the parent's alignment places it. Material: \"Set a max width on content and components to prevent stretching full width.\" Must be a whole number from 120 to 1600."
+          "description": "The widest the component draws, in dp. It still stretches up to that width where it would fill; the parent's alignment places it. Material: \"Set a max width on content and components to prevent stretching full width.\" Must be a whole number from 24 to 1600."
         },
         "itemSize": {
           "type": "string",

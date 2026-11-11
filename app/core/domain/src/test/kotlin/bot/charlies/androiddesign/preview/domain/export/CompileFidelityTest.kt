@@ -16,7 +16,7 @@ class CompileFidelityTest {
         """{"id":"root","component":"Grid","columns":2,"children":["t"]}""",
         """{"id":"t","component":"Text","text":"Hi"}""",
       )
-    ExportFixtures.has(source, "repeat(2) { column(1.fr) }")
+    ExportFixtures.has(source, "repeat(2) { column(minmax(0.dp, 1.fr)) }")
     ExportFixtures.lacks(source, "import androidx.compose.foundation.layout.fr")
   }
 

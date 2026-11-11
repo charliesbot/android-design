@@ -30,16 +30,12 @@ import kotlinx.serialization.json.put
 class StretchAgreementTest {
   /**
    * Components that only make sense inside another one (a Tab is as wide as its row gives it), or
-   * open on an action, and the navigation bar, which Material itself draws at the full width of its
-   * parent.
+   * open on an action.
    */
   private val skipped =
     M3ExpressiveCatalog.overlayNames +
       setOf(
         "Scaffold",
-        "NavigationBar",
-        "NavigationBarItem",
-        "NavigationRailItem",
         "Tab",
         "FabMenuItem",
         "MenuItem",

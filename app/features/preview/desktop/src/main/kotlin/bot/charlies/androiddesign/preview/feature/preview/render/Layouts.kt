@@ -176,7 +176,9 @@ internal fun RenderGrid(ctx: NodeContext) {
 private fun GridOf(ctx: NodeContext, columns: Int, gap: Dp, modifier: Modifier) {
   Grid(
     config = {
-      repeat(columns) { column(1.fr) }
+      // A bare `1.fr` track is `minmax(min-content, 1fr)`, so an image would widen its column to
+      // its bitmap width; a zero minimum keeps the columns equal.
+      repeat(columns) { column(minmax(0.dp, 1.fr)) }
       gap(gap)
     },
     modifier = modifier,

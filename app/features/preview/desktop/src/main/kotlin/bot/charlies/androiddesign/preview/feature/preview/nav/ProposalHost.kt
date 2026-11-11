@@ -29,9 +29,11 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
 import androidx.window.core.layout.computeWindowSizeClass
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
+import bot.charlies.androiddesign.preview.domain.navigation.AppNavigation
 import bot.charlies.androiddesign.preview.domain.navigation.DetailPlaceholders
 import bot.charlies.androiddesign.preview.feature.preview.record.PreviewFrame
 import bot.charlies.androiddesign.preview.feature.preview.record.TreeRecorder
+import bot.charlies.androiddesign.preview.feature.preview.render.AppNavigationFrame
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalRenderer
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalTheme
@@ -72,6 +74,7 @@ fun ProposalHost(
   val supportingLayout = PaneRole.Supporting in panes.values
   val listDetail = rememberListDetailSceneStrategy<String>(directive = directive)
   val supporting = rememberSupportingPaneSceneStrategy<String>(directive = directive)
+  val twoPanes = directive.maxHorizontalPartitions >= 2
   val emptyDetail = emptyDetailList(host, directive, supportingLayout)
   DisposableEffect(recorder, emptyDetail) {
     emptyDetail?.let { recorder?.reportEmptyDetail(it, empty = true) }
@@ -84,31 +87,46 @@ fun ProposalHost(
   // LookaheadScope instead leaves the list blank. Within one class the pane scaffold follows the
   // size itself. The back stack lives in the host, so the window stays on its screen.
   key(sizeClass) {
-    NavDisplay(
-      backStack = host.backStack,
-      modifier = modifier.fillMaxSize(),
-      sceneStrategies = listOf(if (supportingLayout) supporting else listDetail),
-      onBack = { host.back() },
-      entryProvider = { screenId ->
-        val placeholder: (@Composable ThreePaneScaffoldScope.() -> Unit)? =
-          if (DetailPlaceholders.of(host.proposal, screenId) == null) null
-          else {
-            { DetailPlaceholder(host, screenId, sizeClass, currentRecorder) }
+    // The navigation is drawn around the pane scaffold, outside every pane, and the scaffold is
+    // measured in the width that is left: the directive above follows the whole frame, as the
+    // adaptive library's own default does (it reads the window, not the room a suite scaffold
+    // leaves), so a rail narrows the panes without changing how many there are.
+    val destinations = AppNavigation.destinations(host.proposal)
+    val stack = host.backStack.toList()
+    AppNavigationFrame(
+      shown = AppNavigation.shown(host.proposal, sizeClass, stack, twoPanes),
+      destinations = destinations,
+      selected = AppNavigation.selectedIndex(host.proposal, stack),
+      onSelect = host::openDestination,
+      recorder = recorder,
+      modifier = modifier,
+    ) {
+      NavDisplay(
+        backStack = host.backStack,
+        modifier = Modifier.fillMaxSize(),
+        sceneStrategies = listOf(if (supportingLayout) supporting else listDetail),
+        onBack = { host.back() },
+        entryProvider = { screenId ->
+          val placeholder: (@Composable ThreePaneScaffoldScope.() -> Unit)? =
+            if (DetailPlaceholders.of(host.proposal, screenId) == null) null
+            else {
+              { DetailPlaceholder(host, screenId, sizeClass, currentRecorder) }
+            }
+          NavEntry(
+            screenId,
+            metadata = paneMetadata(panes[screenId], supportingLayout, placeholder),
+          ) {
+            ProposalRenderer(
+              host = host,
+              screenId = screenId,
+              sizeClass = sizeClass,
+              recorder = currentRecorder,
+              idPrefix = if (screenId == currentPrimary) "" else "$screenId/",
+            )
           }
-        NavEntry(
-          screenId,
-          metadata = paneMetadata(panes[screenId], supportingLayout, placeholder),
-        ) {
-          ProposalRenderer(
-            host = host,
-            screenId = screenId,
-            sizeClass = sizeClass,
-            recorder = currentRecorder,
-            idPrefix = if (screenId == currentPrimary) "" else "$screenId/",
-          )
-        }
-      },
-    )
+        },
+      )
+    }
   }
 }
 

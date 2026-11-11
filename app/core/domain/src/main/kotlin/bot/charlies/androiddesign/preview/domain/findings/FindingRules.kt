@@ -12,19 +12,19 @@ import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.M3Component
+import bot.charlies.androiddesign.preview.model.NavigationNodes
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.SizeClass
-import bot.charlies.androiddesign.preview.model.TypeGroup
+import bot.charlies.androiddesign.preview.model.TypeRole
 import kotlin.math.hypot
 import kotlin.math.round
 
 /**
  * The checks a rendered view must pass, run over its layout tree: touch targets, fonts, clipped or
  * truncated text, contrast, a primary action at least as tall as its rivals, one FAB per pane,
- * content past the view's edges, a compact carousel with too many text items, and a navigation bar
- * with fewer than three destinations, a docked toolbar drawn with a navigation bar, and a list pane
- * beside an empty detail pane. [tree] arrives with its nodes and no findings yet. Findings come out
- * in rule order, then in document order.
+ * content past the view's edges, a compact carousel with too many text items, a docked toolbar
+ * drawn with a navigation bar, and a list pane beside an empty detail pane. [tree] arrives with its
+ * nodes and no findings yet. Findings come out in rule order, then in document order.
  *
  * A node with no area is not laid out (a closed overlay is never composed), so the rules that
  * measure geometry skip it. While a modal sheet or dialog is open, everything outside it is inert
@@ -63,7 +63,8 @@ object FindingRules {
         .toSet() - M3Component.FabMenuItem.wire
 
     val interactiveTypes: Set<String> =
-      catalog.components.filter { it.interactive }.map { it.name }.toSet()
+      catalog.components.filter { it.interactive }.map { it.name }.toSet() +
+        catalog.navigationItemNames
 
     /** Components whose children scroll sideways, so they are meant to run past their parent. */
     val horizontalScrollers: Set<String> =
@@ -88,18 +89,16 @@ object FindingRules {
             it.prop("label") != null
         }
         .map { it.name }
-        .toSet()
+        .toSet() + catalog.navigationItemNames
   }
 
   private val facets: Map<String, Facets> by lazy {
     Catalogs.all.associate { it.id to Facets(it) }
   }
 
-  private val allGroups = TypeGroup.entries.toSet()
-
-  /** Bundled families (lowercase) and the type groups each may set. */
-  private val fontGroups: Map<String, Set<TypeGroup>> =
-    BundledFont.entries.associate { it.family.lowercase() to it.groups }
+  /** Bundled faces by lowercase family. */
+  private val bundledFonts: Map<String, BundledFont> =
+    BundledFont.entries.associateBy { it.family.lowercase() }
 
   /**
    * The findings of [tree], under the rules of [catalog], which is its view's by default.
@@ -126,7 +125,6 @@ object FindingRules {
       roundEdgeClipped(view) +
       cornerClipped(view) +
       carouselItems(view) +
-      navDestinations(view) +
       dockedToolbarWithNavBar(view) +
       fullScreenDatePicker(view) +
       lineLength(view) +
@@ -213,16 +211,20 @@ object FindingRules {
       val name = displayName(family).lowercase()
       val role = node.roles?.type
       val group = role?.let(view.catalog.typeRoles::get)
-      val allowed =
-        fontGroups[name]
-          ?: allGroups.takeIf { view.catalog.platformFontFamilies.any { it.lowercase() == name } }
+      val bundled = bundledFonts[name]
+      val platform = view.catalog.platformFontFamilies.any { it.lowercase() == name }
+      // Only the Material catalog names its roles with TypeRoles; a platform catalog keeps the
+      // plain type groups.
+      val typeRole =
+        role?.takeIf { view.catalog.platformFontFamilies.isEmpty() }?.let(TypeRole::fromWire)
       val detail =
         when {
-          allowed == null -> "${displayName(family)} is not a bundled font"
-          group == null && allowed.size != allGroups.size ->
-            "${displayName(family)} is for ${groupsLabel(allowed)} text, not ${role ?: "plain text"}"
-          group != null && group !in allowed ->
-            "${displayName(family)} is for ${groupsLabel(allowed)} text, not $role"
+          bundled == null && !platform -> "${displayName(family)} is not a bundled font"
+          bundled == null -> null
+          group == null && !bundled.setsAnyText ->
+            "${displayName(family)} is for ${bundled.scope} text, not ${role ?: "plain text"}"
+          group != null && !bundled.allows(group, typeRole) ->
+            "${displayName(family)} is for ${bundled.scope} text, not $role"
           else -> null
         }
       detail?.let { errorFinding(node, FindingRule.Font, it) }
@@ -230,9 +232,6 @@ object FindingRules {
 
   private fun displayName(family: String): String =
     family.substringBefore(',').trim().trim('"', '\'').trim()
-
-  private fun groupsLabel(groups: Set<TypeGroup>): String =
-    groups.joinToString(" and ") { it.name.lowercase() }
 
   // endregion
 
@@ -704,37 +703,15 @@ object FindingRules {
 
   // endregion
 
-  // region nav-destinations
-
-  /**
-   * Material: "Don't use a navigation bar for fewer than three destinations. Instead, use tabs."
-   */
-  private fun navDestinations(view: View): List<Finding> {
-    val children = view.nodes.filter { it.parent != null }.groupBy { it.parent }
-    return view.nodes
-      .filter { it.type == NAVIGATION_BAR && it.isLaidOut }
-      .mapNotNull { bar ->
-        val destinations = children[bar.id].orEmpty().count { it.type == NAVIGATION_BAR_ITEM }
-        if (destinations < MIN_DESTINATIONS) {
-          errorFinding(
-            bar,
-            FindingRule.NavDestinations,
-            "$destinations ${if (destinations == 1) "destination" else "destinations"}; " +
-              "a navigation bar needs at least $MIN_DESTINATIONS, use tabs for fewer",
-          )
-        } else {
-          null
-        }
-      }
-  }
+  // region docked-toolbar-nav-bar
 
   /**
    * Material: docked toolbars go "only at the bottom of the window, never alongside other
    * bottom-aligned elements such as a nav bar", and the navigation bar and a toolbar "sit at the
-   * bottom so should not be shown at the same time". A Scaffold's bottom bar slot holds one
-   * component, so this can only happen when a navigation bar is drawn elsewhere on the view, such
-   * as inside the content or beside the toolbar in another pane. The tree holds what the view draws
-   * at its width, so a size class override is already applied.
+   * bottom so should not be shown at the same time". The navigation bar is declared once, around
+   * the panes, so this happens when a screen with a docked toolbar is drawn where the bar shows: a
+   * compact destination, or a pane beside a destination. The tree holds what the view draws at its
+   * width, so a size class override is already applied.
    */
   private fun dockedToolbarWithNavBar(view: View): List<Finding> {
     if (view.nodes.none { it.type == NAVIGATION_BAR && it.isLaidOut }) return emptyList()
@@ -868,9 +845,7 @@ object FindingRules {
 
   private val DATE_PICKER = M3Component.DatePicker.wire
   private val DOCKED_TOOLBAR = M3Component.DockedToolbar.wire
-  private val NAVIGATION_BAR = M3Component.NavigationBar.wire
-  private val NAVIGATION_BAR_ITEM = M3Component.NavigationBarItem.wire
-  private const val MIN_DESTINATIONS = 3
+  private const val NAVIGATION_BAR = NavigationNodes.BAR
 
   // endregion
 

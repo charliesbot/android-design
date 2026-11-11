@@ -11,6 +11,7 @@ import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.StyleDef
 import bot.charlies.androiddesign.preview.model.ThemeOverride
 import bot.charlies.androiddesign.preview.model.TypeGroup
+import bot.charlies.androiddesign.preview.model.TypeRole
 import bot.charlies.androiddesign.preview.model.camelToKebab
 
 /**
@@ -88,10 +89,11 @@ internal class ThemeValidator(
       }
       spec.fontVariation?.let { validateVariation(it, path.child("fontVariation")) }
       val family = spec.fontFamily ?: continue
-      if (!familyAllowed(group, family)) {
+      val role = TypeRole.fromKebab(key)
+      if (!familyAllowed(group, role, family)) {
         sink.add(
           path.child("fontFamily"),
-          "'$family' is not allowed for $key: ${allowedFamilies(group)}",
+          "'$family' is not allowed for $key: ${allowedFamilies(group, role)}",
         )
       }
     }
@@ -218,10 +220,12 @@ internal class ThemeValidator(
     fun isShape(value: String): Boolean =
       ShapeToken.fromWire(value) != null || MaterialShape.fromWire(value) != null
 
-    fun familyAllowed(group: TypeGroup, family: String): Boolean =
-      BundledFont.byFamily(family)?.let { group in it.groups } ?: false
+    fun familyAllowed(group: TypeGroup, role: TypeRole?, family: String): Boolean =
+      BundledFont.byFamily(family)?.allows(group, role) ?: false
 
-    private fun allowedFamilies(group: TypeGroup): String =
-      BundledFont.entries.filter { group in it.groups }.joinToString(prefix = "use ") { it.family }
+    private fun allowedFamilies(group: TypeGroup, role: TypeRole?): String =
+      BundledFont.entries
+        .filter { it.allows(group, role) }
+        .joinToString(prefix = "use ") { it.family }
   }
 }

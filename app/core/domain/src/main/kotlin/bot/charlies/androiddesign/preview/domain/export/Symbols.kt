@@ -116,6 +116,14 @@ internal object Sym {
   // adaptive and navigation
   const val currentWindowAdaptiveInfoV2 =
     "androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2"
+  const val calculatePaneScaffoldDirective =
+    "androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective"
+  const val NavigationSuiteScaffold =
+    "androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold"
+  const val NavigationSuiteItem =
+    "androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem"
+  const val NavigationSuiteType =
+    "androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType"
   const val WindowSizeClass = "androidx.window.core.layout.WindowSizeClass"
   const val NavKey = "androidx.navigation3.runtime.NavKey"
   const val entryProvider = "androidx.navigation3.runtime.entryProvider"

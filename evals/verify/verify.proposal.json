@@ -26,7 +26,36 @@
     },
     "placeholders": {
       "home": "pick"
-    }
+    },
+    "destinations": [
+      {
+        "screen": "home",
+        "label": "Home",
+        "icon": "home",
+        "selectedIcon": "home"
+      },
+      {
+        "screen": "actions",
+        "label": "Actions",
+        "icon": "touch_app",
+        "selectedIcon": "touch_app",
+        "badge": 12
+      },
+      {
+        "screen": "inputs",
+        "label": "Inputs",
+        "icon": "tune",
+        "badge": true
+      },
+      {
+        "screen": "overlays",
+        "label": "Overlays",
+        "icon": "layers",
+        "selectedIcon": "layers",
+        "badge": "9+"
+      }
+    ],
+    "railExpanded": true
   },
   "screens": {
     "home": {
@@ -52,8 +81,6 @@
           "id": "root",
           "component": "Scaffold",
           "topBar": "top",
-          "bottomBar": "nav_bar",
-          "navigationRail": "nav_rail",
           "floatingActionButton": "fab",
           "content": "body"
         },
@@ -86,162 +113,6 @@
           "component": "IconButton",
           "icon": "more_vert",
           "contentDescription": "More options"
-        },
-        {
-          "id": "bar_home",
-          "component": "NavigationBarItem",
-          "label": "Home",
-          "icon": "home",
-          "selectedIcon": "home",
-          "selected": true,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "home"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_home",
-          "component": "NavigationRailItem",
-          "label": "Home",
-          "icon": "home",
-          "selected": true,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "home"
-              }
-            }
-          }
-        },
-        {
-          "id": "bar_actions",
-          "component": "NavigationBarItem",
-          "label": "Actions",
-          "icon": "touch_app",
-          "selectedIcon": "touch_app",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "actions"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_actions",
-          "component": "NavigationRailItem",
-          "label": "Actions",
-          "icon": "touch_app",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "actions"
-              }
-            }
-          }
-        },
-        {
-          "id": "bar_inputs",
-          "component": "NavigationBarItem",
-          "label": "Inputs",
-          "icon": "tune",
-          "selectedIcon": "tune",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "inputs"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_inputs",
-          "component": "NavigationRailItem",
-          "label": "Inputs",
-          "icon": "tune",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "inputs"
-              }
-            }
-          }
-        },
-        {
-          "id": "bar_overlays",
-          "component": "NavigationBarItem",
-          "label": "Overlays",
-          "icon": "layers",
-          "selectedIcon": "layers",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "overlays"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_overlays",
-          "component": "NavigationRailItem",
-          "label": "Overlays",
-          "icon": "layers",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "overlays"
-              }
-            }
-          }
-        },
-        {
-          "id": "nav_bar",
-          "component": "NavigationBar",
-          "children": [
-            "bar_home",
-            "bar_actions",
-            "bar_inputs",
-            "bar_overlays"
-          ],
-          "showIn": [
-            "compact"
-          ]
-        },
-        {
-          "id": "nav_rail",
-          "component": "NavigationRail",
-          "children": [
-            "rail_home",
-            "rail_actions",
-            "rail_inputs",
-            "rail_overlays"
-          ],
-          "showIn": [
-            "medium",
-            "expanded"
-          ],
-          "sizeClass": {
-            "expanded": {
-              "expanded": true
-            }
-          }
         },
         {
           "id": "fab",
@@ -752,8 +623,6 @@
           "id": "root",
           "component": "Scaffold",
           "topBar": "top",
-          "bottomBar": "nav_bar",
-          "navigationRail": "nav_rail",
           "content": "body"
         },
         {
@@ -761,162 +630,6 @@
           "component": "TopAppBar",
           "size": "center",
           "title": "Actions"
-        },
-        {
-          "id": "bar_home",
-          "component": "NavigationBarItem",
-          "label": "Home",
-          "icon": "home",
-          "selectedIcon": "home",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "home"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_home",
-          "component": "NavigationRailItem",
-          "label": "Home",
-          "icon": "home",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "home"
-              }
-            }
-          }
-        },
-        {
-          "id": "bar_actions",
-          "component": "NavigationBarItem",
-          "label": "Actions",
-          "icon": "touch_app",
-          "selectedIcon": "touch_app",
-          "selected": true,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "actions"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_actions",
-          "component": "NavigationRailItem",
-          "label": "Actions",
-          "icon": "touch_app",
-          "selected": true,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "actions"
-              }
-            }
-          }
-        },
-        {
-          "id": "bar_inputs",
-          "component": "NavigationBarItem",
-          "label": "Inputs",
-          "icon": "tune",
-          "selectedIcon": "tune",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "inputs"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_inputs",
-          "component": "NavigationRailItem",
-          "label": "Inputs",
-          "icon": "tune",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "inputs"
-              }
-            }
-          }
-        },
-        {
-          "id": "bar_overlays",
-          "component": "NavigationBarItem",
-          "label": "Overlays",
-          "icon": "layers",
-          "selectedIcon": "layers",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "overlays"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_overlays",
-          "component": "NavigationRailItem",
-          "label": "Overlays",
-          "icon": "layers",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "overlays"
-              }
-            }
-          }
-        },
-        {
-          "id": "nav_bar",
-          "component": "NavigationBar",
-          "children": [
-            "bar_home",
-            "bar_actions",
-            "bar_inputs",
-            "bar_overlays"
-          ],
-          "showIn": [
-            "compact"
-          ]
-        },
-        {
-          "id": "nav_rail",
-          "component": "NavigationRail",
-          "children": [
-            "rail_home",
-            "rail_actions",
-            "rail_inputs",
-            "rail_overlays"
-          ],
-          "showIn": [
-            "medium",
-            "expanded"
-          ],
-          "sizeClass": {
-            "expanded": {
-              "expanded": true
-            }
-          }
         },
         {
           "id": "body",
@@ -1497,7 +1210,6 @@
           "component": "Scaffold",
           "topBar": "top",
           "bottomBar": "toolbar",
-          "navigationRail": "nav_rail",
           "content": "body"
         },
         {
@@ -1505,85 +1217,6 @@
           "component": "TopAppBar",
           "size": "small",
           "title": "Inputs and feedback"
-        },
-        {
-          "id": "rail_home",
-          "component": "NavigationRailItem",
-          "label": "Home",
-          "icon": "home",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "home"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_actions",
-          "component": "NavigationRailItem",
-          "label": "Actions",
-          "icon": "touch_app",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "actions"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_inputs",
-          "component": "NavigationRailItem",
-          "label": "Inputs",
-          "icon": "tune",
-          "selected": true,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "inputs"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_overlays",
-          "component": "NavigationRailItem",
-          "label": "Overlays",
-          "icon": "layers",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "overlays"
-              }
-            }
-          }
-        },
-        {
-          "id": "nav_rail",
-          "component": "NavigationRail",
-          "children": [
-            "rail_home",
-            "rail_actions",
-            "rail_inputs",
-            "rail_overlays"
-          ],
-          "showIn": [
-            "medium",
-            "expanded"
-          ],
-          "sizeClass": {
-            "expanded": {
-              "expanded": true
-            }
-          }
         },
         {
           "id": "tb_draw",
@@ -2124,8 +1757,6 @@
           "id": "root",
           "component": "Scaffold",
           "topBar": "top",
-          "bottomBar": "nav_bar",
-          "navigationRail": "nav_rail",
           "floatingActionButton": "fab_menu",
           "content": "body"
         },
@@ -2149,162 +1780,6 @@
               "args": {
                 "overlay": "menu"
               }
-            }
-          }
-        },
-        {
-          "id": "bar_home",
-          "component": "NavigationBarItem",
-          "label": "Home",
-          "icon": "home",
-          "selectedIcon": "home",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "home"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_home",
-          "component": "NavigationRailItem",
-          "label": "Home",
-          "icon": "home",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "home"
-              }
-            }
-          }
-        },
-        {
-          "id": "bar_actions",
-          "component": "NavigationBarItem",
-          "label": "Actions",
-          "icon": "touch_app",
-          "selectedIcon": "touch_app",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "actions"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_actions",
-          "component": "NavigationRailItem",
-          "label": "Actions",
-          "icon": "touch_app",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "actions"
-              }
-            }
-          }
-        },
-        {
-          "id": "bar_inputs",
-          "component": "NavigationBarItem",
-          "label": "Inputs",
-          "icon": "tune",
-          "selectedIcon": "tune",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "inputs"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_inputs",
-          "component": "NavigationRailItem",
-          "label": "Inputs",
-          "icon": "tune",
-          "selected": false,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "inputs"
-              }
-            }
-          }
-        },
-        {
-          "id": "bar_overlays",
-          "component": "NavigationBarItem",
-          "label": "Overlays",
-          "icon": "layers",
-          "selectedIcon": "layers",
-          "selected": true,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "overlays"
-              }
-            }
-          }
-        },
-        {
-          "id": "rail_overlays",
-          "component": "NavigationRailItem",
-          "label": "Overlays",
-          "icon": "layers",
-          "selected": true,
-          "action": {
-            "functionCall": {
-              "@call": "navigate",
-              "args": {
-                "screen": "overlays"
-              }
-            }
-          }
-        },
-        {
-          "id": "nav_bar",
-          "component": "NavigationBar",
-          "children": [
-            "bar_home",
-            "bar_actions",
-            "bar_inputs",
-            "bar_overlays"
-          ],
-          "showIn": [
-            "compact"
-          ]
-        },
-        {
-          "id": "nav_rail",
-          "component": "NavigationRail",
-          "children": [
-            "rail_home",
-            "rail_actions",
-            "rail_inputs",
-            "rail_overlays"
-          ],
-          "showIn": [
-            "medium",
-            "expanded"
-          ],
-          "sizeClass": {
-            "expanded": {
-              "expanded": true
             }
           }
         },
@@ -3473,9 +2948,7 @@
           "component": "Scaffold",
           "topBar": "top",
           "content": "body",
-          "bottomBar": "nav_bar",
-          "floatingActionButton": "fab",
-          "navigationRail": "rail"
+          "floatingActionButton": "fab"
         },
         {
           "id": "top",
@@ -3579,36 +3052,6 @@
           "contentDescription": "New plate"
         },
         {
-          "id": "nav_bar",
-          "component": "NavigationBar",
-          "children": [
-            "nav_home",
-            "nav_chat",
-            "nav_saved"
-          ]
-        },
-        {
-          "id": "nav_home",
-          "component": "NavigationBarItem",
-          "label": "Home",
-          "icon": "home",
-          "selected": true
-        },
-        {
-          "id": "nav_chat",
-          "component": "NavigationBarItem",
-          "label": "Chat",
-          "icon": "chat",
-          "badge": 12
-        },
-        {
-          "id": "nav_saved",
-          "component": "NavigationBarItem",
-          "label": "Saved",
-          "icon": "favorite",
-          "badge": true
-        },
-        {
           "id": "filters",
           "component": "SideSheet",
           "title": "Filters",
@@ -3688,32 +3131,6 @@
           "id": "restored",
           "component": "Snackbar",
           "message": "Plate restored"
-        },
-        {
-          "id": "rail",
-          "component": "NavigationRail",
-          "children": [
-            "rail_home",
-            "rail_chat"
-          ],
-          "showIn": [
-            "medium",
-            "expanded"
-          ]
-        },
-        {
-          "id": "rail_home",
-          "component": "NavigationRailItem",
-          "label": "Home",
-          "icon": "home",
-          "selected": true
-        },
-        {
-          "id": "rail_chat",
-          "component": "NavigationRailItem",
-          "label": "Chat",
-          "icon": "chat",
-          "badge": "9+"
         }
       ]
     },

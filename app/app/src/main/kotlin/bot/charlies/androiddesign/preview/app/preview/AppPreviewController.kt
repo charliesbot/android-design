@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.app.preview
 
 import bot.charlies.androiddesign.preview.app.export.KotlinExport
+import bot.charlies.androiddesign.preview.domain.CheckedColors
 import bot.charlies.androiddesign.preview.domain.OpenedProposal
 import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.PreviewController
@@ -173,13 +174,16 @@ class AppPreviewController(
     val specs = views.orEmpty().distinct().map { viewNamed(it, catalog) }.ifEmpty { catalog.views }
     val started = System.nanoTime()
     val results = linkedMapOf<String, Map<String, ViewCheck>>()
+    val colors = CheckedColors()
     for (screen in screenIds) {
-      val base = specs.associate { view -> view.name to check(proposal, snapshot, screen, view) }
+      val base = specs.associate { view ->
+        view.name to check(proposal, snapshot, screen, view, colors)
+      }
       results[screen] = base
       // One more render per overlay of the screen, with it open, under the name `screen+overlay`.
       for (overlay in OverlayPlacement(proposal.screens.getValue(screen)).overlays) {
         results[OverlayPlacement.renderName(screen, overlay.id)] = specs.associate { view ->
-          val verdict = check(proposal, snapshot, screen, view, overlay.id)
+          val verdict = check(proposal, snapshot, screen, view, colors, overlay.id)
           view.name to verdict.overlaying(base.getValue(view.name))
         }
       }
@@ -187,20 +191,22 @@ class AppPreviewController(
     return ProposalCheck(
       pass = results.values.all { views -> views.values.all { it.pass } },
       ms = (System.nanoTime() - started) / NANOS_PER_MS,
-      screens = results,
+      colors = colors.toMap(),
+      screens = results.mapValues { (_, views) -> ViewCheck.collapse(views) },
     )
   }
 
   /**
-   * One fresh headless render, with [overlay] open when given. A render that throws fails its view
-   * and not the whole check. An overlay render leaves out the layout summary, which is the screen's
-   * and not the overlay's, to keep the result small.
+   * One fresh headless render, with [overlay] open when given, whose colors go into [colors]. A
+   * render that throws fails its view and not the whole check. An overlay render leaves out the
+   * layout summary, which is the screen's and not the overlay's, to keep the result small.
    */
   private suspend fun check(
     proposal: Proposal,
     snapshot: ProposalSnapshot,
     screen: String,
     view: ViewSpec,
+    colors: CheckedColors,
     overlay: String? = null,
   ): ViewCheck {
     val tree =
@@ -211,6 +217,7 @@ class AppPreviewController(
       } catch (e: Exception) {
         return ViewCheck.renderError(e)
       }
+    colors.add(tree)
     return ViewCheck.of(proposal, tree)
   }
 

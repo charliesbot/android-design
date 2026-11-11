@@ -69,6 +69,16 @@ class WearProposalTest {
   }
 
   @Test
+  fun `wear proposals have no app navigation`() {
+    val destinations =
+      "\"destinations\": [{\"screen\": \"home\", \"label\": \"Home\", \"icon\": \"home\"}]"
+    val declared = fixture.replace("\"start\": \"home\"", "\"start\": \"home\", $destinations")
+    errors(declared).assertHas("/navigation/destinations", "no navigation bar or rail")
+    errors(fixture.replace("\"start\": \"home\"", "\"start\": \"home\", \"railExpanded\": true"))
+      .assertHas("/navigation/railExpanded", "no navigation bar or rail")
+  }
+
+  @Test
   fun `wear color and type roles are validated against wear`() {
     errors(fixture.replace("primaryDim", "surface"))
       .assertHas("/screens/home/components/2/color", "not a color role")

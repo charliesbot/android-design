@@ -102,7 +102,7 @@ material:
 **`design/<slug>.proposal.json`** wraps A2UI content in our own envelope. The A2UI wrapper file allows no keys besides `messages`, so the envelope is ours. It holds:
 - `$schema` and a `format` version
 - an optional `theme` override with the same keys as `DESIGN.md`, for exploring a new look
-- `navigation`: the start screen, each screen's pane role, and optionally the screen a list pane's empty detail pane shows (`placeholders`)
+- `navigation`: the start screen, each screen's pane role, optionally the screen a list pane's empty detail pane shows (`placeholders`), and the app's top-level `destinations` (3 to 5, with `railExpanded`), drawn once as a bar at compact and a rail from medium up, outside the panes
 - `screens`: one A2UI `createSurface` body per screen, with its components and its sample `dataModel`
 
 The app only reads the proposal; the agent owns the file and writes it one component per line, so diffs stay readable.
@@ -168,7 +168,7 @@ The owner can also launch the app from Finder or `open`. Those start from launch
 
 **Tools:**
 - `open_proposal(path)`
-- `check_proposal(screens?, views?)`: every screen at all five views by default, tree-only, returning pass or fail per view, each error grouped by rule with its node ids, and a `layout` summary per view (navigation shown, panes, and each pane's main regions as `Type id width`, under 300 bytes) so the agent confirms adaptation without full trees. About 0.2 s for one screen at five views.
+- `check_proposal(screens?, views?)`: every screen at all five views by default, tree-only, returning pass or fail per view, each error grouped by rule with its node ids, `notes` (the info findings, by rule with ids, never a failure), and a `layout` summary per view (navigation shown, panes, and each pane's main regions as `Type id width`, under 300 bytes) so the agent confirms adaptation without full trees. A view equal to an earlier one of the screen is only `{"same": "<view>"}`, and a top-level `colors` gives the hex of each color role the renders use, for light and dark, so contrast and fill strength are judged without a tree. About 0.2 s for one screen at five views.
 - `get_tree(screen?, view?)`: the full tree of one view
 - `set_view(device?, dark?, seed?, variant?, screen?)`: changes the window only; `screen` moves it to a screen as the side panel does
 - `show_preview()`
@@ -229,7 +229,7 @@ Color and type roles come from the proposal and theme, so the app computes contr
 
 The finding rules carry over from v2's runtime checks, with v2's thresholds:
 - touch targets of at least 48 dp
-- the bundled families per type role: Google Sans Flex for plain text, a brand face only on display and headline
+- the bundled families per type role: Google Sans Flex for plain text, a brand face only on display, headline, and large title (Doto on display only)
 - clipped text, and truncated or wrapped labels on buttons, chips, and navigation items
 - contrast of each text and background pair
 - the primary action as the largest interactive element in its pane

@@ -329,6 +329,26 @@ class McpIntegrationTest {
   }
 
   @Test
+  fun `check_proposal returns exactly the documented shape`() {
+    connect()
+    call("open_proposal", mapOf("path" to workspace().toString()))
+
+    val text =
+      call(
+          "check_proposal",
+          mapOf("screens" to listOf("plate_detail"), "views" to listOf("light", "dark")),
+        )
+        .text()
+
+    // The one field that varies between runs is how long the renders took.
+    val withoutMs = text.replace(Regex(""","ms":\d+"""), "")
+    assertEquals(
+      """{"pass":true,"colors":{"light":{"background":"#FFF8F6","onBackground":"#522612","onPrimary":"#FFF7F6","onSurface":"#522612","onSurfaceVariant":"#87513A","primary":"#9C442F","surface":"#FFF8F6"},"dark":{"background":"#1B0A04","onBackground":"#FFDFD3","onPrimary":"#6D3022","onSurface":"#FFDFD3","onSurfaceVariant":"#D49F8A","primary":"#FFB8A8","surface":"#1B0A04"}},"screens":{"plate_detail":{"light":{"pass":true,"layout":{"nav":"none","panes":{"plate_detail":["Text hero_title 379","Text desc 379","Button cook 203"]}}},"dark":{"same":"light"}}}}""",
+      withoutMs,
+    )
+  }
+
+  @Test
   fun `a problem the agent can fix is a tool error that says what to do`() {
     connect()
     val noProposal = call("get_tree")

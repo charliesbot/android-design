@@ -5,6 +5,7 @@ import bot.charlies.androiddesign.preview.data.FileProposalRepository
 import bot.charlies.androiddesign.preview.domain.PreviewException
 import bot.charlies.androiddesign.preview.domain.ProposalCheck
 import bot.charlies.androiddesign.preview.domain.ViewChange
+import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.catalog.CatalogJson
 import bot.charlies.androiddesign.preview.domain.layout.ViewLayout
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
@@ -333,6 +334,74 @@ class AppPreviewControllerTest {
   }
 
   @Test
+  fun `check_proposal writes a view that repeats an earlier one as same, and still fails on it`() =
+    runBlocking {
+      controller.openProposal(workspace().toString())
+
+      val check = controller.checkProposal(screens = listOf("plates"))
+
+      val views = check.screens.getValue("plates")
+      assertNull(views.getValue("light").same)
+      assertEquals("light", views.getValue("dark").same, "dark looks like light")
+      assertNull(views.getValue("tablet").same, "a wider view shows more and stays whole")
+      val failing = workspace()
+      Files.writeString(
+        failing,
+        Files.readString(failing)
+          .replace(
+            "\"label\": \"Cook\"",
+            "\"label\": \"A label that is far too long to fit on one line of a phone\"",
+          ),
+      )
+      controller.openProposal(failing.toString())
+      val broken =
+        controller.checkProposal(screens = listOf("plate_detail"), views = listOf("light", "dark"))
+      assertFalse(broken.pass, "the overall verdict comes from the views, not the collapsed map")
+      assertEquals("light", broken.screens.getValue("plate_detail").getValue("dark").same)
+    }
+
+  @Test
+  fun `check_proposal lists the colors of the roles the renders draw with, once per brightness`() =
+    runBlocking {
+      controller.openProposal(workspace().toString())
+
+      val both = controller.checkProposal(screens = listOf("plate_detail"))
+      assertEquals(listOf("light", "dark"), both.colors.keys.toList())
+      for (colors in both.colors.values) {
+        assertEquals(colors.keys.sorted(), colors.keys.toList(), "sorted by role name")
+        assertTrue(colors.values.all { Regex("#[0-9A-F]{6}").matches(it) }, colors.toString())
+      }
+      assertNotEquals(both.colors.getValue("light"), both.colors.getValue("dark"))
+
+      val light =
+        controller.checkProposal(screens = listOf("plate_detail"), views = listOf("light"))
+      assertEquals(listOf("light"), light.colors.keys.toList())
+      // The light brightness also covers the foldable, tablet and desktop views, which draw more.
+      assertTrue(
+        both.colors.getValue("light").entries.containsAll(light.colors.getValue("light").entries),
+      )
+
+      val tree = controller.getTree("plate_detail", "light")
+      val drawn =
+        tree.nodes.flatMap { listOfNotNull(it.roles?.container, it.roles?.content) }.toSortedSet()
+      assertEquals(drawn.toList(), light.colors.getValue("light").keys.toList())
+    }
+
+  @Test
+  fun `check_proposal lists a Wear proposal's colors for dark alone`() = runBlocking {
+    controller.openProposal(
+      Path.of(System.getProperty("repo.dir"))
+        .resolve("evals/verify/wear.verify.proposal.json")
+        .toString(),
+    )
+
+    val check = controller.checkProposal(screens = listOf("home"))
+
+    assertEquals(listOf("dark"), check.colors.keys.toList())
+    assertTrue(check.colors.getValue("dark").isNotEmpty())
+  }
+
+  @Test
   fun `check_proposal renders only the screens and views asked for`() = runBlocking {
     controller.openProposal(workspace().toString())
 
@@ -344,7 +413,7 @@ class AppPreviewControllerTest {
   }
 
   @Test
-  fun `check_proposal names the rule and the node of a failure and only counts info`() =
+  fun `check_proposal names the rule and the node of a failure and keeps info out of the errors`() =
     runBlocking {
       val file = workspace()
       Files.writeString(
@@ -385,6 +454,13 @@ class AppPreviewControllerTest {
     assertTrue(json.length < 4_500, "five views of 12 failures: ${json.length} characters")
   }
 
+  /** The verdict on [view] of [screen], following `same` to the view it repeats. */
+  private fun ProposalCheck.view(screen: String, view: String): ViewCheck {
+    val views = screens.getValue(screen)
+    val entry = views.getValue(view)
+    return entry.same?.let { views.getValue(it) } ?: entry
+  }
+
   private val verifyProposal: Path
     get() = Path.of(System.getProperty("repo.dir")).resolve("evals/verify/verify.proposal.json")
 
@@ -395,12 +471,17 @@ class AppPreviewControllerTest {
     val check = controller.checkProposal()
 
     fun layout(screen: String, view: String) =
-      assertNotNull(check.screens.getValue(screen).getValue(view).layout, "$screen/$view")
+      assertNotNull(check.view(screen, view).layout, "$screen/$view")
     assertEquals("NavigationBar", layout("home", "light").nav)
     assertEquals("NavigationBar", layout("home", "dark").nav)
     assertEquals("NavigationRail", layout("home", "tablet").nav)
     assertEquals("NavigationRail", layout("home", "desktop").nav)
     assertEquals("none", layout("fabs", "light").nav)
+    // The navigation is drawn once, outside the panes: it shows beside a destination's detail pane
+    // where two panes fit, and a compact detail that covers the window shows none.
+    assertEquals("NavigationRail", layout("detail", "tablet").nav)
+    assertEquals("none", layout("detail", "light").nav)
+    assertEquals("none", layout("detail", "foldable").nav)
     // The detail opens over the list up to medium (the foldable) and beside it from expanded up.
     assertEquals(listOf("detail"), layout("detail", "light").panes.keys.toList())
     assertEquals(listOf("detail"), layout("detail", "foldable").panes.keys.toList())
@@ -408,8 +489,8 @@ class AppPreviewControllerTest {
     val region = Regex("""[A-Z]\w+ \S+ \d+|\+\d+ more""")
     // An overlay render is the screen's with the overlay open, and has no summary of its own.
     for ((screen, views) in check.screens.filterKeys { '+' !in it }) {
-      for ((view, result) in views) {
-        val summary = assertNotNull(result.layout, "$screen/$view")
+      for (view in views.keys) {
+        val summary = assertNotNull(check.view(screen, view).layout, "$screen/$view")
         val json = PreviewJson.compact.encodeToString(ViewLayout.serializer(), summary)
         assertTrue(json.length <= 300, "$screen/$view is ${json.length} bytes: $json")
         assertTrue(summary.panes.values.flatten().all(region::matches), json)
@@ -445,7 +526,7 @@ class AppPreviewControllerTest {
         )
       }
       val json = PreviewJson.compact.encodeToString(ProposalCheck.serializer(), check)
-      assertTrue(json.length < 9_000, "twelve overlays by two views: ${json.length} characters")
+      assertTrue(json.length < 4_000, "twelve overlays by two views: ${json.length} characters")
     }
 
   @Test

@@ -30,24 +30,48 @@ class ViewCheckTest {
   fun `a tree without findings passes and carries its layout`() {
     val check = ViewCheck.of(proposal, treeOf())
     assertTrue(check.pass)
-    assertEquals(0, check.info)
+    assertEquals(emptyList(), check.notes)
     assertEquals(emptyList(), check.errors)
     assertNotNull(check.layout)
   }
 
   @Test
-  fun `info findings are counted and do not fail the view`() {
+  fun `info findings are notes grouped by rule with their ids and no detail, and do not fail the view`() {
     val check =
       ViewCheck.of(
         proposal,
         treeOf(
           Finding("a", FindingRule.Contrast, Severity.Info, "low"),
+          Finding("row[1]", FindingRule.TextTruncated, Severity.Info, "cut"),
           Finding("b", FindingRule.Contrast, Severity.Info, "low"),
+          Finding(null, FindingRule.Offscreen, Severity.Info, "whole view"),
         ),
       )
     assertTrue(check.pass)
-    assertEquals(2, check.info)
+    assertEquals(
+      listOf(
+        CheckNote("contrast", listOf("a", "b")),
+        CheckNote("text-truncated", listOf("row[1]")),
+        CheckNote("offscreen"),
+      ),
+      check.notes,
+    )
     assertEquals(emptyList(), check.errors)
+  }
+
+  @Test
+  fun `a view with notes and an error fails on the error alone`() {
+    val check =
+      ViewCheck.of(
+        proposal,
+        treeOf(
+          Finding("a", FindingRule.Contrast, Severity.Info, "low"),
+          error(FindingRule.OneFab, "fab", "two"),
+        ),
+      )
+    assertEquals(false, check.pass)
+    assertEquals(listOf("one-fab"), check.errors.map { it.rule })
+    assertEquals(listOf("contrast"), check.notes.map { it.rule })
   }
 
   @Test

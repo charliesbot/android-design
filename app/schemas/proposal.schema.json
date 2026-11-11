@@ -257,10 +257,67 @@
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "destinations": {
+          "type": "array",
+          "description": "The app's top-level destinations, 3 to 5, drawn once around the screens and outside every pane: a bottom bar at compact widths, a rail at medium and expanded widths. Leave it out for a proposal with no app-level navigation. Phone catalog only.",
+          "minItems": 3,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/Destination"
+          }
+        },
+        "railExpanded": {
+          "type": "boolean",
+          "description": "Show the rail expanded where the window is expanded (840 dp and up); it is collapsed at medium either way. Default false. Phone catalog only."
         }
       },
       "required": [
         "start"
+      ],
+      "additionalProperties": false
+    },
+    "Destination": {
+      "type": "object",
+      "description": "One top-level destination: the screen it opens, with its label and icon. A tap makes that screen the whole back stack.",
+      "properties": {
+        "screen": {
+          "type": "string",
+          "description": "The screen it opens: a screen of the proposal that is no detail, supporting or extra pane and no placeholder, and that no other destination opens."
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "icon": {
+          "type": "string",
+          "description": "A Material Symbols name."
+        },
+        "selectedIcon": {
+          "type": "string",
+          "description": "A Material Symbols name drawn while it is selected."
+        },
+        "badge": {
+          "description": "true draws a small badge; a number or a string of at most 4 characters draws a large one. A literal only.",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number",
+              "maximum": 9999
+            },
+            {
+              "type": "string",
+              "maxLength": 4
+            }
+          ]
+        }
+      },
+      "required": [
+        "screen",
+        "label",
+        "icon"
       ],
       "additionalProperties": false
     },
@@ -612,22 +669,10 @@
           "$ref": "#/$defs/component.TopAppBar"
         },
         {
-          "$ref": "#/$defs/component.NavigationBar"
-        },
-        {
-          "$ref": "#/$defs/component.NavigationBarItem"
-        },
-        {
           "$ref": "#/$defs/component.Tabs"
         },
         {
           "$ref": "#/$defs/component.Tab"
-        },
-        {
-          "$ref": "#/$defs/component.NavigationRail"
-        },
-        {
-          "$ref": "#/$defs/component.NavigationRailItem"
         },
         {
           "$ref": "#/$defs/component.FloatingToolbar"
@@ -793,7 +838,7 @@
         },
         "maxWidth": {
           "$ref": "#/$defs/DynamicNumber",
-          "description": "The widest the component draws, in dp. It still stretches up to that width where it would fill; the parent's alignment places it. Material: \"Set a max width on content and components to prevent stretching full width.\" Must be a whole number from 120 to 1600."
+          "description": "The widest the component draws, in dp. It still stretches up to that width where it would fill; the parent's alignment places it. Material: \"Set a max width on content and components to prevent stretching full width.\" Must be a whole number from 24 to 1600."
         },
         "itemSize": {
           "type": "string",
@@ -1491,7 +1536,7 @@
     },
     "component.Scaffold": {
       "type": "object",
-      "description": "The screen frame: bars, floating action button and content.",
+      "description": "The screen frame: top bar, bottom toolbar, floating action button and content. Navigation is not a slot of it: a bottom bar or a rail is declared once for the whole proposal in navigation.destinations.",
       "x-compose": "Scaffold",
       "allOf": [
         {
@@ -1511,7 +1556,6 @@
         "bottomBar": {
           "$ref": "#/$defs/Child",
           "x-allowedComponents": [
-            "NavigationBar",
             "FloatingToolbar",
             "DockedToolbar"
           ]
@@ -1525,12 +1569,6 @@
         },
         "content": {
           "$ref": "#/$defs/Child"
-        },
-        "navigationRail": {
-          "$ref": "#/$defs/Child",
-          "x-allowedComponents": [
-            "NavigationRail"
-          ]
         }
       },
       "required": [
@@ -1601,102 +1639,6 @@
       "required": [
         "component",
         "title"
-      ],
-      "unevaluatedProperties": false
-    },
-    "component.NavigationBar": {
-      "type": "object",
-      "description": "Bottom navigation for compact windows.",
-      "x-compose": "ShortNavigationBar",
-      "x-m3-pages": [
-        "navigation-bar"
-      ],
-      "allOf": [
-        {
-          "$ref": "#/$defs/ComponentCommon"
-        }
-      ],
-      "properties": {
-        "component": {
-          "const": "NavigationBar"
-        },
-        "children": {
-          "$ref": "#/$defs/ChildList",
-          "x-allowedComponents": [
-            "NavigationBarItem"
-          ]
-        }
-      },
-      "required": [
-        "component",
-        "children"
-      ],
-      "unevaluatedProperties": false
-    },
-    "component.NavigationBarItem": {
-      "type": "object",
-      "description": "One destination of a NavigationBar.",
-      "x-compose": "ShortNavigationBarItem",
-      "x-m3-pages": [
-        "navigation-bar",
-        "badges"
-      ],
-      "x-interactive": true,
-      "allOf": [
-        {
-          "$ref": "#/$defs/ComponentCommon"
-        }
-      ],
-      "properties": {
-        "component": {
-          "const": "NavigationBarItem"
-        },
-        "label": {
-          "$ref": "#/$defs/DynamicString"
-        },
-        "icon": {
-          "$ref": "#/$defs/DynamicString",
-          "description": "Material Symbols name, such as \"home\"."
-        },
-        "selectedIcon": {
-          "$ref": "#/$defs/DynamicString",
-          "description": "Material Symbols name, such as \"home\"."
-        },
-        "selected": {
-          "$ref": "#/$defs/DynamicBoolean",
-          "default": false
-        },
-        "badge": {
-          "oneOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "number",
-              "maximum": 9999
-            },
-            {
-              "type": "string",
-              "maxLength": 4
-            },
-            {
-              "$ref": "#/$defs/DataBinding"
-            },
-            {
-              "$ref": "#/$defs/IndexCall"
-            }
-          ],
-          "description": "A badge on the icon's upper trailing corner: true draws a small one, a number or a string of at most 4 characters (such as \"99+\") draws a large one with that text."
-        },
-        "action": {
-          "$ref": "#/$defs/Action",
-          "description": "What a tap does."
-        }
-      },
-      "required": [
-        "component",
-        "label",
-        "icon"
       ],
       "unevaluatedProperties": false
     },
@@ -1801,106 +1743,6 @@
       "required": [
         "component",
         "label"
-      ],
-      "unevaluatedProperties": false
-    },
-    "component.NavigationRail": {
-      "type": "object",
-      "description": "Side navigation for medium and expanded windows.",
-      "x-compose": "WideNavigationRail",
-      "x-m3-pages": [
-        "navigation-rail"
-      ],
-      "allOf": [
-        {
-          "$ref": "#/$defs/ComponentCommon"
-        }
-      ],
-      "properties": {
-        "component": {
-          "const": "NavigationRail"
-        },
-        "children": {
-          "$ref": "#/$defs/ChildList",
-          "x-allowedComponents": [
-            "NavigationRailItem"
-          ]
-        },
-        "expanded": {
-          "$ref": "#/$defs/DynamicBoolean",
-          "default": false
-        }
-      },
-      "required": [
-        "component",
-        "children"
-      ],
-      "unevaluatedProperties": false
-    },
-    "component.NavigationRailItem": {
-      "type": "object",
-      "description": "One destination of a NavigationRail.",
-      "x-compose": "WideNavigationRailItem",
-      "x-m3-pages": [
-        "navigation-rail",
-        "badges"
-      ],
-      "x-interactive": true,
-      "allOf": [
-        {
-          "$ref": "#/$defs/ComponentCommon"
-        }
-      ],
-      "properties": {
-        "component": {
-          "const": "NavigationRailItem"
-        },
-        "label": {
-          "$ref": "#/$defs/DynamicString"
-        },
-        "icon": {
-          "$ref": "#/$defs/DynamicString",
-          "description": "Material Symbols name, such as \"home\"."
-        },
-        "selectedIcon": {
-          "$ref": "#/$defs/DynamicString",
-          "description": "Material Symbols name, such as \"home\"."
-        },
-        "selected": {
-          "$ref": "#/$defs/DynamicBoolean",
-          "default": false
-        },
-        "badge": {
-          "oneOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "number",
-              "maximum": 9999
-            },
-            {
-              "type": "string",
-              "maxLength": 4
-            },
-            {
-              "$ref": "#/$defs/DataBinding"
-            },
-            {
-              "$ref": "#/$defs/IndexCall"
-            }
-          ],
-          "description": "A badge on the icon's upper trailing corner: true draws a small one, a number or a string of at most 4 characters (such as \"99+\") draws a large one with that text."
-        },
-        "action": {
-          "$ref": "#/$defs/Action",
-          "description": "What a tap does."
-        }
-      },
-      "required": [
-        "component",
-        "label",
-        "icon"
       ],
       "unevaluatedProperties": false
     },

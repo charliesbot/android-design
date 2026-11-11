@@ -42,6 +42,38 @@ data class Navigation(
    * navigates to.
    */
   val placeholders: Map<String, String> = emptyMap(),
+  /**
+   * The top-level destinations, 3 to 5, drawn once around the screens and outside every pane: a
+   * bottom bar at compact widths and a rail from medium up. Absent when the proposal has no
+   * app-level navigation.
+   */
+  val destinations: List<Destination>? = null,
+  /**
+   * Whether the rail is expanded where the window is expanded (840 dp and up); it is collapsed at
+   * medium either way. Absent is false.
+   */
+  val railExpanded: Boolean? = null,
+) {
+  companion object {
+    /** Material: a navigation bar holds "three to five" destinations, a rail the same. */
+    const val MIN_DESTINATIONS = 3
+    const val MAX_DESTINATIONS = 5
+  }
+}
+
+/**
+ * One destination of `navigation.destinations`: the [screen] it opens, its [label] and its [icon]
+ * (and [selectedIcon] while it is selected), and an optional [badge]: `true`, a number or text of
+ * at most [PropKind.BADGE_MAX_CHARACTERS] characters. A literal only, since this level of the
+ * proposal has no data model.
+ */
+@Serializable
+data class Destination(
+  val screen: String,
+  val label: String,
+  val icon: String,
+  val selectedIcon: String? = null,
+  val badge: JsonElement? = null,
 )
 
 @Serializable
