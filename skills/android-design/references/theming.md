@@ -158,7 +158,7 @@ Voice starting points (tune them to the screen's direction; they are not presets
 
 ### Brand faces (Display and Headline only)
 
-Optional: one face from the set below on Display and Headline styles, with everything else on Google Sans Flex. The face set, one face per proposal, Doto's display-only limit, and keeping Title on Google Sans Flex are this skill's choices, not Google's. All are OFL and bundled as variable TTFs with the previewer app that `android-design-explore` drives (`app/features/preview/desktop/src/main/resources/fonts/` in this skill's repository; copy them into the app's `res/font/`), so an exploration never fetches fonts. Material calls this the brand typeface (larger styles, "to focus on expression") against the plain typeface (smaller styles, "to focus on readability"); do not use a brand face on Body or Label.
+Optional: one face from the set below on Display and Headline styles, with everything else on Google Sans Flex. The face set, one face per proposal, Doto's display-only limit, and keeping Title on Google Sans Flex are this skill's choices, not Google's. All are OFL and bundled as variable TTFs with the previewer app that `android-design-explore` drives, so an exploration never fetches fonts. A real app bundles the variable TTF of each face it uses in `res/font/`. Material calls this the brand typeface (larger styles, "to focus on expression") against the plain typeface (smaller styles, "to focus on readability"); do not use a brand face on Body or Label.
 
 | Face | File | Axes | Use for | Starting point |
 | --- | --- | --- | --- | --- |
