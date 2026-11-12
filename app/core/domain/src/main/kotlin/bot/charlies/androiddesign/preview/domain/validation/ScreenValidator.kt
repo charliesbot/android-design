@@ -92,6 +92,7 @@ internal class ScreenValidator(
     validateSelections()
     validateDialogsAndPickers()
     detectCycles()
+    detectSharedChildren()
   }
 
   /**
@@ -890,6 +891,70 @@ internal class ScreenValidator(
       done += id
     }
     screen.components.forEach { visit(it.id, emptyList()) }
+  }
+
+  /**
+   * A component under two parents would be drawn twice, but the tree and the checks hold one node
+   * per id, so the second copy would have no findings or geometry. At each width the catalog
+   * distinguishes (the base props, then each `sizeClass` breakpoint), an id may be listed once. The
+   * parents are every component nothing references and everything below them, overlays included,
+   * even one that is never drawn, so an agent never has to judge what is drawn. Only `showIn` takes
+   * a parent out of a width. Listing an id twice, in one parent or in two, is the same mistake; a
+   * parent's base props and its `sizeClass` override are read as the one set of props in effect, so
+   * they never count twice.
+   */
+  private fun detectSharedChildren() {
+    val referenced = screen.components.flatMap { referencedIds(it) }.toSet()
+    val roots = screen.components.filter { it.id !in referenced && it.id.isNotEmpty() }
+    val reported = mutableSetOf<String>()
+    for ((label, widthDp, size) in sharedChildViews()) {
+      val refsOf = linkedMapOf<String, MutableList<Pair<ComponentNode, String>>>()
+      val drawn = mutableSetOf<String>()
+      fun shown(node: ComponentNode) = size == null || node.isShownAt(size)
+      fun draw(node: ComponentNode) {
+        if (!shown(node) || !drawn.add(node.id)) return
+        val props = node.props + node.sizeOverridesAt(catalog.sizeBreakpoints, widthDp)
+        for (ref in ChildGraph.childRefs(node.component, props, catalog)) {
+          val child = byId[ref.id] ?: continue
+          if (!shown(child)) continue
+          refsOf.getOrPut(ref.id) { mutableListOf() } += node to ref.prop
+          draw(child)
+        }
+      }
+      roots.forEach(::draw)
+      for ((id, refs) in refsOf) {
+        if (refs.size < 2 || !reported.add(id)) continue
+        val byParent = refs.groupBy({ it.first.id }, { it.second })
+        val named =
+          byParent.entries.joinToString(" and ") { (parent, props) ->
+            "'$parent' (${props.joinToString(", ")})"
+          }
+        val listed = if (byParent.size == 1) "more than once by" else "by both"
+        val second =
+          refs
+            .map { it.first }
+            .let { nodes -> nodes.firstOrNull { it.id != nodes[0].id } ?: nodes[0] }
+        sink.add(
+          componentsPath.child(screen.components.indexOf(second)),
+          "'$id' is listed $listed $named $label; a component is drawn under one parent, so " +
+            "give each use its own id",
+        )
+      }
+    }
+  }
+
+  /**
+   * The widths at which props differ: the base props, then each `sizeClass` breakpoint of the
+   * catalog, each with how the error names it and the size class `showIn` reads, which only a
+   * catalog with `showIn` sizes has.
+   */
+  private fun sharedChildViews(): List<Triple<String, Int, SizeClass?>> {
+    fun sizeAt(widthDp: Int) =
+      if (catalog.showInSizes.isEmpty()) null
+      else catalog.showInSizes.lastOrNull { it.minWidthDp <= widthDp }
+    val base = Triple(sizeAt(0)?.let { "at ${it.wire}" } ?: "in the base props", 0, sizeAt(0))
+    return listOf(base) +
+      catalog.sizeBreakpoints.map { Triple("at ${it.key}", it.minWidthDp, sizeAt(it.minWidthDp)) }
   }
 
   private fun referencedIds(node: ComponentNode): List<String> =

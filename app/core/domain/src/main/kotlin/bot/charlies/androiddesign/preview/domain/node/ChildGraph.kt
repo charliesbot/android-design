@@ -37,6 +37,9 @@ fun JsonElement?.childId(): String? = (this as? JsonPrimitive)?.takeIf { it.isSt
  * child.
  */
 object ChildGraph {
+  /** A child [id] that a node holds through its child prop [prop]. */
+  class ChildRef(val prop: String, val id: String)
+
   /**
    * The ids [node] holds through its child props, a template counting once by its component id.
    * With [withSizeOverrides], ids named only in a `sizeClass` override count too, for questions
@@ -47,7 +50,6 @@ object ChildGraph {
     catalog: Catalog,
     withSizeOverrides: Boolean = false,
   ): List<String> {
-    val def = catalog.find(node.component) ?: return emptyList()
     val sources = buildList {
       add(node.props)
       if (withSizeOverrides) {
@@ -56,9 +58,23 @@ object ChildGraph {
         }
       }
     }
-    return sources.flatMap { props ->
-      def.props.flatMap { prop ->
-        val value = props[prop.name]
+    return sources.flatMap { props -> childRefs(node.component, props, catalog).map { it.id } }
+  }
+
+  /**
+   * The children a component named [component] holds through the child props in [props], which may
+   * be its base props or the props in effect at one size. A template counts once by its component
+   * id.
+   */
+  fun childRefs(
+    component: String,
+    props: Map<String, JsonElement>,
+    catalog: Catalog,
+  ): List<ChildRef> {
+    val def = catalog.find(component) ?: return emptyList()
+    return def.props.flatMap { prop ->
+      val value = props[prop.name]
+      val ids =
         when (prop.kind) {
           PropKind.Child -> listOfNotNull(value.childId())
           PropKind.ChildList ->
@@ -69,7 +85,7 @@ object ChildGraph {
             }
           else -> emptyList()
         }
-      }
+      ids.map { ChildRef(prop.name, it) }
     }
   }
 }

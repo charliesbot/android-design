@@ -32,6 +32,7 @@ class PickerValidatorTest {
   private fun dialog(extra: String) =
     base
       .with("save", """{"id":"save","component":"Button","variant":"text","label":"Save"}""")
+      .with("note", """{"id":"note","component":"Text","text":"Body"}""")
       .with("pick", """{"id":"pick","component":"Dialog","title":"New"$extra}""")
 
   @Test
@@ -48,7 +49,7 @@ class PickerValidatorTest {
       emptyList(),
       errors(
         dialog(
-          ""","variant":"full-screen","confirm":"save","content":["save"],"showIn":["compact"]""",
+          ""","variant":"full-screen","confirm":"save","content":["note"],"showIn":["compact"]""",
         ),
       ),
     )
@@ -110,12 +111,12 @@ class PickerValidatorTest {
     assertEquals(emptyList(), errors(adaptive))
     val dialog =
       dialog(
-        ""","variant":"full-screen","confirm":"save","content":["save"],"sizeClass":{"expanded":{"variant":"full-screen"}}""",
+        ""","variant":"full-screen","confirm":"save","content":["note"],"sizeClass":{"expanded":{"variant":"full-screen"}}""",
       )
     errors(dialog).assertHas(path(dialog, "pick") + "/variant", "at medium, expanded")
     val shownCompactOnly =
       dialog(
-        ""","variant":"full-screen","confirm":"save","content":["save"],"showIn":["compact"]""",
+        ""","variant":"full-screen","confirm":"save","content":["note"],"showIn":["compact"]""",
       )
     assertEquals(emptyList(), errors(shownCompactOnly))
   }

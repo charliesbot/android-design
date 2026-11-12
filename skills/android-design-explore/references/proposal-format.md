@@ -95,7 +95,7 @@ Writing the file is most of the time a proposal takes, so keep it short:
 
 ## Data and bindings
 
-Any text, number, boolean, `badge`, `icon`, or image `src` prop may be a binding instead of a literal: `{"@path": "/user/name"}` reads from the screen's `dataModel`. Inside a template, a relative path reads from the current item: `{"@path": "name"}`, and `{"@call": "@index"}` is the item's index. Keep sample data representative and non-sensitive. Everything else is a literal: color and type roles, shapes, spacing, enums such as `variant`, child references, and actions. A template repeats one component, so to vary one of those per item write the items out as separate components. A component id that two parents list draws once under each, but the tree and the checks keep only one of the two (the last parent), so give each use its own id.
+Any text, number, boolean, `badge`, `icon`, or image `src` prop may be a binding instead of a literal: `{"@path": "/user/name"}` reads from the screen's `dataModel`. Inside a template, a relative path reads from the current item: `{"@path": "name"}`, and `{"@call": "@index"}` is the item's index. Keep sample data representative and non-sensitive. Everything else is a literal: color and type roles, shapes, spacing, enums such as `variant`, child references, and actions. A template repeats one component, so to vary one of those per item write the items out as separate components. A component id may be listed once per size class: the validator rejects an id that two parents both list, or one parent lists twice, overlays and components nothing references included, and a template's `componentId` counts as a listing, so give each use its own id.
 
 ## Actions
 

@@ -17,10 +17,10 @@ class CatalogSmokeTest {
   private val text = """{"id":"t1","component":"Text","text":"Hello"}"""
   private val text2 = """{"id":"t2","component":"Text","text":"World"}"""
 
-  /** Scaffold around a stage Column that holds `subject`. */
-  private fun inStage(subject: String, extra: String = "") =
+  /** Scaffold around a stage Column that holds `subject`, or [stageChild] when it wraps it. */
+  private fun inStage(subject: String, extra: String = "", stageChild: String = "subject") =
     """{"id":"root","component":"Scaffold","content":"stage"},""" +
-      """{"id":"stage","component":"Column","padding":"lg","spacing":"md","children":["subject"]},""" +
+      """{"id":"stage","component":"Column","padding":"lg","spacing":"md","children":["$stageChild"]},""" +
       "$subject,$text,$text2$extra"
 
   private fun inScaffold(slot: String, subject: String, extra: String = "") =
@@ -28,7 +28,8 @@ class CatalogSmokeTest {
 
   private val carouselItems =
     """,{"id":"c1","component":"Card","content":["t1"]},{"id":"c2","component":"Card","content":["t2"]},""" +
-      """{"id":"c3","component":"Card","content":["t1"]}"""
+      """{"id":"c3","component":"Card","content":["t3"]},""" +
+      """{"id":"t3","component":"Text","text":"Again"}"""
 
   private val action = """"action":{"functionCall":{"@call":"open","args":{"overlay":"menu"}}}"""
 
@@ -437,6 +438,7 @@ class CatalogSmokeTest {
         "RadioButton",
         inStage(
           """{"id":"group","component":"RadioGroup","children":["subject","r2"]},{"id":"subject","component":"RadioButton","label":"Small","selected":true},{"id":"r2","component":"RadioButton","label":"Large"}""",
+          stageChild = "group",
         ),
       ),
       Case("Slider", inStage("""{"id":"subject","component":"Slider","value":0.4,"steps":4}""")),
@@ -494,6 +496,7 @@ class CatalogSmokeTest {
         "MenuItem",
         inStage(
           """{"id":"anchor","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"menu"}}}},{"id":"menu","component":"Menu","anchor":"anchor","items":["subject"]},{"id":"subject","component":"MenuItem","label":"Edit","icon":"edit"}""",
+          stageChild = "anchor",
         ),
         open = "menu",
       ),
@@ -502,6 +505,7 @@ class CatalogSmokeTest {
         inStage(
           """{"id":"anchor","component":"Button","label":"More","action":{"functionCall":{"@call":"open","args":{"overlay":"menu"}}}},{"id":"menu","component":"Menu","anchor":"anchor","colors":"vibrant","items":["subject","g2"]},{"id":"subject","component":"MenuGroup","items":["s1","s2"]},{"id":"g2","component":"MenuGroup","items":["k1"]}""",
           """,{"id":"s1","component":"MenuItem","label":"Newest","role":"single","selected":true},{"id":"s2","component":"MenuItem","label":"Oldest","role":"single"},{"id":"k1","component":"MenuItem","label":"Unread","role":"multi"}""",
+          stageChild = "anchor",
         ),
         open = "menu",
       ),
