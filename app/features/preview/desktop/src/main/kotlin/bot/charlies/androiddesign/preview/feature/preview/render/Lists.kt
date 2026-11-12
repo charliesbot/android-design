@@ -27,7 +27,7 @@ internal fun RenderList(ctx: NodeContext) {
       ctx.Children(
         "children",
         0,
-        ChildHost(fillWidth = ctx.def.stretchesChildren, column = this, segmented = segmented),
+        ChildHost(fillWidth = ctx.stretchesChildren, column = this, segmented = segmented),
       )
     }
   }

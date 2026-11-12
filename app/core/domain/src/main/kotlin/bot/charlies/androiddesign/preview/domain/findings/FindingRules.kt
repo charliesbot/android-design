@@ -115,6 +115,7 @@ object FindingRules {
       fonts(view) +
       clippedText(view) +
       croppedByCarouselItem(view) +
+      undrawnText(view) +
       truncatedText(view) +
       truncatedLabels(view) +
       contrast(view) +
@@ -242,6 +243,22 @@ object FindingRules {
     view.nodes
       .filter { it.text?.let { text -> text.overflow && !text.truncated } == true }
       .map { errorFinding(it, FindingRule.TextClipped, "text is cut off with no ellipsis") }
+
+  /**
+   * Text with characters that drew no glyphs, or drew at zero width: a neighbor took all the room
+   * it was given. A node that is not laid out, sits behind a modal, or is in a carousel item (the
+   * mask hides item text by size, and `itemSize` decides what shows) draws nothing on purpose.
+   * Empty text is never reported as undrawn.
+   */
+  private fun undrawnText(view: View): List<Finding> =
+    view.nodes
+      .filter {
+        it.text?.undrawn == true &&
+          it.isLaidOut &&
+          !view.isBehindModal(it) &&
+          view.carouselItem(it) == null
+      }
+      .map { errorFinding(it, FindingRule.TextClipped, "text has no room: drawn 0 dp wide") }
 
   /**
    * A text in a carousel item that extends past the item's visible edges. The carousel's mask crops

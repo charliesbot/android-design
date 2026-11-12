@@ -306,7 +306,7 @@ internal fun RenderButtonGroup(ctx: NodeContext) {
         "children",
         0,
         ChildHost(
-          fillWidth = ctx.def.stretchesChildren,
+          fillWidth = ctx.stretchesChildren,
           row = this,
           connected = true,
           groupKey = ctx.id,
@@ -321,7 +321,7 @@ internal fun RenderButtonGroup(ctx: NodeContext) {
       ctx.Children(
         "children",
         0,
-        ChildHost(fillWidth = ctx.def.stretchesChildren, row = this, groupKey = ctx.id),
+        ChildHost(fillWidth = ctx.stretchesChildren, row = this, groupKey = ctx.id),
       )
     }
   }
@@ -794,7 +794,7 @@ internal fun RenderFabMenu(ctx: NodeContext) {
       }
     },
   ) {
-    ctx.Children("children", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, fabMenu = this))
+    ctx.Children("children", 0, ChildHost(fillWidth = ctx.stretchesChildren, fabMenu = this))
   }
 }
 

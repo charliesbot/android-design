@@ -63,23 +63,28 @@ class TextReport(
   val truncated: Boolean,
   /** The union of the line boxes, in pixels from the text's own origin. */
   val ink: Rect? = null,
+  /** The text has characters but drew no glyphs, or drew at zero width. */
+  val undrawn: Boolean = false,
 ) {
   companion object {
-    fun of(layout: TextLayoutResult) =
-      TextReport(
+    fun of(layout: TextLayoutResult): TextReport {
+      val ink =
+        if (layout.lineCount == 0) null
+        else
+          Rect(
+            (0 until layout.lineCount).minOf { layout.getLineLeft(it) },
+            layout.getLineTop(0),
+            (0 until layout.lineCount).maxOf { layout.getLineRight(it) },
+            layout.getLineBottom(layout.lineCount - 1),
+          )
+      return TextReport(
         lines = layout.lineCount,
         overflow = layout.hasVisualOverflow,
         truncated = (0 until layout.lineCount).any { layout.isLineEllipsized(it) },
-        ink =
-          if (layout.lineCount == 0) null
-          else
-            Rect(
-              (0 until layout.lineCount).minOf { layout.getLineLeft(it) },
-              layout.getLineTop(0),
-              (0 until layout.lineCount).maxOf { layout.getLineRight(it) },
-              layout.getLineBottom(layout.lineCount - 1),
-            ),
+        ink = ink,
+        undrawn = layout.layoutInput.text.text.isNotBlank() && (ink == null || ink.width <= 0f),
       )
+    }
   }
 }
 
@@ -368,6 +373,7 @@ class TreeRecorder {
       lines = primary?.lines ?: 1,
       overflow = reports.any { it.overflow },
       truncated = reports.any { it.truncated },
+      undrawn = reports.any { it.undrawn },
       font = meta.font,
       // The text of a one-text node starts at the node's origin.
       ink = reports.singleOrNull()?.ink?.translate(bounds.topLeft)?.toDp(density),

@@ -145,7 +145,7 @@ internal fun RenderRadioGroup(ctx: NodeContext) {
     ctx.Children(
       "children",
       0,
-      ChildHost(fillWidth = ctx.def.stretchesChildren, column = this, groupKey = ctx.id),
+      ChildHost(fillWidth = ctx.stretchesChildren, column = this, groupKey = ctx.id),
     )
   }
 }

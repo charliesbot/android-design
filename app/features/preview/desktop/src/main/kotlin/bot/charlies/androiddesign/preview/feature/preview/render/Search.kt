@@ -252,7 +252,7 @@ internal fun RenderSearchView(ctx: NodeContext) {
   val look = ctx.searchViewLook()
   val results: @Composable ColumnScope.() -> Unit = {
     CompositionLocalProvider(LocalAmbient provides Ambient(look.container, look.content)) {
-      ctx.Children("content", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))
+      ctx.Children("content", 0, ChildHost(fillWidth = ctx.stretchesChildren, column = this))
     }
   }
   if (host.docked) {

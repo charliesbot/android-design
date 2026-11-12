@@ -22,6 +22,7 @@ import bot.charlies.androiddesign.preview.domain.export.stmt
 import bot.charlies.androiddesign.preview.domain.export.textAlign
 import bot.charlies.androiddesign.preview.domain.export.verticalAlignment
 import bot.charlies.androiddesign.preview.model.ComponentNode
+import bot.charlies.androiddesign.preview.model.WearCatalog
 import bot.charlies.androiddesign.preview.model.WearComponent
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -34,9 +35,17 @@ internal fun WearScreenEmitter.wear(name: String): String = file.use(WearSym.m3(
 internal fun WearScreenEmitter.emitComponent(
   node: ComponentNode,
   p: JsonObject,
-  place: WearPlace,
-): List<Stmt> =
-  when (WearComponent.of(node.component)) {
+  placed: WearPlace,
+): List<Stmt> {
+  val weightedInRow = placed.parentType == "Row" && p.numberProp(node.component, "weight") != null
+  val place =
+    placed.copy(
+      wraps =
+        WearCatalog.find(node.component)?.wrapsAt(placed.parentStretches, weightedInRow) {
+          p[it]
+        } == true,
+    )
+  return when (WearComponent.of(node.component)) {
     WearComponent.Screen -> screenFrame(node, p, place)
     WearComponent.Column -> column(node, p, place)
     WearComponent.Row -> row(node, p, place)
@@ -70,6 +79,7 @@ internal fun WearScreenEmitter.emitComponent(
     WearComponent.AlertDialog,
     WearComponent.ConfirmationDialog -> emptyList()
   }
+}
 
 // region shared pieces
 

@@ -98,6 +98,12 @@ internal data class Place(
    */
   val fillWidth: Boolean = false,
   /**
+   * True when the component drawn here is meant to fill its parent's width but is not given it (see
+   * [bot.charlies.androiddesign.preview.model.ComponentDef.wrapsAt]): its children wrap instead of
+   * stretching. Read by [forChild], which sets it back for the children.
+   */
+  val wraps: Boolean = false,
+  /**
    * True for a child of a row whose `verticalAlignment` is `stretch`. A Column, Row, or Box here
    * gets `fillMaxHeight()`; every other component ignores it.
    */
@@ -126,8 +132,9 @@ internal data class Place(
     copy(
       parentType = parentType,
       inToolbar = parentType == "FloatingToolbar" || parentType == "DockedToolbar",
-      parentStretches = M3ExpressiveCatalog.find(parentType)?.stretchesChildren ?: false,
+      parentStretches = M3ExpressiveCatalog.find(parentType)?.stretchesChildrenWhen(wraps) ?: false,
       fillWidth = false,
+      wraps = false,
       fillHeight = false,
       modifierBase = "Modifier",
       leading = emptyList(),

@@ -48,6 +48,12 @@ internal data class WearPlace(
   val parentType: String? = null,
   /** The parent lets its children stretch to its width (`ComponentDef.stretchesChildren`). */
   val parentStretches: Boolean = true,
+  /**
+   * The component drawn here is meant to fill its parent's width but is not given it (see
+   * [bot.charlies.androiddesign.preview.model.ComponentDef.wrapsAt]): its children wrap. Read by
+   * [forChild].
+   */
+  val wraps: Boolean = false,
   /** A child of a fixed screen, or of a row that stretches: layouts fill the height. */
   val fillHeight: Boolean = false,
   /** The parent is a `Column`, `Row` or `Card`, whose scope takes `weight`. */
@@ -68,7 +74,7 @@ internal data class WearPlace(
     WearPlace(
       scope = scope,
       parentType = parentType,
-      parentStretches = WearCatalog.find(parentType)?.stretchesChildren ?: false,
+      parentStretches = WearCatalog.find(parentType)?.stretchesChildrenWhen(wraps) ?: false,
       weightable = parentType in WEIGHT_SCOPES,
       bodyLarge = bodyLarge && parentType !in RESTYLING_PARENTS,
     )

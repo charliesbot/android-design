@@ -115,6 +115,17 @@ internal class NodeContext(
   /** A number prop, moved into the bounds the catalog gives it (see [PropReader.number]). */
   fun number(key: String): Float? = reader.number(key)?.toFloat()
 
+  /**
+   * Whether this component stretches its children to its width. Not when it wraps (a Column in a
+   * list item's trailing slot, or an unweighted one in a Row): a stretched child would take all the
+   * width the slot offers. The exporter asks the catalog the same way.
+   */
+  val stretchesChildren: Boolean
+    get() =
+      def.stretchesChildrenWhen(
+        def.wrapsAt(host.fillWidth, host.row != null && number("weight") != null, props::value),
+      )
+
   /** A whole-number prop, moved into its bounds like [number]. */
   fun whole(key: String): Int? = number(key)?.toInt()
 

@@ -46,13 +46,18 @@ internal fun ScreenEmitter.emitComponent(
   val tooltip = placement.tooltipAt(node.id)?.let(byId::get)
   // The same rule the previewer uses: the catalog says who stretches and who lets its children,
   // read from the props with their bindings resolved against the screen's sample data.
-  val fillWidth =
-    place.parentStretches &&
-      M3ExpressiveCatalog.find(node.component)?.fillsWidth { props.sampleValue(it, place) } == true
+  val def = M3ExpressiveCatalog.find(node.component)
+  val fillWidth = place.parentStretches && def?.fillsWidth { props.sampleValue(it, place) } == true
+  val weightedInRow = place.parentType == "Row" && props.floatExpr("weight", place) != null
+  // A Scaffold's content layout fills the screen through its leading `fillMaxSize()`, not its
+  // parent.
+  val filled = place.parentStretches || "fillMaxSize()" in place.leading
+  val wraps = def?.wrapsAt(filled, weightedInRow) { props.sampleValue(it, place) } == true
   val inFlexBox = place.parentType == "FlexBox" && needsUnboundedHeight(node)
   val placed =
     place.copy(
       fillWidth = fillWidth,
+      wraps = wraps,
       leading = if (inFlexBox) place.leading + unboundedHeight() else place.leading,
     )
   val wrapped = menu != null || tooltip != null

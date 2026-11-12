@@ -149,8 +149,9 @@ enum class ComponentGroup {
  * @property rangeValued True when its `value` and `range` props must agree.
  * @property width When the component stretches to its parent's width, if the parent allows it.
  * @property stretchesChildren True when the parent lets its children stretch to its width (a Column
- *   does; a Row does not, since that would push its siblings out: they use `weight`). The renderer
- *   and the exporter both read these two, so a stretched child looks the same in both.
+ *   does; a Row does not, since that would push its siblings out: they use `weight`), as long as
+ *   the parent has a width to stretch to: see [wrapsAt]. The renderer and the exporter both read
+ *   these two, so a stretched child looks the same in both.
  * @property m3Pages The slugs of the Material 3 component pages this entry implements
  *   (`sources/m3.material.io/pages/components/<slug>.md`). Entries may share a page (`Tabs` and
  *   `Tab`), and an entry claims the page of each variant it draws (`FloatingActionButton` claims
@@ -188,6 +189,23 @@ data class ComponentDef(
       is WidthFill.UnlessIs -> (value(rule.prop) as? JsonPrimitive)?.content != rule.value
     }
   }
+
+  /**
+   * Whether a node of this component is meant to fill its parent's width but sits where it wraps:
+   * the parent does not stretch it ([parentStretches]) and it is not a weighted child of a row
+   * ([weightedInRow]). Its content then decides its width, so it must not stretch its own children:
+   * they would take every pixel the slot offers and squeeze their neighbors out. A component that
+   * does not fill ([fillsWidth]) sizes itself (a dialog) and is never wrapped. The renderer and the
+   * exporter both ask this, then [stretchesChildrenWhen].
+   */
+  fun wrapsAt(
+    parentStretches: Boolean,
+    weightedInRow: Boolean,
+    valueOf: (String) -> JsonElement?,
+  ): Boolean = !parentStretches && !weightedInRow && fillsWidth(valueOf)
+
+  /** Whether this component stretches its children, given whether it [wraps] ([wrapsAt]). */
+  fun stretchesChildrenWhen(wraps: Boolean): Boolean = stretchesChildren && !wraps
 
   /**
    * A bound number is not validated, so the renderer and the exporter both move it into the bounds

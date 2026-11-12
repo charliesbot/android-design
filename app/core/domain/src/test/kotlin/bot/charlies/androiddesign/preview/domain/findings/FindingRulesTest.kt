@@ -179,6 +179,52 @@ class FindingRulesTest {
   }
 
   @Test
+  fun `text-clipped is an error for text that drew at zero width`() {
+    val finding =
+      textNodeFindings(text(truncated = true, undrawn = true)).of(FindingRule.TextClipped).single()
+    assertEquals("desc", finding.id)
+    assertEquals(Severity.Error, finding.severity)
+    assertEquals("text has no room: drawn 0 dp wide", finding.detail)
+  }
+
+  @Test
+  fun `text-clipped leaves text that drew glyphs alone`() {
+    assertEquals(emptyList(), textNodeFindings(text(ink = Bounds(0f, 0f, 40f, 24f))))
+  }
+
+  @Test
+  fun `undrawn text is not flagged when its node is not laid out or is behind a modal`() {
+    val closed = node("closed", "Text", w = 0f, h = 0f, text = text(undrawn = true))
+    assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(closed))).of(FindingRule.TextClipped))
+    val behind =
+      evaluate(
+        tree(
+          nodes =
+            arrayOf(
+              node("page", "Text", text = text(undrawn = true)),
+              node("sheet", "BottomSheet", y = 300f, h = 300f),
+              node("inside", "Text", parent = "sheet", y = 320f, text = text(undrawn = true)),
+            ),
+        ),
+      )
+    assertEquals(listOf("inside"), behind.of(FindingRule.TextClipped).map { it.id })
+  }
+
+  @Test
+  fun `undrawn text in a carousel item is left to the carousel`() {
+    val findings =
+      evaluate(
+        tree(
+          Views.Light,
+          node("gallery", "Carousel", w = 411f, h = 200f),
+          node("item", "Card", parent = "gallery", x = 0f, w = 40f, h = 200f),
+          node("label", "Text", parent = "item", w = 40f, text = text(undrawn = true)),
+        ),
+      )
+    assertEquals(emptyList(), findings.of(FindingRule.TextClipped))
+  }
+
+  @Test
   fun `an ellipsis excuses the overflow it causes`() {
     val findings = textNodeFindings(text(lines = 3, overflow = true, truncated = true))
     assertEquals(emptyList(), findings.of(FindingRule.TextClipped))

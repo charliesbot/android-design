@@ -93,7 +93,7 @@ internal fun RenderColumn(ctx: NodeContext) {
       verticalArrangement = verticalArrangement(ctx.string("arrangement"), ctx.spacing("spacing")),
       horizontalAlignment = alignment,
     ) {
-      ctx.Children("children", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))
+      ctx.Children("children", 0, ChildHost(fillWidth = ctx.stretchesChildren, column = this))
     }
   }
 }
@@ -128,7 +128,7 @@ internal fun RenderRow(ctx: NodeContext) {
         "children",
         0,
         ChildHost(
-          fillWidth = ctx.def.stretchesChildren,
+          fillWidth = ctx.stretchesChildren,
           fillHeight = verticalAlignment == "stretch",
           row = this,
         ),
@@ -144,7 +144,7 @@ internal fun RenderBox(ctx: NodeContext) {
       modifier = ctx.modifier(fillHeight = true, container = true),
       contentAlignment = alignmentOf(ctx.string("contentAlignment")),
     ) {
-      ctx.Children("children", 0, ChildHost(fillWidth = ctx.def.stretchesChildren))
+      ctx.Children("children", 0, ChildHost(fillWidth = ctx.stretchesChildren))
     }
   }
 }
@@ -183,7 +183,7 @@ private fun GridOf(ctx: NodeContext, columns: Int, gap: Dp, modifier: Modifier) 
     },
     modifier = modifier,
   ) {
-    ctx.Children("children", 0, ChildHost(fillWidth = ctx.def.stretchesChildren))
+    ctx.Children("children", 0, ChildHost(fillWidth = ctx.stretchesChildren))
   }
 }
 
@@ -201,7 +201,7 @@ internal fun RenderFlexBox(ctx: NodeContext) {
           gap(gap)
         },
     ) {
-      ctx.Children("children", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, flexItem = true))
+      ctx.Children("children", 0, ChildHost(fillWidth = ctx.stretchesChildren, flexItem = true))
     }
   }
 }
@@ -231,6 +231,6 @@ internal fun RenderShape(ctx: NodeContext) {
   if (shape != null) modifier = modifier.clip(shape)
   if (fill != null) modifier = modifier.background(ctx.env.color(fill))
   Box(modifier) {
-    ctx.Child("content", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, fillHeight = false))
+    ctx.Child("content", 0, ChildHost(fillWidth = ctx.stretchesChildren, fillHeight = false))
   }
 }

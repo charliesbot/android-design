@@ -95,6 +95,12 @@ data class TextInfo(
    * layout box of a centered text can span the width while its glyphs do not.
    */
   val ink: Bounds? = null,
+  /**
+   * True when a text of the node has characters but drew no glyphs, or drew at zero width: the
+   * space it was given is gone. Unlike [ink] it covers a node that shows several texts (a list
+   * item's headline and supporting line).
+   */
+  val undrawn: Boolean = false,
 )
 
 /**

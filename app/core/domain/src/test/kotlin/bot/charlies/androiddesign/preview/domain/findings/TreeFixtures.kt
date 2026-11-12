@@ -63,7 +63,8 @@ internal fun text(
   truncated: Boolean = false,
   font: String? = FLEX,
   ink: Bounds? = null,
-) = TextInfo(value, lines, overflow, truncated, font, ink)
+  undrawn: Boolean = false,
+) = TextInfo(value, lines, overflow, truncated, font, ink, undrawn)
 
 /** A touch area centered on the bounds and grown to at least 48 x 48 dp. */
 internal fun touchOf(x: Float, y: Float, w: Float, h: Float): Bounds {

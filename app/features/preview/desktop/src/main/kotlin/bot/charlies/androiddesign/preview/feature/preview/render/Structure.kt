@@ -194,7 +194,7 @@ internal fun RenderTabs(ctx: NodeContext) {
       "children",
       0,
       ChildHost(
-        fillWidth = ctx.def.stretchesChildren,
+        fillWidth = ctx.stretchesChildren,
         groupKey = ctx.id,
         secondaryTabs = ctx.enum("variant") == "secondary",
       ),
@@ -279,7 +279,7 @@ internal fun RenderFloatingToolbar(ctx: NodeContext) {
           ctx.Children(
             "children",
             0,
-            ChildHost(fillWidth = ctx.def.stretchesChildren, column = this, toolbar = true),
+            ChildHost(fillWidth = ctx.stretchesChildren, column = this, toolbar = true),
           )
         },
       )
@@ -296,7 +296,7 @@ internal fun RenderFloatingToolbar(ctx: NodeContext) {
             ctx.Children(
               "children",
               0,
-              ChildHost(fillWidth = ctx.def.stretchesChildren, row = this, toolbar = true),
+              ChildHost(fillWidth = ctx.stretchesChildren, row = this, toolbar = true),
             )
           },
         )
@@ -326,7 +326,7 @@ internal fun RenderDockedToolbar(ctx: NodeContext) {
       ctx.Children(
         "children",
         0,
-        ChildHost(fillWidth = ctx.def.stretchesChildren, row = this, toolbar = true),
+        ChildHost(fillWidth = ctx.stretchesChildren, row = this, toolbar = true),
       )
     }
   }
@@ -359,7 +359,7 @@ internal fun RenderCard(ctx: NodeContext) {
   ctx.ReportClip(ctx.env.cornerRadius(ctx.shapeName() ?: "medium")?.let { CornerClip(it) })
   val padding = ctx.padding
   val children: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
-    ctx.Children("content", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))
+    ctx.Children("content", 0, ChildHost(fillWidth = ctx.stretchesChildren, column = this))
   }
   val content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
     CompositionLocalProvider(LocalAmbient provides ambient) {
