@@ -7,7 +7,8 @@ compileSdk = "37"
 minSdk = "26"
 composeBom = "2026.03.01"
 material3 = "1.5.0-alpha29"
-# The exporter's size-class conditions call currentWindowAdaptiveInfoV2, which first ships in adaptive 1.3.0.
+# The exporter's size-class conditions call currentWindowAdaptiveInfoV2, which first ships in adaptive 1.3.0. A pane export
+# (list-detail) also imports adaptive-layout and adaptive-navigation3, released in step with it.
 material3Adaptive = "1.3.0"
 activity = "1.13.0"
 core = "1.18.0"
@@ -35,6 +36,8 @@ compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling
 compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
 compose-material3-adaptive-navigation-suite = { module = "androidx.compose.material3:material3-adaptive-navigation-suite", version.ref = "material3" }
 compose-material3-adaptive = { module = "androidx.compose.material3.adaptive:adaptive", version.ref = "material3Adaptive" }
+compose-material3-adaptive-layout = { module = "androidx.compose.material3.adaptive:adaptive-layout", version.ref = "material3Adaptive" }
+compose-material3-adaptive-navigation3 = { module = "androidx.compose.material3.adaptive:adaptive-navigation3", version.ref = "material3Adaptive" }
 material-kolor = { module = "com.materialkolor:material-kolor", version.ref = "materialKolor" }
 screenshot-validation-api = { module = "com.android.tools.screenshot:screenshot-validation-api", version.ref = "screenshot" }
 

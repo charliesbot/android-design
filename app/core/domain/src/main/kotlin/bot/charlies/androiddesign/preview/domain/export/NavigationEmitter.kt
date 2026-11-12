@@ -281,7 +281,7 @@ internal object NavRoutes {
     file.use(Sym.Serializable)
     file.use(Sym.NavKey)
     return routed(proposal).map {
-      RawDecl(listOf("@Serializable private data object ${name(it)} : NavKey"))
+      RawDecl(listOf("@Serializable internal data object ${name(it)} : NavKey"))
     }
   }
 
