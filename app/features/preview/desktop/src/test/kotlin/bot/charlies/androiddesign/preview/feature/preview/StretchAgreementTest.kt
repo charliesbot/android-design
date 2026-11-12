@@ -5,6 +5,7 @@ import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessRende
 import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
 import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
+import bot.charlies.androiddesign.preview.model.PropKind
 import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.Views
 import kotlin.math.abs
@@ -13,6 +14,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -25,7 +27,10 @@ import kotlinx.serialization.json.put
  *
  * Each case is drawn twice. In the first the subject sits in a Column that fills the screen; in the
  * second it sits in a Shape, which never stretches its child, so the subject's own `fillMaxWidth()`
- * is the difference between the two exports (the subject's children are the same in both).
+ * is what the first export has more of, plus each descendant the catalog says stretches in one case
+ * and not the other (a container that fills also stretches its children, which the wrapped copy in
+ * the Shape does not). The count is exact, worked out from the catalog and the case, not from the
+ * export.
  */
 class StretchAgreementTest {
   /**
@@ -143,7 +148,22 @@ class StretchAgreementTest {
             )
           val widths = widthsIn(inColumn, "subject")
           val rendered = widths.stretches
-          val exported = fillMaxWidths(inColumn) - fillMaxWidths(inShape) == 1
+          // The Shape's copy holds the same subject wrapped, so the exports differ by the
+          // subject's own `fillMaxWidth()` and by every descendant the catalog stretches in one
+          // case and not the other.
+          val nodes = (listOf(subject, text) + extra).associateBy { it.id() }
+          val ownFill = if (def.fillsWidth { subject[it]?.takeIf { v -> v !is JsonNull } }) 1 else 0
+          val childrenDelta =
+            stretchedBelow("subject", nodes, parentStretches = true) -
+              stretchedBelow("subject", nodes, parentStretches = false) -
+              ownFill
+          val gain = fillMaxWidths(inColumn) - fillMaxWidths(inShape)
+          val own = gain - childrenDelta
+          val exported = own == 1
+          if (own !in 0..1) {
+            disagree +=
+              "${def.name} $stated: export gains $gain, the catalog says $childrenDelta (children) + 0 or 1 (itself)"
+          }
           if (rendered) stretching++ else wrapping++
           if (rendered != exported) {
             disagree +=
@@ -153,6 +173,38 @@ class StretchAgreementTest {
       }
     assertEquals(emptyList(), disagree)
     assertTrue(stretching >= 10 && wrapping >= 10, "stretching=$stretching wrapping=$wrapping")
+  }
+
+  private fun JsonObject.id() = (getValue("id") as JsonPrimitive).content
+
+  /**
+   * How many nodes at or below [id] stretch to their parent's width, from the catalog alone: a node
+   * fills when its parent stretches its children and its `width` rule says so, and it stretches its
+   * own children unless it wraps ([ComponentDef.wrapsAt]). [parentStretches] is whether the parent
+   * of [id] stretches its children.
+   */
+  private fun stretchedBelow(
+    id: String,
+    nodes: Map<String, JsonObject>,
+    parentStretches: Boolean,
+  ): Int {
+    val node = nodes.getValue(id)
+    val def =
+      checkNotNull(M3ExpressiveCatalog.find((node.getValue("component") as JsonPrimitive).content))
+    val valueOf = { prop: String -> node[prop]?.takeIf { it !is JsonNull } }
+    val fills = parentStretches && def.fillsWidth(valueOf)
+    val childrenStretch = def.stretchesChildrenWhen(def.wrapsAt(parentStretches, false, valueOf))
+    val childIds =
+      def.props
+        .filter { it.kind == PropKind.Child || it.kind == PropKind.ChildList }
+        .flatMap { prop ->
+          when (val value = node[prop.name]) {
+            is JsonArray -> value.map { (it as JsonPrimitive).content }
+            is JsonPrimitive -> listOf(value.content)
+            else -> emptyList()
+          }
+        }
+    return (if (fills) 1 else 0) + childIds.sumOf { stretchedBelow(it, nodes, childrenStretch) }
   }
 
   /** Components that hold any child, so a progress bar can stand in for the child. */

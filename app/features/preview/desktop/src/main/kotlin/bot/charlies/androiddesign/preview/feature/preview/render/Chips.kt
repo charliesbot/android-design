@@ -168,7 +168,7 @@ internal fun RenderChipGroup(ctx: NodeContext) {
       "children",
       0,
       ChildHost(
-        fillWidth = ctx.def.stretchesChildren,
+        fillWidth = ctx.stretchesChildren,
         groupKey = ctx.id,
         connected = ctx.bool("multi"),
       ),

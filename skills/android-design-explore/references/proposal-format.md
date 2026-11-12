@@ -129,7 +129,7 @@ Size classes are measured on the preview frame: `compact` below 600 dp, `medium`
 
 ## Full-height panes
 
-Panes fill the window's height (`android-design`, layout reference). In a proposal, side-by-side panes are a `Row` with `"verticalAlignment": "stretch"`: its `Column`, `Row`, and `Box` children fill the row's height. The row needs height to fill, so make it the `Scaffold`'s `content`, or give it `"weight": 1` inside a `Column`. Give each pane `weight` for its share of the width, and `"scroll": true` on the pane `Column` that holds a list, so the list scrolls inside its pane. Use `showIn` or `sizeClass` so the stretched row appears only where the panes sit side by side.
+Panes fill the window's height (`android-design`, layout reference). In a proposal, side-by-side panes are a `Row` with `"verticalAlignment": "stretch"`: its `Column`, `Row`, and `Box` children fill the row's height. The row needs height to fill, so make it the `Scaffold`'s `content`, or give it `"weight": 1` inside a `Column`. Give each pane `weight` for its share of the width, and `"scroll": true` on the pane `Column` that holds a list, so the list scrolls inside its pane. Use `showIn` or `sizeClass` so the stretched row appears only where the panes sit side by side. A `Column` that does not fill its width (an unweighted child of a `Row`, a child of a `Box`, a list item's `trailing` slot) wraps its content and stretches none of its children: its `horizontalAlignment` places them, and `weight` on a pane `Column` in a `Row` is what makes it fill.
 
 ## Styles
 

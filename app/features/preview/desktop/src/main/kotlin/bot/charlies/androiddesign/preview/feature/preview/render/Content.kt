@@ -160,7 +160,7 @@ private fun NodeContext.carouselItems(
   }
   val host =
     ChildHost(
-      fillWidth = def.stretchesChildren,
+      fillWidth = stretchesChildren,
       scopeModifier = scopeModifier.maskClip(MaterialTheme.shapes.extraLarge),
     )
   // The nodes inside the item read its current size from this, to apply `itemSize`.

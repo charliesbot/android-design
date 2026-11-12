@@ -107,7 +107,7 @@ internal fun RenderWearCard(ctx: NodeContext) {
   val action = ctx.props.action("action")
   val content: @Composable ColumnScope.() -> Unit = {
     CompositionLocalProvider(LocalWearAmbient provides CardAmbient) {
-      ctx.Children("children", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))
+      ctx.Children("children", 0, ChildHost(fillWidth = ctx.stretchesChildren, column = this))
     }
   }
   if (action != null) {

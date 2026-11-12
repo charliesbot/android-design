@@ -154,7 +154,7 @@ internal fun RenderBottomSheet(ctx: NodeContext) {
     dragHandle = { BottomSheetDefaults.DragHandle() },
   ) {
     CompositionLocalProvider(LocalAmbient provides BottomSheetAmbient) {
-      ctx.Children("content", 0, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))
+      ctx.Children("content", 0, ChildHost(fillWidth = ctx.stretchesChildren, column = this))
       Spacer(Modifier.height(8.dp))
     }
   }
@@ -206,7 +206,7 @@ private fun RenderFullScreenDialog(ctx: NodeContext) {
         .verticalScroll(rememberScrollState())
         .padding(horizontal = FullScreenSpec.CONTENT_PADDING_DP.dp),
     ) {
-      ctx.Children("content", 2, ChildHost(fillWidth = ctx.def.stretchesChildren, column = this))
+      ctx.Children("content", 2, ChildHost(fillWidth = ctx.stretchesChildren, column = this))
     }
   }
 }
@@ -245,7 +245,7 @@ internal fun RenderMenu(ctx: NodeContext) {
             "items",
             0,
             ChildHost(
-              fillWidth = ctx.def.stretchesChildren,
+              fillWidth = ctx.stretchesChildren,
               column = this,
               groupKey = ctx.id,
               vibrantMenu = vibrant,
@@ -278,7 +278,7 @@ internal fun RenderMenuGroup(ctx: NodeContext) {
       "items",
       0,
       ChildHost(
-        fillWidth = ctx.def.stretchesChildren,
+        fillWidth = ctx.stretchesChildren,
         column = this,
         groupKey = ctx.id,
         vibrantMenu = vibrant,
@@ -483,7 +483,7 @@ internal fun RenderSideSheet(ctx: NodeContext) {
               ctx.Children(
                 "content",
                 1,
-                ChildHost(fillWidth = ctx.def.stretchesChildren, column = this),
+                ChildHost(fillWidth = ctx.stretchesChildren, column = this),
               )
             }
           }

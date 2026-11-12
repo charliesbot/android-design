@@ -135,4 +135,37 @@ class StretchExportTest {
     has(layout, "Modifier.fillMaxSize().padding(innerPadding)")
     lacks(layout, "fillMaxWidth()")
   }
+
+  @Test
+  fun `a column in a list item's trailing slot wraps its row`() {
+    val source =
+      ExportFixtures.export(
+        column("list"),
+        """{"id":"list","component":"List","children":["item"]}""",
+        """{"id":"item","component":"ListItem","headline":"Tacos","trailing":"slot"}""",
+        """{"id":"slot","component":"Column","horizontalAlignment":"end","children":["time","rating"]}""",
+        text("time"),
+        """{"id":"rating","component":"Row","children":["score"]}""",
+        text("score"),
+      )
+    // The root column, the list and the list item; neither the slot column nor its row.
+    assertEquals(3, stretches(source))
+  }
+
+  @Test
+  fun `a column in a row wraps its children unless it has a weight`() {
+    fun source(weight: String) =
+      ExportFixtures.export(
+        column("line"),
+        """{"id":"line","component":"Row","children":["pane"]}""",
+        """{"id":"pane","component":"Column"$weight,"children":["label","bar"]}""",
+        text("label"),
+        """{"id":"bar","component":"Row","children":["inner"]}""",
+        text("inner"),
+      )
+    // The root column and the line row stretch; the pane's own row does not.
+    assertEquals(2, stretches(source("")))
+    // A weighted pane fills its share, so its row stretches like any child of a filled column.
+    assertEquals(3, stretches(source(""","weight":1""")))
+  }
 }
