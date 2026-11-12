@@ -14,10 +14,12 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.IntSize
 import bot.charlies.androiddesign.preview.domain.findings.FindingRules
 import bot.charlies.androiddesign.preview.model.A11yInfo
+import bot.charlies.androiddesign.preview.model.Axis
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.CornerClip
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.NodeArrangement
 import bot.charlies.androiddesign.preview.model.NodeColors
 import bot.charlies.androiddesign.preview.model.NodeRoles
 import bot.charlies.androiddesign.preview.model.NodeWeight
@@ -25,7 +27,6 @@ import bot.charlies.androiddesign.preview.model.RingInset
 import bot.charlies.androiddesign.preview.model.TextInfo
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.WearComponent
-import bot.charlies.androiddesign.preview.model.WeightAxis
 import kotlin.math.abs
 
 /**
@@ -50,6 +51,8 @@ class NodeMeta(
   val variant: String? = null,
   /** See [bot.charlies.androiddesign.preview.model.LayoutNode.weight]. */
   val weight: NodeWeight? = null,
+  /** What a Row or Column needs from its main axis to arrange its children, if it does. */
+  val arrangement: ArrangementNeed? = null,
   val interactive: Boolean,
   val roles: NodeRoles,
   val colors: NodeColors,
@@ -59,6 +62,13 @@ class NodeMeta(
   val a11yLabel: String?,
   val actions: List<String>,
 )
+
+/**
+ * A Row or Column whose arrangement needs free space: [name] on its main [axis], with [gapDp]
+ * between children (zero for the space-* ones, which ignore it) and whether it [wraps] its content
+ * there (it is neither stretched nor weighted).
+ */
+class ArrangementNeed(val name: String, val axis: Axis, val gapDp: Float, val wraps: Boolean)
 
 /** One `onTextLayout` report of a text the node shows. */
 class TextReport(
@@ -131,6 +141,8 @@ class TreeRecorder {
   /** Each node's measured size in pixels, before any clipping or list transform. */
   private val measuredSizes = HashMap<String, IntSize>()
   private val positions = HashMap<String, Rect>()
+  /** Each node's size with its container and padding, as its parent lays it out, in pixels. */
+  private val outerSizes = HashMap<String, IntSize>()
   private val texts = HashMap<String, MutableMap<String, TextReport>>()
   private val designHeights = HashMap<String, Float>()
   private val masks = HashMap<String, () -> Rect>()
@@ -161,6 +173,7 @@ class TreeRecorder {
   fun unregister(id: String) {
     metas.remove(id)
     measuredSizes.remove(id)
+    outerSizes.remove(id)
     positions.remove(id)
     texts.remove(id)
     designHeights.remove(id)
@@ -232,6 +245,15 @@ class TreeRecorder {
     if (!coordinates.isAttached) return
     positions[id] = frameRect(coordinates)
     measuredSizes[id] = coordinates.size
+  }
+
+  /**
+   * The size of the box [id] takes in its parent: its measured size grown by its container and
+   * padding, which the tagged box inside them leaves out.
+   */
+  @Synchronized
+  fun reportOuterSize(id: String, size: IntSize) {
+    outerSizes[id] = size
   }
 
   /** [coordinates] as a rect in the preview frame's pixels. */
@@ -354,6 +376,7 @@ class TreeRecorder {
       scrolls = meta.scrolls,
       variant = meta.variant,
       weight = meta.weight?.let { weightWithSize(it, meta.id, density) },
+      arrangement = meta.arrangement?.let { arrangementOf(meta, it, density) },
       bounds = dp,
       layout = layout?.takeIf { it.reachesPastHorizontally(bounds, density) }?.toDp(density),
       touch = touchPx?.toDp(density),
@@ -372,8 +395,35 @@ class TreeRecorder {
   /** [weight] with its node's unclipped measured size along the weighted axis, in dp. */
   private fun weightWithSize(weight: NodeWeight, id: String, density: Float): NodeWeight {
     val measured = measuredSizes[id] ?: return weight
-    val px = if (weight.axis == WeightAxis.Width) measured.width else measured.height
+    val px = if (weight.axis == Axis.Width) measured.width else measured.height
     return weight.copy(size = px / density)
+  }
+
+  /**
+   * The space [need] has: the container's measured main-axis size less its children's (padding
+   * included) and the gaps, all unclipped. It wraps only when no child is weighted, since a
+   * weighted child takes the container's whole size from its parent.
+   */
+  private fun arrangementOf(
+    meta: NodeMeta,
+    need: ArrangementNeed,
+    density: Float,
+  ): NodeArrangement? {
+    val own = measuredSizes[meta.id] ?: return null
+    val children = metas.values.filter { it.parent == meta.id && measuredSizes[it.id] != null }
+    fun IntSize.main() = (if (need.axis == Axis.Width) width else height) / density
+    // A child takes the room of its padding and container too, which its tagged box leaves out.
+    val used = children.sumOf {
+      (outerSizes[it.id] ?: checkNotNull(measuredSizes[it.id])).main().toDouble()
+    }
+    val gaps = need.gapDp * (children.size - 1).coerceAtLeast(0)
+    return NodeArrangement(
+      name = need.name,
+      axis = need.axis,
+      free = own.main() - used.toFloat() - gaps,
+      wraps = need.wraps && children.none { it.weight != null },
+      children = children.size,
+    )
   }
 
   private fun textInfo(meta: NodeMeta, bounds: Rect, density: Float): TextInfo? {

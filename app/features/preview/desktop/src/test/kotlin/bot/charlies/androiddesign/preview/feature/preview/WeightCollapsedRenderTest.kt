@@ -1,8 +1,8 @@
 package bot.charlies.androiddesign.preview.feature.preview
 
+import bot.charlies.androiddesign.preview.model.Axis
 import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.LayoutTree
-import bot.charlies.androiddesign.preview.model.WeightAxis
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -30,14 +30,14 @@ class WeightCollapsedRenderTest {
   @Test
   fun `a weighted child of a scrolling column collapses and is reported`() {
     val tree = columnWith(scroll = true)
-    assertEquals(WeightAxis.Height, tree.node("list").weight?.axis)
+    assertEquals(Axis.Height, tree.node("list").weight?.axis)
     assertEquals(listOf("list"), tree.collapsed())
   }
 
   @Test
   fun `a weighted child of a bounded column takes the space left`() {
     val tree = columnWith(scroll = false)
-    assertEquals(WeightAxis.Height, tree.node("list").weight?.axis)
+    assertEquals(Axis.Height, tree.node("list").weight?.axis)
     assertEquals(emptyList(), tree.collapsed())
   }
 
@@ -53,7 +53,7 @@ class WeightCollapsedRenderTest {
           ),
         )
         .tree
-    assertEquals(WeightAxis.Width, tree.node("a").weight?.axis)
+    assertEquals(Axis.Width, tree.node("a").weight?.axis)
     assertEquals(null, tree.node("b").weight)
     assertEquals(emptyList(), tree.collapsed())
   }
@@ -105,7 +105,7 @@ class WeightCollapsedRenderTest {
   @Test
   fun `weighted buttons below the fold of a scrolling column are not reported`() {
     val tree = scrollWithRow(lines = 60)
-    assertEquals(WeightAxis.Width, tree.node("a").weight?.axis)
+    assertEquals(Axis.Width, tree.node("a").weight?.axis)
     assertEquals(emptyList(), tree.collapsed())
   }
 
