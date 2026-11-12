@@ -23,7 +23,7 @@ The scheme comes from MaterialKolor (`rememberDynamicColorScheme`, spec 2025) wi
 - `app/src/screenshotTest/kotlin/` contains fixed `@PreviewTest` entry points for starter maintenance.
 - `core/strings` holds shared text; `core/designsystem/common` holds fonts and other non-string resources. The remaining core modules preserve `android-dev` boundaries without sample business logic.
 
-The app starts Koin and has a single Navigation 3 destination. It also depends on `material3-adaptive-navigation-suite`, because an export of a proposal with `navigation.destinations` wraps its `NavDisplay` in a `NavigationSuiteScaffold`. Previews call the screen with sample state directly, without starting navigation, DI, databases, or network requests. Separate composables can hold alternatives in the same module. The `android-dev` skill is needed only if you choose to generate further modules, not to use this starter.
+The app starts Koin and has a single Navigation 3 destination. It also depends on `material3-adaptive-navigation-suite`, because an export of a proposal with `navigation.destinations` wraps its `NavDisplay` in a `NavigationSuiteScaffold`. It depends on `adaptive-layout` and `adaptive-navigation3` too, which an export with list-detail or supporting panes imports (`calculatePaneScaffoldDirective`, `rememberListDetailSceneStrategy`). Previews call the screen with sample state directly, without starting navigation, DI, databases, or network requests. Separate composables can hold alternatives in the same module. The `android-dev` skill is needed only if you choose to generate further modules, not to use this starter.
 
 ## Device previews
 

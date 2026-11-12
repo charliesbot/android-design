@@ -261,9 +261,9 @@ fun TonightsPlateTheme(
   )
 }
 
-@Serializable private data object PlatesRoute : NavKey
+@Serializable internal data object PlatesRoute : NavKey
 
-@Serializable private data object PlateDetailRoute : NavKey
+@Serializable internal data object PlateDetailRoute : NavKey
 
 @Composable
 fun TonightsPlateApp() {

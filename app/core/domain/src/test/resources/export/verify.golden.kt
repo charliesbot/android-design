@@ -466,23 +466,23 @@ fun VerifyTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable
   )
 }
 
-@Serializable private data object HomeRoute : NavKey
+@Serializable internal data object HomeRoute : NavKey
 
-@Serializable private data object DetailRoute : NavKey
+@Serializable internal data object DetailRoute : NavKey
 
-@Serializable private data object ActionsRoute : NavKey
+@Serializable internal data object ActionsRoute : NavKey
 
-@Serializable private data object InputsRoute : NavKey
+@Serializable internal data object InputsRoute : NavKey
 
-@Serializable private data object OverlaysRoute : NavKey
+@Serializable internal data object OverlaysRoute : NavKey
 
-@Serializable private data object FabsRoute : NavKey
+@Serializable internal data object FabsRoute : NavKey
 
-@Serializable private data object CollectionsRoute : NavKey
+@Serializable internal data object CollectionsRoute : NavKey
 
-@Serializable private data object FeedbackRoute : NavKey
+@Serializable internal data object FeedbackRoute : NavKey
 
-@Serializable private data object SearchRoute : NavKey
+@Serializable internal data object SearchRoute : NavKey
 
 private fun navigationSuiteTypeFor(
   showNavigation: Boolean,

@@ -23,8 +23,9 @@ class NavigationExportTest {
   @Test
   fun `a full export has a route per screen and a NavDisplay with a back stack`() {
     val source = export(TestProposal.valid().build())
-    has(source, "@Serializable private data object PlatesRoute : NavKey")
-    has(source, "@Serializable private data object PlateDetailRoute : NavKey")
+    has(source, "@Serializable internal data object PlatesRoute : NavKey")
+    has(source, "@Serializable internal data object PlateDetailRoute : NavKey")
+    lacks(source, "private data object")
     has(source, "fun TestApp() { TestTheme {")
     has(source, "val backStack = rememberNavBackStack(PlatesRoute)")
     assertTrue(

@@ -26,8 +26,8 @@ class WearNavigationExportTest {
 
   @Test
   fun `a route per screen and a NavDisplay with the swipe dismiss scene`() {
-    has(source, "@Serializable private data object HomeRoute : NavKey")
-    has(source, "@Serializable private data object SettingsRoute : NavKey")
+    has(source, "@Serializable internal data object HomeRoute : NavKey")
+    has(source, "@Serializable internal data object SettingsRoute : NavKey")
     has(source, "val backStack = rememberNavBackStack(HomeRoute)")
     has(
       source,
