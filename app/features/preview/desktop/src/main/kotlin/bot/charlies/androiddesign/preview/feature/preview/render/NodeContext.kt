@@ -48,9 +48,11 @@ import bot.charlies.androiddesign.preview.model.CornerClip
 import bot.charlies.androiddesign.preview.model.LayoutScope
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.MaterialShape
+import bot.charlies.androiddesign.preview.model.NodeWeight
 import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.StyleDef
 import bot.charlies.androiddesign.preview.model.TypeRole
+import bot.charlies.androiddesign.preview.model.WeightAxis
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -348,6 +350,20 @@ internal fun NodeContext.modifier(
   if (scroll) modifier = modifier.verticalScroll(rememberScrollState())
   if (padded) padding?.let { modifier = modifier.padding(it) }
   return modifier.then(tagged())
+}
+
+/**
+ * The weight [modifier] gives this node and the axis it shares, for the tree: a column's height or
+ * a row's width. Null without a weight, or where the parent's slot has no `RowScope` or
+ * `ColumnScope`.
+ */
+internal fun NodeContext.weightOnAxis(): NodeWeight? {
+  val weight = number("weight") ?: return null
+  return when {
+    host.column != null -> NodeWeight(weight, WeightAxis.Height)
+    host.row != null -> NodeWeight(weight, WeightAxis.Width)
+    else -> null
+  }
 }
 
 /** The props [node] is drawn with in this context's frame, as [growsSemanticsBounds] asks. */

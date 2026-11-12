@@ -4,11 +4,13 @@ import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.CornerClip
 import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.LayoutNode
+import bot.charlies.androiddesign.preview.model.NodeWeight
 import bot.charlies.androiddesign.preview.model.RingInset
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
 import bot.charlies.androiddesign.preview.model.WearCatalog
+import bot.charlies.androiddesign.preview.model.WeightAxis
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -1404,6 +1406,86 @@ class FindingRulesTest {
       listOf("chip"),
       evaluate(tree(Views.Light, chip)).of(FindingRule.CornerClipped).map { it.id },
     )
+  }
+
+  // endregion
+
+  // region weight-collapsed
+
+  private val rowWeight = NodeWeight(1f, WeightAxis.Width, size = 0f)
+  private val columnWeight = NodeWeight(1f, WeightAxis.Height, size = 0f)
+
+  @Test
+  fun `weight-collapsed fails for a weighted node with no height in a column`() {
+    val column = node("col", "Column", 0f, 100f, 360f, 400f)
+    val list = node("list", "Column", 0f, 100f, 360f, 0f, parent = "col", weight = columnWeight)
+    val finding = evaluate(tree(Views.Light, column, list)).of(FindingRule.WeightCollapsed).single()
+    assertEquals("list", finding.id)
+    assertEquals(Severity.Error, finding.severity)
+    assertEquals(
+      "weight 1 gives it 0 dp of height: its parent scrolls, has no bounded height, or its " +
+        "other children fill it; remove the weight or give the parent a bounded size",
+      finding.detail,
+    )
+  }
+
+  @Test
+  fun `weight-collapsed names the width axis of a row`() {
+    val row = node("row", "Row", 0f, 100f, 360f, 48f)
+    val cell = node("cell", "Column", 0f, 100f, 0f, 48f, parent = "row", weight = rowWeight)
+    val finding = evaluate(tree(Views.Light, row, cell)).of(FindingRule.WeightCollapsed).single()
+    assertTrue("0 dp of width" in finding.detail.orEmpty(), finding.detail)
+    assertTrue("no bounded width" in finding.detail.orEmpty(), finding.detail)
+  }
+
+  @Test
+  fun `weight-collapsed passes for a weighted node that took space`() {
+    val fed = NodeWeight(1f, WeightAxis.Height, size = 300f)
+    val list = node("list", "Column", 0f, 100f, 360f, 300f, weight = fed)
+    assertEquals(emptyList(), evaluate(tree(Views.Light, list)).of(FindingRule.WeightCollapsed))
+  }
+
+  @Test
+  fun `weight-collapsed judges the measured size, not the bounds cut to the window`() {
+    // Scrolled below the fold: the bounds are empty, but the node measured 160 dp wide.
+    val scrolledOut = NodeWeight(1f, WeightAxis.Width, size = 160f)
+    val button = node("save", "Button", 0f, 0f, 0f, 0f, weight = scrolledOut)
+    assertEquals(emptyList(), evaluate(tree(Views.Light, button)).of(FindingRule.WeightCollapsed))
+  }
+
+  @Test
+  fun `weight-collapsed skips a node whose size was not measured`() {
+    val unmeasured = NodeWeight(1f, WeightAxis.Height)
+    val list = node("list", "Column", 0f, 100f, 360f, 0f, weight = unmeasured)
+    assertEquals(emptyList(), evaluate(tree(Views.Light, list)).of(FindingRule.WeightCollapsed))
+  }
+
+  @Test
+  fun `weight-collapsed ignores a node without a weight`() {
+    val empty = node("empty", "Column", 0f, 100f, 360f, 0f)
+    assertEquals(emptyList(), evaluate(tree(Views.Light, empty)).of(FindingRule.WeightCollapsed))
+  }
+
+  @Test
+  fun `weight-collapsed skips a weighted node behind an open modal`() {
+    val dialog = node("dialog", "Dialog", 40f, 200f, 280f, 300f)
+    val list = node("list", "Column", 0f, 100f, 360f, 0f, weight = columnWeight)
+    assertEquals(
+      emptyList(),
+      evaluate(tree(Views.Light, list, dialog)).of(FindingRule.WeightCollapsed),
+    )
+  }
+
+  @Test
+  fun `weight-collapsed skips a Spacer`() {
+    val spacer = node("sp", "Spacer", 0f, 100f, 0f, 0f, weight = columnWeight)
+    assertEquals(emptyList(), evaluate(tree(Views.Light, spacer)).of(FindingRule.WeightCollapsed))
+  }
+
+  @Test
+  fun `weight-collapsed skips a closed overlay`() {
+    val sheet = node("sheet", "BottomSheet", 0f, 0f, 0f, 0f, weight = columnWeight)
+    assertEquals(emptyList(), evaluate(tree(Views.Light, sheet)).of(FindingRule.WeightCollapsed))
   }
 
   // endregion

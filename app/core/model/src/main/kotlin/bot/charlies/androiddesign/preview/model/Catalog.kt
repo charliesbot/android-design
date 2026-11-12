@@ -948,7 +948,7 @@ private fun structure(): List<ComponentDef> =
     ComponentDef(
       "TopAppBar",
       ComponentGroup.Structure,
-      "The screen's top bar.",
+      "The screen's top bar. avatar and expanded are for \"size\": \"search\" only.",
       "TopAppBar, CenterAlignedTopAppBar, MediumFlexibleTopAppBar, LargeFlexibleTopAppBar",
       listOf(
         oneOf("size", "small", "center", "medium", "large", "search", default = "small"),

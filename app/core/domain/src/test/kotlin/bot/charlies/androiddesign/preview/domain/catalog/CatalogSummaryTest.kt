@@ -51,6 +51,12 @@ class CatalogSummaryTest {
   }
 
   @Test
+  fun `the TopAppBar line says avatar and expanded are for the search size only`() {
+    val line = line("TopAppBar")
+    assertTrue("avatar and expanded are for \"size\": \"search\" only" in line, line)
+  }
+
+  @Test
   fun `a prop with a catalog default shows it after the kind`() {
     assertTrue("variant: filled|tonal|elevated|outlined|text = filled" in line("Button"))
     assertTrue("size: extra-small|small|medium|large|extra-large = small" in line("Button"))

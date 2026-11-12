@@ -70,6 +70,11 @@ data class LayoutNode(
    * date picker (a docked one is a dropdown, the rest are modal). Omitted for every other node.
    */
   val variant: String? = null,
+  /**
+   * The `weight` of a node a Row or Column gives its share of the space, and the axis it shares.
+   * Omitted for every node without one, and where a weight means nothing (a Box, a Grid).
+   */
+  val weight: NodeWeight? = null,
   val roles: NodeRoles? = null,
   val colors: NodeColors? = null,
   val a11y: A11yInfo? = null,
@@ -77,6 +82,19 @@ data class LayoutNode(
   /** A node with no area was not laid out, such as an overlay that is closed. */
   val isLaidOut: Boolean
     get() = bounds.width > 0f && bounds.height > 0f
+}
+
+/**
+ * The [value] of a node's `weight`, which shares the parent's [axis]: width in a Row, height in a
+ * Column. [size] is the node's measured size along that axis in dp, not cut to the window or a
+ * scroll viewport as `bounds` are, so a node scrolled out of view still has its real size.
+ */
+@Serializable data class NodeWeight(val value: Float, val axis: WeightAxis, val size: Float? = null)
+
+@Serializable
+enum class WeightAxis {
+  @SerialName("width") Width,
+  @SerialName("height") Height,
 }
 
 /** `[x, y, width, height]` in dp. */
@@ -166,6 +184,7 @@ enum class FindingRule(val wire: String) {
   @SerialName("full-screen-date-picker") FullScreenDatePicker("full-screen-date-picker"),
   @SerialName("empty-detail-pane") EmptyDetailPane("empty-detail-pane"),
   @SerialName("line-length") LineLength("line-length"),
+  @SerialName("weight-collapsed") WeightCollapsed("weight-collapsed"),
 }
 
 /** [id] is the component the finding is about, or null when it concerns the whole view. */

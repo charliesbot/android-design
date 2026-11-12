@@ -20,10 +20,12 @@ import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.NodeColors
 import bot.charlies.androiddesign.preview.model.NodeRoles
+import bot.charlies.androiddesign.preview.model.NodeWeight
 import bot.charlies.androiddesign.preview.model.RingInset
 import bot.charlies.androiddesign.preview.model.TextInfo
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.WearComponent
+import bot.charlies.androiddesign.preview.model.WeightAxis
 import kotlin.math.abs
 
 /**
@@ -46,6 +48,8 @@ class NodeMeta(
   val scrolls: Boolean = false,
   /** See [bot.charlies.androiddesign.preview.model.LayoutNode.variant]. */
   val variant: String? = null,
+  /** See [bot.charlies.androiddesign.preview.model.LayoutNode.weight]. */
+  val weight: NodeWeight? = null,
   val interactive: Boolean,
   val roles: NodeRoles,
   val colors: NodeColors,
@@ -349,6 +353,7 @@ class TreeRecorder {
       primary = meta.primary,
       scrolls = meta.scrolls,
       variant = meta.variant,
+      weight = meta.weight?.let { weightWithSize(it, meta.id, density) },
       bounds = dp,
       layout = layout?.takeIf { it.reachesPastHorizontally(bounds, density) }?.toDp(density),
       touch = touchPx?.toDp(density),
@@ -362,6 +367,13 @@ class TreeRecorder {
       colors = meta.colors,
       a11y = a11y(meta, merged),
     )
+  }
+
+  /** [weight] with its node's unclipped measured size along the weighted axis, in dp. */
+  private fun weightWithSize(weight: NodeWeight, id: String, density: Float): NodeWeight {
+    val measured = measuredSizes[id] ?: return weight
+    val px = if (weight.axis == WeightAxis.Width) measured.width else measured.height
+    return weight.copy(size = px / density)
   }
 
   private fun textInfo(meta: NodeMeta, bounds: Rect, density: Float): TextInfo? {
