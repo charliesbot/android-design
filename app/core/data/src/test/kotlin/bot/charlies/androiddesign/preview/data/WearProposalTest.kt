@@ -41,6 +41,27 @@ class WearProposalTest {
   }
 
   @Test
+  fun `a child listed in base props and in another parent's large override is shared`() {
+    val shared =
+      """{"format":1,"name":"w","navigation":{"start":"main"},"screens":{"main":{"catalogId":"$wearId","components":[""" +
+        """{"id":"root","component":"Screen","scroll":false,"children":["col","col2"]},""" +
+        """{"id":"col","component":"Column","children":["hr"]},""" +
+        """{"id":"hr","component":"Text","text":"148"},""" +
+        """{"id":"col2","component":"Column","children":[],"sizeClass":{"large":{"children":["hr"]}}}""" +
+        """]}}}"""
+    val found = errors(shared).filter { "listed by" in it.message }
+    assertTrue(
+      found.any { "'hr'" in it.message && "'col'" in it.message && "'col2'" in it.message },
+      "got $found",
+    )
+    assertTrue(
+      found.none { "compact" in it.message },
+      "a wear error must not name a phone size: $found",
+    )
+    assertTrue(found.any { "large" in it.message }, "got $found")
+  }
+
+  @Test
   fun `a phone screen cannot use a wear component`() {
     errors(fixture.replace(wearId, phoneId))
       .assertHas("/screens/home/components/0/component", "unknown component 'Screen'")

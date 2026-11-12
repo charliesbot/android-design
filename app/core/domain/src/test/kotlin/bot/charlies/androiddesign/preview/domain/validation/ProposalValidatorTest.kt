@@ -139,6 +139,130 @@ class ProposalValidatorTest {
   }
 
   @Test
+  fun `a component listed by two parents is rejected naming both`() {
+    val p =
+      base
+        .with(
+          "body",
+          """{"id":"body","component":"Column","children":["open_plate","more","row"]}""",
+        )
+        .with("row", """{"id":"row","component":"Row","children":["open_plate"]}""")
+    val found = errors(p).filter { it.path == plates("${p.indexOf("row")}") }
+    assertTrue(
+      found.any { e ->
+        listOf("'open_plate'", "'body' (children)", "'row' (children)").all { it in e.message }
+      },
+      "no error naming the id and both parents; got ${errors(p)}",
+    )
+  }
+
+  @Test
+  fun `one parent listing a child twice is rejected naming the props`() {
+    val twice =
+      base.with(
+        "body",
+        """{"id":"body","component":"Column","children":["open_plate","open_plate","more"]}""",
+      )
+    assertTrue(
+      errors(twice).any {
+        "'open_plate'" in it.message && "'body' (children, children)" in it.message
+      },
+      "got ${errors(twice)}",
+    )
+    val slotAndList =
+      base
+        .with(
+          "bar",
+          """{"id":"bar","component":"TopAppBar","title":"Plates","navigationIcon":"nav","actions":["nav"]}""",
+        )
+        .with(
+          "nav",
+          """{"id":"nav","component":"IconButton","icon":"menu","contentDescription":"Menu"}""",
+        )
+    assertTrue(
+      errors(slotAndList).any {
+        "'nav'" in it.message && "'bar' (navigationIcon, actions)" in it.message
+      },
+      "got ${errors(slotAndList)}",
+    )
+  }
+
+  @Test
+  fun `a child shared through a slot and a list is rejected`() {
+    val p =
+      base.with(
+        "bar",
+        """{"id":"bar","component":"TopAppBar","title":"Plates","actions":["more"]}""",
+      )
+    val found = errors(p).filter { "'more'" in it.message }
+    assertTrue(
+      found.any { "'bar' (actions)" in it.message && "'body' (children)" in it.message },
+      "got ${errors(p)}",
+    )
+  }
+
+  @Test
+  fun `reusing a template, an anchor or a size override of one parent is not sharing`() {
+    val p =
+      base
+        .with(
+          "body",
+          """{"id":"body","component":"Column","children":["open_plate","more"],"sizeClass":{"expanded":{"children":["open_plate","more","tip"]}}}""",
+        )
+        .with("tip", """{"id":"tip","component":"Tooltip","anchor":"open_plate","text":"Hint"}""")
+        .with("tip2", """{"id":"tip2","component":"Tooltip","anchor":"open_plate","text":"Hint"}""")
+        .with(
+          "list",
+          """{"id":"list","component":"Column","children":{"componentId":"item","path":"/items"}}""",
+        )
+        .with("item", """{"id":"item","component":"Text","text":"x"}""")
+    assertEquals(emptyList(), errors(p))
+  }
+
+  @Test
+  fun `two parents shown at different sizes may list the same child`() {
+    val p =
+      base
+        .with(
+          "body",
+          """{"id":"body","component":"Column","children":["row_compact","row_wide"]}""",
+        )
+        .with(
+          "row_compact",
+          """{"id":"row_compact","component":"Row","showIn":["compact"],"children":["open_plate"]}""",
+        )
+        .with(
+          "row_wide",
+          """{"id":"row_wide","component":"Row","showIn":["medium","expanded"],"children":["open_plate","more"]}""",
+        )
+        .with("open_plate", """{"id":"open_plate","component":"Button","label":"Cook"}""")
+        .with("more", """{"id":"more","component":"Button","variant":"text","label":"More"}""")
+    assertEquals(emptyList(), errors(p))
+  }
+
+  @Test
+  fun `parents under containers shown at different sizes may list the same child`() {
+    val p =
+      base
+        .with(
+          "body",
+          """{"id":"body","component":"Column","children":["pane_a","pane_b"]}""",
+        )
+        .with(
+          "pane_a",
+          """{"id":"pane_a","component":"Column","showIn":["compact"],"children":["inner_a"]}""",
+        )
+        .with(
+          "pane_b",
+          """{"id":"pane_b","component":"Column","showIn":["expanded"],"children":["inner_b"]}""",
+        )
+        .with("inner_a", """{"id":"inner_a","component":"Row","children":["open_plate"]}""")
+        .with("inner_b", """{"id":"inner_b","component":"Row","children":["open_plate"]}""")
+        .with("open_plate", """{"id":"open_plate","component":"Button","label":"Cook"}""")
+    assertEquals(emptyList(), errors(p))
+  }
+
+  @Test
   fun `a menu anchor refers to its split button without forming a cycle`() {
     val p =
       base
@@ -745,14 +869,17 @@ class ProposalValidatorTest {
         """{"id":"probe","component":"Text","text":"x","maxLines":3,"weight":1.5}""",
         """{"id":"probe","component":"TextField","lines":4}""",
         """{"id":"probe","component":"Slider","steps":5,"range":[0,100],"value":50}""",
-        """{"id":"probe","component":"Grid","children":["more"],"columns":3}""",
-        """{"id":"probe","component":"Grid","children":["more"],"minColumnWidth":160.5}""",
+        """{"id":"probe","component":"Grid","children":["leaf"],"columns":3}""",
+        """{"id":"probe","component":"Grid","children":["leaf"],"minColumnWidth":160.5}""",
         """{"id":"probe","component":"Image","src":"a.png","aspectRatio":1.7778}""",
         """{"id":"probe","component":"ProgressIndicator","progress":0}""",
         """{"id":"probe","component":"Text","text":"x","maxLines":{"@path":"/n"}}""",
         """{"id":"probe","component":"Slider","steps":{"@path":"/n"},"value":{"@path":"/v"}}""",
       )
-    for (json in ok) assertEquals(emptyList(), probe(json), json)
+    val leaf = """{"id":"leaf","component":"Text","text":"x"}"""
+    for (json in ok) {
+      assertEquals(emptyList(), errors(base.with("leaf", leaf).with("probe", json)), json)
+    }
   }
 
   @Test
