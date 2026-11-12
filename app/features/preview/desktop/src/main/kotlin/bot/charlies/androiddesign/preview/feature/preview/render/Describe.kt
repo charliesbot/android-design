@@ -48,6 +48,7 @@ internal fun describe(ctx: NodeContext, ambient: Ambient): NodeMeta {
     order = ctx.order,
     primary = ctx.primary,
     variant = if (ctx.component == M3Component.DatePicker.wire) ctx.enum("variant") else null,
+    weight = ctx.weightOnAxis(),
     interactive = interactive,
     roles =
       NodeRoles(

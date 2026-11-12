@@ -566,7 +566,7 @@
     },
     "TopAppBar": {
       "type": "object",
-      "description": "The screen's top bar.",
+      "description": "The screen's top bar. avatar and expanded are for \"size\": \"search\" only.",
       "x-compose": "TopAppBar, CenterAlignedTopAppBar, MediumFlexibleTopAppBar, LargeFlexibleTopAppBar",
       "x-m3-pages": [
         "app-bars"

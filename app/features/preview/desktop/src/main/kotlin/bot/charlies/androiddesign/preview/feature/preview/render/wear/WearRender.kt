@@ -24,6 +24,7 @@ import bot.charlies.androiddesign.preview.feature.preview.render.RenderSpacer
 import bot.charlies.androiddesign.preview.feature.preview.render.SymbolIcon
 import bot.charlies.androiddesign.preview.feature.preview.render.shapeFor
 import bot.charlies.androiddesign.preview.feature.preview.render.textReporter
+import bot.charlies.androiddesign.preview.feature.preview.render.weightOnAxis
 import bot.charlies.androiddesign.preview.feature.preview.theme.toHex
 import bot.charlies.androiddesign.preview.model.NodeColors
 import bot.charlies.androiddesign.preview.model.NodeRoles
@@ -146,6 +147,7 @@ internal fun describeWear(ctx: NodeContext, ambient: WearAmbient): NodeMeta {
     // An AlertDialog scrolls only when its content does not fit, which the recorder learns from
     // the layout (TreeRecorder.snapshot).
     scrolls = ctx.component == WearComponent.Screen.wire && ctx.bool("scroll"),
+    weight = ctx.weightOnAxis(),
     interactive = interactive,
     roles =
       NodeRoles(

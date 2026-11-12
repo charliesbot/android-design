@@ -16,6 +16,7 @@ import bot.charlies.androiddesign.preview.model.NavigationNodes
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.SizeClass
 import bot.charlies.androiddesign.preview.model.TypeRole
+import bot.charlies.androiddesign.preview.model.WeightAxis
 import kotlin.math.hypot
 import kotlin.math.round
 
@@ -129,6 +130,7 @@ object FindingRules {
       dockedToolbarWithNavBar(view) +
       fullScreenDatePicker(view) +
       lineLength(view) +
+      weightCollapsed(view) +
       emptyDetailPane(emptyDetailLists)
   }
 
@@ -840,6 +842,42 @@ object FindingRules {
   private val CARD = M3Component.Card.wire
   private val LIST_ITEM = M3Component.ListItem.wire
   private val TEXT = M3Component.Text.wire
+
+  // endregion
+
+  // region weight-collapsed
+
+  /**
+   * A weighted node takes its share of what its parent has left along the parent's axis, so one
+   * that measures 0 there got none: a parent that scrolls or has no bounded size along its axis
+   * (Compose gives `weight` nothing to divide inside a `verticalScroll` Column), or whose other
+   * children fill it. The node vanishes, so this is an error. A Spacer is exempt, since absorbing
+   * the space that is left (possibly none) is its job and its tree box is empty whatever it
+   * measures. A closed overlay has no size by design and a node behind an open modal is inert.
+   */
+  private fun weightCollapsed(view: View): List<Finding> =
+    view.nodes
+      .filter {
+        it.weight != null &&
+          it.type != M3Component.Spacer.wire &&
+          it.type !in view.catalog.overlayNames &&
+          !view.isBehindModal(it)
+      }
+      .mapNotNull { node ->
+        val weight = checkNotNull(node.weight)
+        // The measured size, not `bounds`: those are cut to the window and to a scroll viewport, so
+        // a node scrolled out of view has none.
+        val size = weight.size ?: return@mapNotNull null
+        val axis = if (weight.axis == WeightAxis.Width) "width" else "height"
+        if (size > OVERFLOW_SLACK_DP) return@mapNotNull null
+        errorFinding(
+          node,
+          FindingRule.WeightCollapsed,
+          "weight ${dp(weight.value)} gives it 0 dp of $axis: its parent scrolls, has no bounded " +
+            "$axis, or its other children fill it; remove the weight or give the parent a " +
+            "bounded size",
+        )
+      }
 
   // endregion
 
