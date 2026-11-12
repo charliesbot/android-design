@@ -258,6 +258,10 @@ internal val LocalRenderEnv =
  * ([bot.charlies.androiddesign.preview.model.ComponentDef.stretchesChildren]). A Row never does,
  * because that would push its siblings out (use `weight` there).
  *
+ * @property column The `ColumnScope` the parent's composable hosts, for `weight`.
+ * @property row The `RowScope` the parent's composable hosts, for `weight`. Only the scope the
+ *   catalog declares for the slot is kept ([NodeContext.Children]), so it is the catalog that says
+ *   where `weight` applies.
  * @property flexItem The parent is a FlexBox, which measures its items with a finite stand-in for
  *   an unbounded height; an item that grows its semantics bounds gets it back (see
  *   [NodeContext.modifier]).

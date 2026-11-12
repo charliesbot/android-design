@@ -206,7 +206,7 @@ private fun RenderFullScreenDialog(ctx: NodeContext) {
         .verticalScroll(rememberScrollState())
         .padding(horizontal = FullScreenSpec.CONTENT_PADDING_DP.dp),
     ) {
-      ctx.Children("content", 2, ChildHost(fillWidth = ctx.stretchesChildren, column = this))
+      ctx.Children("content", 2, ChildHost(fillWidth = ctx.stretchesChildren))
     }
   }
 }
@@ -233,7 +233,7 @@ internal fun RenderMenu(ctx: NodeContext) {
         ctx.ShownChildren(
           "items",
           0,
-          ChildHost(fillWidth = false, column = this, vibrantMenu = vibrant),
+          ChildHost(fillWidth = false, vibrantMenu = vibrant),
         )
       } else {
         DropdownMenuGroup(
@@ -246,7 +246,6 @@ internal fun RenderMenu(ctx: NodeContext) {
             0,
             ChildHost(
               fillWidth = ctx.stretchesChildren,
-              column = this,
               groupKey = ctx.id,
               vibrantMenu = vibrant,
             ),
@@ -279,7 +278,6 @@ internal fun RenderMenuGroup(ctx: NodeContext) {
       0,
       ChildHost(
         fillWidth = ctx.stretchesChildren,
-        column = this,
         groupKey = ctx.id,
         vibrantMenu = vibrant,
       ),
@@ -483,7 +481,7 @@ internal fun RenderSideSheet(ctx: NodeContext) {
               ctx.Children(
                 "content",
                 1,
-                ChildHost(fillWidth = ctx.stretchesChildren, column = this),
+                ChildHost(fillWidth = ctx.stretchesChildren),
               )
             }
           }

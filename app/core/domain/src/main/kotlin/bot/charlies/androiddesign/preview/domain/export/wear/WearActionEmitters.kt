@@ -211,7 +211,7 @@ internal fun WearScreenEmitter.buttonGroup(
 ): List<Stmt> {
   // The group's scope gives each child its weight, so every member shares the width.
   val children =
-    children(node, p, "children", place.forChild("ButtonGroup").copy(scopeWeight = true))
+    children(node, p, "children", place.inSlot("ButtonGroup", p).copy(scopeWeight = true))
   return children.prelude +
     one(
       wear("ButtonGroup"),
@@ -420,7 +420,7 @@ internal fun WearScreenEmitter.stepper(
   val defaults = defaults("SliderDefaults")
   val content =
     p.literal("content")
-      ?.let { emit(it, place.forChild("Stepper").copy(parentStretches = false)) }
+      ?.let { emit(it, place.inSlot("Stepper", p, "content").copy(parentStretches = false)) }
       .orEmpty()
   return listOf(declaration) +
     one(

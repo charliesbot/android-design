@@ -16,6 +16,7 @@ import bot.charlies.androiddesign.preview.domain.node.ChildItems
 import bot.charlies.androiddesign.preview.domain.node.childItems
 import bot.charlies.androiddesign.preview.model.ActionFunction
 import bot.charlies.androiddesign.preview.model.ComponentNode
+import bot.charlies.androiddesign.preview.model.LayoutScope
 import bot.charlies.androiddesign.preview.model.M3Component
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.SizeClass
@@ -48,10 +49,10 @@ internal fun ScreenEmitter.emitComponent(
   // read from the props with their bindings resolved against the screen's sample data.
   val def = M3ExpressiveCatalog.find(node.component)
   val fillWidth = place.parentStretches && def?.fillsWidth { props.sampleValue(it, place) } == true
-  val weightedInRow = place.parentType == "Row" && props.floatExpr("weight", place) != null
+  val weightedInRow = place.hostScope == LayoutScope.Row && props.floatExpr("weight", place) != null
   // A Scaffold's content layout fills the screen through its leading `fillMaxSize()`, not its
   // parent.
-  val filled = place.parentStretches || "fillMaxSize()" in place.leading
+  val filled = place.parentStretches || place.fillsScreen
   val wraps = def?.wrapsAt(filled, weightedInRow) { props.sampleValue(it, place) } == true
   val inFlexBox = place.parentType == "FlexBox" && needsUnboundedHeight(node)
   val placed =
@@ -61,7 +62,13 @@ internal fun ScreenEmitter.emitComponent(
       leading = if (inFlexBox) place.leading + unboundedHeight() else place.leading,
     )
   val wrapped = menu != null || tooltip != null
-  val own = dispatch(node, props, if (wrapped) placed.copy(parentType = "Box") else placed)
+  // A tooltip or a menu wraps the child in a `Box`, which has no weight to give it.
+  val own =
+    dispatch(
+      node,
+      props,
+      if (wrapped) placed.copy(parentType = "Box", hostScope = LayoutScope.None) else placed,
+    )
   val anchored = if (tooltip == null) own else aroundAnchor(tooltip, own)
   val picker = placement.datePickerAt(node.id)?.let(byId::get)
   // An anchored overlay is written in every branch where its anchor is, each branch being its own
@@ -458,7 +465,7 @@ private fun ScreenEmitter.shape(p: JsonObject, place: Place): List<Stmt> {
   return one(
     file.use(Sym.Box),
     listOf(modifier(place, p, clip, fill)),
-    child(p, "content", place, "Box"),
+    child(p, "content", place, "Shape"),
   )
 }
 
@@ -714,7 +721,7 @@ private fun ScreenEmitter.scaffoldContent(
   val inner = place.forChild("Scaffold")
   if (toolbar != null) {
     val body =
-      emit(contentId, inner.copy(leading = listOf("fillMaxSize()"))) +
+      emit(contentId, inner.copy(leading = listOf("fillMaxSize()"), fillsScreen = true)) +
         emit(toolbar, inner.copy(floating = true))
     return one(
       file.use(Sym.Box),
@@ -731,7 +738,10 @@ private fun ScreenEmitter.scaffoldContent(
     )
   }
   if (content.component in LAYOUT_TYPES) {
-    return emit(contentId, inner.copy(leading = listOf("fillMaxSize()", "padding(innerPadding)")))
+    return emit(
+      contentId,
+      inner.copy(leading = listOf("fillMaxSize()", "padding(innerPadding)"), fillsScreen = true),
+    )
   }
   return one(
     file.use(Sym.Box),
@@ -858,7 +868,7 @@ private fun ScreenEmitter.floatingToolbar(p: JsonObject, place: Place): List<Stm
     m3(callee),
     listOf(
       arg("expanded", "true"),
-      modifierArg(place, over + listOfNotNull(p.floatExpr("weight", place)?.let { "weight($it)" })),
+      modifierArg(place, over + listOfNotNull(weight(place, p))),
       opt("colors", colors),
     ),
     children(p, "children", place, "FloatingToolbar"),
@@ -1110,7 +1120,7 @@ private fun ScreenEmitter.buttonGroup(p: JsonObject, place: Place): List<Stmt> {
       modifier(place, p),
       arg("horizontalArrangement", "${file.use(Sym.Arrangement)}.spacedBy($spacing)"),
     ),
-    children(p, "children", place, "Row") { pl, i, n ->
+    children(p, "children", place, "ButtonGroup") { pl, i, n ->
       if (!connected) pl
       else {
         val index = i.toIntOrNull()
@@ -1488,7 +1498,7 @@ private fun ScreenEmitter.chipGroup(node: ComponentNode, p: JsonObject, place: P
     one(
       file.use(Sym.Row),
       listOf(modifier(place, p), arg("horizontalArrangement", "$defaults.horizontalArrangement()")),
-      children(p, "children", inner, "Row") { pl, _, _ ->
+      children(p, "children", inner, "ChipGroup") { pl, _, _ ->
         pl.copy(chipSelection = inner.chipSelection)
       },
     )

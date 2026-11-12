@@ -36,10 +36,15 @@ private fun WearScreenEmitter.alertDialog(
   close: bot.charlies.androiddesign.preview.domain.export.Lambda,
 ): List<Stmt> {
   // A dialog's buttons keep their own size in upstream's centered row, as its defaults do.
-  val buttons = WearPlace(parentType = "AlertDialog", parentStretches = false)
+  fun buttons(key: String) =
+    WearPlace(
+      parentType = "AlertDialog",
+      parentStretches = false,
+      hostScope = p.hostScope("AlertDialog", key),
+    )
   val place = WearPlace()
   val confirm =
-    p.literal("confirm")?.let { emit(it, buttons) }
+    p.literal("confirm")?.let { emit(it, buttons("confirm")) }
       ?: listOf(
         stmt(
           Call(
@@ -48,7 +53,7 @@ private fun WearScreenEmitter.alertDialog(
           ),
         ),
       )
-  val dismiss = p.literal("dismiss")?.let { emit(it, buttons) }
+  val dismiss = p.literal("dismiss")?.let { emit(it, buttons("dismiss")) }
   return listOf(
     stmt(
       Call(
