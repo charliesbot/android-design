@@ -6,6 +6,7 @@ import bot.charlies.androiddesign.preview.model.Finding
 import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.NodeArrangement
 import bot.charlies.androiddesign.preview.model.NodeColors
 import bot.charlies.androiddesign.preview.model.NodeRoles
 import bot.charlies.androiddesign.preview.model.NodeWeight
@@ -40,6 +41,7 @@ internal fun node(
   clip: CornerClip? = null,
   variant: String? = null,
   weight: NodeWeight? = null,
+  arrangement: NodeArrangement? = null,
 ) =
   LayoutNode(
     id = id,
@@ -55,6 +57,7 @@ internal fun node(
     clip = clip,
     variant = variant,
     weight = weight,
+    arrangement = arrangement,
     roles = typeRole?.let { NodeRoles(type = it) },
     colors = if (content != null || container != null) NodeColors(container, content) else null,
   )

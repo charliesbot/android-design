@@ -1,16 +1,17 @@
 package bot.charlies.androiddesign.preview.domain.findings
 
+import bot.charlies.androiddesign.preview.model.Axis
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.CornerClip
 import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.LayoutNode
+import bot.charlies.androiddesign.preview.model.NodeArrangement
 import bot.charlies.androiddesign.preview.model.NodeWeight
 import bot.charlies.androiddesign.preview.model.RingInset
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
 import bot.charlies.androiddesign.preview.model.WearCatalog
-import bot.charlies.androiddesign.preview.model.WeightAxis
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -1412,8 +1413,8 @@ class FindingRulesTest {
 
   // region weight-collapsed
 
-  private val rowWeight = NodeWeight(1f, WeightAxis.Width, size = 0f)
-  private val columnWeight = NodeWeight(1f, WeightAxis.Height, size = 0f)
+  private val rowWeight = NodeWeight(1f, Axis.Width, size = 0f)
+  private val columnWeight = NodeWeight(1f, Axis.Height, size = 0f)
 
   @Test
   fun `weight-collapsed fails for a weighted node with no height in a column`() {
@@ -1440,7 +1441,7 @@ class FindingRulesTest {
 
   @Test
   fun `weight-collapsed passes for a weighted node that took space`() {
-    val fed = NodeWeight(1f, WeightAxis.Height, size = 300f)
+    val fed = NodeWeight(1f, Axis.Height, size = 300f)
     val list = node("list", "Column", 0f, 100f, 360f, 300f, weight = fed)
     assertEquals(emptyList(), evaluate(tree(Views.Light, list)).of(FindingRule.WeightCollapsed))
   }
@@ -1448,14 +1449,14 @@ class FindingRulesTest {
   @Test
   fun `weight-collapsed judges the measured size, not the bounds cut to the window`() {
     // Scrolled below the fold: the bounds are empty, but the node measured 160 dp wide.
-    val scrolledOut = NodeWeight(1f, WeightAxis.Width, size = 160f)
+    val scrolledOut = NodeWeight(1f, Axis.Width, size = 160f)
     val button = node("save", "Button", 0f, 0f, 0f, 0f, weight = scrolledOut)
     assertEquals(emptyList(), evaluate(tree(Views.Light, button)).of(FindingRule.WeightCollapsed))
   }
 
   @Test
   fun `weight-collapsed skips a node whose size was not measured`() {
-    val unmeasured = NodeWeight(1f, WeightAxis.Height)
+    val unmeasured = NodeWeight(1f, Axis.Height)
     val list = node("list", "Column", 0f, 100f, 360f, 0f, weight = unmeasured)
     assertEquals(emptyList(), evaluate(tree(Views.Light, list)).of(FindingRule.WeightCollapsed))
   }
@@ -1486,6 +1487,124 @@ class FindingRulesTest {
   fun `weight-collapsed skips a closed overlay`() {
     val sheet = node("sheet", "BottomSheet", 0f, 0f, 0f, 0f, weight = columnWeight)
     assertEquals(emptyList(), evaluate(tree(Views.Light, sheet)).of(FindingRule.WeightCollapsed))
+  }
+
+  // endregion
+
+  // region arrangement-no-space
+
+  private fun arranged(
+    name: String = "spaceBetween",
+    free: Float = 0f,
+    wraps: Boolean = true,
+    children: Int = 2,
+  ) = NodeArrangement(name, Axis.Width, free, wraps, children)
+
+  private fun header(arrangement: NodeArrangement, w: Float = 200f) =
+    node("head", "Row", 0f, 100f, w, 24f, arrangement = arrangement)
+
+  @Test
+  fun `arrangement-no-space notes a wrapping row with no free space`() {
+    val finding =
+      evaluate(tree(Views.Light, header(arranged()))).of(FindingRule.ArrangementNoSpace).single()
+    assertEquals("head", finding.id)
+    assertEquals(Severity.Info, finding.severity)
+    assertEquals(
+      "spaceBetween has no effect: the row is only as wide as its children, so there is no " +
+        "space to spread. Give the row room on this axis, usually by weighting the pane or " +
+        "column that wraps it in its parent row.",
+      finding.detail,
+    )
+  }
+
+  @Test
+  fun `arrangement-no-space words a column on the height and its wrapping row`() {
+    val column =
+      node("col", "Column", 0f, 0f, 100f, 80f, arrangement = arranged().copy(axis = Axis.Height))
+    val finding = evaluate(tree(Views.Light, column)).of(FindingRule.ArrangementNoSpace).single()
+    assertEquals(
+      "spaceBetween has no effect: the column is only as tall as its children, so there is no " +
+        "space to spread. Give the column room on this axis: weight it in its parent column, " +
+        "or, when a row holds it, give that row a height and set its verticalAlignment to " +
+        "stretch.",
+      finding.detail,
+    )
+  }
+
+  @Test
+  fun `arrangement-no-space words center and end of a column as placing`() {
+    val column =
+      node(
+        "col",
+        "Column",
+        0f,
+        0f,
+        100f,
+        80f,
+        arrangement = arranged("end").copy(axis = Axis.Height),
+      )
+    val finding = evaluate(tree(Views.Light, column)).of(FindingRule.ArrangementNoSpace).single()
+    assertEquals(
+      "end has no effect: the column is only as tall as its children, so there is no room to " +
+        "place them in. Give the column room on this axis: weight it in its parent column, " +
+        "or, when a row holds it, give that row a height and set its verticalAlignment to " +
+        "stretch.",
+      finding.detail,
+    )
+  }
+
+  @Test
+  fun `arrangement-no-space words center and end as placing`() {
+    val finding =
+      evaluate(tree(Views.Light, header(arranged("center")))).of(FindingRule.ArrangementNoSpace)
+    assertEquals(
+      "center has no effect: the row is only as wide as its children, so there is no room to " +
+        "place them in. Give the row room on this axis, usually by weighting the pane or " +
+        "column that wraps it in its parent row.",
+      finding.single().detail,
+    )
+  }
+
+  @Test
+  fun `arrangement-no-space fires for a single child centered or ended`() {
+    for (name in listOf("center", "end")) {
+      val node = header(arranged(name, children = 1))
+      assertEquals(
+        listOf("head"),
+        evaluate(tree(Views.Light, node)).of(FindingRule.ArrangementNoSpace).map { it.id },
+        name,
+      )
+    }
+  }
+
+  @Test
+  fun `arrangement-no-space passes when there is free space`() {
+    val finding = evaluate(tree(Views.Light, header(arranged(free = 40f))))
+    assertEquals(emptyList(), finding.of(FindingRule.ArrangementNoSpace))
+  }
+
+  @Test
+  fun `arrangement-no-space passes when the container does not wrap`() {
+    val finding = evaluate(tree(Views.Light, header(arranged(wraps = false))))
+    assertEquals(emptyList(), finding.of(FindingRule.ArrangementNoSpace))
+  }
+
+  @Test
+  fun `arrangement-no-space passes for a single child spread between`() {
+    val finding = evaluate(tree(Views.Light, header(arranged(children = 1))))
+    assertEquals(emptyList(), finding.of(FindingRule.ArrangementNoSpace))
+  }
+
+  @Test
+  fun `arrangement-no-space skips a node behind an open modal or not laid out`() {
+    val dialog = node("dialog", "Dialog", 40f, 200f, 280f, 300f)
+    val behind = evaluate(tree(Views.Light, header(arranged()), dialog))
+    assertEquals(emptyList(), behind.of(FindingRule.ArrangementNoSpace))
+    val hidden = node("head", "Row", 0f, 0f, 0f, 0f, arrangement = arranged())
+    assertEquals(
+      emptyList(),
+      evaluate(tree(Views.Light, hidden)).of(FindingRule.ArrangementNoSpace),
+    )
   }
 
   // endregion

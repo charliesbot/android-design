@@ -2,6 +2,7 @@ package bot.charlies.androiddesign.preview.domain.findings
 
 import bot.charlies.androiddesign.preview.domain.DatePickerSpec
 import bot.charlies.androiddesign.preview.domain.design.TypeScale
+import bot.charlies.androiddesign.preview.model.Axis
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.BundledFont
 import bot.charlies.androiddesign.preview.model.Catalog
@@ -16,7 +17,6 @@ import bot.charlies.androiddesign.preview.model.NavigationNodes
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.SizeClass
 import bot.charlies.androiddesign.preview.model.TypeRole
-import bot.charlies.androiddesign.preview.model.WeightAxis
 import kotlin.math.hypot
 import kotlin.math.round
 
@@ -131,6 +131,7 @@ object FindingRules {
       fullScreenDatePicker(view) +
       lineLength(view) +
       weightCollapsed(view) +
+      arrangementNoSpace(view) +
       emptyDetailPane(emptyDetailLists)
   }
 
@@ -868,7 +869,7 @@ object FindingRules {
         // The measured size, not `bounds`: those are cut to the window and to a scroll viewport, so
         // a node scrolled out of view has none.
         val size = weight.size ?: return@mapNotNull null
-        val axis = if (weight.axis == WeightAxis.Width) "width" else "height"
+        val axis = if (weight.axis == Axis.Width) "width" else "height"
         if (size > OVERFLOW_SLACK_DP) return@mapNotNull null
         errorFinding(
           node,
@@ -878,6 +879,49 @@ object FindingRules {
             "bounded size",
         )
       }
+
+  // endregion
+
+  // region arrangement-no-space
+
+  /**
+   * A space-* arrangement, `center` or `end` places children in the free space of the container's
+   * main axis. A Row or Column that wraps its content has none: it is exactly as wide (or tall) as
+   * its children and gaps, so the arrangement does nothing and the children sit flush. That is how
+   * Compose behaves, and a proposal that draws it wrong never sees it, so it is a note, not an
+   * error. The recorder decides [NodeArrangement.wraps] and measures [NodeArrangement.free] from
+   * unclipped sizes. One child spread between has nothing to spread, with or without space, so it
+   * is not reported.
+   */
+  private fun arrangementNoSpace(view: View): List<Finding> =
+    view.nodes
+      .filter { it.arrangement != null && it.isLaidOut && !view.isBehindModal(it) }
+      .mapNotNull { node ->
+        val arrangement = checkNotNull(node.arrangement)
+        if (!arrangement.wraps || arrangement.free > OVERFLOW_SLACK_DP) return@mapNotNull null
+        if (arrangement.children == 1 && arrangement.name == SPACE_BETWEEN) return@mapNotNull null
+        val row = arrangement.axis == Axis.Width
+        val (shape, extent) = if (row) "row" to "wide" else "column" to "tall"
+        val effect =
+          if (arrangement.name.startsWith("space")) "no space to spread"
+          else "no room to place them in"
+        Finding(
+          id = node.id,
+          rule = FindingRule.ArrangementNoSpace,
+          severity = Severity.Info,
+          detail =
+            "${arrangement.name} has no effect: the $shape is only as $extent as its children, " +
+              "so there is $effect. Give the $shape room on this axis" +
+              if (row) {
+                ", usually by weighting the pane or column that wraps it in its parent row."
+              } else {
+                ": weight it in its parent column, or, when a row holds it, give that row a " +
+                  "height and set its verticalAlignment to stretch."
+              },
+        )
+      }
+
+  private const val SPACE_BETWEEN = "spaceBetween"
 
   // endregion
 

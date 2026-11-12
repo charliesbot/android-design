@@ -75,6 +75,11 @@ data class LayoutNode(
    * Omitted for every node without one, and where a weight means nothing (a Box, a Grid).
    */
   val weight: NodeWeight? = null,
+  /**
+   * The main-axis arrangement of a Row or Column that needs free space to show (a space-* one,
+   * `center` or `end`). Omitted for every other node.
+   */
+  val arrangement: NodeArrangement? = null,
   val roles: NodeRoles? = null,
   val colors: NodeColors? = null,
   val a11y: A11yInfo? = null,
@@ -89,10 +94,26 @@ data class LayoutNode(
  * Column. [size] is the node's measured size along that axis in dp, not cut to the window or a
  * scroll viewport as `bounds` are, so a node scrolled out of view still has its real size.
  */
-@Serializable data class NodeWeight(val value: Float, val axis: WeightAxis, val size: Float? = null)
+@Serializable data class NodeWeight(val value: Float, val axis: Axis, val size: Float? = null)
+
+/**
+ * What a Row or Column's [name] arrangement has to work with on its main [axis]: [free] is the
+ * measured size left after its [children] and their gaps, in dp, not cut to the window or a scroll
+ * viewport. [wraps] is true when the container takes its size from its children on that axis (it is
+ * neither stretched nor weighted, and no child is weighted), so the arrangement has no space to
+ * spread them in.
+ */
+@Serializable
+data class NodeArrangement(
+  val name: String,
+  val axis: Axis,
+  val free: Float,
+  val wraps: Boolean,
+  val children: Int,
+)
 
 @Serializable
-enum class WeightAxis {
+enum class Axis {
   @SerialName("width") Width,
   @SerialName("height") Height,
 }
@@ -185,6 +206,7 @@ enum class FindingRule(val wire: String) {
   @SerialName("empty-detail-pane") EmptyDetailPane("empty-detail-pane"),
   @SerialName("line-length") LineLength("line-length"),
   @SerialName("weight-collapsed") WeightCollapsed("weight-collapsed"),
+  @SerialName("arrangement-no-space") ArrangementNoSpace("arrangement-no-space"),
 }
 
 /** [id] is the component the finding is about, or null when it concerns the whole view. */

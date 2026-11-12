@@ -34,25 +34,27 @@ import androidx.compose.ui.unit.dp
 import bot.charlies.androiddesign.preview.domain.CarouselItemGate
 import bot.charlies.androiddesign.preview.domain.layout.growsSemanticsBounds
 import bot.charlies.androiddesign.preview.domain.node.PropReader
+import bot.charlies.androiddesign.preview.feature.preview.record.ArrangementNeed
 import bot.charlies.androiddesign.preview.feature.preview.record.NodeMeta
 import bot.charlies.androiddesign.preview.feature.preview.record.TextReport
 import bot.charlies.androiddesign.preview.feature.preview.render.wear.LocalWearAmbient
 import bot.charlies.androiddesign.preview.feature.preview.render.wear.WearStyledAmbient
 import bot.charlies.androiddesign.preview.feature.preview.render.wear.describeWear
 import bot.charlies.androiddesign.preview.feature.preview.render.wear.wearStyleBackground
+import bot.charlies.androiddesign.preview.model.Axis
 import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.CornerClip
 import bot.charlies.androiddesign.preview.model.LayoutScope
+import bot.charlies.androiddesign.preview.model.M3Component
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.MaterialShape
 import bot.charlies.androiddesign.preview.model.NodeWeight
 import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.StyleDef
 import bot.charlies.androiddesign.preview.model.TypeRole
-import bot.charlies.androiddesign.preview.model.WeightAxis
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -343,6 +345,10 @@ internal fun NodeContext.modifier(
   number(Catalog.MAX_WIDTH)?.let { modifier = modifier.widthIn(max = it.dp) }
   if (host.fillWidth && def.fillsWidth(props::value)) modifier = modifier.fillMaxWidth()
   if (fillHeight && host.fillHeight) modifier = modifier.fillMaxHeight()
+  // Before the container and the padding, so it sees the box the parent lays this node out in.
+  env.recorder?.let { recorder ->
+    modifier = modifier.onGloballyPositioned { recorder.reportOuterSize(id, it.size) }
+  }
   if (container) {
     modifier = modifier.then(styleBackground())
     ReportClip(styleClip(scroll, padded))
@@ -360,11 +366,37 @@ internal fun NodeContext.modifier(
 internal fun NodeContext.weightOnAxis(): NodeWeight? {
   val weight = number("weight") ?: return null
   return when {
-    host.column != null -> NodeWeight(weight, WeightAxis.Height)
-    host.row != null -> NodeWeight(weight, WeightAxis.Width)
+    host.column != null -> NodeWeight(weight, Axis.Height)
+    host.row != null -> NodeWeight(weight, Axis.Width)
     else -> null
   }
 }
+
+/**
+ * The arrangement a Row or Column draws, when it needs free space on its main axis to show. It
+ * wraps when this node is neither weighted in its parent's scope nor stretched along that axis: a
+ * Row stretches across the width the way [modifier] does it, a Column down the height when its
+ * parent offers it.
+ */
+internal fun NodeContext.arrangementNeed(): ArrangementNeed? {
+  val name = string("arrangement") ?: return null
+  if (name !in SPACE_NEEDING) return null
+  val horizontal = component == M3Component.Row.wire
+  if (!horizontal && component != M3Component.Column.wire) return null
+  val weighted =
+    number("weight") != null && (if (horizontal) host.row != null else host.column != null)
+  val stretched =
+    if (horizontal) host.fillWidth && def.fillsWidth(props::value) else host.fillHeight
+  val gap = if (name in setOf("center", "end")) spacing("spacing")?.value ?: 0f else 0f
+  return ArrangementNeed(
+    name = name,
+    axis = if (horizontal) Axis.Width else Axis.Height,
+    gapDp = gap,
+    wraps = !weighted && !stretched,
+  )
+}
+
+private val SPACE_NEEDING = setOf("spaceBetween", "spaceAround", "spaceEvenly", "center", "end")
 
 /** The props [node] is drawn with in this context's frame, as [growsSemanticsBounds] asks. */
 private fun NodeContext.flexProps(other: ComponentNode): List<JsonObject> =

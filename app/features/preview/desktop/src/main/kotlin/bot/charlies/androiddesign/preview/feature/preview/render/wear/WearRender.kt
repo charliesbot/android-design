@@ -22,6 +22,7 @@ import bot.charlies.androiddesign.preview.feature.preview.render.RenderImage
 import bot.charlies.androiddesign.preview.feature.preview.render.RenderRow
 import bot.charlies.androiddesign.preview.feature.preview.render.RenderSpacer
 import bot.charlies.androiddesign.preview.feature.preview.render.SymbolIcon
+import bot.charlies.androiddesign.preview.feature.preview.render.arrangementNeed
 import bot.charlies.androiddesign.preview.feature.preview.render.shapeFor
 import bot.charlies.androiddesign.preview.feature.preview.render.textReporter
 import bot.charlies.androiddesign.preview.feature.preview.render.weightOnAxis
@@ -148,6 +149,7 @@ internal fun describeWear(ctx: NodeContext, ambient: WearAmbient): NodeMeta {
     // the layout (TreeRecorder.snapshot).
     scrolls = ctx.component == WearComponent.Screen.wire && ctx.bool("scroll"),
     weight = ctx.weightOnAxis(),
+    arrangement = ctx.arrangementNeed(),
     interactive = interactive,
     roles =
       NodeRoles(
