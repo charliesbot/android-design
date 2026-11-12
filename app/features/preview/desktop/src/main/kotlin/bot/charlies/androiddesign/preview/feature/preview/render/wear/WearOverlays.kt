@@ -33,7 +33,7 @@ internal fun RenderWearAlertDialog(ctx: NodeContext) {
       onDismissRequest = dismiss,
       confirmButton = {
         if (confirm != null) {
-          ctx.ChildNode(confirm, 1, rowMember())
+          ctx.Child("confirm", 1, rowMember())
         } else {
           AlertDialogDefaults.ConfirmButton(dismiss)
         }
@@ -42,7 +42,7 @@ internal fun RenderWearAlertDialog(ctx: NodeContext) {
       modifier = ctx.modifier(),
       dismissButton = {
         if (dismissButton != null) {
-          ctx.ChildNode(dismissButton, 2, rowMember())
+          ctx.Child("dismiss", 2, rowMember())
         } else {
           AlertDialogDefaults.DismissButton(dismiss)
         }
@@ -53,7 +53,10 @@ internal fun RenderWearAlertDialog(ctx: NodeContext) {
   }
 }
 
-/** A dialog's buttons keep their own size in upstream's centered row, as its defaults do. */
+/**
+ * A dialog's buttons keep their own size in upstream's centered row, as its defaults do. The
+ * buttons slots of `AlertDialog` are `RowScope` lambdas, which the catalog declares.
+ */
 @Composable private fun RowScope.rowMember() = ChildHost(fillWidth = false, row = this)
 
 internal fun NodeContext.confirmationDialogLook() =

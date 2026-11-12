@@ -22,6 +22,7 @@ import bot.charlies.androiddesign.preview.domain.export.stmt
 import bot.charlies.androiddesign.preview.domain.export.textAlign
 import bot.charlies.androiddesign.preview.domain.export.verticalAlignment
 import bot.charlies.androiddesign.preview.model.ComponentNode
+import bot.charlies.androiddesign.preview.model.LayoutScope
 import bot.charlies.androiddesign.preview.model.WearCatalog
 import bot.charlies.androiddesign.preview.model.WearComponent
 import kotlinx.serialization.json.JsonElement
@@ -37,7 +38,8 @@ internal fun WearScreenEmitter.emitComponent(
   p: JsonObject,
   placed: WearPlace,
 ): List<Stmt> {
-  val weightedInRow = placed.parentType == "Row" && p.numberProp(node.component, "weight") != null
+  val weightedInRow =
+    placed.hostScope == LayoutScope.Row && p.numberProp(node.component, "weight") != null
   val place =
     placed.copy(
       wraps =
@@ -175,7 +177,7 @@ private fun WearScreenEmitter.column(
       file.use(Sym.verticalScroll)
       "verticalScroll(${file.use(Sym.rememberScrollState)}())"
     } else null
-  val children = children(node, p, "children", place.forChild("Column"))
+  val children = children(node, p, "children", place.inSlot("Column", p))
   return styledAmbient(
     node,
     one(
@@ -198,7 +200,7 @@ private fun WearScreenEmitter.row(
   val alignment = verticalAlignment(p)
   // Stretch offers the row's height to its Column and Box children, the full-height panes.
   val childPlace =
-    place.forChild("Row").copy(fillHeight = p.literal("verticalAlignment") == "stretch")
+    place.inSlot("Row", p).copy(fillHeight = p.literal("verticalAlignment") == "stretch")
   val children = children(node, p, "children", childPlace)
   return styledAmbient(
     node,
@@ -223,7 +225,7 @@ private fun WearScreenEmitter.box(
     p.literal("contentAlignment")
       ?.takeIf { it != "topStart" }
       ?.let { "${file.use(Sym.Alignment)}.${Naming.pascal(it)}" }
-  val children = children(node, p, "children", place.forChild("Box"))
+  val children = children(node, p, "children", place.inSlot("Box", p))
   return styledAmbient(
     node,
     one(
@@ -358,7 +360,7 @@ private fun WearScreenEmitter.card(
   p: JsonObject,
   place: WearPlace,
 ): List<Stmt> {
-  val children = children(node, p, "children", place.forChild("Card"))
+  val children = children(node, p, "children", place.inSlot("Card", p))
   return children.prelude +
     one(
       wear("Card"),

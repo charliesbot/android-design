@@ -12,6 +12,7 @@ import bot.charlies.androiddesign.preview.model.CarouselItemSize
 import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.DesignSystem
+import bot.charlies.androiddesign.preview.model.LayoutScope
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.MaterialShape
 import bot.charlies.androiddesign.preview.model.PropKind
@@ -85,8 +86,15 @@ internal sealed interface IconName {
 /** What a component needs to know about where it is emitted. */
 internal data class Place(
   override val scope: Scope? = null,
-  /** The component type of the parent, which decides whether `weight` applies. */
+  /** The component type of the parent. */
   val parentType: String? = null,
+  /**
+   * The layout scope of the lambda that holds the component drawn here, which decides whether its
+   * `weight` is written: only a `RowScope` or a `ColumnScope` has `Modifier.weight`. The catalog
+   * declares it per slot ([bot.charlies.androiddesign.preview.model.PropDef.childScope]), as the
+   * previewer reads it.
+   */
+  val hostScope: LayoutScope = LayoutScope.None,
   /**
    * True when the parent lets its children stretch to its width (the catalog's
    * [bot.charlies.androiddesign.preview.model.ComponentDef.stretchesChildren]). The screen's root
@@ -103,6 +111,11 @@ internal data class Place(
    * stretching. Read by [forChild], which sets it back for the children.
    */
   val wraps: Boolean = false,
+  /**
+   * True for the content of a Scaffold, which fills the screen through its leading `fillMaxSize()`
+   * rather than through its parent, so it is not drawn at a wrapped width.
+   */
+  val fillsScreen: Boolean = false,
   /**
    * True for a child of a row whose `verticalAlignment` is `stretch`. A Column, Row, or Box here
    * gets `fillMaxHeight()`; every other component ignores it.
@@ -128,13 +141,15 @@ internal data class Place(
    */
   val inToolbar: Boolean = false,
 ) : Placement {
-  fun forChild(parentType: String) =
+  fun forChild(parentType: String, hostScope: LayoutScope = LayoutScope.None) =
     copy(
       parentType = parentType,
+      hostScope = hostScope,
       inToolbar = parentType == "FloatingToolbar" || parentType == "DockedToolbar",
       parentStretches = M3ExpressiveCatalog.find(parentType)?.stretchesChildrenWhen(wraps) ?: false,
       fillWidth = false,
       wraps = false,
+      fillsScreen = false,
       fillHeight = false,
       modifierBase = "Modifier",
       leading = emptyList(),
@@ -546,10 +561,19 @@ internal class ScreenEmitter(
   // region modifiers
 
   /**
-   * The `modifier` argument: the place's leading calls, the weight inside a row or column, the
-   * stretch to the parent's width, the stretch to its height when [fillHeight] says so, any [extra]
-   * calls, and the padding last. Null when there is nothing to say. A component that pads its own
-   * content inside its container (a Card) sets [padded] to false and writes the padding there.
+   * The `weight(...)` call of a component with [props] at [place], or null when it has no weight or
+   * its lambda has no scope that takes one ([Place.hostScope]).
+   */
+  fun weight(place: Place, props: JsonObject): String? =
+    if (place.hostScope == LayoutScope.None) null
+    else props.floatExpr("weight", place)?.let { "weight($it)" }
+
+  /**
+   * The `modifier` argument: the place's leading calls, the weight where the place's scope has one,
+   * the stretch to the parent's width, the stretch to its height when [fillHeight] says so, any
+   * [extra] calls, and the padding last. Null when there is nothing to say. A component that pads
+   * its own content inside its container (a Card) sets [padded] to false and writes the padding
+   * there.
    */
   fun modifier(
     place: Place,
@@ -560,9 +584,7 @@ internal class ScreenEmitter(
   ): Arg? {
     val parts = mutableListOf<String>()
     parts += place.leading.map(::useModifier)
-    if (place.parentType == "Row" || place.parentType == "Column") {
-      props.floatExpr("weight", place)?.let { parts += "weight($it)" }
-    }
+    weight(place, props)?.let { parts += it }
     props.floatExpr(Catalog.MAX_WIDTH, place)?.let {
       parts += "${useModifier("widthIn")}(max = ${it.removeSuffix("f")}.${file.use(Sym.dp)})"
     }
@@ -588,7 +610,7 @@ internal class ScreenEmitter(
   /** The statements for a `Child` prop, or none. */
   fun child(props: JsonObject, key: String, place: Place, parentType: String): List<Stmt> {
     val id = props.literal(key) ?: return emptyList()
-    return emit(id, place.forChild(parentType))
+    return emit(id, place.forChild(parentType, props.hostScope(parentType, key)))
   }
 
   /** A slot lambda for a `Child` prop, such as `title = { ... }`; null when the prop is absent. */
@@ -610,32 +632,32 @@ internal class ScreenEmitter(
     indexed: Boolean = false,
     shape: (Place, String, String) -> Place = { p, _, _ -> p },
   ): List<Stmt> {
+    val child = place.forChild(parentType, props.hostScope(parentType, key))
     return when (val items = props[key].childItems()) {
       is ChildItems.Listed ->
         items.ids.flatMapIndexed { i, id ->
-          emit(id, shape(place.forChild(parentType), i.toString(), items.ids.size.toString()))
+          emit(id, shape(child, i.toString(), items.ids.size.toString()))
         }
-      is ChildItems.Template ->
-        listOf(loop(items.componentId, items.path, place, parentType, indexed, shape))
+      is ChildItems.Template -> listOf(loop(items.componentId, items.path, child, indexed, shape))
       null -> emptyList()
     }
   }
 
+  /** The loop over the list a template names; [child] is the place of each child of the slot. */
   private fun loop(
     componentId: String,
     path: String,
-    place: Place,
-    parentType: String,
+    child: Place,
     indexed: Boolean,
     shape: (Place, String, String) -> Place,
   ): Stmt {
-    val template = templateScope(componentId, path, place, indexed)
+    val template = templateScope(componentId, path, child, indexed)
     val scope = template.scope
     val body =
       emit(
         componentId,
         shape(
-          place.forChild(parentType).copy(scope = scope),
+          child.copy(scope = scope),
           scope.index ?: "index",
           "${template.list.expr}.size",
         ),
@@ -668,7 +690,7 @@ internal class ScreenEmitter(
     parentType: String,
     shape: (Place) -> Place = { it },
   ): ByIndex {
-    val child = place.forChild(parentType)
+    val child = place.forChild(parentType, props.hostScope(parentType, key))
     when (val items = props[key].childItems()) {
       is ChildItems.Listed -> {
         val bodies = items.ids.map { emit(it, shape(child)) }

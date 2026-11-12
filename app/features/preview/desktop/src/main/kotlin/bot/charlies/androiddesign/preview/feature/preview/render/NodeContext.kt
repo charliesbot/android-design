@@ -45,6 +45,7 @@ import bot.charlies.androiddesign.preview.model.ColorRole
 import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.CornerClip
+import bot.charlies.androiddesign.preview.model.LayoutScope
 import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.MaterialShape
 import bot.charlies.androiddesign.preview.model.ShapeToken
@@ -160,18 +161,32 @@ internal class NodeContext(
     RenderNode(env, ChildRef(id, scope), this.id, order + listOf(slot, index), host)
   }
 
+  /**
+   * [host] as the catalog scopes slot [key] ([ComponentDef.childLayout]): the `RowScope` or
+   * `ColumnScope` the composable hosts is kept for `weight` only where the catalog says the slot
+   * has it, so the exporter, which reads the same declaration, writes `weight` in the same slots.
+   */
+  private fun scoped(key: String, host: ChildHost): ChildHost {
+    val layout = def.childLayout(key, props::value)
+    return host.copy(
+      row = host.row.takeIf { layout == LayoutScope.Row },
+      column = host.column.takeIf { layout == LayoutScope.Column },
+    )
+  }
+
   /** Draws the child a `Child` prop points at. */
   @Composable
   fun Child(key: String, slot: Int, host: ChildHost = ChildHost.Wrap) {
-    ChildNode(props.childId(key), slot, host)
+    ChildNode(props.childId(key), slot, scoped(key, host))
   }
 
   /** Draws the children of a `ChildList` prop; each is told its place among its siblings. */
   @Composable
   fun Children(key: String, slot: Int, host: ChildHost = ChildHost.Flow) {
     val refs = props.children(key)
+    val scoped = scoped(key, host)
     refs.forEachIndexed { index, ref ->
-      RenderNode(env, ref, id, order + listOf(slot, index), host.at(index, refs.size))
+      RenderNode(env, ref, id, order + listOf(slot, index), scoped.at(index, refs.size))
     }
   }
 
@@ -186,8 +201,9 @@ internal class NodeContext(
       props.children(key).withIndex().filter { (_, ref) ->
         env.nodes[ref.id]?.isShownAt(env.sizeClass) == true
       }
+    val scoped = scoped(key, host)
     shown.forEachIndexed { position, (index, ref) ->
-      RenderNode(env, ref, id, order + listOf(slot, index), host.at(position, shown.size))
+      RenderNode(env, ref, id, order + listOf(slot, index), scoped.at(position, shown.size))
     }
   }
 }

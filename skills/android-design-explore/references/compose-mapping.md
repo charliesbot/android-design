@@ -167,7 +167,7 @@ The first cell is the catalog component and the prop values that select the patt
 | Catalog | Compose | Notes |
 | --- | --- | --- |
 | `padding` | `Modifier.padding(16.dp)` | The spacing step's dp value from the design system. |
-| `weight` | `Modifier.weight(w)` | Only inside a `Row` or `Column`. |
+| `weight` | `Modifier.weight(w)` | Only where the Compose lambda that holds the child is a row or column scope, which the catalog declares per child slot (`childScope`): the children of a Row, a Column, a button group, a floating or docked toolbar (a vertical floating toolbar is a column), a Card, a list, a radio group, bottom sheet content, search view content, and the actions of a top app bar, a search bar's trailing icons and a rich tooltip. Nowhere else: not in a Box, a Grid, a FlexBox, a chip group, tabs, a menu, a side sheet or full-screen dialog (their content scrolls, so a weight would collapse), a list item slot or a Scaffold slot, where the previewer ignores it and the export does not write it. In Wear, the children of a Column, a Row and a Card, and the buttons of an AlertDialog. |
 | `style` | The style's tokens as the component's parameters and modifiers | `type`, `color`, `container`, `shape`, and `padding` each map as in Tokens. Not the experimental Styles API, which material3 components do not accept. |
 | `showIn`, `sizeClass` | `BoxWithConstraints` with `maxWidth >= 600.dp` and `maxWidth >= 840.dp` | Or the app's own window size class source. Compact below 600dp, medium to 839dp, expanded from 840dp. |
 | `primary` | The one prominent action of the screen | Not a Compose API: carry the emphasis, not an attribute. |

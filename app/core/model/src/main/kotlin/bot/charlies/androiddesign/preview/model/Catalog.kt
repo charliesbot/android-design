@@ -99,6 +99,8 @@ data class NumberBounds(val min: Double, val max: Double, val whole: Boolean = f
  * @property default The value the renderer and the exporter use when a proposal leaves the prop
  *   out, or null when the prop has no fixed default. This is the only place a default is written
  *   down, and the catalog shows it to agents so they can omit it.
+ * @property childScope For [PropKind.Child] and [PropKind.ChildList], the layout scope of the
+ *   Compose lambda that holds the children: where `weight` applies. See [ChildScope].
  */
 data class PropDef(
   val name: String,
@@ -107,7 +109,51 @@ data class PropDef(
   val description: String = "",
   val allowedChildren: Set<String>? = null,
   val default: JsonPrimitive? = null,
+  val childScope: ChildScope = ChildScope.None,
 )
+
+/**
+ * The layout scope of the Compose lambda that holds a child slot's children. `Modifier.weight` is a
+ * member of `RowScope` and `ColumnScope` only, so this decides whether a child's `weight` means
+ * anything: the previewer weights it and the exporter writes `Modifier.weight(...)` exactly where
+ * the scope is [Row] or [Column].
+ */
+enum class LayoutScope {
+  /** No `RowScope` or `ColumnScope`: a `weight` here is neither drawn nor exported. */
+  None,
+  Row,
+  Column,
+}
+
+/**
+ * The [LayoutScope] a child slot is declared to have, which may depend on a prop of its component.
+ * The renderer and the exporter both read it ([ComponentDef.childLayout]). WeightAgreementTest
+ * checks each declaration against the render and against the exported `weight` calls.
+ */
+sealed interface ChildScope {
+  /** The scope, given the component's props ([valueOf] is a prop's value, or null). */
+  fun resolve(valueOf: (String) -> JsonElement?): LayoutScope
+
+  data class Fixed(val scope: LayoutScope) : ChildScope {
+    override fun resolve(valueOf: (String) -> JsonElement?) = scope
+  }
+
+  /**
+   * A column when the enum prop [prop] is `vertical`, else a row: a floating toolbar's content is a
+   * `RowScope` when horizontal and a `ColumnScope` when vertical.
+   */
+  data class Oriented(val prop: String) : ChildScope {
+    override fun resolve(valueOf: (String) -> JsonElement?) =
+      if ((valueOf(prop) as? JsonPrimitive)?.content == "vertical") LayoutScope.Column
+      else LayoutScope.Row
+  }
+
+  companion object {
+    val None = Fixed(LayoutScope.None)
+    val Row = Fixed(LayoutScope.Row)
+    val Column = Fixed(LayoutScope.Column)
+  }
+}
 
 /** When a component stretches to its parent's width. */
 sealed interface WidthFill {
@@ -219,6 +265,14 @@ data class ComponentDef(
 
   /** The catalog default of prop [name], or null when it is not a prop or has no default. */
   fun defaultOf(name: String): JsonPrimitive? = prop(name)?.default
+
+  /**
+   * The layout scope of the lambda that holds the children of slot [key], given the node's props
+   * ([valueOf], a catalog default counting as a value): where its children's `weight` applies.
+   * [LayoutScope.None] for a slot with no scope and for a prop that is not a slot.
+   */
+  fun childLayout(key: String, valueOf: (String) -> JsonElement?): LayoutScope =
+    prop(key)?.childScope?.resolve { valueOf(it) ?: defaultOf(it) } ?: LayoutScope.None
 }
 
 /** Why the catalog does not draw a Material 3 component page. */
@@ -572,7 +626,16 @@ internal fun child(
   vararg allowed: String,
   required: Boolean = false,
   description: String = "",
-) = PropDef(name, PropKind.Child, required, description, allowed.toSet().ifEmpty { null })
+  scope: ChildScope = ChildScope.None,
+) =
+  PropDef(
+    name,
+    PropKind.Child,
+    required,
+    description,
+    allowed.toSet().ifEmpty { null },
+    childScope = scope,
+  )
 
 internal fun anchor(
   name: String,
@@ -586,7 +649,16 @@ internal fun children(
   vararg allowed: String,
   required: Boolean = false,
   description: String = "",
-) = PropDef(name, PropKind.ChildList, required, description, allowed.toSet().ifEmpty { null })
+  scope: ChildScope = ChildScope.None,
+) =
+  PropDef(
+    name,
+    PropKind.ChildList,
+    required,
+    description,
+    allowed.toSet().ifEmpty { null },
+    childScope = scope,
+  )
 
 internal fun color(name: String, description: String = "") =
   PropDef(name, PropKind.ColorRole, description = description)
@@ -659,7 +731,7 @@ internal fun layout(): List<ComponentDef> =
       "Arranges children vertically.",
       "Column",
       listOf(
-        children("children", required = true),
+        children("children", required = true, scope = ChildScope.Column),
         spacing("spacing", "Gap between children (Arrangement.spacedBy)."),
         oneOf("horizontalAlignment", "start", "center", "end", default = "start"),
         oneOf("arrangement", *arrangements, default = "start"),
@@ -674,7 +746,7 @@ internal fun layout(): List<ComponentDef> =
       "Arranges children horizontally.",
       "Row",
       listOf(
-        children("children", required = true),
+        children("children", required = true, scope = ChildScope.Row),
         spacing("spacing", "Gap between children (Arrangement.spacedBy)."),
         oneOf(
           "verticalAlignment",
@@ -896,6 +968,7 @@ private fun structure(): List<ComponentDef> =
             "The trailing icon buttons. A search app bar has at most two at compact widths, an " +
               "avatar coming in addition, and up to four from medium widths up (override " +
               "`actions` in `sizeClass`).",
+          scope = ChildScope.Row,
         ),
         PropDef(
           "avatar",
@@ -945,7 +1018,7 @@ private fun structure(): List<ComponentDef> =
       listOf(
         oneOf("orientation", "horizontal", "vertical", default = "horizontal"),
         oneOf("colors", "standard", "vibrant", default = "standard"),
-        children("children", required = true),
+        children("children", required = true, scope = ChildScope.Oriented("orientation")),
       ),
       m3Pages = listOf("toolbars"),
     ),
@@ -957,7 +1030,7 @@ private fun structure(): List<ComponentDef> =
       "FlexibleBottomAppBar",
       listOf(
         oneOf("colors", "standard", "vibrant", default = "standard"),
-        children("children", required = true),
+        children("children", required = true, scope = ChildScope.Row),
       ),
       width = WidthFill.Always,
       m3Pages = listOf("toolbars"),
@@ -971,7 +1044,7 @@ private fun structure(): List<ComponentDef> =
         oneOf("variant", "filled", "elevated", "outlined", default = "filled"),
         action(),
         shape(),
-        children("content", required = true),
+        children("content", required = true, scope = ChildScope.Column),
       ),
       stretchesChildren = true,
       width = WidthFill.Always,
@@ -988,7 +1061,7 @@ private fun lists(): List<ComponentDef> =
       "Column of ListItem, or of SegmentedListItem for the segmented variant",
       listOf(
         oneOf("variant", "standard", "segmented", default = "standard"),
-        children("children", "ListItem", required = true),
+        children("children", "ListItem", required = true, scope = ChildScope.Column),
       ),
       stretchesChildren = true,
       width = WidthFill.Always,
@@ -1054,7 +1127,14 @@ private fun actions(): List<ComponentDef> =
       "ButtonGroup, or a Row of toggle buttons with ButtonGroupDefaults.connected shapes",
       listOf(
         oneOf("variant", "standard", "connected", default = "standard"),
-        children("children", "Button", "ToggleButton", "IconButton", required = true),
+        children(
+          "children",
+          "Button",
+          "ToggleButton",
+          "IconButton",
+          required = true,
+          scope = ChildScope.Row,
+        ),
       ),
       m3Pages = listOf("button-groups"),
     ),
@@ -1301,7 +1381,7 @@ private fun inputs(): List<ComponentDef> =
       ComponentGroup.Inputs,
       "A vertical list of radio buttons. Exactly one is selected, and a tap moves the selection.",
       "Column with Modifier.selectableGroup()",
-      listOf(children("children", "RadioButton", required = true)),
+      listOf(children("children", "RadioButton", required = true, scope = ChildScope.Column)),
       stretchesChildren = true,
       width = WidthFill.Always,
       m3Pages = listOf("radio-button"),
@@ -1363,6 +1443,7 @@ private fun inputs(): List<ComponentDef> =
           "trailing",
           "IconButton",
           description = "Trailing icon buttons. At most two, an avatar counting as one.",
+          scope = ChildScope.Row,
         ),
         PropDef(
           "avatar",
@@ -1412,7 +1493,7 @@ private fun overlays(): List<ComponentDef> =
       "A modal sheet from the bottom edge, with a drag handle. Its content spans the sheet edge to " +
         "edge, as ModalBottomSheet adds no side padding: put it in a Column with padding.",
       "ModalBottomSheet with BottomSheetDefaults.DragHandle",
-      listOf(children("content", required = true)),
+      listOf(children("content", required = true, scope = ChildScope.Column)),
       overlay = true,
       stretchesChildren = true,
       m3Pages = listOf("bottom-sheets"),
@@ -1438,7 +1519,12 @@ private fun overlays(): List<ComponentDef> =
               "(Save, Send, Create), never disabled.",
         ),
         child("dismiss", "Button", description = "Basic only: the dismissive text button."),
-        children("content", description = "Full-screen only: the body below the header."),
+        // Scope is None on purpose, as for Menu.items: the content sits in a verticalScroll Column,
+        // so a weighted child gets no main-axis space and collapses.
+        children(
+          "content",
+          description = "Full-screen only: the body below the header.",
+        ),
       ),
       overlay = true,
       stretchesChildren = true,
@@ -1507,6 +1593,8 @@ private fun overlays(): List<ComponentDef> =
           description = "Vibrant is tertiary-based and more prominent: use it sparingly.",
           default = "standard",
         ),
+        // Scope is None on purpose: DropdownMenu content is a ColumnScope, but a scrolling one, so
+        // a weighted item gets no main-axis space and collapses. The exporter never weighted items.
         children(
           "items",
           "MenuItem",
@@ -1525,6 +1613,8 @@ private fun overlays(): List<ComponentDef> =
       "A group of a Menu, set apart from its neighbors by a gap. Single-select items select " +
         "within their group.",
       "DropdownMenuGroup with MenuDefaults.groupShape(index, count)",
+      // Scope is None on purpose, as for Menu.items: a weighted item would collapse in the
+      // scrolling column.
       listOf(children("items", "MenuItem", required = true)),
       stretchesChildren = true,
       m3Pages = listOf("menus"),
@@ -1568,6 +1658,8 @@ private fun overlays(): List<ComponentDef> =
           description =
             "Shows a back icon button at the header's leading side and runs this on a tap.",
         ),
+        // Scope is None on purpose, as for Menu.items: the content sits in a verticalScroll Column,
+        // so a weighted child gets no main-axis space and collapses.
         children("content", required = true),
       ),
       overlay = true,
@@ -1585,7 +1677,7 @@ private fun overlays(): List<ComponentDef> =
         "bar's SearchBarState",
       listOf(
         oneOf("layout", "docked", "full-screen", default = "full-screen"),
-        children("content"),
+        children("content", scope = ChildScope.Column),
       ),
       overlay = true,
       stretchesChildren = true,
@@ -1607,6 +1699,7 @@ private fun overlays(): List<ComponentDef> =
           "actions",
           "Button",
           description = "Rich only: up to two text buttons, side by side.",
+          scope = ChildScope.Row,
         ),
       ),
       overlay = true,

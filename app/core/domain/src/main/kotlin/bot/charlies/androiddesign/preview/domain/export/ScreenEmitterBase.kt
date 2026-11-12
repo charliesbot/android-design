@@ -7,6 +7,7 @@ import bot.charlies.androiddesign.preview.model.ActionFunction
 import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.DesignSystem
+import bot.charlies.androiddesign.preview.model.LayoutScope
 import bot.charlies.androiddesign.preview.model.PropKind
 import bot.charlies.androiddesign.preview.model.Screen
 import kotlinx.serialization.json.JsonArray
@@ -67,6 +68,14 @@ internal abstract class ScreenEmitterBase(
 
   private fun def(component: String) =
     checkNotNull(catalog.find(component)) { "$component is not a ${catalog.key} component" }
+
+  /**
+   * The layout scope of the lambda that holds the children of slot [key] of [component], read from
+   * the catalog the previewer reads. An enum prop that picks it (a toolbar's `orientation`) is read
+   * as the emitter reads it, as a literal.
+   */
+  fun JsonObject.hostScope(component: String, key: String): LayoutScope =
+    def(component).childLayout(key) { literal(it)?.let(::JsonPrimitive) }
 
   /** An enum prop of [component]: the stated value, else its catalog default. */
   fun JsonObject.choice(component: String, key: String): String = reader(component).enum(key)

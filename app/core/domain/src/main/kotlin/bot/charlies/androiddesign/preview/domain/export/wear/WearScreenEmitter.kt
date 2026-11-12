@@ -28,6 +28,7 @@ import bot.charlies.androiddesign.preview.domain.node.childItems
 import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.DesignSystem
+import bot.charlies.androiddesign.preview.model.LayoutScope
 import bot.charlies.androiddesign.preview.model.MaterialShape
 import bot.charlies.androiddesign.preview.model.Screen
 import bot.charlies.androiddesign.preview.model.ShapeToken
@@ -56,9 +57,12 @@ internal data class WearPlace(
   val wraps: Boolean = false,
   /** A child of a fixed screen, or of a row that stretches: layouts fill the height. */
   val fillHeight: Boolean = false,
-  /** The parent is a `Column`, `Row` or `Card`, whose scope takes `weight`. */
-  val weightable: Boolean = false,
-  /** The parent's own scope gives each child `weight(1f)`: a `ButtonGroup`, a dialog's buttons. */
+  /**
+   * The layout scope of the lambda that holds the component drawn here: only a `RowScope` or a
+   * `ColumnScope` takes `weight`. The catalog declares it per slot, as the renderer reads it.
+   */
+  val hostScope: LayoutScope = LayoutScope.None,
+  /** The parent's own scope gives each child `weight(1f)`: a `ButtonGroup`. */
   val scopeWeight: Boolean = false,
   /**
    * A direct child of the scrolling list: it takes the item's height and surface transformation.
@@ -70,17 +74,16 @@ internal data class WearPlace(
   /** `Modifier`, or `modifier` for the screen's root. */
   override val modifierBase: String = "Modifier",
 ) : Placement {
-  fun forChild(parentType: String) =
+  fun forChild(parentType: String, hostScope: LayoutScope = LayoutScope.None) =
     WearPlace(
       scope = scope,
       parentType = parentType,
       parentStretches = WearCatalog.find(parentType)?.stretchesChildrenWhen(wraps) ?: false,
-      weightable = parentType in WEIGHT_SCOPES,
+      hostScope = hostScope,
       bodyLarge = bodyLarge && parentType !in RESTYLING_PARENTS,
     )
 
   private companion object {
-    val WEIGHT_SCOPES = setOf("Column", "Row", "Card")
     val RESTYLING_PARENTS = setOf("Card", "Stepper")
   }
 }
@@ -279,6 +282,10 @@ internal class WearScreenEmitter(
 
   // region modifiers
 
+  /** [place] seen by the children of [parentType]'s slot [key], whose props are [p]. */
+  fun WearPlace.inSlot(parentType: String, p: JsonObject, key: String = "children") =
+    forChild(parentType, p.hostScope(parentType, key))
+
   /**
    * The `modifier` argument of component [node]: the weight, the stretch, the padding, then (in the
    * order the renderer applies them) the content description, the list item's height
@@ -308,7 +315,7 @@ internal class WearScreenEmitter(
     val parts = mutableListOf<String>()
     if (place.scopeWeight) {
       parts += "weight(1f)"
-    } else if (place.weightable) {
+    } else if (place.hostScope != LayoutScope.None) {
       p.numberProp(node.component, "weight")?.let { parts += "weight(${floatLiteral(it)})" }
     }
     val def = WearCatalog.find(node.component)

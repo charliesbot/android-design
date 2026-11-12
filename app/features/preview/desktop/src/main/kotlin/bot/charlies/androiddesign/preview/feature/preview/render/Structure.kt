@@ -117,7 +117,7 @@ internal fun RenderTopAppBar(ctx: NodeContext) {
   }
   val navigation: @Composable () -> Unit = { ctx.Child("navigationIcon", 0, ChildHost.Wrap) }
   val actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
-    ctx.Children("actions", 1, ChildHost.Wrap)
+    ctx.Children("actions", 1, ChildHost(fillWidth = false, row = this))
   }
   val modifier = ctx.modifier()
   val insets = WindowInsets(0, 0, 0, 0)

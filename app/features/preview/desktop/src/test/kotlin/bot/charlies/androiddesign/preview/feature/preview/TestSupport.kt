@@ -6,6 +6,7 @@ import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessRende
 import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessResult
 import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState
+import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.ComponentDef
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.LayoutNode
@@ -77,6 +78,7 @@ private fun requiredValue(
   prop: PropDef,
   id: String,
   extra: MutableList<JsonObject>,
+  catalog: Catalog,
 ): JsonElement =
   when (val kind = prop.kind) {
     PropKind.Text -> JsonPrimitive("Sample")
@@ -89,7 +91,7 @@ private fun requiredValue(
       val allowed = prop.allowedChildren?.minOrNull()
       val childId = if (allowed == null) "t1" else "${id}_${prop.name}"
       if (allowed != null) {
-        extra += requiredNode(checkNotNull(M3ExpressiveCatalog.find(allowed)), childId, extra)
+        extra += requiredNode(checkNotNull(catalog.find(allowed)), childId, extra, catalog)
       }
       if (prop.kind == PropKind.ChildList) JsonArray(listOf(JsonPrimitive(childId)))
       else JsonPrimitive(childId)
@@ -106,8 +108,9 @@ internal fun requiredNode(
   def: ComponentDef,
   id: String,
   extra: MutableList<JsonObject>,
+  catalog: Catalog = M3ExpressiveCatalog,
 ): JsonObject = buildJsonObject {
   put("id", id)
   put("component", def.name)
-  def.props.filter { it.required }.forEach { put(it.name, requiredValue(it, id, extra)) }
+  def.props.filter { it.required }.forEach { put(it.name, requiredValue(it, id, extra, catalog)) }
 }
