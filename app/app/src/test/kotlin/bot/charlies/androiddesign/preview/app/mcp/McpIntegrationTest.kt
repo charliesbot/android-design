@@ -5,6 +5,7 @@ import bot.charlies.androiddesign.preview.app.preview.AppPreviewController
 import bot.charlies.androiddesign.preview.app.preview.HeadlessProposalRenderer
 import bot.charlies.androiddesign.preview.app.preview.PreviewWindow
 import bot.charlies.androiddesign.preview.data.FileProposalRepository
+import bot.charlies.androiddesign.preview.domain.ViewRender
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
 import bot.charlies.androiddesign.preview.mcp.PreviewMcpServer
 import bot.charlies.androiddesign.preview.model.Views
@@ -402,9 +403,13 @@ class McpIntegrationTest {
     val saved = Path.of(text.substringAfter("Saved to ").trim())
     assertTrue(saved.isAbsolute && Files.isRegularFile(saved), text)
     assertEquals("plate_detail-tablet.png", saved.fileName.toString())
-    assertEquals(
-      "plates.proposal.json".removeSuffix(".proposal.json"),
-      saved.parent.fileName.toString(),
+    assertTrue(
+      Regex("plates-[0-9a-f]{8}").matches(saved.parent.fileName.toString()),
+      "folder is the slug plus 8 hex of the path hash: ${saved.parent.fileName}",
+    )
+    assertTrue(
+      "${ViewRender.formatDensity(ViewRender.PIXELS_PER_DP)} px per dp" in text,
+      text,
     )
     assertTrue(Files.readAllBytes(saved).contentEquals(Base64.getDecoder().decode(image.data)))
   }

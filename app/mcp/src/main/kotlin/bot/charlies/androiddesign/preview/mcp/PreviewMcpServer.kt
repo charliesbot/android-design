@@ -122,7 +122,8 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
           "image assets, and overall balance. Same screen and view arguments as get_tree. Not " +
           "for iterating: fix from check_proposal and get_tree. If the picture disagrees with " +
           "the tree, report it as a possible previewer bug. A scrolling Wear list also returns " +
-          "its end-of-list picture. Drawn at 1 px per dp. Also saved to the returned path.",
+          "its end-of-list picture. Drawn at ${ViewRender.pixelsPerDpText} px per dp. Also saved to " +
+          "the returned path.",
       schema = treeSchema(),
     ) { args ->
       controller.renderView(args.string("screen"), args.string("view")).toContent()
@@ -373,7 +374,9 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
 private fun ViewRender.toContent(): List<ContentBlock> {
   val size = "${widthPx}x$heightPx px"
   val caption = buildString {
-    append("Screen '$screen' at view '$view', $size, 1 px per dp. Saved to ${png.path}")
+    append(
+      "Screen '$screen' at view '$view', $size, ${ViewRender.formatDensity(pixelsPerDp)} px per dp. Saved to ${png.path}",
+    )
     end?.let {
       append(
         ". A scrolling list: the first image is the top of the list, the second is the list " +

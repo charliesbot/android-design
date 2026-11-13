@@ -33,6 +33,7 @@ import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.located
 import java.nio.file.Files
 import java.nio.file.Path
+import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -50,7 +51,6 @@ import kotlinx.serialization.json.JsonObject
  * old version, whatever the watcher's timing.
  *
  * @param scope Runs the file watcher.
- * @param renderDir Where `render_view` saves its PNGs, one folder per proposal.
  * @param onShown Called whenever a tool brings the window up, so the session can take the focus.
  */
 class AppPreviewController(
@@ -60,8 +60,6 @@ class AppPreviewController(
   private val renderer: ProposalRenderer,
   private val scope: CoroutineScope,
   private val version: String,
-  private val renderDir: Path =
-    Path.of(System.getProperty("java.io.tmpdir"), "android-design-renders"),
   private val onShown: () -> Unit = {},
 ) : PreviewController {
   private val applying = Mutex()
@@ -106,9 +104,9 @@ class AppPreviewController(
         target.screen,
         target.view,
         target.live,
-        density = RENDER_DENSITY,
+        density = ViewRender.PIXELS_PER_DP,
       )
-    val dir = renderDir.resolve(target.slug)
+    val dir = RENDER_DIR.resolve(target.folder)
     Files.createDirectories(dir)
     fun save(png: ByteArray, suffix: String): RenderedPng {
       val file = dir.resolve("${target.screen}-${target.view.name}$suffix.png")
@@ -118,8 +116,9 @@ class AppPreviewController(
     return ViewRender(
       screen = target.screen,
       view = target.view.name,
-      widthPx = (target.view.width * RENDER_DENSITY).toInt(),
-      heightPx = (target.view.height * RENDER_DENSITY).toInt(),
+      pixelsPerDp = ViewRender.PIXELS_PER_DP,
+      widthPx = (target.view.width * ViewRender.PIXELS_PER_DP).toInt(),
+      heightPx = (target.view.height * ViewRender.PIXELS_PER_DP).toInt(),
       png = save(result.png, ""),
       end = result.end?.let { save(it.png, "-end") },
     )
@@ -131,8 +130,8 @@ class AppPreviewController(
     val screen: String,
     val view: ViewSpec,
     val live: ProposalHostState?,
-    /** The proposal file's name without its extensions, for naming saved renders. */
-    val slug: String,
+    /** The folder under [RENDER_DIR] that holds this proposal's saved renders. */
+    val folder: String,
   )
 
   /**
@@ -145,14 +144,14 @@ class AppPreviewController(
     val snapshot = validSnapshot()
     val proposal = checkNotNull(snapshot.proposal)
     val state = viewer.state.value
-    val slug = snapshot.path.fileName.toString().removeSuffix(".json").removeSuffix(".proposal")
+    val folder = renderFolder(snapshot.path)
     if (screen == null && view == null) {
       return RenderTarget(
         sourceOf(proposal, snapshot, state.effectiveDesign ?: snapshot.designSystem),
         viewer.currentScreen ?: proposal.navigation.start,
         state.view,
         live = state.host,
-        slug,
+        folder,
       )
     }
     val screenId = screen ?: viewer.currentScreen ?: proposal.navigation.start
@@ -164,7 +163,7 @@ class AppPreviewController(
     val spec: ViewSpec = if (view == null) state.view else viewNamed(view, Catalogs.of(proposal))
     val design =
       if (view == null) state.effectiveDesign ?: snapshot.designSystem else snapshot.designSystem
-    return RenderTarget(sourceOf(proposal, snapshot, design), screenId, spec, live = null, slug)
+    return RenderTarget(sourceOf(proposal, snapshot, design), screenId, spec, live = null, folder)
   }
 
   override suspend fun setView(change: ViewChange): ViewState {
@@ -421,8 +420,21 @@ class AppPreviewController(
   private companion object {
     const val MAX_ERRORS = 20
 
-    /** `render_view` draws at 1 px per dp: a desktop view is 1920x1080, small enough to read. */
-    const val RENDER_DENSITY = 1f
+    /** Where `render_view` saves its PNGs, one folder per proposal file. */
+    val RENDER_DIR: Path = Path.of(System.getProperty("java.io.tmpdir"), "android-design-renders")
+    const val FOLDER_HASH_CHARS = 8
+
+    /**
+     * The folder name for a proposal file's renders: its name without extensions plus a short hash
+     * of its absolute path, because every project's proposal can share one file name.
+     */
+    fun renderFolder(file: Path): String {
+      val slug = file.fileName.toString().removeSuffix(".json").removeSuffix(".proposal")
+      val absolute = file.toAbsolutePath().normalize().toString()
+      val hash = MessageDigest.getInstance("SHA-256").digest(absolute.toByteArray()).toHexString()
+      return "$slug-${hash.take(FOLDER_HASH_CHARS)}"
+    }
+
     const val NANOS_PER_MS = 1_000_000L
   }
 }
