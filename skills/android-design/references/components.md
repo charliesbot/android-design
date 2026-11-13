@@ -182,7 +182,7 @@ Rules for both:
 
 ## Patterns from shipped Expressive apps
 
-Recurring moves in Google's showcases and well-reviewed Expressive apps. Read them for examples after choosing the composition (SKILL.md section 8), not to choose it; use one only when it serves the screen's direction.
+Recurring moves in Google's showcases and well-reviewed Expressive apps. Read them for examples after choosing the composition (SKILL.md, Compose the screen), not to choose it; use one only when it serves the screen's direction.
 
 - **Metric card:** a small label over a huge emphasized number in a tinted container; the number is the hero, the label whispers.
 - **Editorial header:** a Display or custom-width title that dominates the top of a screen or sits over a full-bleed photo (an album or trip cover).
@@ -219,6 +219,17 @@ Recurring moves in Google's showcases and well-reviewed Expressive apps. Read th
 | Navigation rail | `WideNavigationRail(state = rememberWideNavigationRailState())`, `WideNavigationRailItem(railExpanded = ...)`, `ModalWideNavigationRail` | `NavigationSuiteScaffold` swaps bar and rail by window size |
 | Slider | `Slider(state = s, onValueChange = { ... })` with `val s = remember { SliderState(value, steps, trackRange = 0f..1f) }`, `VerticalSlider` | The `value =` overload is deprecated in the 1.5 alphas, and `SliderState.valueRange` is now `trackRange`. Custom tracks (a wavy seek bar, inset icons) go in the state overload's `track = { ... }` slot; no XS to XL presets |
 | Carousel | `HorizontalMultiBrowseCarousel`, `HorizontalUncontainedCarousel`, `HorizontalCenteredHeroCarousel` | `rememberCarouselState` |
+
+## Customize without forking
+
+"Material is no longer an 'all or nothing' choice." Keep Material's accessible behavior and put the brand on top, in this order:
+
+1. **Use as-is** with theme tokens (color, type, shape, motion).
+2. **Wrap** a component to preset its parameters.
+3. **Style** it (Compose Styles API as it lands in Material, or colors/shapes parameters).
+4. **Fork** only as a last resort: "When you fork, you break your connection to the Material foundation."
+
+Google's brand examples keep behavior intact and add one subtle touch: a custom shadow and animated background on a single promo button, a custom reward animation replacing the ripple when a task completes, oversized graphic components for a bold identity.
 
 ## Icons
 
