@@ -57,13 +57,13 @@ For a proposal, this step replaces the rendering in `android-design`'s screen ch
 3. Fix every error once, then call `check_proposal` again. An `overflow` error names a node laid out wider than its parent or the view (a row that needs more width than its cell); narrow it, wrap it, or let it scroll. A `corner-clipped` error names a text or control that reaches into the rounded corner of a `Card` or a styled container, which cuts it off; give the container `padding`. Report anything still failing instead of looping.
 4. Confirm the adaptation from the `layout` summaries: each larger view reveals what your adaptation answer promised, such as a second pane, a rail, or more regions. A larger view with the phone's regions only spread wider fails.
 5. Call `get_tree` only when a summary or an error is not enough; its tool description says what it returns.
-6. Once `check_proposal` passes, call `render_view` twice for each screen: once at the phone view (`watch` for Wear) and once at the widest view the proposal has. Look for what the tree cannot show: an icon that does not fit its meaning, an asset that reads poorly, a screen that looks crowded or empty. Fix what you find, confirm the fix with `check_proposal`, and do not render again. When the picture disagrees with the tree (a padding, color, or bound the tree reports that the picture does not show), do not change the proposal to match the picture: report it as a possible previewer bug.
+6. Once `check_proposal` passes, call `render_view` twice for each screen: once at `light` and once at `desktop` (`watch` and `watch-large` for Wear). Look for what the tree cannot show: an icon that does not fit its meaning, an asset that reads poorly, a screen that looks crowded or empty. Fix what you find, confirm the fix with `check_proposal`, and do not render again. When the picture disagrees with the tree (a padding, color, or bound the tree reports that the picture does not show), do not change the proposal to match the picture: report it as a possible previewer bug.
 
-The step is done when `check_proposal` passes or each remaining error is on the list you report, the adaptation is confirmed, and each screen was rendered at its phone and widest views.
+The step is done when `check_proposal` passes or each remaining error is on the list you report, the adaptation is confirmed, and each screen was rendered at both views.
 
 ## Show
 
-Call `show_preview`: `open_proposal` already showed the window, so this brings it back and to the front if the user closed it since. Say in one line what the proposal is, name the tactics a hero layers, list any unresolved findings, what the proposal could not express ([Limits](references/proposal-format.md#limits)), and report "visual quality judged from the layout tree, confirmed with two renders per screen (phone and widest view)". Then stop and wait for the user's reply.
+Call `show_preview`: `open_proposal` already showed the window, so this brings it back and to the front if the user closed it since. Say in one line what the proposal is, name the tactics a hero layers, list any unresolved findings, what the proposal could not express ([Limits](references/proposal-format.md#limits)), and report "visual quality judged from the layout tree, confirmed with two renders per screen". Then stop and wait for the user's reply.
 
 ## Revise
 

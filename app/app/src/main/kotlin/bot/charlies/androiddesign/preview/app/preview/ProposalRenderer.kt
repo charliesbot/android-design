@@ -26,14 +26,13 @@ interface ProposalRenderer {
     overlay: String? = null,
   ): LayoutTree
 
-  /** The tree and a PNG at [density] pixels per dp. See [render] for the parameters. */
+  /** The tree and a PNG at [density] pixels per dp. See [render] for [live]. */
   suspend fun image(
     source: RenderSource,
     screen: String,
     view: ViewSpec,
-    live: ProposalHostState? = null,
-    overlay: String? = null,
-    density: Float = HeadlessRenderer.DENSITY,
+    live: ProposalHostState?,
+    density: Float,
   ): HeadlessResult
 }
 
@@ -58,7 +57,6 @@ class HeadlessProposalRenderer : ProposalRenderer {
     screen: String,
     view: ViewSpec,
     live: ProposalHostState?,
-    overlay: String?,
     density: Float,
   ): HeadlessResult =
     withContext(Dispatchers.Default) {
@@ -67,7 +65,6 @@ class HeadlessProposalRenderer : ProposalRenderer {
         screen,
         view,
         replay = live,
-        overlay = overlay,
         density = density,
       )
     }

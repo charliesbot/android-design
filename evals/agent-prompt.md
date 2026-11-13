@@ -27,9 +27,9 @@ Write only those two files. The previewer app is connected to you over MCP as th
 1. Call `check_proposal`. It checks every screen at {{VIEWS}} in one call and lists the errors, plus `notes` that never fail a view. A proposal that does not validate returns its validation errors instead.
 2. Fix every error once, then call `check_proposal` again. Report anything still failing or unresolved.
 3. {{LAYOUT}}
-4. Once `check_proposal` passes, render each screen twice with `render_view`, at the phone and widest views, as the proposal workflow's check describes.
+4. Once `check_proposal` passes, render each screen twice with `render_view`, at {{RENDER_VIEWS}}, as the proposal workflow's check describes.
 
-You cannot see the window. In your final message, say that visual quality was judged from the layout tree and confirmed with two renders per screen (phone and widest view).
+You cannot see the window. In your final message, say that visual quality was judged from the layout tree and confirmed with two renders per screen.
 
 ## The screen
 

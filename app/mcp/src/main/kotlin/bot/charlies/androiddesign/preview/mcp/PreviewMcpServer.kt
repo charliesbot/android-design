@@ -361,7 +361,8 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
         "(get_catalog wear). open_proposal once, then edit the proposal file and call " +
         "check_proposal after each edit; use get_tree for the geometry of a failing view. Once " +
         "check_proposal passes, render_view gives a picture of a screen at a view as the visual " +
-        "confirmation: two per screen, at the phone and widest views; do not iterate on pictures. The file on disk is the source of " +
+        "confirmation: two per screen, at light and desktop (watch and watch-large for Wear); " +
+        "do not iterate on pictures. The file on disk is the source of " +
         "truth; there is no tool that edits it."
   }
 }

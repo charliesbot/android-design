@@ -52,9 +52,8 @@ class RenderCheckTest {
       screen: String,
       view: ViewSpec,
       live: ProposalHostState?,
-      overlay: String?,
       density: Float,
-    ): HeadlessResult = real.image(source, screen, view, live, overlay, density)
+    ): HeadlessResult = real.image(source, screen, view, live, density)
   }
 
   private val fixtures = Path.of(System.getProperty("fixtures.dir"))
