@@ -22,6 +22,26 @@ Theme setup for Material 3 Expressive in Compose: versions, color schemes, typog
 )
 ```
 
+A typical app theme takes dynamic color where available and falls back to a fixed scheme:
+
+```kotlin
+@Composable
+fun AppTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val colorScheme = when {
+        Build.VERSION.SDK_INT >= 31 -> if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        dark -> darkColorScheme()
+        else -> expressiveLightColorScheme()
+    }
+    MaterialExpressiveTheme(
+        colorScheme = colorScheme,
+        motionScheme = MotionScheme.expressive(),
+        typography = AppTypography, // Google Sans Flex voices plus an optional brand face
+        content = content,
+    )
+}
+```
+
 - At the top level, nulls become `expressiveLightColorScheme()`, `MotionScheme.expressive()`, `Shapes()`, and `Typography()`. Nested, nulls inherit from the outer theme.
 - `expressiveLightColorScheme()` is `lightColorScheme()` with more colorful `on*Container` roles. There is no dark counterpart; use `darkColorScheme()` or a generated scheme.
 - Plain `MaterialTheme(...)` still works but defaults to `MotionScheme.standard()`.
@@ -86,7 +106,7 @@ Decode a small thumbnail for extraction, not the full image. MaterialKolor 5.x i
 | `inverseSurface`, `inverseOnSurface`, `inversePrimary` | Snackbars and reversed elements |
 | `primaryFixed`, `primaryFixedDim` (and secondary, tertiary) | Same tone in light and dark themes |
 
-Pairing and no-alpha rules live in [SKILL.md section 4](../SKILL.md#4-color). Material itself uses opacity only for state layers (built into components), disabled content (38%), and the `scrim` behind modals. `outlineVariant` is for dividers and decorative lines only, never text or icons.
+Pairing and no-alpha rules live in [SKILL.md, Color](../SKILL.md#color). Material itself uses opacity only for state layers (built into components), disabled content (38%), and the `scrim` behind modals. `outlineVariant` is for dividers and decorative lines only, never text or icons.
 
 ### Extra colors (semantic and categories)
 
@@ -112,7 +132,7 @@ fun rememberExtraColor(seed: Color, harmonize: Boolean = true): ExtraColor {
 
 - Harmonizing shifts the hue slightly toward the scheme's primary while keeping its meaning (a red stays red). Skip it when the color is literal (a brand color, transit line colors) or must stay distinguishable: pass `harmonize = false` for categories, and pick seeds far apart in hue.
 - Contrast for colors outside the scheme roles (category seeds, chart series, widget art): HCT tone difference is the contrast rule. "Smaller elements (less than ¼" or 40 dp) require a tone difference of 50 with their background, larger elements require a tone difference of 40." (Google)
-- Use one role per category across a screen: `color` with an `onColor` glyph when the category also appears in a chart, or `container` with `onContainer` when it only marks badges. Category rules: SKILL.md section 4.
+- Use one role per category across a screen: `color` with an `onColor` glyph when the category also appears in a chart, or `container` with `onContainer` when it only marks badges. Category rules: [SKILL.md, Color](../SKILL.md#color).
 
 ### Contrast levels
 
@@ -162,9 +182,9 @@ Optional: one face from the set below on Display, Headline, and Title Large styl
 
 | Face | File | Axes | Use for | Starting point |
 | --- | --- | --- | --- | --- |
-| Fraunces | `fraunces` | `opsz` 9-144, `wght` 100-900, `SOFT` 0-100, `WONK` 0-1 | Warm editorial serif: food, reading, journaling | `wght` 600, `SOFT` 100, `WONK` 1 |
+| Fraunces | `fraunces` | `opsz` 9-144, `wght` 100-900, `SOFT` 0-100, `WONK` 0-1 | Warm editorial serif: food, reading, journaling, heritage | `wght` 600, `SOFT` 100, `WONK` 1 |
 | Bricolage Grotesque | `bricolage_grotesque` | `opsz` 12-96, `wdth` 75-100, `wght` 200-800 | Playful, quirky grotesque: indie, creative tools | `wght` 800, `wdth` 80 to 100 |
-| Big Shoulders Display | `big_shoulders_display` | `wght` 100-900 | Tall condensed poster type: sport, transit, energy | `wght` 800 to 900, tight tracking, line height 1.2x |
+| Big Shoulders Display | `big_shoulders_display` | `wght` 100-900 | Tall condensed poster type: sport, fitness, transit, loud energy | `wght` 800 to 900, tight tracking, line height 1.2x |
 | Doto | `doto` | `ROND` 0-100, `wght` 100-900 | Dot-matrix: timers, music, retro-tech. Display sizes only (36sp and up) | `wght` 700 to 900, `ROND` 100 for round dots |
 
 Measured line boxes (Pixel_10_Pro_XL emulator, M3 `bodyLarge` base style with the token size and line height): Fraunces, Bricolage Grotesque, and Big Shoulders Display match the token line height at 36/44 and 32/40 (Fraunces 44.7dp at 36/44 from pixel rounding), so no extra vertical room is needed. Doto at 45/52 renders 54dp tall, so leave about 2dp of room around a Doto line. Google Sans Flex, by comparison, renders 52.7dp at 36/44 and 46.7dp at 32/40.

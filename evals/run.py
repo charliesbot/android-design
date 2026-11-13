@@ -70,7 +70,7 @@ SURFACE_PROMPT = {
     'phone': {
         'TARGET': 'The screen must work and adapt across phone (411x923), foldable (704x933), tablet (1280x800), and desktop (1920x1080) windows, in light and dark.',
         'VIEWS': 'all five views',
-        'LAYOUT': "Read each view's `layout` summary in the `check_proposal` result (navigation, panes, and regions). Check that the larger views reveal what your section 0 adaptation answer promised, rather than rearranging the phone content. Call `get_tree` only when a summary is not enough.",
+        'LAYOUT': "Read each view's `layout` summary in the `check_proposal` result (navigation, panes, and regions). Check that the larger views reveal what your adaptation answer promised, rather than rearranging the phone content. Call `get_tree` only when a summary is not enough.",
         'DONE': 'implement the brief and adapt across all four window sizes',
     },
     'wear': {

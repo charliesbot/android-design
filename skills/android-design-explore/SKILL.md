@@ -9,26 +9,20 @@ description: >
 
 # Visual design exploration
 
-Follow the `android-design` skill for every design decision: its section 0 answers, components, theming, layout, and the screen check's questions. This skill owns the workflow. Each run is one shot: brief in, one proposal written, checked, shown, then stop. Phone, foldable, tablet, desktop, and Wear OS app screens are in scope; Wear tiles, watch faces, and widgets are not. Where Wear differs, the **Wear OS** section below says how.
+Follow the `android-design` skill for every design decision: its design questions, components, theming, layout, and the screen check's questions. This skill owns the workflow. Each run is one shot: brief in, one proposal written, checked, shown, then stop. Phone, foldable, tablet, desktop, and Wear OS app screens are in scope; Wear tiles, watch faces, and widgets are not. Where Wear differs, the **Wear OS** section below says how.
 
 A proposal is a data file that the previewer app, a native macOS window, draws with real Compose Material 3 components and redraws on every save. You check it through the app's layout tree; the user judges taste in the window.
 
 ## Requirements
 
-macOS, with the previewer app installed and registered as an MCP server named `android_design_preview`. Call its `status` tool first. When its tools are unavailable, stop and tell the user the two steps, then wait:
-
-1. Build and install the app from a checkout of the android-design repository: `cd app && ./gradlew :app:installApp`, which installs `~/Applications/AndroidDesignPreview.app`.
-2. Register it for their harness, then restart the session (`<binary>` is `~/Applications/AndroidDesignPreview.app/Contents/MacOS/AndroidDesignPreview`, written as an absolute path where the harness does not expand `~`):
-   - Claude Code: `claude mcp add --scope user android_design_preview -- <binary>`
-   - Codex: a `[mcp_servers.android_design_preview]` table in `~/.codex/config.toml` with `command = "<binary>"` and `default_tools_approval_mode = "approve"`
-   - Antigravity: `agy mcp add android_design_preview <binary>`
+macOS, with the previewer app installed and registered as an MCP server named `android_design_preview`. Call its `status` tool first. When its tools are unavailable, stop, give the user the setup steps in [references/setup.md](references/setup.md), and wait.
 
 ## Brief
 
-When there is an app, read its relevant screens, theme, assets, and any existing `DESIGN.md` and `design/` proposals first. Answer section 0 of `android-design` in the reply.
+When there is an app, read its relevant screens, theme, assets, and any existing `DESIGN.md` and `design/` proposals first. Answer `android-design`'s design questions in the reply.
 
 - Pick one seed: the brand color, or a content color from the subject (a dish, an album, a trip), never the app's default `#6750A4`.
-- When the screen is a hero moment (question 3 of section 0), layer three or more tactics (section 3) and name them.
+- When the screen is a hero moment (the hero question in `android-design`'s design questions), layer three or more tactics (its Hero moments section) and name them.
 - Keep app code and dependencies unchanged.
 - Use representative, non-sensitive data and assets. Use image generation only for assets inside a proposal, never as a substitute for one.
 
@@ -50,7 +44,7 @@ Both are ordinary tracked files; committing them follows the project's own workf
 
 The proposal carries these design rules; `proposal-format.md` gives the syntax for each, and its [Component rules](references/proposal-format.md#component-rules) section holds the rules for tabs, carousels, overlays, choices, toolbars, menus, app bars, and badges:
 
-- The screen has one primary action, marked as primary, and it leads its peers as `android-design` section 2 describes.
+- The screen has one primary action, marked as primary, and it leads its peers as `android-design`'s Emphasis and hierarchy section describes.
 - It adapts at 600 and 840 dp: `navigation.destinations` draws a bar at compact and a rail from medium up, and a list's detail screen opens beside the list at expanded widths.
 - Text truncates on purpose, with an ellipsis. Button, chip, and navigation labels fit on one line.
 
@@ -59,9 +53,9 @@ The proposal carries these design rules; `proposal-format.md` gives the syntax f
 For a proposal, this step replaces the rendering in `android-design`'s screen check. Answer its questions from the `check_proposal` layout summaries and errors (and `get_tree` when they are not enough), never from a render or pixels. Screenshots stay out of this loop: never take one or ask for one.
 
 1. Call `open_proposal` with the proposal's absolute path. It loads the file, watches it, shows the window, and returns validation errors. Fix them and call `status`, which reports validation errors only, never render findings: an empty `errors` with the proposal open means the file is valid.
-2. Call `check_proposal`. One call checks every screen at every view and returns each view's errors and `layout` summary; its tool description gives the format. A view equal to an earlier one is `{"same": "<view>"}`: read the earlier one. `notes` are info findings that never fail a view; read them. `colors` gives each role's hex for light and dark: judge fills from it (`android-design` section 4's one-strong-fill cap), not from role names.
+2. Call `check_proposal`. One call checks every screen at every view and returns each view's errors and `layout` summary; its tool description gives the format. A view equal to an earlier one is `{"same": "<view>"}`: read the earlier one. `notes` are info findings that never fail a view; read them. `colors` gives each role's hex for light and dark: judge fills from it (`android-design`'s one-strong-fill cap, under Color), not from role names.
 3. Fix every error once, then call `check_proposal` again. An `overflow` error names a node laid out wider than its parent or the view (a row that needs more width than its cell); narrow it, wrap it, or let it scroll. A `corner-clipped` error names a text or control that reaches into the rounded corner of a `Card` or a styled container, which cuts it off; give the container `padding`. Report anything still failing instead of looping.
-4. Confirm the adaptation from the `layout` summaries: each larger view reveals what your section 0 adaptation answer promised, such as a second pane, a rail, or more regions. Google: "Additional space doesn't just mean making the same thing bigger." A larger view with the phone's regions only spread wider fails.
+4. Confirm the adaptation from the `layout` summaries: each larger view reveals what your adaptation answer promised, such as a second pane, a rail, or more regions. A larger view with the phone's regions only spread wider fails.
 5. Call `get_tree` only when a summary or an error is not enough; its tool description says what it returns.
 
 The step is done when `check_proposal` passes or each remaining error is on the list you report, and the adaptation is confirmed.

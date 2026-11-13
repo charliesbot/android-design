@@ -41,4 +41,4 @@ You cannot see the window. In your final message, say that visual quality was ju
 
 ## Final message (under 250 words)
 
-Your section 0 answers (goals, direction including the visual idea, hero, color source, adaptation); key decisions and which part of the skill drove each; what the trees and findings showed and what you changed; anything in the skill that was unclear or wrong.
+Your design-question answers (goals, direction including the visual idea, hero, color source, adaptation); key decisions and which part of the skill drove each; what the trees and findings showed and what you changed; anything in the skill that was unclear or wrong.
