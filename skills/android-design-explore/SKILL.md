@@ -50,7 +50,7 @@ The proposal carries these design rules; `proposal-format.md` gives the syntax f
 
 ## Check
 
-For a proposal, this step replaces the rendering in `android-design`'s screen check. Answer its questions from the `check_proposal` layout summaries and errors (and `get_tree` when they are not enough), not from pixels. The one exception is step 6, a single look at the render once the checks pass. `render_view` is the only way to see the UI: never capture the screen, control the window, or ask the user for a screenshot.
+For a proposal, this step replaces the rendering in `android-design`'s screen check. Answer its questions from the `check_proposal` layout summaries and errors (and `get_tree` when they are not enough), not from pixels. The one exception is step 6: two renders per screen once the checks pass. `render_view` is the only way to see the UI: never capture the screen, control the window, or ask the user for a screenshot.
 
 1. Call `open_proposal` with the proposal's absolute path. It loads the file, watches it, shows the window, and returns validation errors. Fix them and call `status`, which reports validation errors only, never render findings: an empty `errors` with the proposal open means the file is valid.
 2. Call `check_proposal`. One call checks every screen at every view and returns each view's errors and `layout` summary; its tool description gives the format. A view equal to an earlier one is `{"same": "<view>"}`: read the earlier one. `notes` are info findings that never fail a view; read them. `colors` gives each role's hex for light and dark: judge fills from it (`android-design`'s one-strong-fill cap, under Color), not from role names.
@@ -59,11 +59,11 @@ For a proposal, this step replaces the rendering in `android-design`'s screen ch
 5. Call `get_tree` only when a summary or an error is not enough; its tool description says what it returns.
 6. Once `check_proposal` passes, call `render_view` twice for each screen: once at the phone view (`watch` for Wear) and once at the widest view the proposal has. Look for what the tree cannot show: an icon that does not fit its meaning, an asset that reads poorly, a screen that looks crowded or empty. Fix what you find, confirm the fix with `check_proposal`, and do not render again. When the picture disagrees with the tree (a padding, color, or bound the tree reports that the picture does not show), do not change the proposal to match the picture: report it as a possible previewer bug.
 
-The step is done when `check_proposal` passes or each remaining error is on the list you report, the adaptation is confirmed, and each screen was looked at once.
+The step is done when `check_proposal` passes or each remaining error is on the list you report, the adaptation is confirmed, and each screen was rendered at its phone and widest views.
 
 ## Show
 
-Call `show_preview`: `open_proposal` already showed the window, so this brings it back and to the front if the user closed it since. Say in one line what the proposal is, name the tactics a hero layers, list any unresolved findings, what the proposal could not express ([Limits](references/proposal-format.md#limits)), and report "visual quality judged from the layout tree, confirmed with one render per screen". Then stop and wait for the user's reply.
+Call `show_preview`: `open_proposal` already showed the window, so this brings it back and to the front if the user closed it since. Say in one line what the proposal is, name the tactics a hero layers, list any unresolved findings, what the proposal could not express ([Limits](references/proposal-format.md#limits)), and report "visual quality judged from the layout tree, confirmed with two renders per screen (phone and widest view)". Then stop and wait for the user's reply.
 
 ## Revise
 

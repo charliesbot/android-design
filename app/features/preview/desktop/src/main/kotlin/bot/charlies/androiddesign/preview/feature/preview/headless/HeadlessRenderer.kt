@@ -79,8 +79,7 @@ object HeadlessRenderer {
    * @param replay A running host whose back stack and local state (open overlays, toggles, typed
    *   text) are taken over before the tree is read, so the result shows what that host shows.
    * @param overlay The id of an overlay of [screen] to draw open, on top of the replayed state.
-   * @param density Pixels per dp of the PNG; the CLI keeps the sharper [DENSITY], while
-   *   `render_view` draws at 1 so a large view stays small enough for a model to read.
+   * @param density Pixels per dp of the PNG.
    */
   @OptIn(ExperimentalTestApi::class)
   fun image(

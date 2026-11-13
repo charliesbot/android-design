@@ -5,7 +5,6 @@ import bot.charlies.androiddesign.preview.app.preview.AppPreviewController
 import bot.charlies.androiddesign.preview.app.preview.HeadlessProposalRenderer
 import bot.charlies.androiddesign.preview.app.preview.PreviewWindow
 import bot.charlies.androiddesign.preview.data.FileProposalRepository
-import bot.charlies.androiddesign.preview.domain.ViewRender
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
 import bot.charlies.androiddesign.preview.mcp.PreviewMcpServer
 import bot.charlies.androiddesign.preview.model.Views
@@ -408,7 +407,7 @@ class McpIntegrationTest {
       "folder is the slug plus 8 hex of the path hash: ${saved.parent.fileName}",
     )
     assertTrue(
-      "${ViewRender.formatDensity(ViewRender.PIXELS_PER_DP)} px per dp" in text,
+      "1 px per dp" in text,
       text,
     )
     assertTrue(Files.readAllBytes(saved).contentEquals(Base64.getDecoder().decode(image.data)))

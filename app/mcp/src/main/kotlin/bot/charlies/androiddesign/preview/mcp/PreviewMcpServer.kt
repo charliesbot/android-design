@@ -107,7 +107,7 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
           "and every row and the edge button are in the tree, each with its bounds at the scroll " +
           "position where it showed whole, so do not compare positions of rows that are not on " +
           "screen together; an open overlay keeps the list at the top. Read this instead of " +
-          "looking at pictures; render_view is the one visual confirmation, after this passes.",
+          "looking at pictures; render_view is the visual confirmation, after this passes.",
       schema = treeSchema(),
     ) { args ->
       val tree = controller.getTree(args.string("screen"), args.string("view"))
@@ -117,12 +117,12 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
       name = "render_view",
       title = "Render a screen to a picture",
       description =
-        "Renders one screen at one view to a PNG and returns it, for one visual confirmation " +
+        "Renders one screen at one view to a PNG and returns it, for a visual confirmation " +
           "after check_proposal passes: things the layout tree cannot show, such as icon fit, " +
           "image assets, and overall balance. Same screen and view arguments as get_tree. Not " +
           "for iterating: fix from check_proposal and get_tree. If the picture disagrees with " +
           "the tree, report it as a possible previewer bug. A scrolling Wear list also returns " +
-          "its end-of-list picture. Drawn at ${ViewRender.pixelsPerDpText} px per dp. Also saved to " +
+          "its end-of-list picture. Drawn at $DENSITY_TEXT px per dp. Also saved to " +
           "the returned path.",
       schema = treeSchema(),
     ) { args ->
@@ -360,8 +360,8 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
         "(get_catalog m3-expressive) and for Wear OS, drawn in the watch and watch-large views " +
         "(get_catalog wear). open_proposal once, then edit the proposal file and call " +
         "check_proposal after each edit; use get_tree for the geometry of a failing view. Once " +
-        "check_proposal passes, render_view gives one picture of a screen at a view as the single " +
-        "visual confirmation; do not iterate on pictures. The file on disk is the source of " +
+        "check_proposal passes, render_view gives a picture of a screen at a view as the visual " +
+        "confirmation: two per screen, at the phone and widest views; do not iterate on pictures. The file on disk is the source of " +
         "truth; there is no tool that edits it."
   }
 }
@@ -375,7 +375,7 @@ private fun ViewRender.toContent(): List<ContentBlock> {
   val size = "${widthPx}x$heightPx px"
   val caption = buildString {
     append(
-      "Screen '$screen' at view '$view', $size, ${ViewRender.formatDensity(pixelsPerDp)} px per dp. Saved to ${png.path}",
+      "Screen '$screen' at view '$view', $size, $DENSITY_TEXT px per dp. Saved to ${png.path}",
     )
     end?.let {
       append(
@@ -386,6 +386,10 @@ private fun ViewRender.toContent(): List<ContentBlock> {
   }
   return listOfNotNull(png, end).map { it.toImage() } + TextContent(caption)
 }
+
+/** [ViewRender.PIXELS_PER_DP] as text, so a whole number prints as "1", not "1.0". */
+private val DENSITY_TEXT: String =
+  ViewRender.PIXELS_PER_DP.let { if (it % 1f == 0f) it.toInt().toString() else it.toString() }
 
 private fun RenderedPng.toImage() =
   ImageContent(data = Base64.getEncoder().encodeToString(bytes), mimeType = "image/png")

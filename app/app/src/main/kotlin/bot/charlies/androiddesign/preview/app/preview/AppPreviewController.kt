@@ -116,7 +116,6 @@ class AppPreviewController(
     return ViewRender(
       screen = target.screen,
       view = target.view.name,
-      pixelsPerDp = ViewRender.PIXELS_PER_DP,
       widthPx = (target.view.width * ViewRender.PIXELS_PER_DP).toInt(),
       heightPx = (target.view.height * ViewRender.PIXELS_PER_DP).toInt(),
       png = save(result.png, ""),
