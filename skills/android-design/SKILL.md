@@ -25,10 +25,8 @@ Quotes and rules marked **(Google)** come from Google's guidance. Rules marked *
 1. **Route** the request: proposal first, or straight to code ([Route](#route)).
 2. **Answer the [design questions](#design-questions)** in your reply, before any code.
 3. **[Compose the screen](#compose-the-screen)** from those answers.
-4. **Build** it with the [reference](#reference) below: theme, color, type, shape, motion, layout, and the Expressive components.
+4. **Build** it with the [reference](#reference) below: theme, color, type, shape, motion, layout, and the Expressive components. Building is done when the screen compiles and renders.
 5. **Run the [screen check](#screen-check)** on the rendered result.
-
-Building is done when the screen compiles with the theme and components from the reference and renders.
 
 ### Route
 
@@ -44,7 +42,7 @@ The step is done when you are following `android-design-explore` for a proposal,
 
 ### Design questions
 
-Answer these in your reply before any code, a sentence or two each. Skipped answers are how a screen becomes a template.
+Answer these in your reply before any code, a sentence or two each. These answers are what keep a screen from being a template.
 
 1. **Rank the goals.** What is the one primary task on this screen? What is secondary and tertiary? (Google: "Simplifying to one primary task on each page.")
 2. **Choose a direction.** Name the screen's emotional character, the content or interaction that defines it, and one visual idea that ties type, imagery, color, and shape together. Each answer must name a decision ("the total set in tall numerals fills the top third"), not an adjective ("modern, clean"). If the idea describes how most apps of this type already look, it isn't an idea yet.
@@ -54,7 +52,7 @@ Answer these in your reply before any code, a sentence or two each. Skipped answ
 6. **Pick components from the [Components](#components) table**, not from memory of older Material.
 7. **Answer the adaptation question.** For each size class you will render (compact; medium or expanded; large or extra large), name what the extra space reveals: a second pane, an expanded rail, more detail. Use the five questions in [references/layout.md](references/layout.md), starting with "What should be revealed?". Navigation stays consistent: if a larger layout has a rail, compact has a navigation bar for the same destinations. For a control-based screen like a media player, the controls reflow and content is revealed. A larger layout that is only the phone content spread wider has not answered it: "Additional space doesn't just mean making the same thing bigger." (Google)
 
-The step is done when each answer names a decision, not an adjective.
+The step is done when all seven are answered in your reply.
 
 ### Compose the screen
 
@@ -119,7 +117,7 @@ Emphasis is how people find the primary action: larger key actions and deliberat
 
 #### Google's worked example: the Aura breathing app
 
-Each screen spends emphasis by goal rank. Use this as the reasoning template.
+Each screen spends emphasis by goal rank. Use this as the reasoning model.
 
 | Screen | Rank | Emphasis |
 | --- | --- | --- |
@@ -152,7 +150,7 @@ Their v1-to-v2 lesson: ungrouped settings of similar size and inconsistent color
 - **Different jobs get different roles.** Use "a variety of primary, secondary, and tertiary accent colors for hierarchy and distinction": action (`primary`), selection (`secondary`), status or delight (`tertiary`). Google's example: data in `primary`, progress accents in `secondary` yellow.
 - **Surfaces are most of the screen.** Surface colors "represent the majority of your app's colors. Don't be shy to use lots of surface space; the human eye needs space to relax." (Google) Build hierarchy with surface steps and put accent containers only on elements with a job (the hero, a selection, a key status), not on every card.
 - **Apply roles only in their intended pairs or layering orders** (Google's rule): `onX` on `X`; `onSurface`, `onSurfaceVariant`, and `primary` on surfaces; `inverseOnSurface` and `inversePrimary` on `inverseSurface`. Containers are fills, never text colors. Default text is `onSurface`; `onSurfaceVariant` for lower emphasis.
-- **Lower emphasis on text or icons by stepping down to a quieter role** (such as `onSurfaceVariant`); `copy(alpha = ...)` breaks the contrast the role pairs guarantee.
+- **Lower emphasis on text or icons by stepping down to a quieter role** (such as `onSurfaceVariant`), never with `copy(alpha = ...)`, which breaks the contrast the role pairs guarantee.
 - **Surfaces:** `surface` for the body, `surfaceContainer` for navigation regions, and the five container levels for nesting. The most important container gets the brightest surface.
 - Dividers use `outlineVariant`; text field borders use `outline`.
 - **Surface steps:** use each component's prescribed surface mapping (search, for example, specifies containers "more than one step apart"; see the components reference). For custom groups, use a surface difference when the boundary needs emphasis; proximity and alignment can group without another fill.
@@ -189,7 +187,7 @@ Their v1-to-v2 lesson: ungrouped settings of similar size and inconsistent color
 - **Tension creates focus.** Mix round and square; "break from the surrounding shape style to draw attention to a particular element." Material "historically focused on rounded shapes"; sharp contrast is more memorable.
 - **The primary control contrasts in shape with its neighbors** (default). In a cluster of controls (player controls, a button group, a toolbar), make the primary a rounded square among fully round secondaries, or the reverse, at a larger size. Google: "Add unexpected moments by switching between square and fully rounded shapes."
 - **Shape signals state.** Expressive buttons, icon buttons, toggles, and list items morph on press and selection (round to square or back). Use the components' `shapes` parameters to get this for free.
-- **The shape library** (`MaterialShapes`: Cookie9Sided, Sunny, Flower, Clover4Leaf, Burst, Pill, Heart, and 28 more) is for avatars, image crops, decorative graphics, achievements, and a bespoke hero button. Text-heavy containers keep plain rounded corners. "Shapes without clear meaning... add more visual clutter than delight."
+- **The shape library** (`MaterialShapes`: Cookie9Sided, Sunny, Flower, Clover4Leaf, Burst, Pill, Heart, and 28 more) is for avatars, image crops, decorative graphics, achievements, and a bespoke hero button. Not for text-heavy containers. "Shapes without clear meaning... add more visual clutter than delight."
 - **Abstract library shapes as masks on imagery are the normal use.** Photos, album art, avatars, and other non-interactive imagery take them freely: Google says "Use abstract shapes on imagery and decorative UI" and "Get creative when using shape in graphics, for photography cropping, personalized avatar masking, and other non-interactive elements." A mask needs no depicted meaning.
 - **A standalone decorative graphic needs a reason from the subject.** This applies to shapes drawn as their own element, not to masks. Google: "Ensure that shapes resonate with the product's narrative." A sun and cloud on a weather screen, a setting sun for a meditation app, and album art cut into a scalloped record label all depict something; a blob or ripple that depicts nothing is clutter. When a shape depicts an object, keep it recognizable (default): give it the object's color as a static color ([references/theming.md](references/theming.md#extra-colors-semantic-and-categories)) instead of a pale scheme role chosen to quiet it, and make it smaller or crop it if it competes with the hero.
 - **Uniform among peers:** equally important data meant for comparison (metrics, calendar days) uses the same shape and size, evenly spaced, without overlap (Google: "Use uniform shapes and sizes"). Vary scale or form when the data has a deliberate hierarchy, keeping items aligned and comparable. Decorative layering, such as type over an image, is fine when controls and text stay clear.
@@ -221,7 +219,7 @@ val tint by animateColorAsState(if (selected) colors.primary else colors.surface
 - Spring values for both schemes: [references/theming.md](references/theming.md#motion).
 - **Expressive** is the default choice and belongs on hero moments. **Standard** suits utilitarian products. Override a subtree by nesting `MaterialTheme(motionScheme = ...)`.
 - Springs are interruptible and carry velocity when retargeted; input stays live during every animation.
-- **Screen transitions stay simple.** Bounce belongs to components and hero moments. Use container transform for card or list item to detail only in hero moments and shallow hierarchies ("Don't use container transform in apps with deep hierarchies"); platform-default forward/backward for everyday hierarchy; a quick fade between top-level destinations, never a lateral slide (it conflicts with carousel and list gestures). (Google) Fade content out fully before fading new content in; bottom sheets slide, never fade.
+- **Screen transitions stay simple.** Bounce belongs to components and hero moments. Use container transform for card or list item to detail only in hero moments and shallow hierarchies ("Don't use container transform in apps with deep hierarchies"); platform-default forward/backward for everyday hierarchy; a quick fade between top-level destinations, never a lateral slide (it conflicts with carousel and list gestures). (Google) Fade content out fully before fading new content in; never fade a bottom sheet.
 - **Reduced motion:** swap to a scheme whose specs `snap()` (Google's own pattern) and drop decorative morphs and parallax; keep meaningful fades.
 
 ### Spacing and layout
@@ -253,7 +251,7 @@ Stock code reaches for the left column. Lint won't flag it.
 - **App bar vs toolbar:** "Where app bar supports navigation, toolbar provides critical actions for the current page." App bars get one action (two at most), boosted with a filled or tonal icon button; page controls (such as lyrics and queue in a player) go in a floating toolbar of icon buttons or in the app bar within its one or two actions, never as loose text buttons. A floating toolbar can instead be local navigation when the selection swaps the content in place (labeled items with one selected); a screen shows either a toolbar or a navigation bar, never both ([references/components.md](references/components.md#toolbars)).
 - **One FAB per screen** for the single most important action; not every screen needs one. An action that belongs to one card or section (logging water in a water card) is a button inside that container: "individual components, such as cards, shouldn't have their own FAB," and FABs aren't for minor actions (Google). When a screen's only action belongs to one section, it has no FAB.
 - **Button groups:** same size and shape by default; mixed sizes only in hero moments.
-- Read [references/components.md](references/components.md) when choosing a component, writing one you haven't used in this session, or customizing one beyond its parameters (wrap, style, or fork).
+- Read [references/components.md](references/components.md) when choosing a component, writing one you haven't used in this session, or customizing one (use as-is, wrap, style, or fork).
 
 ### Accessibility and writing
 
@@ -278,4 +276,4 @@ Material says how components look; Android's own design guides say how an app be
 
 - **Edge-to-edge:** backgrounds, images, and scrolling content draw behind the system bars; text and controls stay inset. The gesture bar stays transparent. The status bar is transparent unless content scrolls under it, then it gets one protection (Material top app bars already provide it). Keep tap targets clear of the system gesture insets. Pin text inputs above the keyboard. Implementation: the `edge-to-edge` skill.
 - **Settings, onboarding and sign-in, permissions, notifications:** read [references/android-conventions.md](references/android-conventions.md) when the work touches a settings screen or where Settings sits in navigation, onboarding, sign-in, a permission request, or a notification.
-- **Support landscape, window resizing, and both light and dark themes** on every screen; orientation and theme follow the system.
+- **Support landscape, window resizing, and both light and dark themes** on every screen; never lock orientation or theme.
