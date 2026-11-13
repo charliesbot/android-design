@@ -2,23 +2,27 @@ package bot.charlies.androiddesign.preview.app.mcp
 
 import bot.charlies.androiddesign.preview.app.AppInfo
 import bot.charlies.androiddesign.preview.app.preview.AppPreviewController
-import bot.charlies.androiddesign.preview.app.preview.HeadlessTreeRenderer
+import bot.charlies.androiddesign.preview.app.preview.HeadlessProposalRenderer
 import bot.charlies.androiddesign.preview.app.preview.PreviewWindow
 import bot.charlies.androiddesign.preview.data.FileProposalRepository
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
 import bot.charlies.androiddesign.preview.mcp.PreviewMcpServer
+import bot.charlies.androiddesign.preview.model.Views
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.client.StdioClientTransport
 import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Base64
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import javax.imageio.ImageIO
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -61,7 +65,7 @@ class McpIntegrationTest {
       repository = FileProposalRepository(),
       viewer = ViewerViewModel(),
       window = window,
-      renderer = HeadlessTreeRenderer(),
+      renderer = HeadlessProposalRenderer(),
       scope = scope,
       version = AppInfo.VERSION,
     )
@@ -104,13 +108,14 @@ class McpIntegrationTest {
   private fun CallToolResult.json(): JsonObject = Json.parseToJsonElement(text()).jsonObject
 
   @Test
-  fun `the server lists exactly the eight tools with schemas and descriptions`() {
+  fun `the server lists exactly the nine tools with schemas and descriptions`() {
     connect()
     val tools = runBlocking { client.listTools().tools }
     assertEquals(
       setOf(
         "open_proposal",
         "get_tree",
+        "render_view",
         "check_proposal",
         "set_view",
         "show_preview",
@@ -136,6 +141,11 @@ class McpIntegrationTest {
       },
     )
     assertEquals(setOf("screen", "view"), byName.getValue("get_tree").inputSchema.properties?.keys)
+    assertEquals(
+      byName.getValue("get_tree").inputSchema.properties,
+      byName.getValue("render_view").inputSchema.properties,
+    )
+    assertEquals(true, byName.getValue("render_view").annotations?.readOnlyHint)
     val check = byName.getValue("check_proposal").inputSchema.properties
     assertNotNull(check)
     assertEquals(setOf("screens", "views"), check.keys)
@@ -368,6 +378,70 @@ class McpIntegrationTest {
     assertEquals(true, call("open_proposal").isError, "path is required")
     assertEquals(true, call("open_proposal", mapOf("path" to "/no/such/file.json")).isError)
     assertTrue(call("status").isError != true, "status never fails")
+  }
+
+  @Test
+  fun `render_view returns a png at one pixel per dp and saves it where the text says`() {
+    connect()
+    call("open_proposal", mapOf("path" to workspace().toString()))
+    val tablet = Views.every.first { it.name == "tablet" }
+
+    val result = call("render_view", mapOf("screen" to "plate_detail", "view" to "tablet"))
+
+    assertEquals(null, result.isError)
+    assertEquals(null, result.structuredContent, "images are dropped by some clients otherwise")
+    val image = result.content.filterIsInstance<ImageContent>().single()
+    assertEquals("image/png", image.mimeType)
+    val png = ImageIO.read(Base64.getDecoder().decode(image.data).inputStream())
+    assertNotNull(png, "the image is a decodable PNG")
+    assertEquals(tablet.width, png.width)
+    assertEquals(tablet.height, png.height)
+    val text = result.content.filterIsInstance<TextContent>().single().text
+    assertTrue("plate_detail" in text && "tablet" in text, text)
+    assertTrue("${tablet.width}x${tablet.height}" in text, text)
+    val saved = Path.of(text.substringAfter("Saved to ").trim())
+    assertTrue(saved.isAbsolute && Files.isRegularFile(saved), text)
+    assertEquals("plate_detail-tablet.png", saved.fileName.toString())
+    assertTrue(
+      Regex("plates-[0-9a-f]{8}").matches(saved.parent.fileName.toString()),
+      "folder is the slug plus 8 hex of the path hash: ${saved.parent.fileName}",
+    )
+    assertTrue(
+      "1 px per dp" in text,
+      text,
+    )
+    assertTrue(Files.readAllBytes(saved).contentEquals(Base64.getDecoder().decode(image.data)))
+  }
+
+  @Test
+  fun `render_view with no arguments draws the window's screen and view`() {
+    connect()
+    call("open_proposal", mapOf("path" to workspace().toString()))
+    call("set_view", mapOf("device" to "tablet"))
+
+    val result = call("render_view")
+
+    val image = result.content.filterIsInstance<ImageContent>().single()
+    val png = ImageIO.read(Base64.getDecoder().decode(image.data).inputStream())
+    val tablet = Views.every.first { it.name == "tablet" }
+    assertEquals(tablet.width, png.width)
+    assertEquals(tablet.height, png.height)
+    assertTrue(
+      "Screen 'plates' at view 'tablet'" in
+        result.content.filterIsInstance<TextContent>().single().text,
+    )
+  }
+
+  @Test
+  fun `render_view reports an unknown screen or view like get_tree`() {
+    connect()
+    call("open_proposal", mapOf("path" to workspace().toString()))
+
+    val unknownScreen = call("render_view", mapOf("screen" to "nope"))
+    assertEquals(true, unknownScreen.isError)
+    assertTrue("plates" in unknownScreen.text())
+    assertEquals(unknownScreen.text(), call("get_tree", mapOf("screen" to "nope")).text())
+    assertEquals(true, call("render_view", mapOf("view" to "nope")).isError)
   }
 
   @Test

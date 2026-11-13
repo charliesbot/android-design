@@ -29,6 +29,12 @@ interface PreviewController {
   suspend fun getTree(screen: String? = null, view: String? = null): LayoutTree
 
   /**
+   * `render_view`: a PNG of one screen at one view, for one visual confirmation. [screen] and
+   * [view] mean what they do for [getTree], including the defaults.
+   */
+  suspend fun renderView(screen: String? = null, view: String? = null): ViewRender
+
+  /**
    * `set_view`: changes the window's screen, device, brightness, seed or variant; null keeps the
    * value. An unknown screen changes nothing.
    */

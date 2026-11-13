@@ -40,7 +40,7 @@ class SaveToAdoptBenchmark {
         repository = FileProposalRepository(),
         viewer = viewer,
         window = PreviewWindow(),
-        renderer = HeadlessTreeRenderer(),
+        renderer = HeadlessProposalRenderer(),
         scope = scope,
         version = AppInfo.VERSION,
       )

@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.update
  */
 class Sessions(
   private val repository: ProposalRepository,
-  private val renderer: TreeRenderer,
+  private val renderer: ProposalRenderer,
   private val window: PreviewWindow,
   private val scope: CoroutineScope,
   private val version: String,

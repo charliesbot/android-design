@@ -8,7 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
-import bot.charlies.androiddesign.preview.app.preview.HeadlessTreeRenderer
+import bot.charlies.androiddesign.preview.app.preview.HeadlessProposalRenderer
 import bot.charlies.androiddesign.preview.app.preview.PreviewWindow
 import bot.charlies.androiddesign.preview.app.preview.Sessions
 import bot.charlies.androiddesign.preview.data.FileProposalRepository
@@ -35,7 +35,7 @@ class PreviewWindowContentTest {
   private val sessions =
     Sessions(
       repository = FileProposalRepository(),
-      renderer = HeadlessTreeRenderer(),
+      renderer = HeadlessProposalRenderer(),
       window = PreviewWindow(),
       scope = scope,
       version = AppInfo.VERSION,

@@ -70,12 +70,14 @@ SURFACE_PROMPT = {
     'phone': {
         'TARGET': 'The screen must work and adapt across phone (411x923), foldable (704x933), tablet (1280x800), and desktop (1920x1080) windows, in light and dark.',
         'VIEWS': 'all five views',
+        'RENDER_VIEWS': '`light` and `desktop`',
         'LAYOUT': "Read each view's `layout` summary in the `check_proposal` result (navigation, panes, and regions). Check that the larger views reveal what your adaptation answer promised, rather than rearranging the phone content. Call `get_tree` only when a summary is not enough.",
         'DONE': 'implement the brief and adapt across all four window sizes',
     },
     'wear': {
         'TARGET': 'This is a Wear OS proposal: every screen uses the Wear catalog (`get_catalog` lists it), and the previewer draws it on two round, dark watches: small (204x204) and large (227x227). The screen must work on both. Design for the small one first; the large one may show more but never less.',
         'VIEWS': 'both watch views',
+        'RENDER_VIEWS': '`watch` and `watch-large`',
         'LAYOUT': "Read each view's `layout` summary in the `check_proposal` result. Check that nothing important sits where the round edge cuts it, and that the large watch shows at least what the small one does. Call `get_tree` only when a summary is not enough.",
         'DONE': 'implement the brief on the small and the large watch',
     },

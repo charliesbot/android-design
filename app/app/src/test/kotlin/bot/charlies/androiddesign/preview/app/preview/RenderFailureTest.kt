@@ -4,6 +4,7 @@ import bot.charlies.androiddesign.preview.app.AppInfo
 import bot.charlies.androiddesign.preview.data.FileProposalRepository
 import bot.charlies.androiddesign.preview.domain.PreviewException
 import bot.charlies.androiddesign.preview.domain.ViewChange
+import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessResult
 import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
@@ -32,8 +33,8 @@ class RenderFailureTest {
   /**
    * Renders for real, except that a proposal named [BROKEN] throws, as a composition crash does.
    */
-  private class CrashingRenderer : TreeRenderer {
-    private val real = HeadlessTreeRenderer()
+  private class CrashingRenderer : ProposalRenderer {
+    private val real = HeadlessProposalRenderer()
 
     override suspend fun render(
       source: RenderSource,
@@ -51,6 +52,14 @@ class RenderFailureTest {
       }
       return tree
     }
+
+    override suspend fun image(
+      source: RenderSource,
+      screen: String,
+      view: ViewSpec,
+      live: ProposalHostState?,
+      density: Float,
+    ): HeadlessResult = real.image(source, screen, view, live, density)
   }
 
   private val fixtures = Path.of(System.getProperty("fixtures.dir"))
