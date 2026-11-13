@@ -18,7 +18,7 @@ Design exactly ONE screen as a proposal, in two files:
 - `{{PROPOSAL}}`: the proposal. Create it. The folder already holds any assets the brief names, under `assets/`; reference them relative to the proposal file.
 - `{{DESIGN_MD}}`: the design system. Create it. Its front matter holds the seed color, scheme variant, typography, and shapes.
 
-Write only those two files. The previewer app is connected to you over MCP as the server `android_design_preview`; its tools are your only way to check the proposal. Call `open_proposal` with the proposal's absolute path, edit the file, and call `check_proposal` after each change. Do not take screenshots and do not run `render` yourself: the runner renders the final files headlessly and checks them.
+Write only those two files. The previewer app is connected to you over MCP as the server `android_design_preview`; its tools are your only way to check the proposal. Call `open_proposal` with the proposal's absolute path, edit the file, and call `check_proposal` after each change. Do not capture the screen and do not run `render` yourself: `render_view` is your only way to see the proposal, and the runner renders the final files headlessly and checks them.
 
 {{TARGET}}
 
@@ -27,8 +27,9 @@ Write only those two files. The previewer app is connected to you over MCP as th
 1. Call `check_proposal`. It checks every screen at {{VIEWS}} in one call and lists the errors, plus `notes` that never fail a view. A proposal that does not validate returns its validation errors instead.
 2. Fix every error once, then call `check_proposal` again. Report anything still failing or unresolved.
 3. {{LAYOUT}}
+4. Once `check_proposal` passes, look at the screen once with `render_view`, as the proposal workflow's check describes.
 
-You cannot see the window. In your final message, say that visual quality was judged from the layout tree only.
+You cannot see the window. In your final message, say that visual quality was judged from the layout tree and confirmed with one render per screen.
 
 ## The screen
 

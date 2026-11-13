@@ -26,9 +26,9 @@ import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
 
 /**
- * One headless render: the layout tree in dp, and a PNG at [HeadlessRenderer.DENSITY]. A scrolling
- * Wear screen is drawn at the top of its list and its [tree] covers the whole list (the render
- * scrolls it); [end] is the list scrolled to its end, and null for every other screen.
+ * One headless render: the layout tree in dp, and a PNG at the density it was asked for. A
+ * scrolling Wear screen is drawn at the top of its list and its [tree] covers the whole list (the
+ * render scrolls it); [end] is the list scrolled to its end, and null for every other screen.
  */
 class HeadlessResult(val tree: LayoutTree, val png: ByteArray, val end: HeadlessEnd? = null) {
   override fun toString() = "HeadlessResult(${tree.screen}/${tree.view.name}, ${png.size} bytes)"
@@ -56,8 +56,8 @@ data class RenderSource(val proposal: Proposal, val design: DesignSystem, val di
  */
 object HeadlessRenderer {
   /**
-   * Pixels per dp in the PNG. Bounds in the tree stay in dp, so the image is [DENSITY] times the
-   * view's dp size in each direction.
+   * Default pixels per dp in the PNG. Bounds in the tree stay in dp, so the image is the density
+   * times the view's dp size in each direction.
    */
   const val DENSITY = 2f
 
@@ -79,6 +79,8 @@ object HeadlessRenderer {
    * @param replay A running host whose back stack and local state (open overlays, toggles, typed
    *   text) are taken over before the tree is read, so the result shows what that host shows.
    * @param overlay The id of an overlay of [screen] to draw open, on top of the replayed state.
+   * @param density Pixels per dp of the PNG; the CLI keeps the sharper [DENSITY], while
+   *   `render_view` draws at 1 so a large view stays small enough for a model to read.
    */
   @OptIn(ExperimentalTestApi::class)
   fun image(
@@ -88,8 +90,10 @@ object HeadlessRenderer {
     afterLaunch: (ComposeUiTest.(ProposalHostState) -> Unit)? = null,
     replay: ProposalHostState? = null,
     overlay: String? = null,
+    density: Float = DENSITY,
   ): HeadlessResult {
-    val drawn = draw(source, screen, view, afterLaunch, replay, overlay, imageWanted = true)
+    val drawn =
+      draw(source, screen, view, afterLaunch, replay, overlay, imageWanted = true, density)
     return HeadlessResult(drawn.tree, checkNotNull(drawn.png), drawn.end)
   }
 
@@ -107,7 +111,8 @@ object HeadlessRenderer {
     view: ViewSpec,
     replay: ProposalHostState? = null,
     overlay: String? = null,
-  ): LayoutTree = draw(source, screen, view, null, replay, overlay, imageWanted = false).tree
+  ): LayoutTree =
+    draw(source, screen, view, null, replay, overlay, imageWanted = false, DENSITY).tree
 
   /** Draws, and captures the image as well when [imageWanted]. */
   private fun draw(
@@ -118,9 +123,10 @@ object HeadlessRenderer {
     replay: ProposalHostState?,
     overlay: String?,
     imageWanted: Boolean,
+    pixelsPerDp: Float,
   ): Drawn =
     synchronized(renderLock) {
-      drawLocked(source, screen, view, afterLaunch, replay, overlay, imageWanted)
+      drawLocked(source, screen, view, afterLaunch, replay, overlay, imageWanted, pixelsPerDp)
     }
 
   /** The work of [draw], done while holding [renderLock]. */
@@ -133,14 +139,15 @@ object HeadlessRenderer {
     replay: ProposalHostState?,
     overlay: String?,
     imageWanted: Boolean,
+    pixelsPerDp: Float,
   ): Drawn {
     val (proposal, design, proposalDir) = source
     require(screen in proposal.screens) { "no screen '$screen' in this proposal" }
-    val density = Density(DENSITY)
+    val density = Density(pixelsPerDp)
     val test =
       DesktopComposeUiTest(
-        width = (view.width * DENSITY).toInt(),
-        height = (view.height * DENSITY).toInt(),
+        width = (view.width * pixelsPerDp).toInt(),
+        height = (view.height * pixelsPerDp).toInt(),
         density = density,
         useStandardTestDispatcherForComposition = false,
       )

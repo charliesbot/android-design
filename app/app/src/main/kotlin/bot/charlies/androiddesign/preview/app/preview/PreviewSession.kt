@@ -25,7 +25,7 @@ internal constructor(
   val number: Int,
   agent: Boolean,
   repository: ProposalRepository,
-  renderer: TreeRenderer,
+  renderer: ProposalRenderer,
   window: PreviewWindow,
   parentScope: CoroutineScope,
   version: String,

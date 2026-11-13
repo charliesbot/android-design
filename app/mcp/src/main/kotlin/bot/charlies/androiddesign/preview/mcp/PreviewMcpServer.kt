@@ -5,7 +5,9 @@ import bot.charlies.androiddesign.preview.domain.PreviewController
 import bot.charlies.androiddesign.preview.domain.PreviewException
 import bot.charlies.androiddesign.preview.domain.PreviewStatus
 import bot.charlies.androiddesign.preview.domain.ProposalCheck
+import bot.charlies.androiddesign.preview.domain.RenderedPng
 import bot.charlies.androiddesign.preview.domain.ViewChange
+import bot.charlies.androiddesign.preview.domain.ViewRender
 import bot.charlies.androiddesign.preview.domain.ViewState
 import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.Device
@@ -19,11 +21,14 @@ import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.shared.Transport
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.ContentBlock
+import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolAnnotations
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import java.util.Base64
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -36,7 +41,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * The MCP face of the previewer: eight tools that call a [PreviewController]. It does not own any
+ * The MCP face of the previewer: nine tools that call a [PreviewController]. It does not own any
  * transport; [connect] attaches it to one, so the app can use stdio and tests can use pipes.
  *
  * Problems the agent can fix (an unknown screen, an invalid proposal) come back as tool errors with
@@ -102,19 +107,25 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
           "and every row and the edge button are in the tree, each with its bounds at the scroll " +
           "position where it showed whole, so do not compare positions of rows that are not on " +
           "screen together; an open overlay keeps the list at the top. Read this instead of " +
-          "looking at screenshots.",
-      schema =
-        schema(
-          string("screen", "Screen id to render. Defaults to the screen the window is on."),
-          enum(
-            "view",
-            "A named view of the proposal's catalog. Defaults to the view the window shows.",
-            Views.every.map { it.name },
-          ),
-        ),
+          "looking at pictures; render_view is the one visual confirmation, after this passes.",
+      schema = treeSchema(),
     ) { args ->
       val tree = controller.getTree(args.string("screen"), args.string("view"))
       PreviewJson.compact.encodeToString(LayoutTree.serializer(), tree)
+    }
+    contentTool(
+      name = "render_view",
+      title = "Render a screen to a picture",
+      description =
+        "Renders one screen at one view to a PNG and returns it, for one visual confirmation " +
+          "after check_proposal passes: things the layout tree cannot show, such as icon fit, " +
+          "image assets, and overall balance. Same screen and view arguments as get_tree. Not " +
+          "for iterating: fix from check_proposal and get_tree. If the picture disagrees with " +
+          "the tree, report it as a possible previewer bug. A scrolling Wear list also returns " +
+          "its end-of-list picture. Drawn at 1 px per dp. Also saved to the returned path.",
+      schema = treeSchema(),
+    ) { args ->
+      controller.renderView(args.string("screen"), args.string("view")).toContent()
     }
     tool(
       name = "set_view",
@@ -279,6 +290,17 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
     }
   }
 
+  /** The arguments `get_tree` and `render_view` share: which screen, at which view. */
+  private fun treeSchema() =
+    schema(
+      string("screen", "Screen id to render. Defaults to the screen the window is on."),
+      enum(
+        "view",
+        "A named view of the proposal's catalog. Defaults to the view the window shows.",
+        Views.every.map { it.name },
+      ),
+    )
+
   private fun tool(
     name: String,
     title: String,
@@ -286,6 +308,19 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
     schema: ToolSchema,
     readOnly: Boolean = true,
     run: suspend (JsonObject) -> String,
+  ) =
+    contentTool(name, title, description, schema, readOnly) { args ->
+      listOf(TextContent(run(args)))
+    }
+
+  /** A tool whose result is a list of content items, such as a picture and its caption. */
+  private fun contentTool(
+    name: String,
+    title: String,
+    description: String,
+    schema: ToolSchema,
+    readOnly: Boolean = true,
+    run: suspend (JsonObject) -> List<ContentBlock>,
   ) {
     server.addTool(
       name = name,
@@ -301,10 +336,10 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
 
   private suspend fun ClientConnection.guarded(
     request: CallToolRequest,
-    body: suspend () -> String,
+    body: suspend () -> List<ContentBlock>,
   ): CallToolResult =
     try {
-      CallToolResult(content = listOf(TextContent(body())))
+      CallToolResult(content = body())
     } catch (e: CancellationException) {
       throw e
     } catch (e: PreviewException) {
@@ -323,10 +358,34 @@ class PreviewMcpServer(private val controller: PreviewController, private val ve
       "Live previewer for Material 3 Expressive design proposals, for phone, tablet and desktop " +
         "(get_catalog m3-expressive) and for Wear OS, drawn in the watch and watch-large views " +
         "(get_catalog wear). open_proposal once, then edit the proposal file and call " +
-        "check_proposal after each edit; use get_tree for the geometry of a failing view. The " +
-        "file on disk is the source of truth; there is no tool that edits it."
+        "check_proposal after each edit; use get_tree for the geometry of a failing view. Once " +
+        "check_proposal passes, render_view gives one picture of a screen at a view as the single " +
+        "visual confirmation; do not iterate on pictures. The file on disk is the source of " +
+        "truth; there is no tool that edits it."
   }
 }
+
+/**
+ * The picture or pictures, then one text item saying what each is, its size and where it was saved
+ * (for harnesses that do not show MCP images). No structured content: some clients drop images when
+ * it is set.
+ */
+private fun ViewRender.toContent(): List<ContentBlock> {
+  val size = "${widthPx}x$heightPx px"
+  val caption = buildString {
+    append("Screen '$screen' at view '$view', $size, 1 px per dp. Saved to ${png.path}")
+    end?.let {
+      append(
+        ". A scrolling list: the first image is the top of the list, the second is the list " +
+          "scrolled to its end, saved to ${it.path}",
+      )
+    }
+  }
+  return listOfNotNull(png, end).map { it.toImage() } + TextContent(caption)
+}
+
+private fun RenderedPng.toImage() =
+  ImageContent(data = Base64.getEncoder().encodeToString(bytes), mimeType = "image/png")
 
 private class Prop(val name: String, val schema: JsonObject)
 

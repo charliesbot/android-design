@@ -14,7 +14,7 @@ python3 run.py prepare --out /tmp/design-eval --cases music
 
 Preparation makes `music/` a fresh Git repository fixture (one empty commit) with `design/` holding the brief's assets in `design/assets/`, and a snapshot of both skills (`skills/android-design` and `skills/android-design-explore`). There is no starter and no `DESIGN.md`: the agent writes `DESIGN.md` at the fixture root and the proposal at `design/proposal.proposal.json`. `music/case.json` records the proposal path and title, and the command prints the proposal path.
 
-Read `/tmp/design-eval/music/prompt.md` in the agent session you want to test. Have that agent design the brief using the copied skills. The agent connects to the previewer app over MCP as the server `android_design_preview` and checks its work with `check_proposal` and `get_tree`, not screenshots; the runner renders again headlessly. The output directory must be new; preparation never overwrites existing work. Omit `--cases` to prepare all eight cases: the phone cases music, finance, settings, trek, and recipes, and the Wear cases workout, player, and reminder.
+Read `/tmp/design-eval/music/prompt.md` in the agent session you want to test. Have that agent design the brief using the copied skills. The agent connects to the previewer app over MCP as the server `android_design_preview` and checks its work with `check_proposal` and `get_tree`, then looks once per screen with `render_view`; the runner renders again headlessly. The output directory must be new; preparation never overwrites existing work. Omit `--cases` to prepare all eight cases: the phone cases music, finance, settings, trek, and recipes, and the Wear cases workout, player, and reminder.
 
 ## Surfaces
 

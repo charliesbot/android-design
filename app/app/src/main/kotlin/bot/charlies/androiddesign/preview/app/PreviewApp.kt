@@ -14,8 +14,8 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import bot.charlies.androiddesign.preview.app.di.appModule
 import bot.charlies.androiddesign.preview.app.preview.PreviewWindow
+import bot.charlies.androiddesign.preview.app.preview.ProposalRenderer
 import bot.charlies.androiddesign.preview.app.preview.Sessions
-import bot.charlies.androiddesign.preview.app.preview.TreeRenderer
 import bot.charlies.androiddesign.preview.domain.PreviewException
 import bot.charlies.androiddesign.preview.domain.ProposalRepository
 import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
@@ -88,7 +88,7 @@ fun runInstance(launchedByUser: Boolean) {
   val sessions =
     Sessions(
       repository = koin.get<ProposalRepository>(),
-      renderer = koin.get<TreeRenderer>(),
+      renderer = koin.get<ProposalRenderer>(),
       window = window,
       scope = scope,
       version = AppInfo.VERSION,

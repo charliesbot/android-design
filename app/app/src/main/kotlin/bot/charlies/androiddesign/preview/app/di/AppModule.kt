@@ -1,8 +1,8 @@
 package bot.charlies.androiddesign.preview.app.di
 
-import bot.charlies.androiddesign.preview.app.preview.HeadlessTreeRenderer
+import bot.charlies.androiddesign.preview.app.preview.HeadlessProposalRenderer
 import bot.charlies.androiddesign.preview.app.preview.PreviewWindow
-import bot.charlies.androiddesign.preview.app.preview.TreeRenderer
+import bot.charlies.androiddesign.preview.app.preview.ProposalRenderer
 import bot.charlies.androiddesign.preview.data.FileProposalRepository
 import bot.charlies.androiddesign.preview.domain.ProposalRepository
 import org.koin.dsl.module
@@ -14,5 +14,5 @@ import org.koin.dsl.module
 val appModule = module {
   single<ProposalRepository> { FileProposalRepository() }
   single { PreviewWindow() }
-  single<TreeRenderer> { HeadlessTreeRenderer() }
+  single<ProposalRenderer> { HeadlessProposalRenderer() }
 }

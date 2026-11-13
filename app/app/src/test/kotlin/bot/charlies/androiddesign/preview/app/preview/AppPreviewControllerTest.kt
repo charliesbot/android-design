@@ -47,7 +47,7 @@ class AppPreviewControllerTest {
       repository = FileProposalRepository(),
       viewer = viewer,
       window = window,
-      renderer = HeadlessTreeRenderer(),
+      renderer = HeadlessProposalRenderer(),
       scope = scope,
       version = AppInfo.VERSION,
     )
@@ -183,6 +183,33 @@ class AppPreviewControllerTest {
     // At tablet width the detail shows beside its list.
     assertTrue(tree.nodes.any { it.id.startsWith("plates/") }, "the list pane is drawn too")
   }
+
+  @Test
+  fun `render_view with no arguments draws what the window shows, live state replayed`() =
+    runBlocking {
+      controller.openProposal(workspace().toString())
+      controller.setView(ViewChange(device = Device.Tablet))
+
+      val plain = controller.renderView()
+
+      assertEquals("plates", plain.screen)
+      assertEquals("tablet", plain.view)
+      assertEquals(1280, plain.widthPx)
+      assertTrue(Files.isRegularFile(Path.of(plain.png.path)))
+      assertNull(plain.end, "only a scrolling Wear list has an end picture")
+
+      viewer.host().interaction.open("plates", "new_sheet")
+      val replayed = controller.renderView()
+      assertFalse(
+        plain.png.bytes.contentEquals(replayed.png.bytes),
+        "the window's open overlay is in the picture",
+      )
+
+      val fresh = controller.renderView(screen = "plates")
+      assertTrue(fresh.png.bytes.contentEquals(plain.png.bytes), "a named screen drops the overlay")
+      assertFailsWith<PreviewException> { controller.renderView(screen = "nope") }
+      Unit
+    }
 
   @Test
   fun `get_tree with arguments is a fresh render of the named screen and view`() = runBlocking {

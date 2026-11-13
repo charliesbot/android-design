@@ -3,6 +3,7 @@ package bot.charlies.androiddesign.preview.app.preview
 import bot.charlies.androiddesign.preview.app.AppInfo
 import bot.charlies.androiddesign.preview.data.FileProposalRepository
 import bot.charlies.androiddesign.preview.domain.ViewChange
+import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessResult
 import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
 import bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
@@ -31,8 +32,8 @@ import kotlinx.coroutines.withTimeout
 class RenderCheckTest {
   private class Call(val screen: String, val view: ViewSpec, val live: ProposalHostState?)
 
-  private class RecordingRenderer : TreeRenderer {
-    private val real = HeadlessTreeRenderer()
+  private class RecordingRenderer : ProposalRenderer {
+    private val real = HeadlessProposalRenderer()
     val calls = CopyOnWriteArrayList<Call>()
 
     override suspend fun render(
@@ -45,6 +46,15 @@ class RenderCheckTest {
       calls += Call(screen, view, live)
       return real.render(source, screen, view, live, overlay)
     }
+
+    override suspend fun image(
+      source: RenderSource,
+      screen: String,
+      view: ViewSpec,
+      live: ProposalHostState?,
+      overlay: String?,
+      density: Float,
+    ): HeadlessResult = real.image(source, screen, view, live, overlay, density)
   }
 
   private val fixtures = Path.of(System.getProperty("fixtures.dir"))

@@ -37,7 +37,7 @@ class SessionsTest {
   private fun sessions(launchedByUser: Boolean = false) =
     Sessions(
       repository = FileProposalRepository(),
-      renderer = HeadlessTreeRenderer(),
+      renderer = HeadlessProposalRenderer(),
       window = PreviewWindow(),
       scope = scope,
       version = AppInfo.VERSION,

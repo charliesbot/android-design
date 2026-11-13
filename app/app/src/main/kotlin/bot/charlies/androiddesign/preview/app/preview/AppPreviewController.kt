@@ -10,13 +10,16 @@ import bot.charlies.androiddesign.preview.domain.PreviewStatus
 import bot.charlies.androiddesign.preview.domain.ProposalCheck
 import bot.charlies.androiddesign.preview.domain.ProposalRepository
 import bot.charlies.androiddesign.preview.domain.ProposalSnapshot
+import bot.charlies.androiddesign.preview.domain.RenderedPng
 import bot.charlies.androiddesign.preview.domain.ViewChange
 import bot.charlies.androiddesign.preview.domain.ViewCheck
+import bot.charlies.androiddesign.preview.domain.ViewRender
 import bot.charlies.androiddesign.preview.domain.ViewState
 import bot.charlies.androiddesign.preview.domain.catalog.CatalogJson
 import bot.charlies.androiddesign.preview.domain.catalog.CatalogSummary
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
+import bot.charlies.androiddesign.preview.feature.preview.render.ProposalHostState
 import bot.charlies.androiddesign.preview.feature.preview.viewer.ViewerViewModel
 import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.Catalogs
@@ -47,15 +50,18 @@ import kotlinx.serialization.json.JsonObject
  * old version, whatever the watcher's timing.
  *
  * @param scope Runs the file watcher.
+ * @param renderDir Where `render_view` saves its PNGs, one folder per proposal.
  * @param onShown Called whenever a tool brings the window up, so the session can take the focus.
  */
 class AppPreviewController(
   private val repository: ProposalRepository,
   private val viewer: ViewerViewModel,
   private val window: PreviewWindow,
-  private val renderer: TreeRenderer,
+  private val renderer: ProposalRenderer,
   private val scope: CoroutineScope,
   private val version: String,
+  private val renderDir: Path =
+    Path.of(System.getProperty("java.io.tmpdir"), "android-design-renders"),
   private val onShown: () -> Unit = {},
 ) : PreviewController {
   private val applying = Mutex()
@@ -88,17 +94,65 @@ class AppPreviewController(
   }
 
   override suspend fun getTree(screen: String?, view: String?): LayoutTree {
+    val target = resolve(screen, view)
+    return renderer.render(target.source, target.screen, target.view, target.live)
+  }
+
+  override suspend fun renderView(screen: String?, view: String?): ViewRender {
+    val target = resolve(screen, view)
+    val result =
+      renderer.image(
+        target.source,
+        target.screen,
+        target.view,
+        target.live,
+        density = RENDER_DENSITY,
+      )
+    val dir = renderDir.resolve(target.slug)
+    Files.createDirectories(dir)
+    fun save(png: ByteArray, suffix: String): RenderedPng {
+      val file = dir.resolve("${target.screen}-${target.view.name}$suffix.png")
+      Files.write(file, png)
+      return RenderedPng(png, file.toAbsolutePath().toString())
+    }
+    return ViewRender(
+      screen = target.screen,
+      view = target.view.name,
+      widthPx = (target.view.width * RENDER_DENSITY).toInt(),
+      heightPx = (target.view.height * RENDER_DENSITY).toInt(),
+      png = save(result.png, ""),
+      end = result.end?.let { save(it.png, "-end") },
+    )
+  }
+
+  /** What one render draws: the screen, the view, the source and the host to replay, if any. */
+  private class RenderTarget(
+    val source: RenderSource,
+    val screen: String,
+    val view: ViewSpec,
+    val live: ProposalHostState?,
+    /** The proposal file's name without its extensions, for naming saved renders. */
+    val slug: String,
+  )
+
+  /**
+   * Resolves the arguments of `get_tree` and `render_view`, so both draw the same thing. With no
+   * arguments it is what the window shows, its open overlays and selections replayed. With a screen
+   * or a view it is a fresh render; the window's color choices go only with the window's own view,
+   * and a named view is drawn with the proposal's own design.
+   */
+  private suspend fun resolve(screen: String?, view: String?): RenderTarget {
     val snapshot = validSnapshot()
     val proposal = checkNotNull(snapshot.proposal)
     val state = viewer.state.value
-    // No arguments: what the window shows, with its open overlays and selections replayed.
+    val slug = snapshot.path.fileName.toString().removeSuffix(".json").removeSuffix(".proposal")
     if (screen == null && view == null) {
-      val host = state.host
-      return renderer.render(
+      return RenderTarget(
         sourceOf(proposal, snapshot, state.effectiveDesign ?: snapshot.designSystem),
         viewer.currentScreen ?: proposal.navigation.start,
         state.view,
-        live = host,
+        live = state.host,
+        slug,
       )
     }
     val screenId = screen ?: viewer.currentScreen ?: proposal.navigation.start
@@ -108,10 +162,9 @@ class AppPreviewController(
       )
     }
     val spec: ViewSpec = if (view == null) state.view else viewNamed(view, Catalogs.of(proposal))
-    // The window's color choices go with the window's view; a named view is the proposal's own.
     val design =
       if (view == null) state.effectiveDesign ?: snapshot.designSystem else snapshot.designSystem
-    return renderer.render(sourceOf(proposal, snapshot, design), screenId, spec)
+    return RenderTarget(sourceOf(proposal, snapshot, design), screenId, spec, live = null, slug)
   }
 
   override suspend fun setView(change: ViewChange): ViewState {
@@ -367,6 +420,9 @@ class AppPreviewController(
 
   private companion object {
     const val MAX_ERRORS = 20
+
+    /** `render_view` draws at 1 px per dp: a desktop view is 1920x1080, small enough to read. */
+    const val RENDER_DENSITY = 1f
     const val NANOS_PER_MS = 1_000_000L
   }
 }
