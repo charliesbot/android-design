@@ -15,7 +15,7 @@ from checks import read_report, run as run_checks
 from judge import judge, parse, aggregate, validate_runs, SCHEMA, prompt_for as judge_prompt
 from backends import BACKENDS, execute
 from preview_app import app_binary
-from report import label, write_report, write_summary
+from report import METRIC_KEYS, generator_medians, label, write_report, write_summary
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -108,10 +108,15 @@ def prepare_run(cases, out):
     return out
 
 
+def generator_metrics_from(reply):
+    return {key: reply.get(key) for key in METRIC_KEYS}
+
+
 def generate(case_dir, backend, model=None):
     reply = execute(backend, (case_dir / 'prompt.md').read_text(), case_dir,
                     role='generator', model=model, mcp_binary=app_binary())
     (case_dir / 'agent.json').write_text(json.dumps(reply, indent=2))
+    (case_dir / 'generator-metrics.json').write_text(json.dumps(generator_metrics_from(reply), indent=2))
     return reply
 
 
@@ -264,9 +269,13 @@ def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1)
     agent_path = directory / 'agent.json'
     agent = json.loads(agent_path.read_text()) if agent_path.exists() else {
         'backend': 'external', 'cost': None, 'turns': None, 'message': 'Implementation supplied outside the runner.'}
+    metrics_path = directory / 'generator-metrics.json'
+    metrics = json.loads(metrics_path.read_text()) if metrics_path.is_file() else generator_metrics_from(agent)
+    eval_minutes = round((time.time() - started) / 60, 1)
     return {'name': case['name'], 'surface': case['surface'],
-            'minutes': round((time.time() - started) / 60, 1), 'agent': agent,
-            'judge_backend': judge_backend, 'judge_model': judge_model,
+            'minutes': eval_minutes, 'eval_minutes': eval_minutes,
+            'generator_seconds': metrics.get('wall_seconds'), 'generator_metrics': metrics,
+            'agent': agent, 'judge_backend': judge_backend, 'judge_model': judge_model,
             'checks': checks, 'judge': verdict, 'renders': renders,
             'status': overall_status(checks, verdict), 'request_id': request['request_id']}
 
@@ -289,7 +298,8 @@ def select_cases(names):
 
 
 def write_results(out, results, no_open):
-    (out / 'results.json').write_text(json.dumps({'run': out.name, 'cases': results}, indent=2))
+    payload = {'run': out.name, 'generator_medians': generator_medians(results), 'cases': results}
+    (out / 'results.json').write_text(json.dumps(payload, indent=2))
     report = write_report(out, results, HERE / 'baseline')
     print(write_summary(out, results).read_text())
     print(f'report: {report}')

@@ -1,7 +1,8 @@
 import json
-from pathlib import Path
 import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import backends
@@ -131,3 +132,187 @@ class BackendTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 backends.execute('unknown', 'brief', Path('/tmp'), role='generator')
         call.assert_not_called()
+
+    def test_claude_extracts_tokens_model_usage_and_wall_seconds(self):
+        reply = {
+            'result': 'finished',
+            'total_cost_usd': 0.42,
+            'num_turns': 7,
+            'usage': {
+                'input_tokens': 1200,
+                'output_tokens': 340,
+                'cache_read_input_tokens': 800,
+                'cache_creation_input_tokens': 150,
+            },
+            'modelUsage': {'claude-opus-4-1': {'inputTokens': 1200}},
+        }
+        with patch('backends.time.monotonic', side_effect=[10.0, 22.346]), \
+                patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, json.dumps(reply), '')):
+            result = backends.execute('claude', 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY)
+        self.assertEqual(result['model'], 'claude-opus-4-1')
+        self.assertEqual(result['turns'], 7)
+        self.assertEqual(result['wall_seconds'], 12.35)
+        self.assertEqual(result['input_tokens'], 1200)
+        self.assertEqual(result['output_tokens'], 340)
+        self.assertEqual(result['cache_read_tokens'], 800)
+        self.assertEqual(result['cache_creation_tokens'], 150)
+
+    def test_codex_jsonl_extracts_usage_turns_and_compile_retries_vs_layout_findings(self):
+        events = [
+            {'type': 'thread.started', 'thread_id': 't-1'},
+            {'type': 'item.completed', 'item': {'id': 'i0', 'type': 'agent_message', 'text': 'Opening'}},
+            {'type': 'item.completed', 'item': {
+                'id': 'i1', 'type': 'mcp_tool_call', 'server': 'android_design_preview',
+                'tool': 'open_proposal', 'result': {'content': [{'type': 'text', 'text': json.dumps({'valid': False})}]},
+            }},
+            {'type': 'item.completed', 'item': {
+                'id': 'i2', 'type': 'mcp_tool_call', 'server': 'android_design_preview',
+                'tool': 'check_proposal', 'result': {'content': [{'type': 'text', 'text': json.dumps({'pass': False, 'screens': {}})}]},
+            }},
+            {'type': 'item.completed', 'item': {
+                'id': 'i3', 'type': 'mcp_tool_call', 'server': 'android_design_preview',
+                'tool': 'check_design', 'error': {'message': 'compile error'}, 'result': {'content': [{'type': 'text', 'text': 'Unresolved reference'}], 'isError': True},
+            }},
+            {'type': 'item.completed', 'item': {
+                'id': 'i4', 'type': 'mcp_tool_call', 'server': 'android_design_preview',
+                'tool': 'check_design', 'result': {'content': [{'type': 'text', 'text': json.dumps({'compiled': True, 'pass': True})}]},
+            }},
+            {'type': 'item.completed', 'item': {'id': 'i5', 'type': 'agent_message', 'text': 'Done'}},
+            {'type': 'turn.completed', 'usage': {
+                'input_tokens': 5000, 'cached_input_tokens': 3000, 'cache_write_input_tokens': 0,
+                'output_tokens': 410, 'reasoning_output_tokens': 120,
+            }},
+        ]
+        stdout = '\n'.join(json.dumps(e) for e in events) + '\n'
+
+        def fake_run(cmd, **kwargs):
+            self.assertIn('--json', cmd)
+            Path(cmd[cmd.index('--output-last-message') + 1]).write_text('Done')
+            return subprocess.CompletedProcess(cmd, 0, stdout, '')
+
+        with tempfile.TemporaryDirectory() as home, \
+                patch('backends.Path.home', return_value=Path(home)), \
+                patch('backends.subprocess.run', side_effect=fake_run):
+            (Path(home) / '.codex').mkdir()
+            (Path(home) / '.codex/config.toml').write_text('model = "gpt-6-astra"\n')
+            result = backends.execute('codex', 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY)
+
+        self.assertEqual(result['model'], 'gpt-6-astra')
+        self.assertEqual(result['turns'], 2)
+        self.assertEqual(result['input_tokens'], 5000)
+        self.assertEqual(result['output_tokens'], 410)
+        self.assertEqual(result['cache_read_tokens'], 3000)
+        self.assertEqual(result['thinking_tokens'], 120)
+        self.assertEqual(result['check_calls'], 3)
+        self.assertEqual(result['compile_retries'], 2)
+
+    def test_agy_generator_mounts_isolated_plugin_and_cleans_up(self):
+        events = [
+            {'event': 'init', 'init': {'cwd': '/tmp', 'tools': []}},
+            {'event': 'step_update', 'step_update': {'step_index': 1, 'state': 'DONE', 'step_type': 'agent_response'}},
+            {'event': 'step_update', 'step_update': {
+                'step_index': 2, 'state': 'DONE', 'step_type': 'tool', 'tool_name': 'call_mcp_tool',
+                'tool_info': {
+                    'name': 'call_mcp_tool',
+                    'parameters': {'ServerName': 'eval-preview_preview', 'ToolName': 'check_design'},
+                    'output': json.dumps({'compiled': False, 'errors': ['missing import']}),
+                },
+            }},
+            {'event': 'step_update', 'step_update': {'step_index': 3, 'state': 'DONE', 'step_type': 'agent_response'}},
+            {'event': 'step_update', 'step_update': {
+                'step_index': 4, 'state': 'DONE', 'step_type': 'tool', 'tool_name': 'call_mcp_tool',
+                'tool_info': {
+                    'name': 'call_mcp_tool',
+                    'parameters': {'ServerName': 'eval-preview_preview', 'ToolName': 'check_design'},
+                    'output': json.dumps({'compiled': True, 'pass': False}),
+                },
+            }},
+            {'event': 'step_update', 'step_update': {'step_index': 5, 'state': 'DONE', 'step_type': 'agent_response'}},
+            {'event': 'result', 'result': {
+                'status': 'SUCCESS', 'response': 'Design ready.', 'num_turns': 1,
+                'usage': {'input_tokens': 21000, 'output_tokens': 950, 'thinking_tokens': 400, 'cache_read_tokens': 14000},
+            }},
+        ]
+        stdout = '\n'.join(json.dumps(e) for e in events) + '\n'
+        seen = {}
+
+        with tempfile.TemporaryDirectory() as case_tmp, tempfile.TemporaryDirectory() as home_tmp:
+            case_dir = Path(case_tmp).resolve()
+            (Path(home_tmp) / '.gemini/antigravity-cli').mkdir(parents=True)
+            (Path(home_tmp) / '.gemini/antigravity-cli/settings.json').write_text(json.dumps({'model': 'Gemini 3.8 Flash (High)'}))
+
+            def fake_run(cmd, **kwargs):
+                seen['cmd'] = cmd
+                seen['stdin'] = kwargs.get('stdin')
+                pdir = case_dir / '.agents/plugins/eval-preview'
+                seen['plugin'] = json.loads((pdir / 'plugin.json').read_text())
+                seen['mcp'] = json.loads((pdir / 'mcp_config.json').read_text())
+                return subprocess.CompletedProcess(cmd, 0, stdout, '')
+
+            with patch('backends.Path.home', return_value=Path(home_tmp)), \
+                    patch('backends.subprocess.run', side_effect=fake_run):
+                result = backends.execute('agy', 'Use android_design_preview to inspect.', case_dir,
+                                          role='generator', mcp_binary=BINARY)
+
+            self.assertFalse((case_dir / '.agents').exists())
+
+        self.assertEqual(seen['stdin'], subprocess.DEVNULL)
+        self.assertEqual(seen['plugin'], {'name': 'eval-preview'})
+        preview = seen['mcp']['mcpServers']['preview']
+        self.assertEqual(preview['command'], BINARY)
+        self.assertTrue(preview['env']['ANDROID_DESIGN_PREVIEW_SOCKET'].startswith('/tmp/adp-'))
+        cmd = seen['cmd']
+        prompt_arg = cmd[cmd.index('-p') + 1]
+        self.assertIn('eval-preview_preview', prompt_arg)
+        settings = json.loads(cmd[cmd.index('--settings') + 1])
+        self.assertIn(f'write_file({case_dir})', settings['permissions']['allow'])
+        self.assertIn('mcp(eval-preview_preview/*)', settings['permissions']['allow'])
+        self.assertIn('command(*)', settings['permissions']['deny'])
+        self.assertIn('mcp(android_design_preview/*)', settings['permissions']['deny'])
+        self.assertNotIn('--dangerously-skip-permissions', cmd)
+        self.assertEqual(result['model'], 'Gemini 3.8 Flash (High)')
+        self.assertEqual(result['turns'], 3)
+        self.assertEqual(result['input_tokens'], 21000)
+        self.assertEqual(result['output_tokens'], 950)
+        self.assertEqual(result['thinking_tokens'], 400)
+        self.assertEqual(result['cache_read_tokens'], 14000)
+        self.assertEqual(result['check_calls'], 2)
+        self.assertEqual(result['compile_retries'], 1)
+
+    def test_agy_judge_uses_read_only_settings_structured_output_and_rejects_errors(self):
+        schema = {'type': 'object', 'properties': {'items': {'type': 'array'}}}
+        good_out = '\n'.join([
+            json.dumps({'event': 'init', 'init': {'model': 'gemini-3.8-flash-high'}}),
+            json.dumps({'event': 'result', 'result': {
+                'status': 'SUCCESS',
+                'structured_output': {'items': [{'id': 'R-one', 'pass': True, 'reason': 'Clear'}]},
+                'num_turns': 1,
+                'usage': {'input_tokens': 3000, 'output_tokens': 120, 'cache_read_tokens': 500},
+            }}),
+        ]) + '\n'
+
+        with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, good_out, '')) as call:
+            result = backends.execute('agy', 'judge', Path('/tmp'), role='judge',
+                                      images=['/tmp/renders/a.png'], schema=schema)
+        cmd = call.call_args.args[0]
+        self.assertEqual(cmd[cmd.index('--add-dir') + 1], str(Path('/tmp/renders').resolve()))
+        self.assertEqual(json.loads(cmd[cmd.index('--json-schema') + 1]), schema)
+        settings = json.loads(cmd[cmd.index('--settings') + 1])
+        self.assertEqual(settings['permissions']['allow'], ['read_file(*)'])
+        self.assertIn('mcp(*)', settings['permissions']['deny'])
+        self.assertIn('write_file(*)', settings['permissions']['deny'])
+        self.assertEqual(json.loads(result['message']), {'items': [{'id': 'R-one', 'pass': True, 'reason': 'Clear'}]})
+        self.assertEqual(result['model'], 'gemini-3.8-flash-high')
+        self.assertIsNone(result['check_calls'])
+
+        denied_out = json.dumps({'event': 'result', 'result': {
+            'status': 'SUCCESS', 'response': '', 'denied_actions': [{'action': 'read_file'}],
+        }})
+        with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, denied_out, '')):
+            with self.assertRaisesRegex(RuntimeError, 'permission denied'):
+                backends.execute('agy', 'judge', Path('/tmp'), role='judge')
+
+        error_out = json.dumps({'event': 'result', 'result': {'status': 'ERROR', 'error': 'quota exceeded'}})
+        with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, error_out, '')):
+            with self.assertRaisesRegex(RuntimeError, 'quota exceeded'):
+                backends.execute('agy', 'judge', Path('/tmp'), role='judge')
