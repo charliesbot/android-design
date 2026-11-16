@@ -199,6 +199,11 @@ export function renderBoardHtml({ nonce }) {
       font-size: 13px;
     }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+    .selected-source { margin-top: 4px; word-break: break-all; }
+    .stage-findings { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+    .node-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; max-height: 280px; overflow: auto; }
+    .node-item { text-align: left; padding: 4px 6px; }
+    .card-meta { color: var(--muted); }
     .finding { padding: 8px; border-radius: 6px; background: var(--surface-2); font-size: 12px; }
     .finding.error { border-left: 3px solid var(--fail); }
     .finding.info { border-left: 3px solid var(--warn); }
@@ -310,15 +315,15 @@ export function renderBoardHtml({ nonce }) {
         <aside class="inspector">
           <div>
             <strong>Source Location</strong>
-            <div id="selected-source" class="mono" style="margin-top:4px;word-break:break-all;">none selected</div>
+            <div id="selected-source" class="mono selected-source">none selected</div>
           </div>
           <div>
             <strong>Render Checks</strong>
-            <div id="stage-findings" style="display:flex;flex-direction:column;gap:6px;margin-top:6px;"></div>
+            <div id="stage-findings" class="stage-findings"></div>
           </div>
           <div>
             <strong>Layout &amp; Navigation Nodes</strong>
-            <div id="node-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:280px;overflow:auto;"></div>
+            <div id="node-list" class="node-list"></div>
           </div>
         </aside>
       </div>
@@ -600,8 +605,7 @@ export function renderBoardHtml({ nonce }) {
         }
 
         const meta = document.createElement("div");
-        meta.className = "mono";
-        meta.style.color = "var(--muted)";
+        meta.className = "mono card-meta";
         meta.textContent = "screens: " + dir.screens.join(", ") + (dir.overlays.length ? " | overlays: " + dir.overlays.map((o) => o.id).join(", ") : "");
 
         card.append(head, preview, meta);
@@ -609,15 +613,46 @@ export function renderBoardHtml({ nonce }) {
       }
     }
 
+    function boundsRect(bounds) {
+      if (Array.isArray(bounds) && bounds.length === 4) {
+        const [x, y, width, height] = bounds.map(Number);
+        if (width > 0 && height > 0) return { x, y, width, height };
+        return null;
+      }
+      if (bounds && typeof bounds === "object" && Number(bounds.width) > 0 && Number(bounds.height) > 0) {
+        return {
+          x: Number(bounds.x) || 0,
+          y: Number(bounds.y) || 0,
+          width: Number(bounds.width),
+          height: Number(bounds.height),
+        };
+      }
+      return null;
+    }
+
+    function hasRoleMetadata(roles) {
+      if (!roles) return false;
+      if (Array.isArray(roles)) return roles.length > 0;
+      if (typeof roles === "object") return Object.values(roles).some(Boolean);
+      return false;
+    }
+
     function maybeSwitchTargetFromNode(node) {
       const dir = currentDirectionMeta();
       if (!dir || !node) return false;
-      const roles = Array.isArray(node.roles) ? node.roles : [];
-      const candidates = [node.id, node.text?.value]
+      const roleValues = Array.isArray(node.roles)
+        ? node.roles
+        : (node.roles && typeof node.roles === "object" ? Object.values(node.roles).filter(Boolean) : []);
+      const isNavOrTab =
+        /nav|tab/i.test(node.type || "") ||
+        /tab/i.test(node.a11y?.role || "") ||
+        roleValues.some((r) => /nav|tab/i.test(String(r)));
+
+      const candidates = [node.id, node.text?.value, node.a11y?.label]
         .filter(Boolean)
         .map((s) => String(s).trim().toLowerCase());
 
-      if (roles.some((r) => /nav|tab/i.test(r))) {
+      if (isNavOrTab) {
         const matchedScreen = dir.screens.find((s) =>
           candidates.some((c) => c === s.toLowerCase() || s.toLowerCase().includes(c)),
         );
@@ -656,20 +691,23 @@ export function renderBoardHtml({ nonce }) {
       }
       svg.classList.remove("hidden");
 
-      const nodes = render.tree.nodes.filter((n) => n.bounds && n.bounds.width > 0 && n.bounds.height > 0);
-      nodes.forEach((node, idx) => {
+      const laidOut = render.tree.nodes
+        .map((node) => ({ node, rectBounds: boundsRect(node.bounds) }))
+        .filter((entry) => entry.rectBounds !== null);
+
+      laidOut.forEach(({ node, rectBounds }, idx) => {
         const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        rect.setAttribute("x", String(node.bounds.x));
-        rect.setAttribute("y", String(node.bounds.y));
-        rect.setAttribute("width", String(node.bounds.width));
-        rect.setAttribute("height", String(node.bounds.height));
+        rect.setAttribute("x", String(rectBounds.x));
+        rect.setAttribute("y", String(rectBounds.y));
+        rect.setAttribute("width", String(rectBounds.width));
+        rect.setAttribute("height", String(rectBounds.height));
         rect.setAttribute("class", "node" + (node.primary ? " primary" : ""));
         rect.dataset.index = String(idx);
 
         const loc = node.sourceFile && node.sourceLine
           ? node.sourceFile + ":" + node.sourceLine
           : (state.board?.sourceFile || "");
-        const dims = Math.round(node.bounds.width) + "x" + Math.round(node.bounds.height) + " dp";
+        const dims = Math.round(rectBounds.width) + "x" + Math.round(rectBounds.height) + " dp";
         const label = node.type + (node.id ? "#" + node.id : "") + " (" + dims + ") " + loc;
 
         rect.addEventListener("mouseenter", () => {
@@ -687,12 +725,10 @@ export function renderBoardHtml({ nonce }) {
         });
         svg.appendChild(rect);
 
-        if (node.sourceLine || node.primary || (node.roles && node.roles.length)) {
+        if (node.sourceLine || node.primary || hasRoleMetadata(node.roles)) {
           const item = document.createElement("button");
           item.type = "button";
-          item.className = "mono";
-          item.style.textAlign = "left";
-          item.style.padding = "4px 6px";
+          item.className = "mono node-item";
           item.textContent = label;
           item.onclick = () => copySourceLocation(loc);
           els.nodeList.appendChild(item);
@@ -702,9 +738,15 @@ export function renderBoardHtml({ nonce }) {
 
     function renderStageFindings(render) {
       els.stageFindings.innerHTML = "";
-      const errs = render.check?.errors || [];
-      const notes = render.check?.notes || {};
-      if (errs.length === 0 && Object.keys(notes).length === 0) {
+      const errs = Array.isArray(render.check?.errors) ? render.check.errors : [];
+      const rawNotes = render.check?.notes;
+      const notesList = Array.isArray(rawNotes)
+        ? rawNotes
+        : (rawNotes && typeof rawNotes === "object"
+          ? Object.entries(rawNotes).map(([rule, ids]) => ({ rule, ids }))
+          : []);
+
+      if (errs.length === 0 && notesList.length === 0) {
         const ok = document.createElement("div");
         ok.className = "pill pass";
         ok.textContent = "Zero findings for this view";
@@ -714,13 +756,16 @@ export function renderBoardHtml({ nonce }) {
       for (const e of errs) {
         const div = document.createElement("div");
         div.className = "finding error";
-        div.textContent = (e.rule || "error") + ": " + (e.detail || JSON.stringify(e));
+        const idsText = Array.isArray(e.ids) && e.ids.length ? e.ids.join(", ") : "";
+        const tail = [idsText, e.detail].filter(Boolean).join(" ");
+        div.textContent = (e.rule || "error") + (tail ? ": " + tail : "");
         els.stageFindings.appendChild(div);
       }
-      for (const [rule, ids] of Object.entries(notes)) {
+      for (const note of notesList) {
         const div = document.createElement("div");
         div.className = "finding info";
-        div.textContent = rule + ": " + (Array.isArray(ids) ? ids.join(", ") : String(ids));
+        const ids = Array.isArray(note.ids) ? note.ids.join(", ") : String(note.ids || "");
+        div.textContent = (note.rule || "info") + (ids ? ": " + ids : "");
         els.stageFindings.appendChild(div);
       }
     }

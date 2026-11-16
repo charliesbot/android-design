@@ -186,10 +186,13 @@ async function runRender(targetPath, flags) {
         return {
           screen: item.artifactName,
           view: item.view,
-          files: hasFiles ? filesBase : null,
-          ...(hasEndFiles ? { endFiles: `${filesBase}-end` } : {}),
+          png: hasFiles ? `${filesBase}.png` : null,
+          tree: hasFiles ? `${filesBase}.tree.json` : null,
           pass: item.pass,
           failures: item.failures,
+          ...(hasEndFiles
+            ? { endPng: `${filesBase}-end.png`, endTree: `${filesBase}-end.tree.json` }
+            : {}),
         };
       }),
       pass: result.pass,

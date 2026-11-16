@@ -52,8 +52,8 @@ rl.on("line", async (line) => {
     const pass = !content.includes("// FAIL_CHECK");
     const sampleViewCheck = {
       pass,
-      errors: pass ? [] : [{ rule: "touchTargets", detail: "too small" }],
-      notes: {},
+      errors: pass ? [] : [{ rule: "touch-target", ids: ["btn"], detail: "too small" }],
+      notes: [],
       colors: { surface: "#FFFFFF" },
     };
     const sampleLayout = { navigation: "none", screens: [{ id: "home", children: ["Button b1 88"] }] };
@@ -131,7 +131,7 @@ rl.on("line", async (line) => {
         pass: true,
         renderMs: 8,
         compileCount,
-        check: { pass: true, errors: [], notes: {}, colors: {} },
+        check: { pass: true, errors: [], notes: [], colors: {} },
         tree: {
           screen: "home",
           view: req.params.view || "light",
@@ -141,7 +141,8 @@ rl.on("line", async (line) => {
               type: "Button",
               primary: true,
               scrolls: false,
-              bounds: { x: 24, y: 120, width: 140, height: 48 },
+              bounds: [24, 120, 140, 48],
+              roles: { container: "primary", content: "onPrimary" },
               scrollsHorizontally: false,
               sourceFile: "Test.explore.kt",
               sourceLine: 18,
@@ -164,7 +165,7 @@ rl.on("line", async (line) => {
         tree: {
           screen: "home",
           view: req.params.view || "light",
-          nodes: [{ id: "root", type: "Scaffold", bounds: { x: 0, y: 0, width: 412, height: 915 }, primary: false, scrolls: false, scrollsHorizontally: false, sourceFile: "Test.explore.kt", sourceLine: 12 }],
+          nodes: [{ id: "root", type: "Scaffold", bounds: [0, 0, 412, 915], primary: false, scrolls: false, scrollsHorizontally: false, sourceFile: "Test.explore.kt", sourceLine: 12 }],
           findings: [],
         },
       },

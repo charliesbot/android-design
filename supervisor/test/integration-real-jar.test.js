@@ -145,6 +145,7 @@ test(
       const treePayload = JSON.parse(treeResp.result.content[0].text);
       const sourcedNodes = treePayload.tree.nodes.filter((n) => n.sourceFile === "Sample.explore.kt" && n.sourceLine > 0);
       assert.ok(sourcedNodes.length > 0, "Expected SlotTreeExtractor to populate Sample.explore.kt line numbers");
+      assert.ok(Array.isArray(sourcedNodes[0].bounds) && sourcedNodes[0].bounds.length === 4);
 
       await board.start();
       const renderRes = await postJson({
@@ -154,11 +155,15 @@ test(
       });
       assert.equal(renderRes.status, 200);
       assert.ok(renderRes.body.pngBase64.length > 100);
+      const laidOutRealNodes = renderRes.body.tree.nodes.filter(
+        (n) => n.sourceFile === "Sample.explore.kt" && n.sourceLine > 0 && Array.isArray(n.bounds) && n.bounds[2] > 0 && n.bounds[3] > 0,
+      );
+      assert.ok(laidOutRealNodes.length > 0, "Expected laid-out 4-element [x, y, w, h] bounds arrays on real JAR nodes");
       assert.ok(
-        renderRes.body.tree.nodes.some((n) => n.sourceFile === "Sample.explore.kt" && n.sourceLine > 0),
+        renderRes.body.check.notes === undefined || Array.isArray(renderRes.body.check.notes),
       );
 
-      // Verify CLI `render <file> --out <dir>` writes report.json and exits 0.
+      // Verify CLI `render <file> --out <dir>` writes report.json matching RenderEntry.
       const cliOutDir = path.join(tmpDir, "cli-out");
       const binPath = path.resolve(TEST_DIR, "..", "bin", "android-design-preview.js");
       await execFileAsync(process.execPath, [binPath, "render", explorePath, "--out", cliOutDir], {
@@ -169,6 +174,24 @@ test(
       const cliReport = JSON.parse(fs.readFileSync(reportPath, "utf8"));
       assert.equal(cliReport.valid, true);
       assert.equal(cliReport.pass, true);
+      assert.ok(cliReport.renders[0].png.endsWith(".png"));
+      assert.ok(cliReport.renders[0].tree.endsWith(".tree.json"));
+
+      // Verify `--directions` path emits the exact same RenderEntry schema (`png`, `tree`, `pass`, `failures`).
+      const dirOutDir = path.join(tmpDir, "cli-dir-out");
+      await execFileAsync(
+        process.execPath,
+        [binPath, "render", explorePath, "--directions", "Editorial", "--views", "light", "--out", dirOutDir],
+        { env: { ...process.env, ANDROID_DESIGN_PREVIEW_JAR: BUILT_JAR } },
+      );
+      const dirReport = JSON.parse(fs.readFileSync(path.join(dirOutDir, "report.json"), "utf8"));
+      assert.equal(dirReport.valid, true);
+      assert.equal(dirReport.pass, true);
+      assert.equal(dirReport.renders.length, 1);
+      assert.equal(dirReport.renders[0].png, "home-light.png");
+      assert.equal(dirReport.renders[0].tree, "home-light.tree.json");
+      assert.equal(fs.existsSync(path.join(dirOutDir, dirReport.renders[0].png)), true);
+      assert.equal(fs.existsSync(path.join(dirOutDir, dirReport.renders[0].tree)), true);
     } finally {
       await board.close();
       await mcp.close();

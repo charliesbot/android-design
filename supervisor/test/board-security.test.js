@@ -66,7 +66,7 @@ rl.on("line", (line) => {
         pass: true,
         renderMs: 6,
         compileCount: count,
-        check: { pass: true, errors: [], notes: {}, colors: {} },
+        check: { pass: true, errors: [], notes: [{ rule: "line-length", ids: ["body"] }], colors: {} },
         tree: {
           screen: "feed",
           view: "light",
@@ -76,7 +76,8 @@ rl.on("line", (line) => {
               type: "Button",
               primary: true,
               scrolls: false,
-              bounds: { x: 16, y: 700, width: 120, height: 48 },
+              bounds: [16, 700, 120, 48],
+              roles: { container: "primary", content: "onPrimary" },
               scrollsHorizontally: false,
               sourceFile: "Board.explore.kt",
               sourceLine: 33,
@@ -226,6 +227,8 @@ test("board server enforces Host, Origin, 256-bit token, no compile route, and l
       assert.equal(htmlRes.status, 200);
       assert.ok(htmlRes.headers["content-security-policy"].includes("frame-ancestors 'none'"));
       assert.ok(htmlRes.body.includes('id="stage-svg"'));
+      assert.ok(htmlRes.body.includes("boundsRect"));
+      assert.equal(/\sstyle\s*=/.test(htmlRes.body), false, "HTML must not contain inline style= attrs under nonce CSP");
 
       const renderRes = await rawHttpRequest({
         port,
@@ -243,6 +246,8 @@ test("board server enforces Host, Origin, 256-bit token, no compile route, and l
       const rendered = JSON.parse(renderRes.body);
       assert.equal(rendered.tree.nodes[0].sourceFile, "Board.explore.kt");
       assert.equal(rendered.tree.nodes[0].sourceLine, 33);
+      assert.deepEqual(rendered.tree.nodes[0].bounds, [16, 700, 120, 48]);
+      assert.equal(rendered.check.notes[0].rule, "line-length");
 
       // Oversized body (> 16 KB) cleanly returns HTTP 413 rather than dropping the connection.
       const oversizedRes = await rawHttpRequest({
