@@ -6,6 +6,7 @@ plugins {
 
 dependencies {
   api(project(":core:domain"))
+  api(project(":core:data"))
   implementation(project(":wear:compose"))
   implementation(compose.desktop.currentOs)
   implementation(compose.components.uiToolingPreview)
@@ -15,9 +16,12 @@ dependencies {
   implementation(libs.adaptive.navigation3)
   implementation(libs.material.kolor)
   implementation(libs.kotlinx.coroutines.swing)
+  implementation(libs.kotlin.compiler.embeddable)
+  implementation(libs.kotlin.compose.compiler.embeddable)
+  implementation(libs.jetbrains.annotations)
 }
 
-dependencies { testImplementation(project(":core:data")) }
+dependencies { testImplementation(kotlin("test")) }
 
 tasks.test {
   // Tests share the fixtures of :core:data.

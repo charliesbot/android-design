@@ -6,6 +6,7 @@ import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.M3Component
+import bot.charlies.androiddesign.preview.model.NavigationNodes
 import bot.charlies.androiddesign.preview.model.Proposal
 import kotlin.math.roundToInt
 import kotlinx.serialization.Serializable
@@ -41,6 +42,55 @@ object LayoutSummary {
    * The most regions listed for one screen, which keeps a view's summary to a few hundred bytes.
    */
   const val MAX_REGIONS = 8
+
+  /** Summarizes an `.explore.kt` [tree] directly from its hierarchy without a JSON proposal. */
+  fun of(tree: LayoutTree, catalog: Catalog = Catalogs.forView(tree.view)): ViewLayout {
+    val children = tree.nodes.groupBy { it.parent }
+    val roots =
+      tree.nodes
+        .filter { it.parent == null && it.isLaidOut && it.id != NavigationNodes.CONTAINER_ID }
+        .sortedBy { it.bounds.x }
+    val paneEntries =
+      if (roots.any { it.id.startsWith(PANE_PREFIX) }) {
+        val byPane = linkedMapOf<String, MutableList<LayoutNode>>()
+        for (root in roots) {
+          if (!root.id.startsWith(PANE_PREFIX)) continue
+          val paneName = root.id.removePrefix(PANE_PREFIX).substringBefore('/')
+          byPane.getOrPut(paneName) { mutableListOf() } += root
+        }
+        byPane.map { (paneName, groupRoots) ->
+          val paneChildren = groupRoots.flatMap {
+            directContentChildren(it, children).ifEmpty { listOf(it) }
+          }
+          Pane(paneName, "$PANE_PREFIX$paneName/", groupRoots.minOf { it.bounds.x }, paneChildren)
+        }
+      } else {
+        val contentNodes = roots.flatMap {
+          directContentChildren(it, children).ifEmpty { listOf(it) }
+        }
+        listOf(Pane(tree.screen, "", roots.firstOrNull()?.bounds?.x ?: 0f, contentNodes))
+      }
+    return ViewLayout(
+      nav = navigation(tree, catalog),
+      panes = paneEntries.associate { it.screen to regions(it) },
+    )
+  }
+
+  private fun directContentChildren(
+    root: LayoutNode,
+    children: Map<String?, List<LayoutNode>>,
+  ): List<LayoutNode> {
+    val kids = children[root.id].orEmpty().filter { it.isLaidOut }
+    if (root.type != M3Component.Scaffold.wire) return kids
+    val inner = kids.firstOrNull {
+      it.type != M3Component.TopAppBar.wire && it.type != M3Component.FloatingActionButton.wire
+    }
+    return inner?.let {
+      children[it.id].orEmpty().filter { child -> child.isLaidOut }.ifEmpty { listOf(it) }
+    } ?: kids
+  }
+
+  const val PANE_PREFIX = "@pane/"
 
   fun of(proposal: Proposal, tree: LayoutTree): ViewLayout {
     val children = tree.nodes.groupBy { it.parent }

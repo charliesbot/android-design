@@ -1,5 +1,7 @@
 package bot.charlies.androiddesign.preview.domain.findings
 
+import bot.charlies.androiddesign.preview.domain.design.TypeScale
+import bot.charlies.androiddesign.preview.model.Catalog
 import kotlin.math.pow
 
 /** WCAG 2 contrast math on `#RRGGBB` colors. */
@@ -12,6 +14,7 @@ object Contrast {
 
   const val NORMAL_RATIO = 4.5
   const val LARGE_RATIO = 3.0
+  private const val BOLD_WEIGHT = 700
 
   private val HEX = Regex("^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$")
 
@@ -33,6 +36,14 @@ object Contrast {
   fun requiredRatio(sizeDp: Float, bold: Boolean): Double =
     if (sizeDp >= LARGE_TEXT_DP || (bold && sizeDp >= LARGE_BOLD_TEXT_DP)) LARGE_RATIO
     else NORMAL_RATIO
+
+  /**
+   * The ratio required for typography role [roleWire] in [catalog], defaulting to [NORMAL_RATIO].
+   */
+  fun requiredRatio(catalog: Catalog, roleWire: String?): Double {
+    val spec = roleWire?.let { TypeScale.of(catalog, it) } ?: return NORMAL_RATIO
+    return requiredRatio(spec.sizeSp, spec.weight >= BOLD_WEIGHT)
+  }
 
   private fun linear(channel: Double): Double =
     if (channel <= 0.04045) channel / 12.92 else ((channel + 0.055) / 1.055).pow(2.4)

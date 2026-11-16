@@ -83,6 +83,9 @@ data class LayoutNode(
   val roles: NodeRoles? = null,
   val colors: NodeColors? = null,
   val a11y: A11yInfo? = null,
+  val scrollsHorizontally: Boolean = false,
+  val sourceFile: String? = null,
+  val sourceLine: Int? = null,
 ) {
   /** A node with no area was not laid out, such as an overlay that is closed. */
   val isLaidOut: Boolean
