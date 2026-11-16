@@ -2,6 +2,8 @@ package bot.charlies.androiddesign.preview.domain
 
 import bot.charlies.androiddesign.preview.domain.layout.LayoutSummary
 import bot.charlies.androiddesign.preview.domain.layout.ViewLayout
+import bot.charlies.androiddesign.preview.model.Catalog
+import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.Severity
@@ -60,8 +62,15 @@ private constructor(
     /** The rule of a view whose render threw. */
     const val RENDER_ERROR = "render-error"
 
+    /** The verdict on an `.explore.kt` [tree] rendered under [catalog]. */
+    fun of(tree: LayoutTree, catalog: Catalog = Catalogs.forView(tree.view)): ViewCheck =
+      ofTree(tree) { LayoutSummary.of(tree, catalog) }
+
     /** The verdict on [tree], the render of a screen of [proposal]. */
-    fun of(proposal: Proposal, tree: LayoutTree): ViewCheck {
+    fun of(proposal: Proposal, tree: LayoutTree): ViewCheck =
+      ofTree(tree) { LayoutSummary.of(proposal, tree) }
+
+    private fun ofTree(tree: LayoutTree, summary: () -> ViewLayout): ViewCheck {
       val errors =
         tree.findings
           .filter { it.severity == Severity.Error }
@@ -76,7 +85,7 @@ private constructor(
         pass = errors.isEmpty(),
         notes = notes,
         errors = errors,
-        layout = LayoutSummary.of(proposal, tree),
+        layout = summary(),
       )
     }
 

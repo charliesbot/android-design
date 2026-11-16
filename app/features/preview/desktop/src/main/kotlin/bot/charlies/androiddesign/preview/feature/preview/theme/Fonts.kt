@@ -43,6 +43,13 @@ object ProposalFonts {
   private val cache = ConcurrentHashMap<Key, FontFamily>()
   private val symbolCache = ConcurrentHashMap<Pair<Boolean, Int>, FontFamily>()
   private val bases = ConcurrentHashMap<String, SkiaTypeface>()
+  private val reverseFaces = ConcurrentHashMap<FontFamily, FontFace>()
+
+  /** The bundled [FontFace] behind [family], or null when [family] did not come from here. */
+  fun faceOf(family: FontFamily?): FontFace? = family?.let(reverseFaces::get)
+
+  /** True when [family] is one of the bundled Material Symbols icon fonts. */
+  fun isSymbolFont(family: FontFamily?): Boolean = family != null && family in symbolCache.values
 
   private data class Key(val face: FontFace, val weight: Int, val axes: List<FontAxis>)
 
@@ -81,7 +88,7 @@ object ProposalFonts {
     val usable = axes.filter { it.tag != "wght" && it.value.isFinite() }
     return cache.getOrPut(Key(face, clamped, usable)) {
       val settings = listOf("wght" to clamped.toFloat()) + usable.map { it.tag to it.value }
-      variableFont(face.resource, settings)
+      variableFont(face.resource, settings).also { reverseFaces[it] = face }
     }
   }
 

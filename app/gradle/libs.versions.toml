@@ -13,6 +13,8 @@ kaml = "0.104.0"
 koin = "4.2.2"
 junit = "5.14.4"
 spotless = "8.10.4"
+skiko = "0.156.0"
+jetbrainsAnnotations = "26.1.0"
 
 [libraries]
 compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "material3" }
@@ -29,6 +31,10 @@ kaml = { module = "com.charleskorn.kaml:kaml", version.ref = "kaml" }
 koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
 koin-compose = { module = "io.insert-koin:koin-compose", version.ref = "koin" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "kotlin" }
+kotlin-compose-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable", version.ref = "kotlin" }
+skiko-awt-runtime-all = { module = "org.jetbrains.skiko:skiko-awt-runtime-all", version.ref = "skiko" }
+jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrainsAnnotations" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

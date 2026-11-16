@@ -1,7 +1,6 @@
 package bot.charlies.androiddesign.preview.domain.findings
 
 import bot.charlies.androiddesign.preview.domain.DatePickerSpec
-import bot.charlies.androiddesign.preview.domain.design.TypeScale
 import bot.charlies.androiddesign.preview.model.Axis
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.BundledFont
@@ -339,18 +338,13 @@ object FindingRules {
             ?: view.ancestors(node).firstNotNullOfOrNull { it.colors?.container }
             ?: return@mapNotNull null
         val ratio = Contrast.ratio(content, backdrop) ?: return@mapNotNull null
-        val spec = node.roles?.type?.let { TypeScale.of(view.catalog, it) }
-        val need =
-          if (spec == null) Contrast.NORMAL_RATIO
-          else Contrast.requiredRatio(spec.sizeSp, spec.weight >= BOLD_WEIGHT)
+        val need = Contrast.requiredRatio(view.catalog, node.roles?.type)
         if (ratio < need) {
           errorFinding(node, FindingRule.Contrast, "${number(ratio)}:1, needs ${number(need)}:1")
         } else {
           null
         }
       }
-
-  private const val BOLD_WEIGHT = 700
 
   // endregion
 
@@ -461,8 +455,13 @@ object FindingRules {
     val flagged =
       view.nodes.mapNotNull { node ->
         if (!node.isLaidOut || view.isBehindModal(node)) return@mapNotNull null
-        if (view.ancestors(node).any { it.type in view.facets.horizontalScrollers })
+        if (
+          view.ancestors(node).any {
+            it.scrollsHorizontally || it.type in view.facets.horizontalScrollers
+          }
+        ) {
           return@mapNotNull null
+        }
         if (node.right() > width + EDGE_SLACK_DP || node.bounds.x < -EDGE_SLACK_DP) {
           return@mapNotNull null
         }

@@ -65,6 +65,16 @@ class RenderCommand(
       return ExitCode.USAGE
     }
     Files.createDirectories(options.out)
+    if (proposalPath.fileName.toString().endsWith(".explore.kt")) {
+      return ExploreRenderRunner.runCliRender(
+        sourcePath = proposalPath,
+        outDir = options.out,
+        explicitDesign = options.design,
+        requestedViews = options.views,
+        requestedScreens = options.screens,
+        err = err,
+      )
+    }
 
     val loaded = ProposalReader().read(proposalPath, options.design)
     val proposal = loaded.proposal
