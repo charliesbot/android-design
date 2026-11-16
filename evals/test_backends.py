@@ -316,3 +316,58 @@ class BackendTests(unittest.TestCase):
         with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, error_out, '')):
             with self.assertRaisesRegex(RuntimeError, 'quota exceeded'):
                 backends.execute('agy', 'judge', Path('/tmp'), role='judge')
+
+    def test_claude_generator_streams_ndjson_and_tracks_check_calls_and_compile_retries(self):
+        events = [
+            {'type': 'assistant', 'message': {'content': [
+                {'type': 'tool_use', 'id': 'u1', 'name': 'mcp__android_design_preview__open_proposal', 'input': {}},
+                {'type': 'tool_use', 'id': 'u2', 'name': 'mcp__android_design_preview__check_proposal', 'input': {}},
+            ]}},
+            {'type': 'user', 'message': {'content': [
+                {'type': 'tool_result', 'tool_use_id': 'u1', 'content': json.dumps({'valid': False})},
+                {'type': 'tool_result', 'tool_use_id': 'u2', 'content': [{'type': 'text', 'text': json.dumps({'pass': False})}]},
+            ]}},
+            {'type': 'assistant', 'message': {'content': [
+                {'type': 'tool_use', 'id': 'u3', 'name': 'mcp__android_design_preview__check_design', 'input': {}},
+                {'type': 'tool_use', 'id': 'u4', 'name': 'mcp__android_design_preview__check_design', 'input': {}},
+            ]}},
+            {'type': 'user', 'message': {'content': [
+                {'type': 'tool_result', 'tool_use_id': 'u3', 'is_error': True, 'content': 'compile error'},
+                {'type': 'tool_result', 'tool_use_id': 'u4', 'content': json.dumps({'compiled': True, 'pass': True})},
+            ]}},
+            {
+                'type': 'result',
+                'result': 'Proposal checked.',
+                'total_cost_usd': 0.55,
+                'num_turns': 4,
+                'usage': {'input_tokens': 2400, 'output_tokens': 610, 'cache_read_input_tokens': 1000},
+                'modelUsage': {'claude-sonnet-4-5': {'inputTokens': 2400}},
+            },
+        ]
+        ndjson = '\n'.join(json.dumps(e) for e in events) + '\n'
+        with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, ndjson, '')) as call:
+            result = backends.execute('claude', 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY)
+
+        cmd = call.call_args.args[0]
+        self.assertEqual(cmd[cmd.index('--output-format') + 1], 'stream-json')
+        self.assertIn('--verbose', cmd)
+        self.assertEqual(result['check_calls'], 3)
+        self.assertEqual(result['compile_retries'], 2)
+        self.assertEqual(result['model'], 'claude-sonnet-4-5')
+        self.assertEqual(result['cost'], 0.55)
+        self.assertEqual(result['turns'], 4)
+        self.assertEqual(result['input_tokens'], 2400)
+        self.assertEqual(result['output_tokens'], 610)
+        self.assertEqual(result['cache_read_tokens'], 1000)
+
+        with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, json.dumps(events), '')):
+            array_result = backends.execute('claude', 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY)
+        self.assertEqual(array_result['check_calls'], 3)
+        self.assertEqual(array_result['compile_retries'], 2)
+        self.assertEqual(array_result['message'], 'Proposal checked.')
+
+        with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, '{"result":"ok"}', '')) as judge_call:
+            backends.execute('claude', 'judge', Path('/tmp'), role='judge', images=['/tmp/a.png'])
+        judge_cmd = judge_call.call_args.args[0]
+        self.assertEqual(judge_cmd[judge_cmd.index('--output-format') + 1], 'json')
+        self.assertNotIn('--verbose', judge_cmd)

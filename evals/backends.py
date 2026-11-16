@@ -90,6 +90,28 @@ def _extract_text(content):
     return ''
 
 
+def _consume_claude_events(events, stats, pending_tools):
+    reply = None
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        etype = event.get('type')
+        if etype == 'assistant':
+            for block in (event.get('message') or {}).get('content') or []:
+                if isinstance(block, dict) and block.get('type') == 'tool_use':
+                    tid = block.get('id')
+                    if tid:
+                        pending_tools[tid] = block.get('name') or ''
+        elif etype == 'user':
+            for block in (event.get('message') or {}).get('content') or []:
+                if isinstance(block, dict) and block.get('type') == 'tool_result':
+                    tname = pending_tools.get(block.get('tool_use_id'), '')
+                    _record_preview_tool(stats, tname, _extract_text(block.get('content')), bool(block.get('is_error')))
+        elif etype == 'result':
+            reply = event
+    return reply
+
+
 def _parse_claude(stdout, role, model):
     reply = None
     saw_stream = False
@@ -99,7 +121,12 @@ def _parse_claude(stdout, role, model):
         parsed = json.loads(stdout)
         if isinstance(parsed, dict):
             reply = parsed
+            saw_stream = parsed.get('type') == 'result'
+        elif isinstance(parsed, list):
+            saw_stream = True
+            reply = _consume_claude_events(parsed, stats, pending_tools)
     except ValueError:
+        events = []
         for raw in stdout.splitlines():
             line = raw.strip()
             if not line:
@@ -108,23 +135,11 @@ def _parse_claude(stdout, role, model):
                 event = json.loads(line)
             except ValueError:
                 continue
-            if not isinstance(event, dict):
-                continue
+            if isinstance(event, dict):
+                events.append(event)
+        if events:
             saw_stream = True
-            etype = event.get('type')
-            if etype == 'assistant':
-                for block in (event.get('message') or {}).get('content') or []:
-                    if isinstance(block, dict) and block.get('type') == 'tool_use':
-                        tid = block.get('id')
-                        if tid:
-                            pending_tools[tid] = block.get('name') or ''
-            elif etype == 'user':
-                for block in (event.get('message') or {}).get('content') or []:
-                    if isinstance(block, dict) and block.get('type') == 'tool_result':
-                        tname = pending_tools.get(block.get('tool_use_id'), '')
-                        _record_preview_tool(stats, tname, _extract_text(block.get('content')), bool(block.get('is_error')))
-            elif etype == 'result':
-                reply = event
+            reply = _consume_claude_events(events, stats, pending_tools)
     if not isinstance(reply, dict):
         raise RuntimeError('claude returned an invalid response envelope')
     if reply.get('is_error'):
@@ -298,7 +313,11 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
             # temp dir.
             socket = str(Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='adp-', dir='/tmp'))) / 's.sock')
         if backend == 'claude':
-            command = ['claude', '-p', '--output-format', 'json']
+            command = (
+                ['claude', '-p', '--output-format', 'stream-json', '--verbose']
+                if role == 'generator'
+                else ['claude', '-p', '--output-format', 'json']
+            )
             if role == 'generator':
                 config = temporary / 'mcp.json'
                 config.write_text(json.dumps({'mcpServers': {SERVER_NAME: {'command': str(mcp_binary), 'args': [], 'env': {SOCKET_ENV: socket}}}}))
