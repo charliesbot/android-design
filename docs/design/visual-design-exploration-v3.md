@@ -2,6 +2,8 @@
 
 **Date:** 2026-10-30
 
+> **Planned successor:** [Visual design exploration v4](visual-design-exploration-v4.md) specifies the cross-OS plugin and Code-First Kotlin sandbox that will supersede this design once its rollout gate passes.
+
 ## TL;DR
 
 Design exploration moves from HTML proposals to a native macOS previewer app built with Compose Multiplatform. The agent writes a proposal as an A2UI v1.0 file against our own Material 3 Expressive catalog. The app watches that file and draws it with real Compose Material 3 components in a live window, redrawing about 130 ms after a save with no compile step. The agent checks its work from a layout tree it reads over a stdio MCP server, never from screenshots, while the owner judges taste in the live window. Speed and likeness to native Compose are the two goals, and every earlier version traded one for the other.
@@ -268,6 +270,7 @@ v3 replaces the HTML proposal runtime: `@m3e/web`, `gallery/runtime-src/`, `gall
 
 ## Links
 
+- [Visual design exploration v4](visual-design-exploration-v4.md), the planned cross-OS plugin and Code-First Kotlin sandbox
 - [Visual design exploration v2](../archive/visual-design-exploration-v2.md), the HTML design this replaces
 - [Compose Multiplatform proposal fidelity research](../research/compose-multiplatform-proposal-fidelity.md)
 - [A2UI specification v1.0](https://github.com/a2ui-project/a2ui/tree/main/specification/v1_0)
