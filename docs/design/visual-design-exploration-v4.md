@@ -138,7 +138,7 @@ All eight eval cases (`music`, `finance`, `settings`, `trek`, `recipes`, `workou
 | Metric | v3 baseline (`#113`) | v4 `.explore.kt` (Run 1, untuned) | v4 `.explore.kt` (Run 2, tuned) |
 | --- | --- | --- | --- |
 | Cases passed (rubric) | `4/8` (`76/82` items) | `6/8` (`79/82` items) | **`6/8`** (`80/82` items) |
-| Deterministic code checks | `21/21` (`all pass`) | `24/24` (`all pass`) | **`24/24`** (`all pass`) |
+| Deterministic code checks | `21/21` (`all pass`) | `21/21` (`all pass`) | **`21/21`** (`all pass`) |
 | Median compile-fix retries | `0` | `3` | **`0`** (`0, 1, 0, 0, 0, 2, 0, 0`) |
 | Median agent turns | `47` | `51` | **`35`** (`-25.5%`) |
 | Median input tokens | `297,881` | `296,790.5` | **`257,128.5`** (`-13.7%`) |
