@@ -1,5 +1,10 @@
 package bot.charlies.androiddesign.preview.model
 
+import kotlinx.serialization.Serializable
+
+/** A problem found in an exploration file, compiler run, or DESIGN.md. */
+@Serializable data class ValidationError(val path: String, val message: String)
+
 /**
  * The first line of what went wrong, which is enough to point at a failure in a report or on a
  * terminal. A missing or blank message reads as the exception's class name.

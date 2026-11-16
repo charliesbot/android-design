@@ -1,16 +1,13 @@
 package bot.charlies.androiddesign.preview.domain.layout
 
-import bot.charlies.androiddesign.preview.model.Catalog
-import bot.charlies.androiddesign.preview.model.Catalogs
-import bot.charlies.androiddesign.preview.model.ComponentNode
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.M3Component
 import bot.charlies.androiddesign.preview.model.NavigationNodes
-import bot.charlies.androiddesign.preview.model.Proposal
+import bot.charlies.androiddesign.preview.model.SurfaceSpec
+import bot.charlies.androiddesign.preview.model.SurfaceSpecs
 import kotlin.math.roundToInt
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * What an agent needs to see that a view adapts, without the tree: which screens are on show, which
@@ -43,8 +40,10 @@ object LayoutSummary {
    */
   const val MAX_REGIONS = 8
 
-  /** Summarizes an `.explore.kt` [tree] directly from its hierarchy without a JSON proposal. */
-  fun of(tree: LayoutTree, catalog: Catalog = Catalogs.forView(tree.view)): ViewLayout {
+  const val PANE_PREFIX = "@pane/"
+
+  /** Summarizes a rendered [tree] from its hierarchy under [surface]. */
+  fun of(tree: LayoutTree, surface: SurfaceSpec = SurfaceSpecs.forView(tree.view)): ViewLayout {
     val children = tree.nodes.groupBy { it.parent }
     val roots =
       tree.nodes
@@ -62,16 +61,16 @@ object LayoutSummary {
           val paneChildren = groupRoots.flatMap {
             directContentChildren(it, children).ifEmpty { listOf(it) }
           }
-          Pane(paneName, "$PANE_PREFIX$paneName/", groupRoots.minOf { it.bounds.x }, paneChildren)
+          Pane(paneName, "$PANE_PREFIX$paneName/", paneChildren)
         }
       } else {
         val contentNodes = roots.flatMap {
           directContentChildren(it, children).ifEmpty { listOf(it) }
         }
-        listOf(Pane(tree.screen, "", roots.firstOrNull()?.bounds?.x ?: 0f, contentNodes))
+        listOf(Pane(tree.screen, "", contentNodes))
       }
     return ViewLayout(
-      nav = navigation(tree, catalog),
+      nav = navigation(tree, surface),
       panes = paneEntries.associate { it.screen to regions(it) },
     )
   }
@@ -90,52 +89,15 @@ object LayoutSummary {
     } ?: kids
   }
 
-  const val PANE_PREFIX = "@pane/"
-
-  fun of(proposal: Proposal, tree: LayoutTree): ViewLayout {
-    val children = tree.nodes.groupBy { it.parent }
-    val panes =
-      proposal.screens
-        .mapNotNull { (screen, body) ->
-          // The renderer prefixes the ids of every pane but the one that was asked for.
-          val prefix = if (screen == tree.screen) "" else "$screen/"
-          val root = tree.nodes.firstOrNull { it.id == prefix + ComponentNode.ROOT_ID }
-          val content = contentRootOf(body.components)?.let { prefix + it }
-          root?.let {
-            Pane(
-              screen,
-              prefix,
-              it.bounds.x,
-              content?.let(children::get).orEmpty().filter { it.isLaidOut },
-            )
-          }
-        }
-        .sortedBy { it.x }
-    return ViewLayout(
-      nav = navigation(tree, Catalogs.of(proposal)),
-      panes = panes.associate { it.screen to regions(it) },
-    )
-  }
-
   private class Pane(
     val screen: String,
     val prefix: String,
-    /** Where the pane starts, which orders the panes left to right. */
-    val x: Float,
-    /** The children of the screen's content root. */
     val children: List<LayoutNode>,
   )
 
-  /** The id of a scaffold's content, or of the root itself for any other root. */
-  private fun contentRootOf(components: List<ComponentNode>): String? {
-    val root = components.firstOrNull { it.id == ComponentNode.ROOT_ID } ?: return null
-    if (root.component != M3Component.Scaffold.wire) return root.id
-    return (root.props["content"] as? JsonPrimitive)?.takeIf { it.isString }?.content
-  }
-
-  private fun navigation(tree: LayoutTree, catalog: Catalog): String {
+  private fun navigation(tree: LayoutTree, surface: SurfaceSpec): String {
     val shown = tree.nodes.map { it.type }.toSet()
-    return catalog.navigationNames.filter { it in shown }.joinToString("+").ifEmpty { NO_NAV }
+    return surface.navigationNames.filter { it in shown }.joinToString("+").ifEmpty { NO_NAV }
   }
 
   private fun regions(pane: Pane): List<String> {

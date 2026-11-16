@@ -20,7 +20,7 @@ import bot.charlies.androiddesign.preview.feature.preview.theme.parseHexColor
 import bot.charlies.androiddesign.preview.feature.preview.theme.toHex
 import bot.charlies.androiddesign.preview.feature.preview.theme.toPaletteStyle
 import bot.charlies.androiddesign.preview.model.DesignSystem
-import bot.charlies.androiddesign.preview.model.WearCatalog
+import bot.charlies.androiddesign.preview.model.WearSurface
 import com.materialkolor.dynamicColorScheme
 import com.materialkolor.dynamiccolor.ColorSpec
 
@@ -55,13 +55,10 @@ object WearThemeResolver {
     return WearTheme(design, colorScheme(design), typography, families)
   }
 
-  /**
-   * The color scheme [design] resolves to as `#RRGGBB` per role of [WearCatalog.colorRoles]: the
-   * values the previewer draws, which the Kotlin export writes into the exported theme.
-   */
+  /** The color scheme [design] resolves to as `#RRGGBB` per role of [WearSurface.colorRoles]. */
   fun roleColors(design: DesignSystem): Map<String, String> {
     val scheme = colorScheme(design)
-    return WearCatalog.colorRoles.associateWith { role ->
+    return WearSurface.colorRoles.associateWith { role ->
       checkNotNull(scheme.color(role)) { "'$role' is not a Wear color role" }.toHex()
     }
   }
@@ -127,9 +124,9 @@ object WearThemeResolver {
   /** The upstream type scale with the design's per-role overrides on top. */
   private fun typography(design: DesignSystem): Pair<Typography, Map<String, String>> {
     val base = Typography()
-    val families = WearCatalog.typeRoles.keys.associateWith { DEFAULT_FAMILY }.toMutableMap()
+    val families = WearSurface.typeRoles.keys.associateWith { DEFAULT_FAMILY }.toMutableMap()
     val styles = linkedMapOf<String, TextStyle>()
-    for (role in WearCatalog.typeRoles.keys) {
+    for (role in WearSurface.typeRoles.keys) {
       var style = checkNotNull(base.style(role))
       val override = design.typography[role]
       if (override != null) {

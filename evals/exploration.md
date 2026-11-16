@@ -1,6 +1,6 @@
 # Exploration workflow checks
 
-The design evals check one proposal (`design/<slug>.proposal.json` plus `DESIGN.md`) in a prepared fixture. They do not prove the requesting app's isolation or agent routing. Check those separately.
+The design evals check one exploration (`design/<slug>.explore.kt` plus `DESIGN.md`) in a prepared fixture. They do not prove the requesting app's isolation or agent routing. Check those separately.
 
 ## Deterministic checks
 
@@ -10,37 +10,34 @@ From the repository root:
 python3 -m unittest discover scripts
 python3 -m unittest discover evals
 python3 scripts/check_coverage.py
-(cd app && ./gradlew test spotlessCheck)
+(cd app && ./gradlew build spotlessCheck)
+(cd supervisor && npm test && npm pack --dry-run)
 ```
 
-The design evals need macOS and the previewer app installed (`./gradlew :app:installApp` from `app/`, or `ANDROID_DESIGN_PREVIEW` set to its executable). No Node.js, Chrome, or Android SDK.
+Requires Node.js 18+ and Java 17+ (`./gradlew :app:workerJar` builds `app/app/build/libs/android-design-preview.jar`). No Android SDK or Chrome binary is required.
 
-The Gradle tests cover validation, finding rules, the exporter, and the MCP server. The Python tests cover the runner, `report.json` checks, and the agent launchers without model calls.
+The Gradle tests cover source linting, bytecode/classloader sandbox policy, Compose tooling slot extraction, pixel contrast sampling, finding rules, CLI `render`, and the stdio JSON-RPC `worker`. The Node tests cover the MCP supervisor, browser board HTTP origin/token checks, and end-to-end real-JAR MCP execution. The Python tests cover the runner, `report.json` checks, and the agent launchers without model calls.
 
 ## Exploration smoke check
 
-Run in an expendable folder (a Git repository or not). Needs the previewer app and a harness that can register an MCP server; no browser tool and no way to view images are needed.
+Run in an expendable folder (a Git repository or not). Needs Node 18+, Java 17+, and a harness with the `plugin/` installed (or `android_design_preview` registered in MCP config).
 
-1. In the harness, register the app as the stdio server `android_design_preview` with the app's executable as its command. The agent should check that the server is connected before it starts, and tell the user how to register it if not.
-2. Have the agent author `<fixture-folder>/design/<slug>.proposal.json` and `DESIGN.md` with its own seed color, then call `open_proposal`. Then ask for two more ideas: expect two distinct proposals as new sibling files, each with its own seed, and at least one of the three layering three or more tactics and naming them.
-3. Have the agent call `check_proposal` for each proposal (every screen at all five views in one call), fix every error once, and call it again until it passes or the remaining errors are reported. Then it confirms the adaptation from each view's `layout` summary, calling `get_tree` only where a summary is not enough. With no way to view the window, the agent must report visual quality unverified.
-4. Look at the window. Switch devices with the Phone, Foldable, Tablet, and Desktop buttons, and pick a brightness (Light or Dark), a Color row (the proposal's seed or one of six presets), or a Style row in the side panel; the proposal and the viewer recolor in place and nothing is written to the proposal file.
-5. Invalid proposal: in a copy, use an unknown component, a raw hex color, or a `navigate` to a missing screen. `open_proposal` must return the validation error with its path, the window must show the errors in place of the frame, and `<app> render` must exit 2 and list the same errors in `report.json`.
-6. Show the user the window (or `show_preview`) and the proposal path, then stop. On a chat reply ("make it warmer"), edit the same proposal file in place: the window redraws and no version copies are kept.
-7. Approval is the user saying so in chat. The agent reports the approved proposal, its path, and `export_kotlin` (or `<app> export`) as the way to port it. For an explore-only request it does not implement. Production app files must be unchanged.
-8. Hidden window: close the window and call `get_tree` again. It must answer from the headless renderer, and `show_preview` must bring the window back.
-
-The workflow never invokes an agent for the user, and it implements an approved proposal only when the original request was to build.
+1. Start an interactive session: check that `android_design_preview` (`check_design` and `get_tree`) is available in MCP tools. When unavailable, the agent reports the missing server and registration instructions from `plugin/mcp_config.json` rather than falling back to HTML or raw CLI loops.
+2. Have the agent author `<fixture-folder>/design/<slug>.explore.kt` and `DESIGN.md` with its own seed color using verified signatures from `plugin/skills/android-design-explore/references/compose-signatures.md`. Ask for three ideas in one exploration: expect three `direction(...)` blocks inside `<slug>.explore.kt` or cleanly distinct directions, each compiled and verified with `check_design`.
+3. Confirm `check_design` compiles in memory, checks all five phone views (`light`, `dark`, `foldable`, `tablet`, `desktop`) in one call, returns primary screenshots once error findings reach zero, and starts the localhost browser board (`http://127.0.0.1:<port>/?token=<secret>`). Verify `get_tree` returns geometry and `<file>:<line>` source locations where inspection is needed.
+4. Open the browser board link: switch devices, brightness, seed color, palette variant, screen, and overlays (re-renders warmly in ~40 ms without recompiling), hover/click the click-to-source SVG overlay to copy `<file>:<line>`, and edit the `.explore.kt` file directly to verify SSE live reload.
+5. Invalid exploration: introduce a compile error, raw `Color(...)` hex literal, or disallowed `java.io.File` reference. `check_design` must return validation/compiler/security errors without writing production files, and `<supervisor> render <file.explore.kt> --out <dir>` must exit 2 with the same errors in `report.json`.
+6. Approving a direction reports the chosen direction name, `.explore.kt` file path, and next steps from `plugin/skills/android-design-explore/references/porting.md`. For an explore-only request it does not modify production app files.
 
 ## Agent routing checks
 
-- "Explore a home screen idea." Expect one proposal, not several. "Show me three home-screen ideas." Expect three proposals, each its own `design/<slug>.proposal.json` in the chosen folder, each with its `check_proposal` errors fixed once and any remainder reported, and each opened in the window for the owner. Outside a repository it still works; it never scaffolds a new app.
-- "Build a music theory app with the android-design skill." Expect one proposal shown in the window and a wait for approval before any Compose, then the export after the user approves.
-- "Build a habit tracker app in Compose." (no design ask) Expect no proposal: the agent codes directly, applying `android-design`'s decisions and screen check.
-- "Explore a redesign of Today." Expect read-only inspection of app code and dependencies, with writes only to the proposal and `DESIGN.md`.
-- "Make it warmer." Expect one revision that edits the same proposal file, with no version copies.
-- After an explore-only request, approving a design in chat must end exploration, not start implementation. After a design-focused build request, approval continues to the export. Either way, "Implement the approved design" transitions to the requesting project's workflow, exports the proposal with `export_kotlin`, preserves its library versions, and compares the rendered Compose result with the approved proposal.
-- "Explore a Wear timer app." Expect a Wear proposal in its own file (`design/<slug>-wear.proposal.json`), every screen using the Wear catalog id, checked at the `watch` and `watch-large` views, with one screen element marked `primary` (usually the edge button). A port starts from `export_kotlin`, and the run skips the phone views and size classes. A Wear tile or widget request gets the skill saying those are outside this workflow.
-- App not connected. Expect the agent to say the `android_design_preview` server is missing and how to register it, not to fall back to writing HTML.
+- "Explore a home screen idea." Expect one `.explore.kt` file with one `direction(...)`. "Show me three home-screen ideas." Expect one `.explore.kt` file holding multiple `direction(...)` alternatives checked together and shown side by side on the browser board. Outside a repository it still works; it never scaffolds a new app.
+- "Build a music theory app with the android-design skill." Expect one exploration shown on the browser board and a wait for approval before copying/wiring composables into app modules per `porting.md`.
+- "Build a habit tracker app in Compose." (no design ask) Expect no `.explore.kt` file: the agent codes directly, applying `android-design`'s decisions and screen check.
+- "Explore a redesign of Today." Expect read-only inspection of app code and dependencies, with writes only to `design/<slug>.explore.kt` and `DESIGN.md`.
+- "Make it warmer." Expect one in-place edit to the active `.explore.kt` (or `DESIGN.md`), with no duplicate version files (`-v2.explore.kt`).
+- After an explore-only request, approving a design in chat must end exploration, not start implementation. Either way, "Implement the approved design" follows `porting.md`: copies approved `@Composable` screens into the app, replaces `SymbolIcon`, `designPainter`, `bundledFontFamily`, and kit helpers with real app resources/Navigation 3, and verifies live previews via `kakao/prevue` or `compose-preview`.
+- "Explore a Wear timer app." Expect a `wearBoard` file (`design/<slug>-wear.explore.kt`) checked at `watch` and `watch-large` with one CTA tagged `Modifier.testTag("ad:primary")`, skipping phone views and size classes. A Wear tile or widget request gets the skill saying those are outside this workflow.
+- Server not connected. Expect the agent to say the `android_design_preview` server is missing and how to register it, not to fall back to writing HTML.
 
 Run the design evals (`evals/README.md`) after changing skill instructions. Model-based checks send prompts, source context, and screenshots through the configured agent service; obtain the required execution permission before running them.

@@ -32,17 +32,16 @@ import bot.charlies.androiddesign.preview.kit.ExplorePaneKey
 import bot.charlies.androiddesign.preview.model.A11yInfo
 import bot.charlies.androiddesign.preview.model.Axis
 import bot.charlies.androiddesign.preview.model.Bounds
-import bot.charlies.androiddesign.preview.model.Catalog
-import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.CornerClip
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.M3Component
-import bot.charlies.androiddesign.preview.model.NavigationNodes
 import bot.charlies.androiddesign.preview.model.NodeColors
 import bot.charlies.androiddesign.preview.model.NodeRoles
 import bot.charlies.androiddesign.preview.model.NodeWeight
 import bot.charlies.androiddesign.preview.model.RingInset
+import bot.charlies.androiddesign.preview.model.SurfaceSpec
+import bot.charlies.androiddesign.preview.model.SurfaceSpecs
 import bot.charlies.androiddesign.preview.model.TextInfo
 import bot.charlies.androiddesign.preview.model.TypeRole
 import bot.charlies.androiddesign.preview.model.ViewSpec
@@ -335,7 +334,7 @@ internal object SlotTreeExtractor {
       idByLayout[layout] = unique
     }
 
-    val catalog = Catalogs.forView(view)
+    val surfaceSpec = SurfaceSpecs.forView(view)
     val rootWindowPos =
       rootCoordinates?.takeIf { it.isAttached }?.localToWindow(Offset.Zero) ?: Offset.Zero
     val layoutNodes = orderedLayouts.mapNotNull { layout ->
@@ -350,7 +349,7 @@ internal object SlotTreeExtractor {
         rootCoordinates = rootCoordinates,
         rootWindowPos = rootWindowPos,
         bitmap = bitmap,
-        catalog = catalog,
+        surfaceSpec = surfaceSpec,
         surface = surface,
         view = view,
         density = density,
@@ -360,7 +359,11 @@ internal object SlotTreeExtractor {
     val rawTree =
       LayoutTree(screen = screen, view = view, nodes = layoutNodes, findings = emptyList())
     val findings =
-      FindingRules.evaluate(rawTree, catalog = catalog, emptyDetailLists = emptyDetailLists)
+      FindingRules.evaluate(
+        rawTree,
+        surface = surfaceSpec,
+        emptyDetailLists = emptyDetailLists,
+      )
     return rawTree.copy(findings = findings)
   }
 
@@ -489,7 +492,7 @@ internal object SlotTreeExtractor {
     rootCoordinates: LayoutCoordinates?,
     rootWindowPos: Offset,
     bitmap: Bitmap?,
-    catalog: Catalog,
+    surfaceSpec: SurfaceSpec,
     surface: BoardSurface,
     view: ViewSpec,
     density: Float,
@@ -516,10 +519,8 @@ internal object SlotTreeExtractor {
     val ownedSemantics = collectOwnedSemantics(layout, claimed, semanticsByLayout)
     val mergedNode =
       mergedByLayout[layout] ?: directSemantics.firstOrNull() ?: ownedSemantics.firstOrNull()
-    val isInteractiveType =
-      catalog.find(site.mappedType)?.interactive == true ||
-        site.mappedType in NavigationNodes.itemTypes
-    val interactive = isInteractive(site.mappedType, catalog, directSemantics)
+    val isInteractiveType = site.mappedType in surfaceSpec.interactiveTypes
+    val interactive = isInteractive(site.mappedType, surfaceSpec, directSemantics)
     val primary =
       (isInteractiveType || directSemantics.any { it.config.contains(SemanticsActions.OnClick) }) &&
         (directSemantics + if (isInteractiveType) ownedSemantics else emptyList()).any {
@@ -561,8 +562,8 @@ internal object SlotTreeExtractor {
         ownedSemantics = ownedSemantics,
         rootWindowPos = rootWindowPos,
         bitmap = bitmap,
+        surfaceSpec = surfaceSpec,
         surface = surface,
-        catalog = catalog,
         layout = layout,
         claimed = claimed,
         semanticsByLayout = semanticsByLayout,
@@ -677,8 +678,8 @@ internal object SlotTreeExtractor {
     ownedSemantics: List<SemanticsNode>,
     rootWindowPos: Offset,
     bitmap: Bitmap?,
+    surfaceSpec: SurfaceSpec,
     surface: BoardSurface,
-    catalog: Catalog,
     layout: LayoutInfo,
     claimed: IdentityHashMap<LayoutInfo, CallSite>,
     semanticsByLayout: IdentityHashMap<LayoutInfo, MutableList<SemanticsNode>>,
@@ -691,7 +692,7 @@ internal object SlotTreeExtractor {
     // First look in directly owned semantics, then include internal child Text layouts for label
     // controls (e.g. Button/Tab).
     val candidates =
-      if (isLabelControl(type, catalog)) {
+      if (isLabelControl(type, surfaceSpec)) {
         val all = ArrayList(ownedSemantics)
         for ((childLayout, semNodes) in semanticsByLayout) {
           if (
@@ -776,7 +777,7 @@ internal object SlotTreeExtractor {
             lineRectsPx = entry.rectsPx,
             excludeRectsPx = allLineRectsPx,
           ) ?: continue
-        val margin = sample.ratio - Contrast.requiredRatio(catalog, entry.role)
+        val margin = sample.ratio - Contrast.requiredRatio(surfaceSpec, entry.role)
         if (margin < worstMargin) {
           worstMargin = margin
           worstEntry = entry
@@ -818,17 +819,15 @@ internal object SlotTreeExtractor {
     return !res.layoutInput.softWrap && res.multiParagraph.maxIntrinsicWidth > maxWidthPx
   }
 
-  private fun isLabelControl(type: String, catalog: Catalog): Boolean =
-    type in NavigationNodes.itemTypes ||
-      catalog.find(type)?.let { it.interactive && it.prop("label") != null } == true
+  private fun isLabelControl(type: String, surfaceSpec: SurfaceSpec): Boolean =
+    type in surfaceSpec.labelTypes
 
   private fun isInteractive(
     type: String,
-    catalog: Catalog,
+    surfaceSpec: SurfaceSpec,
     semantics: List<SemanticsNode>,
   ): Boolean =
-    type in NavigationNodes.itemTypes ||
-      catalog.find(type)?.interactive == true ||
+    type in surfaceSpec.interactiveTypes ||
       semantics.any {
         it.config.contains(SemanticsActions.OnClick) ||
           it.config.contains(SemanticsProperties.ToggleableState)

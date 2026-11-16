@@ -4,13 +4,13 @@
 
 ## TL;DR
 
-Visual design exploration replaces the macOS Swing app and `.dmg` installer with a cross-platform plugin under `plugin/`, a ~25 KB Node `npx` MCP supervisor (zero idle JVM memory), a supervised headless Skiko JVM worker (`skiko-awt-runtime-all`), and a localhost HTML and SVG browser board. Inside that runtime, v4 introduces a **Code-First Compose Kotlin Sandbox** alongside v3's JSON pipeline: agents write real `@Composable` screens in `design/<slug>.explore.kt`, compiled in memory by `K2JVMCompiler` behind a bytecode/classloader allowlist and checked across five views in **328 to 460 ms warm**. Once the `.kt` sandbox passes a side-by-side 8-case agent A/B benchmark against v3 (matching or beating 6/8 rubric quality at >= 30% lower median wall time), v3's ~15,000 lines of A2UI JSON catalog, interpreter, schemas, and Kotlin exporter are removed; if compile retries eat the speed gain, the new outer runtime ships around the existing JSON interpreter instead.
+Visual design exploration replaces the macOS Swing app, `.dmg` installer, and A2UI JSON pipeline with a cross-platform plugin under `plugin/`, a ~25 KB Node `npx` MCP supervisor (zero idle JVM memory), a supervised headless Skiko JVM worker (`skiko-awt-runtime-all`), and a localhost HTML and SVG browser board. Agents write real `@Composable` screens directly in `design/<slug>.explore.kt`, compiled in memory by `K2JVMCompiler` behind a bytecode and classloader allowlist and checked across five views in **328 to 460 ms warm**. Following the 8-case agent A/B rollout benchmark, v3's superseded Swing window, JSON catalog, schemas, and `export/` package have been removed.
 
 ## Design
 
 ### Why v4
 
-v3 ([visual-design-exploration-v3.md](visual-design-exploration-v3.md)) proved that previewing with real Compose Material 3 and upstream Wear Compose hits the fidelity bar. Three structural problems remained:
+v3 ([visual-design-exploration-v3.md](../archive/visual-design-exploration-v3.md)) proved that previewing with real Compose Material 3 and upstream Wear Compose hits the fidelity bar. Three structural problems remained:
 
 1. **A closed JSON catalog limits brainstorming and taxes maintenance.** A2UI JSON restricts designs to 40 pre-wired component slots, blocking custom `Canvas` graphics, editorial overlaps, and bespoke `RoundedPolygon` compositions. Maintaining that intermediate language requires `Catalog.kt` and `WearCatalog.kt` (2,280 lines), 25+ interpreter files, JSON schemas, `export/` (8,071 lines), and a 71 KB `compose-mapping.md`, all updated whenever Material 3 changes.
 2. **Generation is slow (~160 s median) because of dual-language model overhead.** In v3's timed trace, MCP tools took 2.5 s while 157.5 s was the model reading ~120 KB of Kotlin plus JSON documentation, reasoning in an unfamiliar flat ID-pointer JSON dialect across 17 to 36 turns ([script-ban-eval.md](script-ban-eval.md)), and making sequential `status`, `get_catalog`, `open_proposal`, `check_proposal`, and `render_view` calls.
@@ -131,13 +131,26 @@ Distributable files live under `plugin/` (`plugin/skills/`, Antigravity `plugin.
 
 Approving a direction needs no code generator (`export/` is gone), though porting still wires the screen into the app: the agent copies the approved `@Composable` screen functions into the target project's module layout, removes `testTag("ad:primary")` if undesired, connects them to the app's theme, ViewModel state, and Navigation 3 routes, and verifies the live screens with `kakao/prevue` on macOS or `compose-preview` elsewhere.
 
-## Open questions
+## Rollout gate results
 
-- **Agent-run 8-case A/B gate (gates deleting v3's JSON pipeline):** Warm compile plus 5-view render latency (`328 to 460 ms`), `@ComposeToolingApi` slot extraction, and 2 px perimeter contrast sampling are verified; end-to-end LLM authoring behavior across the 8 eval briefs (`music`, `finance`, `settings`, `trek`, `recipes`, `workout`, `player`, `reminder`) is not yet measured. Removing v3's ~15,000 lines of JSON catalog, interpreter, schemas, and exporter requires: (1) rubric pass rate >= 6/8 ([script-ban-eval.md](script-ban-eval.md)), (2) median generation wall time >= 30% faster than the v3 JSON baseline, and (3) median compile-fix retries <= 1 per case. If beta API compile retries offset the speed gain, the outer `plugin/`, Node supervisor, headless worker, and browser board ship around v3's JSON interpreter instead.
+All eight eval cases (`music`, `finance`, `settings`, `trek`, `recipes`, `workout`, `player`, `reminder`) ran head-to-head in `evals/run.py` using Antigravity (`Gemini 3.8 Flash (High)`) against `#113`'s v3 JSON baseline:
+
+| Metric | v3 baseline (`#113`) | v4 `.explore.kt` (Run 1, untuned) | v4 `.explore.kt` (Run 2, tuned) |
+| --- | --- | --- | --- |
+| Cases passed (rubric) | `4/8` (`77/82` items) | `6/8` (`80/82` items) | **`6/8`** (`80/82` items) |
+| Deterministic code checks | `21/21` (`all pass`) | `21/21` (`all pass`) | **`21/21`** (`all pass`) |
+| Median compile-fix retries | `0` | `3` | **`0`** (`0, 1, 0, 0, 0, 2, 0, 0`) |
+| Median agent turns | `47` | `51` | **`35`** (`-25.5%`) |
+| Median input tokens | `297,881` | `296,790.5` | **`257,128.5`** (`-13.7%`) |
+| Median output tokens | `50,962` | `72,645.5` | `67,142` |
+| Median check calls | `5.5` | `13` | `5.5` |
+| Median wall time | `272.6 s` | `326.1 s` | `317.2 s` (`3/5` phone briefs faster than v3) |
+
+After fixing synthetic `$WhenMappings` `NoSuchFieldError` allowlisting in `SandboxPolicy`, documenting `DESIGN.md` front matter, and keeping responsive layouts parameterized inside a single screen body (~275 lines median in Run 2 vs ~900 to 1,430 lines in Run 1), Run 2 cleared the rubric (`6/8` vs `4/8`) and compile-retry (`0` median) gates while cutting turns by `25.5%` and input tokens by `13.7%`. Higher thinking-token volume on Wear kept overall median wall time at `317.2 s` vs v3's `272.6 s` (though `finance`, `settings`, and `recipes` were all faster than v3); given the `+2/8` rubric gain, `0` median compile retries, and removal of the separate Kotlin export pipeline, the owner waived the wall-time threshold and retired the superseded v3 pipeline.
 
 ## Links
 
-- [Visual design exploration v3](visual-design-exploration-v3.md): the JSON-interpreted macOS previewer architecture kept alongside v4 until the 8-case agent A/B gate passes
-- [Wear OS in the previewer](wear-os-previewer.md): the upstream `androidx.wear.compose` desktop port reused unchanged on the worker classpath
+- [Visual design exploration v3](../archive/visual-design-exploration-v3.md): archived JSON-interpreted macOS previewer design superseded by v4
+- [Wear OS in the previewer](wear-os-previewer.md): the upstream `androidx.wear.compose` desktop port reused on the worker classpath
 - [Script ban eval baseline](script-ban-eval.md): the 8-case v3 baseline (17 to 36 turns, 6/8 rubric) and why `claude -p` generators use MCP rather than `Bash`
 - [`kakao/prevue`](https://github.com/kakao/prevue): browser-based `@Preview` hot-swap tool used on macOS when wiring approved screens into an Android app

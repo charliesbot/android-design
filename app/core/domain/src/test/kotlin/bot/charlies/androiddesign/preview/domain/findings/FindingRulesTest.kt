@@ -11,7 +11,8 @@ import bot.charlies.androiddesign.preview.model.RingInset
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
-import bot.charlies.androiddesign.preview.model.WearCatalog
+import bot.charlies.androiddesign.preview.model.WearComponent
+import bot.charlies.androiddesign.preview.model.WearSurface
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -1183,10 +1184,11 @@ class FindingRulesTest {
       emptyList(),
       evaluate(tree(Views.Watch, edge, ring, clock)).of(FindingRule.RoundEdgeClipped),
     )
-    WearCatalog.roundEdgeNames
+    val wearNames = WearComponent.entries.map { it.wire }.toSet()
+    WearSurface.roundEdgeNames
       .filter { it != "TimeText" }
       .forEach {
-        assertTrue(WearCatalog.find(it) != null, it)
+        assertTrue(it in wearNames, it)
       }
   }
 

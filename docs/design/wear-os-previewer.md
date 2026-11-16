@@ -2,6 +2,8 @@
 
 **Date:** 2026-11-04
 
+> **v4 status:** The `:wear:compose` upstream desktop port documented below now runs inside [Visual design exploration v4](visual-design-exploration-v4.md) via `wearBoard` in `.explore.kt`. The v3 JSON catalog (`WearCatalog`) and `WearExporter` were retired once v4 passed its rollout gate.
+
 ## TL;DR
 
 The previewer draws Wear OS proposals with Google's real Wear Compose components. Wear Compose ships only as Android libraries, so the app compiles Google's own source code for Compose Multiplatform desktop, with small stand-ins (shims) for the Android-only parts. Upstream stays byte-identical to Google's release, so an upgrade replaces it wholesale with a script. A second catalog, two round watch views and a Wear theme sit on top, and every existing path (live window, headless renders, `check_proposal`, `get_tree`) handles both surfaces. `app/wear/README.md` is the operational reference: every shim, every excluded file, and the known fidelity gaps.
@@ -10,7 +12,7 @@ Kotlin export for Wear proposals is described under Kotlin export below.
 
 ## Why port the source
 
-The goal is the same as the phone previewer's (`visual-design-exploration-v3.md`): the real component, live, with no compile step during iteration. Wear Compose (`androidx.wear.compose`) is published only as Android AARs, with no desktop variant, so it cannot be a normal dependency of a macOS app.
+The goal is the same as the phone previewer's ([visual-design-exploration-v3.md](../archive/visual-design-exploration-v3.md)): the real component, live, with no compile step during iteration. Wear Compose (`androidx.wear.compose`) is published only as Android AARs, with no desktop variant, so it cannot be a normal dependency of a macOS app.
 
 A spike on 2026-11-04 measured the source of 1.8.0-alpha03: about 86% of its files are plain Compose, and the rest touch Android in a few known ways (context and settings, curved text drawn with `android.graphics`, haptics, dialogs' window). Every Compose API it uses exists on desktop except about a dozen platform ones. Its dependency versions matched the app's Compose Multiplatform 1.13.0-beta01. The spike's render matched a render of the same code on real Android (Robolectric) apart from the typeface.
 
@@ -70,5 +72,6 @@ Because upstream stays byte-identical, an upgrade replaces it wholesale with `sc
 ## Links
 
 - `app/wear/README.md`: shims, exclusions, typography, dialogs, fidelity gaps.
-- `docs/design/visual-design-exploration-v3.md`: the previewer this extends.
-- `docs/research/material-3-wear-os.md` and `skills/android-design/references/wear-os.md`: the Wear design guidance.
+- `docs/design/visual-design-exploration-v4.md`: current exploration runtime hosting `:wear:compose`.
+- `docs/archive/visual-design-exploration-v3.md`: historical v3 previewer design.
+- `docs/research/material-3-wear-os.md` and `plugin/skills/android-design/references/wear-os.md`: the Wear design guidance.

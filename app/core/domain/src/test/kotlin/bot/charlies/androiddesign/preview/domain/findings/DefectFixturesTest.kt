@@ -10,15 +10,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Seeded defects as synthetic layout trees, ported from the HTML version's defect fixtures (since
- * removed). Each test is named after its defect. The base screen is a headline, supporting text, a
- * small primary button, and either a floating toolbar (compact) or a navigation rail (expanded).
- * Every defect must fail exactly the rule it seeds, and every control must pass.
- *
- * Fixtures that cannot happen in v3 are listed in the report, not here: lint-only defects (raw hex,
- * inline style, font size outside a voice, unknown icon, expressive palette), HTML overlap and
- * scroller geometry, mid-word breaks, CSS line-height clipping, a modal open on load, a native
- * button, and the HTML navigation drawer.
+ * Seeded defects as synthetic layout trees. Each test is named after its defect. The base screen is
+ * a headline, supporting text, a small primary button, and either a floating toolbar (compact) or a
+ * navigation rail (expanded). Every defect must fail exactly the rule it seeds, and every control
+ * must pass.
  */
 class DefectFixturesTest {
   private val surface = "#FEF7FF"

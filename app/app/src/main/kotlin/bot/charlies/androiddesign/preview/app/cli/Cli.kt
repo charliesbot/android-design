@@ -3,7 +3,7 @@ package bot.charlies.androiddesign.preview.app.cli
 import bot.charlies.androiddesign.preview.app.AppInfo
 import java.io.PrintStream
 
-/** Exit codes of the command line. 0 is success; 1 means findings failed; 2 an invalid proposal. */
+/** Exit codes of the command line. 0 is success; 1 means findings failed; 2 an invalid file. */
 object ExitCode {
   const val OK = 0
   const val FINDINGS_FAILED = 1
@@ -13,7 +13,7 @@ object ExitCode {
   const val USAGE = 64
 }
 
-/** A subcommand such as `render`. */
+/** A subcommand such as `render` or `worker`. */
 interface Command {
   val name: String
   val usage: String
@@ -59,12 +59,9 @@ fun parseArgs(args: List<String>, flags: Set<String>, err: PrintStream): ParsedA
   return ParsedArgs(positional, values)
 }
 
-/**
- * Dispatches the first argument to its [Command]. Running with no arguments starts the app (see
- * `Main.kt`), so it never reaches here; if it does, it prints the usage.
- */
+/** Dispatches the first argument to its headless [Command]. */
 object Cli {
-  private val commands: List<Command> = listOf(RenderCommand(), ExportCommand, WorkerCommand())
+  private val commands: List<Command> = listOf(RenderCommand(), WorkerCommand())
 
   fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
     val first = args.firstOrNull()

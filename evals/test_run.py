@@ -9,6 +9,7 @@ import judge
 import run
 
 BINARY = '/Apps/AndroidDesignPreview'
+JAR = '/Apps/android-design-preview.jar'
 VIEWS = ('light', 'dark', 'foldable', 'tablet', 'desktop')
 
 
@@ -16,8 +17,8 @@ def fake_case(directory):
     """A case directory shaped like prepare() leaves it, without running git."""
     design = directory / 'design'
     design.mkdir(parents=True)
-    proposal = design / 'proposal.proposal.json'
-    proposal.write_text('{"format": 1}')
+    proposal = design / 'proposal.explore.kt'
+    proposal.write_text('val preview = designBoard { screen("main") {} }\n')
     (directory / 'case.json').write_text(json.dumps({'proposal': str(proposal), 'title': 'music'}))
     return proposal
 
@@ -68,7 +69,7 @@ class PrepareTest(unittest.TestCase):
             self.assertEqual(len(log.stdout.strip().splitlines()), 1)
             self.assertTrue((directory / 'skills/android-design/SKILL.md').is_file())
             self.assertTrue((directory / 'skills/android-design-explore/SKILL.md').is_file())
-            self.assertEqual(proposal, directory / 'design/proposal.proposal.json')
+            self.assertEqual(proposal, directory / 'design/proposal.explore.kt')
             self.assertTrue((directory / 'design/assets/album_art.jpg').is_file())
             self.assertEqual(sorted(p.name for p in (directory / 'design').iterdir()), ['assets'])
             self.assertFalse((directory / 'DESIGN.md').exists())
@@ -87,6 +88,7 @@ class PrepareTest(unittest.TestCase):
             self.assertIn(str(directory / 'DESIGN.md'), text)
             self.assertIn(str(directory / 'skills/android-design'), text)
             self.assertIn(str(directory / 'skills/android-design-explore'), text)
+            self.assertIn('check_design', text)
             self.assertIn(case['prompt'], text)
             self.assertNotIn('{{', text)
 
@@ -132,12 +134,14 @@ class PrepareTest(unittest.TestCase):
                 text = run.prompt_for(case, directory)
             self.assertNotIn('{{', text)
             if case['surface'] == 'wear':
+                self.assertIn('design/proposal-wear.explore.kt', text)
                 self.assertIn('204x204', text)
                 self.assertIn('227x227', text)
                 self.assertIn('both watch views', text)
                 for phone in ('411x923', '1920x1080', 'foldable', 'five views'):
                     self.assertNotIn(phone, text)
             else:
+                self.assertIn('design/proposal.explore.kt', text)
                 self.assertIn('411x923', text)
                 self.assertIn('all five views', text)
                 self.assertNotIn('227x227', text)
@@ -198,6 +202,7 @@ class ArtifactPipelineTests(unittest.TestCase):
                 return fake_render(directory, screens=('plates', 'detail'))(command, **kwargs)
 
             with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
+                    mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
                     mock.patch.object(run.subprocess, 'run', side_effect=fake_run):
                 images, error = run.render(directory)
             self.assertIsNone(error)
@@ -212,6 +217,7 @@ class ArtifactPipelineTests(unittest.TestCase):
             fake_case(directory)
             (directory / 'DESIGN.md').write_text('---\nversion: alpha\n---\n')
             with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
+                    mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
                     mock.patch.object(run.subprocess, 'run', side_effect=fake_render(directory)) as call:
                 run.render(directory)
             command = call.call_args.args[0]
@@ -225,6 +231,7 @@ class ArtifactPipelineTests(unittest.TestCase):
             stale = directory / 'renders/old.png'
             stale.write_bytes(b'old')
             with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
+                    mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
                     mock.patch.object(run.subprocess, 'run', side_effect=fake_render(directory, views=('dark',))):
                 images, error = run.render(directory)
             self.assertFalse(stale.exists())
@@ -240,6 +247,7 @@ class ArtifactPipelineTests(unittest.TestCase):
                 return subprocess.CompletedProcess(command, 2, '', 'invalid')
 
             with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
+                    mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
                     mock.patch.object(run.subprocess, 'run', side_effect=invalid):
                 images, error = run.render(directory)
             self.assertEqual(images, [])
@@ -252,6 +260,7 @@ class ArtifactPipelineTests(unittest.TestCase):
             fake_case(directory)
             crashed = subprocess.CompletedProcess([], 1, '', 'JVM crashed')
             with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
+                    mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
                     mock.patch.object(run.subprocess, 'run', return_value=crashed):
                 images, error = run.render(directory)
             self.assertEqual(images, [])
@@ -261,8 +270,8 @@ class ArtifactPipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             fake_case(directory)
-            hint = RuntimeError('Run `./gradlew :app:installApp`')
-            with mock.patch.object(run, 'app_binary', side_effect=hint), self.assertRaisesRegex(RuntimeError, 'installApp'):
+            hint = RuntimeError('The preview supervisor is missing')
+            with mock.patch.object(run, 'app_binary', side_effect=hint), self.assertRaisesRegex(RuntimeError, 'supervisor'):
                 run.render(directory)
 
     def test_generation_hands_the_app_to_the_agent_over_mcp(self):
@@ -271,9 +280,11 @@ class ArtifactPipelineTests(unittest.TestCase):
             (directory / 'prompt.md').write_text('brief')
             reply = {'message': 'done'}
             with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
+                    mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
                     mock.patch.object(run, 'execute', return_value=reply) as agent:
                 run.generate(directory, 'claude')
             self.assertEqual(agent.call_args.kwargs['mcp_binary'], Path(BINARY))
+            self.assertEqual(agent.call_args.kwargs['mcp_jar'], Path(JAR))
             self.assertEqual(agent.call_args.kwargs['role'], 'generator')
 
     def test_missing_judge_is_pending_not_passed(self):
@@ -325,7 +336,7 @@ class ArtifactPipelineTests(unittest.TestCase):
             self.assertNotIn('C-valid', request['item_ids'])
             self.assertNotIn('.tree.json', request['prompt'])
             hashed = set(request['artifacts'])
-            self.assertIn('design/proposal.proposal.json', hashed)
+            self.assertIn('design/proposal.explore.kt', hashed)
             self.assertIn('DESIGN.md', hashed)
             self.assertIn('renders/player-desktop.png', hashed)
             self.assertFalse(any(k.endswith('.tree.json') for k in hashed))
@@ -443,6 +454,7 @@ class ArtifactPipelineTests(unittest.TestCase):
             (out / 'rubric.md').write_text('Rubric')
             images = write_report(directory)
             with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
+                    mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
                     mock.patch.object(run, 'execute', return_value=reply):
                 run.generate(directory, 'agy')
             metrics = json.loads((directory / 'generator-metrics.json').read_text())

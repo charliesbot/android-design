@@ -19,21 +19,5 @@ dependencies {
   implementation(libs.kotlin.compiler.embeddable)
   implementation(libs.kotlin.compose.compiler.embeddable)
   implementation(libs.jetbrains.annotations)
-}
-
-dependencies { testImplementation(kotlin("test")) }
-
-tasks.test {
-  // Tests share the fixtures of :core:data.
-  systemProperty(
-    "fixtures.dir",
-    project(":core:data")
-      .layout
-      .projectDirectory
-      .dir("src/test/resources/fixtures")
-      .asFile
-      .absolutePath,
-  )
-  // The verify proposal lives in the repository's evals folder, above this standalone build.
-  systemProperty("repo.dir", rootProject.layout.projectDirectory.asFile.parentFile.absolutePath)
+  testImplementation(kotlin("test"))
 }

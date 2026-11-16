@@ -19,5 +19,4 @@ file is the official variable font, saved without the axis list in its name. Its
 `10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7`:
 https://github.com/google/material-design-icons/blob/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/LICENSE
 
-The six text faces are identical to the copies in `evals/compose-starter/`, and
-`scripts/test_font_copies.py` fails when they drift, so update both together.
+`scripts/test_font_copies.py` verifies all seven bundled font files and their license files here.

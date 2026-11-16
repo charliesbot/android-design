@@ -2,28 +2,20 @@ package bot.charlies.androiddesign.preview.domain
 
 import bot.charlies.androiddesign.preview.domain.layout.LayoutSummary
 import bot.charlies.androiddesign.preview.domain.layout.ViewLayout
-import bot.charlies.androiddesign.preview.model.Catalog
-import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.LayoutTree
-import bot.charlies.androiddesign.preview.model.Proposal
 import bot.charlies.androiddesign.preview.model.Severity
+import bot.charlies.androiddesign.preview.model.SurfaceSpec
+import bot.charlies.androiddesign.preview.model.SurfaceSpecs
 import bot.charlies.androiddesign.preview.model.firstLine
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * One screen at one view. [errors] fail the view; [notes] are the info findings, which do not. A
- * note is a finding to look at, not a failure, so a view with notes still passes. [layout] says
- * what the view shows, so adaptation can be compared across views without reading a tree; a render
- * that threw has none.
+ * One screen at one view. [errors] fail the view; [notes] are info findings, which do not. [layout]
+ * says what the view shows, so adaptation can be compared across views without reading a tree.
  *
- * This is the one verdict on a view: `check_proposal` returns it and the `render` command's report
- * is flattened from it, so both fail the same views for the same reasons.
- *
- * `check_proposal` writes a view whose verdict equals an earlier view's of the same screen as just
- * [same], the name of that view ([collapse]). Such an entry has no verdict of its own: [same] is
- * its only content, and [pass] says so rather than guess. [same] cannot be set by any other
- * constructor, so a value cannot claim to repeat a view and also carry a verdict.
+ * [collapse] writes a view whose verdict equals an earlier view's of the same screen as [same], the
+ * name of that view.
  */
 @Serializable
 @ConsistentCopyVisibility
@@ -62,15 +54,11 @@ private constructor(
     /** The rule of a view whose render threw. */
     const val RENDER_ERROR = "render-error"
 
-    /** The verdict on an `.explore.kt` [tree] rendered under [catalog]. */
-    fun of(tree: LayoutTree, catalog: Catalog = Catalogs.forView(tree.view)): ViewCheck =
-      ofTree(tree) { LayoutSummary.of(tree, catalog) }
+    /** Names a render of [screen] with [overlay] open (`screen+overlay`). */
+    fun renderOverlayName(screen: String, overlay: String): String = "$screen+$overlay"
 
-    /** The verdict on [tree], the render of a screen of [proposal]. */
-    fun of(proposal: Proposal, tree: LayoutTree): ViewCheck =
-      ofTree(tree) { LayoutSummary.of(proposal, tree) }
-
-    private fun ofTree(tree: LayoutTree, summary: () -> ViewLayout): ViewCheck {
+    /** The verdict on an `.explore.kt` [tree] rendered under [surface]. */
+    fun of(tree: LayoutTree, surface: SurfaceSpec = SurfaceSpecs.forView(tree.view)): ViewCheck {
       val errors =
         tree.findings
           .filter { it.severity == Severity.Error }
@@ -85,7 +73,7 @@ private constructor(
         pass = errors.isEmpty(),
         notes = notes,
         errors = errors,
-        layout = summary(),
+        layout = LayoutSummary.of(tree, surface),
       )
     }
 
@@ -121,9 +109,8 @@ private constructor(
 
 /**
  * The error findings of one view that share a [rule] and [detail], with the components they are
- * about in [ids] (empty when the finding concerns the whole view). A rule such as `one-fab` words
- * its detail once for all offenders, so grouping keeps the result small without dropping a node. A
- * render that threw is the rule [ViewCheck.RENDER_ERROR].
+ * about in [ids] (empty when the finding concerns the whole view). A render that threw is the rule
+ * [ViewCheck.RENDER_ERROR].
  */
 @Serializable
 data class CheckError(
@@ -134,15 +121,10 @@ data class CheckError(
 
 /**
  * The info findings of one view that share a [rule], with the components they are about in [ids]
- * (empty when the finding concerns the whole view). A note has no detail: the rule names it, and
- * `get_tree` has the rest.
+ * (empty when the finding concerns the whole view).
  */
 @Serializable data class CheckNote(val rule: String, val ids: List<String> = emptyList())
 
-/**
- * The entries of [this] that [known] does not already report, matched by rule and component id (an
- * entry with no ids by rule), each with only its new ids.
- */
 private fun <T> List<T>.beyond(
   known: List<T>,
   rule: (T) -> String,

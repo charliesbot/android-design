@@ -6,14 +6,16 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 
 class CollapseTest {
   private val pass = ViewCheck(pass = true)
 
   private fun json(views: Map<String, ViewCheck>) =
     PreviewJson.compact.encodeToString(
-      ProposalCheck.serializer(),
-      ProposalCheck(pass = true, ms = 1, screens = mapOf("home" to views)),
+      MapSerializer(String.serializer(), ViewCheck.serializer()),
+      views,
     )
 
   @Test
@@ -22,10 +24,7 @@ class CollapseTest {
 
     assertEquals(pass, views.getValue("light"))
     assertEquals(ViewCheck.same("light"), views.getValue("dark"))
-    assertEquals(
-      """{"pass":true,"ms":1,"screens":{"home":{"light":{"pass":true},"dark":{"same":"light"}}}}""",
-      json(views),
-    )
+    assertEquals("""{"light":{"pass":true},"dark":{"same":"light"}}""", json(views))
   }
 
   @Test
@@ -61,17 +60,13 @@ class CollapseTest {
   }
 
   @Test
-  fun `a failing view equal to an earlier failing view collapses and the proposal still fails`() {
+  fun `a failing view equal to an earlier failing view collapses and stays failing`() {
     val failing = ViewCheck(pass = false, errors = listOf(CheckError("one-fab", listOf("f"))))
     val views = ViewCheck.collapse(linkedMapOf("light" to failing, "dark" to failing))
 
     assertEquals("light", views.getValue("dark").same)
-    val check = ProposalCheck(pass = false, ms = 1, screens = mapOf("home" to views))
-    assertTrue(
-      """"dark":{"same":"light"}""" in
-        PreviewJson.compact.encodeToString(ProposalCheck.serializer(), check),
-    )
-    assertEquals(false, check.pass)
+    assertTrue(""""dark":{"same":"light"}""" in json(views))
+    assertEquals(false, views.getValue("light").pass)
   }
 
   @Test

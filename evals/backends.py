@@ -1,8 +1,8 @@
 """Optional CLI adapters. Evaluation artifacts do not depend on these launchers.
 
-A generator reaches the previewer app over MCP, registered as `android_design_preview` for that one run only, with its
-own socket so the run starts a fresh instance of `mcp_binary` and never forwards to an app that is already running. A
-judge never sees the app.
+A generator reaches the previewer over MCP, registered as `android_design_preview` for that one run only,
+passing ANDROID_DESIGN_NO_OPEN=1 (and ANDROID_DESIGN_PREVIEW_JAR when provided) so each run supervises its
+own isolated headless worker without opening browser windows. A judge never sees the MCP server.
 """
 import json
 import shutil
@@ -13,12 +13,9 @@ import tomllib
 from contextlib import ExitStack
 from pathlib import Path
 
-from preview_app import SERVER_NAME
+from preview_app import JAR_ENV, NO_OPEN_ENV, SERVER_NAME
 
 BACKENDS = ('agy', 'claude', 'codex')
-
-# The app's override for its instance socket (InstanceSocket.SOCKET_ENV in app/).
-SOCKET_ENV = 'ANDROID_DESIGN_PREVIEW_SOCKET'
 
 # Per-run Antigravity workspace plugin name so global ~/.gemini/config/mcp_config.json never shadows the isolated server.
 AGY_PLUGIN = 'eval-preview'
@@ -58,17 +55,40 @@ def _normalize_preview_tool(name):
     return name
 
 
+def _parse_tool_payload(output_text):
+    if not isinstance(output_text, str) or not output_text.strip():
+        return None
+    text = output_text.strip()
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        brace = text.find('{')
+        if brace < 0:
+            return None
+        try:
+            parsed, _ = json.JSONDecoder().raw_decode(text[brace:])
+        except ValueError:
+            return None
+    if isinstance(parsed, dict):
+        return parsed
+    if isinstance(parsed, list):
+        extracted = _extract_text(parsed).strip()
+        if not extracted:
+            return None
+        try:
+            inner = json.loads(extracted)
+        except ValueError:
+            return None
+        return inner if isinstance(inner, dict) else None
+    return None
+
+
 def _is_compile_or_validation_failure(base_name, output_text, is_error):
     if base_name not in RETRY_TOOLS:
         return False
     if is_error:
         return True
-    if not isinstance(output_text, str) or not output_text.strip():
-        return False
-    try:
-        payload = json.loads(output_text)
-    except ValueError:
-        return False
+    payload = _parse_tool_payload(output_text)
     return isinstance(payload, dict) and (payload.get('valid') is False or payload.get('compiled') is False)
 
 
@@ -296,22 +316,20 @@ def _cleanup_agy_plugin(plugin_dir, plugins_dir, agents_dir, had_plugins, had_ag
             pass
 
 
-def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, timeout=3600, mcp_binary=None):
+def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, timeout=3600, mcp_binary=None, mcp_jar=None):
     if backend not in BACKENDS:
         raise ValueError(f'Unknown backend: {backend}')
     if role not in ('generator', 'judge'):
         raise ValueError(f'Unknown role: {role}')
     if role == 'generator' and not mcp_binary:
-        raise ValueError('A generator needs mcp_binary, the previewer app it designs with')
+        raise ValueError('A generator needs mcp_binary, the preview supervisor it designs with')
     with tempfile.TemporaryDirectory(prefix='android-design-backend-') as temporary, ExitStack() as stack:
         temporary = Path(temporary)
         final = temporary / 'final.txt'
-        socket = None
+        server_env = {NO_OPEN_ENV: '1'}
+        if mcp_jar is not None:
+            server_env[JAR_ENV] = str(mcp_jar)
         stdin_input = prompt
-        if role == 'generator':
-            # Unix socket paths are limited to about 104 bytes on macOS, so the socket lives under /tmp, not the usual
-            # temp dir.
-            socket = str(Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='adp-', dir='/tmp'))) / 's.sock')
         if backend == 'claude':
             command = (
                 ['claude', '-p', '--output-format', 'stream-json', '--verbose']
@@ -320,7 +338,7 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
             )
             if role == 'generator':
                 config = temporary / 'mcp.json'
-                config.write_text(json.dumps({'mcpServers': {SERVER_NAME: {'command': str(mcp_binary), 'args': [], 'env': {SOCKET_ENV: socket}}}}))
+                config.write_text(json.dumps({'mcpServers': {SERVER_NAME: {'command': str(mcp_binary), 'args': [], 'env': server_env}}}))
                 # `claude -p` refuses writes nobody allowed, so the generator may edit its case folder only,
                 # like Codex's workspace-write. `//` makes the rule's path absolute.
                 command += ['--mcp-config', str(config), '--strict-mcp-config',
@@ -338,8 +356,9 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
             if role == 'generator':
                 command += ['-c', f'mcp_servers.{SERVER_NAME}.command={json.dumps(str(mcp_binary))}',
                             '-c', f'mcp_servers.{SERVER_NAME}.args=[]',
-                            '-c', f'mcp_servers.{SERVER_NAME}.default_tools_approval_mode="approve"',
-                            '-c', f'mcp_servers.{SERVER_NAME}.env.{SOCKET_ENV}={json.dumps(socket)}']
+                            '-c', f'mcp_servers.{SERVER_NAME}.default_tools_approval_mode="approve"']
+                for k, v in server_env.items():
+                    command += ['-c', f'mcp_servers.{SERVER_NAME}.env.{k}={json.dumps(v)}']
             for image in images:
                 command += ['--image', str(Path(image).resolve())]
             if schema:
@@ -364,7 +383,7 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
                         'preview': {
                             'command': str(mcp_binary),
                             'args': [],
-                            'env': {SOCKET_ENV: socket},
+                            'env': server_env,
                         }
                     }
                 }))

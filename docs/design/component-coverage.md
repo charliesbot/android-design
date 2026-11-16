@@ -2,6 +2,8 @@
 
 **Date:** 2026-11-04
 
+> **v4 status:** [Visual design exploration v4](visual-design-exploration-v4.md) retired the v3 JSON catalog (`Catalog.kt`, `app/schemas/`), `export/`, and `compose-mapping.md`. Authors now write real Material 3 Compose code directly in `.explore.kt`. M3 page coverage against `sources/m3.material.io/pages/components/` is enforced directly against `scripts/material3-inventory.txt` (generated from pinned `material3-desktop`) and `CallNameMapper.kt` by `scripts/test_m3_page_coverage.py`.
+
 ## TL;DR
 
 The previewer draws 24 of the 36 components Material 3 lists at m3.material.io/components. Ten are missing, six covered ones lack variants the skill recommends, and two are left out on purpose because Material retired them. Every gap maps to real material3 composables, present in both the Android build the evals port to and the desktop build the app renders with, so every gap closes the same way the catalog was built: one registry entry, rendered and exported from that entry. Where Material has no single composable (modal side sheet, full-screen dialog, full-screen date picker), the component is composed from real ones, and the exporter emits the same composition. Coverage stays current through the registry itself: each component names the Material page it implements, each omission records why, and a test fails when Material publishes a component page that neither claims.
@@ -22,7 +24,7 @@ Both omissions are Material's own retirements:
 
 ## Rules every addition follows
 
-- **Real composables only.** A component renders with the material3 composables its `compose` field names, never a lookalike, per the fidelity bar in `visual-design-exploration-v3.md`. When Compose has no single composable for a Material component, the component is composed from real ones, as the connected button group already is (a `Row` of `ToggleButton`s with connected shapes). The renderer and the exporter use the same composition, so the port matches the preview exactly. Three new components are composed: the modal side sheet, the full-screen dialog and the full-screen date picker.
+- **Real composables only.** A component renders with the material3 composables its `compose` field names, never a lookalike, per the fidelity bar in [visual-design-exploration-v3.md](../archive/visual-design-exploration-v3.md). When Compose has no single composable for a Material component, the component is composed from real ones, as the connected button group already is (a `Row` of `ToggleButton`s with connected shapes). The renderer and the exporter use the same composition, so the port matches the preview exactly. Three new components are composed: the modal side sheet, the full-screen dialog and the full-screen date picker.
 - **One entry, every path.** A component exists once, as a `ComponentDef`. The renderer, the exporter, the schemas in `app/schemas/`, `check_proposal` and `get_tree` all read that entry, and `compose-mapping.md` gets its row. No path special-cases a component the registry does not describe.
 - **Variants are props, families are components.** When Material's variants share one Compose family and placement rules, they are a `variant` (or similar) prop, as `Button` and `Card` do. A variant becomes its own component only when its composable, slot or placement rules differ, which is why the docked toolbar is not a prop of `FloatingToolbar`.
 - **State starts from a prop.** A control's state (selected, checked, expanded, picked date) starts at a proposal prop and then lives in the window's interaction state, like `checked` on `Switch` today. A static render always shows the prop's value.
@@ -145,7 +147,8 @@ The desktop build lags Android. The app renders with JetBrains' material3 (1.13.
 
 ## Links
 
-- [Visual design exploration v3](visual-design-exploration-v3.md): why the previewer exists, its fidelity bar, and its architecture
+- [Visual design exploration v4](visual-design-exploration-v4.md): current Code-First Compose exploration architecture
+- [Visual design exploration v3](../archive/visual-design-exploration-v3.md): historical v3 previewer fidelity bar and catalog architecture
 - [Material 3 components research](../research/material-3-components.md): the distilled usage rules per component
-- [compose-mapping.md](../../skills/android-design-explore/references/compose-mapping.md): proposal component to Compose mapping
+- [compose-signatures.md](../../plugin/skills/android-design-explore/references/compose-signatures.md): verified Material 3 and Wear M3 Compose API signatures
 - [Material 3 components](https://m3.material.io/components)

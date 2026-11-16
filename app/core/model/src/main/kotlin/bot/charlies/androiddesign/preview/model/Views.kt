@@ -95,10 +95,10 @@ object Views {
   val WatchLarge =
     ViewSpec("watch-large", Device.Watch, 227, 227, dark = true, SizeClass.Compact, round = true)
 
-  /** The views of the phone catalog ([M3ExpressiveCatalog.views]). */
+  /** The views of [PhoneSurface]. */
   val all: List<ViewSpec> = listOf(Light, Dark, Foldable, Tablet, Desktop)
 
-  /** The views of the Wear catalog ([WearCatalog.views]). */
+  /** The views of [WearSurface]. */
   val wear: List<ViewSpec> = listOf(Watch, WatchLarge)
 
   /** Every view of every catalog. A proposal is checked in its own catalog's views, not these. */

@@ -3,11 +3,11 @@
 
 Usage: material3_inventory.py
 
-Reads the material3 version from the Compose sandbox's (`evals/compose-starter`) libs.versions.toml, finds the matching AAR in the
+Reads the material3 version from app/gradle/libs.versions.toml, finds the matching material3-desktop JAR in the
 local Gradle cache, and writes scripts/material3-inventory.txt: one name per line (`Class`, `Class.member`, or a bare
-top-level function name), no signatures. compose-mapping.md may only use names that appear here.
+top-level function name), no signatures.
 
-Needs `javap` from a JDK. Build the Compose sandbox (`evals/compose-starter`) once so Gradle downloads the artifacts.
+Needs `javap` from a JDK. Build `app/` (`cd app && ./gradlew build`) once so Gradle downloads the artifact.
 """
 import re
 import subprocess
@@ -17,7 +17,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-LIBS_TOML = ROOT / "evals/compose-starter/gradle/libs.versions.toml"
+LIBS_TOML = ROOT / "app/gradle/libs.versions.toml"
 INVENTORY = ROOT / "scripts/material3-inventory.txt"
 GRADLE_FILES = Path.home() / ".gradle/caches/modules-2/files-2.1"
 
@@ -41,14 +41,18 @@ def version_key(version):
     return [int(part) if part.isdigit() else part for part in re.split(r"[.\-]", version)]
 
 
-def find_aar(group, artifact, version=None):
-    """Finds the binary AAR of an artifact in the Gradle cache; without a version, the newest cached one."""
+def find_jar(group, artifact, version=None):
+    """Finds the binary JAR of an artifact in the Gradle cache; without a version, the newest cached one."""
     base = GRADLE_FILES / group / artifact
     versions = [version] if version else sorted((p.name for p in base.glob("*")), key=version_key, reverse=True) if base.exists() else []
     for candidate in versions:
-        aars = [p for p in (base / candidate).glob("*/*.aar")]
-        if aars:
-            return candidate, aars[0]
+        jars = [
+            p
+            for p in (base / candidate).glob("*/*.jar")
+            if not p.name.endswith("-sources.jar") and not p.name.endswith("-javadoc.jar")
+        ]
+        if jars:
+            return candidate, jars[0]
     return None, None
 
 
@@ -192,32 +196,27 @@ def material3_entries(classes_dir, class_names):
     return entries
 
 
-def extract_classes_jar(aar, target):
-    with zipfile.ZipFile(aar) as archive:
-        archive.extract("classes.jar", target)
-    return zipfile.ZipFile(Path(target) / "classes.jar")
-
-
 def main():
     version = material3_version(LIBS_TOML.read_text())
-    _, aar = find_aar("androidx.compose.material3", "material3-android", version)
-    if not aar:
-        sys.exit(f"material3-android {version} is not in {GRADLE_FILES}. Build the Compose sandbox (`evals/compose-starter`) once so Gradle downloads it.")
+    _, jar_path = find_jar("org.jetbrains.compose.material3", "material3-desktop", version)
+    if not jar_path:
+        sys.exit(
+            f"material3-desktop {version} is not in {GRADLE_FILES}. Build `app/` (`cd app && ./gradlew build`) once so Gradle downloads it."
+        )
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
-        jar = extract_classes_jar(aar, tmp / "material3")
-        wanted = material3_class_names(jar)
-        with jar:
+        with zipfile.ZipFile(jar_path) as jar:
+            wanted = material3_class_names(jar)
             jar.extractall(tmp / "material3" / "classes", [n.replace(".", "/") + ".class" for n in wanted])
         classes = tmp / "material3" / "classes"
         entries = material3_entries(classes, wanted)
 
-    header = f"# androidx.compose.material3:material3-android:{version}"
+    header = f"# org.jetbrains.compose.material3:material3-desktop:{version}"
     lines = [header, *sorted(entries)]
     INVENTORY.write_text("\n".join(lines) + "\n")
 
-    print(f"{INVENTORY.relative_to(ROOT)}: {len(entries)} material3 names from {aar.name} {version}")
+    print(f"{INVENTORY.relative_to(ROOT)}: {len(entries)} material3 names from {jar_path.name} {version}")
 
 
 if __name__ == "__main__":

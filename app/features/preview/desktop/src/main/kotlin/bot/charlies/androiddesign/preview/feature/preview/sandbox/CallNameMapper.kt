@@ -26,6 +26,8 @@ internal object CallNameMapper {
       "SymbolIcon" to M3Component.Icon.wire,
       "Icon" to M3Component.Icon.wire,
       "Image" to M3Component.Image.wire,
+      "Badge" to M3Component.Box.wire,
+      "BadgedBox" to M3Component.Box.wire,
       "HorizontalMultiBrowseCarousel" to M3Component.Carousel.wire,
       "HorizontalCenteredHeroCarousel" to M3Component.Carousel.wire,
       "HorizontalUncontainedCarousel" to M3Component.Carousel.wire,

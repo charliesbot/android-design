@@ -1,24 +1,20 @@
 package bot.charlies.androiddesign.preview.domain.design
 
-import bot.charlies.androiddesign.preview.model.Catalog
+import bot.charlies.androiddesign.preview.model.SurfaceSpec
 import bot.charlies.androiddesign.preview.model.TypeGroup
 import bot.charlies.androiddesign.preview.model.TypeRole
-import bot.charlies.androiddesign.preview.model.WearCatalog
+import bot.charlies.androiddesign.preview.model.WearSurface
 
 /** Size, weight and tracking of one type role. */
 internal data class TypeSpec(val sizeSp: Float, val weight: Int, val trackingSp: Float)
 
-/**
- * The Material 3 type scale as `compose-mapping.md` records it. The baseline weight and tracking
- * match the library's `Typography()`. The emphasized values are Google's tokens, which the pinned
- * library does not apply yet, so the exporter writes them out.
- */
+/** Material 3 and Wear Material 3 type scales for WCAG large-text contrast thresholds. */
 internal object TypeScale {
   /**
-   * The size and weight of the type role named [wire] in [catalog], or null if it has no such role.
+   * The size and weight of the type role named [wire] in [surface], or null if it has no such role.
    */
-  fun of(catalog: Catalog, wire: String): TypeSpec? =
-    if (catalog === WearCatalog) wear[wire] else TypeRole.fromWire(wire)?.let(::of)
+  fun of(surface: SurfaceSpec, wire: String): TypeSpec? =
+    if (surface === WearSurface) wear[wire] else TypeRole.fromWire(wire)?.let(::of)
 
   /**
    * The Wear Material 3 type scale, read from `TypeScaleTokens` of the Wear Compose sources
