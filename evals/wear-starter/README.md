@@ -15,7 +15,7 @@ This is the Wear OS sandbox for the manual export check in `evals/README.md`. Co
 
 A screen with the time text off needs `Frame(clock = false)`: its `timeText = {}` takes effect only inside the navigation host, so an isolated preview would still show the app clock.
 
-The starter ships no fonts or icons. Text uses the layoutlib system font, so label weights look lighter than the previewer's bundled Roboto Flex. Import each Material Symbol the export names (its header lists them; a `_filled` suffix is Fill 1) as a vector drawable into `app/src/main/res/drawable/`, as the Icons section of `skills/android-design-explore/references/compose-mapping.md` describes. The exporter lists an `Image` as a drawable too: add a bitmap or vector for it.
+The starter ships no fonts or icons. Text uses the layoutlib system font, so label weights look lighter than the previewer's bundled Roboto Flex. Import each Material Symbol the export names (its header lists them; a `_filled` suffix is Fill 1) as a vector drawable into `app/src/main/res/drawable/`, as the Icons section of `plugin/skills/android-design-explore/references/compose-mapping.md` describes. The exporter lists an `Image` as a drawable too: add a bitmap or vector for it.
 
 ## Render
 

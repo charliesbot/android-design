@@ -8,10 +8,12 @@ It is charliesbot's personal repository. Optimize for the owner's workflow, not 
 
 ## Layout
 
-- `skills/android-design/` is the installable design judgment skill (`SKILL.md` and `references/`): building, refining, and reviewing real Compose.
-- `skills/android-design-explore/` is the installable exploration skill (`SKILL.md` and `references/`): proposals written for the previewer app, checked through its MCP server, and ported to Compose. It builds on `android-design`.
-- Chai installs both from `skills/`, so keep anything that is not skill content out of these folders.
-- `app/` is the previewer app, a standalone Gradle build (Compose Multiplatform, macOS): it draws proposals live, serves MCP over stdio, and renders headlessly for the evals. Its component registry (`app/core/model/.../Catalog.kt`) is the single source of truth for the catalog; `app/schemas/` holds the generated catalog and proposal schemas. `docs/design/visual-design-exploration-v3.md` records why it exists and how it is built.
+- `plugin/` holds the distributable bundle: `plugin/skills/`, Antigravity `plugin/plugin.json` and `plugin/mcp_config.json`, Claude Code `.claude-plugin/`, Codex `.codex-plugin/`, and `.mcp.json`. Root marketplace manifests (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) point to `plugin/`.
+- `plugin/skills/android-design/` is the installable design judgment skill (`SKILL.md` and `references/`): building, refining, and reviewing real Compose.
+- `plugin/skills/android-design-explore/` is the installable exploration skill (`SKILL.md` and `references/`): live `.explore.kt` Compose boards checked through the `android_design_preview` MCP server, viewed in the browser board, and wired into an app. It builds on `android-design`.
+- Chai and `npx skills` install both from `plugin/skills/`, so keep anything that is not skill content out of these folders.
+- `supervisor/` holds the pure-JS `@charliesbot/android-design-preview` Node MCP supervisor and localhost HTML/SVG browser board.
+- `app/` is the previewer backend, a standalone Gradle build (Compose Multiplatform): it compiles `.explore.kt` files inside a sandboxed classloader, runs headless Skiko checks, and runs the stdio worker (`android-design-preview.jar`). Its component registry (`app/core/model/.../Catalog.kt`) and `docs/design/visual-design-exploration-v4.md` define the design-system checks and runtime.
 - `app/wear/compose/` is the Wear Compose port: Google's `androidx.wear.compose` sources compiled for desktop. `upstream/` stays byte-identical to Google's release, so fixes go in shims or exclusions. Read `app/wear/README.md` before changing or upgrading the port.
 - `docs/research/` holds the distilled research the skill is built from. `docs/research/source-coverage.md` is the page-by-page ledger of every official source and whether its guidance reached the research docs.
 - `evals/` checks that agents following the skill still produce screens that meet its rules. See `evals/README.md`.
@@ -53,9 +55,11 @@ Run the check for every kind of change you made:
 - **A skill's `description`:** the trigger evals (`evals/README.md`, Trigger evals).
 - **The rubric:** `evals/calibrate.py` first.
 - **`evals/`:** `python3 -m unittest discover evals`.
+- **`supervisor/`:** `cd supervisor && npm test && npm pack --dry-run`.
 - **`scripts/`:** `python3 -m unittest discover scripts`.
 - **The app:** `cd app && ./gradlew build spotlessCheck`.
-- **The catalog registry:** `cd app && ./gradlew :core:domain:writeSchemas`, commit `app/schemas/`, and give each new component a row in `skills/android-design-explore/references/compose-mapping.md` (the scripts tests fail until it has one).
+- **The catalog registry:** `cd app && ./gradlew :core:domain:writeSchemas`, commit `app/schemas/`, and give each new component a row in `plugin/skills/android-design-explore/references/compose-mapping.md` (the scripts tests fail until it has one).
+- **`compose-signatures.md`:** `python3 scripts/generate_signatures.py` and verify `scripts/test_signatures.py` passes.
 - **The material3 version of `evals/compose-starter/`:** run `python3 scripts/material3_inventory.py` and read its diff against the gaps listed in `docs/design/component-coverage.md` (Staying current): the `no-compose-api` omissions, the components composed from parts, and the in-page variant gaps. Then fix `compose-mapping.md` until the scripts tests pass.
 - **`compose-mapping.md`, the app's exporter, or the material3 version:** the manual export check in `evals/README.md`.
 - **Wear Compose upgrade:** follow `app/wear/README.md` (Upgrading).

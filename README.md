@@ -1,35 +1,36 @@
 # android-design
 
-Agent skills for designing Android UI with Material 3 Expressive in Jetpack Compose, for phone, tablet, and desktop apps. Every rule is distilled from Google's official guidance.
+Agent skills for designing Android UI with Material 3 Expressive and Wear OS Jetpack Compose, for phone, foldable, tablet, desktop, and Wear OS apps. Every rule is distilled from Google's official guidance.
 
 - **`android-design`** gives an agent design judgment for building, refining, and reviewing real Compose: hierarchy, color, type, shape, motion, and component choice.
-- **`android-design-explore`** lets an agent explore directions as live proposals in a native previewer app, then port the approved one to Compose.
+- **`android-design-explore`** lets an agent explore directions as live `.explore.kt` Compose boards checked over MCP, view alternatives side by side in a localhost browser board, and wire approved screens into an app.
 
-## Install the skills
+## Install the plugin
+
+Requires **Node.js 18+** and **Java 17+** (JDK or Android Studio's bundled JBR).
+
+- **Antigravity:** point a workspace or user plugin directory to `plugin/` (contains `plugin.json`, `mcp_config.json`, and `skills/`).
+- **Standalone skills only (`npx skills` or Chai):**
 
 ```bash
 npx skills add charliesbot/android-design
 ```
 
-Or copy the folders in `skills/` into your agent's skills directory (for Claude Code, `~/.claude/skills/`).
+`plugin/skills/` holds `android-design` and `android-design-explore` directly for `npx skills` or copying into `~/.claude/skills/`.
 
-## Install the previewer app
+## Manual MCP server registration
 
-Only `android-design-explore` needs it. It runs on Apple Silicon Macs.
+`plugin/mcp_config.json` and `plugin/.mcp.json` start the pure-JS Node MCP supervisor automatically:
 
-1. Download `AndroidDesignPreview.dmg` from the [latest release](https://github.com/charliesbot/android-design/releases/latest) and drag the app into Applications.
-2. Clear the quarantine flag. The app is not signed, and a quarantined copy started by an agent never responds.
+```json
+{
+  "mcpServers": {
+    "android_design_preview": {
+      "command": "npx",
+      "args": ["-y", "@charliesbot/android-design-preview@0.4.0"]
+    }
+  }
+}
+```
 
-   ```bash
-   xattr -dr com.apple.quarantine /Applications/AndroidDesignPreview.app
-   ```
-
-3. Register its binary as a stdio MCP server named `android_design_preview`. For Claude Code:
-
-   ```bash
-   claude mcp add --scope user android_design_preview -- /Applications/AndroidDesignPreview.app/Contents/MacOS/AndroidDesignPreview
-   ```
-
-Other agents take the same binary path as a stdio MCP command. All agents share one window, one tab per session. You can also open the app yourself and load a proposal with File > Open Proposal.
-
-To build from source instead (JDK 17), run `./gradlew :app:installApp` in `app/`. It installs to `~/Applications`, needs no quarantine step, and the binary path changes to match.
+The first `check_design` call downloads and SHA-256 verifies `android-design-preview.jar` into `~/.cache/android-design-preview/0.4.0/`. To run against a local build (`cd app && ./gradlew :app:workerJar`), set `ANDROID_DESIGN_PREVIEW_JAR` to `app/app/build/libs/android-design-preview.jar`.

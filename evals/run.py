@@ -19,8 +19,8 @@ from report import METRIC_KEYS, generator_medians, label, write_report, write_su
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-SKILL_DIR = ROOT / "skills" / "android-design"
-EXPLORE_DIR = ROOT / "skills" / "android-design-explore"
+SKILL_DIR = ROOT / "plugin" / "skills" / "android-design"
+EXPLORE_DIR = ROOT / "plugin" / "skills" / "android-design-explore"
 # Where prepare() copies both skills inside a case directory.
 CASE_SKILLS = "skills"
 # Names inside a case directory. The agent writes DESIGN.md and the proposal; `render` writes renders/.

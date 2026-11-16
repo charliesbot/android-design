@@ -13,9 +13,9 @@ This is the Compose sandbox for the manual export check in `evals/README.md`. Co
 | `darkTheme: Boolean` | none (the `dark` view) | Default follows the system. |
 | `dynamic: Boolean` | none | Default `false`. When true on API 31+, uses wallpaper colors instead of the seed. |
 
-`theme/Typography.kt` also has `voiceFont(R.font.<file>, weight, axes...)` for a `DESIGN.md` typography entry's font: pass every axis its `fontVariation` names (`opsz`, `SOFT`, `WONK`, `wdth`), because Compose sets only the axes it is given. Its `*Emphasized` styles equal the baseline roles in this material3 version, so copy a baseline role with the emphasized token weight instead (see `skills/android-design-explore/references/compose-mapping.md`, type roles).
+`theme/Typography.kt` also has `voiceFont(R.font.<file>, weight, axes...)` for a `DESIGN.md` typography entry's font: pass every axis its `fontVariation` names (`opsz`, `SOFT`, `WONK`, `wdth`), because Compose sets only the axes it is given. Its `*Emphasized` styles equal the baseline roles in this material3 version, so copy a baseline role with the emphasized token weight instead (see `plugin/skills/android-design-explore/references/compose-mapping.md`, type roles).
 
-The scheme comes from MaterialKolor (`rememberDynamicColorScheme`, spec 2025) with Material 3 Expressive motion and the bundled Google Sans Flex typography. The starter ships no icons: a port imports each Material Symbol it uses as a vector drawable into `app/src/main/res/drawable/` and draws it with `Icon(painterResource(...))`, as the Icons section of `skills/android-design-explore/references/compose-mapping.md` describes.
+The scheme comes from MaterialKolor (`rememberDynamicColorScheme`, spec 2025) with Material 3 Expressive motion and the bundled Google Sans Flex typography. The starter ships no icons: a port imports each Material Symbol it uses as a vector drawable into `app/src/main/res/drawable/` and draws it with `Icon(painterResource(...))`, as the Icons section of `plugin/skills/android-design-explore/references/compose-mapping.md` describes.
 ## Entry points
 
 - `app/src/main/kotlin/com/example/designsandbox/ProposalScreen.kt`: phone/tablet proposal with sample state.

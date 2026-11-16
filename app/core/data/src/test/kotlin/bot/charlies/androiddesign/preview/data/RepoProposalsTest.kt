@@ -54,7 +54,8 @@ class RepoProposalsTest {
 
   private companion object {
     const val VERIFY = "evals/verify/verify.proposal.json"
-    const val FORMAT_REFERENCE = "skills/android-design-explore/references/proposal-format.md"
+    const val FORMAT_REFERENCE =
+      "plugin/skills/android-design-explore/references/proposal-format.md"
 
     /** Gradle runs tests from the module folder; the repository root holds `evals/`. */
     fun findRepoRoot(): Path {
