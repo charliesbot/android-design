@@ -444,4 +444,267 @@ class SandboxFindingRulesTest {
       "Expected TouchTarget for 32.dp VerticalSlider, got findings=${res.tree.findings} nodes=${res.tree.nodes.map { "${it.id}:${it.type}:b=${it.bounds}:t=${it.touch}" }}",
     )
   }
+
+  @Test
+  fun `keeps container bounds for SplitButtonLayout and ButtonGroup without false Overflow`() {
+    val src =
+      """
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.runtime.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("Container Bounds") {
+        screen {
+          Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            SplitButtonLayout(
+              leadingButton = {
+                SplitButtonDefaults.LeadingButton(onClick = {}) { Text("Save") }
+              },
+              trailingButton = {
+                SplitButtonDefaults.TrailingButton(
+                  checked = false,
+                  onCheckedChange = {},
+                ) {
+                  SymbolIcon("keyboard_arrow_down")
+                }
+              },
+            )
+            ButtonGroup(
+              overflowIndicator = { _ ->
+                IconButton(onClick = {}) { SymbolIcon("more_vert") }
+              },
+            ) {
+              clickableItem(onClick = {}, label = "One")
+              clickableItem(onClick = {}, label = "Two")
+            }
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val res = renderSource(src, fileName = "container-bounds.explore.kt")
+    val splitNode = res.tree.nodes.firstOrNull { it.type == "SplitButton" }
+    val groupNode = res.tree.nodes.firstOrNull { it.type == "ButtonGroup" }
+    assertNotNull(splitNode, "Expected SplitButton node in ${res.tree.nodes.map { it.type }}")
+    assertNotNull(groupNode, "Expected ButtonGroup node in ${res.tree.nodes.map { it.type }}")
+    val overflowFindings = res.tree.findings.filter { it.rule == FindingRule.Overflow }
+    assertTrue(
+      overflowFindings.isEmpty(),
+      "Expected zero Overflow findings for SplitButtonLayout and ButtonGroup, got $overflowFindings",
+    )
+    assertTrue(
+      splitNode.bounds.width > 80f && groupNode.bounds.width > 80f,
+      "Expected container bounds preserved, got split=${splitNode.bounds} group=${groupNode.bounds}",
+    )
+  }
+
+  @Test
+  fun `collapses ToggleFloatingActionButton into FabMenu without false OneFab`() {
+    for (expanded in listOf(false, true)) {
+      val src =
+        """
+        import androidx.compose.foundation.layout.*
+        import androidx.compose.material3.*
+        import androidx.compose.runtime.*
+        import androidx.compose.ui.Modifier
+        import androidx.compose.ui.platform.testTag
+        import androidx.compose.ui.unit.dp
+        import bot.charlies.androiddesign.preview.kit.*
+
+        val preview = designBoard("Fab Menu") {
+          screen {
+            Scaffold(
+              floatingActionButton = {
+                FloatingActionButtonMenu(
+                  expanded = $expanded,
+                  button = {
+                    ToggleFloatingActionButton(
+                      checked = $expanded,
+                      onCheckedChange = {},
+                      modifier = Modifier.testTag(AD_PRIMARY_TAG),
+                    ) {
+                      SymbolIcon("add")
+                    }
+                  },
+                ) {
+                  FloatingActionButtonMenuItem(
+                    onClick = {},
+                    text = { Text("Item") },
+                    icon = { SymbolIcon("edit") },
+                  )
+                }
+              },
+            ) { innerPadding ->
+              Column(modifier = Modifier.padding(innerPadding).padding(16.dp)) {
+                FilledIconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
+                  SymbolIcon("share")
+                }
+              }
+            }
+          }
+        }
+        """
+          .trimIndent()
+      val res = renderSource(src, fileName = "fab-menu-$expanded.explore.kt")
+      val fabMenus = res.tree.nodes.filter { it.type == "FabMenu" }
+      val plainFabs = res.tree.nodes.filter { it.type == "FloatingActionButton" }
+      assertEquals(
+        1,
+        fabMenus.size,
+        "Expected single FabMenu node (expanded=$expanded), got ${res.tree.nodes.map { it.type }}",
+      )
+      assertTrue(
+        plainFabs.isEmpty(),
+        "Expected nested ToggleFloatingActionButton absorbed into FabMenu (expanded=$expanded), got $plainFabs",
+      )
+      assertTrue(
+        fabMenus.single().primary,
+        "Expected AD_PRIMARY_TAG on ToggleFloatingActionButton to mark FabMenu as primary (expanded=$expanded)",
+      )
+      assertNotNull(fabMenus.single().touch, "Expected FabMenu touch bounds (expanded=$expanded)")
+      val rules = res.tree.findings.map { it.rule }.toSet()
+      assertTrue(
+        FindingRule.OneFab !in rules && FindingRule.PrimaryLargest !in rules,
+        "Expected no OneFab or PrimaryLargest findings for FabMenu (expanded=$expanded), got ${res.tree.findings}",
+      )
+    }
+  }
+
+  @Test
+  fun `does not treat non-modal sheets, drawers, or inline pickers as open modals`() {
+    val sheetSrc =
+      """
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.runtime.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("Bottom Sheet Scaffold") {
+        screen {
+          BottomSheetScaffold(
+            sheetContent = {
+              Column(modifier = Modifier.padding(16.dp)) { Text("Sheet") }
+            },
+          ) { innerPadding ->
+            Column(modifier = Modifier.padding(innerPadding).padding(16.dp)) {
+              VerticalSlider(
+                state = rememberSliderState(value = 0.5f),
+                onValueChange = {},
+                modifier = Modifier.width(32.dp).height(120.dp),
+              )
+            }
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val sheetRes = renderSource(sheetSrc, fileName = "sheet-scaffold.explore.kt")
+    val sheetRules = sheetRes.tree.findings.map { it.rule }.toSet()
+    assertTrue(
+      FindingRule.TouchTarget in sheetRules,
+      "Expected TouchTarget inside BottomSheetScaffold (not suppressed as modal), got ${sheetRes.tree.findings}",
+    )
+
+    val drawerSrc =
+      """
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.runtime.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.platform.testTag
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("Permanent Drawer") {
+        screen {
+          PermanentNavigationDrawer(
+            drawerContent = {
+              PermanentDrawerSheet {
+                Column(modifier = Modifier.padding(16.dp)) { Text("Nav") }
+              }
+            },
+          ) {
+            Column(
+              modifier = Modifier.padding(16.dp),
+              verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+              Button(
+                onClick = {},
+                modifier = Modifier.testTag(AD_PRIMARY_TAG).height(48.dp),
+              ) {
+                Text("Go")
+              }
+              FilledIconButton(
+                onClick = {},
+                modifier = Modifier.size(72.dp),
+              ) {
+                SymbolIcon("star")
+              }
+            }
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val drawerRes =
+      renderSource(drawerSrc, fileName = "permanent-drawer.explore.kt", view = Views.Tablet)
+    val drawerRules = drawerRes.tree.findings.map { it.rule }.toSet()
+    assertTrue(
+      FindingRule.PrimaryLargest in drawerRules,
+      "Expected PrimaryLargest inside PermanentNavigationDrawer (not suppressed as modal), got ${drawerRes.tree.findings}",
+    )
+
+    val inlinePickersSrc =
+      """
+      import androidx.compose.foundation.*
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.runtime.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.platform.testTag
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("Inline Pickers") {
+        screen {
+          Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            TimeInput(state = rememberTimePickerState())
+            DatePicker(state = rememberDatePickerState())
+            Button(
+              onClick = {},
+              modifier = Modifier.testTag(AD_PRIMARY_TAG).height(48.dp),
+            ) {
+              Text("Save")
+            }
+            FilledIconButton(
+              onClick = {},
+              modifier = Modifier.size(72.dp),
+            ) {
+              SymbolIcon("check")
+            }
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val inlinePickersRes = renderSource(inlinePickersSrc, fileName = "inline-pickers.explore.kt")
+    val pickerNode = inlinePickersRes.tree.nodes.firstOrNull { it.type == "DatePicker" }
+    assertEquals("docked", pickerNode?.variant)
+    val inlineRules = inlinePickersRes.tree.findings.map { it.rule }.toSet()
+    assertTrue(
+      FindingRule.PrimaryLargest in inlineRules,
+      "Expected PrimaryLargest alongside inline TimeInput/DatePicker (not suppressed as modal), got ${inlinePickersRes.tree.findings}",
+    )
+  }
 }

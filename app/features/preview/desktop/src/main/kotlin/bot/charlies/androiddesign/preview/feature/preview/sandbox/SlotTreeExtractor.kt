@@ -20,6 +20,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Density
+import bot.charlies.androiddesign.preview.domain.DatePickerSpec
 import bot.charlies.androiddesign.preview.domain.findings.FindingRules
 import bot.charlies.androiddesign.preview.domain.layout.LayoutSummary
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
@@ -208,6 +209,24 @@ internal object SlotTreeExtractor {
     tables.forEach { table ->
       table.compositionGroups.forEach { root -> walkGroup(root, null) }
     }
+    // ToggleFloatingActionButton inside FloatingActionButtonMenu and DatePicker/DateRangePicker
+    // inside DatePickerDialog are outer and inner wrappers of the same component; drop the inner
+    // entry so the outer wrapper owns its primary tag, text, and touch bounds and is counted once.
+    val redundantNested =
+      claimed.entries
+        .filter { (layout, site) ->
+          val parentAncestors = generateSequence(layout.parentInfo) { it.parentInfo }
+          when (site.rawName) {
+            "ToggleFloatingActionButton" ->
+              parentAncestors.any { anc -> claimed[anc]?.mappedType == M3Component.FabMenu.wire }
+            "DatePicker",
+            "DateRangePicker" ->
+              parentAncestors.any { anc -> claimed[anc]?.rawName == "DatePickerDialog" }
+            else -> false
+          }
+        }
+        .map { it.key }
+    redundantNested.forEach(claimed::remove)
 
     val semanticsByLayout = IdentityHashMap<LayoutInfo, MutableList<SemanticsNode>>()
     val mergedByLayout = IdentityHashMap<LayoutInfo, SemanticsNode>()
@@ -361,13 +380,15 @@ internal object SlotTreeExtractor {
     }
 
     val visibleBoundsPx =
-      ownedSemantics.firstOrNull()?.boundsInFrame(rootWindowPos)?.let { sRect ->
+      directSemantics.firstOrNull()?.boundsInFrame(rootWindowPos)?.let { sRect ->
         clipWithin(sRect, layoutRectPx)
       } ?: layoutRectPx
     val touchPx =
       if (!interactive) null
       else {
-        val touchSemantics = directSemantics.ifEmpty { ownedSemantics }
+        val touchSemantics =
+          if (site.mappedType == M3Component.FabMenu.wire) directSemantics + ownedSemantics
+          else directSemantics.ifEmpty { ownedSemantics }
         val semTouch =
           touchSemantics
             .map { it.touchBoundsInFrame(rootWindowPos) }
@@ -431,6 +452,12 @@ internal object SlotTreeExtractor {
       text = textData.textInfo,
       ring = ringInset,
       clip = cornerClip,
+      variant =
+        if (site.mappedType == M3Component.DatePicker.wire && site.rawName != "DatePickerDialog") {
+          DatePickerSpec.Variant.Docked.wire
+        } else {
+          null
+        },
       weight = weightInfo,
       roles = textData.roles,
       colors = textData.colors,

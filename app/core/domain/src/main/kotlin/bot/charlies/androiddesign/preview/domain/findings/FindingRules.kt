@@ -393,7 +393,11 @@ object FindingRules {
 
   private fun oneFab(view: View): List<Finding> =
     view.nodes
-      .filter { it.type in view.catalog.fabNames && it.isLaidOut }
+      .filter {
+        it.type in view.catalog.fabNames &&
+          it.isLaidOut &&
+          view.ancestors(it).none { anc -> anc.type in view.catalog.fabNames }
+      }
       .groupBy(::pane)
       .values
       .filter { it.size > 1 }
