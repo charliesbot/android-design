@@ -707,4 +707,287 @@ class SandboxFindingRulesTest {
       "Expected PrimaryLargest alongside inline TimeInput/DatePicker (not suppressed as modal), got ${inlinePickersRes.tree.findings}",
     )
   }
+
+  @Test
+  fun `claims cross-layer modals and popups and suppresses findings behind modal scrims`() {
+    fun screenWithOverlay(overlayBlock: String): String =
+      """
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.runtime.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.platform.testTag
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("Cross-Layer Modal") {
+        screen {
+          Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+              modifier = Modifier.padding(16.dp),
+              verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+              Button(
+                onClick = {},
+                modifier = Modifier.testTag(AD_PRIMARY_TAG).height(48.dp),
+              ) {
+                Text("Primary")
+              }
+              FilledIconButton(
+                onClick = {},
+                modifier = Modifier.size(72.dp),
+              ) {
+                SymbolIcon("star")
+              }
+              VerticalSlider(
+                state = rememberSliderState(value = 0.5f),
+                onValueChange = {},
+                modifier = Modifier.width(32.dp).height(120.dp),
+              )
+              Surface(color = MaterialTheme.colorScheme.surface) {
+                Text("Faint behind", color = MaterialTheme.colorScheme.surfaceVariant)
+              }
+            }
+            $overlayBlock
+          }
+        }
+      }
+      """
+        .trimIndent()
+
+    val baseline = renderSource(screenWithOverlay(""), fileName = "base-no-modal.explore.kt")
+    val baseRules = baseline.tree.findings.map { it.rule }.toSet()
+    assertTrue(FindingRule.PrimaryLargest in baseRules, "Baseline must trigger PrimaryLargest")
+    assertTrue(FindingRule.TouchTarget in baseRules, "Baseline must trigger TouchTarget")
+    assertTrue(FindingRule.Contrast in baseRules, "Baseline must trigger Contrast")
+
+    val alertDialogRes =
+      renderSource(
+        screenWithOverlay(
+          """
+          AlertDialog(
+            onDismissRequest = {},
+            confirmButton = { TextButton(onClick = {}) { Text("OK") } },
+            title = { Text("Confirm") },
+            text = {
+              Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                Text("Faint in dialog", color = MaterialTheme.colorScheme.surfaceVariant)
+              }
+            },
+          )
+          """
+            .trimIndent(),
+        ),
+        fileName = "alert-modal.explore.kt",
+      )
+    val dialogNode = alertDialogRes.tree.nodes.firstOrNull { it.type == "Dialog" }
+    assertNotNull(
+      dialogNode,
+      "Expected AlertDialog Dialog node in ${alertDialogRes.tree.nodes.map { it.type }}",
+    )
+    assertTrue(dialogNode.isLaidOut && dialogNode.bounds.height < Views.Light.height)
+    val alertRules = alertDialogRes.tree.findings.map { it.rule }.toSet()
+    assertTrue(
+      FindingRule.PrimaryLargest !in alertRules,
+      "AlertDialog must suppress PrimaryLargest: ${alertDialogRes.tree.findings}",
+    )
+    assertTrue(
+      FindingRule.TouchTarget !in alertRules,
+      "AlertDialog must suppress TouchTarget: ${alertDialogRes.tree.findings}",
+    )
+    val behindFaint = alertDialogRes.tree.nodes.first { it.text?.value == "Faint behind" }
+    val insideFaint = alertDialogRes.tree.nodes.first { it.text?.value == "Faint in dialog" }
+    val contrastFindingIds =
+      alertDialogRes.tree.findings.filter { it.rule == FindingRule.Contrast }.map { it.id }
+    assertTrue(
+      behindFaint.id !in contrastFindingIds,
+      "Base contrast behind scrim must be suppressed",
+    )
+    assertTrue(
+      insideFaint.id in contrastFindingIds,
+      "Contrast inside AlertDialog must still be checked",
+    )
+
+    val sheetRes =
+      renderSource(
+        screenWithOverlay(
+          """
+          ModalBottomSheet(
+            onDismissRequest = {},
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+          ) {
+            Column(modifier = Modifier.padding(16.dp)) { Text("Sheet body") }
+          }
+          """
+            .trimIndent(),
+        ),
+        fileName = "modal-sheet.explore.kt",
+      )
+    val sheetNode = sheetRes.tree.nodes.firstOrNull { it.type == "BottomSheet" }
+    assertNotNull(
+      sheetNode,
+      "Expected ModalBottomSheet BottomSheet node in ${sheetRes.tree.nodes.map { it.type }}",
+    )
+    assertTrue(sheetNode.isLaidOut && sheetNode.bounds.height < Views.Light.height)
+    val sheetRules = sheetRes.tree.findings.map { it.rule }.toSet()
+    assertTrue(
+      FindingRule.PrimaryLargest !in sheetRules &&
+        FindingRule.TouchTarget !in sheetRules &&
+        FindingRule.Contrast !in sheetRules,
+      "ModalBottomSheet must suppress behind-scrim rules, got ${sheetRes.tree.findings}",
+    )
+
+    val dateDialogRes =
+      renderSource(
+        screenWithOverlay(
+          """
+          DatePickerDialog(
+            onDismissRequest = {},
+            confirmButton = { TextButton(onClick = {}) { Text("OK") } },
+          ) {
+            DatePicker(state = rememberDatePickerState())
+          }
+          """
+            .trimIndent(),
+        ),
+        fileName = "date-dialog.explore.kt",
+      )
+    val datePickers = dateDialogRes.tree.nodes.filter { it.type == "DatePicker" }
+    assertEquals(1, datePickers.size, "Expected single collapsed DatePicker node, got $datePickers")
+    assertEquals(
+      null,
+      datePickers.single().variant,
+      "DatePickerDialog must remain modal (variant == null)",
+    )
+    val dateRules = dateDialogRes.tree.findings.map { it.rule }.toSet()
+    assertTrue(
+      FindingRule.PrimaryLargest !in dateRules &&
+        FindingRule.TouchTarget !in dateRules &&
+        FindingRule.Contrast !in dateRules,
+      "DatePickerDialog must suppress behind-scrim rules, got ${dateDialogRes.tree.findings}",
+    )
+
+    val timeDialogRes =
+      renderSource(
+        screenWithOverlay(
+          """
+          TimePickerDialog(
+            onDismissRequest = {},
+            confirmButton = { TextButton(onClick = {}) { Text("OK") } },
+            title = { TimePickerDialogDefaults.Title(displayMode = TimePickerDisplayMode.Input) },
+          ) {
+            TimeInput(state = rememberTimePickerState())
+          }
+          """
+            .trimIndent(),
+        ),
+        fileName = "time-dialog.explore.kt",
+      )
+    val timePickerNode = timeDialogRes.tree.nodes.firstOrNull { it.type == "TimePicker" }
+    assertNotNull(
+      timePickerNode,
+      "Expected TimePickerDialog node in ${timeDialogRes.tree.nodes.map { it.type }}",
+    )
+    assertTrue(timePickerNode.isLaidOut)
+    val timeRules = timeDialogRes.tree.findings.map { it.rule }.toSet()
+    assertTrue(
+      FindingRule.PrimaryLargest !in timeRules &&
+        FindingRule.TouchTarget !in timeRules &&
+        FindingRule.Contrast !in timeRules,
+      "TimePickerDialog must suppress behind-scrim rules, got ${timeDialogRes.tree.findings}",
+    )
+
+    val openMenuRes =
+      renderSource(
+        screenWithOverlay(
+          """
+          Box {
+            DropdownMenu(expanded = true, onDismissRequest = {}) {
+              DropdownMenuItem(text = { Text("Copy") }, onClick = {})
+            }
+          }
+          """
+            .trimIndent(),
+        ),
+        fileName = "open-menu.explore.kt",
+      )
+    val menuNode = openMenuRes.tree.nodes.firstOrNull { it.type == "Menu" }
+    val menuItemNode = openMenuRes.tree.nodes.firstOrNull { it.type == "MenuItem" }
+    assertNotNull(menuNode, "Expected expanded DropdownMenu node")
+    assertNotNull(menuItemNode, "Expected DropdownMenuItem node")
+    assertTrue(menuNode.isLaidOut)
+    assertEquals(menuNode.id, menuItemNode.parent)
+    assertTrue(
+      FindingRule.PrimaryLargest in openMenuRes.tree.findings.map { it.rule },
+      "Open non-modal DropdownMenu must still report PrimaryLargest on screen",
+    )
+
+    val closedMenuRes =
+      renderSource(
+        screenWithOverlay(
+          """
+          Box {
+            DropdownMenu(expanded = false, onDismissRequest = {}) {
+              DropdownMenuItem(text = { Text("Copy") }, onClick = {})
+            }
+          }
+          """
+            .trimIndent(),
+        ),
+        fileName = "closed-menu.explore.kt",
+      )
+    assertTrue(
+      closedMenuRes.tree.nodes.none { it.type == "Menu" },
+      "Closed DropdownMenu must not emit Menu node: ${closedMenuRes.tree.nodes.map { it.type }}",
+    )
+  }
+
+  @Test
+  fun `samples contrast per sub-text on composite TimePicker, selected DatePicker, and mixed ButtonGroup`() {
+    val src =
+      """
+      import androidx.compose.foundation.*
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.runtime.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("Composite Contrast") {
+        screen {
+          Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+          ) {
+            ButtonGroup(
+              overflowIndicator = { _ ->
+                IconButton(onClick = {}) { SymbolIcon("more_vert") }
+              },
+            ) {
+              toggleableItem(checked = true, label = "Day", onCheckedChange = {})
+              toggleableItem(checked = false, label = "Week", onCheckedChange = {})
+            }
+            TimePicker(state = rememberTimePickerState(initialHour = 9, initialMinute = 30))
+            DatePicker(state = rememberDatePickerState(initialSelectedDateMillis = 1793923200000L))
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val res = renderSource(src, fileName = "composite-contrast.explore.kt")
+    val rules = res.tree.findings.map { it.rule }.toSet()
+    assertTrue(
+      FindingRule.Contrast !in rules,
+      "Expected zero false Contrast findings on stock TimePicker/DatePicker/ButtonGroup, got ${res.tree.findings}",
+    )
+    assertTrue(
+      FindingRule.Font !in rules,
+      "Expected zero Font findings on stock TimePicker/DatePicker/ButtonGroup, got ${res.tree.findings}",
+    )
+    val dateNode = res.tree.nodes.firstOrNull { it.type == "DatePicker" }
+    val groupNode = res.tree.nodes.firstOrNull { it.type == "ButtonGroup" }
+    assertNotNull(dateNode?.colors, "Expected DatePicker sampled colors")
+    assertNotNull(groupNode?.colors, "Expected ButtonGroup sampled colors")
+  }
 }

@@ -33,7 +33,6 @@ import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import java.util.Collections
-import java.util.IdentityHashMap
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
@@ -85,7 +84,7 @@ object SandboxHeadlessRenderer {
         density = density,
         useStandardTestDispatcherForComposition = false,
       )
-    val inspectionTables = Collections.newSetFromMap(IdentityHashMap<CompositionData, Boolean>())
+    val inspectionTables = Collections.synchronizedSet(LinkedHashSet<CompositionData>())
     var rootCoordinates: LayoutCoordinates? = null
     var emptyDetailScreen: String? = null
     lateinit var tree: LayoutTree

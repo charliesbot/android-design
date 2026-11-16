@@ -25,22 +25,23 @@ internal object PixelContrastSampler {
   private const val DARK_BG_PERCENTILE = 0.10
   private const val PERIMETER_PX = 2
 
-  fun sample(bitmap: Bitmap, fgColor: Color, lineRectsPx: List<Rect>): SampledContrast? {
+  fun sample(
+    bitmap: Bitmap,
+    fgColor: Color,
+    lineRectsPx: List<Rect>,
+    excludeRectsPx: List<Rect> = lineRectsPx,
+  ): SampledContrast? {
     val effectiveFg = if (fgColor == Color.Unspecified) Color.Black else fgColor
     if (effectiveFg.alpha <= 0f) return null
-    val intRects = lineRectsPx.mapNotNull { rect ->
-      val left = floor(rect.left).toInt().coerceIn(0, bitmap.width)
-      val top = floor(rect.top).toInt().coerceIn(0, bitmap.height)
-      val right = ceil(rect.right).toInt().coerceIn(0, bitmap.width)
-      val bottom = ceil(rect.bottom).toInt().coerceIn(0, bitmap.height)
-      if (right > left && bottom > top) IntRect(left, top, right, bottom) else null
-    }
+    val intRects = toIntRects(bitmap, lineRectsPx)
     if (intRects.isEmpty()) return null
+    val excludeIntRects =
+      if (excludeRectsPx === lineRectsPx) intRects else toIntRects(bitmap, excludeRectsPx)
 
     val opaqueFgLum = Contrast.relativeLuminance(colorToHex(effectiveFg)) ?: return null
     var worst: SampledContrast? = null
     for (line in intRects) {
-      val samples = collectPerimeterSamples(bitmap, line, intRects)
+      val samples = collectPerimeterSamples(bitmap, line, excludeIntRects)
       if (samples.isEmpty()) continue
       samples.sortBy { it.luminance }
       val pct =
@@ -55,6 +56,15 @@ internal object PixelContrastSampler {
     }
     return worst
   }
+
+  private fun toIntRects(bitmap: Bitmap, rects: List<Rect>): List<IntRect> =
+    rects.mapNotNull { rect ->
+      val left = floor(rect.left).toInt().coerceIn(0, bitmap.width)
+      val top = floor(rect.top).toInt().coerceIn(0, bitmap.height)
+      val right = ceil(rect.right).toInt().coerceIn(0, bitmap.width)
+      val bottom = ceil(rect.bottom).toInt().coerceIn(0, bitmap.height)
+      if (right > left && bottom > top) IntRect(left, top, right, bottom) else null
+    }
 
   private fun compositeOver(fg: Color, bgArgb: Int): String {
     val srgb = fg.convert(ColorSpaces.Srgb)

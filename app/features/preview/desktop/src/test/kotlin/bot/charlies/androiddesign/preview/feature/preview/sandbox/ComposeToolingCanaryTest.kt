@@ -127,4 +127,73 @@ class ComposeToolingCanaryTest {
       dir.toFile().deleteRecursively()
     }
   }
+
+  @Test
+  fun `slot extractor resolves cross-layer AlertDialog node, sourceLine, bounds, and child parenting`() {
+    val lines =
+      listOf(
+        "import androidx.compose.foundation.layout.*", // 1
+        "import androidx.compose.material3.*", // 2
+        "import androidx.compose.runtime.*", // 3
+        "import androidx.compose.ui.Modifier", // 4
+        "import androidx.compose.ui.unit.dp", // 5
+        "import bot.charlies.androiddesign.preview.kit.*", // 6
+        "", // 7
+        "val preview = designBoard(\"Dialog Canary\") {", // 8
+        "  screen(\"home\") {", // 9
+        "    Box(modifier = Modifier.fillMaxSize()) {", // 10
+        "      Text(\"Behind modal\")", // 11
+        "      AlertDialog(", // 12
+        "        onDismissRequest = {},", // 13
+        "        confirmButton = { TextButton(onClick = {}) { Text(\"Delete\") } },", // 14
+        "        title = { Text(\"Delete item?\") },", // 15
+        "        text = { Text(\"This cannot be undone.\") },", // 16
+        "      )", // 17
+        "    }", // 18
+        "  }", // 19
+        "}", // 20
+      )
+    val sourceText = lines.joinToString("\n")
+    val dir: Path = createTempDirectory("dialog-canary-")
+    try {
+      val rawCompile =
+        ExplorationCompiler.compileSource("dialog-canary.explore.kt", sourceText, dir)
+      assertIs<CompileResult.Compiled>(rawCompile, "Compile failed: $rawCompile")
+      val direction = rawCompile.board.directions.single()
+      val rendered =
+        SandboxHeadlessRenderer.render(
+          compiled = rawCompile,
+          direction = direction,
+          screenId = "home",
+          view = lightView,
+          designSystem = rawCompile.board.resolveDesignSystem(),
+        )
+      val nodes = rendered.tree.nodes
+      val dialogNode = nodes.firstOrNull { it.type == M3Component.Dialog.wire }
+      assertNotNull(dialogNode, "Expected cross-layer Dialog node in ${nodes.map { it.type }}")
+      assertEquals("dialog-canary.explore.kt", dialogNode.sourceFile)
+      assertEquals(12, dialogNode.sourceLine, "Wrong AlertDialog sourceLine: $dialogNode")
+      assertTrue(dialogNode.bounds.width > 0f && dialogNode.bounds.height > 0f)
+      assertTrue(
+        dialogNode.bounds.height < lightView.height,
+        "Expected AlertDialog card bounds smaller than screen height, got ${dialogNode.bounds}",
+      )
+
+      val titleText = nodes.firstOrNull { it.text?.value == "Delete item?" }
+      assertNotNull(titleText, "Expected dialog title Text node")
+      assertEquals(dialogNode.id, titleText.parent, "Title Text must parent to Dialog: $titleText")
+      assertEquals(15, titleText.sourceLine)
+
+      val confirmButton = nodes.firstOrNull { it.type == M3Component.Button.wire }
+      assertNotNull(confirmButton, "Expected confirm TextButton node")
+      assertEquals(
+        dialogNode.id,
+        confirmButton.parent,
+        "Confirm button must parent to Dialog: $confirmButton",
+      )
+      assertEquals(14, confirmButton.sourceLine)
+    } finally {
+      dir.toFile().deleteRecursively()
+    }
+  }
 }

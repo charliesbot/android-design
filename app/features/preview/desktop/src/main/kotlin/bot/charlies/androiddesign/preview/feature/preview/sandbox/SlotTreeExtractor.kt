@@ -21,6 +21,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Density
 import bot.charlies.androiddesign.preview.domain.DatePickerSpec
+import bot.charlies.androiddesign.preview.domain.findings.Contrast
 import bot.charlies.androiddesign.preview.domain.findings.FindingRules
 import bot.charlies.androiddesign.preview.domain.layout.LayoutSummary
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
@@ -73,10 +74,16 @@ internal object SlotTreeExtractor {
     val order: Int,
   )
 
+  private enum class LayerKind {
+    Dialog,
+    Popup,
+  }
+
   private data class FrameContext(
     val sourceFile: String?,
     val lineNumber: Int?,
     val rawName: String?,
+    val inCrossLayerCall: Boolean = false,
   )
 
   fun extract(
@@ -95,6 +102,16 @@ internal object SlotTreeExtractor {
   ): LayoutTree {
     val lineOffsets = computeLineStarts(sourceText)
     val claimed = IdentityHashMap<LayoutInfo, CallSite>()
+    val pendingByKind =
+      mapOf(
+        LayerKind.Dialog to ArrayDeque<CallSite?>(),
+        LayerKind.Popup to ArrayDeque<CallSite?>(),
+      )
+    val layerTables =
+      mapOf(
+        LayerKind.Dialog to ArrayList<CompositionData>(),
+        LayerKind.Popup to ArrayList<CompositionData>(),
+      )
     var orderCounter = 0
 
     data class SourceCallSite(val ident: String?, val line: Int)
@@ -129,20 +146,47 @@ internal object SlotTreeExtractor {
       val isTargetCall =
         ((resolvedFile == explorationFile && isEmitWorthyCall(fnName, caller?.rawName)) ||
           isAlwaysTrackedChrome(fnName)) && (isKnownComponent || isDirectLayout)
+      val isCrossLayer = fnName in CROSS_LAYER_CALL_NAMES
 
       if (isTargetCall && fnName != null) {
-        val layoutInfo =
-          if (isDirectLayout) group.node as LayoutInfo else findPrimaryLayoutInfo(group)
-        if (layoutInfo != null && !claimed.containsKey(layoutInfo)) {
-          val mapped = CallNameMapper.map(fnName, surface)
-          claimed[layoutInfo] =
-            CallSite(
-              rawName = fnName,
-              mappedType = mapped,
-              sourceFile = resolvedFile,
-              sourceLine = resolvedLine,
-              order = orderCounter++,
-            )
+        if (isCrossLayer) {
+          if (caller?.inCrossLayerCall != true) {
+            findLayerHostKind(group, explorationFile)?.let { kind ->
+              pendingByKind
+                .getValue(kind)
+                .addLast(
+                  CallSite(
+                    rawName = fnName,
+                    mappedType = CallNameMapper.map(fnName, surface),
+                    sourceFile = resolvedFile,
+                    sourceLine = resolvedLine,
+                    order = orderCounter++,
+                  ),
+                )
+            }
+          }
+        } else {
+          val layoutInfo =
+            if (isDirectLayout) group.node as LayoutInfo else findPrimaryLayoutInfo(group)
+          if (layoutInfo != null && !claimed.containsKey(layoutInfo)) {
+            val mapped = CallNameMapper.map(fnName, surface)
+            claimed[layoutInfo] =
+              CallSite(
+                rawName = fnName,
+                mappedType = mapped,
+                sourceFile = resolvedFile,
+                sourceLine = resolvedLine,
+                order = orderCounter++,
+              )
+          }
+        }
+      } else if (caller?.inCrossLayerCall != true) {
+        // Reserve FIFO alignment for untracked Popup/Dialog hosts (e.g. TooltipPopup).
+        when {
+          fnName == "DialogLayout" && ownFile == "Dialog.skiko.kt" ->
+            pendingByKind.getValue(LayerKind.Dialog).addLast(null)
+          fnName == "PopupLayout" && ownFile == "Popup.skiko.kt" ->
+            pendingByKind.getValue(LayerKind.Popup).addLast(null)
         }
       }
 
@@ -171,6 +215,7 @@ internal object SlotTreeExtractor {
       var callCursor = 0
       val fallbackChildLine = callSites.firstOrNull()?.line ?: resolvedLine
       val effectiveChildFile = ownFile ?: caller?.sourceFile
+      val childInCrossLayer = (caller?.inCrossLayerCall == true) || (isCrossLayer && isTargetCall)
       children.forEach { child ->
         val matchedLine =
           if (ownFile == explorationFile && callSites.isNotEmpty()) {
@@ -201,13 +246,28 @@ internal object SlotTreeExtractor {
             sourceFile = effectiveChildFile,
             lineNumber = matchedLine,
             rawName = fnName,
+            inCrossLayerCall = childInCrossLayer,
           ),
         )
       }
     }
 
     tables.forEach { table ->
+      detectLayerTableKind(table, explorationFile)?.let { kind ->
+        layerTables.getValue(kind) += table
+      }
       table.compositionGroups.forEach { root -> walkGroup(root, null) }
+    }
+    for (kind in LayerKind.entries) {
+      val pending = pendingByKind.getValue(kind)
+      val spawned = layerTables.getValue(kind)
+      for ((idx, table) in spawned.withIndex()) {
+        val site = pending.getOrNull(idx) ?: continue
+        val containerLayout = findLayerContainerLayoutInfo(table, explorationFile, claimed)
+        if (containerLayout != null && !claimed.containsKey(containerLayout)) {
+          claimed[containerLayout] = site
+        }
+      }
     }
     // ToggleFloatingActionButton inside FloatingActionButtonMenu and DatePicker/DateRangePicker
     // inside DatePickerDialog are outer and inner wrappers of the same component; drop the inner
@@ -325,6 +385,99 @@ internal object SlotTreeExtractor {
     return null
   }
 
+  private fun detectLayerTableKind(table: CompositionData, explorationFile: String): LayerKind? {
+    fun visit(group: CompositionGroup, depth: Int): LayerKind? {
+      val parsed = group.sourceInfo?.takeIf { it.isNotEmpty() }?.let(::parseSourceInformation)
+      val fnName = parsed?.functionName
+      val ownFile = parsed?.sourceFile?.substringAfterLast('/')
+      if (ownFile == explorationFile) return null
+      if (fnName == "DialogLayout" || fnName == "PopupLayout") return null
+      if (fnName == "rememberDialogMeasurePolicy") return LayerKind.Dialog
+      if (fnName == "rememberPopupMeasurePolicy") return LayerKind.Popup
+      if (depth <= 4 && fnName == null && ownFile == "Dialog.skiko.kt") return LayerKind.Dialog
+      if (depth <= 4 && fnName == null && ownFile == "Popup.skiko.kt") return LayerKind.Popup
+      for (child in group.compositionGroups) {
+        visit(child, depth + 1)?.let {
+          return it
+        }
+      }
+      return null
+    }
+    for (root in table.compositionGroups) {
+      visit(root, 0)?.let {
+        return it
+      }
+    }
+    return null
+  }
+
+  private fun findLayerHostKind(group: CompositionGroup, explorationFile: String): LayerKind? {
+    for (child in group.compositionGroups) {
+      val parsed = child.sourceInfo?.takeIf { it.isNotEmpty() }?.let(::parseSourceInformation)
+      val fnName = parsed?.functionName
+      val ownFile = parsed?.sourceFile?.substringAfterLast('/')
+      if (ownFile == explorationFile) continue
+      when {
+        fnName == "DialogLayout" || (fnName == "Dialog" && ownFile == "Dialog.skiko.kt") ->
+          return LayerKind.Dialog
+        fnName == "PopupLayout" || (fnName == "Popup" && ownFile == "Popup.skiko.kt") ->
+          return LayerKind.Popup
+      }
+      findLayerHostKind(child, explorationFile)?.let {
+        return it
+      }
+    }
+    return null
+  }
+
+  private fun findLayerContainerLayoutInfo(
+    table: CompositionData,
+    explorationFile: String,
+    claimed: IdentityHashMap<LayoutInfo, CallSite>,
+  ): LayoutInfo? {
+    var layerRootLayout: LayoutInfo? = null
+    var childAfterRoot: LayoutInfo? = null
+
+    fun LayoutInfo.isUsable(): Boolean =
+      isAttached && isPlaced && width > 0 && height > 0 && !claimed.containsKey(this)
+
+    fun visit(group: CompositionGroup): LayoutInfo? {
+      val parsed = group.sourceInfo?.takeIf { it.isNotEmpty() }?.let(::parseSourceInformation)
+      val fnName = parsed?.functionName
+      val ownFile = parsed?.sourceFile?.substringAfterLast('/')
+      if (ownFile == explorationFile) return null
+      if (fnName == "DialogLayout" || fnName == "PopupLayout") return null
+
+      val direct = (group.node as? LayoutInfo)?.takeIf { it.isUsable() }
+      if (direct != null) {
+        if (layerRootLayout == null) {
+          layerRootLayout = direct
+        } else if (childAfterRoot == null && direct !== layerRootLayout) {
+          childAfterRoot = direct
+        }
+      }
+
+      if (fnName in LAYER_CONTAINER_FUNCTIONS) {
+        val surfaceLayout = findPrimaryLayoutInfo(group)?.takeIf { it.isUsable() }
+        if (surfaceLayout != null) return surfaceLayout
+      }
+
+      for (child in group.compositionGroups) {
+        visit(child)?.let {
+          return it
+        }
+      }
+      return null
+    }
+
+    for (root in table.compositionGroups) {
+      visit(root)?.let {
+        return it
+      }
+    }
+    return childAfterRoot ?: layerRootLayout
+  }
+
   private fun buildLayoutNode(
     layout: LayoutInfo,
     site: CallSite,
@@ -372,9 +525,14 @@ internal object SlotTreeExtractor {
         (directSemantics + if (isInteractiveType) ownedSemantics else emptyList()).any {
           it.config.getOrNull(SemanticsProperties.TestTag) == AD_PRIMARY_TAG
         }
-    val scrollsVertically = directSemantics.any {
-      it.config.contains(SemanticsProperties.VerticalScrollAxisRange)
-    }
+    val scrollsVertically =
+      (directSemantics +
+          if (surface == BoardSurface.Wear && site.mappedType == WearComponent.AlertDialog.wire) {
+            ownedSemantics
+          } else {
+            emptyList()
+          })
+        .any { it.config.contains(SemanticsProperties.VerticalScrollAxisRange) }
     val scrollsHorizontally = directSemantics.any {
       it.config.contains(SemanticsProperties.HorizontalScrollAxisRange)
     }
@@ -454,7 +612,14 @@ internal object SlotTreeExtractor {
       clip = cornerClip,
       variant =
         if (site.mappedType == M3Component.DatePicker.wire && site.rawName != "DatePickerDialog") {
-          DatePickerSpec.Variant.Docked.wire
+          if (
+            generateSequence(layout.parentInfo) { it.parentInfo }
+              .any { anc -> claimed[anc]?.mappedType == M3Component.Dialog.wire }
+          ) {
+            DatePickerSpec.Variant.FullScreen.wire
+          } else {
+            DatePickerSpec.Variant.Docked.wire
+          }
         } else {
           null
         },
@@ -493,7 +658,7 @@ internal object SlotTreeExtractor {
     val result = mutableListOf<SemanticsNode>()
     semanticsByLayout[rootLayout]?.let(result::addAll)
     for ((candidateLayout, semNodes) in semanticsByLayout) {
-      if (candidateLayout === rootLayout) continue
+      if (candidateLayout === rootLayout || claimed.containsKey(candidateLayout)) continue
       if (nearestClaimedAncestor(candidateLayout, claimed) === rootLayout) {
         result.addAll(semNodes)
       }
@@ -555,24 +720,29 @@ internal object SlotTreeExtractor {
     }
     if (textLayouts.isEmpty()) return ExtractedTextAndColor()
 
-    val (firstNode, firstRes) = textLayouts.first()
-    val rawText = firstRes.layoutInput.text.text
-    val style = firstRes.layoutInput.style
-    val family = resolveFontFamilyName(style.fontFamily, surface)
-    val inferredRole = inferTypeRole(style.fontSize.value, style.fontWeight?.weight ?: 400, surface)
+    data class SubTextEntry(
+      val res: TextLayoutResult,
+      val rectsPx: List<Rect>,
+      val family: String?,
+      val role: String,
+    )
 
-    val lineRectsPx = ArrayList<Rect>()
+    val allLineRectsPx = ArrayList<Rect>()
     var truncated = false
     var overflow = false
     var undrawn = false
     var maxLines = 1
     var combinedInk: Rect? = null
 
-    for ((semNode, res) in textLayouts) {
+    val entries = textLayouts.map { (semNode, res) ->
+      val style = res.layoutInput.style
+      val family = resolveFontFamilyName(style.fontFamily, surface)
+      val role = inferTypeRole(style.fontSize.value, style.fontWeight?.weight ?: 400, surface)
       maxLines = maxOf(maxLines, res.lineCount)
       if (hasActualTextOverflow(res)) overflow = true
       if ((0 until res.lineCount).any { res.isLineEllipsized(it) }) truncated = true
       val origin = semNode.positionInFrame(rootWindowPos)
+      val rectsPx = ArrayList<Rect>()
       var nodeInk: Rect? = null
       for (line in 0 until res.lineCount) {
         val left = res.getLineLeft(line)
@@ -581,7 +751,8 @@ internal object SlotTreeExtractor {
         val bottom = res.getLineBottom(line)
         val r = Rect(origin.x + left, origin.y + top, origin.x + right, origin.y + bottom)
         if (r.width > 0f && r.height > 0f) {
-          lineRectsPx += r
+          rectsPx += r
+          allLineRectsPx += r
           nodeInk = if (nodeInk == null) r else unionRect(nodeInk, r)
         }
       }
@@ -589,14 +760,33 @@ internal object SlotTreeExtractor {
       if (nodeInk != null) {
         combinedInk = if (combinedInk == null) nodeInk else unionRect(combinedInk, nodeInk)
       }
+      SubTextEntry(res = res, rectsPx = rectsPx, family = family, role = role)
     }
 
-    val sampled =
-      if (bitmap != null && lineRectsPx.isNotEmpty()) {
-        PixelContrastSampler.sample(bitmap, style.color, lineRectsPx)
-      } else {
-        null
+    var worstEntry: SubTextEntry? = null
+    var worstSample: SampledContrast? = null
+    var worstMargin = Double.POSITIVE_INFINITY
+    if (bitmap != null && allLineRectsPx.isNotEmpty()) {
+      for (entry in entries) {
+        if (entry.rectsPx.isEmpty()) continue
+        val sample =
+          PixelContrastSampler.sample(
+            bitmap = bitmap,
+            fgColor = entry.res.layoutInput.style.color,
+            lineRectsPx = entry.rectsPx,
+            excludeRectsPx = allLineRectsPx,
+          ) ?: continue
+        val margin = sample.ratio - Contrast.requiredRatio(catalog, entry.role)
+        if (margin < worstMargin) {
+          worstMargin = margin
+          worstEntry = entry
+          worstSample = sample
+        }
       }
+    }
+
+    val chosenEntry = worstEntry ?: entries.first()
+    val rawText = textLayouts.first().second.layoutInput.text.text
 
     return ExtractedTextAndColor(
       textInfo =
@@ -605,12 +795,12 @@ internal object SlotTreeExtractor {
           lines = maxLines,
           overflow = overflow,
           truncated = truncated,
-          font = family,
+          font = chosenEntry.family,
           ink = combinedInk?.toDp(density),
           undrawn = undrawn,
         ),
-      roles = NodeRoles(type = inferredRole),
-      colors = sampled?.let { NodeColors(container = it.bgHex, content = it.fgHex) },
+      roles = NodeRoles(type = chosenEntry.role),
+      colors = worstSample?.let { NodeColors(container = it.bgHex, content = it.fgHex) },
     )
   }
 
@@ -966,6 +1156,34 @@ internal object SlotTreeExtractor {
       "SubcomposeLayout",
     )
 
+  private val CROSS_LAYER_CALL_NAMES =
+    setOf(
+      "Dialog",
+      "AlertDialog",
+      "BasicAlertDialog",
+      "ConfirmationDialog",
+      "ModalBottomSheet",
+      "DatePickerDialog",
+      "TimePickerDialog",
+      "VibrantTimePickerDialog",
+      "DropdownMenu",
+      "DropdownMenuPopup",
+      "ExposedDropdownMenu",
+      "ExpandedFullScreenSearchBar",
+      "ExpandedFullScreenContainedSearchBar",
+      "ExpandedDockedSearchBar",
+      "ExpandedDockedSearchBarWithGap",
+    )
+
+  private val LAYER_CONTAINER_FUNCTIONS =
+    setOf(
+      "Surface",
+      "AlertDialogContent",
+      "ConfirmationDialogContent",
+      "DropdownMenuPopupContent",
+      "DropdownMenuContent",
+    )
+
   private val CHROME_CALL_NAMES =
     setOf(
       "ShortNavigationBar",
@@ -980,6 +1198,7 @@ internal object SlotTreeExtractor {
       "NavigationRailItem",
       "NavigationDrawerItem",
       "TimeText",
+      "Dialog",
       "ModalBottomSheet",
       "AlertDialog",
       "BasicAlertDialog",
@@ -994,5 +1213,7 @@ internal object SlotTreeExtractor {
       "ExpandedFullScreenContainedSearchBar",
       "ExpandedDockedSearchBar",
       "ExpandedDockedSearchBarWithGap",
+      "PlainTooltip",
+      "RichTooltip",
     )
 }
