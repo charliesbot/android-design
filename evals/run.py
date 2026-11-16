@@ -2,6 +2,7 @@
 """Agent-independent artifacts: prepare, evaluate, score; optional automated run adapters."""
 import argparse
 import hashlib
+import os
 import re
 import json
 import shutil
@@ -14,7 +15,7 @@ from pathlib import Path
 from checks import read_report, run as run_checks
 from judge import judge, parse, aggregate, validate_runs, SCHEMA, prompt_for as judge_prompt
 from backends import BACKENDS, execute
-from preview_app import app_binary
+from preview_app import JAR_ENV, NO_OPEN_ENV, app_binary, worker_jar
 from report import METRIC_KEYS, generator_medians, label, write_report, write_summary
 
 HERE = Path(__file__).resolve().parent
@@ -23,8 +24,9 @@ SKILL_DIR = ROOT / "plugin" / "skills" / "android-design"
 EXPLORE_DIR = ROOT / "plugin" / "skills" / "android-design-explore"
 # Where prepare() copies both skills inside a case directory.
 CASE_SKILLS = "skills"
-# Names inside a case directory. The agent writes DESIGN.md and the proposal; `render` writes renders/.
-PROPOSAL = "design/proposal.proposal.json"
+# Names inside a case directory. The agent writes DESIGN.md and the exploration; `render` writes renders/.
+PROPOSAL = "design/proposal.explore.kt"
+WEAR_PROPOSAL = "design/proposal-wear.explore.kt"
 DESIGN_MD = "DESIGN.md"
 GIT = ["git", "-c", "user.name=android-design-evals", "-c", "user.email=evals@example.invalid"]
 
@@ -53,7 +55,7 @@ def prepare(case, case_dir):
         shutil.copytree(skill, case_dir / CASE_SKILLS / skill.name)
     run_tool(["git", "init", "-q"], cwd=case_dir)
     run_tool([*GIT, "commit", "-q", "--allow-empty", "-m", "Initial commit"], cwd=case_dir)
-    proposal = case_dir / PROPOSAL
+    proposal = case_dir / (WEAR_PROPOSAL if case.get("surface") == "wear" else PROPOSAL)
     for f in case.get("files", []):
         target = proposal.parent / f["to"]
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -64,21 +66,21 @@ def prepare(case, case_dir):
     return proposal
 
 
-# What the agent prompt says per surface: where the proposal must work, what check_proposal covers, and how to
+# What the agent prompt says per surface: where the exploration must work, what check_design covers, and how to
 # read its layout summaries. Phone-size cases cover the window size classes; Wear cases cover the two round watches.
 SURFACE_PROMPT = {
     'phone': {
-        'TARGET': 'The screen must work and adapt across phone (411x923), foldable (704x933), tablet (1280x800), and desktop (1920x1080) windows, in light and dark.',
+        'TARGET': 'The screen must work and adapt across phone (411x923), foldable (704x933), tablet (1280x800), and desktop (1920x1080) windows, in light and dark, using `designBoard(...)` and `androidx.compose.material3.*`.',
         'VIEWS': 'all five views',
         'RENDER_VIEWS': '`light` and `desktop`',
-        'LAYOUT': "Read each view's `layout` summary in the `check_proposal` result (navigation, panes, and regions). Check that the larger views reveal what your adaptation answer promised, rather than rearranging the phone content. Call `get_tree` only when a summary is not enough.",
+        'LAYOUT': "Read each view's `layout` summary in `check_design` (unchanged views collapse to `{\"same\": \"<view>\"}`). Confirm larger views reveal what your adaptation answer promised rather than rearranging phone content, verify `colors` has one strong fill, and inspect the returned `light` and `desktop` images once checks pass. Call `get_tree` only when a failing finding needs exact bounds or line numbers.",
         'DONE': 'implement the brief and adapt across all four window sizes',
     },
     'wear': {
-        'TARGET': 'This is a Wear OS proposal: every screen uses the Wear catalog (`get_catalog` lists it), and the previewer draws it on two round, dark watches: small (204x204) and large (227x227). The screen must work on both. Design for the small one first; the large one may show more but never less.',
+        'TARGET': 'This is a Wear OS exploration using `wearBoard(...)` and `androidx.wear.compose.material3.*`. The previewer draws it on two round, dark watches: small (204x204) and large (227x227). Design for the small one first; the large one may show more but never less.',
         'VIEWS': 'both watch views',
         'RENDER_VIEWS': '`watch` and `watch-large`',
-        'LAYOUT': "Read each view's `layout` summary in the `check_proposal` result. Check that nothing important sits where the round edge cuts it, and that the large watch shows at least what the small one does. Call `get_tree` only when a summary is not enough.",
+        'LAYOUT': "Read each view's `layout` summary in `check_design`. Confirm nothing sits where the round edge cuts it, inspect the returned `watch` and `watch-large` images once checks pass, and verify the large watch shows at least what the small one does. Call `get_tree` only when a failing finding needs exact bounds or line numbers.",
         'DONE': 'implement the brief on the small and the large watch',
     },
 }
@@ -114,18 +116,18 @@ def generator_metrics_from(reply):
 
 def generate(case_dir, backend, model=None):
     reply = execute(backend, (case_dir / 'prompt.md').read_text(), case_dir,
-                    role='generator', model=model, mcp_binary=app_binary())
+                    role='generator', model=model, mcp_binary=app_binary(), mcp_jar=worker_jar())
     (case_dir / 'agent.json').write_text(json.dumps(reply, indent=2))
     (case_dir / 'generator-metrics.json').write_text(json.dumps(generator_metrics_from(reply), indent=2))
     return reply
 
 
 def render(case_dir):
-    """Renders the proposal headlessly with the previewer app into <case>/renders/ (PNGs, trees, report.json).
+    """Renders the exploration headlessly with the supervisor + worker into <case>/renders/ (PNGs, trees, report.json).
 
-    Stale renders are removed first. Returns (images, error). An invalid proposal (exit 2) or failing findings
+    Stale renders are removed first. Returns (images, error). An invalid exploration (exit 2) or failing findings
     (exit 1) are not errors here: report.json records them and checks.py reports them. Only an infrastructure
-    failure (no report.json, timeout) is an error. A missing app raises RuntimeError.
+    failure (no report.json, timeout) is an error. Missing supervisor or JAR raises RuntimeError.
     """
     renders = case_dir / 'renders'
     if renders.is_symlink():
@@ -133,12 +135,15 @@ def render(case_dir):
     if renders.exists():
         shutil.rmtree(renders)
     (case_dir / 'render.log').unlink(missing_ok=True)
-    command = [str(app_binary()), 'render', str(proposal_path(case_dir)), '--out', str(renders)]
+    binary = app_binary()
+    jar = worker_jar()
+    command = [str(binary), 'render', str(proposal_path(case_dir)), '--out', str(renders)]
     design = case_dir / DESIGN_MD
     if design.is_file():
         command += ['--design', str(design)]
+    env = {**os.environ, JAR_ENV: str(jar), NO_OPEN_ENV: '1'}
     try:
-        done = subprocess.run(command, cwd=case_dir, capture_output=True, text=True, timeout=900,
+        done = subprocess.run(command, cwd=case_dir, env=env, capture_output=True, text=True, timeout=900,
                               stdin=subprocess.DEVNULL)
     except (OSError, subprocess.TimeoutExpired) as error:
         (case_dir / 'render.log').write_text(str(error))

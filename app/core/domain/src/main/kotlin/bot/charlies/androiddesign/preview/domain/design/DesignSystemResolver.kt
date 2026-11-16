@@ -1,18 +1,18 @@
 package bot.charlies.androiddesign.preview.domain.design
 
-import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.DesignSystem
-import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.PaletteVariant
+import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.ShapeToken
 import bot.charlies.androiddesign.preview.model.StyleDef
+import bot.charlies.androiddesign.preview.model.SurfaceSpec
 import bot.charlies.androiddesign.preview.model.ThemeOverride
 import bot.charlies.androiddesign.preview.model.TypographyOverride
 import bot.charlies.androiddesign.preview.model.camelToKebab
 
 /**
- * Merges DESIGN.md with a proposal's `theme` (the proposal wins per key) and fills defaults. Values
- * it cannot read are dropped; the validator is what reports them.
+ * Merges `DESIGN.md` with board-level [ThemeOverride] settings (the board wins per key) and fills
+ * defaults.
  */
 object DesignSystemResolver {
   const val DEFAULT_SEED = "#6750A4"
@@ -63,21 +63,21 @@ object DesignSystemResolver {
     DIMENSION.matchEntire(value.trim())?.groupValues?.get(1)?.toFloatOrNull()
 
   /**
-   * Resolves the layers under the roles of [catalog]: the phone's by default. A role the catalog
+   * Resolves the layers under the roles of [surface]: [PhoneSurface] by default. A role the surface
    * does not have is dropped.
    */
   fun resolve(
     designMd: ThemeOverride?,
-    proposalTheme: ThemeOverride?,
-    catalog: Catalog = M3ExpressiveCatalog,
+    boardTheme: ThemeOverride?,
+    surface: SurfaceSpec = PhoneSurface,
   ): DesignSystem {
-    val colorRoles = catalog.colorRoles.associateBy { it.camelToKebab() }
-    val typeRoles = catalog.typeRoles.keys.associateBy { it.camelToKebab() }
-    val layers = listOfNotNull(designMd, proposalTheme)
+    val colorRoles = surface.colorRoles.associateBy { it.camelToKebab() }
+    val typeRoles = surface.typeRoles.keys.associateBy { it.camelToKebab() }
+    val layers = listOfNotNull(designMd, boardTheme)
     val colors = layers.fold(emptyMap<String, String>()) { acc, layer -> acc + layer.colors }
 
     val declaredSeed =
-      listOfNotNull(proposalTheme, designMd).firstNotNullOfOrNull { layerSeed(it, colors) }
+      listOfNotNull(boardTheme, designMd).firstNotNullOfOrNull { layerSeed(it, colors) }
     val seed = declaredSeed ?: DEFAULT_SEED
     val scheme = layers.mapNotNull { it.material?.scheme }
     val variant =
@@ -93,9 +93,9 @@ object DesignSystemResolver {
     }
 
     val typography = linkedMapOf<String, TypographyOverride>()
-    // A catalog with a platform typeface ignores DESIGN.md's typography, written for another one.
+    // A surface with a platform typeface ignores DESIGN.md's typography, written for another one.
     val typographyLayers =
-      if (catalog.platformFontFamilies.isEmpty()) layers else listOfNotNull(proposalTheme)
+      if (surface.platformFontFamilies.isEmpty()) layers else listOfNotNull(boardTheme)
     for (layer in typographyLayers) {
       for ((key, value) in layer.typography) {
         val role = typeRoles[key] ?: continue

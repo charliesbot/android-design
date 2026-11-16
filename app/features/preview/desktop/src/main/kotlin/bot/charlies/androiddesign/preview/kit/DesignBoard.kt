@@ -33,18 +33,18 @@ import androidx.window.core.layout.computeWindowSizeClass
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalTheme
 import bot.charlies.androiddesign.preview.feature.preview.theme.wear.ProvideWearTheme
-import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.DesignSystem
-import bot.charlies.androiddesign.preview.model.M3ExpressiveCatalog
 import bot.charlies.androiddesign.preview.model.MaterialOverride
 import bot.charlies.androiddesign.preview.model.PaletteVariant
+import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.SchemeOverride
 import bot.charlies.androiddesign.preview.model.SizeClass
+import bot.charlies.androiddesign.preview.model.SurfaceSpec
 import bot.charlies.androiddesign.preview.model.ThemeOverride
 import bot.charlies.androiddesign.preview.model.TypeRole
 import bot.charlies.androiddesign.preview.model.TypographyOverride
 import bot.charlies.androiddesign.preview.model.ViewSpec
-import bot.charlies.androiddesign.preview.model.WearCatalog
+import bot.charlies.androiddesign.preview.model.WearSurface
 import java.nio.file.Path
 import kotlin.math.roundToInt
 
@@ -111,8 +111,8 @@ internal constructor(
   val brandFont: BundledFont?,
   val directions: List<DirectionSpec>,
 ) {
-  val catalog: Catalog
-    get() = if (surface == BoardSurface.Wear) WearCatalog else M3ExpressiveCatalog
+  val surfaceSpec: SurfaceSpec
+    get() = if (surface == BoardSurface.Wear) WearSurface else PhoneSurface
 
   /** Resolves board, DESIGN.md, and optional viewer overrides into a merged [DesignSystem]. */
   fun resolveDesignSystem(
@@ -162,7 +162,7 @@ internal constructor(
             },
         )
       }
-    return DesignSystemResolver.resolve(designMd, boardOverride, catalog)
+    return DesignSystemResolver.resolve(designMd, boardOverride, surfaceSpec)
   }
 }
 

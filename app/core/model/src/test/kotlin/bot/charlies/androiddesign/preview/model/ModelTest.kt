@@ -3,14 +3,9 @@ package bot.charlies.androiddesign.preview.model
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.put
 
 class ModelTest {
   @Test
@@ -61,26 +56,6 @@ class ModelTest {
   }
 
   @Test
-  fun `every catalog default is a value its prop accepts`() {
-    for (def in M3ExpressiveCatalog.components) {
-      for (prop in def.props) {
-        val default = prop.default ?: continue
-        val label = "${def.name}.${prop.name}"
-        when (val kind = prop.kind) {
-          is PropKind.Enum -> assertTrue(default.isString && default.content in kind.values, label)
-          PropKind.Bool -> assertNotNull(default.booleanOrNull, label)
-          PropKind.Icon -> assertTrue(default.isString && default.content.isNotEmpty(), label)
-          is PropKind.Number -> {
-            val number = assertNotNull(default.doubleOrNull, label)
-            assertTrue(kind.bounds == null || number in kind.bounds, label)
-          }
-          else -> error("$label: a ${kind::class.simpleName} prop has no default")
-        }
-      }
-    }
-  }
-
-  @Test
   fun `kebab names are what DESIGN dot md uses`() {
     assertEquals("surface-container-high", ColorRole.SurfaceContainerHigh.kebab)
     assertEquals(TypeRole.LabelSmallEmphasized, TypeRole.fromKebab("label-small-emphasized"))
@@ -128,24 +103,11 @@ class ModelTest {
   fun `every size class has a view`() {
     assertEquals(SizeClass.entries.toSet(), Views.all.map { it.sizeClass }.toSet())
     Views.all.forEach { assertEquals(SizeClass.forWidth(it.width), it.sizeClass, it.name) }
+    assertTrue(WearSurface.views.all { it.round && it.dark && it.sizeClass == SizeClass.Compact })
   }
 
   @Test
-  fun `the registry has unique component names and resolves every allowed child`() {
-    val names = M3ExpressiveCatalog.components.map { it.name }
-    assertEquals(names.size, names.toSet().size)
-    for (def in M3ExpressiveCatalog.components) {
-      assertEquals(def.props.size, def.props.map { it.name }.toSet().size, def.name)
-      for (prop in def.props) {
-        prop.allowedChildren?.forEach {
-          assertNotNull(M3ExpressiveCatalog.find(it), "${def.name}.${prop.name} -> $it")
-        }
-      }
-    }
-  }
-
-  @Test
-  fun `the layout tree encodes the way the brief shows`() {
+  fun `the layout tree encodes cleanly`() {
     val tree =
       LayoutTree(
         screen = "plates",
@@ -185,7 +147,7 @@ class ModelTest {
   }
 
   @Test
-  fun `the registry flags pin each trait per catalog`() {
+  fun `surface specs pin each trait per surface`() {
     assertEquals(
       setOf(
         "BottomSheet",
@@ -198,27 +160,24 @@ class ModelTest {
         "DatePicker",
         "TimePicker",
       ),
-      M3ExpressiveCatalog.overlayNames,
+      PhoneSurface.overlayNames,
     )
     assertEquals(
       setOf("BottomSheet", "Dialog", "SideSheet", "SearchView", "DatePicker", "TimePicker"),
-      M3ExpressiveCatalog.modalNames,
+      PhoneSurface.modalNames,
     )
-    assertEquals(setOf("FloatingActionButton", "FabMenu"), M3ExpressiveCatalog.fabNames)
-    assertEquals(setOf("Carousel", "Tabs"), flagged(M3ExpressiveCatalog) { it.scrollsSideways })
-    assertEquals(setOf("Slider", "RangeSlider"), flagged(M3ExpressiveCatalog) { it.rangeValued })
-    assertTrue(M3ExpressiveCatalog.overlayNames.containsAll(M3ExpressiveCatalog.modalNames))
+    assertEquals(setOf("FloatingActionButton", "FabMenu"), PhoneSurface.fabNames)
+    assertEquals(setOf("Carousel", "Tabs"), PhoneSurface.horizontalScrollers)
+    assertTrue(PhoneSurface.overlayNames.containsAll(PhoneSurface.modalNames))
 
-    assertEquals(setOf("AlertDialog", "ConfirmationDialog"), WearCatalog.overlayNames)
-    assertEquals(setOf("AlertDialog", "ConfirmationDialog"), WearCatalog.modalNames)
-    assertEquals(emptySet(), WearCatalog.fabNames)
-    assertEquals(emptySet(), flagged(WearCatalog) { it.scrollsSideways })
-    assertEquals(setOf("Slider", "Stepper"), flagged(WearCatalog) { it.rangeValued })
-    assertTrue(WearCatalog.overlayNames.containsAll(WearCatalog.modalNames))
+    assertEquals(setOf("AlertDialog", "ConfirmationDialog"), WearSurface.overlayNames)
+    assertEquals(setOf("AlertDialog", "ConfirmationDialog"), WearSurface.modalNames)
+    assertEquals(emptySet(), WearSurface.fabNames)
+    assertEquals(emptySet(), WearSurface.horizontalScrollers)
+    assertTrue(WearSurface.overlayNames.containsAll(WearSurface.modalNames))
+    assertEquals(WearSurface, SurfaceSpecs.forView(Views.Watch))
+    assertEquals(PhoneSurface, SurfaceSpecs.forView(Views.Light))
   }
-
-  private fun flagged(catalog: Catalog, trait: (ComponentDef) -> Boolean): Set<String> =
-    catalog.components.filter(trait).map { it.name }.toSet()
 
   @Test
   fun `a tree with an error finding does not pass`() {
@@ -240,42 +199,5 @@ class ModelTest {
       val failure = assertFailsWith<SerializationException>(bad) { decode(bad) }
       assertEquals("Bounds must be [x, y, width, height]", failure.message, bad)
     }
-  }
-
-  @Test
-  fun `wear large overrides apply from 225 dp, so at 227 and not at 204`() {
-    val node =
-      ComponentNode(
-        "t",
-        "Text",
-        buildJsonObject {
-          put("sizeClass", buildJsonObject { put("large", buildJsonObject { put("type", "big") }) })
-        },
-      )
-    val breakpoints = WearCatalog.sizeBreakpoints
-    assertEquals(emptyMap(), node.sizeOverridesAt(breakpoints, Views.Watch.width))
-    assertEquals(setOf("type"), node.sizeOverridesAt(breakpoints, Views.WatchLarge.width).keys)
-    assertTrue(WearCatalog.views.all { it.round && it.dark && it.sizeClass == SizeClass.Compact })
-  }
-
-  @Test
-  fun `phone size overrides are unchanged`() {
-    val node =
-      ComponentNode(
-        "t",
-        "Text",
-        buildJsonObject {
-          put(
-            "sizeClass",
-            buildJsonObject {
-              put("medium", buildJsonObject { put("a", 1) })
-              put("expanded", buildJsonObject { put("b", 2) })
-            },
-          )
-        },
-      )
-    assertEquals(emptyMap(), node.sizeOverridesAt(SizeClass.Compact))
-    assertEquals(setOf("a"), node.sizeOverridesAt(SizeClass.Medium).keys)
-    assertEquals(setOf("a", "b"), node.sizeOverridesAt(SizeClass.Expanded).keys)
   }
 }

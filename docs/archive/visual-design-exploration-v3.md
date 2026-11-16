@@ -1,8 +1,8 @@
 # Visual design exploration v3
 
-**Date:** 2026-10-30
+> **Archived:** Superseded by [Visual design exploration v4](../design/visual-design-exploration-v4.md).
 
-> **Planned successor:** [Visual design exploration v4](visual-design-exploration-v4.md) specifies the cross-OS plugin and Code-First Kotlin sandbox that will supersede this design once its rollout gate passes.
+**Date:** 2026-10-30
 
 ## TL;DR
 
@@ -50,7 +50,7 @@ The app lives in `app/` at the root of this repository, never under `skills/`, w
 | Agent connection | Official Kotlin MCP SDK `io.modelcontextprotocol:kotlin-sdk` 0.16.0, `StdioServerTransport` |
 | Parsing | kotlinx.serialization for proposals, and a Kotlin YAML library for `DESIGN.md` front matter |
 
-The desktop material3 covers the skill's component guidance; [component-coverage.md](component-coverage.md) tracks which of its components the catalog draws so far. Every name that `skills/android-design-explore/references/compose-mapping.md` relies on exists in the desktop jar. The only miss is `isDark`, a false match, because the mapping uses `isDark` as a MaterialKolor parameter. The 16 names the desktop jar lacks are Android-only APIs: wallpaper dynamic color, secure window flags, and carousel keyline internals.
+The desktop material3 covers the skill's component guidance; [component-coverage.md](../design/component-coverage.md) tracks which of its components the catalog draws so far. Every name that `skills/android-design-explore/references/compose-mapping.md` relies on exists in the desktop jar. The only miss is `isDark`, a false match, because the mapping uses `isDark` as a MaterialKolor parameter. The 16 names the desktop jar lacks are Android-only APIs: wallpaper dynamic color, secure window flags, and carousel keyline internals.
 
 **Architecture.** The app follows the `android-dev` skill's layering and conventions, adapted for a desktop platform, for consistency with the owner's apps. Its Android bootstrap scripts do not apply.
 
@@ -270,8 +270,8 @@ v3 replaces the HTML proposal runtime: `@m3e/web`, `gallery/runtime-src/`, `gall
 
 ## Links
 
-- [Visual design exploration v4](visual-design-exploration-v4.md), the planned cross-OS plugin and Code-First Kotlin sandbox
-- [Visual design exploration v2](../archive/visual-design-exploration-v2.md), the HTML design this replaces
+- [Visual design exploration v4](../design/visual-design-exploration-v4.md), the cross-OS plugin and Code-First Kotlin sandbox that supersedes this design
+- [Visual design exploration v2](visual-design-exploration-v2.md), the HTML design this replaces
 - [Compose Multiplatform proposal fidelity research](../research/compose-multiplatform-proposal-fidelity.md)
 - [A2UI specification v1.0](https://github.com/a2ui-project/a2ui/tree/main/specification/v1_0)
 - [AndroidX A2UI Compose releases](https://developer.android.com/jetpack/androidx/releases/a2ui-compose)

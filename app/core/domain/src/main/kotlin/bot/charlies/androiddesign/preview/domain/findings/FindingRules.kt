@@ -4,9 +4,6 @@ import bot.charlies.androiddesign.preview.domain.DatePickerSpec
 import bot.charlies.androiddesign.preview.model.Axis
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.BundledFont
-import bot.charlies.androiddesign.preview.model.Catalog
-import bot.charlies.androiddesign.preview.model.Catalogs
-import bot.charlies.androiddesign.preview.model.ComponentGroup
 import bot.charlies.androiddesign.preview.model.Finding
 import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.LayoutNode
@@ -15,6 +12,8 @@ import bot.charlies.androiddesign.preview.model.M3Component
 import bot.charlies.androiddesign.preview.model.NavigationNodes
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.SizeClass
+import bot.charlies.androiddesign.preview.model.SurfaceSpec
+import bot.charlies.androiddesign.preview.model.SurfaceSpecs
 import bot.charlies.androiddesign.preview.model.TypeRole
 import kotlin.math.hypot
 import kotlin.math.round
@@ -49,68 +48,21 @@ object FindingRules {
   /** Slack on a child reaching past its parent or the window. */
   private const val OVERFLOW_SLACK_DP = 0.5f
 
-  /** The component sets the rules read, derived once per catalog. */
-  private class Facets(val catalog: Catalog) {
-    /**
-     * Components that compete with the primary: buttons, icon buttons, FABs, split buttons, chips.
-     */
-    val actionTypes: Set<String> =
-      catalog.components
-        .filter {
-          it.interactive && it.group in setOf(ComponentGroup.Actions, ComponentGroup.Chips)
-        }
-        .map { it.name }
-        .toSet() - M3Component.FabMenuItem.wire
-
-    val interactiveTypes: Set<String> =
-      catalog.components.filter { it.interactive }.map { it.name }.toSet() +
-        catalog.navigationItemNames
-
-    /** Components whose children scroll sideways, so they are meant to run past their parent. */
-    val horizontalScrollers: Set<String> =
-      catalog.components.filter { it.scrollsSideways }.map { it.name }.toSet()
-
-    /**
-     * Controls whose label must stay on one line (Google: "Don't truncate or wrap label text"):
-     * interactive components with a `label` in the action, chip, navigation and overlay groups.
-     * Text fields and checkboxes keep ordinary text behavior.
-     */
-    val labelTypes: Set<String> =
-      catalog.components
-        .filter {
-          it.interactive &&
-            it.group in
-              setOf(
-                ComponentGroup.Actions,
-                ComponentGroup.Chips,
-                ComponentGroup.Structure,
-                ComponentGroup.Overlays,
-              ) &&
-            it.prop("label") != null
-        }
-        .map { it.name }
-        .toSet() + catalog.navigationItemNames
-  }
-
-  private val facets: Map<String, Facets> by lazy {
-    Catalogs.all.associate { it.id to Facets(it) }
-  }
-
   /** Bundled faces by lowercase family. */
   private val bundledFonts: Map<String, BundledFont> =
     BundledFont.entries.associateBy { it.family.lowercase() }
 
   /**
-   * The findings of [tree], under the rules of [catalog], which is its view's by default.
+   * The findings of [tree], under the rules of [surface], which is its view's by default.
    * [emptyDetailLists] are the list screens the view shows beside a detail pane with no
    * placeholder: the tree holds no node for an empty pane, so the renderer reports them.
    */
   fun evaluate(
     tree: LayoutTree,
-    catalog: Catalog = Catalogs.forView(tree.view),
+    surface: SurfaceSpec = SurfaceSpecs.forView(tree.view),
     emptyDetailLists: List<String> = emptyList(),
   ): List<Finding> {
-    val view = View(tree, checkNotNull(facets[catalog.id]) { "unknown catalog ${catalog.id}" })
+    val view = View(tree, surface)
     return touchTargets(view) +
       fonts(view) +
       clippedText(view) +
@@ -136,8 +88,7 @@ object FindingRules {
 
   // region the view
 
-  private class View(val tree: LayoutTree, val facets: Facets) {
-    val catalog: Catalog = facets.catalog
+  private class View(val tree: LayoutTree, val surface: SurfaceSpec) {
     val nodes: List<LayoutNode> = tree.nodes
     private val byId: Map<String, LayoutNode> = buildMap {
       nodes.forEach { putIfAbsent(it.id, it) }
@@ -146,7 +97,7 @@ object FindingRules {
     /** Open modal surfaces: a sheet or dialog node that takes up space. */
     private val modals: Set<String> =
       nodes
-        .filter { it.type in catalog.modalNames && it.isLaidOut && !it.isDropdown }
+        .filter { it.type in surface.modalNames && it.isLaidOut && !it.isDropdown }
         .map { it.id }
         .toSet()
 
@@ -188,11 +139,13 @@ object FindingRules {
 
   private fun touchTargets(view: View): List<Finding> =
     view.nodes
-      .filter { it.type in view.facets.interactiveTypes && it.isLaidOut && !view.isBehindModal(it) }
+      .filter {
+        it.type in view.surface.interactiveTypes && it.isLaidOut && !view.isBehindModal(it)
+      }
       .mapNotNull { node ->
         val width = maxOf(node.bounds.width, node.touch?.width ?: 0f)
         val height = maxOf(node.bounds.height, node.touch?.height ?: 0f)
-        val min = view.catalog.minTouchTargetDp
+        val min = view.surface.minTouchTargetDp
         if (width < min - TARGET_SLACK_DP || height < min - TARGET_SLACK_DP) {
           errorFinding(
             node,
@@ -213,13 +166,13 @@ object FindingRules {
       val family = node.text?.font ?: return@mapNotNull null
       val name = displayName(family).lowercase()
       val role = node.roles?.type
-      val group = role?.let(view.catalog.typeRoles::get)
+      val group = role?.let(view.surface.typeRoles::get)
       val bundled = bundledFonts[name]
-      val platform = view.catalog.platformFontFamilies.any { it.lowercase() == name }
-      // Only the Material catalog names its roles with TypeRoles; a platform catalog keeps the
+      val platform = view.surface.platformFontFamilies.any { it.lowercase() == name }
+      // Only the Material surface names its roles with TypeRoles; a platform surface keeps the
       // plain type groups.
       val typeRole =
-        role?.takeIf { view.catalog.platformFontFamilies.isEmpty() }?.let(TypeRole::fromWire)
+        role?.takeIf { view.surface.platformFontFamilies.isEmpty() }?.let(TypeRole::fromWire)
       val detail =
         when {
           bundled == null && !platform -> "${displayName(family)} is not a bundled font"
@@ -299,7 +252,7 @@ object FindingRules {
 
   private fun truncatedText(view: View): List<Finding> =
     view.nodes
-      .filter { it.text?.truncated == true && it.type !in view.facets.labelTypes }
+      .filter { it.text?.truncated == true && it.type !in view.surface.labelTypes }
       .map { node ->
         val lines = node.text?.lines ?: 1
         Finding(
@@ -312,7 +265,7 @@ object FindingRules {
 
   private fun truncatedLabels(view: View): List<Finding> =
     view.nodes
-      .filter { it.type in view.facets.labelTypes }
+      .filter { it.type in view.surface.labelTypes }
       .mapNotNull { node ->
         val text = node.text ?: return@mapNotNull null
         val detail =
@@ -338,7 +291,7 @@ object FindingRules {
             ?: view.ancestors(node).firstNotNullOfOrNull { it.colors?.container }
             ?: return@mapNotNull null
         val ratio = Contrast.ratio(content, backdrop) ?: return@mapNotNull null
-        val need = Contrast.requiredRatio(view.catalog, node.roles?.type)
+        val need = Contrast.requiredRatio(view.surface, node.roles?.type)
         if (ratio < need) {
           errorFinding(node, FindingRule.Contrast, "${number(ratio)}:1, needs ${number(need)}:1")
         } else {
@@ -354,10 +307,10 @@ object FindingRules {
     if (view.modalOpen) return emptyList()
     val actions =
       view.nodes.filter { node ->
-        node.type in view.facets.actionTypes &&
+        node.type in view.surface.actionTypes &&
           node.isLaidOut &&
           // Navigation chrome is not compared with the primary action.
-          view.ancestors(node).none { it.type in view.catalog.navigationNames }
+          view.ancestors(node).none { it.type in view.surface.navigationNames }
       }
     val largestByPane =
       actions.groupBy(::pane).mapValues { (_, group) -> group.maxBy { it.bounds.height } }
@@ -394,9 +347,9 @@ object FindingRules {
   private fun oneFab(view: View): List<Finding> =
     view.nodes
       .filter {
-        it.type in view.catalog.fabNames &&
+        it.type in view.surface.fabNames &&
           it.isLaidOut &&
-          view.ancestors(it).none { anc -> anc.type in view.catalog.fabNames }
+          view.ancestors(it).none { anc -> anc.type in view.surface.fabNames }
       }
       .groupBy(::pane)
       .values
@@ -464,7 +417,7 @@ object FindingRules {
         if (!node.isLaidOut || view.isBehindModal(node)) return@mapNotNull null
         if (
           view.ancestors(node).any {
-            it.scrollsHorizontally || it.type in view.facets.horizontalScrollers
+            it.scrollsHorizontally || it.type in view.surface.horizontalScrollers
           }
         ) {
           return@mapNotNull null
@@ -477,7 +430,7 @@ object FindingRules {
         // the window, not inside that parent: only the view bounds it.
         val parent =
           node.parent?.let(byId::get)?.takeIf {
-            it.isLaidOut && node.type !in view.catalog.overlayNames
+            it.isLaidOut && node.type !in view.surface.overlayNames
           }
         val parentBox = parent?.let { it.layout ?: it.bounds }
         val pastParent = parentBox?.let { box.right() - it.right() } ?: 0f
@@ -528,15 +481,15 @@ object FindingRules {
     return view.nodes
       .filter { node ->
         node.isLaidOut &&
-          (node.type in view.facets.actionTypes || node.text != null) &&
-          node.type !in view.catalog.roundEdgeNames &&
+          (node.type in view.surface.actionTypes || node.text != null) &&
+          node.type !in view.surface.roundEdgeNames &&
           !view.isBehindModal(node) &&
           !node.scrolls &&
           view.ancestors(node).none { it.scrolls }
       }
       .mapNotNull { node ->
         // A text is judged by the lines it drew; a control by its bounds.
-        val b = node.text?.ink?.takeIf { node.type !in view.facets.actionTypes } ?: node.bounds
+        val b = node.text?.ink?.takeIf { node.type !in view.surface.actionTypes } ?: node.bounds
         val right = b.x + b.width
         val reach =
           listOf(b.x to b.y, right to b.y, b.x to b.y + b.height, right to b.y + b.height).maxOf {
@@ -613,11 +566,11 @@ object FindingRules {
   private fun cornerClipped(view: View): List<Finding> =
     view.nodes
       .filter { node ->
-        node.isLaidOut && (node.type in view.facets.actionTypes || node.text != null)
+        node.isLaidOut && (node.type in view.surface.actionTypes || node.text != null)
       }
       .mapNotNull { node ->
         val b =
-          if (node.type in view.facets.actionTypes) node.bounds
+          if (node.type in view.surface.actionTypes) node.bounds
           else node.text?.ink ?: return@mapNotNull null
         val (shape, reach) =
           (sequenceOf(node) + view.ancestors(node))
@@ -867,7 +820,7 @@ object FindingRules {
       .filter {
         it.weight != null &&
           it.type != M3Component.Spacer.wire &&
-          it.type !in view.catalog.overlayNames &&
+          it.type !in view.surface.overlayNames &&
           !view.isBehindModal(it)
       }
       .mapNotNull { node ->

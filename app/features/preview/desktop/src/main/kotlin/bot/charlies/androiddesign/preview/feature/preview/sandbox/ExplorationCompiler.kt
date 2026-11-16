@@ -50,9 +50,18 @@ object ExplorationCompiler {
         compileMs = 0L,
       )
     }
+    val sourceText =
+      try {
+        Files.readString(normalized)
+      } catch (e: java.nio.charset.CharacterCodingException) {
+        return CompileResult.Failed(
+          listOf(ValidationError(normalized.toString(), "File is not valid UTF-8: ${e.message}")),
+          compileMs = 0L,
+        )
+      }
     return compileSource(
       fileName = normalized.fileName.toString(),
-      sourceText = Files.readString(normalized),
+      sourceText = sourceText,
       explorationDir = normalized.parent,
     )
   }

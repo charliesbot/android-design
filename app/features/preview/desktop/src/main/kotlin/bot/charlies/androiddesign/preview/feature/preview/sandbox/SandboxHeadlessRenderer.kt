@@ -24,8 +24,6 @@ import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.text.font.createFontFamilyResolver
 import androidx.compose.ui.unit.Density
 import bot.charlies.androiddesign.preview.domain.findings.ScrolledTree
-import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessEnd
-import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessResult
 import bot.charlies.androiddesign.preview.kit.BoardSurface
 import bot.charlies.androiddesign.preview.kit.DirectionSpec
 import bot.charlies.androiddesign.preview.kit.ExploreBoardFrame
@@ -36,6 +34,18 @@ import java.util.Collections
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
+
+/**
+ * One headless render: the layout tree in dp, and a PNG at the density requested. A scrolling Wear
+ * screen is drawn at the top of its list and its [tree] covers the whole list; [end] is the list
+ * scrolled to its end, and null for every other screen.
+ */
+class HeadlessResult(val tree: LayoutTree, val png: ByteArray, val end: HeadlessEnd? = null) {
+  override fun toString() = "HeadlessResult(${tree.screen}/${tree.view.name}, ${png.size} bytes)"
+}
+
+/** A scrolling list drawn at its end: the tree of what is on screen there, and its PNG. */
+class HeadlessEnd(val tree: LayoutTree, val png: ByteArray)
 
 /**
  * Renders one compiled `.explore.kt` screen headlessly using `DesktopComposeUiTest`, captures the

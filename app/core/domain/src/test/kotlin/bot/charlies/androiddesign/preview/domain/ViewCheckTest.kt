@@ -13,8 +13,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ViewCheckTest {
-  private val proposal = TestProposal.valid().build()
-
   private fun treeOf(vararg findings: Finding) =
     LayoutTree(
       screen = "plates",
@@ -28,7 +26,7 @@ class ViewCheckTest {
 
   @Test
   fun `a tree without findings passes and carries its layout`() {
-    val check = ViewCheck.of(proposal, treeOf())
+    val check = ViewCheck.of(treeOf())
     assertTrue(check.pass)
     assertEquals(emptyList(), check.notes)
     assertEquals(emptyList(), check.errors)
@@ -39,7 +37,6 @@ class ViewCheckTest {
   fun `info findings are notes grouped by rule with their ids and no detail, and do not fail the view`() {
     val check =
       ViewCheck.of(
-        proposal,
         treeOf(
           Finding("a", FindingRule.Contrast, Severity.Info, "low"),
           Finding("row[1]", FindingRule.TextTruncated, Severity.Info, "cut"),
@@ -63,7 +60,6 @@ class ViewCheckTest {
   fun `a view with notes and an error fails on the error alone`() {
     val check =
       ViewCheck.of(
-        proposal,
         treeOf(
           Finding("a", FindingRule.Contrast, Severity.Info, "low"),
           error(FindingRule.OneFab, "fab", "two"),
@@ -78,7 +74,6 @@ class ViewCheckTest {
   fun `error findings of one rule and detail share an entry with their ids`() {
     val check =
       ViewCheck.of(
-        proposal,
         treeOf(
           error(FindingRule.OneFab, "fab_a", "2 floating action buttons, keep one"),
           error(FindingRule.TouchTarget, "chip", "chip 40x40"),
@@ -97,8 +92,7 @@ class ViewCheckTest {
 
   @Test
   fun `a finding about the whole view has no ids`() {
-    val check =
-      ViewCheck.of(proposal, treeOf(error(FindingRule.Offscreen, null, "content cut off")))
+    val check = ViewCheck.of(treeOf(error(FindingRule.Offscreen, null, "content cut off")))
     assertEquals(listOf(CheckError("offscreen", emptyList(), "content cut off")), check.errors)
   }
 

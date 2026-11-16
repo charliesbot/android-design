@@ -348,4 +348,29 @@ class SandboxSecurityTest {
       assertIs<CompileResult.Compiled>(compileSnippet(wearSrc, "allowed-wear.explore.kt"))
     assertEquals(BoardSurface.Wear, wearCompiled.board.surface)
   }
+
+  @Test
+  fun `allows exhaustive enum when expressions producing synthetic WhenMappings`() {
+    val src =
+      """
+      import androidx.compose.material3.Text
+      import androidx.compose.runtime.*
+      import bot.charlies.androiddesign.preview.kit.*
+
+      private enum class Mode { Overview, Detail }
+
+      val preview = designBoard("Enum When") {
+        screen("main") {
+          var mode by remember { mutableStateOf(Mode.Overview) }
+          val label = when (mode) {
+            Mode.Overview -> "All"
+            Mode.Detail -> "One"
+          }
+          Text(label)
+        }
+      }
+      """
+        .trimIndent()
+    assertIs<CompileResult.Compiled>(compileSnippet(src, "enum-when.explore.kt"))
+  }
 }

@@ -4,21 +4,37 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ComponentIdsTest {
   @Test
-  fun `the phone enum names exactly the phone catalog's components`() {
-    assertEquals(
-      M3ExpressiveCatalog.components.map { it.name }.toSet(),
-      M3Component.entries.map { it.wire }.toSet(),
-    )
-  }
+  fun `every surface component trait name belongs to its component enum or navigation nodes`() {
+    val phoneNames = M3Component.entries.map { it.wire }.toSet()
+    val wearNames = WearComponent.entries.map { it.wire }.toSet()
 
-  @Test
-  fun `the Wear enum names exactly the Wear catalog's components`() {
-    assertEquals(
-      WearCatalog.components.map { it.name }.toSet(),
-      WearComponent.entries.map { it.wire }.toSet(),
+    assertTrue(
+      (PhoneSurface.overlayNames +
+          PhoneSurface.modalNames +
+          PhoneSurface.fabNames +
+          PhoneSurface.horizontalScrollers +
+          PhoneSurface.actionTypes)
+        .all { it in phoneNames },
+    )
+    assertTrue(
+      (PhoneSurface.interactiveTypes + PhoneSurface.labelTypes).all {
+        it in phoneNames || it in NavigationNodes.itemTypes
+      },
+    )
+    assertTrue(
+      (WearSurface.overlayNames +
+          WearSurface.modalNames +
+          WearSurface.interactiveTypes +
+          WearSurface.actionTypes +
+          WearSurface.labelTypes)
+        .all { it in wearNames },
+    )
+    assertTrue(
+      WearSurface.roundEdgeNames.filter { it != "TimeText" }.all { it in wearNames },
     )
   }
 

@@ -22,7 +22,7 @@ class SandboxFindingRulesTest {
     source: String,
     fileName: String = "rules.explore.kt",
     view: bot.charlies.androiddesign.preview.model.ViewSpec = Views.Light,
-  ): bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessResult {
+  ): HeadlessResult {
     val dir: Path = createTempDirectory("rules-test-")
     return try {
       val res = ExplorationCompiler.compileSource(fileName, source, dir)

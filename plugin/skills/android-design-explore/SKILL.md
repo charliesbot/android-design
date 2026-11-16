@@ -48,6 +48,14 @@ Follow these exploration rules:
 - Adapt at 600 and 840 dp: switch `ShortNavigationBar` to `WideNavigationRail` (or use `listDetail` / `supportingPane` for dual-pane layouts) so wider views reveal more structure rather than stretching phone content.
 - Keep labels concise so button, chip, and navigation items fit on one line without truncation.
 
+### Writing it compactly
+
+Keep each single-direction `.explore.kt` file concise (around 150 to 300 lines):
+
+- Author ONE adaptive screen (or shared subcomposables parameterized by `BoxWithConstraints` `maxWidth`, `listDetail`, or `supportingPane`) instead of duplicating separate `PhoneScreen`, `FoldableScreen`, `TabletScreen`, and `DesktopScreen` copies of the same UI.
+- Store sample entries in a compact list of 3 to 5 items and render rows in a loop rather than repeating card blocks inline.
+- Make small targeted edits when fixing findings instead of rewriting the file.
+
 ## Check
 
 `check_design` compiles in memory inside a sandboxed worker, enforces token rules, checks every direction, screen, overlay, and view (`light`, `dark`, `foldable`, `tablet`, `desktop`, or `watch` and `watch-large` on Wear), and when error findings reach zero, returns `[TextContent(checkJson), ImageContent(lightPng), ImageContent(desktopPng)]` (`watch` and `watch-large` on Wear) plus `boardUrl`.

@@ -3,20 +3,19 @@ package bot.charlies.androiddesign.preview.app.cli
 import bot.charlies.androiddesign.preview.data.DesignMdLocator
 import bot.charlies.androiddesign.preview.data.DesignMdParse
 import bot.charlies.androiddesign.preview.data.DesignMdParser
-import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.domain.layout.LayoutSummary
 import bot.charlies.androiddesign.preview.domain.layout.ViewLayout
-import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessResult
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.CompileResult
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.ExplorationCompiler
+import bot.charlies.androiddesign.preview.feature.preview.sandbox.HeadlessResult
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.SandboxHeadlessRenderer
 import bot.charlies.androiddesign.preview.kit.DirectionSpec
-import bot.charlies.androiddesign.preview.model.Catalog
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PreviewJson
+import bot.charlies.androiddesign.preview.model.SurfaceSpec
 import bot.charlies.androiddesign.preview.model.ThemeOverride
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
@@ -24,11 +23,36 @@ import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.Path
 
+/** Renders one compiled screen target at one [ViewSpec] with an optional open overlay. */
+fun interface ExploreTargetRenderer {
+  fun render(
+    compiled: CompileResult.Compiled,
+    direction: DirectionSpec,
+    screenId: String,
+    view: ViewSpec,
+    designSystem: DesignSystem,
+    overlayId: String?,
+  ): HeadlessResult
+}
+
 /**
  * Shared loader and headless renderer for `.explore.kt` explorations used by both [RenderCommand]
  * and [WorkerCommand].
  */
 internal object ExploreRenderRunner {
+  val defaultRenderer: ExploreTargetRenderer =
+    ExploreTargetRenderer { compiled, direction, screenId, view, designSystem, overlayId ->
+      SandboxHeadlessRenderer.render(
+        compiled = compiled,
+        direction = direction,
+        screenId = screenId,
+        view = view,
+        designSystem = designSystem,
+        overlayId = overlayId,
+        encodePng = true,
+      )
+    }
+
   data class LoadedExploration(
     val sourcePath: Path,
     val designPath: Path?,
@@ -143,6 +167,7 @@ internal object ExploreRenderRunner {
     requestedViews: List<String>?,
     requestedScreens: List<String>?,
     err: PrintStream,
+    targetRenderer: ExploreTargetRenderer = defaultRenderer,
   ): Int {
     val loaded = loadAndCompile(sourcePath, explicitDesign)
     val compiled = loaded.compiled
@@ -159,8 +184,8 @@ internal object ExploreRenderRunner {
       return ExitCode.INVALID
     }
 
-    val catalog = compiled.board.catalog
-    val views = resolveViews(requestedViews, catalog, err) ?: return ExitCode.USAGE
+    val surface = compiled.board.surfaceSpec
+    val views = resolveViews(requestedViews, surface, err) ?: return ExitCode.USAGE
     val targets =
       resolveTargets(compiled.board.directions, requestedScreens, directionFilter = null)
     if (requestedScreens != null) {
@@ -188,6 +213,7 @@ internal object ExploreRenderRunner {
         targets = targets,
         views = views,
         outDir = outDir,
+        targetRenderer = targetRenderer,
       )
     val entries = rendered.map { it.entry }
     val report =
@@ -243,8 +269,9 @@ internal object ExploreRenderRunner {
     targets: List<ScreenTarget>,
     views: List<ViewSpec>,
     outDir: Path? = null,
+    targetRenderer: ExploreTargetRenderer = defaultRenderer,
   ): List<RenderedTarget> {
-    val catalog = compiled.board.catalog
+    val surface = compiled.board.surfaceSpec
     val out = mutableListOf<RenderedTarget>()
     for (target in targets) {
       val baseChecks = ArrayList<ViewCheck>(views.size)
@@ -258,9 +285,10 @@ internal object ExploreRenderRunner {
             overlayId = null,
             view = view,
             designSystem = designSystem,
-            catalog = catalog,
+            surface = surface,
             baseCheck = null,
             outDir = outDir,
+            targetRenderer = targetRenderer,
           )
         baseChecks += item.check
         out += item
@@ -277,9 +305,10 @@ internal object ExploreRenderRunner {
               overlayId = overlay.id,
               view = view,
               designSystem = designSystem,
-              catalog = catalog,
+              surface = surface,
               baseCheck = baseChecks[index],
               outDir = outDir,
+              targetRenderer = targetRenderer,
             )
         }
       }
@@ -295,22 +324,22 @@ internal object ExploreRenderRunner {
     overlayId: String?,
     view: ViewSpec,
     designSystem: DesignSystem,
-    catalog: Catalog,
+    surface: SurfaceSpec,
     baseCheck: ViewCheck?,
     outDir: Path?,
+    targetRenderer: ExploreTargetRenderer = defaultRenderer,
   ): RenderedTarget {
-    val artifactName = overlayId?.let { OverlayPlacement.renderName(prefix, it) } ?: prefix
+    val artifactName = overlayId?.let { ViewCheck.renderOverlayName(prefix, it) } ?: prefix
     val startNs = System.nanoTime()
     val headless =
       try {
-        SandboxHeadlessRenderer.render(
+        targetRenderer.render(
           compiled = compiled,
           direction = direction,
           screenId = screenId,
           view = view,
           designSystem = designSystem,
           overlayId = overlayId,
-          encodePng = true,
         )
       } catch (e: Exception) {
         val elapsedMs = (System.nanoTime() - startNs) / 1_000_000L
@@ -329,9 +358,9 @@ internal object ExploreRenderRunner {
         )
       }
     val elapsedMs = (System.nanoTime() - startNs) / 1_000_000L
-    val full = ViewCheck.of(headless.tree, catalog)
+    val full = ViewCheck.of(headless.tree, surface)
     val check = if (baseCheck == null) full else full.overlaying(baseCheck)
-    val layout = LayoutSummary.of(headless.tree, catalog)
+    val layout = LayoutSummary.of(headless.tree, surface)
     val filesBase = "$artifactName-${view.name}"
     var endFiles: String? = null
     if (outDir != null) {
@@ -372,7 +401,7 @@ internal object ExploreRenderRunner {
     )
   }
 
-  private fun writeReport(
+  fun writeReport(
     outDir: Path,
     sourcePath: Path,
     designPath: Path?,
@@ -399,16 +428,20 @@ internal object ExploreRenderRunner {
     return report
   }
 
-  fun resolveViews(requested: List<String>?, catalog: Catalog, err: PrintStream): List<ViewSpec>? =
+  fun resolveViews(
+    requested: List<String>?,
+    surface: SurfaceSpec,
+    err: PrintStream,
+  ): List<ViewSpec>? =
     requested?.map { name ->
-      catalog.views.firstOrNull { it.name == name }
+      surface.views.firstOrNull { it.name == name }
         ?: run {
           err.println(
-            "unknown view '$name' (the ${catalog.key} views: ${catalog.views.joinToString { it.name }})",
+            "unknown view '$name' (the ${surface.key} views: ${surface.views.joinToString { it.name }})",
           )
           return null
         }
-    } ?: catalog.views
+    } ?: surface.views
 
   private fun sanitizeSegment(name: String): String =
     name.trim().replace(Regex("""[^A-Za-z0-9._-]+"""), "_").ifBlank { "direction" }

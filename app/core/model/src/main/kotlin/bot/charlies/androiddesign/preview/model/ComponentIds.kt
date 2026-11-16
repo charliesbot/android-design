@@ -1,11 +1,6 @@
 package bot.charlies.androiddesign.preview.model
 
-/**
- * The components of [M3ExpressiveCatalog], typed. Each entry's name is its wire name, the
- * `component` a proposal node gives. Code that does something per component switches over these
- * with an exhaustive `when`, so a new catalog component fails to compile until every switch handles
- * it. A model test keeps the entries and the catalog's components equal.
- */
+/** Canonical wire names for Material 3 components on [PhoneSurface]. */
 enum class M3Component {
   Column,
   Row,
@@ -71,13 +66,13 @@ enum class M3Component {
 
     fun fromWire(wire: String): M3Component? = byWire[wire]
 
-    /** The component [wire] names. Validation rejects unknown names, so one here is a bug. */
+    /** The component [wire] names, failing loudly when unknown. */
     fun of(wire: String): M3Component =
-      fromWire(wire) ?: error("$wire is not a ${M3ExpressiveCatalog.KEY} component")
+      fromWire(wire) ?: error("$wire is not a ${PhoneSurface.key} component")
   }
 }
 
-/** The components of [WearCatalog], typed like [M3Component]. */
+/** Canonical wire names for Wear OS components on [WearSurface]. */
 enum class WearComponent {
   Column,
   Row,
@@ -119,8 +114,8 @@ enum class WearComponent {
 
     fun fromWire(wire: String): WearComponent? = byWire[wire]
 
-    /** The component [wire] names. Validation rejects unknown names, so one here is a bug. */
+    /** The component [wire] names, failing loudly when unknown. */
     fun of(wire: String): WearComponent =
-      fromWire(wire) ?: error("$wire is not a ${WearCatalog.KEY} component")
+      fromWire(wire) ?: error("$wire is not a ${WearSurface.key} component")
   }
 }

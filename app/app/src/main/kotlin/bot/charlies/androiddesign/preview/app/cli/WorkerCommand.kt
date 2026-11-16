@@ -1,21 +1,16 @@
 package bot.charlies.androiddesign.preview.app.cli
 
-import bot.charlies.androiddesign.preview.data.ProposalReader
-import bot.charlies.androiddesign.preview.domain.OverlayPlacement
 import bot.charlies.androiddesign.preview.domain.ViewCheck
-import bot.charlies.androiddesign.preview.domain.layout.LayoutSummary
+import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.domain.layout.ViewLayout
-import bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessRenderer
-import bot.charlies.androiddesign.preview.feature.preview.headless.RenderSource
 import bot.charlies.androiddesign.preview.kit.BoardSurface
-import bot.charlies.androiddesign.preview.model.Catalogs
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.PreviewJson
+import bot.charlies.androiddesign.preview.model.SurfaceSpec
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
-import bot.charlies.androiddesign.preview.model.Views
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -173,15 +168,9 @@ class WorkerCommand(
     val view: String,
   )
 
-  private sealed interface CachedSource {
-    data class Exploration(val loaded: ExploreRenderRunner.LoadedExploration) : CachedSource
-
-    data class Proposal(val path: Path, val source: RenderSource) : CachedSource
-  }
-
   private class SessionState {
     var compileCount: Int = 0
-    var cached: CachedSource? = null
+    var cached: ExploreRenderRunner.LoadedExploration? = null
     val trees = LinkedHashMap<TreeKey, LayoutTree>()
   }
 
@@ -296,7 +285,26 @@ class WorkerCommand(
     state.trees.clear()
 
     if (!sourcePath.fileName.toString().endsWith(".explore.kt")) {
-      return compileAndCheckProposal(sourcePath, params, state)
+      state.cached = null
+      val defaults = DesignSystemResolver.resolve(null, null)
+      return CompileAndCheckResult(
+        valid = false,
+        pass = false,
+        compileMs = 0L,
+        renderMs = 0L,
+        compileCount = state.compileCount,
+        surface = "phone",
+        boardName = null,
+        sourcePath = sourcePath.toString(),
+        designPath = params.design,
+        theme = ReportTheme(defaults.seed, defaults.variant.wire, defaults.contrast),
+        errors =
+          listOf(
+            ValidationError(sourcePath.toString(), "Expected an .explore.kt exploration file"),
+          ),
+        boardMeta = null,
+        renders = emptyList(),
+      )
     }
 
     val loaded = ExploreRenderRunner.loadAndCompile(sourcePath, params.design?.let(Path::of))
@@ -325,10 +333,10 @@ class WorkerCommand(
       )
     }
 
-    state.cached = CachedSource.Exploration(loaded)
+    state.cached = loaded
     val board = compiled.board
-    val catalog = board.catalog
-    val views = resolveWorkerViews(params.views, catalog)
+    val surface = board.surfaceSpec
+    val views = resolveWorkerViews(params.views, surface)
     val directionFilter = params.directions?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet()
     val targets =
       ExploreRenderRunner.resolveTargets(board.directions, params.screens, directionFilter)
@@ -394,7 +402,7 @@ class WorkerCommand(
               overlays = dir.overlays.map { ov -> OverlayMeta(ov.id, ov.screen) },
             )
           },
-        views = catalog.views,
+        views = surface.views,
       )
 
     return CompileAndCheckResult(
@@ -419,183 +427,10 @@ class WorkerCommand(
     )
   }
 
-  private fun compileAndCheckProposal(
-    sourcePath: Path,
-    params: CompileAndCheckParams,
-    state: SessionState,
-  ): CompileAndCheckResult {
-    val startedNs = System.nanoTime()
-    val loaded = ProposalReader().read(sourcePath, params.design?.let(Path::of))
-    val loadMs = (System.nanoTime() - startedNs) / 1_000_000L
-    val proposal = loaded.proposal
-    if (proposal == null || !loaded.isValid) {
-      state.cached = null
-      return CompileAndCheckResult(
-        valid = false,
-        pass = false,
-        compileMs = loadMs,
-        renderMs = 0L,
-        compileCount = state.compileCount,
-        surface = "phone",
-        boardName = null,
-        sourcePath = sourcePath.toString(),
-        designPath = loaded.designMdPath?.toString(),
-        theme =
-          ReportTheme(
-            loaded.designSystem.seed,
-            loaded.designSystem.variant.wire,
-            loaded.designSystem.contrast,
-          ),
-        errors = loaded.errors,
-        boardMeta = null,
-        renders = emptyList(),
-      )
-    }
-
-    val renderSource = RenderSource(proposal, loaded.designSystem, sourcePath.parent)
-    state.cached = CachedSource.Proposal(sourcePath, renderSource)
-    val catalog = Catalogs.of(proposal)
-    val views = resolveWorkerViews(params.views, catalog)
-    val screens = params.screens ?: proposal.screens.keys.toList()
-    val renderStartNs = System.nanoTime()
-    val outDir = params.outDir?.let(Path::of)
-    val b64 = Base64.getEncoder()
-    val primaryViews =
-      if (catalog.key == "wear") setOf("watch", "watch-large") else setOf("light", "desktop")
-
-    val items = mutableListOf<WorkerRenderItem>()
-    for (screen in screens) {
-      val baseChecks = ArrayList<ViewCheck>(views.size)
-      for (view in views) {
-        val t0 = System.nanoTime()
-        val res = HeadlessRenderer.image(renderSource, screen, view)
-        val dt = (System.nanoTime() - t0) / 1_000_000L
-        val check = ViewCheck.of(proposal, res.tree)
-        val layout = LayoutSummary.of(res.tree, catalog)
-        state.trees[TreeKey("main", screen, null, view.name)] = res.tree
-        val entry =
-          RenderEntry.of(
-            screen,
-            view.name,
-            if (outDir != null) "$screen-${view.name}" else null,
-            check,
-          )
-        if (outDir != null) {
-          Files.createDirectories(outDir)
-          Files.write(outDir.resolve("$screen-${view.name}.png"), res.png)
-        }
-        baseChecks += check
-        val attachPng = params.allImages || (params.includeImages && view.name in primaryViews)
-        items +=
-          WorkerRenderItem(
-            direction = "main",
-            screen = screen,
-            overlay = null,
-            view = view.name,
-            artifactName = screen,
-            pass = entry.pass,
-            renderMs = dt,
-            check = check,
-            layout = layout,
-            failures = entry.failures,
-            pngBase64 = if (attachPng) b64.encodeToString(res.png) else null,
-          )
-      }
-      OverlayPlacement(proposal.screens.getValue(screen)).overlays.forEach { ov ->
-        views.forEachIndexed { idx, view ->
-          val t0 = System.nanoTime()
-          val res = HeadlessRenderer.image(renderSource, screen, view, overlay = ov.id)
-          val dt = (System.nanoTime() - t0) / 1_000_000L
-          val full = ViewCheck.of(proposal, res.tree)
-          val check = full.overlaying(baseChecks[idx])
-          val art = OverlayPlacement.renderName(screen, ov.id)
-          state.trees[TreeKey("main", screen, ov.id, view.name)] = res.tree
-          val entry = RenderEntry.of(art, view.name, null, check)
-          items +=
-            WorkerRenderItem(
-              direction = "main",
-              screen = screen,
-              overlay = ov.id,
-              view = view.name,
-              artifactName = art,
-              pass = entry.pass,
-              renderMs = dt,
-              check = check,
-              layout = LayoutSummary.of(res.tree, catalog),
-              failures = entry.failures,
-              pngBase64 = if (params.allImages) b64.encodeToString(res.png) else null,
-            )
-        }
-      }
-    }
-
-    val renderMs = (System.nanoTime() - renderStartNs) / 1_000_000L
-    val allPass = items.all { it.pass }
-    val finalItems =
-      if (!allPass || params.allImages || params.includeImages) {
-        items
-      } else {
-        items.mapIndexed { idx, item ->
-          if (item.overlay == null && item.view in primaryViews) {
-            val view = views.first { it.name == item.view }
-            val png = HeadlessRenderer.image(renderSource, item.screen, view).png
-            item.copy(pngBase64 = b64.encodeToString(png))
-          } else {
-            item
-          }
-        }
-      }
-    val meta =
-      BoardMeta(
-        directions =
-          listOf(
-            DirectionMeta(
-              name = "main",
-              surface = catalog.key,
-              startScreen = proposal.screens.keys.first(),
-              screens = proposal.screens.keys.toList(),
-              overlays = emptyList(),
-            ),
-          ),
-        views = catalog.views,
-      )
-    return CompileAndCheckResult(
-      valid = true,
-      pass = allPass,
-      compileMs = loadMs,
-      renderMs = renderMs,
-      compileCount = state.compileCount,
-      surface = catalog.key,
-      boardName = loaded.designSystem.name,
-      sourcePath = sourcePath.toString(),
-      designPath = loaded.designMdPath?.toString(),
-      theme =
-        ReportTheme(
-          loaded.designSystem.seed,
-          loaded.designSystem.variant.wire,
-          loaded.designSystem.contrast,
-        ),
-      errors = emptyList(),
-      boardMeta = meta,
-      renders = finalItems,
-    )
-  }
-
   private fun handleRenderView(params: RenderViewParams, state: SessionState): RenderViewResult {
-    val cached =
+    val loaded =
       state.cached
         ?: throw WorkerException("no_compiled_board", "Call compileAndCheck before renderView")
-    return when (cached) {
-      is CachedSource.Exploration -> renderExplorationView(cached.loaded, params, state)
-      is CachedSource.Proposal -> renderProposalView(cached.source, params, state)
-    }
-  }
-
-  private fun renderExplorationView(
-    loaded: ExploreRenderRunner.LoadedExploration,
-    params: RenderViewParams,
-    state: SessionState,
-  ): RenderViewResult {
     val compiled =
       loaded.compiled
         ?: throw WorkerException("no_compiled_board", "Cached exploration has compile errors")
@@ -620,12 +455,12 @@ class WorkerCommand(
             throw WorkerException("unknown_overlay", "No overlay '$ovId' in '${direction.name}'")
           }
         }
-    val catalog = board.catalog
-    val defaultView = catalog.views.first()
+    val surface = board.surfaceSpec
+    val defaultView = surface.views.first()
     val baseView =
       params.view?.let { name ->
-        catalog.views.firstOrNull { it.name == name }
-          ?: throw WorkerException("unknown_view", "Unknown view '$name' for ${catalog.key}")
+        surface.views.firstOrNull { it.name == name }
+          ?: throw WorkerException("unknown_view", "Unknown view '$name' for ${surface.key}")
       } ?: defaultView
     val effectiveView =
       if (params.dark != null && board.surface == BoardSurface.Phone) {
@@ -654,7 +489,7 @@ class WorkerCommand(
         overlayId = overlayId,
         view = effectiveView,
         designSystem = system,
-        catalog = catalog,
+        surface = surface,
         baseCheck = null,
         outDir = null,
       )
@@ -682,96 +517,41 @@ class WorkerCommand(
     )
   }
 
-  private fun renderProposalView(
-    source: RenderSource,
-    params: RenderViewParams,
-    state: SessionState,
-  ): RenderViewResult {
-    val catalog = Catalogs.of(source.proposal)
-    val screen = params.screen ?: source.proposal.screens.keys.first()
-    val baseView =
-      params.view?.let { name -> catalog.views.firstOrNull { it.name == name } }
-        ?: catalog.views.first()
-    val view =
-      if (params.dark != null && catalog.key == "phone") baseView.copy(dark = params.dark)
-      else baseView
-    val t0 = System.nanoTime()
-    val res = HeadlessRenderer.image(source, screen, view, overlay = params.overlay)
-    val dt = (System.nanoTime() - t0) / 1_000_000L
-    val check = ViewCheck.of(source.proposal, res.tree)
-    state.trees[TreeKey("main", screen, params.overlay, baseView.name)] = res.tree
-    val b64 = Base64.getEncoder()
-    return RenderViewResult(
-      direction = "main",
-      screen = screen,
-      overlay = params.overlay,
-      view = baseView.name,
-      pass = check.pass,
-      renderMs = dt,
-      compileCount = state.compileCount,
-      check = check,
-      layout = LayoutSummary.of(res.tree, catalog),
-      tree = res.tree,
-      pngBase64 = b64.encodeToString(res.png),
-      endPngBase64 = res.end?.png?.let(b64::encodeToString),
-    )
-  }
-
   private fun handleGetTree(params: GetTreeParams, state: SessionState): GetTreeResult {
-    val cached =
+    val loaded =
       state.cached
         ?: throw WorkerException("no_compiled_board", "Call compileAndCheck before getTree")
+    val compiled =
+      loaded.compiled ?: throw WorkerException("no_compiled_board", "Cached exploration is invalid")
     val overlayId = params.overlay?.takeIf { it.isNotBlank() }
-    val (directionName, screenId, viewName) =
-      when (cached) {
-        is CachedSource.Exploration -> {
-          val compiled =
-            cached.loaded.compiled
-              ?: throw WorkerException("no_compiled_board", "Cached exploration is invalid")
-          val dir =
-            params.direction?.let { name ->
-              compiled.board.directions.firstOrNull { it.name == name }
-                ?: throw WorkerException("unknown_direction", "Unknown direction '$name'")
-            } ?: compiled.board.directions.first()
-          val scr = params.screen ?: dir.startScreen
-          if (scr !in dir.screenIds) {
-            throw WorkerException("unknown_screen", "No screen '$scr' in direction '${dir.name}'")
-          }
-          if (overlayId != null && dir.overlays.none { it.id == overlayId }) {
-            throw WorkerException("unknown_overlay", "No overlay '$overlayId' in '${dir.name}'")
-          }
-          val vw =
-            params.view
-              ?: if (compiled.board.surface == BoardSurface.Wear) Views.Watch.name
-              else Views.Light.name
-          Triple(dir.name, scr, vw)
-        }
-        is CachedSource.Proposal -> {
-          val cat = Catalogs.of(cached.source.proposal)
-          val scr = params.screen ?: cached.source.proposal.screens.keys.first()
-          if (scr !in cached.source.proposal.screens) {
-            throw WorkerException("unknown_screen", "No screen '$scr' in proposal")
-          }
-          val vw = params.view ?: cat.views.first().name
-          Triple("main", scr, vw)
-        }
-      }
-
-    val key = TreeKey(directionName, screenId, overlayId, viewName)
+    val dir =
+      params.direction?.let { name ->
+        compiled.board.directions.firstOrNull { it.name == name }
+          ?: throw WorkerException("unknown_direction", "Unknown direction '$name'")
+      } ?: compiled.board.directions.first()
+    val scr = params.screen ?: dir.startScreen
+    if (scr !in dir.screenIds) {
+      throw WorkerException("unknown_screen", "No screen '$scr' in direction '${dir.name}'")
+    }
+    if (overlayId != null && dir.overlays.none { it.id == overlayId }) {
+      throw WorkerException("unknown_overlay", "No overlay '$overlayId' in '${dir.name}'")
+    }
+    val vw = params.view ?: compiled.board.surfaceSpec.views.first().name
+    val key = TreeKey(dir.name, scr, overlayId, vw)
     val tree =
       state.trees[key]
         ?: handleRenderView(
             RenderViewParams(
-              direction = directionName,
-              screen = screenId,
+              direction = dir.name,
+              screen = scr,
               overlay = overlayId,
-              view = viewName,
+              view = vw,
             ),
             state,
           )
           .tree
     val bounded = params.maxDepth?.let { pruneDepth(tree, it) } ?: tree
-    return GetTreeResult(directionName, screenId, overlayId, viewName, bounded)
+    return GetTreeResult(dir.name, scr, overlayId, vw, bounded)
   }
 
   private fun pruneDepth(tree: LayoutTree, maxDepth: Int): LayoutTree {
@@ -791,14 +571,14 @@ class WorkerCommand(
 
   private fun resolveWorkerViews(
     requested: List<String>?,
-    catalog: bot.charlies.androiddesign.preview.model.Catalog,
+    surface: SurfaceSpec,
   ): List<ViewSpec> {
-    if (requested == null) return catalog.views
+    if (requested == null) return surface.views
     return requested.map { name ->
-      catalog.views.firstOrNull { it.name == name }
+      surface.views.firstOrNull { it.name == name }
         ?: throw WorkerException(
           "unknown_view",
-          "Unknown view '$name' (expected one of ${catalog.views.joinToString { it.name }})",
+          "Unknown view '$name' (expected one of ${surface.views.joinToString { it.name }})",
         )
     }
   }

@@ -13,7 +13,11 @@ class DesignMdParserTest {
 
   @Test
   fun `the fixture front matter is parsed`() {
-    val theme = parsed(Fixtures.text(Fixtures.DESIGN_MD))
+    val text =
+      checkNotNull(javaClass.classLoader.getResourceAsStream("fixtures/DESIGN.md"))
+        .bufferedReader()
+        .use { it.readText() }
+    val theme = parsed(text)
     assertEquals("alpha", theme.version)
     assertEquals("Tonight's plate", theme.name)
     assertEquals("#B5523B", theme.colors["primary"])
