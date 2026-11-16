@@ -6,7 +6,6 @@ from pathlib import Path
 from unittest import mock
 
 import judge
-
 import run
 
 BINARY = '/Apps/AndroidDesignPreview'
@@ -418,6 +417,97 @@ class ArtifactPipelineTests(unittest.TestCase):
     def test_case_selection_rejects_unknown_names(self):
         with self.assertRaises(ValueError):
             run.select_cases('typo')
+
+    def test_generate_writes_generator_metrics_json_and_evaluate_separates_timings(self):
+        case = {'name': 'music', 'surface': 'phone', 'assertions': [{'type': 'rubric', 'id': 'R-one'}]}
+        reply = {
+            'backend': 'agy',
+            'model': 'Gemini 3.8 Flash (High)',
+            'wall_seconds': 84.5,
+            'turns': 12,
+            'input_tokens': 41000,
+            'output_tokens': 2200,
+            'thinking_tokens': 900,
+            'cache_read_tokens': 30000,
+            'cache_creation_tokens': None,
+            'cost': None,
+            'check_calls': 4,
+            'compile_retries': 1,
+            'message': 'done',
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            directory = out / 'music'
+            fake_case(directory)
+            (directory / 'prompt.md').write_text('brief')
+            (out / 'rubric.md').write_text('Rubric')
+            images = write_report(directory)
+            with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
+                    mock.patch.object(run, 'execute', return_value=reply):
+                run.generate(directory, 'agy')
+            metrics = json.loads((directory / 'generator-metrics.json').read_text())
+            self.assertEqual(metrics['wall_seconds'], 84.5)
+            self.assertEqual(metrics['turns'], 12)
+            self.assertEqual(metrics['input_tokens'], 41000)
+            self.assertEqual(metrics['output_tokens'], 2200)
+            self.assertEqual(metrics['check_calls'], 4)
+            self.assertEqual(metrics['compile_retries'], 1)
+            self.assertEqual(metrics['model'], 'Gemini 3.8 Flash (High)')
+            self.assertNotIn('message', metrics)
+
+            ok = {'C-valid': {'pass': True}}
+            with mock.patch.object(run, 'render', return_value=(images, None)), \
+                    mock.patch.object(run, 'run_checks', return_value=ok):
+                evaluated = run.evaluate_case(case, out)
+            self.assertEqual(evaluated['generator_seconds'], 84.5)
+            self.assertEqual(evaluated['eval_minutes'], evaluated['minutes'])
+            self.assertEqual(evaluated['generator_metrics'], metrics)
+
+    def test_write_results_computes_medians_and_handles_missing_fields(self):
+        case_full = {
+            'name': 'music', 'surface': 'phone', 'status': 'passed',
+            'minutes': 0.2, 'eval_minutes': 0.2, 'generator_seconds': 60.0,
+            'generator_metrics': {
+                'backend': 'agy', 'model': 'Gemini 3.8 Flash (High)', 'wall_seconds': 60.0,
+                'turns': 10, 'input_tokens': 20000, 'output_tokens': 1200,
+                'check_calls': 3, 'compile_retries': 0,
+            },
+            'agent': {'cost': None, 'message': 'ok'},
+            'checks': {'C-valid': {'pass': True}},
+            'judge': {'R-one': {'pass': True}},
+            'renders': [{'screen': 'plates', 'view': 'light', 'png': 'plates-light.png', 'pass': True}],
+        }
+        case_partial = {
+            'name': 'finance', 'surface': 'phone', 'status': 'failed',
+            'minutes': 0.3,
+            'generator_metrics': {
+                'backend': 'claude', 'model': 'claude-opus-4-1', 'wall_seconds': 120.0,
+                'turns': 16, 'input_tokens': None, 'output_tokens': None,
+                'check_calls': None, 'compile_retries': None,
+            },
+            'agent': {'cost': 1.25, 'message': 'ok'},
+            'checks': {'C-valid': {'pass': True}},
+            'judge': {'R-one': {'pass': False, 'reason': 'unclear hierarchy'}},
+            'renders': [{'screen': 'home', 'view': 'light', 'png': 'home-light.png', 'pass': True}],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            run.write_results(out, [case_full, case_partial], no_open=True)
+            results_json = json.loads((out / 'results.json').read_text())
+            summary_text = (out / 'summary.md').read_text()
+            report_html = (out / 'report.html').read_text()
+
+        medians = results_json['generator_medians']
+        self.assertEqual(medians['wall_seconds'], 90.0)
+        self.assertEqual(medians['turns'], 13)
+        self.assertEqual(medians['output_tokens'], 1200)
+        self.assertEqual(medians['models'], ['Gemini 3.8 Flash (High)', 'claude-opus-4-1'])
+        self.assertIn('Generator medians: wall 90.0s, turns 13', summary_text)
+        self.assertIn('| finance | phone | failed | 1/1 | 0/1 | 120.0 | 16 | - | - |', summary_text)
+        self.assertIn('gen 60.0s · eval 0.2 min · 10 turns · 1200 out tok · 3 checks · 0 retries', report_html)
+        self.assertIn('agent $1.25', report_html)
+        self.assertNotIn('\u2014', summary_text)
+        self.assertNotIn('\u2014', report_html)
 
 
 if __name__ == "__main__":
