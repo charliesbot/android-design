@@ -20,6 +20,8 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
@@ -39,13 +41,14 @@ import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.SchemeOverride
 import bot.charlies.androiddesign.preview.model.SizeClass
 import bot.charlies.androiddesign.preview.model.ThemeOverride
-import bot.charlies.androiddesign.preview.model.TypeGroup
 import bot.charlies.androiddesign.preview.model.TypeRole
 import bot.charlies.androiddesign.preview.model.TypographyOverride
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.WearCatalog
 import java.nio.file.Path
 import kotlin.math.roundToInt
+
+internal val ExplorePaneKey = SemanticsPropertyKey<String>("ExplorePane")
 
 enum class BoardSurface {
   Phone,
@@ -120,15 +123,10 @@ internal constructor(
     val effectiveSeed = seedOverride ?: seedHex
     val effectiveVariant = variantOverride ?: variant
     val typographyOverrides =
-      if (surface == BoardSurface.Phone && brandFont != null) {
+      if (surface == BoardSurface.Phone && brandFont != null && !brandFont.setsAnyText) {
         buildMap {
           for (role in TypeRole.entries) {
-            if (role.group in setOf(TypeGroup.Display, TypeGroup.Headline)) {
-              put(role.kebab, TypographyOverride(fontFamily = brandFont.family))
-            } else if (
-              brandFont != BundledFont.Doto &&
-                (role == TypeRole.TitleLarge || role == TypeRole.TitleLargeEmphasized)
-            ) {
+            if (brandFont.allows(role.group, role)) {
               put(role.kebab, TypographyOverride(fontFamily = brandFont.family))
             }
           }
@@ -523,9 +521,11 @@ internal fun ExploreBoardFrame(
               val entryScreen = direction.screens.getValue(entryId)
               val metadata = paneMetadata(entryScreen.paneRole, direction.strategyKind, placeholder)
               NavEntry(entryId, metadata = metadata) {
-                entryScreen.content { next ->
-                  if (next in direction.screens && backStack.lastOrNull() != next) {
-                    backStack.add(next)
+                Box(Modifier.fillMaxSize().semantics { set(ExplorePaneKey, entryId) }) {
+                  entryScreen.content { next ->
+                    if (next in direction.screens && backStack.lastOrNull() != next) {
+                      backStack.add(next)
+                    }
                   }
                 }
               }

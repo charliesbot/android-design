@@ -25,12 +25,9 @@ internal object PixelContrastSampler {
   private const val DARK_BG_PERCENTILE = 0.10
   private const val PERIMETER_PX = 2
 
-  private data class PixelSample(val luminance: Double, val hex: String)
-
   fun sample(bitmap: Bitmap, fgColor: Color, lineRectsPx: List<Rect>): SampledContrast? {
-    if (fgColor == Color.Unspecified || fgColor.alpha <= 0f) return null
-    val fgHex = colorToHex(fgColor)
-    val fgLum = Contrast.relativeLuminance(fgHex) ?: return null
+    val effectiveFg = if (fgColor == Color.Unspecified) Color.Black else fgColor
+    if (effectiveFg.alpha <= 0f) return null
     val intRects = lineRectsPx.mapNotNull { rect ->
       val left = floor(rect.left).toInt().coerceIn(0, bitmap.width)
       val top = floor(rect.top).toInt().coerceIn(0, bitmap.height)
@@ -40,21 +37,39 @@ internal object PixelContrastSampler {
     }
     if (intRects.isEmpty()) return null
 
+    val opaqueFgLum = Contrast.relativeLuminance(colorToHex(effectiveFg)) ?: return null
     var worst: SampledContrast? = null
     for (line in intRects) {
       val samples = collectPerimeterSamples(bitmap, line, intRects)
       if (samples.isEmpty()) continue
       samples.sortBy { it.luminance }
-      val pct = if (fgLum > LIGHT_FOREGROUND_LUMINANCE) LIGHT_BG_PERCENTILE else DARK_BG_PERCENTILE
+      val pct =
+        if (opaqueFgLum > LIGHT_FOREGROUND_LUMINANCE) LIGHT_BG_PERCENTILE else DARK_BG_PERCENTILE
       val idx = floor((samples.size - 1) * pct).toInt().coerceIn(0, samples.lastIndex)
       val picked = samples[idx]
-      val ratio = Contrast.ratio(fgHex, picked.hex) ?: continue
+      val compositedHex = compositeOver(effectiveFg, picked.argb)
+      val ratio = Contrast.ratio(compositedHex, picked.hex) ?: continue
       if (worst == null || ratio < worst.ratio) {
-        worst = SampledContrast(fgHex = fgHex, bgHex = picked.hex, ratio = ratio)
+        worst = SampledContrast(fgHex = compositedHex, bgHex = picked.hex, ratio = ratio)
       }
     }
     return worst
   }
+
+  private fun compositeOver(fg: Color, bgArgb: Int): String {
+    val srgb = fg.convert(ColorSpaces.Srgb)
+    val alpha = srgb.alpha.coerceIn(0f, 1f)
+    if (alpha >= 0.999f) return colorToHex(srgb)
+    val bgR = ((bgArgb ushr 16) and 0xFF) / 255f
+    val bgG = ((bgArgb ushr 8) and 0xFF) / 255f
+    val bgB = (bgArgb and 0xFF) / 255f
+    val r = ((srgb.red * alpha + bgR * (1f - alpha)) * 255f).roundToInt().coerceIn(0, 255)
+    val g = ((srgb.green * alpha + bgG * (1f - alpha)) * 255f).roundToInt().coerceIn(0, 255)
+    val b = ((srgb.blue * alpha + bgB * (1f - alpha)) * 255f).roundToInt().coerceIn(0, 255)
+    return "#%02X%02X%02X".format(r, g, b)
+  }
+
+  private data class PixelSample(val luminance: Double, val hex: String, val argb: Int)
 
   private fun collectPerimeterSamples(
     bitmap: Bitmap,
@@ -75,7 +90,7 @@ internal object PixelContrastSampler {
         val b = argb and 0xFF
         val hex = "#%02X%02X%02X".format(r, g, b)
         val lum = Contrast.relativeLuminance(hex) ?: continue
-        samples += PixelSample(lum, hex)
+        samples += PixelSample(lum, hex, argb)
       }
     }
     return samples

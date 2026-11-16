@@ -3,12 +3,14 @@ package bot.charlies.androiddesign.preview.feature.preview.sandbox
 import bot.charlies.androiddesign.preview.data.DesignMdParse
 import bot.charlies.androiddesign.preview.data.DesignMdParser
 import bot.charlies.androiddesign.preview.domain.findings.FindingRules
+import bot.charlies.androiddesign.preview.domain.layout.LayoutSummary
 import bot.charlies.androiddesign.preview.kit.BoardSurface
 import bot.charlies.androiddesign.preview.kit.BundledFont
 import bot.charlies.androiddesign.preview.kit.PaletteVariant
 import bot.charlies.androiddesign.preview.kit.designBoard
 import bot.charlies.androiddesign.preview.kit.resolveConfinedAsset
 import bot.charlies.androiddesign.preview.model.FindingRule
+import bot.charlies.androiddesign.preview.model.M3Component
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.Views
 import java.nio.file.Files
@@ -215,6 +217,141 @@ class DesignBoardKitTest {
           overlayId = "filter",
         )
       assertTrue(overlayRes.png.isNotEmpty())
+      val dialogText = overlayRes.tree.nodes.firstOrNull { it.text?.value == "Active filters" }
+      assertNotNull(
+        dialogText,
+        "Expected dialog text node in overlay tree: ${overlayRes.tree.nodes}",
+      )
+      val ink = assertNotNull(dialogText.text?.ink)
+      assertTrue(ink.x > 10f && ink.y > 50f, "Expected frame-relative dialog ink, got $ink")
+      assertNotNull(dialogText.colors, "Expected sampled dialog text contrast colors")
+    } finally {
+      dir.toFile().deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `BundledFont Doto applies only to display roles and keeps headline in Google Sans Flex`() {
+    val src =
+      """
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("Doto", brandFont = BundledFont.Doto) {
+        screen("main") {
+          Column(modifier = Modifier.padding(16.dp)) {
+            Text("Big Hero", style = MaterialTheme.typography.displaySmall)
+            Text("Section Headline", style = MaterialTheme.typography.headlineMedium)
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val dir = createTempDirectory("doto-role-test-")
+    try {
+      val compiled =
+        assertIs<CompileResult.Compiled>(
+          ExplorationCompiler.compileSource("doto.explore.kt", src, dir),
+        )
+      val res =
+        SandboxHeadlessRenderer.render(
+          compiled = compiled,
+          direction = compiled.board.directions.single(),
+          screenId = "main",
+          view = lightView,
+          designSystem = compiled.board.resolveDesignSystem(),
+        )
+      assertTrue(
+        res.tree.findings.none { it.rule == FindingRule.Font },
+        "Unexpected Font findings for Doto board: ${res.tree.findings}",
+      )
+      val hero = res.tree.nodes.first { it.text?.value == "Big Hero" }
+      val head = res.tree.nodes.first { it.text?.value == "Section Headline" }
+      assertEquals("Doto", hero.text?.font)
+      assertEquals("Google Sans Flex", head.text?.font)
+    } finally {
+      dir.toFile().deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `two-pane listDetail isolates per-pane oneFab, primaryLargest, and LayoutSummary panes`() {
+    val src =
+      """
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.platform.testTag
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("TwoPane Isolation") {
+        direction("Split") {
+          listDetail(
+            list = { onOpen ->
+              Scaffold(
+                floatingActionButton = { FloatingActionButton(onClick = {}) { Text("+") } },
+              ) { pad ->
+                Column(modifier = Modifier.padding(pad).padding(16.dp)) {
+                  Button(
+                    onClick = onOpen,
+                    modifier = Modifier.testTag(AD_PRIMARY_TAG).height(64.dp),
+                  ) {
+                    Text("Open")
+                  }
+                }
+              }
+            },
+            detail = {
+              Scaffold(
+                floatingActionButton = { FloatingActionButton(onClick = {}) { Text("Go") } },
+              ) { pad ->
+                Column(modifier = Modifier.padding(pad).padding(16.dp)) {
+                  Button(
+                    onClick = {},
+                    modifier = Modifier.testTag(AD_PRIMARY_TAG).height(72.dp),
+                  ) {
+                    Text("Primary Detail")
+                  }
+                }
+              }
+            },
+            placeholder = { Text("Pick") },
+          )
+        }
+      }
+      """
+        .trimIndent()
+    val dir = createTempDirectory("twopane-isolation-")
+    try {
+      val compiled =
+        assertIs<CompileResult.Compiled>(
+          ExplorationCompiler.compileSource("twopane.explore.kt", src, dir),
+        )
+      val res =
+        SandboxHeadlessRenderer.render(
+          compiled = compiled,
+          direction = compiled.board.directions.single(),
+          screenId = "detail",
+          view = desktopView,
+          designSystem = compiled.board.resolveDesignSystem(),
+        )
+      val isolationFailures =
+        res.tree.findings.filter {
+          it.rule == FindingRule.OneFab || it.rule == FindingRule.PrimaryLargest
+        }
+      assertTrue(
+        isolationFailures.isEmpty(),
+        "Expected per-pane isolation for OneFab & PrimaryLargest, got $isolationFailures; nodes=${res.tree.nodes.map { it.id }}",
+      )
+      val summary = LayoutSummary.of(res.tree)
+      assertEquals(setOf("list", "detail"), summary.panes.keys, "panes=${summary.panes}")
+      assertTrue(
+        res.tree.nodes.count { it.type == M3Component.FloatingActionButton.wire } == 2,
+      )
     } finally {
       dir.toFile().deleteRecursively()
     }

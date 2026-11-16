@@ -25,8 +25,8 @@ class SandboxFindingRulesTest {
   ): bot.charlies.androiddesign.preview.feature.preview.headless.HeadlessResult {
     val dir: Path = createTempDirectory("rules-test-")
     return try {
-      val compiled =
-        assertIs<CompileResult.Compiled>(ExplorationCompiler.compileSource(fileName, source, dir))
+      val res = ExplorationCompiler.compileSource(fileName, source, dir)
+      val compiled = assertIs<CompileResult.Compiled>(res, "Compile failed: $res")
       val direction = compiled.board.directions.single()
       SandboxHeadlessRenderer.render(
         compiled = compiled,
@@ -305,6 +305,143 @@ class SandboxFindingRulesTest {
     assertTrue(
       FindingRule.RoundEdgeClipped in rules,
       "Expected RoundEdgeClipped on unpadded non-scrolling Wear text, got ${clipRes.tree.findings}",
+    )
+  }
+
+  @Test
+  fun `enforces contrast on rendered M3 Text with explicit and inherited LocalContentColor`() {
+    val src =
+      """
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("M3 Contrast") {
+        screen {
+          Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Readable default")
+            Surface(color = MaterialTheme.colorScheme.surface) {
+              Text("Low explicit", color = MaterialTheme.colorScheme.surfaceVariant)
+            }
+            Surface(
+              color = MaterialTheme.colorScheme.surfaceContainer,
+              contentColor = MaterialTheme.colorScheme.surfaceVariant,
+            ) {
+              Text("Low inherited")
+            }
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val res = renderSource(src, fileName = "m3-contrast.explore.kt")
+    val readable = res.tree.nodes.first { it.text?.value == "Readable default" }
+    assertNotNull(readable.colors?.container)
+    assertNotNull(readable.colors?.content)
+    val explicit = res.tree.nodes.first { it.text?.value == "Low explicit" }
+    val inherited = res.tree.nodes.first { it.text?.value == "Low inherited" }
+    val contrastIds = res.tree.findings.filter { it.rule == FindingRule.Contrast }.map { it.id }
+    assertTrue(
+      explicit.id in contrastIds,
+      "Expected Contrast finding on explicit low-contrast M3 Text, got ${res.tree.findings}",
+    )
+    assertTrue(
+      inherited.id in contrastIds,
+      "Expected Contrast finding on inherited LocalContentColor M3 Text, got ${res.tree.findings}",
+    )
+    val semi =
+      PixelContrastSampler.sample(
+        bitmap = solidBitmap(60, 40, 0xFFFFFFFF.toInt()),
+        fgColor = Color.Black.copy(alpha = 0.25f),
+        lineRectsPx = listOf(Rect(10f, 10f, 50f, 24f)),
+      )
+    assertNotNull(semi)
+    assertTrue(
+      semi.ratio < 2.0,
+      "Semi-transparent fg over white must fail after compositing: $semi",
+    )
+  }
+
+  @Test
+  fun `maps M3 1_5 FlexibleBottomAppBar and FilledIconToggleButton to DockedToolbarNavBar and TouchTarget`() {
+    val src =
+      """
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.runtime.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.platform.testTag
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("M3 1.5 Mapping") {
+        screen {
+          Scaffold(
+            bottomBar = {
+              Column {
+                FlexibleBottomAppBar { Text("Actions") }
+                ShortNavigationBar {
+                  ShortNavigationBarItem(
+                    selected = true,
+                    onClick = {},
+                    icon = { SymbolIcon("home") },
+                    label = { Text("Home") },
+                  )
+                }
+              }
+            },
+          ) { innerPadding ->
+            Column(
+              modifier = Modifier.padding(innerPadding).padding(16.dp),
+              verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+              Button(
+                onClick = {},
+                modifier = Modifier.testTag(AD_PRIMARY_TAG).height(48.dp),
+              ) {
+                Text("Primary")
+              }
+              FilledIconToggleButton(
+                checked = false,
+                onCheckedChange = {},
+                modifier = Modifier.size(72.dp),
+              ) {
+                SymbolIcon("favorite")
+              }
+              VerticalSlider(
+                state = rememberSliderState(value = 0.5f),
+                onValueChange = {},
+                modifier = Modifier.width(32.dp).height(120.dp),
+              )
+            }
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val res = renderSource(src, fileName = "m3-15.explore.kt")
+    val rules = res.tree.findings.map { it.rule }.toSet()
+    assertTrue(
+      res.tree.nodes.any { it.type == "IconButton" },
+      "Expected FilledIconToggleButton mapped to IconButton, got ${res.tree.nodes.map { it.type }}",
+    )
+    assertTrue(
+      res.tree.nodes.any { it.type == "Slider" },
+      "Expected VerticalSlider mapped to Slider, got ${res.tree.nodes.map { it.type }}",
+    )
+    assertTrue(
+      FindingRule.DockedToolbarNavBar in rules,
+      "Expected DockedToolbarNavBar for FlexibleBottomAppBar + ShortNavigationBar, got ${res.tree.findings}",
+    )
+    assertTrue(
+      FindingRule.PrimaryLargest in rules,
+      "Expected PrimaryLargest for 72.dp FilledIconToggleButton > 48.dp AD_PRIMARY_TAG Button, got ${res.tree.findings}",
+    )
+    assertTrue(
+      FindingRule.TouchTarget in rules,
+      "Expected TouchTarget for 32.dp VerticalSlider, got findings=${res.tree.findings} nodes=${res.tree.nodes.map { "${it.id}:${it.type}:b=${it.bounds}:t=${it.touch}" }}",
     )
   }
 }

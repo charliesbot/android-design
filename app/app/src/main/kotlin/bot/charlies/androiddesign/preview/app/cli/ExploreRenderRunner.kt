@@ -351,8 +351,8 @@ internal object ExploreRenderRunner {
       artifactName = artifactName,
       renderMs = elapsedMs,
       result = headless,
-      check = full,
-      layout = layout,
+      check = check,
+      layout = if (overlayId == null) layout else null,
       entry =
         RenderEntry.of(
           artifactName,

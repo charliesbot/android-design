@@ -382,7 +382,10 @@ object FindingRules {
    * for the requested screen, whose ids are plain. A list-detail view draws more than one screen,
    * and each keeps its own primary action and floating action button.
    */
-  private fun pane(node: LayoutNode): String = node.id.substringBefore('/', "")
+  private fun pane(node: LayoutNode): String =
+    node.id
+      .removePrefix(bot.charlies.androiddesign.preview.domain.layout.LayoutSummary.PANE_PREFIX)
+      .substringBefore('/', "")
 
   // endregion
 

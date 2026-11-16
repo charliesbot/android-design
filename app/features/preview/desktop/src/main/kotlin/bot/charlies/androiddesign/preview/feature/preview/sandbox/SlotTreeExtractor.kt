@@ -21,10 +21,12 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Density
 import bot.charlies.androiddesign.preview.domain.findings.FindingRules
+import bot.charlies.androiddesign.preview.domain.layout.LayoutSummary
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
 import bot.charlies.androiddesign.preview.feature.preview.theme.wear.WearThemeResolver
 import bot.charlies.androiddesign.preview.kit.AD_PRIMARY_TAG
 import bot.charlies.androiddesign.preview.kit.BoardSurface
+import bot.charlies.androiddesign.preview.kit.ExplorePaneKey
 import bot.charlies.androiddesign.preview.model.A11yInfo
 import bot.charlies.androiddesign.preview.model.Axis
 import bot.charlies.androiddesign.preview.model.Bounds
@@ -209,28 +211,47 @@ internal object SlotTreeExtractor {
 
     val semanticsByLayout = IdentityHashMap<LayoutInfo, MutableList<SemanticsNode>>()
     val mergedByLayout = IdentityHashMap<LayoutInfo, SemanticsNode>()
-    indexSemantics(unmergedRoots, semanticsByLayout)
+    val paneRootsByLayout = IdentityHashMap<LayoutInfo, String>()
+    indexSemantics(unmergedRoots, semanticsByLayout, paneRootsByLayout)
     mergedRoots.forEach { root -> indexMerged(root, mergedByLayout) }
 
     val orderedLayouts = claimed.entries.sortedBy { it.value.order }.map { it.key }
+    val paneByLayout = IdentityHashMap<LayoutInfo, String>()
+    val distinctPanes = LinkedHashSet<String>()
+    for (layout in orderedLayouts) {
+      val paneId = resolvePaneId(layout, paneRootsByLayout)
+      if (paneId != null) {
+        paneByLayout[layout] = paneId
+        distinctPanes += paneId
+      }
+    }
+    val multiPane = distinctPanes.size > 1
+
     val idByLayout = IdentityHashMap<LayoutInfo, String>()
     val usedIds = HashSet<String>()
+    val fallbackCounts = HashMap<String, Int>()
     for (layout in orderedLayouts) {
       val site = claimed.getValue(layout)
       val typeDecap = site.mappedType.replaceFirstChar { it.lowercaseChar() }
       val sig = semanticSignature(layout, claimed, semanticsByLayout, mergedByLayout)
+      val lineSuffix = site.sourceLine?.let { "@L$it" }.orEmpty()
+      val panePrefix =
+        if (multiPane) paneByLayout[layout]?.let { "${LayoutSummary.PANE_PREFIX}$it/" }.orEmpty()
+        else ""
       val suffix =
         if (!sig.isNullOrBlank()) {
           (sig.hashCode().toLong() and 0xFFFFFL).toString(16)
         } else {
-          "s${layout.semanticsId}"
+          val bucketKey = "$panePrefix$typeDecap$lineSuffix"
+          val next = (fallbackCounts[bucketKey] ?: 0) + 1
+          fallbackCounts[bucketKey] = next
+          next.toString()
         }
-      val lineSuffix = site.sourceLine?.let { "@L$it" }.orEmpty()
       val baseId = "${typeDecap}_$suffix"
-      var unique = "$baseId$lineSuffix"
+      var unique = "$panePrefix$baseId$lineSuffix"
       var dup = 2
       while (!usedIds.add(unique)) {
-        unique = "${baseId}_${dup++}$lineSuffix"
+        unique = "$panePrefix${baseId}_${dup++}$lineSuffix"
       }
       idByLayout[layout] = unique
     }
@@ -319,28 +340,37 @@ internal object SlotTreeExtractor {
 
     val layoutRectPx = measureLayoutRectPx(layout, rootCoordinates, rootWindowPos)
     val unclippedDp = layoutRectPx.toDp(density)
+    val directSemantics = semanticsByLayout[layout].orEmpty()
     val ownedSemantics = collectOwnedSemantics(layout, claimed, semanticsByLayout)
-    val mergedNode = mergedByLayout[layout] ?: ownedSemantics.firstOrNull()
-    val primary = ownedSemantics.any {
-      it.config.getOrNull(SemanticsProperties.TestTag) == AD_PRIMARY_TAG
-    }
-    val scrollsVertically = ownedSemantics.any {
+    val mergedNode =
+      mergedByLayout[layout] ?: directSemantics.firstOrNull() ?: ownedSemantics.firstOrNull()
+    val isInteractiveType =
+      catalog.find(site.mappedType)?.interactive == true ||
+        site.mappedType in NavigationNodes.itemTypes
+    val interactive = isInteractive(site.mappedType, catalog, directSemantics)
+    val primary =
+      (isInteractiveType || directSemantics.any { it.config.contains(SemanticsActions.OnClick) }) &&
+        (directSemantics + if (isInteractiveType) ownedSemantics else emptyList()).any {
+          it.config.getOrNull(SemanticsProperties.TestTag) == AD_PRIMARY_TAG
+        }
+    val scrollsVertically = directSemantics.any {
       it.config.contains(SemanticsProperties.VerticalScrollAxisRange)
     }
-    val scrollsHorizontally = ownedSemantics.any {
+    val scrollsHorizontally = directSemantics.any {
       it.config.contains(SemanticsProperties.HorizontalScrollAxisRange)
     }
-    val interactive = isInteractive(site.mappedType, catalog, ownedSemantics)
 
     val visibleBoundsPx =
-      ownedSemantics.firstOrNull()?.boundsInRoot?.let { sRect -> clipWithin(sRect, layoutRectPx) }
-        ?: layoutRectPx
+      ownedSemantics.firstOrNull()?.boundsInFrame(rootWindowPos)?.let { sRect ->
+        clipWithin(sRect, layoutRectPx)
+      } ?: layoutRectPx
     val touchPx =
       if (!interactive) null
       else {
+        val touchSemantics = directSemantics.ifEmpty { ownedSemantics }
         val semTouch =
-          ownedSemantics
-            .map { it.touchBoundsInRoot }
+          touchSemantics
+            .map { it.touchBoundsInFrame(rootWindowPos) }
             .fold<Rect, Rect?>(null) { acc, r -> if (acc == null) r else unionRect(acc, r) }
         semTouch?.let { unionRect(it, layoutRectPx) } ?: layoutRectPx
       }
@@ -350,6 +380,7 @@ internal object SlotTreeExtractor {
       extractTextAndContrast(
         type = site.mappedType,
         ownedSemantics = ownedSemantics,
+        rootWindowPos = rootWindowPos,
         bitmap = bitmap,
         surface = surface,
         catalog = catalog,
@@ -452,6 +483,7 @@ internal object SlotTreeExtractor {
   private fun extractTextAndContrast(
     type: String,
     ownedSemantics: List<SemanticsNode>,
+    rootWindowPos: Offset,
     bitmap: Bitmap?,
     surface: BoardSurface,
     catalog: Catalog,
@@ -513,7 +545,7 @@ internal object SlotTreeExtractor {
       maxLines = maxOf(maxLines, res.lineCount)
       if (hasActualTextOverflow(res)) overflow = true
       if ((0 until res.lineCount).any { res.isLineEllipsized(it) }) truncated = true
-      val origin = semNode.positionInRoot
+      val origin = semNode.positionInFrame(rootWindowPos)
       var nodeInk: Rect? = null
       for (line in 0 until res.lineCount) {
         val left = res.getLineLeft(line)
@@ -765,14 +797,41 @@ internal object SlotTreeExtractor {
   private fun Rect.toDp(density: Float): Bounds =
     Bounds(left / density, top / density, width / density, height / density)
 
+  private fun SemanticsNode.boundsInFrame(rootWindowPos: Offset): Rect =
+    boundsInWindow.translate(-rootWindowPos)
+
+  private fun SemanticsNode.positionInFrame(rootWindowPos: Offset): Offset =
+    positionInWindow - rootWindowPos
+
+  private fun SemanticsNode.touchBoundsInFrame(rootWindowPos: Offset): Rect =
+    touchBoundsInRoot.translate(positionInWindow - positionInRoot - rootWindowPos)
+
   private fun indexSemantics(
     nodes: List<SemanticsNode>,
     out: IdentityHashMap<LayoutInfo, MutableList<SemanticsNode>>,
+    paneRoots: IdentityHashMap<LayoutInfo, String>,
   ) {
     for (node in nodes) {
       out.getOrPut(node.layoutInfo) { mutableListOf() } += node
-      indexSemantics(node.children, out)
+      node.config.getOrNull(ExplorePaneKey)?.let { paneId ->
+        paneRoots[node.layoutInfo] = paneId
+      }
+      indexSemantics(node.children, out, paneRoots)
     }
+  }
+
+  private fun resolvePaneId(
+    layout: LayoutInfo,
+    paneRoots: IdentityHashMap<LayoutInfo, String>,
+  ): String? {
+    var cursor: LayoutInfo? = layout
+    while (cursor != null) {
+      paneRoots[cursor]?.let {
+        return it
+      }
+      cursor = cursor.parentInfo
+    }
+    return null
   }
 
   private fun indexMerged(node: SemanticsNode, out: IdentityHashMap<LayoutInfo, SemanticsNode>) {
@@ -853,9 +912,14 @@ internal object SlotTreeExtractor {
       "MediumFloatingActionButton",
       "LargeFloatingActionButton",
       "SmallFloatingActionButton",
+      "ToggleFloatingActionButton",
       "ListItem",
+      "BottomAppBar",
+      "FlexibleBottomAppBar",
       "ModalBottomSheet",
       "AlertDialog",
+      "BasicAlertDialog",
+      "DropdownMenuPopup",
     )
 
   private val SKIPPED_FRAMEWORK_NAMES =
@@ -881,13 +945,27 @@ internal object SlotTreeExtractor {
       "NavigationBar",
       "ShortNavigationBarItem",
       "NavigationBarItem",
+      "AnimatedNavigationItem",
       "WideNavigationRail",
+      "ModalWideNavigationRail",
       "NavigationRail",
       "WideNavigationRailItem",
       "NavigationRailItem",
+      "NavigationDrawerItem",
       "TimeText",
       "ModalBottomSheet",
       "AlertDialog",
+      "BasicAlertDialog",
       "ConfirmationDialog",
+      "DatePickerDialog",
+      "TimePickerDialog",
+      "VibrantTimePickerDialog",
+      "DropdownMenu",
+      "DropdownMenuPopup",
+      "ExposedDropdownMenu",
+      "ExpandedFullScreenSearchBar",
+      "ExpandedFullScreenContainedSearchBar",
+      "ExpandedDockedSearchBar",
+      "ExpandedDockedSearchBarWithGap",
     )
 }

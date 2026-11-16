@@ -721,6 +721,7 @@ class WorkerCommand(
     val cached =
       state.cached
         ?: throw WorkerException("no_compiled_board", "Call compileAndCheck before getTree")
+    val overlayId = params.overlay?.takeIf { it.isNotBlank() }
     val (directionName, screenId, viewName) =
       when (cached) {
         is CachedSource.Exploration -> {
@@ -730,8 +731,15 @@ class WorkerCommand(
           val dir =
             params.direction?.let { name ->
               compiled.board.directions.firstOrNull { it.name == name }
+                ?: throw WorkerException("unknown_direction", "Unknown direction '$name'")
             } ?: compiled.board.directions.first()
           val scr = params.screen ?: dir.startScreen
+          if (scr !in dir.screenIds) {
+            throw WorkerException("unknown_screen", "No screen '$scr' in direction '${dir.name}'")
+          }
+          if (overlayId != null && dir.overlays.none { it.id == overlayId }) {
+            throw WorkerException("unknown_overlay", "No overlay '$overlayId' in '${dir.name}'")
+          }
           val vw =
             params.view
               ?: if (compiled.board.surface == BoardSurface.Wear) Views.Watch.name
@@ -741,26 +749,29 @@ class WorkerCommand(
         is CachedSource.Proposal -> {
           val cat = Catalogs.of(cached.source.proposal)
           val scr = params.screen ?: cached.source.proposal.screens.keys.first()
+          if (scr !in cached.source.proposal.screens) {
+            throw WorkerException("unknown_screen", "No screen '$scr' in proposal")
+          }
           val vw = params.view ?: cat.views.first().name
           Triple("main", scr, vw)
         }
       }
 
-    val key = TreeKey(directionName, screenId, params.overlay, viewName)
+    val key = TreeKey(directionName, screenId, overlayId, viewName)
     val tree =
       state.trees[key]
         ?: handleRenderView(
             RenderViewParams(
               direction = directionName,
               screen = screenId,
-              overlay = params.overlay,
+              overlay = overlayId,
               view = viewName,
             ),
             state,
           )
           .tree
     val bounded = params.maxDepth?.let { pruneDepth(tree, it) } ?: tree
-    return GetTreeResult(directionName, screenId, params.overlay, viewName, bounded)
+    return GetTreeResult(directionName, screenId, overlayId, viewName, bounded)
   }
 
   private fun pruneDepth(tree: LayoutTree, maxDepth: Int): LayoutTree {

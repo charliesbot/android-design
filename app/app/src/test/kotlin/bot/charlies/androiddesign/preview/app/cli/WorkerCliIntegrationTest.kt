@@ -273,6 +273,124 @@ class WorkerCliIntegrationTest {
 
       val resp5 = PreviewJson.compact.parseToJsonElement(lines[4]).jsonObject
       assertEquals("bye", resp5["result"]!!.jsonObject["status"]!!.jsonPrimitive.content)
+
+      // Overlay filtered check + getTree validation: base has small-primary error, overlay is
+      // clean.
+      val overlaySrc =
+        """
+        import androidx.compose.foundation.layout.*
+        import androidx.compose.material3.*
+        import androidx.compose.ui.Modifier
+        import androidx.compose.ui.platform.testTag
+        import androidx.compose.ui.unit.dp
+        import bot.charlies.androiddesign.preview.kit.*
+
+        val preview = designBoard("Overlay Filter") {
+          direction("Main") {
+            screen("home") {
+              Column {
+                Button(onClick = {}, modifier = Modifier.testTag(AD_PRIMARY_TAG).height(48.dp)) {
+                  Text("Small Primary")
+                }
+                Button(onClick = {}, modifier = Modifier.height(72.dp).fillMaxWidth()) {
+                  Text("Bigger Rival")
+                }
+              }
+            }
+            overlay("info", screen = "home") {
+              AlertDialog(
+                onDismissRequest = {},
+                confirmButton = { TextButton(onClick = {}) { Text("OK") } },
+                text = { Text("Clean overlay") },
+              )
+            }
+          }
+        }
+        """
+          .trimIndent()
+      val overlayFile = dir.resolve("ov.explore.kt").also { Files.writeString(it, overlaySrc) }
+      val ovReqs =
+        listOf(
+          buildJsonObject {
+            put("id", JsonPrimitive(10))
+            put("method", JsonPrimitive("compileAndCheck"))
+            put(
+              "params",
+              buildJsonObject {
+                put("path", JsonPrimitive(overlayFile.toString()))
+                put(
+                  "views",
+                  kotlinx.serialization.json.buildJsonArray { add(JsonPrimitive("light")) },
+                )
+              },
+            )
+          },
+          buildJsonObject {
+            put("id", JsonPrimitive(11))
+            put("method", JsonPrimitive("getTree"))
+            put(
+              "params",
+              buildJsonObject {
+                put("direction", JsonPrimitive("Main"))
+                put("screen", JsonPrimitive("home"))
+                put("overlay", JsonPrimitive(""))
+                put("view", JsonPrimitive("light"))
+              },
+            )
+          },
+          buildJsonObject {
+            put("id", JsonPrimitive(12))
+            put("method", JsonPrimitive("getTree"))
+            put(
+              "params",
+              buildJsonObject { put("direction", JsonPrimitive("MissingDir")) },
+            )
+          },
+          buildJsonObject {
+            put("id", JsonPrimitive(13))
+            put("method", JsonPrimitive("shutdown"))
+          },
+        )
+      val ovIn =
+        ovReqs.joinToString("\n") {
+          PreviewJson.compact.encodeToString(JsonObject.serializer(), it)
+        } + "\n"
+      val ovOut = ByteArrayOutputStream()
+      val ovErr = ByteArrayOutputStream()
+      val ovCode =
+        WorkerCommand(
+            input = ByteArrayInputStream(ovIn.toByteArray(Charsets.UTF_8)),
+            redirectSystemOut = false,
+          )
+          .run(emptyList(), PrintStream(ovOut), PrintStream(ovErr))
+      assertEquals(ExitCode.OK, ovCode, "err=${ovErr.toString(Charsets.UTF_8)}")
+      val ovLines = ovOut.toString(Charsets.UTF_8).trim().lines().filter { it.isNotBlank() }
+      assertEquals(4, ovLines.size)
+      val ovRenders =
+        PreviewJson.compact
+          .parseToJsonElement(ovLines[0])
+          .jsonObject["result"]!!
+          .jsonObject["renders"]!!
+          .jsonArray
+      val baseItem = ovRenders.first { it.jsonObject["overlay"] == null }.jsonObject
+      val ovItem = ovRenders.first { it.jsonObject["overlay"] != null }.jsonObject
+      assertEquals("false", baseItem["pass"]!!.jsonPrimitive.content)
+      assertEquals(
+        "true",
+        ovItem["pass"]!!.jsonPrimitive.content,
+        "ovItem=$ovItem baseItem=$baseItem",
+      )
+      assertEquals("true", ovItem["check"]!!.jsonObject["pass"]!!.jsonPrimitive.content)
+      assertNull(ovItem["check"]!!.jsonObject["errors"])
+      assertNull(ovItem["layout"])
+
+      val cachedGet = PreviewJson.compact.parseToJsonElement(ovLines[1]).jsonObject
+      assertNull(cachedGet["error"], "Blank overlay should resolve base tree cleanly: $cachedGet")
+      val missingDir = PreviewJson.compact.parseToJsonElement(ovLines[2]).jsonObject
+      assertEquals(
+        "unknown_direction",
+        missingDir["error"]!!.jsonObject["code"]!!.jsonPrimitive.content,
+      )
     } finally {
       dir.toFile().deleteRecursively()
     }

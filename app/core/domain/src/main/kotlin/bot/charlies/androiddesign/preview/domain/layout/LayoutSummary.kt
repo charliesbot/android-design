@@ -52,10 +52,17 @@ object LayoutSummary {
         .sortedBy { it.bounds.x }
     val paneEntries =
       if (roots.any { it.id.startsWith(PANE_PREFIX) }) {
-        roots.map { root ->
+        val byPane = linkedMapOf<String, MutableList<LayoutNode>>()
+        for (root in roots) {
+          if (!root.id.startsWith(PANE_PREFIX)) continue
           val paneName = root.id.removePrefix(PANE_PREFIX).substringBefore('/')
-          val paneChildren = directContentChildren(root, children)
-          Pane(paneName, "${paneName}/", root.bounds.x, paneChildren)
+          byPane.getOrPut(paneName) { mutableListOf() } += root
+        }
+        byPane.map { (paneName, groupRoots) ->
+          val paneChildren = groupRoots.flatMap {
+            directContentChildren(it, children).ifEmpty { listOf(it) }
+          }
+          Pane(paneName, "$PANE_PREFIX$paneName/", groupRoots.minOf { it.bounds.x }, paneChildren)
         }
       } else {
         val contentNodes = roots.flatMap {
