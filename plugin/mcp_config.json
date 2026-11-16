@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "android_design_preview": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@charliesbot/android-design-preview@0.4.0"
+      ]
+    }
+  }
+}

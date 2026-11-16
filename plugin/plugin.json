@@ -1,0 +1,12 @@
+{
+  "name": "android-design",
+  "displayName": "Android Design Preview",
+  "version": "0.4.0",
+  "description": "Material 3 Expressive design judgment and live Compose board explorations for Android phone, tablet, desktop, and Wear OS screens.",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "Explore two distinct visual directions for an editorial recipe app home screen as a live design board.",
+    "Design a glanceable Wear OS workout timer screen in Compose and verify both watch sizes.",
+    "Review this Jetpack Compose screen against Material 3 Expressive hierarchy, color, and adaptive layout rules."
+  ]
+}

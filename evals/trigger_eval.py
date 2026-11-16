@@ -105,7 +105,7 @@ def main():
     args = parser.parse_args()
 
     name = args.eval_set.stem
-    sandbox = build_sandbox(ROOT / "skills", INSTALLED, name, args.description)
+    sandbox = build_sandbox(ROOT / "plugin" / "skills", INSTALLED, name, args.description)
     items = json.loads(args.eval_set.read_text())
     jobs = [item for item in items for _ in range(args.runs)]
     try:

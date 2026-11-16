@@ -1,0 +1,12 @@
+{
+  "name": "charliesbot-android-design",
+  "description": "Material 3 Expressive and Wear OS Compose design skills with live headless previewing.",
+  "plugins": [
+    {
+      "name": "android-design",
+      "version": "0.4.0",
+      "description": "Material 3 Expressive design judgment and live Compose board explorations for Android phone, tablet, desktop, and Wear OS screens.",
+      "source": "./plugin"
+    }
+  ]
+}
