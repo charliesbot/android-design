@@ -52,7 +52,13 @@ class PluginManifestsTest(unittest.TestCase):
         self.assertEqual(codex_plugin["name"], agy_plugin["name"])
         self.assertEqual(codex_plugin["version"], version)
         self.assertEqual(codex_plugin["skills"], "./skills/")
-        self.assertEqual(codex_plugin["mcpServers"], "./.mcp.json")
+        self.assertEqual(codex_plugin["mcpServers"], "./.codex-plugin/mcp.json")
+
+        codex_mcp = json.loads((PLUGIN_DIR / ".codex-plugin/mcp.json").read_text())
+        codex_server = codex_mcp["mcpServers"]["android_design_preview"]
+        self.assertEqual(codex_server["command"], "node")
+        self.assertEqual(codex_server["args"], ["./scripts/android-design-preview.js"])
+        self.assertEqual(codex_server["cwd"], ".")
 
         claude_mkt = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text())
         entry = claude_mkt["plugins"][0]
