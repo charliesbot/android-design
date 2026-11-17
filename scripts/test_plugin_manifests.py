@@ -1,4 +1,4 @@
-"""Checks version sync and manifest validity across supervisor/ and plugin/."""
+"""Checks version sync and manifest validity across plugin/ and supervisor/."""
 
 import json
 import unittest
@@ -20,21 +20,29 @@ ANTIGRAVITY_ALLOWED_KEYS = {
 
 class PluginManifestsTest(unittest.TestCase):
     def test_versions_and_manifests_stay_in_sync(self):
-        pkg = json.loads(SUPERVISOR_PKG.read_text())
-        version = pkg["version"]
-        expected_npm_arg = f"{pkg['name']}@{version}"
-
         agy_plugin = json.loads((PLUGIN_DIR / "plugin.json").read_text())
+        version = agy_plugin["version"]
         self.assertEqual(set(agy_plugin) - ANTIGRAVITY_ALLOWED_KEYS, set())
-        self.assertEqual(agy_plugin["version"], version)
         self.assertTrue((PLUGIN_DIR / agy_plugin["logo"]).is_file())
         self.assertTrue(1 <= len(agy_plugin["suggestedPrompts"]) <= 3)
 
-        for rel in ("mcp_config.json", ".mcp.json"):
+        self.assertTrue((PLUGIN_DIR / "scripts/android-design-preview.js").is_file())
+        self.assertEqual(json.loads((PLUGIN_DIR / "scripts/package.json").read_text()), {"type": "module"})
+
+        sup_pkg = json.loads(SUPERVISOR_PKG.read_text())
+        self.assertIs(sup_pkg.get("private"), True)
+        for npm_key in ("version", "bin", "files"):
+            self.assertNotIn(npm_key, sup_pkg)
+
+        expected_args = {
+            "mcp_config.json": ["${PLUGIN_ROOT}/scripts/android-design-preview.js"],
+            ".mcp.json": ["${CLAUDE_PLUGIN_ROOT}/scripts/android-design-preview.js"],
+        }
+        for rel, args in expected_args.items():
             mcp = json.loads((PLUGIN_DIR / rel).read_text())
             server = mcp["mcpServers"]["android_design_preview"]
-            self.assertEqual(server["command"], "npx")
-            self.assertEqual(server["args"], ["-y", expected_npm_arg])
+            self.assertEqual(server["command"], "node")
+            self.assertEqual(server["args"], args)
 
         claude_plugin = json.loads((PLUGIN_DIR / ".claude-plugin/plugin.json").read_text())
         self.assertEqual(claude_plugin["name"], agy_plugin["name"])
@@ -44,7 +52,13 @@ class PluginManifestsTest(unittest.TestCase):
         self.assertEqual(codex_plugin["name"], agy_plugin["name"])
         self.assertEqual(codex_plugin["version"], version)
         self.assertEqual(codex_plugin["skills"], "./skills/")
-        self.assertEqual(codex_plugin["mcpServers"], "./.mcp.json")
+        self.assertEqual(codex_plugin["mcpServers"], "./.codex-plugin/mcp.json")
+
+        codex_mcp = json.loads((PLUGIN_DIR / ".codex-plugin/mcp.json").read_text())
+        codex_server = codex_mcp["mcpServers"]["android_design_preview"]
+        self.assertEqual(codex_server["command"], "node")
+        self.assertEqual(codex_server["args"], ["./scripts/android-design-preview.js"])
+        self.assertEqual(codex_server["cwd"], ".")
 
         claude_mkt = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text())
         entry = claude_mkt["plugins"][0]

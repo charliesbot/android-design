@@ -7,9 +7,9 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { BoardServer } from "../src/board-server.js";
-import { PreviewMcpServer } from "../src/mcp-server.js";
-import { WorkerSupervisor } from "../src/worker-supervisor.js";
+import { BoardServer } from "../../plugin/scripts/board-server.js";
+import { PreviewMcpServer } from "../../plugin/scripts/mcp-server.js";
+import { WorkerSupervisor } from "../../plugin/scripts/worker-supervisor.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -165,7 +165,7 @@ test(
 
       // Verify CLI `render <file> --out <dir>` writes report.json matching RenderEntry.
       const cliOutDir = path.join(tmpDir, "cli-out");
-      const binPath = path.resolve(TEST_DIR, "..", "bin", "android-design-preview.js");
+      const binPath = path.resolve(REPO_ROOT, "plugin", "scripts", "android-design-preview.js");
       await execFileAsync(process.execPath, [binPath, "render", explorePath, "--out", cliOutDir], {
         env: { ...process.env, ANDROID_DESIGN_PREVIEW_JAR: BUILT_JAR },
       });

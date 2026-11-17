@@ -263,6 +263,7 @@ class BackendTests(unittest.TestCase):
         self.assertIn('mcp(eval-preview_preview/*)', settings['permissions']['allow'])
         self.assertIn('command(*)', settings['permissions']['deny'])
         self.assertIn('mcp(android_design_preview/*)', settings['permissions']['deny'])
+        self.assertIn('mcp(android-design_android_design_preview/*)', settings['permissions']['deny'])
         self.assertNotIn('--dangerously-skip-permissions', cmd)
         self.assertEqual(result['model'], 'Gemini 3.8 Flash (High)')
         self.assertEqual(result['turns'], 3)

@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SUPERVISOR_BIN = ROOT / "supervisor/bin/android-design-preview.js"
-SUPERVISOR_PKG = ROOT / "supervisor/package.json"
+SUPERVISOR_BIN = ROOT / "plugin/scripts/android-design-preview.js"
+PLUGIN_MANIFEST = ROOT / "plugin/plugin.json"
 REPO_JAR = ROOT / "app/app/build/libs/android-design-preview.jar"
 EXECUTABLE_ENV = "ANDROID_DESIGN_PREVIEW"
 JAR_ENV = "ANDROID_DESIGN_PREVIEW_JAR"
@@ -15,13 +15,13 @@ SERVER_NAME = "android_design_preview"
 
 def _supervisor_version():
     try:
-        return json.loads(SUPERVISOR_PKG.read_text(encoding="utf-8")).get("version") or "0.4.0"
+        return json.loads(PLUGIN_MANIFEST.read_text(encoding="utf-8")).get("version") or "0.4.0"
     except (OSError, ValueError):
         return "0.4.0"
 
 
 def app_binary(environ=None, home=None):
-    """The previewer executable/supervisor: $ANDROID_DESIGN_PREVIEW, then supervisor/bin/android-design-preview.js."""
+    """The previewer executable/supervisor: $ANDROID_DESIGN_PREVIEW, then plugin/scripts/android-design-preview.js."""
     environ = os.environ if environ is None else environ
     override = environ.get(EXECUTABLE_ENV)
     if override:

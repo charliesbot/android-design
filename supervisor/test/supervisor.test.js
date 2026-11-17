@@ -6,10 +6,10 @@ import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import test from "node:test";
-import { JarCache, parseSha256Text } from "../src/jar-cache.js";
-import { collectJavaCandidates, locateJava, parseJavaMajorVersion } from "../src/java-locator.js";
-import { PreviewMcpServer, formatCheckSummary } from "../src/mcp-server.js";
-import { WorkerSupervisor, WorkerTimeoutError } from "../src/worker-supervisor.js";
+import { JarCache, parseSha256Text } from "../../plugin/scripts/jar-cache.js";
+import { collectJavaCandidates, locateJava, parseJavaMajorVersion } from "../../plugin/scripts/java-locator.js";
+import { PreviewMcpServer, formatCheckSummary } from "../../plugin/scripts/mcp-server.js";
+import { WorkerSupervisor, WorkerTimeoutError } from "../../plugin/scripts/worker-supervisor.js";
 
 function withTempDir(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ad-sup-test-"));

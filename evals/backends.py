@@ -397,7 +397,13 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
                     'artifactReviewPolicy': 'always-proceed',
                     'permissions': {
                         'allow': ['read_file(*)', f'write_file({cwd_path})', f'mcp({AGY_MCP_SERVER}/*)'],
-                        'deny': ['command(*)', f'mcp({SERVER_NAME}/*)', 'read_url(*)', 'execute_url(*)'],
+                        'deny': [
+                            'command(*)',
+                            f'mcp({SERVER_NAME}/*)',
+                            f'mcp(android-design_{SERVER_NAME}/*)',
+                            'read_url(*)',
+                            'execute_url(*)',
+                        ],
                     },
                 }
                 command = ['agy', '-p', agy_prompt, '--output-format', 'stream-json',

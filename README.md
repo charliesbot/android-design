@@ -9,7 +9,7 @@ Agent skills for designing Android UI with Material 3 Expressive and Wear OS Jet
 
 Requires **Node.js 18+** and **Java 17+** (JDK or Android Studio's bundled JBR).
 
-- **Antigravity:** point a workspace or user plugin directory to `plugin/` (contains `plugin.json`, `mcp_config.json`, and `skills/`).
+- **Antigravity (from a local clone):** run `agy plugin install ./plugin` (or `./scripts/install_local_plugin.sh` when developing locally to also build `:app:workerJar` into `~/.cache/android-design-preview/<version>/`).
 - **Standalone skills only (`npx skills` or Chai):**
 
 ```bash
@@ -20,17 +20,17 @@ npx skills add charliesbot/android-design
 
 ## Manual MCP server registration
 
-`plugin/mcp_config.json` and `plugin/.mcp.json` start the pure-JS Node MCP supervisor automatically:
+`plugin/mcp_config.json` (`${PLUGIN_ROOT}`) and `plugin/.mcp.json` (`${CLAUDE_PLUGIN_ROOT}`) launch the bundled pure-JS Node MCP supervisor at `plugin/scripts/android-design-preview.js` automatically:
 
 ```json
 {
   "mcpServers": {
     "android_design_preview": {
-      "command": "npx",
-      "args": ["-y", "@charliesbot/android-design-preview@0.4.0"]
+      "command": "node",
+      "args": ["/path/to/android-design/plugin/scripts/android-design-preview.js"]
     }
   }
 }
 ```
 
-The first `check_design` call downloads and SHA-256 verifies `android-design-preview.jar` into `~/.cache/android-design-preview/0.4.0/`. To run against a local build (`cd app && ./gradlew :app:workerJar`), set `ANDROID_DESIGN_PREVIEW_JAR` to `app/app/build/libs/android-design-preview.jar`.
+If `~/.cache/android-design-preview/0.4.0/android-design-preview.jar` is absent, the first session downloads and SHA-256 verifies `android-design-preview.jar` from the matching GitHub Release. To use a local build (`cd app && ./gradlew :app:workerJar`), run `./scripts/install_local_plugin.sh` or set `ANDROID_DESIGN_PREVIEW_JAR` to `app/app/build/libs/android-design-preview.jar`.

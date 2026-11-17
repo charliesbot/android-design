@@ -4,11 +4,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SRC_DIR = path.dirname(fileURLToPath(import.meta.url));
-const PKG_PATH = path.resolve(SRC_DIR, "..", "package.json");
-const PKG = JSON.parse(fs.readFileSync(PKG_PATH, "utf8"));
+const PLUGIN_MANIFEST_PATH = path.resolve(SRC_DIR, "..", "plugin.json");
+const PLUGIN_MANIFEST = JSON.parse(fs.readFileSync(PLUGIN_MANIFEST_PATH, "utf8"));
 
-export const PACKAGE_NAME = PKG.name;
-export const PACKAGE_VERSION = PKG.version;
+export const PACKAGE_NAME = PLUGIN_MANIFEST.name;
+export const PACKAGE_VERSION = PLUGIN_MANIFEST.version;
 export const DEFAULT_REPO = "charliesbot/android-design";
 export const JAR_FILENAME = "android-design-preview.jar";
 export const JAR_SHA_FILENAME = `${JAR_FILENAME}.sha256`;
