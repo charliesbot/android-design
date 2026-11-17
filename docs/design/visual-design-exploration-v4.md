@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-Visual design exploration replaces the macOS Swing app, `.dmg` installer, and A2UI JSON pipeline with a cross-platform plugin under `plugin/`, a ~25 KB Node `npx` MCP supervisor (zero idle JVM memory), a supervised headless Skiko JVM worker (`skiko-awt-runtime-all`), and a localhost HTML and SVG browser board. Agents write real `@Composable` screens directly in `design/<slug>.explore.kt`, compiled in memory by `K2JVMCompiler` behind a bytecode and classloader allowlist and checked across five views in **328 to 460 ms warm**. Following the 8-case agent A/B rollout benchmark, v3's superseded Swing window, JSON catalog, schemas, and `export/` package have been removed.
+Visual design exploration replaces the macOS Swing app, `.dmg` installer, and A2UI JSON pipeline with a cross-platform plugin under `plugin/`, a ~93 KB pure-JS Node MCP supervisor bundled at `plugin/scripts/` (zero idle JVM memory), a supervised headless Skiko JVM worker (`skiko-awt-runtime-all`), and a localhost HTML and SVG browser board. Agents write real `@Composable` screens directly in `design/<slug>.explore.kt`, compiled in memory by `K2JVMCompiler` behind a bytecode and classloader allowlist and checked across five views in **328 to 460 ms warm**. Following the 8-case agent A/B rollout benchmark, v3's superseded Swing window, JSON catalog, schemas, and `export/` package have been removed.
 
 ## Design
 
@@ -31,13 +31,13 @@ Measured on Apple Silicon inside an already-booted headless JDK process (excludi
 - **Building exploration directly on `kakao/prevue`:** Adopted on macOS for iterating inside target Android repositories after exploration (0.2 to 0.9 s `@Preview` hot-swap), while unsuitable as the exploration engine itself (macOS-only, requires `ANDROID_HOME` and an Android Gradle module, ~1.4 GB RAM per daemon, and no deterministic M3 layout or contrast rules).
 - **CLI commands instead of MCP:** `claude -p` blocks granting `Bash` to spawned eval generators ([script-ban-eval.md](script-ban-eval.md)), interactive harnesses prompt on shell commands, and CLI stdout cannot return inline `ImageContent`, adding extra `Read` turns per PNG.
 
-### Runtime: Node `npx` supervisor and disposable JVM worker
+### Runtime: bundled Node supervisor and disposable JVM worker
 
 ```text
 Agent (Claude Code / Codex / Antigravity)
   │ stdio MCP (initialize + tools/list answered in Node: ~20 ms, 0 MB JVM heap when idle)
   ▼
-npx @charliesbot/android-design-preview@<version>   (~25 KB Node supervisor)
+node ${PLUGIN_ROOT}/scripts/android-design-preview.js   (~93 KB pure-JS Node supervisor)
   ├── Localhost HTTP + SSE server (127.0.0.1:<port>, Host + Origin + 256-bit session token)
   ├── Warms ~/.cache/ GitHub Release JAR (~132 MB, SHA-256 verified) in background on cache miss
   └── Spawns JVM only on first tool call & supervises over private stdio pipes (no JVM port)
@@ -48,7 +48,7 @@ npx @charliesbot/android-design-preview@<version>   (~25 KB Node supervisor)
         └── HeadlessRenderer + Wear Compose + SubcomposeLayout slot inspector + finding rules
 ```
 
-**Background JAR warm-up and lazy JVM spawn.** npm tarballs past 100 MB hit registry timeouts and slow down cold `npx` installs. Publishing a ~25 KB pure-JS supervisor lets enabled plugin sessions answer MCP `initialize` and `tools/list` in ~20 ms with zero JVM memory. On supervisor startup, if `~/.cache/android-design-preview/<version>/android-design-preview.jar` is missing (first session after install or upgrade), Node starts a background download and SHA-256 verification immediately while the agent reads the brief; cached sessions only run a `fs.existsSync` check. The JVM worker itself is spawned only on the first `check_design` or `get_tree` call, locating `java` 17+ (`PATH`, `JAVA_HOME`, or Android Studio's bundled JBR) and honoring `ANDROID_DESIGN_PREVIEW_JAR` for local builds and `evals/run.py`.
+**Background JAR warm-up and lazy JVM spawn.** Plugin bundles stay under ~250 KB so git/marketplace installs never drag a 132 MB fat JAR. Shipping a pure-JS Node supervisor inside `plugin/scripts/` (expanded via `${PLUGIN_ROOT}` in `mcp_config.json` and `${CLAUDE_PLUGIN_ROOT}` in `.mcp.json`, with no npm registry dependency) lets enabled plugin sessions answer MCP `initialize` and `tools/list` in ~20 ms with zero JVM memory. On supervisor startup, if `~/.cache/android-design-preview/<version>/android-design-preview.jar` is missing (first session after install or upgrade), Node starts a background download and SHA-256 verification immediately while the agent reads the brief; local dev (`scripts/install_local_plugin.sh`) populates that cache directly from `./gradlew :app:workerJar`, and cached sessions only run a `fs.existsSync` check. The JVM worker itself is spawned only on the first `check_design` or `get_tree` call, locating `java` 17+ (`PATH`, `JAVA_HOME`, or Android Studio's bundled JBR) and honoring `ANDROID_DESIGN_PREVIEW_JAR` for local builds and `evals/run.py`.
 
 **Split deadlines and worker recycling.** In-process JVM thread interruption cannot stop a tight loop (`while (true)`) inside composition, and repeated `ClassLoader` loads can retain entries in Skia or Compose caches. Running one JVM as a supervised child of Node solves both without running two JVMs. Deadlines are split by phase so slower Intel or Windows machines do not trip false timeouts on cold boot: JAR download reports progress separately, worker process boot plus round-1 JIT warmup gets a **30 s** readiness budget, and each in-worker `compile + render` request after readiness gets a strict **5 s** deadline before Node sends `SIGKILL` and respawns a clean worker. Node also recycles the worker every 25 compiles and after idle timeout.
 
@@ -127,7 +127,7 @@ Node serves an HTML, CSS, and SVG board at `http://127.0.0.1:<port>/?token=<secr
 
 ### Plugin bundle and moving to production
 
-Distributable files live under `plugin/` (`plugin/skills/`, Antigravity `plugin.json` and `mcp_config.json`, Claude Code `.claude-plugin/`, Codex `.codex-plugin/`, and `.mcp.json` pinned to `@charliesbot/android-design-preview@<version>`) so installs transfer ~150 KB rather than `sources/`, `evals/`, and `app/`. Root marketplace manifests point to `./plugin` via git-subdir, while `npx skills add` and Chai (`~/chai.toml`) read `plugin/skills/` directly.
+Distributable files live under `plugin/` (`plugin/skills/`, `plugin/scripts/`, Antigravity `plugin.json` and `mcp_config.json`, Claude Code `.claude-plugin/`, Codex `.codex-plugin/`, and `.mcp.json` launching `${PLUGIN_ROOT}/scripts/android-design-preview.js` / `${CLAUDE_PLUGIN_ROOT}/scripts/android-design-preview.js`) so installs transfer ~250 KB rather than `sources/`, `evals/`, and `app/`. Root marketplace manifests point to `./plugin` via git-subdir, while `npx skills add` and Chai (`~/chai.toml`) read `plugin/skills/` directly.
 
 Approving a direction needs no code generator (`export/` is gone), though porting still wires the screen into the app: the agent copies the approved `@Composable` screen functions into the target project's module layout, removes `testTag("ad:primary")` if undesired, connects them to the app's theme, ViewModel state, and Navigation 3 routes, and verifies the live screens with `kakao/prevue` on macOS or `compose-preview` elsewhere.
 

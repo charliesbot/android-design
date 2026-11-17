@@ -22,7 +22,7 @@ class PreviewAppTests(unittest.TestCase):
 
     def test_repo_supervisor_is_used_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
-            supervisor = make_file(tmp, "supervisor/bin/android-design-preview.js")
+            supervisor = make_file(tmp, "plugin/scripts/android-design-preview.js")
             original = preview_app.SUPERVISOR_BIN
             preview_app.SUPERVISOR_BIN = supervisor
             try:
@@ -37,7 +37,7 @@ class PreviewAppTests(unittest.TestCase):
     def test_worker_jar_prefers_env_then_repo_then_cache(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp) / "home"
-            version = json.loads(preview_app.SUPERVISOR_PKG.read_text())["version"]
+            version = json.loads(preview_app.PLUGIN_MANIFEST.read_text())["version"]
             cached = make_file(home / ".cache/android-design-preview" / version, "android-design-preview.jar")
             repo = make_file(tmp, "repo/android-design-preview.jar")
             custom = make_file(tmp, "custom/worker.jar")

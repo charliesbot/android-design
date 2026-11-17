@@ -27,7 +27,7 @@ import kotlinx.serialization.json.encodeToJsonElement
 
 /**
  * Headless socket-free stdio JSON-RPC worker (`ping`, `compileAndCheck`, `renderView`, `getTree`,
- * `shutdown`) driven by the Node `npx` MCP supervisor.
+ * `shutdown`) driven by the Node MCP supervisor.
  */
 class WorkerCommand(
   private val input: InputStream? = null,

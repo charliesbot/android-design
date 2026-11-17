@@ -4,7 +4,7 @@ Material 3 Expressive design judgment (`android-design`) and live Jetpack Compos
 
 ## Prerequisites
 
-- **Node.js 18+** (runs `npx -y @charliesbot/android-design-preview@0.4.0`)
+- **Node.js 18+** (runs `scripts/android-design-preview.js`)
 - **Java 17+** (system JDK or Android Studio's bundled JBR)
 
 ## Included skills and MCP tools
