@@ -11,7 +11,7 @@ python3 -m unittest discover scripts
 python3 -m unittest discover evals
 python3 scripts/check_coverage.py
 (cd app && ./gradlew build spotlessCheck)
-(cd supervisor && npm test && npm pack --dry-run)
+(cd supervisor && npm test)
 ```
 
 Requires Node.js 18+ and Java 17+ (`./gradlew :app:workerJar` builds `app/app/build/libs/android-design-preview.jar`). No Android SDK or Chrome binary is required.
