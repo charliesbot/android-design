@@ -1,0 +1,193 @@
+#!/bin/sh
+set -eu
+
+# Resolve symlinks so ~/.local/bin/android-design-preview finds plugin/plugin.json.
+resolve_script() {
+  target="$1"
+  while [ -L "$target" ]; do
+    dir=$(CDPATH= cd -- "$(dirname -- "$target")" && pwd)
+    link=$(readlink "$target")
+    case "$link" in
+      /*) target="$link" ;;
+      *) target="$dir/$link" ;;
+    esac
+  done
+  dir=$(CDPATH= cd -- "$(dirname -- "$target")" && pwd)
+  printf '%s/%s\n' "$dir" "$(basename -- "$target")"
+}
+
+SCRIPT_PATH=$(resolve_script "$0")
+BIN_DIR=$(dirname -- "$SCRIPT_PATH")
+PLUGIN_DIR=$(CDPATH= cd -- "$BIN_DIR/.." && pwd)
+REPO_DIR=$(CDPATH= cd -- "$PLUGIN_DIR/.." 2>/dev/null && pwd || printf '')
+
+CACHE_ROOT="${ANDROID_DESIGN_CACHE_DIR:-${ANDROID_DESIGN_PREVIEW_CACHE_DIR:-$HOME/.cache/android-design-preview}}"
+DEFAULT_REPO="charliesbot/android-design"
+
+read_version() {
+  manifest="$PLUGIN_DIR/plugin.json"
+  if [ -f "$manifest" ]; then
+    sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$manifest" | head -n 1
+  else
+    printf '0.4.0\n'
+  fi
+}
+
+java_major() {
+  bin="$1"
+  [ -x "$bin" ] || return 1
+  ver=$("$bin" -version 2>&1 | sed -n 's/.*version "\([^"]*\)".*/\1/p' | head -n 1)
+  [ -n "$ver" ] || return 1
+  case "$ver" in
+    1.*) major=$(printf '%s' "$ver" | cut -d. -f2) ;;
+    *) major=$(printf '%s' "$ver" | cut -d. -f1 | sed 's/[^0-9].*//') ;;
+  esac
+  [ -n "$major" ] && [ "$major" -ge 17 ] 2>/dev/null
+}
+
+find_java() {
+  cache_file="$CACHE_ROOT/.java-bin"
+  if [ -f "$cache_file" ]; then
+    cached=$(cat "$cache_file" 2>/dev/null || true)
+    if [ -n "$cached" ] && [ -x "$cached" ]; then
+      JAVA_BIN="$cached"
+      return 0
+    fi
+  fi
+
+  # 1. Explicit JAVA_HOME
+  if [ -n "${JAVA_HOME:-}" ] && java_major "$JAVA_HOME/bin/java"; then
+    found="$JAVA_HOME/bin/java"
+  # 2. PATH
+  elif path_java=$(command -v java 2>/dev/null) && java_major "$path_java"; then
+    found="$path_java"
+  # 3. macOS java_home
+  elif [ -x /usr/libexec/java_home ] && mac_home=$(/usr/libexec/java_home -v 17+ 2>/dev/null) && java_major "$mac_home/bin/java"; then
+    found="$mac_home/bin/java"
+  else
+    found=""
+    # 4. Android Studio bundled JBR (macOS & Linux)
+    for candidate in \
+      "/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java" \
+      "$HOME/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java" \
+      "/Applications/Android Studio Preview.app/Contents/jbr/Contents/Home/bin/java" \
+      "/opt/android-studio/jbr/bin/java" \
+      "$HOME/android-studio/jbr/bin/java" \
+      "$HOME/.local/share/JetBrains/Toolbox/apps/android-studio/jbr/bin/java"
+    do
+      if java_major "$candidate"; then
+        found="$candidate"
+        break
+      fi
+    done
+  fi
+
+  if [ -z "${found:-}" ]; then
+    printf '{"ok":false,"error":"java_not_found","message":"Java 17+ is required. Install JDK 17+ or Android Studio and retry."}\n'
+    exit 3
+  fi
+
+  mkdir -p "$CACHE_ROOT" 2>/dev/null || true
+  printf '%s\n' "$found" > "$cache_file" 2>/dev/null || true
+  JAVA_BIN="$found"
+}
+
+sha256_of() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print tolower($1)}'
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print tolower($1)}'
+  else
+    return 1
+  fi
+}
+
+download_file() {
+  url="$1"
+  dest="$2"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --retry 2 -o "$dest" "$url"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO "$dest" "$url"
+  else
+    printf '{"ok":false,"error":"download_tool_missing","message":"curl or wget is required to download android-design-preview.jar"}\n'
+    exit 3
+  fi
+}
+
+resolve_jar() {
+  if [ -n "${ANDROID_DESIGN_PREVIEW_JAR:-}" ]; then
+    if [ ! -f "$ANDROID_DESIGN_PREVIEW_JAR" ]; then
+      printf '{"ok":false,"error":"jar_not_found","message":"ANDROID_DESIGN_PREVIEW_JAR points to a missing file"}\n'
+      exit 3
+    fi
+    JAR_PATH="$ANDROID_DESIGN_PREVIEW_JAR"
+    return 0
+  fi
+
+  version=$(read_version)
+  cached_jar="$CACHE_ROOT/$version/android-design-preview.jar"
+  if [ -f "$cached_jar" ]; then
+    JAR_PATH="$cached_jar"
+    return 0
+  fi
+
+  if [ -n "$REPO_DIR" ] && [ -f "$REPO_DIR/app/app/build/libs/android-design-preview.jar" ]; then
+    JAR_PATH="$REPO_DIR/app/app/build/libs/android-design-preview.jar"
+    return 0
+  fi
+
+  jar_url="${ANDROID_DESIGN_PREVIEW_JAR_URL:-https://github.com/$DEFAULT_REPO/releases/download/v$version/android-design-preview.jar}"
+  sha_url="${ANDROID_DESIGN_PREVIEW_SHA_URL:-$jar_url.sha256}"
+
+  mkdir -p "$CACHE_ROOT/$version"
+  tmp_jar="$cached_jar.tmp.$$"
+  tmp_sha="$cached_jar.sha.$$"
+  trap 'rm -f "$tmp_jar" "$tmp_sha"' EXIT HUP INT TERM
+
+  download_file "$sha_url" "$tmp_sha" || {
+    printf '{"ok":false,"error":"jar_download_failed","message":"Failed downloading JAR checksum from GitHub Release"}\n'
+    exit 3
+  }
+  expected=$(grep -Eo '[A-Fa-f0-9]{64}' "$tmp_sha" | head -n 1 | tr '[:upper:]' '[:lower:]')
+  if [ -z "$expected" ]; then
+    printf '{"ok":false,"error":"jar_checksum_invalid","message":"Invalid SHA-256 checksum file from release"}\n'
+    exit 3
+  fi
+
+  download_file "$jar_url" "$tmp_jar" || {
+    printf '{"ok":false,"error":"jar_download_failed","message":"Failed downloading android-design-preview.jar from GitHub Release"}\n'
+    exit 3
+  }
+  actual=$(sha256_of "$tmp_jar") || {
+    printf '{"ok":false,"error":"sha_tool_missing","message":"shasum or sha256sum is required to verify android-design-preview.jar"}\n'
+    exit 3
+  }
+  if [ "$actual" != "$expected" ]; then
+    rm -f "$tmp_jar" "$tmp_sha"
+    printf '{"ok":false,"error":"jar_checksum_mismatch","message":"SHA-256 verification failed for android-design-preview.jar"}\n'
+    exit 3
+  fi
+
+  mv "$tmp_jar" "$cached_jar"
+  rm -f "$tmp_sha"
+  trap - EXIT HUP INT TERM
+  JAR_PATH="$cached_jar"
+}
+
+JAVA_BIN=""
+JAR_PATH=""
+find_java
+resolve_jar
+export ANDROID_DESIGN_PREVIEW_SCRIPT="$SCRIPT_PATH"
+export ANDROID_DESIGN_PREVIEW_JAR="$JAR_PATH"
+
+cmd="${1:-}"
+case "$cmd" in
+  server|worker|render)
+    exec "$JAVA_BIN" -Djava.awt.headless=true -jar "$JAR_PATH" "$@"
+    ;;
+  *)
+    exec "$JAVA_BIN" -Djava.awt.headless=true -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -jar "$JAR_PATH" "$@"
+    ;;
+esac

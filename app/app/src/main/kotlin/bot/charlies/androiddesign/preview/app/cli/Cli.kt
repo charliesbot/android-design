@@ -1,6 +1,14 @@
 package bot.charlies.androiddesign.preview.app.cli
 
 import bot.charlies.androiddesign.preview.app.AppInfo
+import bot.charlies.androiddesign.preview.app.client.CheckCommand
+import bot.charlies.androiddesign.preview.app.client.InstallCommand
+import bot.charlies.androiddesign.preview.app.client.OpenCommand
+import bot.charlies.androiddesign.preview.app.client.SelectionCommand
+import bot.charlies.androiddesign.preview.app.client.StatusCommand
+import bot.charlies.androiddesign.preview.app.client.StopCommand
+import bot.charlies.androiddesign.preview.app.client.TreeCommand
+import bot.charlies.androiddesign.preview.app.server.ServerCommand
 import java.io.PrintStream
 
 /** Exit codes of the command line. 0 is success; 1 means findings failed; 2 an invalid file. */
@@ -61,13 +69,29 @@ fun parseArgs(args: List<String>, flags: Set<String>, err: PrintStream): ParsedA
 
 /** Dispatches the first argument to its headless [Command]. */
 object Cli {
-  private val commands: List<Command> = listOf(RenderCommand(), WorkerCommand())
+  private val commands: List<Command> =
+    listOf(
+      CheckCommand(),
+      TreeCommand(),
+      SelectionCommand(),
+      OpenCommand(),
+      StatusCommand(),
+      StopCommand(),
+      RenderCommand(),
+      InstallCommand(),
+      ServerCommand(),
+      WorkerCommand(),
+    )
 
   fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
     val first = args.firstOrNull()
     if (first == null) {
       printUsage(err)
       return ExitCode.USAGE
+    }
+    if (first == "--help" || first == "-h") {
+      printUsage(out)
+      return ExitCode.OK
     }
     if (first == "--version") {
       out.println(AppInfo.VERSION)
@@ -82,9 +106,13 @@ object Cli {
     return command.run(args.drop(1), out, err)
   }
 
-  fun printUsage(err: PrintStream) {
-    err.println("usage:")
-    commands.forEach { err.println("  ${it.usage}") }
-    err.println("  --version")
+  fun printUsage(out: PrintStream) {
+    out.println("usage: android-design-preview <command> [options]")
+    commands
+      .filter { it.name != "server" && it.name != "worker" }
+      .forEach { out.println("  ${it.usage}") }
+    out.println("  --version")
+    out.println("  --help")
+    out.println("Run `android-design-preview <command> --help` for details and exit codes.")
   }
 }

@@ -39,7 +39,7 @@ fun interface ExploreTargetRenderer {
  * Shared loader and headless renderer for `.explore.kt` explorations used by both [RenderCommand]
  * and [WorkerCommand].
  */
-internal object ExploreRenderRunner {
+object ExploreRenderRunner {
   val defaultRenderer: ExploreTargetRenderer =
     ExploreTargetRenderer { compiled, direction, screenId, view, designSystem, overlayId ->
       SandboxHeadlessRenderer.render(

@@ -190,26 +190,136 @@ enum class Severity {
 }
 
 @Serializable
-enum class FindingRule(val wire: String) {
-  @SerialName("touch-target") TouchTarget("touch-target"),
-  @SerialName("font") Font("font"),
-  @SerialName("text-clipped") TextClipped("text-clipped"),
-  @SerialName("text-truncated") TextTruncated("text-truncated"),
-  @SerialName("label-truncated") LabelTruncated("label-truncated"),
-  @SerialName("contrast") Contrast("contrast"),
-  @SerialName("primary-largest") PrimaryLargest("primary-largest"),
-  @SerialName("one-fab") OneFab("one-fab"),
-  @SerialName("offscreen") Offscreen("offscreen"),
-  @SerialName("overflow") Overflow("overflow"),
-  @SerialName("round-edge-clipped") RoundEdgeClipped("round-edge-clipped"),
-  @SerialName("corner-clipped") CornerClipped("corner-clipped"),
-  @SerialName("carousel-items") CarouselItems("carousel-items"),
-  @SerialName("docked-toolbar-nav-bar") DockedToolbarNavBar("docked-toolbar-nav-bar"),
-  @SerialName("full-screen-date-picker") FullScreenDatePicker("full-screen-date-picker"),
-  @SerialName("empty-detail-pane") EmptyDetailPane("empty-detail-pane"),
-  @SerialName("line-length") LineLength("line-length"),
-  @SerialName("weight-collapsed") WeightCollapsed("weight-collapsed"),
-  @SerialName("arrangement-no-space") ArrangementNoSpace("arrangement-no-space"),
+enum class FindingRule(val wire: String, val reference: String, val hint: String) {
+  @SerialName("touch-target")
+  TouchTarget(
+    wire = "touch-target",
+    reference = "components.md#selection-guide",
+    hint =
+      "Size interactive controls to at least 48x48 dp (standard M3 buttons/IconButton or sizeIn(minWidth = 48.dp, minHeight = 48.dp)).",
+  ),
+  @SerialName("font")
+  Font(
+    wire = "font",
+    reference = "theming.md#typography",
+    hint =
+      "Use bundled fonts only: Google Sans Flex for body/label/titleMedium/titleSmall, one brand face on Display/Headline/titleLarge (Doto Display only), and Google Sans Code for numerals.",
+  ),
+  @SerialName("text-clipped")
+  TextClipped(
+    wire = "text-clipped",
+    reference = "layout.md#density-and-text",
+    hint =
+      "Give text room to wrap or widen its container so glyphs are neither clipped nor collapsed to zero width.",
+  ),
+  @SerialName("text-truncated")
+  TextTruncated(
+    wire = "text-truncated",
+    reference = "layout.md#density-and-text",
+    hint =
+      "Check whether ellipsized body text hides important meaning or should wrap onto another line.",
+  ),
+  @SerialName("label-truncated")
+  LabelTruncated(
+    wire = "label-truncated",
+    reference = "components.md#component-details",
+    hint =
+      "Shorten button, chip, tab, or navigation labels to 1 to 2 words so labels never truncate.",
+  ),
+  @SerialName("contrast")
+  Contrast(
+    wire = "contrast",
+    reference = "theming.md#color-schemes",
+    hint =
+      "Pair semantic onSurface/onSurfaceVariant or container tokens (never outline/outlineVariant for text) to meet WCAG contrast (>= 4.5:1 body, >= 3:1 large).",
+  ),
+  @SerialName("primary-largest")
+  PrimaryLargest(
+    wire = "primary-largest",
+    reference = "components.md#selection-guide",
+    hint =
+      "Tag one primary CTA with Modifier.testTag(\"ad:primary\") and size its height >= every peer button or chip (56 dp M button on phone; Medium/Large EdgeButton on Wear).",
+  ),
+  @SerialName("one-fab")
+  OneFab(
+    wire = "one-fab",
+    reference = "components.md#component-details",
+    hint = "Keep at most one FloatingActionButton per pane.",
+  ),
+  @SerialName("offscreen")
+  Offscreen(
+    wire = "offscreen",
+    reference = "layout.md#breakpoints",
+    hint = "Keep content within viewport bounds or inside a scrollable container.",
+  ),
+  @SerialName("overflow")
+  Overflow(
+    wire = "overflow",
+    reference = "layout.md#breakpoints",
+    hint =
+      "Prevent horizontal overflow past the parent or window width (use FlowRow, weight, widthIn, or horizontal scrolling).",
+  ),
+  @SerialName("round-edge-clipped")
+  RoundEdgeClipped(
+    wire = "round-edge-clipped",
+    reference = "wear-os.md#layout",
+    hint =
+      "Keep Wear content inset from the circular display edge and progress ring using ScreenScaffold contentPadding and TransformingLazyColumn.",
+  ),
+  @SerialName("corner-clipped")
+  CornerClipped(
+    wire = "corner-clipped",
+    reference = "theming.md#shapes",
+    hint = "Add inner padding so text and controls stay clear of rounded container corners.",
+  ),
+  @SerialName("carousel-items")
+  CarouselItems(
+    wire = "carousel-items",
+    reference = "components.md#component-details",
+    hint = "Keep compact carousels visual rather than crowded with text items.",
+  ),
+  @SerialName("docked-toolbar-nav-bar")
+  DockedToolbarNavBar(
+    wire = "docked-toolbar-nav-bar",
+    reference = "layout.md#navigation-by-size",
+    hint =
+      "Avoid pairing a docked bottom toolbar with a bottom navigation bar; use a floating toolbar or promote navigation to a rail.",
+  ),
+  @SerialName("full-screen-date-picker")
+  FullScreenDatePicker(
+    wire = "full-screen-date-picker",
+    reference = "components.md#component-details",
+    hint =
+      "Prefer modal or docked date pickers on larger windows instead of full-screen date pickers.",
+  ),
+  @SerialName("empty-detail-pane")
+  EmptyDetailPane(
+    wire = "empty-detail-pane",
+    reference = "layout.md#canonical-layouts",
+    hint =
+      "Provide a placeholder composable in listDetail(...) so wide windows never show an empty detail pane.",
+  ),
+  @SerialName("line-length")
+  LineLength(
+    wire = "line-length",
+    reference = "layout.md#grids-and-max-widths",
+    hint =
+      "Cap reading text, Card, and ListItem panes with Modifier.widthIn(max = 420.dp) on foldable/tablet/desktop so lines stay <= 60 characters.",
+  ),
+  @SerialName("weight-collapsed")
+  WeightCollapsed(
+    wire = "weight-collapsed",
+    reference = "layout.md#breakpoints",
+    hint =
+      "Give weighted Row/Column children minimum space or wrap into multiple rows/columns so weighted nodes do not collapse to <= 0.5 dp.",
+  ),
+  @SerialName("arrangement-no-space")
+  ArrangementNoSpace(
+    wire = "arrangement-no-space",
+    reference = "layout.md#grids-and-max-widths",
+    hint =
+      "Give spaced Row/Column containers room on their main axis (fillMaxWidth/weight) so arrangement spacing takes effect.",
+  ),
 }
 
 /** [id] is the component the finding is about, or null when it concerns the whole view. */
@@ -219,6 +329,8 @@ data class Finding(
   val rule: FindingRule,
   val severity: Severity,
   val detail: String? = null,
+  val reference: String? = null,
+  val hint: String? = null,
 )
 
 /** Writes whole numbers without a decimal point and others rounded to two places. */
