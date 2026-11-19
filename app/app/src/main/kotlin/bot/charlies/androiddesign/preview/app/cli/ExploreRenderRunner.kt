@@ -36,8 +36,8 @@ fun interface ExploreTargetRenderer {
 }
 
 /**
- * Shared loader and headless renderer for `.explore.kt` explorations used by both [RenderCommand]
- * and [WorkerCommand].
+ * Shared loader and headless renderer for `.explore.kt` explorations used by [RenderCommand] and
+ * the preview HTTP server.
  */
 object ExploreRenderRunner {
   val defaultRenderer: ExploreTargetRenderer =

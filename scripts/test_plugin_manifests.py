@@ -1,12 +1,14 @@
-"""Checks version sync and manifest validity across plugin/ and supervisor/."""
+"""Checks version sync, CLI bootstrap scripts, and manifest validity across plugin/."""
 
 import json
+import os
+import re
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SUPERVISOR_PKG = ROOT / "supervisor/package.json"
 PLUGIN_DIR = ROOT / "plugin"
+APP_MAIN_KT = ROOT / "app/app/src/main/kotlin/bot/charlies/androiddesign/preview/app/Main.kt"
 ANTIGRAVITY_ALLOWED_KEYS = {
     "name",
     "displayName",
@@ -26,23 +28,28 @@ class PluginManifestsTest(unittest.TestCase):
         self.assertTrue((PLUGIN_DIR / agy_plugin["logo"]).is_file())
         self.assertTrue(1 <= len(agy_plugin["suggestedPrompts"]) <= 3)
 
-        self.assertTrue((PLUGIN_DIR / "scripts/android-design-preview.js").is_file())
-        self.assertEqual(json.loads((PLUGIN_DIR / "scripts/package.json").read_text()), {"type": "module"})
+        # v5 bootstrap scripts exist (POSIX script must be executable).
+        posix_bin = PLUGIN_DIR / "bin/android-design-preview"
+        win_bin = PLUGIN_DIR / "bin/android-design-preview.cmd"
+        self.assertTrue(posix_bin.is_file())
+        self.assertTrue(os.access(posix_bin, os.X_OK), "plugin/bin/android-design-preview must be executable")
+        self.assertTrue(win_bin.is_file())
 
-        sup_pkg = json.loads(SUPERVISOR_PKG.read_text())
-        self.assertIs(sup_pkg.get("private"), True)
-        for npm_key in ("version", "bin", "files"):
-            self.assertNotIn(npm_key, sup_pkg)
+        # v4 Node MCP supervisor and MCP configs are retired.
+        for removed in (
+            PLUGIN_DIR / "scripts",
+            ROOT / "supervisor",
+            PLUGIN_DIR / "mcp_config.json",
+            PLUGIN_DIR / ".mcp.json",
+            PLUGIN_DIR / ".codex-plugin/mcp.json",
+        ):
+            self.assertFalse(removed.exists(), f"retired v4 path should not exist: {removed.relative_to(ROOT)}")
 
-        expected_args = {
-            "mcp_config.json": ["${PLUGIN_ROOT}/scripts/android-design-preview.js"],
-            ".mcp.json": ["${CLAUDE_PLUGIN_ROOT}/scripts/android-design-preview.js"],
-        }
-        for rel, args in expected_args.items():
-            mcp = json.loads((PLUGIN_DIR / rel).read_text())
-            server = mcp["mcpServers"]["android_design_preview"]
-            self.assertEqual(server["command"], "node")
-            self.assertEqual(server["args"], args)
+        # AppInfo.VERSION in Main.kt matches plugin version.
+        main_kt = APP_MAIN_KT.read_text(encoding="utf-8")
+        match = re.search(r'const val VERSION = "([^"]+)"', main_kt)
+        self.assertIsNotNone(match, "AppInfo.VERSION not found in Main.kt")
+        self.assertEqual(match.group(1), version)
 
         claude_plugin = json.loads((PLUGIN_DIR / ".claude-plugin/plugin.json").read_text())
         self.assertEqual(claude_plugin["name"], agy_plugin["name"])
@@ -52,13 +59,7 @@ class PluginManifestsTest(unittest.TestCase):
         self.assertEqual(codex_plugin["name"], agy_plugin["name"])
         self.assertEqual(codex_plugin["version"], version)
         self.assertEqual(codex_plugin["skills"], "./skills/")
-        self.assertEqual(codex_plugin["mcpServers"], "./.codex-plugin/mcp.json")
-
-        codex_mcp = json.loads((PLUGIN_DIR / ".codex-plugin/mcp.json").read_text())
-        codex_server = codex_mcp["mcpServers"]["android_design_preview"]
-        self.assertEqual(codex_server["command"], "node")
-        self.assertEqual(codex_server["args"], ["./scripts/android-design-preview.js"])
-        self.assertEqual(codex_server["cwd"], ".")
+        self.assertNotIn("mcpServers", codex_plugin)
 
         claude_mkt = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text())
         entry = claude_mkt["plugins"][0]
@@ -73,15 +74,14 @@ class PluginManifestsTest(unittest.TestCase):
         self.assertTrue((PLUGIN_DIR / "skills/android-design/SKILL.md").is_file())
         self.assertTrue((PLUGIN_DIR / "skills/android-design-explore/SKILL.md").is_file())
 
-    def test_no_em_dashes_in_plugin_or_supervisor(self):
-        for folder in (PLUGIN_DIR, ROOT / "supervisor"):
-            for path in folder.rglob("*"):
-                if path.is_file() and path.suffix in {".md", ".json", ".js", ".mjs", ".svg"}:
-                    self.assertNotIn(
-                        "\u2014",
-                        path.read_text(encoding="utf-8"),
-                        f"em-dash found in {path.relative_to(ROOT)}",
-                    )
+    def test_no_em_dashes_in_plugin(self):
+        for path in PLUGIN_DIR.rglob("*"):
+            if path.is_file() and path.suffix in {".md", ".json", ".svg", ".cmd", ""}:
+                self.assertNotIn(
+                    "\u2014",
+                    path.read_text(encoding="utf-8"),
+                    f"em-dash found in {path.relative_to(ROOT)}",
+                )
 
 
 if __name__ == "__main__":

@@ -8,12 +8,11 @@ It is charliesbot's personal repository. Optimize for the owner's workflow, not 
 
 ## Layout
 
-- `plugin/` holds the distributable bundle: `plugin/skills/`, `plugin/scripts/` (the pure-JS Node MCP supervisor and localhost HTML/SVG browser board), Antigravity `plugin/plugin.json` and `plugin/mcp_config.json`, Claude Code `.claude-plugin/`, Codex `.codex-plugin/`, and `.mcp.json`. Root marketplace manifests (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) point to `plugin/`.
+- `plugin/` holds the distributable bundle: `plugin/skills/`, `plugin/bin/` (the cross-OS `android-design-preview` POSIX `sh` and Windows `.cmd` bootstrap scripts), Antigravity `plugin/plugin.json`, Claude Code `.claude-plugin/`, and Codex `.codex-plugin/`. Root marketplace manifests (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) point to `plugin/`.
 - `plugin/skills/android-design/` is the installable design judgment skill (`SKILL.md` and `references/`): building, refining, and reviewing real Compose.
-- `plugin/skills/android-design-explore/` is the installable exploration skill (`SKILL.md` and `references/`): live `.explore.kt` Compose boards checked through the `android_design_preview` MCP server, viewed in the browser board, and wired into an app. It builds on `android-design`.
+- `plugin/skills/android-design-explore/` is the installable exploration skill (`SKILL.md` and `references/`): live `.explore.kt` Compose boards checked through the `android-design-preview` CLI and long-running Kotlin HTTP/SSE server, viewed in the browser board, and wired into an app. It builds on `android-design`.
 - Chai and `npx skills` install both from `plugin/skills/`, so keep anything that is not skill content out of these folders.
-- `supervisor/` holds the Node test suite (`supervisor/test/`) covering the bundled JS supervisor in `plugin/scripts/`.
-- `app/` is the previewer backend, a standalone Gradle build (Compose Multiplatform): it compiles `.explore.kt` files inside a sandboxed classloader, runs headless Skiko checks, and runs the stdio worker (`android-design-preview.jar`). `SurfaceSpec.kt`, `CallNameMapper.kt`, `FindingRules.kt`, and `docs/design/visual-design-exploration-v5.md` define the design-system checks and runtime.
+- `app/` is the previewer backend, a standalone Gradle build (Compose Multiplatform): it compiles `.explore.kt` files inside a sandboxed classloader, runs headless Skiko checks, serves the localhost HTTP/SSE browser board, and ships the `HttpURLConnection` CLI client inside `android-design-preview.jar`. `SurfaceSpec.kt`, `CallNameMapper.kt`, `FindingRules.kt`, and `docs/design/visual-design-exploration-v5.md` define the design-system checks and runtime.
 - `app/wear/compose/` is the Wear Compose port: Google's `androidx.wear.compose` sources compiled for desktop. `upstream/` stays byte-identical to Google's release, so fixes go in shims or exclusions. Read `app/wear/README.md` before changing or upgrading the port.
 - `docs/research/` holds the distilled research the skill is built from. `docs/research/source-coverage.md` is the page-by-page ledger of every official source and whether its guidance reached the research docs.
 - `evals/` checks that agents following the skill still produce screens that meet its rules. See `evals/README.md`.
@@ -54,7 +53,7 @@ Run the check for every kind of change you made:
 - **A skill's `description`:** the trigger evals (`evals/README.md`, Trigger evals).
 - **The rubric:** `evals/calibrate.py` first.
 - **`evals/`:** `python3 -m unittest discover evals`.
-- **`plugin/scripts/` or `supervisor/`:** `cd supervisor && npm test` and `python3 -m unittest discover scripts`.
+- **`plugin/bin/` or manifests:** `python3 -m unittest discover scripts` and `cd app && ./gradlew build spotlessCheck`.
 - **`scripts/`:** `python3 -m unittest discover scripts`.
 - **The app:** `cd app && ./gradlew build spotlessCheck`.
 - **The pinned `material3` version in `app/gradle/libs.versions.toml`:** run `python3 scripts/material3_inventory.py`, regenerate `compose-signatures.md` with `python3 scripts/generate_signatures.py`, update `scripts/test_m3_page_coverage.py` / `CallNameMapper.kt` for any new components, and run `python3 -m unittest discover scripts`.

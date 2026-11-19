@@ -14,7 +14,7 @@ if defined ANDROID_DESIGN_CACHE_DIR (
   set "CACHE_ROOT=%USERPROFILE%\.cache\android-design-preview"
 )
 
-set "VERSION=0.4.0"
+set "VERSION=0.5.0"
 if exist "%PLUGIN_DIR%\plugin.json" (
   for /f "usebackq delims=" %%V in (`powershell -NoProfile -Command "(Get-Content '%PLUGIN_DIR%\plugin.json' -Raw | ConvertFrom-Json).version" 2^>nul`) do (
     if not "%%V"=="" set "VERSION=%%V"
@@ -32,7 +32,6 @@ set "ANDROID_DESIGN_PREVIEW_JAR=%JAR_PATH%"
 
 set "CMD=%~1"
 if /I "%CMD%"=="server" goto :run_full
-if /I "%CMD%"=="worker" goto :run_full
 if /I "%CMD%"=="render" goto :run_full
 
 "%JAVA_BIN%" -Djava.awt.headless=true -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -jar "%JAR_PATH%" %*

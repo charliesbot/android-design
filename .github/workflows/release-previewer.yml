@@ -1,5 +1,5 @@
-# Builds the cross-OS headless Skiko worker JAR and its SHA-256 checksum on a version tag
-# and attaches both to a GitHub release so the bundled Node MCP supervisor downloads and verifies them.
+# Builds the cross-OS headless Skiko previewer JAR and its SHA-256 checksum on a version tag
+# and attaches both to a GitHub release so plugin/bin/android-design-preview downloads and verifies them.
 name: Release previewer worker
 
 on:

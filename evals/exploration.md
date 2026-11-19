@@ -11,22 +11,21 @@ python3 -m unittest discover scripts
 python3 -m unittest discover evals
 python3 scripts/check_coverage.py
 (cd app && ./gradlew build spotlessCheck)
-(cd supervisor && npm test)
 ```
 
-Requires Node.js 18+ and Java 17+ (`./gradlew :app:workerJar` builds `app/app/build/libs/android-design-preview.jar`). No Android SDK or Chrome binary is required.
+Requires Java 17+ (`./gradlew :app:workerJar` builds `app/app/build/libs/android-design-preview.jar`). No Node.js, Android SDK, or Chrome binary is required.
 
-The Gradle tests cover source linting, bytecode/classloader sandbox policy, Compose tooling slot extraction, pixel contrast sampling, finding rules, CLI `render`, and the stdio JSON-RPC `worker`. The Node tests cover the MCP supervisor, browser board HTTP origin/token checks, and end-to-end real-JAR MCP execution. The Python tests cover the runner, `report.json` checks, and the agent launchers without model calls.
+The Gradle tests cover source linting, bytecode/classloader sandbox policy, Compose tooling slot extraction, pixel contrast sampling, finding rules with reference anchors, the Kotlin HTTP/SSE server, per-view priority queue, browser board security and selection re-resolution, `HttpURLConnection` CLI commands, and headless `render`. The Python tests cover manifests, source coverage, eval runner, `report.json` checks, multi-turn aggregation, and per-harness transcript audits without model calls.
 
 ## Exploration smoke check
 
-Run in an expendable folder (a Git repository or not). Needs Node 18+, Java 17+, and a harness with the `plugin/` installed (or `android_design_preview` registered in MCP config).
+Run in an expendable folder (a Git repository or not). Needs Java 17+ and `android-design-preview` on `PATH` (via Claude Code plugin `bin/` or `plugin/bin/android-design-preview install`).
 
-1. Start an interactive session: check that `android_design_preview` (`check_design` and `get_tree`) is available in MCP tools. When unavailable, the agent reports the missing server and registration instructions from `plugin/mcp_config.json` rather than falling back to HTML or raw CLI loops.
-2. Have the agent author `<fixture-folder>/design/<slug>.explore.kt` and `DESIGN.md` with its own seed color using verified signatures from `plugin/skills/android-design-explore/references/compose-signatures.md`. Ask for three ideas in one exploration: expect three `direction(...)` blocks inside `<slug>.explore.kt` or cleanly distinct directions, each compiled and verified with `check_design`.
-3. Confirm `check_design` compiles in memory, checks all five phone views (`light`, `dark`, `foldable`, `tablet`, `desktop`) in one call, returns primary screenshots once error findings reach zero, and starts the localhost browser board (`http://127.0.0.1:<port>/?token=<secret>`). Verify `get_tree` returns geometry and `<file>:<line>` source locations where inspection is needed.
-4. Open the browser board link: switch devices, brightness, seed color, palette variant, screen, and overlays (re-renders warmly in ~40 ms without recompiling), hover/click the click-to-source SVG overlay to copy `<file>:<line>`, and edit the `.explore.kt` file directly to verify SSE live reload.
-5. Invalid exploration: introduce a compile error, raw `Color(...)` hex literal, or disallowed `java.io.File` reference. `check_design` must return validation/compiler/security errors without writing production files, and `<supervisor> render <file.explore.kt> --out <dir>` must exit 2 with the same errors in `report.json`.
+1. Start an interactive session: verify `android-design-preview status` works. When missing or exiting `3`, the agent reports the missing prerequisite and links `plugin/skills/android-design-explore/references/setup.md` rather than falling back to HTML or editing user sandbox config unasked.
+2. Have the agent author `<fixture-folder>/design/<slug>.explore.kt` and `DESIGN.md` with its own seed color using verified signatures from `plugin/skills/android-design-explore/references/compose-signatures.md`. Ask for three ideas in one exploration: expect three `direction(...)` blocks inside `<slug>.explore.kt` or cleanly distinct directions, each compiled and verified with `android-design-preview check`.
+3. Confirm unscoped `android-design-preview check` compiles in memory, checks all five phone views (`light`, `dark`, `foldable`, `tablet`, `desktop`) in one call, writes 2x PNGs (`light` and `desktop` on pass; up to two deduplicated failing views on fail), and returns `boardUrl` (`http://127.0.0.1:<port>/?view=<token>`). Confirm scoped `check --direction <d> --view <v>` returns a 1x PNG path, and `android-design-preview tree` returns geometry and `<file>:<line>` source locations when needed.
+4. Open the browser board (`android-design-preview open <file>`): switch devices, brightness, seed color, palette variant, screen, and overlays (re-renders warmly in ~40 ms without recompiling), click a node on the SVG overlay to record a board selection (`android-design-preview selection <file>`), and edit the `.explore.kt` file directly to verify focus-first SSE live reload.
+5. Invalid exploration: introduce a compile error, raw `Color(...)` hex literal, or disallowed `java.io.File` reference. `android-design-preview check` must exit `1` with validation/compiler/security errors without writing production files, and `android-design-preview render <file.explore.kt> --out <dir>` must exit `2` with the same errors in `report.json`.
 6. Approving a direction reports the chosen direction name, `.explore.kt` file path, and next steps from `plugin/skills/android-design-explore/references/porting.md`. For an explore-only request it does not modify production app files.
 
 ## Agent routing checks
@@ -38,6 +37,6 @@ Run in an expendable folder (a Git repository or not). Needs Node 18+, Java 17+,
 - "Make it warmer." Expect one in-place edit to the active `.explore.kt` (or `DESIGN.md`), with no duplicate version files (`-v2.explore.kt`).
 - After an explore-only request, approving a design in chat must end exploration, not start implementation. Either way, "Implement the approved design" follows `porting.md`: copies approved `@Composable` screens into the app, replaces `SymbolIcon`, `designPainter`, `bundledFontFamily`, and kit helpers with real app resources/Navigation 3, and verifies live previews via `kakao/prevue` or `compose-preview`.
 - "Explore a Wear timer app." Expect a `wearBoard` file (`design/<slug>-wear.explore.kt`) checked at `watch` and `watch-large` with one CTA tagged `Modifier.testTag("ad:primary")`, skipping phone views and size classes. A Wear tile or widget request gets the skill saying those are outside this workflow.
-- Server not connected. Expect the agent to say the `android_design_preview` server is missing and how to register it, not to fall back to writing HTML.
+- Tool missing or Java unavailable (`exit 3`). Expect the agent to stop, report the prerequisite from `references/setup.md`, and wait rather than falling back to writing HTML.
 
 Run the design evals (`evals/README.md`) after changing skill instructions. Model-based checks send prompts, source context, and screenshots through the configured agent service; obtain the required execution permission before running them.

@@ -3,7 +3,6 @@ package bot.charlies.androiddesign.preview.app.server
 import bot.charlies.androiddesign.preview.app.AppInfo
 import bot.charlies.androiddesign.preview.app.cli.ExploreRenderRunner
 import bot.charlies.androiddesign.preview.app.cli.ReportTheme
-import bot.charlies.androiddesign.preview.app.cli.WorkerCommand
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.kit.BoardSurface
 import bot.charlies.androiddesign.preview.model.LayoutNode
@@ -1439,15 +1438,15 @@ class PreviewHttpServer(
     val compiled = loaded.compiled
     val board = compiled?.board
     val meta = board?.let { b ->
-      WorkerCommand.BoardMeta(
+      BoardMeta(
         directions =
           b.directions.map { dir ->
-            WorkerCommand.DirectionMeta(
+            DirectionMeta(
               name = dir.name,
               surface = if (dir.surface == BoardSurface.Wear) "wear" else "phone",
               startScreen = dir.startScreen,
               screens = dir.screenIds,
-              overlays = dir.overlays.map { ov -> WorkerCommand.OverlayMeta(ov.id, ov.screen) },
+              overlays = dir.overlays.map { ov -> OverlayMeta(ov.id, ov.screen) },
             )
           },
         views = b.surfaceSpec.views,

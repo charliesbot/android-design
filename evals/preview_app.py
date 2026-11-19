@@ -16,9 +16,9 @@ SERVER_NAME = "android_design_preview"
 
 def _plugin_version():
     try:
-        return json.loads(PLUGIN_MANIFEST.read_text(encoding="utf-8")).get("version") or "0.4.0"
+        return json.loads(PLUGIN_MANIFEST.read_text(encoding="utf-8")).get("version") or "0.5.0"
     except (OSError, ValueError):
-        return "0.4.0"
+        return "0.5.0"
 
 
 def app_binary(environ=None, home=None):
