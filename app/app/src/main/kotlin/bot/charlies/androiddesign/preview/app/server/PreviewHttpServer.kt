@@ -119,7 +119,11 @@ class PreviewHttpServer(
       },
     )
 
-  private val fileWatcher = FileWatcher { src, design -> handleFileChanged(src, design) }
+  private val fileWatcher = FileWatcher { src, design ->
+    if (sseClients.isNotEmpty()) {
+      handleFileChanged(src, design)
+    }
+  }
 
   private val httpExecutor = Executors.newCachedThreadPool { r ->
     Thread(r, "android-design-http").apply { isDaemon = true }
@@ -988,6 +992,7 @@ class PreviewHttpServer(
       }
       out.flush()
       sseClients.add(client)
+      activeSourcePath?.let { src -> handleFileChanged(src, activeDesignPath) }
       while (!closed.get()) {
         try {
           Thread.sleep(20_000L)
