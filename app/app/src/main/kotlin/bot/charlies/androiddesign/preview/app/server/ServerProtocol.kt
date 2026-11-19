@@ -53,7 +53,6 @@ data class CheckRenderSummary(
   val pass: Boolean,
   val renderMs: Long,
   val check: ViewCheck,
-  val layout: ViewLayout? = null,
   val failures: List<String> = emptyList(),
 )
 

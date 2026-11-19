@@ -127,6 +127,7 @@ class MultiTurnTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / 'run'
             with mock.patch.object(multiturn, 'execute', side_effect=fake_execute), \
+                    mock.patch.object(multiturn.eval_run, '_stop_preview_server'), \
                     mock.patch.object(multiturn.eval_run, 'render', return_value=(['/tmp/a.png'], None)), \
                     mock.patch.object(multiturn, 'run_checks', return_value={'C-valid': {'pass': True}}):
                 report = multiturn.run_multiturn(

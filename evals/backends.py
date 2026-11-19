@@ -1,33 +1,35 @@
 """Optional CLI adapters. Evaluation artifacts do not depend on these launchers.
 
-A generator reaches the previewer over MCP, registered as `android_design_preview` for that one run only,
-passing ANDROID_DESIGN_NO_OPEN=1 (and ANDROID_DESIGN_PREVIEW_JAR when provided) so each run supervises its
-own isolated headless worker without opening browser windows. A judge never sees the MCP server.
+A generator invokes the `android-design-preview` CLI from `plugin/bin/` placed on `PATH`, passing
+`ANDROID_DESIGN_NO_OPEN=1` and `ANDROID_DESIGN_PREVIEW_JAR` when provided. Judges never receive the
+preview CLI or shell access.
 """
 import json
+import os
+import re
 import shlex
-import shutil
 import subprocess
 import tempfile
 import time
 import tomllib
-from contextlib import ExitStack
 from pathlib import Path
 
 from preview_app import JAR_ENV, NO_OPEN_ENV, SERVER_NAME
 
 BACKENDS = ('agy', 'claude', 'codex')
 
-# Per-run Antigravity workspace plugin name so global ~/.gemini/config/mcp_config.json never shadows the isolated server.
-AGY_PLUGIN = 'eval-preview'
+# Legacy v4 MCP names kept for parsing historical transcripts alongside v5 CLI invocations.
 AGY_MCP_SERVER = 'eval-preview_preview'
-
 CHECK_TOOLS = ('check_proposal', 'check_design')
 RETRY_TOOLS = ('open_proposal', 'check_proposal', 'check_design')
 
+PREVIEW_CLI_NAME = 'android-design-preview'
 SKILL_SNAPSHOT_NAMES = ('android-design', 'android-design-explore')
 SHELL_READ_COMMANDS = frozenset({
     'cat', 'sed', 'head', 'tail', 'nl', 'awk', 'grep', 'rg', 'cut', 'fold', 'pr', 'less', 'more',
+})
+CODEX_READONLY_COMMANDS = frozenset({
+    'cat', 'head', 'tail', 'nl', 'ls', 'rg', 'grep', 'wc', 'sed',
 })
 SHELL_WRAPPERS = frozenset({'sh', 'bash', 'zsh', 'dash', 'ksh'})
 SHELL_OPERATORS = frozenset({'|', '&&', '||', ';'})
@@ -95,10 +97,13 @@ def _parse_tool_payload(output_text):
 def _is_compile_or_validation_failure(base_name, output_text, is_error):
     if base_name not in RETRY_TOOLS:
         return False
-    if is_error:
-        return True
     payload = _parse_tool_payload(output_text)
-    return isinstance(payload, dict) and (payload.get('valid') is False or payload.get('compiled') is False)
+    if isinstance(payload, dict):
+        if payload.get('valid') is False or payload.get('compiled') is False:
+            return True
+        if payload.get('valid') is True or payload.get('compiled') is True:
+            return False
+    return bool(is_error)
 
 
 def _record_preview_tool(stats, tool_name, output_text, is_error):
@@ -126,6 +131,7 @@ def _new_stats():
         'skill_bytes_read': 0,
         'skill_read_calls': 0,
         'skill_files_read': {},
+        'shell_commands': [],
     }
 
 
@@ -171,56 +177,279 @@ def _skill_rel_path(raw_path, cwd=None):
     return None
 
 
-def _tokenize_shell(command):
+def _unwrap_outer_shell(command):
+    """Unwrap one outer `/bin/zsh -lc "..."` or `bash -c "..."` harness wrapper into a raw shell string."""
     if isinstance(command, list):
         tokens = [str(part) for part in command if part is not None]
-    elif isinstance(command, str):
-        try:
-            lexer = shlex.shlex(command, posix=True, punctuation_chars='|&;')
-            lexer.whitespace_split = True
-            tokens = list(lexer)
-        except ValueError:
-            tokens = command.split()
-    else:
-        return []
-    # Unwrap `/bin/zsh -lc "..."` / `bash -c "..."`
-    if len(tokens) >= 3 and Path(tokens[0]).name in SHELL_WRAPPERS:
-        for i, tok in enumerate(tokens[1:], start=1):
-            if tok.startswith('-') and 'c' in tok[1:] and i + 1 < len(tokens):
-                return _tokenize_shell(tokens[i + 1])
-    return tokens
+        if len(tokens) >= 3 and Path(tokens[0]).name in SHELL_WRAPPERS:
+            for i, tok in enumerate(tokens[1:], start=1):
+                if tok.startswith('-') and 'c' in tok[1:] and i + 1 < len(tokens):
+                    return tokens[i + 1]
+        return ' '.join(shlex.quote(t) for t in tokens)
+    if not isinstance(command, str):
+        return ''
+    text = command.strip()
+    try:
+        parts = shlex.split(text)
+    except ValueError:
+        return text
+    if len(parts) >= 3 and Path(parts[0]).name in SHELL_WRAPPERS:
+        for i, tok in enumerate(parts[1:], start=1):
+            if tok.startswith('-') and 'c' in tok[1:] and i + 1 < len(parts) and i + 1 == len(parts) - 1:
+                return parts[i + 1]
+    return text
+
+
+def _scan_shell(raw_cmd):
+    """Parse a raw shell command string into (segments, operators, violations).
+
+    Detects unquoted redirections, command substitutions, backticks, subshells, newlines, and backgrounding.
+    """
+    violations = []
+    if not isinstance(raw_cmd, str) or not raw_cmd.strip():
+        return [], [], ['empty command']
+
+    segments = []
+    operators = []
+    current_tokens = []
+    buf = []
+    in_token = False
+    in_single = False
+    in_double = False
+    i = 0
+    n = len(raw_cmd)
+
+    def flush_token():
+        nonlocal in_token
+        if in_token or buf:
+            current_tokens.append(''.join(buf))
+            buf.clear()
+            in_token = False
+
+    def flush_segment():
+        flush_token()
+        if current_tokens:
+            segments.append(list(current_tokens))
+            current_tokens.clear()
+
+    while i < n:
+        ch = raw_cmd[i]
+        if in_single:
+            if ch == "'":
+                in_single = False
+            else:
+                buf.append(ch)
+            i += 1
+            continue
+        if in_double:
+            if ch == '\\' and i + 1 < n:
+                buf.append(raw_cmd[i + 1])
+                i += 2
+                continue
+            if ch == '"':
+                in_double = False
+                i += 1
+                continue
+            if ch == '`':
+                violations.append('backtick command substitution')
+            elif ch == '$' and i + 1 < n and raw_cmd[i + 1] == '(':
+                violations.append('$(...) command substitution')
+            buf.append(ch)
+            i += 1
+            continue
+
+        # Unquoted context
+        if ch in ('\n', '\r'):
+            violations.append('multi-line shell command')
+            i += 1
+            continue
+        if ch == '\\' and i + 1 < n:
+            in_token = True
+            buf.append(raw_cmd[i + 1])
+            i += 2
+            continue
+        if ch == "'":
+            in_token = True
+            in_single = True
+            i += 1
+            continue
+        if ch == '"':
+            in_token = True
+            in_double = True
+            i += 1
+            continue
+        if ch == '`':
+            violations.append('backtick command substitution')
+            i += 1
+            continue
+        if ch == '$' and i + 1 < n and raw_cmd[i + 1] == '(':
+            violations.append('$(...) command substitution')
+            i += 2
+            continue
+        if ch in ('(', ')'):
+            violations.append('subshell or process substitution')
+            i += 1
+            continue
+        if ch in ('>', '<'):
+            violations.append(f'shell redirection ({ch})')
+            i += 1
+            continue
+        if ch == '|':
+            flush_segment()
+            if i + 1 < n and raw_cmd[i + 1] == '|':
+                operators.append('||')
+                i += 2
+            else:
+                operators.append('|')
+                i += 1
+            continue
+        if ch == '&':
+            flush_segment()
+            if i + 1 < n and raw_cmd[i + 1] == '&':
+                operators.append('&&')
+                i += 2
+            else:
+                violations.append('background operator (&)')
+                i += 1
+            continue
+        if ch == ';':
+            flush_segment()
+            operators.append(';')
+            i += 1
+            continue
+        if ch.isspace():
+            flush_token()
+            i += 1
+            continue
+        in_token = True
+        buf.append(ch)
+        i += 1
+
+    if in_single or in_double:
+        violations.append('unclosed quote')
+    flush_segment()
+    return segments, operators, violations
+
+
+def _segment_command_and_args(segment):
+    idx = 0
+    while idx < len(segment) and '=' in segment[idx] and not segment[idx].startswith(('-', '/', '.')):
+        idx += 1
+    if idx >= len(segment):
+        return '', []
+    return Path(segment[idx]).name, segment[idx + 1:]
+
+
+def _sed_has_inplace_flag(args):
+    for arg in args:
+        if arg == '--':
+            break
+        if arg == '--in-place' or arg.startswith('--in-place='):
+            return True
+        if arg.startswith('-') and not arg.startswith('--') and 'i' in arg[1:]:
+            return True
+    return False
+
+
+def audit_agy_shell_command(command):
+    """Antigravity may run ONLY a single `android-design-preview` invocation (no chains, pipes, or other commands)."""
+    raw = _unwrap_outer_shell(command)
+    segments, operators, violations = _scan_shell(raw)
+    if violations:
+        return f'disallowed shell syntax ({", ".join(violations)}): {raw}'
+    if operators or len(segments) != 1:
+        return f'chained or piped shell command is not allowed: {raw}'
+    cmd_name, _ = _segment_command_and_args(segments[0])
+    if cmd_name != PREVIEW_CLI_NAME:
+        return f'disallowed command {cmd_name!r} (only {PREVIEW_CLI_NAME} is allowed): {raw}'
+    return None
+
+
+def audit_codex_shell_command(command):
+    """Codex may run `android-design-preview` and read-only file commands (`cat`, `head`, `tail`, `nl`, `ls`,
+    `rg`, `grep`, `wc`, and `sed` without `-i`), alone or piped into each other."""
+    raw = _unwrap_outer_shell(command)
+    segments, operators, violations = _scan_shell(raw)
+    if violations:
+        return f'disallowed shell syntax ({", ".join(violations)}): {raw}'
+    if not segments:
+        return f'empty shell command: {raw}'
+    if len(operators) >= len(segments):
+        return f'malformed shell operators: {raw}'
+    for seg in segments:
+        cmd_name, args = _segment_command_and_args(seg)
+        if cmd_name == PREVIEW_CLI_NAME:
+            continue
+        if cmd_name not in CODEX_READONLY_COMMANDS:
+            return f'disallowed command {cmd_name!r}: {raw}'
+        if cmd_name == 'sed' and _sed_has_inplace_flag(args):
+            return f'sed in-place edit (-i) is not allowed: {raw}'
+    return None
 
 
 def _extract_shell_skill_paths(command, cwd=None):
-    tokens = _tokenize_shell(command)
-    if not tokens:
-        return []
-    segments = []
-    current = []
-    for tok in tokens:
-        if tok in SHELL_OPERATORS:
-            if current:
-                segments.append(current)
-                current = []
-        else:
-            current.append(tok)
-    if current:
-        segments.append(current)
+    raw = _unwrap_outer_shell(command)
+    segments, _, _ = _scan_shell(raw)
     matched = []
     for seg in segments:
-        idx = 0
-        while idx < len(seg) and '=' in seg[idx] and not seg[idx].startswith(('-', '/', '.')):
-            idx += 1
-        if idx >= len(seg):
-            continue
-        cmd_name = Path(seg[idx]).name
+        cmd_name, args = _segment_command_and_args(seg)
         if cmd_name not in SHELL_READ_COMMANDS:
             continue
-        for arg in seg[idx + 1:]:
+        for arg in args:
             rel = _skill_rel_path(arg, cwd)
             if rel:
                 matched.append(rel)
     return matched
+
+
+def _is_harness_permission_refusal(output_text, is_error):
+    if not is_error or not isinstance(output_text, str):
+        return False
+    if '{' in output_text:
+        return False
+    lowered = output_text.lower()
+    return (
+        'requires approval' in lowered
+        or 'requested permissions' in lowered
+        or 'permission denied' in lowered
+    )
+
+
+def _truncated_json_valid_flag(output_text):
+    if not isinstance(output_text, str) or '{' not in output_text:
+        return None
+    head = output_text[output_text.find('{'):][:400]
+    match = re.search(r'"(?:valid|compiled)"\s*:\s*(true|false)', head)
+    if not match:
+        return None
+    return match.group(1) == 'true'
+
+
+def _record_cli_preview_command(stats, command, output_text, is_error):
+    if _is_harness_permission_refusal(output_text, is_error):
+        return
+    raw = _unwrap_outer_shell(command)
+    segments, _, _ = _scan_shell(raw)
+    for seg in segments:
+        cmd_name, args = _segment_command_and_args(seg)
+        if cmd_name == PREVIEW_CLI_NAME and args and args[0] == 'check':
+            stats['check_calls'] += 1
+            payload = _parse_tool_payload(output_text)
+            if isinstance(payload, dict):
+                if payload.get('valid') is False or payload.get('compiled') is False:
+                    stats['compile_retries'] += 1
+            else:
+                valid_flag = _truncated_json_valid_flag(output_text)
+                if valid_flag is False or (valid_flag is None and is_error):
+                    stats['compile_retries'] += 1
+
+
+def _skill_output_byte_count(output_text):
+    text = output_text or ''
+    summary = re.fullmatch(r'\s*\d+\s+lines?,\s*(\d+)\s+bytes?\s*', text)
+    if summary:
+        return int(summary.group(1))
+    return len(text.encode('utf-8'))
 
 
 def _record_skill_read(stats, paths, output_text, is_error):
@@ -229,7 +458,7 @@ def _record_skill_read(stats, paths, output_text, is_error):
     unique_in_call = list(dict.fromkeys(p for p in paths if p))
     if not unique_in_call:
         return
-    byte_count = len((output_text or '').encode('utf-8'))
+    byte_count = _skill_output_byte_count(output_text)
     stats['skill_bytes_read'] += byte_count
     stats['skill_read_calls'] += 1
     files = stats['skill_files_read']
@@ -278,7 +507,10 @@ def _consume_claude_events(events, stats, pending_tools, cwd=None):
                             _record_skill_read(stats, [rel], output_text, is_error)
                     elif tname in ('Bash', 'run_command', 'shell'):
                         cmd = tinput.get('command') or tinput.get('CommandLine')
-                        _record_skill_read(stats, _extract_shell_skill_paths(cmd, cwd), output_text, is_error)
+                        if cmd:
+                            stats['shell_commands'].append(cmd)
+                            _record_cli_preview_command(stats, cmd, output_text, is_error)
+                            _record_skill_read(stats, _extract_shell_skill_paths(cmd, cwd), output_text, is_error)
         elif etype == 'result':
             reply = event
     return reply
@@ -380,7 +612,10 @@ def _parse_codex(stdout, final_path, role, model, cwd=None):
                     output = _extract_text(item.get('output'))
                 exit_code = item.get('exit_code')
                 is_err = (exit_code is not None and exit_code != 0) or item.get('status') == 'failed'
-                _record_skill_read(stats, _extract_shell_skill_paths(cmd, cwd), output, is_err)
+                if cmd:
+                    stats['shell_commands'].append(cmd)
+                    _record_cli_preview_command(stats, cmd, output, is_err)
+                    _record_skill_read(stats, _extract_shell_skill_paths(cmd, cwd), output, is_err)
             elif itype in ('read_file', 'file_read'):
                 raw_path = item.get('path') or item.get('file_path')
                 output = item.get('content') if isinstance(item.get('content'), str) else _extract_text(item.get('output'))
@@ -400,6 +635,11 @@ def _parse_codex(stdout, final_path, role, model, cwd=None):
             for dst, src in mapping:
                 if isinstance(u.get(src), int):
                     usage_totals[dst] = usage_totals.get(dst, 0) + u[src]
+    if role == 'generator':
+        for cmd in stats['shell_commands']:
+            violation = audit_codex_shell_command(cmd)
+            if violation:
+                raise RuntimeError(f'codex script-ban audit failed: {violation}')
     fields = {'model': model or event_model or _default_model('codex')}
     if saw_events:
         fields['turns'] = max(agent_messages, 1)
@@ -459,7 +699,10 @@ def _parse_agy(stdout, role, model, cwd=None):
                             _record_skill_read(stats, [rel], output_text, is_error)
                     elif tname in ('run_command', 'shell'):
                         cmd = params.get('CommandLine') or params.get('command')
-                        _record_skill_read(stats, _extract_shell_skill_paths(cmd, cwd), output_text, is_error)
+                        if cmd:
+                            stats['shell_commands'].append(cmd)
+                            _record_cli_preview_command(stats, cmd, output_text, is_error)
+                            _record_skill_read(stats, _extract_shell_skill_paths(cmd, cwd), output_text, is_error)
         elif kind == 'result':
             terminal = obj.get('result') if isinstance(obj.get('result'), dict) else None
         elif 'status' in obj and terminal is None:
@@ -473,6 +716,11 @@ def _parse_agy(stdout, role, model, cwd=None):
     message = json.dumps(structured) if structured is not None else (terminal.get('response') or '')
     if terminal.get('denied_actions') and (not isinstance(message, str) or not message.strip()):
         raise RuntimeError(f'agy {role} permission denied: {terminal["denied_actions"]}')
+    if role == 'generator':
+        for cmd in stats['shell_commands']:
+            violation = audit_agy_shell_command(cmd)
+            if violation:
+                raise RuntimeError(f'agy script-ban audit failed: {violation}')
     usage = terminal.get('usage') if isinstance(terminal.get('usage'), dict) else {}
     fields = {
         'model': model or init_model or _default_model('agy'),
@@ -489,37 +737,29 @@ def _parse_agy(stdout, role, model, cwd=None):
     return message, fields
 
 
-def _cleanup_agy_plugin(plugin_dir, plugins_dir, agents_dir, had_plugins, had_agents):
-    shutil.rmtree(plugin_dir, ignore_errors=True)
-    if not had_plugins and plugins_dir.is_dir():
-        try:
-            plugins_dir.rmdir()
-        except OSError:
-            pass
-    if not had_agents and agents_dir.is_dir():
-        try:
-            agents_dir.rmdir()
-        except OSError:
-            pass
-
-
-def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, timeout=3600, mcp_binary=None, mcp_jar=None,
-            resume_session=None):
+def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, timeout=3600,
+            mcp_binary=None, mcp_jar=None, resume_session=None):
     if backend not in BACKENDS:
         raise ValueError(f'Unknown backend: {backend}')
     if role not in ('generator', 'judge'):
         raise ValueError(f'Unknown role: {role}')
     if role == 'generator' and not mcp_binary:
-        raise ValueError('A generator needs mcp_binary, the preview supervisor it designs with')
+        raise ValueError('A generator needs mcp_binary, the preview CLI executable it designs with')
     if resume_session and backend != 'claude':
         raise ValueError(f'resume_session is only supported on claude, not {backend}')
-    with tempfile.TemporaryDirectory(prefix='android-design-backend-') as temporary, ExitStack() as stack:
+    with tempfile.TemporaryDirectory(prefix='android-design-backend-') as temporary:
         temporary = Path(temporary)
         final = temporary / 'final.txt'
-        server_env = {NO_OPEN_ENV: '1'}
-        if mcp_jar is not None:
-            server_env[JAR_ENV] = str(mcp_jar)
+        proc_env = dict(os.environ)
+        if role == 'generator':
+            bin_dir = str(Path(mcp_binary).resolve().parent)
+            proc_env['PATH'] = bin_dir + os.pathsep + proc_env.get('PATH', '')
+            proc_env[NO_OPEN_ENV] = '1'
+            if mcp_jar is not None:
+                proc_env[JAR_ENV] = str(mcp_jar)
+
         stdin_input = prompt
+        cwd_path = Path(cwd).resolve()
         if backend == 'claude':
             command = (
                 ['claude', '-p', '--output-format', 'stream-json', '--verbose']
@@ -529,12 +769,20 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
             if resume_session:
                 command += ['--resume', str(resume_session)]
             if role == 'generator':
-                config = temporary / 'mcp.json'
-                config.write_text(json.dumps({'mcpServers': {SERVER_NAME: {'command': str(mcp_binary), 'args': [], 'env': server_env}}}))
-                # `claude -p` refuses writes nobody allowed, so the generator may edit its case folder only,
-                # like Codex's workspace-write. `//` makes the rule's path absolute.
-                command += ['--mcp-config', str(config), '--strict-mcp-config',
-                            '--allowedTools', f'mcp__{SERVER_NAME}__*', f'Edit(/{Path(cwd).resolve()}/**)']
+                # `claude -p` enforces the script ban directly via --allowedTools: only
+                # `android-design-preview` shell commands, edits/writes inside the case folder,
+                # and reading files including rendered PNGs in ~/.cache/android-design-preview.
+                cache_dir = (Path.home() / '.cache' / 'android-design-preview').resolve()
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                command += [
+                    '--allowedTools',
+                    f'Bash({PREVIEW_CLI_NAME}:*)',
+                    f'Edit(/{cwd_path}/**)',
+                    f'Write(/{cwd_path}/**)',
+                    'Read',
+                    '--add-dir',
+                    str(cache_dir),
+                ]
             if role == 'judge':
                 command += ['--tools', 'Read', '--allowedTools', 'Read']
                 for folder in sorted({str(Path(p).resolve().parent) for p in images}):
@@ -546,11 +794,11 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
                        '--sandbox', 'read-only' if role == 'judge' else 'workspace-write',
                        '--output-last-message', str(final)]
             if role == 'generator':
-                command += ['-c', f'mcp_servers.{SERVER_NAME}.command={json.dumps(str(mcp_binary))}',
-                            '-c', f'mcp_servers.{SERVER_NAME}.args=[]',
-                            '-c', f'mcp_servers.{SERVER_NAME}.default_tools_approval_mode="approve"']
-                for k, v in server_env.items():
-                    command += ['-c', f'mcp_servers.{SERVER_NAME}.env.{k}={json.dumps(v)}']
+                cache_dir = Path.home() / '.cache' / 'android-design-preview'
+                command += [
+                    '-c', 'sandbox_workspace_write.network_access=true',
+                    '-c', f'sandbox_workspace_write.writable_roots={json.dumps([str(cache_dir)])}',
+                ]
             for image in images:
                 command += ['--image', str(Path(image).resolve())]
             if schema:
@@ -560,45 +808,16 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
             command += ['-']
         else:
             stdin_input = None
-            cwd_path = Path(cwd).resolve()
             if role == 'generator':
-                agents_dir = cwd_path / '.agents'
-                plugins_dir = agents_dir / 'plugins'
-                plugin_dir = plugins_dir / AGY_PLUGIN
-                had_agents = agents_dir.exists()
-                had_plugins = plugins_dir.exists()
-                plugin_dir.mkdir(parents=True, exist_ok=True)
-                stack.callback(_cleanup_agy_plugin, plugin_dir, plugins_dir, agents_dir, had_plugins, had_agents)
-                (plugin_dir / 'plugin.json').write_text(json.dumps({'name': AGY_PLUGIN}))
-                (plugin_dir / 'mcp_config.json').write_text(json.dumps({
-                    'mcpServers': {
-                        'preview': {
-                            'command': str(mcp_binary),
-                            'args': [],
-                            'env': server_env,
-                        }
-                    }
-                }))
-                agy_prompt = (
-                    prompt.replace(SERVER_NAME, AGY_MCP_SERVER)
-                    + f'\n\nUse MCP server `{AGY_MCP_SERVER}` for every previewer tool call '
-                    + f'(global `{SERVER_NAME}` is disabled for this isolated run).'
-                )
                 settings = {
                     'allowNonWorkspaceAccess': True,
                     'artifactReviewPolicy': 'always-proceed',
                     'permissions': {
-                        'allow': ['read_file(*)', f'write_file({cwd_path})', f'mcp({AGY_MCP_SERVER}/*)'],
-                        'deny': [
-                            'command(*)',
-                            f'mcp({SERVER_NAME}/*)',
-                            f'mcp(android-design_{SERVER_NAME}/*)',
-                            'read_url(*)',
-                            'execute_url(*)',
-                        ],
+                        'allow': ['read_file(*)', f'write_file({cwd_path})', 'command(*)'],
+                        'deny': ['mcp(*)', 'read_url(*)', 'execute_url(*)'],
                     },
                 }
-                command = ['agy', '-p', agy_prompt, '--output-format', 'stream-json',
+                command = ['agy', '-p', prompt, '--output-format', 'stream-json',
                            '--disable-slash-commands', '--settings', json.dumps(settings)]
             else:
                 settings = {
@@ -617,7 +836,7 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
                 command += ['--json-schema', json.dumps(schema)]
         if model:
             command += ['--model', model]
-        run_kwargs = {'cwd': cwd, 'capture_output': True, 'text': True, 'timeout': timeout}
+        run_kwargs = {'cwd': cwd, 'env': proc_env, 'capture_output': True, 'text': True, 'timeout': timeout}
         if stdin_input is not None:
             run_kwargs['input'] = stdin_input
         else:

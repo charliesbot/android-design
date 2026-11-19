@@ -119,7 +119,11 @@ class PreviewHttpServer(
       },
     )
 
-  private val fileWatcher = FileWatcher { src, design -> handleFileChanged(src, design) }
+  private val fileWatcher = FileWatcher { src, design ->
+    if (sseClients.isNotEmpty()) {
+      handleFileChanged(src, design)
+    }
+  }
 
   private val httpExecutor = Executors.newCachedThreadPool { r ->
     Thread(r, "android-design-http").apply { isDaemon = true }
@@ -708,7 +712,6 @@ class PreviewHttpServer(
         pass = art.pass,
         renderMs = art.renderMs,
         check = art.check,
-        layout = art.layout,
         failures = art.entry.failures,
       )
     }
@@ -989,6 +992,7 @@ class PreviewHttpServer(
       }
       out.flush()
       sseClients.add(client)
+      activeSourcePath?.let { src -> handleFileChanged(src, activeDesignPath) }
       while (!closed.get()) {
         try {
           Thread.sleep(20_000L)
@@ -1577,9 +1581,16 @@ class PreviewHttpServer(
       val primaryViews =
         if (surface == BoardSurface.Wear) setOf("watch", "watch-large")
         else setOf("light", "desktop")
-      return artifacts
-        .filter { it.overlay == null && it.view.name in primaryViews }
-        .mapNotNull(::toOutput)
+      val seenHashes = LinkedHashSet<String>()
+      return buildList {
+        for (art in artifacts) {
+          if (art.overlay != null || art.view.name !in primaryViews) continue
+          val out = toOutput(art) ?: continue
+          val hash = art.pngSha256
+          if (hash != null && !seenHashes.add(hash)) continue
+          add(out)
+        }
+      }
     }
 
     private fun parseQuery(raw: String?): Map<String, String> {

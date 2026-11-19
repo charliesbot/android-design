@@ -9,83 +9,61 @@ description: >
 
 # Visual design exploration
 
-Follow the `android-design` skill for every design decision: its design questions, components, theming, layout, and visual criteria. This skill owns the exploration workflow. Each run writes a live Jetpack Compose exploration board, verifies it headlessly through `android_design_preview`, shows renders and the interactive browser board link, then waits for feedback. Phone, foldable, tablet, desktop, and Wear OS app screens are in scope; Wear tiles, watch faces, and widgets are not. Where Wear differs, the **Wear OS** section below says how.
+Follow `android-design` for every design decision: its design questions, components, theming, layout, and visual criteria. This skill owns the exploration loop and how you talk to the person. Phone, foldable, tablet, desktop, and Wear OS app screens are in scope; Wear tiles, watch faces, and widgets are not.
 
-## Requirements
+## Tooling
 
-Requires the `android_design_preview` MCP server (`check_design` and `get_tree`), which runs on macOS, Linux, and Windows with Node.js 18+ and Java 17+. Call `check_design` when your first draft is ready. If its tools are unavailable or report missing Java/Node prerequisites, stop, give the user [references/setup.md](references/setup.md), and wait.
+Run `android-design-preview` from the shell (`android-design-preview <command> --help` documents every flag, exit code, and JSON field).
 
-## Brief
+- Commands: `check`, `tree`, `selection`, `open`, `status`, `stop`, `render`, `install`.
+- Exit codes: `0` success, `1` compile/render/check failure or no selection, `2` usage or choice, `3` server or prerequisites not ready.
+- If `android-design-preview` is missing or exits `3`, stop, give the user [references/setup.md](references/setup.md), and wait. Never change user sandbox config unasked.
 
-When there is an app, read its relevant screens, theme, assets, and any existing `DESIGN.md` and `design/*.explore.kt` files first. Answer `android-design`'s design questions in your reply before writing code:
+## 1. Brief
 
-- Pick one seed: the brand color, or a content color from the subject (a dish, an album, a trip), never the default `#6750A4`.
-- When the screen is a hero moment, layer three or more tactics and name them.
+When there is an app, read its relevant screens, theme, assets, and any existing `DESIGN.md` and `design/*.explore.kt` first. Answer `android-design`'s seven design questions in your reply before writing code:
+
+- Pick one seed color from the brand or subject (a dish, an album, a trip), never the default `#6750A4`.
+- Name the three or more layered tactics for any hero moment.
 - Keep app code and dependencies unchanged.
-- Use representative, non-sensitive data and assets. Use image generation only for assets inside `design/assets/`, never as a substitute for a Compose board.
+- Use representative, non-sensitive data and assets. Use image generation only for files inside `design/assets/`, never instead of a Compose board.
+- For alternatives, put multiple `direction("...")` blocks in one `.explore.kt` file so they compare side by side, each a distinct composition rather than a recoloring.
 
-When the user asks for alternatives, declare multiple `direction("...")` blocks inside the same `<slug>.explore.kt` file so they compare side by side on the browser board, each a genuinely distinct composition with clear visual differentiation rather than a recoloring.
+## 2. Write
 
-## Files
+Work in the app's repository root or the folder the user names; never write into this skill's own repository.
 
-Work in the app's repository root, or the folder the user names. Never write into this skill's own repository.
+- `DESIGN.md` at the repo root holds shared defaults (`colors.primary`, `material.scheme.variant`, bundled typography roles). Create when missing; edit only for shared changes.
+- `design/<slug>.explore.kt` holds the board (`design/<slug>-wear.explore.kt` for Wear OS using `wearBoard(...)`).
+- Read [references/compose-signatures.md](references/compose-signatures.md) for pinned Material 3 Expressive, Wear M3, and Exploration Kit signatures. Do **not** read `references/porting.md` until the user approves a direction and asks to wire it into the app.
+- Follow the kit rules: tag the single primary CTA with `Modifier.testTag("ad:primary")`; keep raw `Color(...)` hex literals and `.copy(alpha = ...)` out of screen code; use `SymbolIcon(...)` and `designPainter("assets/...")`; author one adaptive screen (`listDetail`, `supportingPane`, or `BoxWithConstraints`) instead of duplicating per-breakpoint screens (aim for ~150 to 300 lines per direction).
 
-- `DESIGN.md` at the repo root holds the shared design system (`colors.primary` seed, `material.scheme.variant`, bundled typography roles). Create it when missing; update it only when every exploration should share a change.
-- `design/<slug>.explore.kt` holds the Compose exploration board (`design/<slug>-wear.explore.kt` for Wear OS).
+## 3. Iterate and check
 
-Report the file's absolute path and the `boardUrl` returned by `check_design`.
+Every `check` writes PNGs on disk and returns their paths in `images`, plus `boardUrl`, layout summaries, and findings (each finding carries its fix `hint` and `reference` anchor in `android-design/references/`). Read a reference section when a finding points to it rather than pre-reading every reference file.
 
-## Write
+1. **First draft (full check):** run `android-design-preview check <file>` (unscoped) to check every direction, screen, overlay, and view (`light`, `dark`, `foldable`, `tablet`, `desktop`, or `watch` and `watch-large` on Wear).
+2. **Targeted fixes (scoped loop):** edit the file, then run ONE clean `android-design-preview check <file> --direction <d> --view <v>` (add `--screen <s>` when a direction has multiple screens) for the single direction and view you changed. Never pipe, chain, or loop `android-design-preview` across multiple views during iteration. Scoped checks always return a 1x PNG path whether findings pass or fail. Call `android-design-preview tree <file> --direction <d> --view <v>` only when a finding needs exact bounds or `file:line`.
+3. **Open the image before claiming a fix:** after a visual change, open the single returned 1x PNG path for the changed view with your file-reading tool to verify hierarchy, icon fit, asset legibility, and spacing balance. Never claim a visual fix from `tree` or JSON alone.
+4. **Final gate (full check):** before showing the person, run unscoped `android-design-preview check <file>` once more, verify adaptation in `layout` summaries (`tablet`/`desktop` reveal what your adaptation answer promised), check `colors` for one strong fill, and open the returned `light` and `desktop` (`watch` and `watch-large` on Wear) PNGs.
+5. **Fix cap:** cap full checks at two fix rounds (scoped iterations between them are uncapped). Report any unresolved findings instead of looping.
 
-1. Read [references/compose-signatures.md](references/compose-signatures.md) for the exact pinned Material 3 Expressive, Wear M3, and Exploration Kit signatures. Do **not** read `references/porting.md` until the user approves a direction and requests implementation.
-2. Write `DESIGN.md` (if needed) and `design/<slug>.explore.kt` using `designBoard(...)` or `wearBoard(...)`.
+## 4. Show
 
-Follow these exploration rules:
+Run `android-design-preview open <file>` on interactive runs (or share `boardUrl` from `check`). In your reply:
 
-- Mark the screen's single primary CTA with `Modifier.testTag("ad:primary")` (`AD_PRIMARY_TAG`).
-- Never place raw `Color(...)` hex literals in screen code (pass `seed = 0xFF...` on `designBoard` / `wearBoard` instead) and never call `.copy(alpha = ...)`. Use `MaterialTheme.colorScheme` and `MaterialTheme.typography` roles in intended pairs (`onSurfaceVariant` for subdued text).
-- Draw bundled Material Symbols with `SymbolIcon(...)` and local images beneath the exploration folder with `designPainter("assets/...")`.
-- Adapt at 600 and 840 dp: switch `ShortNavigationBar` to `WideNavigationRail` (or use `listDetail` / `supportingPane` for dual-pane layouts) so wider views reveal more structure rather than stretching phone content.
-- Keep labels concise so button, chip, and navigation items fit on one line without truncation.
+- State in one line what the exploration covers and name the tactics layered for hero moments.
+- Report any remaining unresolved findings.
+- Share the absolute `.explore.kt` path and clickable `boardUrl`, and state `"visual quality checked from layout metrics and native-resolution renders"`.
+- Stop and wait for the user's reply.
 
-### Writing it compactly
+## 5. Revise
 
-Keep each single-direction `.explore.kt` file concise (around 150 to 300 lines):
+- Whenever the user refers to `"this"`, `"here"`, or a clicked element, check `selection` first (from the latest `check` response or `android-design-preview selection <file>`). If no selection exists, ask the person to click the part they mean on the browser board; do not guess from source. If `selection.stale` is true, confirm the match using `callName` and `callChain`.
+- Edit the same `design/<slug>.explore.kt` file (the server watches saves and pushes focus-first SSE updates). Iterate with scoped `check`, open the returned PNG after visual changes, and run a full `check` gate before presenting.
 
-- Author ONE adaptive screen (or shared subcomposables parameterized by `BoxWithConstraints` `maxWidth`, `listDetail`, or `supportingPane`) instead of duplicating separate `PhoneScreen`, `FoldableScreen`, `TabletScreen`, and `DesktopScreen` copies of the same UI.
-- Store sample entries in a compact list of 3 to 5 items and render rows in a loop rather than repeating card blocks inline.
-- Make small targeted edits when fixing findings instead of rewriting the file.
+## 6. Approve, port, or delete
 
-## Check
-
-`check_design` compiles in memory inside a sandboxed worker, enforces token rules, checks every direction, screen, overlay, and view (`light`, `dark`, `foldable`, `tablet`, `desktop`, or `watch` and `watch-large` on Wear), and when error findings reach zero, returns `[TextContent(checkJson), ImageContent(lightPng), ImageContent(desktopPng)]` (`watch` and `watch-large` on Wear) plus `boardUrl`.
-
-1. Call `check_design` with the absolute `path` of your `.explore.kt` file (leave `views` unset so every view checks in one call).
-2. Fix every compile diagnostic, token rule violation, or error finding (`overflow`, `corner-clipped`, `touch-target`, contrast, typography, `round-edge-clipped`). Read `notes` (info findings) and `colors` (judge strong fills from rendered hex roles, keeping one strong fill on the hero or coherent action group). A view equal to an earlier one on the same screen collapses to `{"same": "<view>"}`.
-3. Confirm adaptation from the `layout` summaries: each larger view (`tablet`, `desktop`) must show what your adaptation answer promised.
-4. Call `get_tree` only when a failing finding needs exact node bounds or `<file>:<line>` locations.
-5. Once checks pass and `check_design` returns images (`light` + `desktop`, or `watch` + `watch-large`), visually inspect the PNGs for hierarchy, icon fit, asset legibility, and spacing balance. Fix any visual flaw, re-run `check_design` once to confirm, and never exceed two fix rounds without reporting unresolved findings.
-
-## Show
-
-State in one line what the exploration covers, name the tactics layered for hero moments, note any remaining unresolved findings, share the absolute `.explore.kt` path and clickable `boardUrl`, and report `"visual quality checked from layout metrics and native-resolution renders"`. Stop and wait for the user's reply.
-
-## Revise
-
-Edit the same `design/<slug>.explore.kt` file (the browser board watches saves and pushes SSE updates automatically). Re-run `check_design` on changed directions/screens, keeping a single clean file with no stale copies.
-
-## Approve and port
-
-Approval is the user saying so in chat. An explore-only request ends here: do not touch app source code. A build request (sent here by `android-design`'s Route step) continues to wiring: now read [references/porting.md](references/porting.md) and follow the host project's planning, branch, verification, and review workflow.
-
-## Wear OS
-
-Wear explorations follow the same loop using `wearBoard(...)` and `design/<slug>-wear.explore.kt`:
-
-- **Views:** `watch` (204 dp round, dark) and `watch-large` (227 dp round, dark).
-- **Scrolling and scaffold:** wrap in `AppScaffold` and `ScreenScaffold`; scrolling screens use `TransformingLazyColumn` and optional `EdgeButton`. The previewer scrolls from top to end and merges bounds automatically.
-- **Findings:** fix `round-edge-clipped` with percentage margins (`PaddingDefaults`) or tighter content.
-
-## Delete
-
-Remove `design/<slug>.explore.kt` (or `-wear.explore.kt`) when asked. Keep `DESIGN.md` unless the user asks to remove it too.
+- **Explore-only:** approval in chat ends the task; do not touch app source code.
+- **Build / port:** once the user approves a direction for implementation, read [references/porting.md](references/porting.md) and follow the host project's planning, branch, verification, and review workflow.
+- **Delete:** remove `design/<slug>.explore.kt` (or `-wear.explore.kt`) when asked; keep `DESIGN.md` unless asked to remove it too.

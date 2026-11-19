@@ -193,6 +193,19 @@ Recurring moves in Google's showcases and well-reviewed Expressive apps. Read th
 - **Segmented settings:** grouped list items with gaps, leading icons in tonal circles, switches with check and close thumb icons (`Switch(thumbContent = ...)`).
 - **Wavy progress** for playback and goals; circular wavy progress for countdowns.
 
+### Worked example: Aura breathing app
+
+Google's case study spends emphasis by goal rank across four screens:
+
+| Screen | Rank | Emphasis |
+| --- | --- | --- |
+| Home | Primary: start a session | Extra-large "Start breathing" button in dark `primary` on a soft surface, low on screen. Settings grouped as list items in `secondary`. Daily message in a soft container, least emphasis. |
+| Session | Hero moment | A screen-filling flower shape (`MaterialShapes.Flower` and `Sunny`) grows and shrinks with each breath on spring motion; vibrant yellow on inhale; huge countdown numerals against small labels; pause/stop small at the bottom; navigation bar hidden. |
+| Report | Secondary | Fewer tactics "to reduce cognitive load": metrics in uniform flower shapes, emphasized numbers, a medium (not XL) Finish button. |
+| Progress | Tertiary | Subtle: key data in `primary`, completed days as small secondary shapes, numbers "large enough to scan, but they don't dominate." |
+
+Their v1-to-v2 lesson: ungrouped settings of similar size and inconsistent color competed for attention; grouping them above one extra-large button went "from cluttered to calm."
+
 ## Expressive API map
 
 | Component | Compose API | Notes |
