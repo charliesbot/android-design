@@ -366,3 +366,181 @@ class BackendTests(unittest.TestCase):
         judge_cmd = judge_call.call_args.args[0]
         self.assertEqual(judge_cmd[judge_cmd.index('--output-format') + 1], 'json')
         self.assertNotIn('--verbose', judge_cmd)
+
+    def test_claude_tracks_skill_bytes_read_unique_files_and_resume(self):
+        with tempfile.TemporaryDirectory() as case_tmp:
+            case_dir = Path(case_tmp).resolve()
+            skill_a = case_dir / 'skills/android-design/SKILL.md'
+            skill_b = case_dir / 'skills/android-design-explore/references/compose-signatures.md'
+            other = case_dir / 'DESIGN.md'
+            outside = Path('/Users/example/.claude/skills/android-design/SKILL.md')
+            part1 = 'alpha ' * 10
+            part2 = 'beta ' * 6
+            sigs = 'fun TopAppBar()\n'
+            events = [
+                {'type': 'assistant', 'message': {'content': [
+                    {'type': 'tool_use', 'id': 'r1', 'name': 'Read', 'input': {'file_path': str(skill_a), 'offset': 1, 'limit': 50}},
+                    {'type': 'tool_use', 'id': 'r2', 'name': 'Read', 'input': {'file_path': 'skills/android-design/SKILL.md', 'offset': 51, 'limit': 50}},
+                    {'type': 'tool_use', 'id': 'r3', 'name': 'Read', 'input': {'file_path': str(skill_b)}},
+                    {'type': 'tool_use', 'id': 'r4', 'name': 'Read', 'input': {'file_path': str(other)}},
+                    {'type': 'tool_use', 'id': 'r5', 'name': 'Read', 'input': {'file_path': str(outside)}},
+                    {'type': 'tool_use', 'id': 'r6', 'name': 'Read', 'input': {'file_path': str(skill_a)}},
+                ]}},
+                {'type': 'user', 'message': {'content': [
+                    {'type': 'tool_result', 'tool_use_id': 'r1', 'content': part1},
+                    {'type': 'tool_result', 'tool_use_id': 'r2', 'content': [{'type': 'text', 'text': part2}]},
+                    {'type': 'tool_result', 'tool_use_id': 'r3', 'content': sigs},
+                    {'type': 'tool_result', 'tool_use_id': 'r4', 'content': 'design doc content'},
+                    {'type': 'tool_result', 'tool_use_id': 'r5', 'content': 'global skill content'},
+                    {'type': 'tool_result', 'tool_use_id': 'r6', 'is_error': True, 'content': 'read failed'},
+                ]}},
+                {
+                    'type': 'result',
+                    'session_id': 'sess-abc-123',
+                    'result': 'Updated.',
+                    'num_turns': 2,
+                    'usage': {'input_tokens': 500, 'output_tokens': 120},
+                },
+            ]
+            ndjson = '\n'.join(json.dumps(e) for e in events) + '\n'
+            with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, ndjson, '')) as call:
+                result = backends.execute('claude', 'revise', case_dir, role='generator',
+                                          mcp_binary=BINARY, resume_session='sess-prev')
+            cmd = call.call_args.args[0]
+            self.assertEqual(cmd[cmd.index('--resume') + 1], 'sess-prev')
+            expected_a = len(part1.encode('utf-8')) + len(part2.encode('utf-8'))
+            expected_b = len(sigs.encode('utf-8'))
+            self.assertEqual(result['session_id'], 'sess-abc-123')
+            self.assertEqual(result['skill_bytes_read'], expected_a + expected_b)
+            self.assertEqual(result['skill_read_calls'], 3)
+            self.assertEqual(result['skill_unique_files'], 2)
+            self.assertEqual(result['skill_files_read'], {
+                'android-design/SKILL.md': {'reads': 2, 'bytes': expected_a},
+                'android-design-explore/references/compose-signatures.md': {'reads': 1, 'bytes': expected_b},
+            })
+
+    def test_codex_tracks_skill_bytes_read_from_shell_commands(self):
+        with tempfile.TemporaryDirectory() as case_tmp:
+            case_dir = Path(case_tmp).resolve()
+            out1 = 'line 1\nline 2\n'
+            out2 = 'multi file output!!'
+            out3 = 'piped slice'
+            events = [
+                {'type': 'item.completed', 'item': {
+                    'id': 'c1', 'type': 'command_execution',
+                    'command': "/bin/zsh -lc \"sed -n '1,40p' skills/android-design/SKILL.md\"",
+                    'aggregated_output': out1, 'exit_code': 0, 'status': 'completed',
+                }},
+                {'type': 'item.completed', 'item': {
+                    'id': 'c2', 'type': 'command_execution',
+                    'command': 'cat skills/android-design/SKILL.md skills/android-design-explore/SKILL.md',
+                    'aggregated_output': out2, 'exit_code': 0, 'status': 'completed',
+                }},
+                {'type': 'item.completed', 'item': {
+                    'id': 'c3', 'type': 'command_execution',
+                    'command': f'/bin/bash -lc "head -n 20 {case_dir}/skills/android-design/references/layout.md | nl -ba"',
+                    'aggregated_output': out3, 'exit_code': 0, 'status': 'completed',
+                }},
+                {'type': 'item.completed', 'item': {
+                    'id': 'c4', 'type': 'command_execution',
+                    'command': 'ls skills/android-design',
+                    'aggregated_output': 'SKILL.md\nreferences\n', 'exit_code': 0, 'status': 'completed',
+                }},
+                {'type': 'item.completed', 'item': {
+                    'id': 'c5', 'type': 'command_execution',
+                    'command': 'cat DESIGN.md',
+                    'aggregated_output': 'design md', 'exit_code': 0, 'status': 'completed',
+                }},
+                {'type': 'item.completed', 'item': {
+                    'id': 'c6', 'type': 'command_execution',
+                    'command': 'cat skills/android-design/missing.md',
+                    'aggregated_output': 'No such file', 'exit_code': 1, 'status': 'failed',
+                }},
+                {'type': 'item.completed', 'item': {'id': 'm1', 'type': 'agent_message', 'text': 'Done'}},
+                {'type': 'turn.completed', 'usage': {'input_tokens': 1000, 'output_tokens': 200}},
+            ]
+            stdout = '\n'.join(json.dumps(e) for e in events) + '\n'
+
+            def fake_run(cmd, **kwargs):
+                Path(cmd[cmd.index('--output-last-message') + 1]).write_text('Done')
+                return subprocess.CompletedProcess(cmd, 0, stdout, '')
+
+            with patch('backends.subprocess.run', side_effect=fake_run):
+                result = backends.execute('codex', 'brief', case_dir, role='generator', mcp_binary=BINARY)
+
+            total_expected = len(out1.encode()) + len(out2.encode()) + len(out3.encode())
+            self.assertEqual(result['skill_bytes_read'], total_expected)
+            self.assertEqual(result['skill_read_calls'], 3)
+            self.assertEqual(result['skill_unique_files'], 3)
+            self.assertEqual(
+                sum(v['bytes'] for v in result['skill_files_read'].values()),
+                result['skill_bytes_read'],
+            )
+            self.assertEqual(result['skill_files_read']['android-design/SKILL.md']['reads'], 2)
+            self.assertEqual(result['skill_files_read']['android-design-explore/SKILL.md']['reads'], 1)
+            self.assertEqual(result['skill_files_read']['android-design/references/layout.md']['bytes'], len(out3.encode()))
+
+    def test_agy_tracks_skill_bytes_read_from_read_file_steps(self):
+        with tempfile.TemporaryDirectory() as case_tmp:
+            case_dir = Path(case_tmp).resolve()
+            content_a = 'M3 rules body with utf8 \u00e9'
+            content_b = 'Explore steps'
+            events = [
+                {'event': 'init', 'init': {'cwd': str(case_dir), 'model': 'gemini-3.8-flash-high'}},
+                {'event': 'step_update', 'step_update': {
+                    'step_index': 1, 'state': 'DONE', 'step_type': 'tool', 'tool_name': 'read_file',
+                    'tool_info': {
+                        'name': 'read_file',
+                        'parameters': {'Path': str(case_dir / 'skills/android-design/SKILL.md')},
+                        'output': content_a,
+                    },
+                }},
+                {'event': 'step_update', 'step_update': {
+                    'step_index': 2, 'state': 'DONE', 'step_type': 'tool', 'tool_name': 'read_file',
+                    'tool_info': {
+                        'name': 'read_file',
+                        'parameters': {'Path': 'skills/android-design-explore/SKILL.md'},
+                        'output': content_b,
+                    },
+                }},
+                {'event': 'step_update', 'step_update': {
+                    'step_index': 3, 'state': 'DONE', 'step_type': 'tool', 'tool_name': 'read_file',
+                    'tool_info': {
+                        'name': 'read_file',
+                        'parameters': {'Path': str(case_dir / 'design/proposal.explore.kt')},
+                        'output': 'val preview = designBoard {}',
+                    },
+                }},
+                {'event': 'step_update', 'step_update': {
+                    'step_index': 4, 'state': 'DONE', 'step_type': 'tool', 'tool_name': 'read_file',
+                    'tool_info': {
+                        'name': 'read_file',
+                        'parameters': {'Path': str(case_dir / 'skills/android-design/references/layout.md')},
+                        'output': 'permission denied',
+                        'error': 'denied',
+                    },
+                }},
+                {'event': 'result', 'result': {
+                    'status': 'SUCCESS', 'response': 'Ready.', 'num_turns': 1,
+                    'usage': {'input_tokens': 5000, 'output_tokens': 300},
+                }},
+            ]
+            stdout = '\n'.join(json.dumps(e) for e in events) + '\n'
+            with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, stdout, '')):
+                result = backends.execute('agy', 'brief', case_dir, role='generator', mcp_binary=BINARY)
+
+            bytes_a = len(content_a.encode('utf-8'))
+            bytes_b = len(content_b.encode('utf-8'))
+            self.assertEqual(result['skill_bytes_read'], bytes_a + bytes_b)
+            self.assertEqual(result['skill_read_calls'], 2)
+            self.assertEqual(result['skill_unique_files'], 2)
+            self.assertEqual(result['skill_files_read'], {
+                'android-design/SKILL.md': {'reads': 1, 'bytes': bytes_a},
+                'android-design-explore/SKILL.md': {'reads': 1, 'bytes': bytes_b},
+            })
+
+    def test_resume_session_rejected_for_non_claude_backends(self):
+        for backend in ('agy', 'codex'):
+            with patch('backends.subprocess.run') as call, self.assertRaisesRegex(ValueError, 'resume_session'):
+                backends.execute(backend, 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY, resume_session='s1')
+            call.assert_not_called()
