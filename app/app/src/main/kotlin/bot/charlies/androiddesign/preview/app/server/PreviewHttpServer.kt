@@ -1581,9 +1581,16 @@ class PreviewHttpServer(
       val primaryViews =
         if (surface == BoardSurface.Wear) setOf("watch", "watch-large")
         else setOf("light", "desktop")
-      return artifacts
-        .filter { it.overlay == null && it.view.name in primaryViews }
-        .mapNotNull(::toOutput)
+      val seenHashes = LinkedHashSet<String>()
+      return buildList {
+        for (art in artifacts) {
+          if (art.overlay != null || art.view.name !in primaryViews) continue
+          val out = toOutput(art) ?: continue
+          val hash = art.pngSha256
+          if (hash != null && !seenHashes.add(hash)) continue
+          add(out)
+        }
+      }
     }
 
     private fun parseQuery(raw: String?): Map<String, String> {
