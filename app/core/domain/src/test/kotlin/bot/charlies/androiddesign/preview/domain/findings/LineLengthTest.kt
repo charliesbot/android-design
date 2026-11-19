@@ -173,4 +173,105 @@ class LineLengthTest {
         .filter { it.rule == FindingRule.LineLength }
     assertEquals(emptyList(), findings.map { it.id })
   }
+
+  @Test
+  fun `a single-line 86-character text in a 699 dp desktop pane fails`() {
+    val line86 =
+      "A single unbroken sentence of body copy that runs far past sixty characters on desktop"
+    assertEquals(86, line86.length)
+    val findings =
+      evaluate(
+          tree(
+            Views.Desktop,
+            node(
+              "body",
+              "Text",
+              x = 384f,
+              w = 699f,
+              h = 20f,
+              text = text(line86, lines = 1, ink = Bounds(384f, 0f, 585f, 20f)),
+            ),
+          ),
+        )
+        .filter { it.rule == FindingRule.LineLength }
+    assertEquals(listOf("body"), findings.map { it.id })
+    assertEquals(Severity.Error, findings.single().severity)
+  }
+
+  @Test
+  fun `a short single-line heading in a wide desktop pane passes`() {
+    val findings =
+      evaluate(
+          tree(
+            Views.Desktop,
+            node(
+              "heading",
+              "Text",
+              x = 384f,
+              w = 699f,
+              h = 32f,
+              text = text("Tonight's menu", lines = 1, ink = Bounds(384f, 0f, 160f, 32f)),
+            ),
+          ),
+        )
+        .filter { it.rule == FindingRule.LineLength }
+    assertEquals(emptyList(), findings.map { it.id })
+  }
+
+  @Test
+  fun `a truncated single-line text spanning a wide desktop pane fails`() {
+    val longLine =
+      "A very long summary sentence that gets ellipsized only after filling almost seven hundred dp on desktop"
+    val findings =
+      evaluate(
+          tree(
+            Views.Desktop,
+            node(
+              "summary",
+              "Text",
+              x = 384f,
+              w = 699f,
+              h = 20f,
+              text =
+                text(
+                  longLine,
+                  lines = 1,
+                  overflow = true,
+                  truncated = true,
+                  ink = Bounds(384f, 0f, 699f, 20f),
+                ),
+            ),
+          ),
+        )
+        .filter { it.rule == FindingRule.LineLength }
+    assertEquals(listOf("summary"), findings.map { it.id })
+  }
+
+  @Test
+  fun `a truncated large display headline under 60 characters passes even in a wide pane`() {
+    val headline = "Autumn harvest tasting menu for Saturday night"
+    val findings =
+      evaluate(
+          tree(
+            Views.Desktop,
+            node(
+              "display",
+              "Text",
+              x = 384f,
+              w = 699f,
+              h = 52f,
+              text =
+                text(
+                  headline,
+                  lines = 1,
+                  overflow = true,
+                  truncated = true,
+                  ink = Bounds(384f, 0f, 699f, 52f),
+                ),
+            ),
+          ),
+        )
+        .filter { it.rule == FindingRule.LineLength }
+    assertEquals(emptyList(), findings.map { it.id })
+  }
 }
