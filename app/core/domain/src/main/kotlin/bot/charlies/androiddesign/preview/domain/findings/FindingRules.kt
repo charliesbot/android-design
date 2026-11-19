@@ -744,10 +744,12 @@ object FindingRules {
   /**
    * Material: "Across all breakpoints, adjust margins and type styles to keep text between 40–60
    * characters per line," and "Adapt the width of the list container based on a line's length." A
-   * card, a list item, or a paragraph wide enough for a line past [MAX_LINE_CHARACTERS] fails. A
-   * character's width is measured from the single-line text drawn: the container's own text, else
-   * the median of the view's, else [BODY_CHARACTER_WIDTH]. Only the outermost such container is
-   * reported.
+   * card, a list item, or a single- or multi-line text wide enough for a line past
+   * [MAX_LINE_CHARACTERS] fails. For wrapped text and containers, a character's width is measured
+   * from single-line text drawn (the container's own text, else the median of the view's, else
+   * [BODY_CHARACTER_WIDTH]). For single-line text, the drawn character count is measured directly
+   * (capped by the string length when truncated) so short headings in wide panes are not flagged.
+   * Only the outermost such container is reported.
    */
   private fun lineLength(view: View): List<Finding> {
     val viewWidth = medianCharacterWidth(view.nodes) ?: BODY_CHARACTER_WIDTH
@@ -757,23 +759,36 @@ object FindingRules {
           when (node.type) {
             CARD,
             LIST_ITEM -> node.text != null || view.descendants(node).any { it.text != null }
-            TEXT -> (node.text?.lines ?: 0) > 1
+            TEXT -> (node.text?.lines ?: 0) >= 1
             else -> false
           }
       }
     val wide = candidates.mapNotNull { node ->
-      val own = medianCharacterWidth(listOf(node) + view.descendants(node).toList())
-      val characters = node.bounds.width / (own ?: viewWidth)
-      if (characters > MAX_LINE_CHARACTERS) node to characters else null
+      val text = node.text
+      val (measuredWidth, characters) =
+        if (node.type == TEXT && text != null && text.lines == 1) {
+          val drawnWidth = text.ink?.width ?: node.bounds.width
+          val chars =
+            if (!text.truncated && !text.overflow) {
+              text.value.length.toFloat()
+            } else {
+              minOf(drawnWidth / viewWidth, text.value.length.toFloat())
+            }
+          drawnWidth to chars
+        } else {
+          val own = medianCharacterWidth(listOf(node) + view.descendants(node).toList())
+          node.bounds.width to (node.bounds.width / (own ?: viewWidth))
+        }
+      if (characters > MAX_LINE_CHARACTERS) Triple(node, measuredWidth, characters) else null
     }
     val wideIds = wide.map { it.first.id }.toSet()
     return wide
-      .filter { (node, _) -> view.ancestors(node).none { it.id in wideIds } }
-      .map { (node, characters) ->
+      .filter { (node, _, _) -> view.ancestors(node).none { it.id in wideIds } }
+      .map { (node, width, characters) ->
         errorFinding(
           node,
           FindingRule.LineLength,
-          "${dp(node.bounds.width)} dp wide fits about ${characters.toInt()} characters a line; " +
+          "${dp(width)} dp wide fits about ${characters.toInt()} characters a line; " +
             "Material keeps text at 40 to 60, so give it a maxWidth, a fixed pane, or more columns",
         )
       }
