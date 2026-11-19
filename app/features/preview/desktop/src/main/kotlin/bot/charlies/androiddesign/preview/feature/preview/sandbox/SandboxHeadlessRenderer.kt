@@ -34,6 +34,9 @@ import java.util.Collections
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
+import org.jetbrains.skia.Rect as SkiaRect
+import org.jetbrains.skia.SamplingMode
+import org.jetbrains.skia.Surface
 
 /**
  * One headless render: the layout tree in dp, and a PNG at the density requested. A scrolling Wear
@@ -83,10 +86,14 @@ object SandboxHeadlessRenderer {
     view: ViewSpec,
     designSystem: DesignSystem,
     overlayId: String?,
-    pixelsPerDp: Float,
+    outputDensity: Float,
     encodePng: Boolean,
   ): HeadlessResult {
+    // Always compose and sample contrast at 2x density so scoped 1x checks and full 2x checks
+    // produce identical findings, then downsample the encoded PNG when outputDensity < DENSITY.
+    val pixelsPerDp = DENSITY
     val density = Density(pixelsPerDp)
+    val pngScale = (outputDensity / pixelsPerDp).coerceIn(0.25f, 1f)
     val test =
       DesktopComposeUiTest(
         width = (view.width * pixelsPerDp).toInt(),
@@ -147,7 +154,7 @@ object SandboxHeadlessRenderer {
 
       val (firstTree, firstBitmap) = takeSnapshot()
       tree = firstTree
-      if (encodePng) pngBytes = firstBitmap.toPng()
+      if (encodePng) pngBytes = firstBitmap.toPng(pngScale)
 
       if (compiled.board.surface == BoardSurface.Wear && overlayId == null) {
         val scrollable =
@@ -163,7 +170,8 @@ object SandboxHeadlessRenderer {
           }
           if (positions.size > 1) {
             tree = ScrolledTree.merge(positions)
-            val endPng = if (encodePng) lastBitmap?.toPng() ?: ByteArray(0) else ByteArray(0)
+            val endPng =
+              if (encodePng) lastBitmap?.toPng(pngScale) ?: ByteArray(0) else ByteArray(0)
             endResult = HeadlessEnd(positions.last(), endPng)
           }
         }
@@ -241,8 +249,27 @@ object SandboxHeadlessRenderer {
     }
   }
 
-  private fun Bitmap.toPng(): ByteArray =
+  private fun Bitmap.toPng(scale: Float = 1f): ByteArray =
     Image.makeFromBitmap(this).use { image ->
-      checkNotNull(image.encodeToData(EncodedImageFormat.PNG)) { "PNG encoding failed" }.bytes
+      if (scale >= 0.999f) {
+        checkNotNull(image.encodeToData(EncodedImageFormat.PNG)) { "PNG encoding failed" }.bytes
+      } else {
+        val outW = (width * scale).toInt().coerceAtLeast(1)
+        val outH = (height * scale).toInt().coerceAtLeast(1)
+        Surface.makeRasterN32Premul(outW, outH).use { surface ->
+          surface.canvas.drawImageRect(
+            image = image,
+            src = SkiaRect.makeWH(width.toFloat(), height.toFloat()),
+            dst = SkiaRect.makeWH(outW.toFloat(), outH.toFloat()),
+            samplingMode = SamplingMode.LINEAR,
+            paint = null,
+            strict = true,
+          )
+          surface.makeImageSnapshot().use { scaled ->
+            checkNotNull(scaled.encodeToData(EncodedImageFormat.PNG)) { "PNG encoding failed" }
+              .bytes
+          }
+        }
+      }
     }
 }

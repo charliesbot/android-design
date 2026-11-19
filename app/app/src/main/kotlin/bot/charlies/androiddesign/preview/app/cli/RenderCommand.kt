@@ -31,6 +31,23 @@ class RenderCommand(
   )
 
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
+    if (args.any { it == "--help" || it == "-h" }) {
+      out.println(
+        """
+        Usage: android-design-preview $usage
+
+        Compile and render every screen, overlay, and view headlessly into <dir>, writing
+        <screen>-<view>.png, <screen>-<view>.tree.json, and report.json.
+
+        Exit codes:
+          0  Valid and every render passed
+          1  One or more renders failed checks or threw
+          2  Invalid exploration or compilation error
+        """
+          .trimIndent(),
+      )
+      return ExitCode.OK
+    }
     val options = parse(args, err) ?: return ExitCode.USAGE
     val sourcePath = options.source.toAbsolutePath().normalize()
     if (!Files.isRegularFile(sourcePath)) {

@@ -124,3 +124,13 @@ val workerJar =
   }
 
 tasks.named("assemble") { dependsOn(workerJar) }
+
+tasks.test {
+  dependsOn(workerJar)
+  systemProperty("sun.net.http.allowRestrictedHeaders", "true")
+  systemProperty("preview.jar", workerJar.flatMap { it.archiveFile }.get().asFile.absolutePath)
+  systemProperty(
+    "preview.bin",
+    rootProject.projectDir.parentFile.resolve("plugin/bin/android-design-preview").absolutePath,
+  )
+}

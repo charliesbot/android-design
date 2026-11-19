@@ -62,13 +62,29 @@ private constructor(
       val errors =
         tree.findings
           .filter { it.severity == Severity.Error }
-          .groupBy({ it.rule.wire to it.detail }, { it.id })
-          .map { (key, ids) -> CheckError(key.first, ids.filterNotNull(), key.second) }
+          .groupBy { Triple(it.rule.wire, it.detail, it.reference to it.hint) }
+          .map { (key, group) ->
+            CheckError(
+              rule = key.first,
+              ids = group.mapNotNull { it.id },
+              detail = key.second,
+              reference = key.third.first,
+              hint = key.third.second,
+            )
+          }
       val notes =
         tree.findings
           .filter { it.severity == Severity.Info }
-          .groupBy({ it.rule.wire }, { it.id })
-          .map { (rule, ids) -> CheckNote(rule, ids.filterNotNull()) }
+          .groupBy { it.rule.wire }
+          .map { (rule, group) ->
+            val first = group.firstOrNull()
+            CheckNote(
+              rule = rule,
+              ids = group.mapNotNull { it.id },
+              reference = first?.reference,
+              hint = first?.hint,
+            )
+          }
       return ViewCheck(
         pass = errors.isEmpty(),
         notes = notes,
@@ -117,13 +133,21 @@ data class CheckError(
   val rule: String,
   val ids: List<String> = emptyList(),
   val detail: String? = null,
+  val reference: String? = null,
+  val hint: String? = null,
 )
 
 /**
  * The info findings of one view that share a [rule], with the components they are about in [ids]
  * (empty when the finding concerns the whole view).
  */
-@Serializable data class CheckNote(val rule: String, val ids: List<String> = emptyList())
+@Serializable
+data class CheckNote(
+  val rule: String,
+  val ids: List<String> = emptyList(),
+  val reference: String? = null,
+  val hint: String? = null,
+)
 
 private fun <T> List<T>.beyond(
   known: List<T>,

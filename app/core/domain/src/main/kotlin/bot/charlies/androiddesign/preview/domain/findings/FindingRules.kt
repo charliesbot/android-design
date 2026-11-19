@@ -63,27 +63,34 @@ object FindingRules {
     emptyDetailLists: List<String> = emptyList(),
   ): List<Finding> {
     val view = View(tree, surface)
-    return touchTargets(view) +
-      fonts(view) +
-      clippedText(view) +
-      croppedByCarouselItem(view) +
-      undrawnText(view) +
-      truncatedText(view) +
-      truncatedLabels(view) +
-      contrast(view) +
-      primaryLargest(view) +
-      oneFab(view) +
-      offscreen(view) +
-      overflow(view) +
-      roundEdgeClipped(view) +
-      cornerClipped(view) +
-      carouselItems(view) +
-      dockedToolbarWithNavBar(view) +
-      fullScreenDatePicker(view) +
-      lineLength(view) +
-      weightCollapsed(view) +
-      arrangementNoSpace(view) +
-      emptyDetailPane(emptyDetailLists)
+    val raw =
+      touchTargets(view) +
+        fonts(view) +
+        clippedText(view) +
+        croppedByCarouselItem(view) +
+        undrawnText(view) +
+        truncatedText(view) +
+        truncatedLabels(view) +
+        contrast(view) +
+        primaryLargest(view) +
+        oneFab(view) +
+        offscreen(view) +
+        overflow(view) +
+        roundEdgeClipped(view) +
+        cornerClipped(view) +
+        carouselItems(view) +
+        dockedToolbarWithNavBar(view) +
+        fullScreenDatePicker(view) +
+        lineLength(view) +
+        weightCollapsed(view) +
+        arrangementNoSpace(view) +
+        emptyDetailPane(emptyDetailLists)
+    return raw.map { finding ->
+      finding.copy(
+        reference = finding.reference ?: finding.rule.reference,
+        hint = finding.hint ?: finding.rule.hint,
+      )
+    }
   }
 
   // region the view
