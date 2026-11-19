@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-04
 
-> **v4 status:** [Visual design exploration v4](visual-design-exploration-v4.md) retired the v3 JSON catalog (`Catalog.kt`, `app/schemas/`), `export/`, and `compose-mapping.md`. Authors now write real Material 3 Compose code directly in `.explore.kt`. M3 page coverage against `sources/m3.material.io/pages/components/` is enforced directly against `scripts/material3-inventory.txt` (generated from pinned `material3-desktop`) and `CallNameMapper.kt` by `scripts/test_m3_page_coverage.py`.
+> **Status:** [Visual design exploration v4](../archive/visual-design-exploration-v4.md) retired the v3 JSON catalog (`Catalog.kt`, `app/schemas/`), `export/`, and `compose-mapping.md`. Authors now write real Material 3 Compose code directly in `.explore.kt`. M3 page coverage against `sources/m3.material.io/pages/components/` is enforced directly against `scripts/material3-inventory.txt` (generated from pinned `material3-desktop`) and `CallNameMapper.kt` by `scripts/test_m3_page_coverage.py`.
 
 ## TL;DR
 
@@ -147,7 +147,7 @@ The desktop build lags Android. The app renders with JetBrains' material3 (1.13.
 
 ## Links
 
-- [Visual design exploration v4](visual-design-exploration-v4.md): current Code-First Compose exploration architecture
+- [Visual design exploration v5](visual-design-exploration-v5.md): current Code-First Compose exploration architecture
 - [Visual design exploration v3](../archive/visual-design-exploration-v3.md): historical v3 previewer fidelity bar and catalog architecture
 - [Material 3 components research](../research/material-3-components.md): the distilled usage rules per component
 - [compose-signatures.md](../../plugin/skills/android-design-explore/references/compose-signatures.md): verified Material 3 and Wear M3 Compose API signatures

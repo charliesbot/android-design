@@ -1,6 +1,6 @@
 # Visual design exploration v3
 
-> **Archived:** Superseded by [Visual design exploration v4](../design/visual-design-exploration-v4.md).
+> **Archived:** Superseded by [Visual design exploration v4](visual-design-exploration-v4.md).
 
 **Date:** 2026-10-30
 
@@ -270,7 +270,7 @@ v3 replaces the HTML proposal runtime: `@m3e/web`, `gallery/runtime-src/`, `gall
 
 ## Links
 
-- [Visual design exploration v4](../design/visual-design-exploration-v4.md), the cross-OS plugin and Code-First Kotlin sandbox that supersedes this design
+- [Visual design exploration v4](visual-design-exploration-v4.md), the cross-OS plugin and Code-First Kotlin sandbox that supersedes this design
 - [Visual design exploration v2](visual-design-exploration-v2.md), the HTML design this replaces
 - [Compose Multiplatform proposal fidelity research](../research/compose-multiplatform-proposal-fidelity.md)
 - [A2UI specification v1.0](https://github.com/a2ui-project/a2ui/tree/main/specification/v1_0)

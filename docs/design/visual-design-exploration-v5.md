@@ -1,0 +1,186 @@
+# Visual design exploration v5
+
+**Date:** 2026-11-18
+
+## TL;DR
+
+v5 keeps v4's runtime (bundled Node supervisor, disposable headless Skiko JVM worker, bytecode sandbox, `designBoard` kit, and 21 finding rules) and redesigns the loop around it. Each save produces one shared result, iteration checks only the direction and view being changed and always returns its image, the board updates the screen the person is looking at first, and a board click reaches the agent as `file:line`. A full check of every view stays the gate before showing the person. A head-to-head against `kakao/prevue` showed the engine was never the bottleneck: one scoped view compiles and renders in about 0.5 s, while v4's loop spent 3.4 to 7.7 s per edit checking every view, twice.
+
+## Design
+
+### Why v5
+
+v4 ([visual-design-exploration-v4.md](../archive/visual-design-exploration-v4.md)) made explorations real Compose code with deterministic checks and passed its rollout gate. In use, iterating still felt slow. A Prevue 0.22.1 fit test built the same three-direction board (editorial, map led, itinerary) for both tools and ran the same edit script, measured on Apple Silicon:
+
+| Structural edit, save to result | Time |
+|---|---|
+| Prevue `wait`, focused card | 1.16 s |
+| v4 `check_design`, every direction and view | 6.9 to 7.7 s |
+| v4 compile plus render, one direction and one view | 0.45 to 0.55 s |
+| v4 save to board update | 3.3 to 3.5 s |
+
+Three properties of v4's loop explain the gap:
+
+1. **Every save was checked twice.** The board's file watcher ran a full `compileAndCheck` 120 ms after each save, and the agent's `check_design` then queued behind it on the single worker and repeated the same work.
+2. **Every call checked everything.** Three directions across five views is 15 renders and checks, about 2.8 s, however small the edit. v4's "328 to 460 ms warm" figure was measured on a 29-line, single-direction screen and holds per view, not per realistic board.
+3. **The agent iterated without seeing.** Images returned only once every error finding cleared, and then always `light` and `desktop`, never the view that failed. In the fit test no full check returned an image, because a foldable `line-length` finding never cleared during the script.
+
+Prevue felt faster for reasons of loop design, not rendering: the watcher's render is the agent's result (`prevue wait`), the focused card redraws before the rest, images are opened on demand, words like "this" resolve through `prevue selection`, and actions target source lines. v5 adopts those mechanics. Prevue itself is not adopted as the engine: it needs an Android Gradle module, runs only on macOS, and carries no design checks. In the same test v4 flagged a foldable line-length problem that Prevue rendered without comment.
+
+### Why Code-First works without Gradle
+
+v1 took ~2 minutes per edit because every round booted Gradle, AGP, Android resource merging, and Robolectric, with no signature reference for beta Material 3 APIs.
+
+Measured on Apple Silicon inside an already-booted headless JDK process (excluding ~0.5 s of initial JVM process startup) with `kotlin-compiler-embeddable:2.4.21`, `kotlin-compose-compiler-plugin-embeddable:2.4.21` (`sourceInformation=true`), and `:app`'s Compose Multiplatform `1.13.0-beta01` classpath:
+- Compiling a 53-line Material 3 Expressive screen (`LargeFlexibleTopAppBar`, `MediumFloatingActionButton`, `Card`, `displaySmallEmphasized`, `LinearWavyProgressIndicator`, `LazyColumn`, `ListItem`) across 8 rounds took `1,909 ms` on round 1 (compiler JIT warmup) and **`267 to 429 ms`** on rounds 2 through 8.
+- End-to-end compile plus 5-view `runDesktopComposeUiTest` rendering and Skia bitmap capture on a 29-line M3 Expressive screen across 5 rounds took **`2,071 ms`** on round 1 (`1,639 ms` compile + `432 ms` 5-view render) and **`328 to 460 ms`** on rounds 2 through 5 (`244 to 375 ms` compile + `79 to 85 ms` across all five views).
+
+### Rejected alternatives
+
+- **Migrating exploration to `kakao/prevue`:** Measured in the fit test above. Its loop is better; its engine is not a fit (macOS only, needs `ANDROID_HOME`, a Gradle module, and a classpath dump, about 1.4 GB RAM per daemon, 1.2 to 1.9 s save to screen, and no Material 3 checks). Prevue stays the tool for iterating on real `@Preview`s inside an Android app after a direction is approved.
+- **A third MCP tool for the fast path (a `wait` equivalent):** Scoping `check_design` reaches the same speed once results are shared, without another tool for agents to choose between. Two tools stay.
+- **JetBrains `compose-hot-reload` (`1.2.0`) in a scratch Gradle module:** Avoids writing a ~180-line `K2JVMCompiler` host, at the cost of reopening a native desktop Swing window, requiring Gradle and Kotlin daemons plus a ~200 MB JBR 25 download (~1.5 to 2.5 GB RAM), and checking one live window per tool call.
+- **Pure Compose Multiplatform Wasm (`wasmJs`) or WebMCP:** `skiko.wasm` requires a browser WebGL canvas, so Node.js cannot run `HeadlessRenderer` without ~170 MB per-OS headless Chromium binaries or stalling on closed or backgrounded tabs. Coding harnesses also do not speak `navigator.modelContext` directly and still require a local stdio server and file watcher.
+- **CLI commands instead of MCP:** `claude -p` blocks granting `Bash` to spawned eval generators ([script-ban-eval.md](script-ban-eval.md)), interactive harnesses prompt on shell commands, and CLI stdout cannot return inline `ImageContent`, adding extra `Read` turns per PNG.
+
+### Runtime: bundled Node supervisor and disposable JVM worker
+
+```text
+Agent (Claude Code / Codex / Antigravity)
+  │ stdio MCP (initialize + tools/list answered in Node: ~20 ms, 0 MB JVM heap when idle)
+  ▼
+node ${PLUGIN_ROOT}/scripts/android-design-preview.js   (~93 KB pure-JS Node supervisor)
+  ├── Localhost HTTP + SSE server (127.0.0.1:<port>, Host + Origin + 256-bit session token)
+  ├── Warms ~/.cache/ GitHub Release JAR (~132 MB, SHA-256 verified) in background on cache miss
+  └── Spawns JVM only on first tool call & supervises over private stdio pipes (no JVM port)
+        ▼
+      Headless JVM Worker (java -Djava.awt.headless=true -jar android-design-preview.jar)
+        ├── Skiko (skiko-awt-runtime-all: macos-arm64/x64, linux-arm64/x64, windows-arm64/x64)
+        ├── K2JVMCompiler + Compose Compiler + constant-pool guard + SandboxClassLoader
+        └── HeadlessRenderer + Wear Compose + SubcomposeLayout slot inspector + finding rules
+```
+
+**Background JAR warm-up and lazy JVM spawn.** Plugin bundles stay under ~250 KB so git/marketplace installs never drag a 132 MB fat JAR. Shipping a pure-JS Node supervisor inside `plugin/scripts/` (expanded via `${PLUGIN_ROOT}` in `mcp_config.json` and `${CLAUDE_PLUGIN_ROOT}` in `.mcp.json`, with no npm registry dependency) lets enabled plugin sessions answer MCP `initialize` and `tools/list` in ~20 ms with zero JVM memory. On supervisor startup, if `~/.cache/android-design-preview/<version>/android-design-preview.jar` is missing (first session after install or upgrade), Node starts a background download and SHA-256 verification immediately while the agent reads the brief; local dev (`scripts/install_local_plugin.sh`) populates that cache directly from `./gradlew :app:workerJar`, and cached sessions only run a `fs.existsSync` check. The JVM worker itself is spawned only on the first `check_design` or `get_tree` call, locating `java` 17+ (`PATH`, `JAVA_HOME`, or Android Studio's bundled JBR) and honoring `ANDROID_DESIGN_PREVIEW_JAR` for local builds and `evals/run.py`.
+
+**Split deadlines and worker recycling.** In-process JVM thread interruption cannot stop a tight loop (`while (true)`) inside composition, and repeated `ClassLoader` loads can retain entries in Skia or Compose caches. Running one JVM as a supervised child of Node solves both without running two JVMs. Deadlines are split by phase so slower Intel or Windows machines do not trip false timeouts on cold boot: JAR download reports progress separately, worker process boot plus round-1 JIT warmup gets a **30 s** readiness budget, and each in-worker `compile + render` request after readiness gets a strict **5 s** deadline before Node sends `SIGKILL` and respawns a clean worker. Node also recycles the worker every 25 compiles and after idle timeout.
+
+**Minimal surfaces.** Agents see two MCP tools (`check_design` and `get_tree`). Humans and `evals/run.py` use two CLI commands (`serve` and `render`).
+
+### Security and sandbox boundary
+
+Compiling `.kt` files executes JVM bytecode, which changes v3's data-only trust model and interacts with [script-ban-eval.md](script-ban-eval.md). Three controls bound that surface:
+
+1. **No network-reachable compile surface.** The JVM worker opens zero network ports. Node's HTTP server serves the browser board only: it requires `Host: 127.0.0.1:<port>` (blocking DNS rebinding), validates `Origin` plus a 256-bit per-session token (`http://127.0.0.1:<port>/?token=<secret>`) on state-changing requests, and exposes no endpoint that compiles arbitrary paths or source strings. Only the agent's stdio MCP pipe can call `check_design(path)`.
+2. **Constant-pool bytecode verification, `SandboxClassLoader`, and inert UI locals.** Before loading compiled `.class` files, the worker inspects each classfile's constant pool and loads classes through an allowlisting `SandboxClassLoader` permitting only:
+   - `androidx.compose.*`, `androidx.navigation3.*`, `androidx.wear.compose.*`, `androidx.graphics.shapes.*`, `com.materialkolor.*`, `kotlinx.collections.immutable.*`, and `bot.charlies.androiddesign.preview.kit.*`.
+   - `kotlinx.coroutines.*` with `newSingleThreadContext` and `newFixedThreadPoolContext` (`ThreadPoolDispatcherKt`) explicitly denied (`Dispatchers.IO` is harmless with all I/O blocked).
+   - Safe `kotlin.*` packages (`kotlin.*` with `kotlin.io.*`, `kotlin.system.*`, `kotlin.reflect.*`, and `kotlin.concurrent.*` explicitly denied so `kotlin.concurrent.thread { }` cannot spawn threads without referencing `Thread` directly).
+   - Explicit `java.lang` value types (`Object`, `String`, `CharSequence`, `Number` subclasses, `Boolean`, `Enum`, `Math`, `Throwable`, standard runtime exceptions), explicit `java.util` collection and value types (`List`, `Map`, `Set`, `Collection`, `Iterable`, `Iterator`, `ArrayList`, `HashMap`, `LinkedHashMap`, `HashSet`, `LinkedHashSet`, `Collections`, `Arrays`, `Objects`, `Optional`, `Comparator`, `Locale`, `UUID`), and `java.util.concurrent.atomic.*`. Broad `java.util.*` is not allowed, blocking `java.util.prefs.*` (disk writes), `java.util.logging.*` (`FileHandler`), `java.util.concurrent.*` executors, `java.util.Timer`, `java.util.ServiceLoader`, and `java.util.zip.*` / `java.util.jar.*`.
+   - In `java.lang.invoke.*`, only `LambdaMetafactory` and `StringConcatFactory` bootstrap entries required by Kotlin lambdas and string templates; direct `MethodHandles`, `Class.forName`, `ClassLoader`, `Runtime`, `ProcessBuilder`, `System`, `Thread`, `java.lang.reflect.*`, `java.io.*`, `java.nio.*`, and `java.net.*` are rejected before execution.
+   In addition, `designBoard` and `wearBoard` override `LocalUriHandler`, `LocalClipboard`, and `LocalClipboardManager` with inert no-op implementations so explorations cannot open browser URLs or touch the host clipboard through allowed Compose UI APIs.
+3. **Explicit trust boundary and eval parity.** Bytecode, classloader, and CompositionLocal sandboxing keeps LLM-authored explorations deterministic and side-effect-free (preserving `script-ban-eval.md`'s ban on file-generating scripts while keeping `claude -p` free of `Bash` permissions); it is not a multi-tenant VM boundary for untrusted third-party code.
+
+### Exploration files and the `DesignBoard` kit
+
+Explorations are tracked files at `design/<slug>.explore.kt`, optionally reading shared defaults from `DESIGN.md` front matter at the repository root.
+
+Screen composables use standard AndroidX imports, marking the primary CTA with a namespaced `Modifier.testTag("ad:primary")` so copied screens never collide with an app's own `"primary"` test tags. The top-level `designBoard` or `wearBoard` block in `bot.charlies.androiddesign.preview.kit` wires bundled variable fonts (`ProposalFonts`), seed schemes, Navigation 3 adaptive panes (`ListDetailSceneStrategy`, `SupportingPaneSceneStrategy`), overlays, inert `LocalUriHandler`/`LocalClipboard` stubs, and safe relative image loading (`designPainter("assets/cover.jpg")`, confined beneath the exploration directory with `..` traversal blocked):
+
+```kotlin
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import bot.charlies.androiddesign.preview.kit.*
+
+val preview = designBoard(
+  name = "Tonight's plate",
+  seed = 0xFFB5523B,
+  variant = PaletteVariant.TonalSpot,
+  brandFont = BundledFont.Fraunces,
+) {
+  direction("Editorial split") {
+    listDetail(
+      list = { onOpenDetail -> PlatesListScreen(onSelect = onOpenDetail) },
+      detail = { PlateDetailScreen() },
+      placeholder = { PickPlatePlaceholder() },
+    )
+  }
+}
+```
+
+Multiple `direction(...)` blocks in one file render side by side on the browser board when comparing alternatives.
+
+### The loop
+
+```text
+person saves or agent edits  ──►  file watcher (Node)
+                                        │ content hash = source + DESIGN.md + worker version
+                                        ▼
+                         ┌──────── result store (Node) ────────┐
+agent: check_design ───► │ hit: same hash and scope already    │──► response
+  (scoped or full)       │      done or in flight, reuse it    │
+                         │ miss: enqueue one worker job        │
+                         └──────────────┬──────────────────────┘
+                                        ▼
+                     worker queue, by priority: agent request,
+                     board focus, board remainder (cancelled when a newer save lands)
+```
+
+**One result per save.** Node keys every worker result by content hash and scope (`directions`, `screens`, `views`). When `check_design` asks for a scope that a finished or in-flight job already covers for the same hash, Node waits for that job and answers from it instead of queueing another. The worker keeps the compiled classes for the last hash, so an unchanged file is never recompiled. A newer save cancels queued board-remainder jobs for the older hash.
+
+**Scoped iteration, full check as the gate.** While iterating, the skill calls `check_design` with the one direction and view it just changed. That costs about one compile plus one render (0.45 to 0.55 s in the fit test) instead of a full board. The full call, with `directions` and `views` unset, runs on the first draft and once more before showing the person. The cap of two fix rounds applies to full checks; scoped iterations between them are not capped.
+
+**Images during iteration.** A scoped check always returns its image, whether findings pass or fail, because it is one view and the agent cannot judge a visual fix without it. A full check that fails returns the images of the views that failed, so the agent sees the foldable or desktop problem rather than a passing light view. A full check that passes returns `light` and `desktop` (`watch` and `watch-large` on Wear) for the final visual inspection. `includeImages` and `allImages` keep their meaning as explicit overrides. The skill tells the agent to look after any visual change and before saying something is fixed, which also catches pixel-only render bugs that `get_tree` cannot show.
+
+### Browser board
+
+Node serves an HTML, CSS, and SVG board at `http://127.0.0.1:<port>/?token=<secret>` and opens it in the default browser on interactive runs:
+
+- **Focus first, then the rest.** The board reports which direction and view the person has open. On save, Node renders that one first and pushes it over Server-Sent Events, then renders the remaining views at low priority and pushes them as they finish. Views not yet redrawn are marked stale on the board instead of showing an old render as current. With no board open, the agent's most recent scope counts as the focus.
+- **Multi-direction board and ~40 ms switches.** Shows multiple `direction(...)` blocks side by side or focuses one direction with Brightness, Seed Color, Style Variant, Screen, Overlay, and Device controls. Because `<slug>.explore.kt` stays compiled in the worker, changing theme or device settings re-renders in ~40 ms without recompiling.
+- **Live file watching.** Node watches `DESIGN.md` and `<slug>.explore.kt`. Watcher runs feed the shared result store, so a save the board already rendered is free for the agent's next scoped check.
+- **Click-to-source SVG overlay.** Maps `CompositionGroup` source locations and `SemanticsNode` bounds onto each 2x PNG: hovering shows the Composable name, `<file>:<line>`, and measured dp dimensions. Clicking selects that node, copies `<slug>.explore.kt:<line>` to the clipboard, and records it as the person's selection. Clicking navigation or overlay triggers still switches the board state.
+
+### Selection reaches the agent
+
+The board stores the last clicked node per file: `<file>:<line>`, Composable call name, ancestor call chain, direction, screen, view, and dp bounds. `get_tree` called with `selected: true` returns that node and its subtree, and every `check_design` response carries a `selection` field when the person has clicked since the agent's previous call. The skill tells the agent to read the selection first whenever the person says "this", "here", or similar, and to ask the person to click the part they mean when nothing is selected, without guessing from the source. Storing the click needs a state-changing board request, so it goes through the same `Origin` and session token checks as every other board write.
+
+### Slot inspection and finding rules
+
+Both `android-design` and `android-design-explore` speak Jetpack Compose Kotlin, backed by a compact ~2-page Material 3 Expressive `1.5.0` and Wear M3 signature sheet generated from the verified dependency jars so agents do not guess beta parameter names.
+
+`check_design(path, directions?, screens?, views?)` runs source token lint (rejecting raw `Color(...)` hex literals outside `designBoard` and `.copy(alpha = ...)`), compiles in memory, and checks every requested screen and overlay across the requested catalog views (`light`, `dark`, `foldable`, `tablet`, `desktop`, or `watch` and `watch-large` on Wear; all of them when `views` is unset). It returns compact findings per direction, screen, overlay, and view, the `boardUrl`, any new `selection`, and images by the policy above.
+
+**Slot-table and semantics extraction.** `androidx.compose.runtime:runtime-desktop:1.13.0-beta01` includes `LocalInspectionTables` and `parseSourceInformation` (without adding `ui-tooling-data`), annotated `@ComposeToolingApi` alongside `Composer.collectParameterInformation()`. Because `LocalInspectionTables` is bound when a subcomposition starts, `HeadlessRenderer` wraps the target composable inside a 6-line `SubcomposeLayout` under `CompositionLocalProvider(LocalInspectionTables provides tables)`, pairing `parseSourceInformation` (`C<line>@<offset>L<length>`) with placed `LayoutInfo` boxes and `SemanticsNode` trees to recover `<file>:<line>`, the Composable call identifier at `source[offset]`, unclipped `LayoutInfo` dimensions, and `ModifierInfo` entries. Because `@ComposeToolingApi` carries no cross-release stability guarantee, Compose versions remain pinned in `app/gradle/libs.versions.toml` and a dedicated canary unit test asserts that call names, line numbers, and bounds resolve on a fixture screen so upgrades fail loudly if the format changes. On Wear views, `HeadlessRenderer` scrolls the root vertical scroller via `SemanticsProperties.VerticalScrollAxisRange` and `SemanticsActions.ScrollBy` half a viewport at a time and merges nodes through `ScrolledTree.merge`.
+
+Mapping of all 21 check functions in `FindingRules.kt`:
+
+| Mechanism | Checks |
+|---|---|
+| **`SemanticsNode` + `GetTextLayoutResult` + slot call names (15 checks)** | `touchTargets` (48 dp `touchBoundsInRoot`), `clippedText`, `undrawnText`, `truncatedText` (info), `truncatedLabels` (buttons, chips, tabs, nav items), `primaryLargest` (`testTag("ad:primary")` vs action call names per pane), `oneFab`, `offscreen`, `overflow` (unclipped `LayoutInfo.width` vs parent/view, exempting `HorizontalScrollAxisRange`), `lineLength` (`Card`, `ListItem`, and multi-line `Text` > 60 measured chars), `carouselItems` (info), `dockedToolbarWithNavBar`, `fullScreenDatePicker` (info), and `emptyDetailPane` (info, from `listDetail` when `placeholder` is omitted) |
+| **`LayoutInfo.getModifierInfo()` + Wear/carousel geometry (3 checks)** | `weightCollapsed` (weighted non-`Spacer` node measuring `<= 0.5 dp`), `cornerClipped` (rounded `Shape` clip radius from `GraphicsLayer` modifiers vs text ink and control bounds), `roundEdgeClipped`, and `croppedByCarouselItem` |
+| **`designBoard` + `TextLayoutResult` + bytecode/source guard (2 checks)** | `fonts` (reads resolved `ProposalFonts` family and `fontSize` on `TextLayoutResult.layoutInput.style`; unbundled `FontFamily` constructors and raw `Color(...)` / `.copy(alpha = ...)` rejected) |
+| **2 px perimeter Skia bitmap sampling (1 check, upgraded)** | `contrast`: reads exact sRGB foreground luminance $L_{\text{fg}}$ from `TextLayoutResult.layoutInput.style.color`, samples the 2 px outer perimeter band around each drawn line's ink box (zero glyph anti-aliasing pollution, including white-on-white), and checks WCAG ratio at the 10th-worst background luminance percentile (`p90` when $L_{\text{fg}} > 0.179$, `p10` otherwise), catching low contrast over photos and gradients |
+| **Dropped (1 info note)** | `arrangementNoSpace`: omitted because inline `Row` and `Column` calls do not retain their `Arrangement` instance on `LayoutInfo` |
+
+### Plugin bundle and moving to production
+
+Distributable files live under `plugin/` (`plugin/skills/`, `plugin/scripts/`, Antigravity `plugin.json` and `mcp_config.json`, Claude Code `.claude-plugin/`, Codex `.codex-plugin/`, and `.mcp.json` launching `${PLUGIN_ROOT}/scripts/android-design-preview.js` / `${CLAUDE_PLUGIN_ROOT}/scripts/android-design-preview.js`) so installs transfer ~250 KB rather than `sources/`, `evals/`, and `app/`. Root marketplace manifests point to `./plugin` via git-subdir, while `npx skills add` and Chai (`~/chai.toml`) read `plugin/skills/` directly.
+
+Approving a direction needs no code generator (`export/` is gone), though porting still wires the screen into the app: the agent copies the approved `@Composable` screen functions into the target project's module layout, removes `testTag("ad:primary")` if undesired, connects them to the app's theme, ViewModel state, and Navigation 3 routes, and verifies the live screens with `kakao/prevue` on macOS or `compose-preview` elsewhere.
+
+## Open questions
+
+- **Do scoped iterations hold eval quality?** v4's gate (6/8 rubric, 0 median compile retries) was measured with full checks on every call. The eight-case A/B needs rerunning to confirm that fewer full checks with more images keep or improve rubric scores, turns, and tokens.
+- **How many failing-view images should a full check return?** Returning every failing view could mean five images on a badly broken board. A cap (for example three, deduplicated by identical renders) is likely; the right number depends on eval token cost.
+- **Width slider.** A 240 to 1600 dp slider marked at 600 and 840 dp. At about 0.12 s per scoped render after compile, v5 could reflow while the person drags (throttled), which Prevue's release-to-commit slider cannot. Designed after the faster loop is measured.
+- **One live, tappable direction.** Taps and scroll on the focused direction, targeted by `file:line`, so toggles, sheets, and navigation states can be tried rather than only viewed. Needs a long-lived composition in the worker, which conflicts with the disposable per-request model and the 5 s deadline.
+
+## Links
+
+- [Visual design exploration v4](../archive/visual-design-exploration-v4.md): archived; the runtime this design keeps, its rollout gate results, and the loop it replaces
+- [Visual design exploration v3](../archive/visual-design-exploration-v3.md): archived JSON-interpreted macOS previewer design superseded by v4
+- [Wear OS in the previewer](wear-os-previewer.md): the upstream `androidx.wear.compose` desktop port reused on the worker classpath
+- [Script ban eval baseline](script-ban-eval.md): the 8-case v3 baseline and why `claude -p` generators use MCP rather than `Bash`
+- [`kakao/prevue`](https://github.com/kakao/prevue): browser-based `@Preview` hot-swap tool whose loop this design adopts, used on macOS when wiring approved screens into an Android app
