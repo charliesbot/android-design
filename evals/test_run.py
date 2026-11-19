@@ -88,7 +88,7 @@ class PrepareTest(unittest.TestCase):
             self.assertIn(str(directory / 'DESIGN.md'), text)
             self.assertIn(str(directory / 'skills/android-design'), text)
             self.assertIn(str(directory / 'skills/android-design-explore'), text)
-            self.assertIn('check_design', text)
+            self.assertIn('android-design-preview check', text)
             self.assertIn(case['prompt'], text)
             self.assertNotIn('{{', text)
 
@@ -281,6 +281,7 @@ class ArtifactPipelineTests(unittest.TestCase):
             reply = {'message': 'done'}
             with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
                     mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
+                    mock.patch.object(run, '_stop_preview_server'), \
                     mock.patch.object(run, 'execute', return_value=reply) as agent:
                 run.generate(directory, 'claude')
             self.assertEqual(agent.call_args.kwargs['mcp_binary'], Path(BINARY))
@@ -459,6 +460,7 @@ class ArtifactPipelineTests(unittest.TestCase):
             images = write_report(directory)
             with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
                     mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
+                    mock.patch.object(run, '_stop_preview_server'), \
                     mock.patch.object(run, 'execute', return_value=reply):
                 run.generate(directory, 'agy')
             metrics = json.loads((directory / 'generator-metrics.json').read_text())

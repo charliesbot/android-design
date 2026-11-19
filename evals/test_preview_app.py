@@ -20,15 +20,15 @@ class PreviewAppTests(unittest.TestCase):
             found = preview_app.app_binary({preview_app.EXECUTABLE_ENV: str(custom)})
             self.assertEqual(found, custom)
 
-    def test_repo_supervisor_is_used_by_default(self):
+    def test_repo_cli_bin_is_used_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
-            supervisor = make_file(tmp, "plugin/scripts/android-design-preview.js")
-            original = preview_app.SUPERVISOR_BIN
-            preview_app.SUPERVISOR_BIN = supervisor
+            cli = make_file(tmp, "plugin/bin/android-design-preview")
+            original = preview_app.CLI_BIN
+            preview_app.CLI_BIN = cli
             try:
-                self.assertEqual(preview_app.app_binary({}), supervisor)
+                self.assertEqual(preview_app.app_binary({}), cli)
             finally:
-                preview_app.SUPERVISOR_BIN = original
+                preview_app.CLI_BIN = original
 
     def test_broken_supervisor_env_override_is_an_error(self):
         with self.assertRaisesRegex(RuntimeError, preview_app.EXECUTABLE_ENV):

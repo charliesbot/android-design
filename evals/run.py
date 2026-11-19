@@ -66,21 +66,21 @@ def prepare(case, case_dir):
     return proposal
 
 
-# What the agent prompt says per surface: where the exploration must work, what check_design covers, and how to
-# read its layout summaries. Phone-size cases cover the window size classes; Wear cases cover the two round watches.
+# What the agent prompt says per surface: where the exploration must work, what `android-design-preview check`
+# covers, and how to read its layout summaries. Phone-size cases cover the window size classes; Wear cases cover the two round watches.
 SURFACE_PROMPT = {
     'phone': {
         'TARGET': 'The screen must work and adapt across phone (411x923), foldable (704x933), tablet (1280x800), and desktop (1920x1080) windows, in light and dark, using `designBoard(...)` and `androidx.compose.material3.*`.',
         'VIEWS': 'all five views',
         'RENDER_VIEWS': '`light` and `desktop`',
-        'LAYOUT': "Read each view's `layout` summary in `check_design` (unchanged views collapse to `{\"same\": \"<view>\"}`). Confirm larger views reveal what your adaptation answer promised rather than rearranging phone content, verify `colors` has one strong fill, and inspect the returned `light` and `desktop` images once checks pass. Call `get_tree` only when a failing finding needs exact bounds or line numbers.",
+        'LAYOUT': "Read each view's `layout` summary in `android-design-preview check`. Confirm larger views reveal what your adaptation answer promised rather than rearranging phone content, verify `colors` has one strong fill, and open and inspect the returned `light` and `desktop` PNG paths once checks pass.",
         'DONE': 'implement the brief and adapt across all four window sizes',
     },
     'wear': {
         'TARGET': 'This is a Wear OS exploration using `wearBoard(...)` and `androidx.wear.compose.material3.*`. The previewer draws it on two round, dark watches: small (204x204) and large (227x227). Design for the small one first; the large one may show more but never less.',
         'VIEWS': 'both watch views',
         'RENDER_VIEWS': '`watch` and `watch-large`',
-        'LAYOUT': "Read each view's `layout` summary in `check_design`. Confirm nothing sits where the round edge cuts it, inspect the returned `watch` and `watch-large` images once checks pass, and verify the large watch shows at least what the small one does. Call `get_tree` only when a failing finding needs exact bounds or line numbers.",
+        'LAYOUT': "Read each view's `layout` summary in `android-design-preview check`. Confirm nothing sits where the round edge cuts it, open and inspect the returned `watch` and `watch-large` PNG paths once checks pass, and verify the large watch shows at least what the small one does.",
         'DONE': 'implement the brief on the small and the large watch',
     },
 }
@@ -114,9 +114,25 @@ def generator_metrics_from(reply):
     return {key: reply.get(key) for key in METRIC_KEYS}
 
 
+def _stop_preview_server(case_dir, binary, jar):
+    env = {**os.environ, JAR_ENV: str(jar), NO_OPEN_ENV: '1'}
+    try:
+        subprocess.run(
+            [str(binary), 'stop', str(case_dir)],
+            cwd=case_dir, env=env, capture_output=True, text=True, timeout=15, stdin=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
 def generate(case_dir, backend, model=None):
-    reply = execute(backend, (case_dir / 'prompt.md').read_text(), case_dir,
-                    role='generator', model=model, mcp_binary=app_binary(), mcp_jar=worker_jar())
+    binary = app_binary()
+    jar = worker_jar()
+    try:
+        reply = execute(backend, (case_dir / 'prompt.md').read_text(), case_dir,
+                        role='generator', model=model, mcp_binary=binary, mcp_jar=jar)
+    finally:
+        _stop_preview_server(case_dir, binary, jar)
     (case_dir / 'agent.json').write_text(json.dumps(reply, indent=2))
     (case_dir / 'generator-metrics.json').write_text(json.dumps(generator_metrics_from(reply), indent=2))
     return reply

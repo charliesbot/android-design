@@ -1,30 +1,34 @@
 # Previewer setup
 
-Read this when the `android_design_preview` MCP tools (`check_design`, `get_tree`) are unavailable or report missing prerequisites. Tell the user these steps, then wait.
+Read this when `android-design-preview` is not on `PATH` or exits `3` (missing Java or server prerequisites). Tell the user these steps, then wait. Never edit the user's harness config unasked.
 
 ## Prerequisites
 
-- **Node.js 18+** (runs `plugin/scripts/android-design-preview.js`)
-- **Java 17+** (system JDK or Android Studio's bundled JBR)
+- **Java 17+** (system `java` on `PATH`, `JAVA_HOME`, or Android Studio's bundled JBR)
 
-When `~/.cache/android-design-preview/0.4.0/android-design-preview.jar` is missing, the first session downloads and SHA-256 verifies `android-design-preview.jar` from GitHub Releases into that directory.
+On first run, if `~/.cache/android-design-preview/<version>/android-design-preview.jar` is missing, the bootstrap script downloads `android-design-preview.jar` from GitHub Releases and verifies its SHA-256 checksum automatically.
 
-## Register the plugin or MCP server
+## Put `android-design-preview` on `PATH`
 
-- **Antigravity:** run `agy plugin install <path-to-repo>/plugin` (or `./scripts/install_local_plugin.sh` from a repo checkout to build a local worker JAR first). Or add the server in `~/.gemini/config/mcp_config.json`:
+- **Claude Code:** installing the plugin puts `plugin/bin/` on `PATH` automatically.
+- **Antigravity, Codex, `npx skills`, and Chai:** run `install` once from the plugin or repository checkout to link the bootstrap script into `~/.local/bin`:
 
-  ```json
-  {
-    "mcpServers": {
-      "android_design_preview": {
-        "command": "node",
-        "args": ["<path-to-repo>/plugin/scripts/android-design-preview.js"]
-      }
-    }
-  }
+  ```sh
+  <path-to-plugin>/bin/android-design-preview install
   ```
 
-- **Claude Code:** `claude mcp add --scope user android_design_preview -- node <path-to-repo>/plugin/scripts/android-design-preview.js`
-- **Codex:** add a `[mcp_servers.android_design_preview]` table in `~/.codex/config.toml` with `command = "node"`, `args = ["<path-to-repo>/plugin/scripts/android-design-preview.js"]`, and `default_tools_approval_mode = "approve"`.
+  Make sure `~/.local/bin` is on your `PATH`, then retry.
 
-To override the cached worker JAR with a local build (`cd app && ./gradlew :app:workerJar`), set `ANDROID_DESIGN_PREVIEW_JAR` to `<path-to-repo>/app/app/build/libs/android-design-preview.jar`. Restart the session after registering.
+## Codex sandbox settings (only if the command fails in Codex)
+
+Codex runs shell commands inside its workspace-write sandbox, which blocks loopback HTTP and cache writes by default. If `android-design-preview` fails in Codex with a connection or permission error, tell the user to add these settings to `~/.codex/config.toml` (noting that `network_access = true` opens outbound network access to all Codex shell commands, not only this tool):
+
+```toml
+[sandbox_workspace_write]
+network_access = true
+writable_roots = ["~/.cache/android-design-preview"]
+```
+
+## Local development JAR override
+
+To test a locally built JAR (`cd app && ./gradlew :app:workerJar`), set `ANDROID_DESIGN_PREVIEW_JAR` to `<path-to-repo>/app/app/build/libs/android-design-preview.jar`.

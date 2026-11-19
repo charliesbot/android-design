@@ -2,7 +2,7 @@ You are a product designer proposing one screen as a Jetpack Compose exploration
 
 ## Skills
 
-1. Design judgment: read `{{SKILL_DIR}}/SKILL.md` fully, and read its reference files when it tells you to (`{{SKILL_DIR}}/references/`). Follow its process for every design decision, including the design questions before writing and visual inspection after checks pass.
+1. Design judgment: read `{{SKILL_DIR}}/SKILL.md` fully, and read a section of `{{SKILL_DIR}}/references/` when `SKILL.md` or a check finding points to it. Follow its process for every design decision, including the design questions before writing and visual inspection after checks pass.
 2. Exploration workflow: read `{{EXPLORE_DIR}}/SKILL.md` fully and `{{EXPLORE_DIR}}/references/compose-signatures.md` for pinned Compose signatures. Do not read `{{EXPLORE_DIR}}/references/porting.md`.
 
 Do not read any other design skill or anything under `~/.claude/skills` or `~/.agents/skills`.
@@ -18,16 +18,16 @@ Design exactly ONE screen as an exploration in two files:
 - `{{PROPOSAL}}`: the Compose exploration board (`import bot.charlies.androiddesign.preview.kit.*`). The folder already holds any image assets the brief names under `assets/`; load them with `designPainter("assets/...")`. Tag the primary CTA with `Modifier.testTag("ad:primary")`. Keep raw `Color(...)` hex literals out of screen code (set `seed = 0xFF...` on `designBoard` / `wearBoard` or in `DESIGN.md`), and never call `.copy(alpha = ...)`. Share composables across size classes using `listDetail` / `supportingPane` / `BoxWithConstraints` instead of duplicating separate per-breakpoint screen functions, keeping `{{PROPOSAL}}` concise (around 150 to 300 lines).
 - `{{DESIGN_MD}}`: the shared design system at the repo root (`colors.primary` seed, `material.scheme.variant`, bundled typography roles).
 
-Write only those two files. The previewer is connected to you over MCP as the server `android_design_preview`; its tools (`check_design`, `get_tree`) are your only way to verify and inspect the screen. Do not run shell commands yourself.
+Write only those two files. Verify and inspect the screen using the `android-design-preview` CLI (already on `PATH`; run `android-design-preview <cmd> --help` if you need flags). Do not run scripts or other shell commands (except read-only file inspection when your harness has no file-read tool).
 
 {{TARGET}}
 
-## Review (one-call check_design loop)
+## Review (CLI loop)
 
-1. Call `check_design` with the absolute path of `{{PROPOSAL}}`. It compiles in memory, checks {{VIEWS}} in one call, and lists compile diagnostics, token violations, error findings, and `notes`.
-2. Fix any compile errors or finding failures and call `check_design` again (at most two fix rounds; report anything still failing instead of looping).
-3. {{LAYOUT}}
-4. `check_design` automatically attaches `ImageContent` renders (`{{RENDER_VIEWS}}`) once checks pass. Visually inspect those images directly.
+1. Run `android-design-preview check {{PROPOSAL}}` on your first draft to check {{VIEWS}} in one command. It prints one JSON line with compile diagnostics, token violations, error findings (each with a fix `hint` and `reference` anchor), `notes`, `layout` summaries, and `images` (PNG paths on disk).
+2. When fixing a finding on one direction or view, iterate with a scoped check: `android-design-preview check {{PROPOSAL}} --direction <d> --view <v>`, which writes a 1x PNG path whether findings pass or fail. Open the returned PNG path with your file-reading tool after visual changes.
+3. Run `android-design-preview tree {{PROPOSAL}} --direction <d> --view <v>` only when a failing finding needs exact node bounds or `file:line` locations.
+4. Before finishing, run unscoped `android-design-preview check {{PROPOSAL}}` once more as the final gate (cap full checks at two fix rounds; report remaining errors instead of looping). {{LAYOUT}}
 
 In your final message, report that visual quality was verified from layout metrics and native-resolution renders.
 
@@ -38,7 +38,7 @@ In your final message, report that visual quality was verified from layout metri
 ## Definition of done
 
 - `{{PROPOSAL}}` and `{{DESIGN_MD}}` {{DONE}}.
-- `check_design` passes (or remaining errors are reported cleanly), adaptation is confirmed from `layout` summaries, and you inspected the returned {{RENDER_VIEWS}} renders.
+- Unscoped `android-design-preview check` passes (or remaining errors are reported cleanly), adaptation is confirmed from `layout` summaries, and you opened and inspected the returned {{RENDER_VIEWS}} PNGs.
 
 ## Final message (under 250 words)
 

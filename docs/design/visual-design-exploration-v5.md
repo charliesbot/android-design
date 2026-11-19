@@ -119,7 +119,7 @@ Compiling `.kt` files executes JVM bytecode. Three controls bound that surface:
    - **Antigravity** cannot allow one command alone. Verified with `agy -p`: a `deny` of `command(*)` overrides an `allow` of `command(android-design-preview *)`, and without the deny every command runs, chains included.
    - **Codex** generators already have a shell in v4, since `workspace-write` runs commands.
 
-   For Antigravity and Codex, `evals/backends.py` audits the generator's transcript, which it already parses for tool calls, and fails the case when any shell command other than a single `android-design-preview` call ran. The ban is enforced after the fact there rather than prevented, which is enough for an eval.
+   For Antigravity and Codex, `evals/backends.py` audits the generator's transcript, which it already parses for tool calls, with a per-harness rule: Antigravity reads files through `read_file`, so its audit fails the case when any shell command other than a single `android-design-preview` invocation ran (rejecting chains, pipes, subshells, and other binaries); Codex reads files through the shell and edits through `apply_patch`, so its audit allows single `android-design-preview` invocations plus read-only commands (`cat`, `head`, `tail`, `nl`, `ls`, `rg`, `grep`, `wc`, and `sed` without `-i`), alone or piped into each other, and fails the case on interpreters, output redirection, `tee`, `sed -i`, command substitution or subshells, or chains containing a non-allowed command. The ban is enforced after the fact there rather than prevented, which is enough for an eval.
 
 ### Exploration files and the `DesignBoard` kit
 

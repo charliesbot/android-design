@@ -123,11 +123,15 @@ def first_turn_prompt(out_dir, revision_text, total_turns):
 
 
 def followup_turn_prompt(turn_number, total_turns, title, revision_text):
+    verify = (
+        'run an unscoped `android-design-preview check` across all views and open the returned `light` and `desktop` PNGs'
+        if turn_number == total_turns
+        else 'run a scoped `android-design-preview check` on the changed direction and view, and open the returned 1x PNG to verify the visual change'
+    )
     return (
         f'Revision {turn_number} of {total_turns} ({title}):\n\n'
         f'{revision_text}\n\n'
-        'Apply this edit to the exploration, verify with the previewer, inspect the render if visual '
-        'appearance changed, and reply briefly (under 100 words) with what changed.'
+        f'Apply this edit to the exploration, {verify}, and reply briefly (under 100 words) with what changed.'
     )
 
 
@@ -284,33 +288,36 @@ def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v4', timeout
     session_id = None
     prev_cumulative_cost = None
     turn_records = []
-    for idx, (title, body) in enumerate(revisions, start=1):
-        prompt = (
-            first_turn_prompt(out_dir, body, total)
-            if idx == 1
-            else followup_turn_prompt(idx, total, title, body)
-        )
-        reply = execute(
-            'claude', prompt, out_dir,
-            role='generator', model=model, timeout=timeout,
-            mcp_binary=mcp_binary, mcp_jar=mcp_jar,
-            resume_session=session_id,
-        )
-        if idx == 1:
-            session_id = reply.get('session_id')
-            if not session_id:
-                raise RuntimeError('Claude did not return a session_id on turn 1; cannot resume session')
-        (out_dir / f'turn-{idx:02d}.json').write_text(json.dumps(reply, indent=2))
-        rec = _turn_record(idx, title, reply, prev_cumulative_cost=prev_cumulative_cost)
-        if isinstance(reply.get('cost'), (int, float)):
-            prev_cumulative_cost = reply['cost']
-        turn_records.append(rec)
-        print(
-            f"[turn {idx:02d}/{total}] {title}: {rec['wall_seconds']}s, "
-            f"in+cache={rec['total_input_tokens']}, out={rec['output_tokens']}, "
-            f"checks={rec['check_calls']}, retries={rec['compile_retries']}, skill_B={rec['skill_bytes_read']}",
-            flush=True,
-        )
+    try:
+        for idx, (title, body) in enumerate(revisions, start=1):
+            prompt = (
+                first_turn_prompt(out_dir, body, total)
+                if idx == 1
+                else followup_turn_prompt(idx, total, title, body)
+            )
+            reply = execute(
+                'claude', prompt, out_dir,
+                role='generator', model=model, timeout=timeout,
+                mcp_binary=mcp_binary, mcp_jar=mcp_jar,
+                resume_session=session_id,
+            )
+            if idx == 1:
+                session_id = reply.get('session_id')
+                if not session_id:
+                    raise RuntimeError('Claude did not return a session_id on turn 1; cannot resume session')
+            (out_dir / f'turn-{idx:02d}.json').write_text(json.dumps(reply, indent=2))
+            rec = _turn_record(idx, title, reply, prev_cumulative_cost=prev_cumulative_cost)
+            if isinstance(reply.get('cost'), (int, float)):
+                prev_cumulative_cost = reply['cost']
+            turn_records.append(rec)
+            print(
+                f"[turn {idx:02d}/{total}] {title}: {rec['wall_seconds']}s, "
+                f"in+cache={rec['total_input_tokens']}, out={rec['output_tokens']}, "
+                f"checks={rec['check_calls']}, retries={rec['compile_retries']}, skill_B={rec['skill_bytes_read']}",
+                flush=True,
+            )
+    finally:
+        eval_run._stop_preview_server(out_dir, mcp_binary, mcp_jar)
 
     images, render_error = eval_run.render(out_dir)
     checks = run_checks(out_dir, 'phone')
