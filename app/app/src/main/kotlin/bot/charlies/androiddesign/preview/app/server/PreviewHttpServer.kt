@@ -708,7 +708,6 @@ class PreviewHttpServer(
         pass = art.pass,
         renderMs = art.renderMs,
         check = art.check,
-        layout = art.layout,
         failures = art.entry.failures,
       )
     }

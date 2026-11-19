@@ -444,13 +444,21 @@ def _record_cli_preview_command(stats, command, output_text, is_error):
                     stats['compile_retries'] += 1
 
 
+def _skill_output_byte_count(output_text):
+    text = output_text or ''
+    summary = re.fullmatch(r'\s*\d+\s+lines?,\s*(\d+)\s+bytes?\s*', text)
+    if summary:
+        return int(summary.group(1))
+    return len(text.encode('utf-8'))
+
+
 def _record_skill_read(stats, paths, output_text, is_error):
     if is_error or not paths:
         return
     unique_in_call = list(dict.fromkeys(p for p in paths if p))
     if not unique_in_call:
         return
-    byte_count = len((output_text or '').encode('utf-8'))
+    byte_count = _skill_output_byte_count(output_text)
     stats['skill_bytes_read'] += byte_count
     stats['skill_read_calls'] += 1
     files = stats['skill_files_read']

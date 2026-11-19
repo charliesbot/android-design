@@ -641,3 +641,37 @@ class BackendTests(unittest.TestCase):
             result = backends.execute('claude', 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY)
         self.assertEqual(result['check_calls'], 2)
         self.assertEqual(result['compile_retries'], 1)
+
+    def test_agy_tracks_skill_bytes_read_from_summary_output(self):
+        with tempfile.TemporaryDirectory() as case_tmp:
+            case_dir = Path(case_tmp).resolve()
+            events = [
+                {'event': 'step_update', 'step_update': {
+                    'step_index': 1, 'state': 'DONE', 'step_type': 'tool', 'tool_name': 'read_file',
+                    'tool_info': {
+                        'name': 'read_file',
+                        'parameters': {'Path': str(case_dir / 'skills/android-design/SKILL.md')},
+                        'output': '196 lines, 24584 bytes',
+                    },
+                }},
+                {'event': 'step_update', 'step_update': {
+                    'step_index': 2, 'state': 'DONE', 'step_type': 'tool', 'tool_name': 'read_file',
+                    'tool_info': {
+                        'name': 'read_file',
+                        'parameters': {'Path': str(case_dir / 'skills/android-design-explore/SKILL.md')},
+                        'output': '69 lines, 5120 bytes',
+                    },
+                }},
+                {'event': 'result', 'result': {
+                    'status': 'SUCCESS', 'response': 'Ready.', 'num_turns': 1,
+                    'usage': {'input_tokens': 5000, 'output_tokens': 300},
+                }},
+            ]
+            stdout = '\n'.join(json.dumps(e) for e in events) + '\n'
+            with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, stdout, '')):
+                result = backends.execute('agy', 'brief', case_dir, role='generator', mcp_binary=BINARY)
+            self.assertEqual(result['skill_bytes_read'], 24584 + 5120)
+            self.assertEqual(result['skill_files_read'], {
+                'android-design/SKILL.md': {'reads': 1, 'bytes': 24584},
+                'android-design-explore/SKILL.md': {'reads': 1, 'bytes': 5120},
+            })

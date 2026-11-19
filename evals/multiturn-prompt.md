@@ -16,12 +16,13 @@ Each revision in this session is an approved edit for this disposable evaluation
 - `{{PROPOSAL}}`: existing two-direction Compose exploration board (`Editorial split` and `Quick pantry`).
 - `{{DESIGN_MD}}`: shared design system at the repo root.
 - Verify edits using the `android-design-preview` CLI (already on `PATH`):
-  - For targeted revisions, run a scoped check on the changed direction and view (`android-design-preview check {{PROPOSAL}} --direction "<dir>" --view <view>`), which writes a 1x PNG path immediately. Open the returned 1x PNG path with `Read` to inspect visual edits.
-  - On the final revision (or when changing shared themes), run an unscoped `android-design-preview check {{PROPOSAL}}` to verify all views.
+  - For each targeted revision, apply your edit first (do not run a pre-edit check), then run ONE clean scoped check on the single changed direction, screen (when applicable), and view (`android-design-preview check {{PROPOSAL}} --direction "<dir>" --screen "<screen>" --view <view>`). Open that single returned 1x PNG with `Read` to verify the visual result; do not check or open 3 to 4 views per turn.
+  - On the final revision (or when changing shared themes), run ONE unscoped `android-design-preview check {{PROPOSAL}}` to verify all views and open its returned `light` and `desktop` PNGs.
+  - Run `android-design-preview` directly as a single command: never pipe (`| head`, `| grep`), chain (`;`, `&&`), or wrap it in shell loops.
 - Keep raw `Color(...)` hex literals out of screen code and never call `.copy(alpha = ...)`. Keep `Modifier.testTag("ad:primary")` on the primary CTA. Do not run shell commands other than `android-design-preview`.
 
 ## Revision 1 of {{TOTAL_TURNS}}
 
 {{REVISION}}
 
-Apply this revision, run a scoped `android-design-preview check` on the direction and view you changed, open its returned 1x PNG to inspect the visual result, and reply briefly (under 100 words) with what changed.
+Apply this revision, run ONE scoped `android-design-preview check` on the single direction, screen, and view you changed, open its single returned 1x PNG to inspect the visual result, and reply briefly (under 100 words) with what changed.

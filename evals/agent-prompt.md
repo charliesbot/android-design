@@ -18,7 +18,7 @@ Design exactly ONE screen as an exploration in two files:
 - `{{PROPOSAL}}`: the Compose exploration board (`import bot.charlies.androiddesign.preview.kit.*`). The folder already holds any image assets the brief names under `assets/`; load them with `designPainter("assets/...")`. Tag the primary CTA with `Modifier.testTag("ad:primary")`. Keep raw `Color(...)` hex literals out of screen code (set `seed = 0xFF...` on `designBoard` / `wearBoard` or in `DESIGN.md`), and never call `.copy(alpha = ...)`. Share composables across size classes using `listDetail` / `supportingPane` / `BoxWithConstraints` instead of duplicating separate per-breakpoint screen functions, keeping `{{PROPOSAL}}` concise (around 150 to 300 lines).
 - `{{DESIGN_MD}}`: the shared design system at the repo root (`colors.primary` seed, `material.scheme.variant`, bundled typography roles).
 
-Write only those two files. Verify and inspect the screen using the `android-design-preview` CLI (already on `PATH`; run `android-design-preview <cmd> --help` if you need flags). Do not run scripts or other shell commands (except read-only file inspection when your harness has no file-read tool).
+Write only those two files. Verify and inspect the screen using the `android-design-preview` CLI (already on `PATH`; run `android-design-preview <cmd> --help` if you need flags). Run ONLY single `android-design-preview` shell commands: never run `ls`, `which`, `cat`, `head`, `grep`, scripts, pipes, redirects, or loops in the shell (use your file-reading tool for files and assets; only harnesses without a file-read tool may use read-only shell commands).
 
 {{TARGET}}
 

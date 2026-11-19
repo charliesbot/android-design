@@ -124,9 +124,9 @@ def first_turn_prompt(out_dir, revision_text, total_turns):
 
 def followup_turn_prompt(turn_number, total_turns, title, revision_text):
     verify = (
-        'run an unscoped `android-design-preview check` across all views and open the returned `light` and `desktop` PNGs'
+        'run ONE unscoped `android-design-preview check` across all views and open its returned `light` and `desktop` PNGs'
         if turn_number == total_turns
-        else 'run a scoped `android-design-preview check` on the changed direction and view, and open the returned 1x PNG to verify the visual change'
+        else 'run ONE scoped `android-design-preview check` on the single changed direction, screen (if multiple), and view, and open that single returned 1x PNG to verify the visual change'
     )
     return (
         f'Revision {turn_number} of {total_turns} ({title}):\n\n'
