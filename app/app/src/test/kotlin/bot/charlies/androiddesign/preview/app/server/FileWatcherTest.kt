@@ -126,4 +126,43 @@ class FileWatcherTest {
       watcher.stop()
     }
   }
+
+  @Test
+  fun `watch after stop is a clean no-op and switching targets cancels stale debounce`(
+    @TempDir tempDir: Path,
+  ) {
+    val fileA = tempDir.resolve("a.explore.kt")
+    val fileB = tempDir.resolve("b.explore.kt")
+    Files.writeString(fileA, "val a = 1\n")
+    Files.writeString(fileB, "val b = 1\n")
+
+    val firedFor = mutableListOf<Path>()
+    val bLatch = CountDownLatch(1)
+    val watcher =
+      FileWatcher(debounceMs = 80L) { src, _ ->
+        synchronized(firedFor) { firedFor.add(src) }
+        if (src == fileB.toAbsolutePath().normalize()) bLatch.countDown()
+      }
+    try {
+      watcher.watch(fileA, null)
+      Thread.sleep(150L)
+      Files.writeString(fileA, "val a = 222\n")
+      // Switch to fileB before fileA's debounce fires, then save fileB.
+      watcher.watch(fileB, null)
+      Thread.sleep(120L)
+      Files.writeString(fileB, "val b = 333\n")
+      assertTrue(bLatch.await(1_000L, TimeUnit.MILLISECONDS))
+      Thread.sleep(200L)
+      synchronized(firedFor) {
+        assertEquals(listOf(fileB.toAbsolutePath().normalize()), firedFor)
+      }
+
+      watcher.stop()
+      // Calling watch() and stop() again after stop() must not throw RejectedExecutionException.
+      watcher.watch(fileA, null)
+      watcher.stop()
+    } finally {
+      watcher.stop()
+    }
+  }
 }

@@ -36,6 +36,8 @@ class FileWatcher(
     Thread(runnable, "android-design-watcher-debounce").apply { isDaemon = true }
   }
 
+  private var stopped = false
+  private var generation = 0L
   private var activeSource: Path? = null
   private var activeDesign: Path? = null
   private var lastSourceStamp: FileStamp? = null
@@ -47,7 +49,11 @@ class FileWatcher(
     val normSource = sourcePath.toAbsolutePath().normalize()
     val normDesign = designPath?.toAbsolutePath()?.normalize()
     synchronized(stateLock) {
+      if (stopped) return
       if (normSource == activeSource && normDesign == activeDesign && running.get()) return
+      generation++
+      pendingTask?.cancel(false)
+      pendingTask = null
       activeSource = normSource
       activeDesign = normDesign
       lastSourceStamp = readStamp(normSource)
@@ -57,7 +63,7 @@ class FileWatcher(
   }
 
   private fun ensureStartedLocked() {
-    if (!running.compareAndSet(false, true)) return
+    if (stopped || !running.compareAndSet(false, true)) return
     pollTask =
       pollScheduler.scheduleWithFixedDelay(
         { pollOnce() },
@@ -69,74 +75,82 @@ class FileWatcher(
 
   private fun pollOnce() {
     if (!running.get()) return
-    val changedTarget: Pair<Path, Path?>? =
-      synchronized(stateLock) {
-        if (!running.get()) return
-        val src = activeSource ?: return
-        val design = activeDesign
-        val nextSource = readStamp(src)
-        val nextDesign = design?.let(::readStamp)
-        val changed = nextSource != lastSourceStamp || nextDesign != lastDesignStamp
-        if (changed) {
-          lastSourceStamp = nextSource
-          lastDesignStamp = nextDesign
-          src to design
-        } else {
-          null
-        }
-      }
-    if (changedTarget != null) {
-      scheduleFire(changedTarget.first, changedTarget.second)
-    }
-  }
-
-  private fun scheduleFire(src: Path, design: Path?) {
     synchronized(stateLock) {
-      if (!running.get()) return
-      pendingTask?.cancel(false)
-      pendingTask =
-        debounceScheduler.schedule(
-          { fireIfQuiet(src, design) },
-          debounceMs,
-          TimeUnit.MILLISECONDS,
-        )
+      if (stopped || !running.get()) return
+      val src = activeSource ?: return
+      val design = activeDesign
+      val nextSource = readStamp(src)
+      val nextDesign = design?.let(::readStamp)
+      if (nextSource != lastSourceStamp || nextDesign != lastDesignStamp) {
+        lastSourceStamp = nextSource
+        lastDesignStamp = nextDesign
+        scheduleFireLocked(src, design)
+      }
     }
   }
 
-  private fun fireIfQuiet(src: Path, design: Path?) {
+  private fun scheduleFireLocked(src: Path, design: Path?) {
+    if (stopped || !running.get()) return
+    val expectedGen = ++generation
+    pendingTask?.cancel(false)
+    pendingTask =
+      debounceScheduler.schedule(
+        { fireIfQuiet(src, design, expectedGen) },
+        debounceMs,
+        TimeUnit.MILLISECONDS,
+      )
+  }
+
+  private fun fireIfQuiet(src: Path, design: Path?, expectedGen: Long) {
     if (!running.get()) return
-    val stillChanging =
+    val shouldFire =
       synchronized(stateLock) {
-        if (!running.get() || activeSource != src || activeDesign != design) return
+        if (
+          stopped ||
+            !running.get() ||
+            generation != expectedGen ||
+            activeSource != src ||
+            activeDesign != design
+        ) {
+          return
+        }
         val nextSource = readStamp(src)
         val nextDesign = design?.let(::readStamp)
         if (nextSource != lastSourceStamp || nextDesign != lastDesignStamp) {
           lastSourceStamp = nextSource
           lastDesignStamp = nextDesign
-          true
-        } else {
+          scheduleFireLocked(src, design)
           false
+        } else {
+          pendingTask = null
+          true
         }
       }
-    if (stillChanging) {
-      scheduleFire(src, design)
-      return
-    }
-    if (running.get() && Files.isRegularFile(src)) {
+    if (shouldFire && running.get() && Files.isRegularFile(src)) {
       onChanged(src, design)
     }
   }
 
   fun stop() {
     running.set(false)
-    synchronized(stateLock) {
-      pollTask?.cancel(false)
-      pollTask = null
-      pendingTask?.cancel(false)
-      pendingTask = null
+    val shouldShutdown =
+      synchronized(stateLock) {
+        if (stopped) {
+          false
+        } else {
+          stopped = true
+          generation++
+          pollTask?.cancel(false)
+          pollTask = null
+          pendingTask?.cancel(false)
+          pendingTask = null
+          true
+        }
+      }
+    if (shouldShutdown) {
+      pollScheduler.shutdownNow()
+      debounceScheduler.shutdownNow()
     }
-    pollScheduler.shutdownNow()
-    debounceScheduler.shutdownNow()
   }
 
   private fun readStamp(path: Path): FileStamp =
