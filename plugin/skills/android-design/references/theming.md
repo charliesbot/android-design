@@ -279,7 +279,17 @@ Change a token to change every component mapped to it; pass `shape` to change on
 
 `MaterialShapes` (experimental) has 35 `RoundedPolygon`s: Circle, Square, Slanted, Arch, Fan, Arrow, SemiCircle, Oval, Pill, Triangle, Diamond, ClamShell, Pentagon, Gem, Sunny, VerySunny, Cookie4Sided, Cookie6Sided, Cookie7Sided, Cookie9Sided, Cookie12Sided, Ghostish, Clover4Leaf, Clover8Leaf, Burst, SoftBurst, Boom, SoftBoom, Flower, Puffy, PuffyDiamond, PixelCircle, PixelTriangle, Bun, Heart.
 
-Clip with `Modifier.clip(MaterialShapes.Sunny.toShape())` or use as a `Surface` shape.
+Clip with `Modifier.clip(MaterialShapes.Sunny.toShape())` or use as a `Surface` shape:
+
+```kotlin
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+Image(
+    painter = avatar,
+    contentDescription = null,
+    contentScale = ContentScale.Crop,
+    modifier = Modifier.size(96.dp).clip(MaterialShapes.Cookie9Sided.toShape()),
+)
+```
 
 ### Shape morphing
 
@@ -316,6 +326,16 @@ fun MorphingBadge(done: Boolean, modifier: Modifier = Modifier) {
 | Effects fast / default / slow | 1.0 / 3800, 1600, 800 | same |
 
 - Override one subtree by nesting `MaterialTheme(motionScheme = MotionScheme.standard()) { ... }` (`LocalMotionScheme` was removed).
+- Custom components read specs from the active scheme instead of `tween()`:
+
+```kotlin
+val scale by animateFloatAsState(if (pressed) 0.94f else 1f, MaterialTheme.motionScheme.fastSpatialSpec())
+val tint by animateColorAsState(
+    if (selected) colors.primary else colors.surfaceContainerHigh,
+    MaterialTheme.motionScheme.defaultEffectsSpec(),
+)
+```
+
 - Reduced motion, Google's pattern:
 
 ```kotlin
