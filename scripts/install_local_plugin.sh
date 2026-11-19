@@ -10,5 +10,6 @@ CACHE_DIR="$HOME/.cache/android-design-preview/$VERSION"
 mkdir -p "$CACHE_DIR"
 cp "$JAR_SRC" "$CACHE_DIR/android-design-preview.jar"
 
+"$ROOT/plugin/bin/android-design-preview" install
 agy plugin validate "$ROOT/plugin"
 agy plugin install "$ROOT/plugin"

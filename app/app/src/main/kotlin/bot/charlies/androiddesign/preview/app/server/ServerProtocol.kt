@@ -1,12 +1,12 @@
 package bot.charlies.androiddesign.preview.app.server
 
 import bot.charlies.androiddesign.preview.app.cli.ReportTheme
-import bot.charlies.androiddesign.preview.app.cli.WorkerCommand
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.layout.ViewLayout
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.ValidationError
+import bot.charlies.androiddesign.preview.model.ViewSpec
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -176,6 +176,23 @@ data class BoardViewRef(
   val view: String,
 )
 
+@Serializable data class OverlayMeta(val id: String, val screen: String? = null)
+
+@Serializable
+data class DirectionMeta(
+  val name: String,
+  val surface: String,
+  val startScreen: String,
+  val screens: List<String>,
+  val overlays: List<OverlayMeta>,
+)
+
+@Serializable
+data class BoardMeta(
+  val directions: List<DirectionMeta>,
+  val views: List<ViewSpec>,
+)
+
 @Serializable
 data class BoardPayload(
   val valid: Boolean,
@@ -191,7 +208,7 @@ data class BoardPayload(
   val designPath: String? = null,
   val theme: ReportTheme,
   val errors: List<ValidationError> = emptyList(),
-  val boardMeta: WorkerCommand.BoardMeta? = null,
+  val boardMeta: BoardMeta? = null,
   val renders: List<BoardRenderResponse> = emptyList(),
   val staleViews: List<BoardViewRef> = emptyList(),
   val updatedAt: Long,

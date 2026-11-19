@@ -21,7 +21,7 @@ object ExitCode {
   const val USAGE = 64
 }
 
-/** A subcommand such as `render` or `worker`. */
+/** A subcommand such as `check` or `render`. */
 interface Command {
   val name: String
   val usage: String
@@ -80,7 +80,6 @@ object Cli {
       RenderCommand(),
       InstallCommand(),
       ServerCommand(),
-      WorkerCommand(),
     )
 
   fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
@@ -108,9 +107,7 @@ object Cli {
 
   fun printUsage(out: PrintStream) {
     out.println("usage: android-design-preview <command> [options]")
-    commands
-      .filter { it.name != "server" && it.name != "worker" }
-      .forEach { out.println("  ${it.usage}") }
+    commands.filter { it.name != "server" }.forEach { out.println("  ${it.usage}") }
     out.println("  --version")
     out.println("  --help")
     out.println("Run `android-design-preview <command> --help` for details and exit codes.")
