@@ -169,6 +169,22 @@ object ServerPaths {
     }
   }
 
+  /**
+   * Deletes [path] only if its current on-disk contents still equal [expected], preventing a
+   * cleanup pass from removing a record that another process just replaced.
+   */
+  fun deleteRecordIfMatches(path: Path, expected: ServerRecord): Boolean {
+    synchronized(recordLock) {
+      val current = readRecord(path) ?: return false
+      if (current != expected) return false
+      return try {
+        Files.deleteIfExists(path)
+      } catch (_: Exception) {
+        false
+      }
+    }
+  }
+
   private fun setOwnerOnlyPermissions(path: Path) {
     try {
       Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rw-------"))
