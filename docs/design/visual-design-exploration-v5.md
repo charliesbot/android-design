@@ -216,6 +216,42 @@ Approving a direction needs no code generator, though porting still wires the sc
 
 v5 replaces v4 only after the eight-case A/B in `evals/run.py` meets v4's bar (at least 6/8 rubric passes, every deterministic check passing, and 0 median compile retries) and a multi-turn revision case shows v5 using no more tokens and no more wall time per turn than v4. The multi-turn case matters because a brainstorm runs ten or more revisions: every image the agent opens stays in its context for later turns, and the tool time v5 saves (about 6.5 s per edit) is small next to model time across a long session. Wall time matters too because v4 returned images inline, while v5's image paths cost the agent a separate read, one more model round trip each time it looks.
 
+### Rollout gate results
+
+Both gates passed on `#126`'s branch with the trimmed `android-design/SKILL.md` (`24,584` bytes vs v4's `40,738` bytes, `-39.7%`) and shrunk `android-design-explore/SKILL.md` (`69` lines).
+
+**Eight-case A/B (`evals/run.py`, Antigravity `Gemini 3.8 Flash (High)` generator and judge):**
+
+| Metric | v4 baseline (Run 2, tuned) | v5 (`96658ea`) | Gate |
+| --- | --- | --- | --- |
+| Cases passed (rubric) | `6/8` (`80/82` items) | **`7/8`** (`81/82` items) | Pass (`>= 6/8`) |
+| Deterministic code checks | `21/21` (100%) | **`21/21`** (100%) | Pass (100%) |
+| Median compile retries | `0` | **`0`** (`0, 0, 1, 0, 1, 0, 2, 0`) | Pass (`0`) |
+| Median agent turns | `35` | `35` | |
+| Median input tokens | `257,128.5` | **`150,382`** (`-41.5%`) | |
+| Median output tokens | `67,142` | **`44,664.5`** (`-33.5%`) | |
+| Median check calls | `5.5` | `8.5` | |
+| Median wall time | `317.2 s` | `448.9 s` | |
+| Median `skill_bytes_read` | n/a | `112,236 B` (`51,659 B` to `89,030 B` on Wear) | |
+
+All three Wear cases (`workout`, `player`, `reminder`) passed `9/9`, and four of five phone cases (`music`, `settings`, `trek`, `recipes`) passed `11/11`; `finance` passed `10/11` (`R-finance-categories`).
+
+**Ten-turn multi-turn revision case (`evals/multiturn.py`, Claude `claude-fable-5-2`):**
+
+| Metric | v4 baseline (`304ffe4`) | v5 (`3b1294c`) | Delta / Gate |
+| --- | --- | --- | --- |
+| Final deterministic checks | `3/3` pass | **`3/3`** pass | Pass |
+| Mean total tokens / turn | `385,918.5` | **`275,745.3`** | `-28.5%` (Pass) |
+| Median total tokens / turn | `387,757.5` | **`268,044.0`** | `-30.9%` (Pass) |
+| Mean wall time / turn | `33.75 s` (`337.46 s` total) | **`33.72 s`** (`337.20 s` total) | `-0.1%` (Pass) |
+| Median wall time / turn | `29.45 s` | **`26.57 s`** | `-9.8%` (Pass) |
+| Total cost (mean / median per turn) | `$5.9603` (`$0.5960` / `$0.4213`) | **`$3.6292`** (`$0.3629` / `$0.2113`) | `-39.1%` mean / `-49.8%` median |
+| Total check calls | `13` (`1.3` / turn) | **`10`** (`1.0` / turn) | `-23.1%` |
+| Compile retries | `0` | **`0`** | Pass |
+| `skill_bytes_read` | `71,245 B` (`4` files) | **`42,315 B`** (`3` files) | `-40.6%` |
+
+Diagnostic fixes that closed the multi-turn gate during `#126`: granting Claude generators `--add-dir ~/.cache/android-design-preview` and `Read` so path-based PNG reads succeed, removing the duplicate top-level `layout` field from `CheckRenderSummary` (keeping unscoped `check` JSON under Claude's 10 KB truncation threshold), skipping `FileWatcher` background compiles when zero browser SSE clients are connected (preventing intermediate `Edit` saves from exhausting the 25-compile recycle budget mid-session), deduplicating pixel-identical passing images by SHA-256, and instructing scoped iteration to run one check and open one 1x PNG per revision.
+
 ## Links
 
 - [Visual design exploration v4](../archive/visual-design-exploration-v4.md): archived; the sandbox, kit, and checks this design keeps, its rollout gate results, and the Node MCP loop it replaces
