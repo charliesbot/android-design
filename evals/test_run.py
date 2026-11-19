@@ -444,6 +444,10 @@ class ArtifactPipelineTests(unittest.TestCase):
             'cost': None,
             'check_calls': 4,
             'compile_retries': 1,
+            'skill_bytes_read': 58400,
+            'skill_read_calls': 4,
+            'skill_unique_files': 3,
+            'skill_files_read': {'android-design/SKILL.md': {'reads': 2, 'bytes': 40700}},
             'message': 'done',
         }
         with tempfile.TemporaryDirectory() as tmp:
@@ -464,6 +468,10 @@ class ArtifactPipelineTests(unittest.TestCase):
             self.assertEqual(metrics['output_tokens'], 2200)
             self.assertEqual(metrics['check_calls'], 4)
             self.assertEqual(metrics['compile_retries'], 1)
+            self.assertEqual(metrics['skill_bytes_read'], 58400)
+            self.assertEqual(metrics['skill_read_calls'], 4)
+            self.assertEqual(metrics['skill_unique_files'], 3)
+            self.assertEqual(metrics['skill_files_read'], {'android-design/SKILL.md': {'reads': 2, 'bytes': 40700}})
             self.assertEqual(metrics['model'], 'Gemini 3.8 Flash (High)')
             self.assertNotIn('message', metrics)
 
@@ -482,7 +490,7 @@ class ArtifactPipelineTests(unittest.TestCase):
             'generator_metrics': {
                 'backend': 'agy', 'model': 'Gemini 3.8 Flash (High)', 'wall_seconds': 60.0,
                 'turns': 10, 'input_tokens': 20000, 'output_tokens': 1200,
-                'check_calls': 3, 'compile_retries': 0,
+                'check_calls': 3, 'compile_retries': 0, 'skill_bytes_read': 58000,
             },
             'agent': {'cost': None, 'message': 'ok'},
             'checks': {'C-valid': {'pass': True}},
@@ -495,7 +503,7 @@ class ArtifactPipelineTests(unittest.TestCase):
             'generator_metrics': {
                 'backend': 'claude', 'model': 'claude-opus-4-1', 'wall_seconds': 120.0,
                 'turns': 16, 'input_tokens': None, 'output_tokens': None,
-                'check_calls': None, 'compile_retries': None,
+                'check_calls': None, 'compile_retries': None, 'skill_bytes_read': None,
             },
             'agent': {'cost': 1.25, 'message': 'ok'},
             'checks': {'C-valid': {'pass': True}},
@@ -513,10 +521,14 @@ class ArtifactPipelineTests(unittest.TestCase):
         self.assertEqual(medians['wall_seconds'], 90.0)
         self.assertEqual(medians['turns'], 13)
         self.assertEqual(medians['output_tokens'], 1200)
+        self.assertEqual(medians['skill_bytes_read'], 58000)
         self.assertEqual(medians['models'], ['Gemini 3.8 Flash (High)', 'claude-opus-4-1'])
         self.assertIn('Generator medians: wall 90.0s, turns 13', summary_text)
-        self.assertIn('| finance | phone | failed | 1/1 | 0/1 | 120.0 | 16 | - | - |', summary_text)
-        self.assertIn('gen 60.0s · eval 0.2 min · 10 turns · 1200 out tok · 3 checks · 0 retries', report_html)
+        self.assertIn('skill_bytes_read 58000', summary_text)
+        self.assertIn('| music | phone | passed | 1/1 | 1/1 | 60.0 | 10 | 1200 | 0 | 58000 |', summary_text)
+        self.assertIn('| finance | phone | failed | 1/1 | 0/1 | 120.0 | 16 | - | - | - |', summary_text)
+        self.assertIn('gen 60.0s · eval 0.2 min · 10 turns · 1200 out tok · 3 checks · 0 retries · 58000 skill B', report_html)
+        self.assertIn('<span>skill 58000 B</span>', report_html)
         self.assertIn('agent $1.25', report_html)
         self.assertNotIn('\u2014', summary_text)
         self.assertNotIn('\u2014', report_html)

@@ -19,8 +19,20 @@ METRIC_KEYS = (
     "cost",
     "check_calls",
     "compile_retries",
+    "skill_bytes_read",
+    "skill_read_calls",
+    "skill_unique_files",
+    "skill_files_read",
 )
-MEDIAN_KEYS = ("wall_seconds", "turns", "input_tokens", "output_tokens", "check_calls", "compile_retries")
+MEDIAN_KEYS = (
+    "wall_seconds",
+    "turns",
+    "input_tokens",
+    "output_tokens",
+    "check_calls",
+    "compile_retries",
+    "skill_bytes_read",
+)
 
 
 def case_metrics(result):
@@ -96,6 +108,7 @@ def write_report(out: Path, results, baseline_dir: Path):
             f"<span>out {_fmt(medians['output_tokens'])} tok</span>"
             f"<span>checks {_fmt(medians['check_calls'])}</span>"
             f"<span>retries {_fmt(medians['compile_retries'])}</span>"
+            f"<span>skill {_fmt(medians['skill_bytes_read'], ' B')}</span>"
             f"<span>model {html.escape(models)}</span>"
             "</p>"
         )
@@ -127,6 +140,8 @@ def write_report(out: Path, results, baseline_dir: Path):
             meta.append(f"{m['check_calls']} checks")
         if m.get("compile_retries") is not None:
             meta.append(f"{m['compile_retries']} retries")
+        if m.get("skill_bytes_read") is not None:
+            meta.append(f"{m['skill_bytes_read']} skill B")
         if m.get("model"):
             meta.append(html.escape(str(m["model"])))
         meta.append(f"agent ${cost if cost is not None else '?'}")
@@ -160,8 +175,8 @@ figcaption{{color:var(--muted);font-size:13px;text-align:center}} pre{{white-spa
 def write_summary(out: Path, results):
     """Writes summary.md, a plain scores table plus every failure, for terminals and CI summaries."""
     lines = [
-        "| Case | Surface | Status | Code checks | Rubric | Gen (s) | Turns | Out tokens | Retries |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Case | Surface | Status | Code checks | Rubric | Gen (s) | Turns | Out tokens | Retries | Skill bytes |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for r in results:
         c_pass, c_total = score(r["checks"])
@@ -170,7 +185,8 @@ def write_summary(out: Path, results):
         gen_s = r.get("generator_seconds") if r.get("generator_seconds") is not None else m.get("wall_seconds")
         lines.append(
             f"| {r['name']} | {r['surface']} | {r.get('status', 'legacy')} | {c_pass}/{c_total} | {j_pass}/{j_total} "
-            f"| {_fmt(gen_s)} | {_fmt(m.get('turns'))} | {_fmt(m.get('output_tokens'))} | {_fmt(m.get('compile_retries'))} |"
+            f"| {_fmt(gen_s)} | {_fmt(m.get('turns'))} | {_fmt(m.get('output_tokens'))} | {_fmt(m.get('compile_retries'))} "
+            f"| {_fmt(m.get('skill_bytes_read'))} |"
         )
     medians = generator_medians(results)
     if medians["wall_seconds"] is not None or medians["turns"] is not None:
@@ -179,7 +195,8 @@ def write_summary(out: Path, results):
         lines.append(
             f"Generator medians: wall {_fmt(medians['wall_seconds'], 's')}, turns {_fmt(medians['turns'])}, "
             f"input_tokens {_fmt(medians['input_tokens'])}, output_tokens {_fmt(medians['output_tokens'])}, "
-            f"check_calls {_fmt(medians['check_calls'])}, compile_retries {_fmt(medians['compile_retries'])} "
+            f"check_calls {_fmt(medians['check_calls'])}, compile_retries {_fmt(medians['compile_retries'])}, "
+            f"skill_bytes_read {_fmt(medians['skill_bytes_read'])} "
             f"(model: {models})"
         )
     failed = [(r["name"], k, v.get("detail") or v.get("reason") or "")

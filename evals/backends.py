@@ -5,6 +5,7 @@ passing ANDROID_DESIGN_NO_OPEN=1 (and ANDROID_DESIGN_PREVIEW_JAR when provided) 
 own isolated headless worker without opening browser windows. A judge never sees the MCP server.
 """
 import json
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -23,6 +24,14 @@ AGY_MCP_SERVER = 'eval-preview_preview'
 
 CHECK_TOOLS = ('check_proposal', 'check_design')
 RETRY_TOOLS = ('open_proposal', 'check_proposal', 'check_design')
+
+SKILL_SNAPSHOT_NAMES = ('android-design', 'android-design-explore')
+SHELL_READ_COMMANDS = frozenset({
+    'cat', 'sed', 'head', 'tail', 'nl', 'awk', 'grep', 'rg', 'cut', 'fold', 'pr', 'less', 'more',
+})
+SHELL_WRAPPERS = frozenset({'sh', 'bash', 'zsh', 'dash', 'ksh'})
+SHELL_OPERATORS = frozenset({'|', '&&', '||', ';'})
+NON_FILE_SKILL_DIRS = frozenset({'references', 'scripts', 'assets'})
 
 
 def _default_model(backend, home=None):
@@ -110,7 +119,134 @@ def _extract_text(content):
     return ''
 
 
-def _consume_claude_events(events, stats, pending_tools):
+def _new_stats():
+    return {
+        'check_calls': 0,
+        'compile_retries': 0,
+        'skill_bytes_read': 0,
+        'skill_read_calls': 0,
+        'skill_files_read': {},
+    }
+
+
+def _skill_fields(stats):
+    return {
+        'skill_bytes_read': stats['skill_bytes_read'],
+        'skill_read_calls': stats['skill_read_calls'],
+        'skill_unique_files': len(stats['skill_files_read']),
+        'skill_files_read': dict(sorted(stats['skill_files_read'].items())),
+    }
+
+
+def _skill_rel_path(raw_path, cwd=None):
+    """Return canonical '<skill>/...' path when raw_path points to a file inside the case's skills/ snapshot."""
+    if not isinstance(raw_path, str):
+        return None
+    cleaned = raw_path.strip().strip('\'"')
+    if not cleaned or cleaned.startswith('-'):
+        return None
+    p = Path(cleaned)
+    if cwd is not None:
+        cwd_root = Path(cwd).resolve()
+        skills_root = cwd_root / 'skills'
+        try:
+            resolved = p.resolve() if p.is_absolute() else (cwd_root / p).resolve()
+            rel = resolved.relative_to(skills_root)
+        except (OSError, ValueError):
+            return None
+        if len(rel.parts) < 2 or rel.parts[0] not in SKILL_SNAPSHOT_NAMES:
+            return None
+        if resolved.is_dir():
+            return None
+        if not resolved.exists() and rel.parts[-1] in NON_FILE_SKILL_DIRS:
+            return None
+        return rel.as_posix()
+    parts = p.parts
+    for idx, part in enumerate(parts):
+        if part == 'skills' and idx + 2 < len(parts) and parts[idx + 1] in SKILL_SNAPSHOT_NAMES:
+            rel_parts = parts[idx + 1:]
+            if rel_parts[-1] in NON_FILE_SKILL_DIRS:
+                return None
+            return '/'.join(rel_parts)
+    return None
+
+
+def _tokenize_shell(command):
+    if isinstance(command, list):
+        tokens = [str(part) for part in command if part is not None]
+    elif isinstance(command, str):
+        try:
+            lexer = shlex.shlex(command, posix=True, punctuation_chars='|&;')
+            lexer.whitespace_split = True
+            tokens = list(lexer)
+        except ValueError:
+            tokens = command.split()
+    else:
+        return []
+    # Unwrap `/bin/zsh -lc "..."` / `bash -c "..."`
+    if len(tokens) >= 3 and Path(tokens[0]).name in SHELL_WRAPPERS:
+        for i, tok in enumerate(tokens[1:], start=1):
+            if tok.startswith('-') and 'c' in tok[1:] and i + 1 < len(tokens):
+                return _tokenize_shell(tokens[i + 1])
+    return tokens
+
+
+def _extract_shell_skill_paths(command, cwd=None):
+    tokens = _tokenize_shell(command)
+    if not tokens:
+        return []
+    segments = []
+    current = []
+    for tok in tokens:
+        if tok in SHELL_OPERATORS:
+            if current:
+                segments.append(current)
+                current = []
+        else:
+            current.append(tok)
+    if current:
+        segments.append(current)
+    matched = []
+    for seg in segments:
+        idx = 0
+        while idx < len(seg) and '=' in seg[idx] and not seg[idx].startswith(('-', '/', '.')):
+            idx += 1
+        if idx >= len(seg):
+            continue
+        cmd_name = Path(seg[idx]).name
+        if cmd_name not in SHELL_READ_COMMANDS:
+            continue
+        for arg in seg[idx + 1:]:
+            rel = _skill_rel_path(arg, cwd)
+            if rel:
+                matched.append(rel)
+    return matched
+
+
+def _record_skill_read(stats, paths, output_text, is_error):
+    if is_error or not paths:
+        return
+    unique_in_call = list(dict.fromkeys(p for p in paths if p))
+    if not unique_in_call:
+        return
+    byte_count = len((output_text or '').encode('utf-8'))
+    stats['skill_bytes_read'] += byte_count
+    stats['skill_read_calls'] += 1
+    files = stats['skill_files_read']
+    if len(unique_in_call) == 1:
+        rel = unique_in_call[0]
+        entry = files.setdefault(rel, {'reads': 0, 'bytes': 0})
+        entry['reads'] += 1
+        entry['bytes'] += byte_count
+    else:
+        share, rem = divmod(byte_count, len(unique_in_call))
+        for idx, rel in enumerate(unique_in_call):
+            entry = files.setdefault(rel, {'reads': 0, 'bytes': 0})
+            entry['reads'] += 1
+            entry['bytes'] += share + (1 if idx < rem else 0)
+
+
+def _consume_claude_events(events, stats, pending_tools, cwd=None):
     reply = None
     for event in events:
         if not isinstance(event, dict):
@@ -121,21 +257,37 @@ def _consume_claude_events(events, stats, pending_tools):
                 if isinstance(block, dict) and block.get('type') == 'tool_use':
                     tid = block.get('id')
                     if tid:
-                        pending_tools[tid] = block.get('name') or ''
+                        tinput = block.get('input') if isinstance(block.get('input'), dict) else {}
+                        pending_tools[tid] = (block.get('name') or '', tinput)
         elif etype == 'user':
             for block in (event.get('message') or {}).get('content') or []:
                 if isinstance(block, dict) and block.get('type') == 'tool_result':
-                    tname = pending_tools.get(block.get('tool_use_id'), '')
-                    _record_preview_tool(stats, tname, _extract_text(block.get('content')), bool(block.get('is_error')))
+                    tname, tinput = pending_tools.get(block.get('tool_use_id'), ('', {}))
+                    output_text = _extract_text(block.get('content'))
+                    is_error = bool(block.get('is_error'))
+                    _record_preview_tool(stats, tname, output_text, is_error)
+                    if tname in ('Read', 'read_file', 'view_file'):
+                        raw_path = (
+                            tinput.get('file_path')
+                            or tinput.get('Path')
+                            or tinput.get('path')
+                            or tinput.get('AbsolutePath')
+                        )
+                        rel = _skill_rel_path(raw_path, cwd)
+                        if rel:
+                            _record_skill_read(stats, [rel], output_text, is_error)
+                    elif tname in ('Bash', 'run_command', 'shell'):
+                        cmd = tinput.get('command') or tinput.get('CommandLine')
+                        _record_skill_read(stats, _extract_shell_skill_paths(cmd, cwd), output_text, is_error)
         elif etype == 'result':
             reply = event
     return reply
 
 
-def _parse_claude(stdout, role, model):
+def _parse_claude(stdout, role, model, cwd=None):
     reply = None
     saw_stream = False
-    stats = {'check_calls': 0, 'compile_retries': 0}
+    stats = _new_stats()
     pending_tools = {}
     try:
         parsed = json.loads(stdout)
@@ -144,7 +296,7 @@ def _parse_claude(stdout, role, model):
             saw_stream = parsed.get('type') == 'result'
         elif isinstance(parsed, list):
             saw_stream = True
-            reply = _consume_claude_events(parsed, stats, pending_tools)
+            reply = _consume_claude_events(parsed, stats, pending_tools, cwd=cwd)
     except ValueError:
         events = []
         for raw in stdout.splitlines():
@@ -159,7 +311,7 @@ def _parse_claude(stdout, role, model):
                 events.append(event)
         if events:
             saw_stream = True
-            reply = _consume_claude_events(events, stats, pending_tools)
+            reply = _consume_claude_events(events, stats, pending_tools, cwd=cwd)
     if not isinstance(reply, dict):
         raise RuntimeError('claude returned an invalid response envelope')
     if reply.get('is_error'):
@@ -182,17 +334,20 @@ def _parse_claude(stdout, role, model):
         'cache_read_tokens': usage.get('cache_read_input_tokens', usage.get('cache_read_tokens')),
         'cache_creation_tokens': usage.get('cache_creation_input_tokens', usage.get('cache_creation_tokens')),
     }
+    if isinstance(reply.get('session_id'), str) and reply['session_id'].strip():
+        fields['session_id'] = reply['session_id'].strip()
     if role == 'generator' and saw_stream:
         fields['check_calls'] = stats['check_calls']
         fields['compile_retries'] = stats['compile_retries']
+        fields.update(_skill_fields(stats))
     return message, fields
 
 
-def _parse_codex(stdout, final_path, role, model):
+def _parse_codex(stdout, final_path, role, model, cwd=None):
     message = final_path.read_text() if final_path.exists() else ''
     saw_events = False
     agent_messages = 0
-    stats = {'check_calls': 0, 'compile_retries': 0}
+    stats = _new_stats()
     usage_totals = {}
     event_model = None
     for raw in stdout.splitlines():
@@ -218,6 +373,21 @@ def _parse_codex(stdout, final_path, role, model):
                 res = item.get('result') if isinstance(item.get('result'), dict) else {}
                 err = bool(item.get('error')) or bool(res.get('isError'))
                 _record_preview_tool(stats, item.get('tool') or '', _extract_text(res.get('content')), err)
+            elif itype in ('command_execution', 'local_shell_call'):
+                cmd = item.get('command')
+                output = item.get('aggregated_output')
+                if not isinstance(output, str):
+                    output = _extract_text(item.get('output'))
+                exit_code = item.get('exit_code')
+                is_err = (exit_code is not None and exit_code != 0) or item.get('status') == 'failed'
+                _record_skill_read(stats, _extract_shell_skill_paths(cmd, cwd), output, is_err)
+            elif itype in ('read_file', 'file_read'):
+                raw_path = item.get('path') or item.get('file_path')
+                output = item.get('content') if isinstance(item.get('content'), str) else _extract_text(item.get('output'))
+                is_err = bool(item.get('error')) or item.get('status') == 'failed'
+                rel = _skill_rel_path(raw_path, cwd)
+                if rel:
+                    _record_skill_read(stats, [rel], output, is_err)
         elif etype == 'turn.completed':
             u = event.get('usage') if isinstance(event.get('usage'), dict) else {}
             mapping = (
@@ -237,14 +407,15 @@ def _parse_codex(stdout, final_path, role, model):
         if role == 'generator':
             fields['check_calls'] = stats['check_calls']
             fields['compile_retries'] = stats['compile_retries']
+            fields.update(_skill_fields(stats))
     return message, fields
 
 
-def _parse_agy(stdout, role, model):
+def _parse_agy(stdout, role, model, cwd=None):
     terminal = None
     init_model = None
     agent_steps = 0
-    stats = {'check_calls': 0, 'compile_retries': 0}
+    stats = _new_stats()
     for raw in stdout.splitlines():
         line = raw.strip()
         if not line:
@@ -268,12 +439,27 @@ def _parse_agy(stdout, role, model):
                     agent_steps += 1
                 elif stype == 'tool':
                     info = su.get('tool_info') if isinstance(su.get('tool_info'), dict) else {}
+                    params = info.get('parameters') if isinstance(info.get('parameters'), dict) else {}
                     if info.get('name') == 'call_mcp_tool':
-                        params = info.get('parameters') if isinstance(info.get('parameters'), dict) else {}
                         tname = params.get('ToolName') or ''
                     else:
                         tname = su.get('tool_name') or info.get('name') or ''
-                    _record_preview_tool(stats, tname, info.get('output') or '', bool(info.get('error')))
+                    output_text = info.get('output') or ''
+                    is_error = bool(info.get('error'))
+                    _record_preview_tool(stats, tname, output_text, is_error)
+                    if tname in ('read_file', 'view_file'):
+                        raw_path = (
+                            params.get('Path')
+                            or params.get('path')
+                            or params.get('file_path')
+                            or params.get('AbsolutePath')
+                        )
+                        rel = _skill_rel_path(raw_path, cwd)
+                        if rel:
+                            _record_skill_read(stats, [rel], output_text, is_error)
+                    elif tname in ('run_command', 'shell'):
+                        cmd = params.get('CommandLine') or params.get('command')
+                        _record_skill_read(stats, _extract_shell_skill_paths(cmd, cwd), output_text, is_error)
         elif kind == 'result':
             terminal = obj.get('result') if isinstance(obj.get('result'), dict) else None
         elif 'status' in obj and terminal is None:
@@ -299,6 +485,7 @@ def _parse_agy(stdout, role, model):
     if role == 'generator':
         fields['check_calls'] = stats['check_calls']
         fields['compile_retries'] = stats['compile_retries']
+        fields.update(_skill_fields(stats))
     return message, fields
 
 
@@ -316,13 +503,16 @@ def _cleanup_agy_plugin(plugin_dir, plugins_dir, agents_dir, had_plugins, had_ag
             pass
 
 
-def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, timeout=3600, mcp_binary=None, mcp_jar=None):
+def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, timeout=3600, mcp_binary=None, mcp_jar=None,
+            resume_session=None):
     if backend not in BACKENDS:
         raise ValueError(f'Unknown backend: {backend}')
     if role not in ('generator', 'judge'):
         raise ValueError(f'Unknown role: {role}')
     if role == 'generator' and not mcp_binary:
         raise ValueError('A generator needs mcp_binary, the preview supervisor it designs with')
+    if resume_session and backend != 'claude':
+        raise ValueError(f'resume_session is only supported on claude, not {backend}')
     with tempfile.TemporaryDirectory(prefix='android-design-backend-') as temporary, ExitStack() as stack:
         temporary = Path(temporary)
         final = temporary / 'final.txt'
@@ -336,6 +526,8 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
                 if role == 'generator'
                 else ['claude', '-p', '--output-format', 'json']
             )
+            if resume_session:
+                command += ['--resume', str(resume_session)]
             if role == 'generator':
                 config = temporary / 'mcp.json'
                 config.write_text(json.dumps({'mcpServers': {SERVER_NAME: {'command': str(mcp_binary), 'args': [], 'env': server_env}}}))
@@ -451,13 +643,17 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
             'cache_creation_tokens': None,
             'check_calls': None,
             'compile_retries': None,
+            'skill_bytes_read': None,
+            'skill_read_calls': None,
+            'skill_unique_files': None,
+            'skill_files_read': None,
         }
         if backend == 'claude':
-            message, parsed_fields = _parse_claude(done.stdout, role, model)
+            message, parsed_fields = _parse_claude(done.stdout, role, model, cwd=cwd)
         elif backend == 'codex':
-            message, parsed_fields = _parse_codex(done.stdout, final, role, model)
+            message, parsed_fields = _parse_codex(done.stdout, final, role, model, cwd=cwd)
         else:
-            message, parsed_fields = _parse_agy(done.stdout, role, model)
+            message, parsed_fields = _parse_agy(done.stdout, role, model, cwd=cwd)
         result.update(parsed_fields)
         if not isinstance(message, str) or not message.strip():
             raise RuntimeError(f'{backend} {role} returned no final message')
