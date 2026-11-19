@@ -594,3 +594,50 @@ class BackendTests(unittest.TestCase):
             with patch('backends.subprocess.run') as call, self.assertRaisesRegex(ValueError, 'resume_session'):
                 backends.execute(backend, 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY, resume_session='s1')
             call.assert_not_called()
+
+    def test_claude_generator_grants_read_access_to_preview_cache_dir(self):
+        events = [{'type': 'result', 'result': 'Done.', 'num_turns': 1, 'usage': {}}]
+        ndjson = '\n'.join(json.dumps(e) for e in events) + '\n'
+        with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, ndjson, '')) as call:
+            backends.execute('claude', 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY)
+        cmd = call.call_args.args[0]
+        cache_dir = str((Path.home() / '.cache' / 'android-design-preview').resolve())
+        self.assertIn('--add-dir', cmd)
+        self.assertEqual(cmd[cmd.index('--add-dir') + 1], cache_dir)
+        self.assertIn('Read', cmd)
+
+    def test_claude_truncated_json_and_permission_refusals_do_not_inflate_compile_retries(self):
+        truncated_valid = (
+            'Exit code 1\n'
+            '{"ok":false,"valid":true,"pass":false,"scoped":false,"findings":[{"detail":"1.05:1"'
+            '\n\n... [4500 characters truncated] ...\n\n'
+            ',"images":[]}'
+        )
+        truncated_invalid = (
+            'Exit code 1\n'
+            '{"ok":false,"valid":false,"pass":false,"errors":[{"message":"unresolved ref"'
+            '\n\n... [4500 characters truncated] ...\n\n'
+            '}]}'
+        )
+        permission_refusal = (
+            'This Bash command contains multiple operations. '
+            'The following part requires approval: echo ---'
+        )
+        events = [
+            {'type': 'assistant', 'message': {'content': [
+                {'type': 'tool_use', 'id': 'u1', 'name': 'Bash', 'input': {'command': 'android-design-preview check design/proposal.explore.kt'}},
+                {'type': 'tool_use', 'id': 'u2', 'name': 'Bash', 'input': {'command': 'android-design-preview check design/proposal.explore.kt'}},
+                {'type': 'tool_use', 'id': 'u3', 'name': 'Bash', 'input': {'command': 'android-design-preview check design/proposal.explore.kt && echo --- && android-design-preview check design/proposal.explore.kt'}},
+            ]}},
+            {'type': 'user', 'message': {'content': [
+                {'type': 'tool_result', 'tool_use_id': 'u1', 'is_error': True, 'content': truncated_valid},
+                {'type': 'tool_result', 'tool_use_id': 'u2', 'is_error': True, 'content': truncated_invalid},
+                {'type': 'tool_result', 'tool_use_id': 'u3', 'is_error': True, 'content': permission_refusal},
+            ]}},
+            {'type': 'result', 'result': 'Checked.', 'num_turns': 2, 'usage': {}},
+        ]
+        ndjson = '\n'.join(json.dumps(e) for e in events) + '\n'
+        with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, ndjson, '')):
+            result = backends.execute('claude', 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY)
+        self.assertEqual(result['check_calls'], 2)
+        self.assertEqual(result['compile_retries'], 1)

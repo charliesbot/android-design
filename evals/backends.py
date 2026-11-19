@@ -6,6 +6,7 @@ preview CLI or shell access.
 """
 import json
 import os
+import re
 import shlex
 import subprocess
 import tempfile
@@ -401,7 +402,32 @@ def _extract_shell_skill_paths(command, cwd=None):
     return matched
 
 
+def _is_harness_permission_refusal(output_text, is_error):
+    if not is_error or not isinstance(output_text, str):
+        return False
+    if '{' in output_text:
+        return False
+    lowered = output_text.lower()
+    return (
+        'requires approval' in lowered
+        or 'requested permissions' in lowered
+        or 'permission denied' in lowered
+    )
+
+
+def _truncated_json_valid_flag(output_text):
+    if not isinstance(output_text, str) or '{' not in output_text:
+        return None
+    head = output_text[output_text.find('{'):][:400]
+    match = re.search(r'"(?:valid|compiled)"\s*:\s*(true|false)', head)
+    if not match:
+        return None
+    return match.group(1) == 'true'
+
+
 def _record_cli_preview_command(stats, command, output_text, is_error):
+    if _is_harness_permission_refusal(output_text, is_error):
+        return
     raw = _unwrap_outer_shell(command)
     segments, _, _ = _scan_shell(raw)
     for seg in segments:
@@ -412,8 +438,10 @@ def _record_cli_preview_command(stats, command, output_text, is_error):
             if isinstance(payload, dict):
                 if payload.get('valid') is False or payload.get('compiled') is False:
                     stats['compile_retries'] += 1
-            elif is_error:
-                stats['compile_retries'] += 1
+            else:
+                valid_flag = _truncated_json_valid_flag(output_text)
+                if valid_flag is False or (valid_flag is None and is_error):
+                    stats['compile_retries'] += 1
 
 
 def _record_skill_read(stats, paths, output_text, is_error):
@@ -734,12 +762,18 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
                 command += ['--resume', str(resume_session)]
             if role == 'generator':
                 # `claude -p` enforces the script ban directly via --allowedTools: only
-                # `android-design-preview` shell commands plus edits/writes inside the case folder.
+                # `android-design-preview` shell commands, edits/writes inside the case folder,
+                # and reading files including rendered PNGs in ~/.cache/android-design-preview.
+                cache_dir = (Path.home() / '.cache' / 'android-design-preview').resolve()
+                cache_dir.mkdir(parents=True, exist_ok=True)
                 command += [
                     '--allowedTools',
                     f'Bash({PREVIEW_CLI_NAME}:*)',
                     f'Edit(/{cwd_path}/**)',
                     f'Write(/{cwd_path}/**)',
+                    'Read',
+                    '--add-dir',
+                    str(cache_dir),
                 ]
             if role == 'judge':
                 command += ['--tools', 'Read', '--allowedTools', 'Read']
