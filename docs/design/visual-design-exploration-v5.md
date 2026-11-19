@@ -42,6 +42,7 @@ Measured on Apple Silicon inside an already-booted headless JDK process (excludi
 - **A Go client:** A single static binary that starts in milliseconds and needs no Java, but the server needs Java regardless. It would add a second language, a request and response contract defined twice, and six OS and architecture binaries in the plugin, to save about 0.2 s per call.
 - **A one-shot CLI with no server:** Every call would pay JVM start and compiler warmup (about 2 s for the first compile), losing the 0.5 s loop.
 - **Migrating exploration to `kakao/prevue`:** Measured above. Its loop and architecture are adopted; its engine is not a fit (macOS only, needs `ANDROID_HOME`, a Gradle module, and a classpath dump, about 1.4 GB RAM per daemon, 1.2 to 1.9 s save to screen, and no Material 3 checks). Prevue stays the tool for iterating on real `@Preview`s inside an Android app after a direction is approved.
+- **Kit placeholders such as `MockMap` and `MockChart`:** They would save the agent from hand-drawing stand-ins (the fit test's illustrative map took about 35 lines of `Canvas`), but risk a generic look shared by every exploration, against the skill's rule that graphics come from the subject. Not in v5; reconsider only if eval telemetry shows hand-drawn maps and charts are a real output cost.
 - **JetBrains `compose-hot-reload` (`1.2.0`) in a scratch Gradle module:** Requires Gradle and Kotlin daemons plus a ~200 MB JBR 25 download (~1.5 to 2.5 GB RAM) and reopens a native desktop window per check.
 - **Pure Compose Multiplatform Wasm (`wasmJs`) or WebMCP:** `skiko.wasm` requires a browser WebGL canvas, so headless checks would need ~170 MB per-OS Chromium binaries or stall on closed or backgrounded tabs.
 
@@ -81,6 +82,7 @@ Every command answers with one JSON line and an exit code: `0` success, `1` comp
 | `open <file>` | Print and open the board URL. |
 | `status`, `stop` | Server state for the current repository, and shutting it down. |
 | `render <file> --out <dir>` | Write PNGs and trees for humans and `evals/run.py`. |
+| `install` | Link the command into `~/.local/bin` for harnesses that do not put the plugin's `bin/` on `PATH`. |
 
 ### What the agent reads
 
@@ -167,6 +169,7 @@ The server serves an HTML, CSS, and SVG board at `http://127.0.0.1:<port>/?view=
 - **Focus first, then the rest.** The board reports which direction and view the person has open. On save, the server renders that one first and pushes it over Server-Sent Events, then renders the remaining views at low priority and pushes them as they finish. Views not yet redrawn are marked stale instead of showing an old render as current. With no board open, the agent's most recent scope counts as the focus.
 - **Multi-direction board and ~40 ms switches.** Shows multiple `direction(...)` blocks side by side or focuses one direction with Brightness, Seed Color, Style Variant, Screen, Overlay, and Device controls. Because `<slug>.explore.kt` stays compiled, changing theme or device settings re-renders in ~40 ms without recompiling.
 - **Live file watching.** The server watches `DESIGN.md` and `<slug>.explore.kt`. Watcher runs feed the shared result store, so a save the board already rendered is free for the agent's next scoped check.
+- **Fixed views, no free resize or live input.** The board keeps v4's catalog views; `foldable`, `tablet`, and `desktop` already show what each breakpoint reveals, so v5 adds no width slider. Renders stay static images, with no taps or scrolling on a live composition.
 - **Click-to-source SVG overlay.** Maps `CompositionGroup` source locations and `SemanticsNode` bounds onto each 2x PNG: hovering shows the Composable name, `<file>:<line>`, and measured dp dimensions. Clicking selects that node, copies `<slug>.explore.kt:<line>` to the clipboard, and records it as the person's selection. Clicking navigation or overlay triggers still switches the board state.
 
 ### Selection reaches the agent
@@ -193,18 +196,13 @@ Mapping of all 21 check functions in `FindingRules.kt`:
 
 ### Plugin bundle and moving to production
 
-Distributable files live under `plugin/`: `plugin/skills/`, `plugin/bin/` (the bootstrap scripts), and each harness's manifest (Antigravity `plugin.json`, Claude Code `.claude-plugin/`, Codex `.codex-plugin/`), with no MCP configuration. The JAR stays out of the plugin and is fetched on first use, so installs stay small. Root marketplace manifests point to `./plugin` via git-subdir, while `npx skills add` and Chai (`~/chai.toml`) read `plugin/skills/` directly. Skills call the command by the path each harness provides for plugin files, following Prevue's per-harness skill generation from one source when the paths differ.
+Distributable files live under `plugin/`: `plugin/skills/`, `plugin/bin/` (the bootstrap scripts), and each harness's manifest (Antigravity `plugin.json`, Claude Code `.claude-plugin/`, Codex `.codex-plugin/`), with no MCP configuration. The JAR stays out of the plugin and is fetched on first use, so installs stay small. Root marketplace manifests point to `./plugin` via git-subdir, while `npx skills add` and Chai (`~/chai.toml`) read `plugin/skills/` directly. The skills call `android-design-preview` by name, so the one setup requirement is that it is on `PATH`. Claude Code puts a plugin's `bin/` on `PATH` (Prevue relies on the same). Antigravity, Codex, `npx skills`, and Chai installs run `android-design-preview install` once from the plugin or repository checkout, which links the bootstrap script into `~/.local/bin`; when the command is missing, the skill gives the person that one step. Codex runs shell commands in its workspace-write sandbox, so it also needs `sandbox_workspace_write.network_access = true` (localhost and the first JAR download) and `~/.cache/android-design-preview` in `writable_roots`, the same requirement Prevue has for `~/.prevue`. Antigravity runs terminal commands unsandboxed by default.
 
 Approving a direction needs no code generator, though porting still wires the screen into the app: the agent copies the approved `@Composable` screen functions into the target project's module layout, removes `testTag("ad:primary")` if undesired, connects them to the app's theme, ViewModel state, and Navigation 3 routes, and verifies the live screens with `kakao/prevue` on macOS or `compose-preview` elsewhere.
 
-## Open questions
+## Rollout gate
 
-- **How does each harness expose the plugin's `bin/`?** Claude Code puts a plugin's `bin/` on `PATH` (Prevue relies on this). Codex and Antigravity need confirming; the skill may need the absolute path per harness.
-- **Do scoped iterations hold eval quality?** v4's gate (6/8 rubric, 0 median compile retries) was measured with full checks on every call and inline images. The eight-case A/B needs rerunning to confirm that fewer full checks, more images, and images read by path keep or improve rubric scores, turns, and tokens.
-- **What does a long session cost?** The eight cases are single-shot. A brainstorm runs ten or more revision turns, and every image the agent opens stays in its context for every later turn. The tool time v5 saves (about 6.5 s per edit) is small next to model time in a long session, so a multi-turn revision benchmark should measure context growth, and whether 1x scoped images and the two-image cap are enough.
-- **Kit placeholders for maps and charts.** A `MockMap` or `MockChart` in the kit would save the agent from hand-drawing stand-ins (the fit test's illustrative map took about 35 lines of `Canvas`), cutting output tokens. The risk is a generic look that every exploration shares, against the skill's rule that graphics come from the subject. Decide after evals show how often cases hand-draw maps or charts and how much output they cost.
-- **Width slider.** A 240 to 1600 dp slider marked at 600 and 840 dp. At about 0.12 s per scoped render after compile, v5 could reflow while the person drags (throttled), which Prevue's release-to-commit slider cannot.
-- **One live, tappable direction.** Taps and scroll on the focused direction, targeted by `file:line`. A long-lived server makes a persistent composition possible, but it must still respect the request deadline and recycling.
+v5 replaces v4 only after the eight-case A/B in `evals/run.py` meets v4's bar (at least 6/8 rubric passes, every deterministic check passing, and 0 median compile retries) and a multi-turn revision case shows v5 using no more tokens per turn than v4. The multi-turn case matters because a brainstorm runs ten or more revisions: every image the agent opens stays in its context for later turns, and the tool time v5 saves (about 6.5 s per edit) is small next to model time across a long session.
 
 ## Links
 
