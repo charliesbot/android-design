@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-v5 adopts Prevue's architecture and loop: a command-line tool, `android-design-preview`, that talks over localhost to one long-running Kotlin server, which compiles, renders, checks, and serves the browser board. Both the command and the server are Kotlin, replacing v4's Node MCP supervisor. Each save produces one shared result, iteration checks only the direction and view being changed and always writes its image, the board updates the screen the person is looking at first, and a board click reaches the agent as `file:line`. v4's bytecode sandbox, `designBoard` kit, and 21 finding rules carry over unchanged, and a full check of every view stays the gate before showing the person.
+v5 adopts Prevue's architecture and loop: a command-line tool, `android-design-preview`, that talks over localhost to one long-running Kotlin server, which compiles, renders, checks, and serves the browser board. Both the command and the server are Kotlin, replacing v4's Node MCP supervisor. Each save produces one shared result, iteration checks only the direction and view being changed and always writes its image, the board updates the screen the person is looking at first, and a board click reaches the agent as `file:line`. The explore skill shrinks to the order of steps, with command details in `--help` and guidance attached to findings, since model reading time outweighs tool time. v4's bytecode sandbox, `designBoard` kit, and 21 finding rules carry over unchanged, and a full check of every view stays the gate before showing the person.
 
 ## Design
 
@@ -81,6 +81,17 @@ Every command answers with one JSON line and an exit code: `0` success, `1` comp
 | `open <file>` | Print and open the board URL. |
 | `status`, `stop` | Server state for the current repository, and shutting it down. |
 | `render <file> --out <dir>` | Write PNGs and trees for humans and `evals/run.py`. |
+
+### What the agent reads
+
+Tool time is the smaller part of an exploration. In v3's timed trace, 157.5 of 160 s was the model reading and reasoning, and v4's median rollout run took 317 s of wall time while each tool call took seconds. v5 therefore treats context as part of the loop.
+
+Today an exploration always reads `android-design/SKILL.md` (40.7 KB), `android-design-explore/SKILL.md` (7.7 KB), and `compose-signatures.md` (9.9 KB), about 58 KB, and steps can pull in `components.md` (36.2 KB), `theming.md` (22.2 KB), `layout.md` (11.0 KB), and `wear-os.md` (10.6 KB), up to about 144 KB in all. v5 changes how that knowledge reaches the agent:
+
+- **The explore skill holds only the order of steps and the rules for talking to the person,** as Prevue's does in about 110 lines. Command arguments, response fields, and failure meanings live in each command's `--help`, read only when the agent needs them.
+- **Findings carry their own guidance.** Each finding includes its fix hint and the reference section that explains it (for example, `line-length` points to `layout.md#grids-and-max-widths`), so references are read when a finding calls for them rather than up front.
+- **Always-read files hold rules; quotes, examples, and recipes live in references.** `android-design/SKILL.md` keeps the design questions and rules every exploration needs. Supporting material moves to the reference that a step or finding points to. Every such move is judged by the rubric evals, since this content is the skill's design judgment.
+- **Evals report reading cost.** Generator telemetry records the bytes of skill files each case reads, so a skill change is judged by its cost as well as its rubric score.
 
 ### Security and sandbox boundary
 
@@ -191,6 +202,7 @@ Approving a direction needs no code generator, though porting still wires the sc
 - **How does each harness expose the plugin's `bin/`?** Claude Code puts a plugin's `bin/` on `PATH` (Prevue relies on this). Codex and Antigravity need confirming; the skill may need the absolute path per harness.
 - **Do scoped iterations hold eval quality?** v4's gate (6/8 rubric, 0 median compile retries) was measured with full checks on every call and inline images. The eight-case A/B needs rerunning to confirm that fewer full checks, more images, and images read by path keep or improve rubric scores, turns, and tokens.
 - **What does a long session cost?** The eight cases are single-shot. A brainstorm runs ten or more revision turns, and every image the agent opens stays in its context for every later turn. The tool time v5 saves (about 6.5 s per edit) is small next to model time in a long session, so a multi-turn revision benchmark should measure context growth, and whether 1x scoped images and the two-image cap are enough.
+- **Kit placeholders for maps and charts.** A `MockMap` or `MockChart` in the kit would save the agent from hand-drawing stand-ins (the fit test's illustrative map took about 35 lines of `Canvas`), cutting output tokens. The risk is a generic look that every exploration shares, against the skill's rule that graphics come from the subject. Decide after evals show how often cases hand-draw maps or charts and how much output they cost.
 - **Width slider.** A 240 to 1600 dp slider marked at 600 and 840 dp. At about 0.12 s per scoped render after compile, v5 could reflow while the person drags (throttled), which Prevue's release-to-commit slider cannot.
 - **One live, tappable direction.** Taps and scroll on the focused direction, targeted by `file:line`. A long-lived server makes a persistent composition possible, but it must still respect the request deadline and recycling.
 
