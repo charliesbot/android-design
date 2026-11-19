@@ -225,7 +225,7 @@ Both gates passed on `#126`'s branch with the trimmed `android-design/SKILL.md` 
 | Metric | v4 baseline (Run 2, tuned) | v5 (`d9df0b7`) | Notes |
 | --- | --- | --- | --- |
 | Cases passed (rubric) | `6/8` (`80/82` items) | `5/8` (`69/71` judged items across 7 completed cases) | `finance` aborted on API `503 UNAVAILABLE` before judging |
-| Deterministic code checks | `21/21` (100%) | `20/21` (`C-generation` failed on `finance`) | `recipes` failed `C-review` (`contrast`, `overflow`, `line-length`) after 1 check |
+| Deterministic code checks | `21/21` (100%) | `20/21` deterministic (`20/22` with `C-generation`) | `recipes` failed `C-review` (`contrast`, `overflow`, `line-length`) after 1 check; `finance` passed `3/3` deterministic checks (`3/4` total) before failing `C-generation` on `503` |
 | Median compile retries | `0` | **`0`** (`1, 0, 0, 0, 0, 0, 1`) | |
 | Median agent turns | `35` | **`27`** (`-22.9%`) | |
 | Median input tokens | `257,128.5` | **`197,819`** (`-23.1%`) | |
@@ -234,7 +234,7 @@ Both gates passed on `#126`'s branch with the trimmed `android-design/SKILL.md` 
 | Median wall time | `317.2 s` | `655.9 s` | Elevated API latency during the `503 UNAVAILABLE` window despite fewer turns |
 | Median `skill_bytes_read` | n/a | `112,236 B` (`62,656 B` to `89,030 B` on Wear) | |
 
-Per-case results on `d9df0b7`: `music`, `settings`, and `trek` passed `11/11`; `player` and `reminder` passed `9/9`; `workout` passed `2/2` code checks and `8/9` rubric (`R-workout-hero`); `recipes` passed `2/3` code checks (`C-review` flagged `contrast`, `overflow`, and `line-length` after only 1 check) and `10/11` rubric (`R-adaptive`); `finance` hit an upstream Gemini API `503 UNAVAILABLE` error (`C-generation`), and a standalone retry of `finance` passed all 3 code checks (`C-valid`, `C-review`, `C-palette`) but failed `C-generation` on the Antigravity script-ban audit (`grep` against an internal step log). The original `#126` rollout gate on `96658ea` had passed `7/8` rubric (`81/82` items), `21/21` code checks, `0` median compile retries, `35` median turns, `150,382` median input tokens, `44,664.5` median output tokens, `8.5` median check calls, and `448.9 s` median wall time.
+Per-case results on `d9df0b7`: `music`, `settings`, and `trek` passed `11/11`; `player` and `reminder` passed `9/9`; `workout` passed `2/2` code checks and `8/9` rubric (`R-workout-hero`); `recipes` passed `2/3` code checks (`C-review` flagged `contrast`, `overflow`, and `line-length` after only 1 check) and `10/11` rubric (`R-adaptive`); `finance` passed `3/3` deterministic checks (`3/4` total) before hitting an upstream Gemini API `503 UNAVAILABLE` error (`C-generation`), and a standalone retry of `finance` passed `3/3` deterministic checks (`3/4` total) before failing `C-generation` on the Antigravity script-ban audit (`grep` against an internal step log). The original `#126` rollout gate on `96658ea` had passed `7/8` rubric (`81/82` items), `21/21` code checks, `0` median compile retries, `35` median turns, `150,382` median input tokens, `44,664.5` median output tokens, `8.5` median check calls, and `448.9 s` median wall time.
 
 **Ten-turn multi-turn revision case (`evals/multiturn.py`, Claude `claude-fable-5-2`):**
 
