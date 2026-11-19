@@ -139,9 +139,16 @@ class CacheCleanerTest {
       // Starting another server triggers cache cleanup.
       startingServer.start()
 
-      // Wait briefly for startup cleanup task to finish.
+      // Wait briefly for the async startup cleanup pass (server records + renders) to finish.
       val deadline = System.currentTimeMillis() + 5_000L
-      while (System.currentTimeMillis() < deadline && Files.exists(deadRecPath)) {
+      while (
+        System.currentTimeMillis() < deadline &&
+          (Files.exists(deadRecPath) ||
+            Files.exists(deadLogPath) ||
+            Files.exists(staleTimeoutPath) ||
+            Files.exists(oldDir) ||
+            hashDirs.take(5).any { Files.exists(it) })
+      ) {
         Thread.sleep(50L)
       }
 
@@ -252,5 +259,42 @@ class CacheCleanerTest {
     assertFalse(Files.exists(orphanLog))
     assertFalse(Files.exists(emptyAfterCleanRepo), "Empty repo render dir should be removed")
     assertTrue(Files.exists(mixedHash), "Hash dir with recently touched child PNG must be kept")
+  }
+
+  @Test
+  fun `preserves active timeout record when repoRoot is a symbolic link`(@TempDir tmp: Path) {
+    val cacheRoot = tmp.resolve("cache")
+    val realRepo = tmp.resolve("real-repo")
+    Files.createDirectories(realRepo.resolve("design"))
+    Files.writeString(realRepo.resolve("DESIGN.md"), "---\ncolors:\n  primary: \"#336699\"\n---\n")
+    Files.writeString(realRepo.resolve("design/proposal.explore.kt"), "val loop = 1\n")
+
+    val symlinkRepo = Files.createSymbolicLink(tmp.resolve("linked-repo"), realRepo)
+    val logicalSource = symlinkRepo.resolve("design/proposal.explore.kt")
+    val activeHash = ContentHasher.snapshot(logicalSource).contentHash
+
+    val recPath = ServerPaths.recordPath(symlinkRepo, cacheRoot)
+    ServerPaths.writeRecord(
+      recPath,
+      ServerRecord(
+        pid = 444L,
+        port = 1,
+        jarVersion = "0.5.0",
+        startedAt = 1000L,
+        repoRoot = symlinkRepo.toAbsolutePath().normalize().toString(),
+        clientSecret = "sym-secret",
+        viewToken = "sym-view",
+        timeouts = listOf(TimeoutEntry(activeHash, "compile", System.currentTimeMillis())),
+        haltedAt = System.currentTimeMillis(),
+      ),
+    )
+
+    val summary = CacheCleaner.clean(cacheRoot = cacheRoot, statusProbe = { false })
+    assertEquals(0, summary.deletedRecords)
+    assertEquals(1, summary.keptRecords)
+    assertTrue(
+      Files.exists(recPath),
+      "Dead record with active timeout under a symlinked repoRoot must be preserved",
+    )
   }
 }

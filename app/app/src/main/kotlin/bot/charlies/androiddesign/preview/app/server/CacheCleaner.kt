@@ -211,6 +211,13 @@ object CacheCleaner {
       }
     if (!Files.isDirectory(repoRoot)) return false
 
+    val walkRoot =
+      try {
+        if (Files.isSymbolicLink(repoRoot)) repoRoot.toRealPath() else repoRoot
+      } catch (_: Exception) {
+        return true
+      }
+
     val recordedHashes = record.timeouts.mapTo(HashSet()) { it.contentHash }
     val versionsToCheck =
       if (record.jarVersion == AppInfo.VERSION) listOf(record.jarVersion)
@@ -219,7 +226,7 @@ object CacheCleaner {
 
     try {
       Files.walkFileTree(
-        repoRoot,
+        walkRoot,
         emptySet(),
         MAX_EXPLORE_SCAN_DEPTH,
         object : SimpleFileVisitor<Path>() {
@@ -227,7 +234,7 @@ object CacheCleaner {
             dir: Path,
             attrs: BasicFileAttributes,
           ): FileVisitResult {
-            if (dir != repoRoot) {
+            if (dir != walkRoot) {
               if (attrs.isSymbolicLink) return FileVisitResult.SKIP_SUBTREE
               val name = dir.fileName?.toString().orEmpty()
               if (name in SKIP_DIRS) return FileVisitResult.SKIP_SUBTREE
@@ -239,10 +246,12 @@ object CacheCleaner {
             if (!attrs.isRegularFile || !file.fileName.toString().endsWith(".explore.kt")) {
               return FileVisitResult.CONTINUE
             }
+            val logicalFile =
+              if (walkRoot == repoRoot) file else repoRoot.resolve(walkRoot.relativize(file))
             for (ver in versionsToCheck) {
               val hash =
                 try {
-                  ContentHasher.snapshot(file, jarVersion = ver).contentHash
+                  ContentHasher.snapshot(logicalFile, jarVersion = ver).contentHash
                 } catch (_: Exception) {
                   continue
                 }
