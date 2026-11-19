@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-04
 
-> **v4 status:** The `:wear:compose` upstream desktop port documented below now runs inside [Visual design exploration v4](visual-design-exploration-v4.md) via `wearBoard` in `.explore.kt`. The v3 JSON catalog (`WearCatalog`) and `WearExporter` were retired once v4 passed its rollout gate.
+> **Status:** The `:wear:compose` upstream desktop port documented below runs inside [Visual design exploration v5](visual-design-exploration-v5.md) via `wearBoard` in `.explore.kt`. The v3 JSON catalog (`WearCatalog`) and `WearExporter` were retired once [v4](../archive/visual-design-exploration-v4.md) passed its rollout gate.
 
 ## TL;DR
 
@@ -72,6 +72,6 @@ Because upstream stays byte-identical, an upgrade replaces it wholesale with `sc
 ## Links
 
 - `app/wear/README.md`: shims, exclusions, typography, dialogs, fidelity gaps.
-- `docs/design/visual-design-exploration-v4.md`: current exploration runtime hosting `:wear:compose`.
+- `docs/design/visual-design-exploration-v5.md`: current exploration runtime hosting `:wear:compose`.
 - `docs/archive/visual-design-exploration-v3.md`: historical v3 previewer design.
 - `docs/research/material-3-wear-os.md` and `plugin/skills/android-design/references/wear-os.md`: the Wear design guidance.

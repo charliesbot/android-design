@@ -1,5 +1,7 @@
 # Visual design exploration v4
 
+> **Archived:** Superseded by [Visual design exploration v5](../design/visual-design-exploration-v5.md).
+
 **Date:** 2026-11-15
 
 ## TL;DR
@@ -10,10 +12,10 @@ Visual design exploration replaces the macOS Swing app, `.dmg` installer, and A2
 
 ### Why v4
 
-v3 ([visual-design-exploration-v3.md](../archive/visual-design-exploration-v3.md)) proved that previewing with real Compose Material 3 and upstream Wear Compose hits the fidelity bar. Three structural problems remained:
+v3 ([visual-design-exploration-v3.md](visual-design-exploration-v3.md)) proved that previewing with real Compose Material 3 and upstream Wear Compose hits the fidelity bar. Three structural problems remained:
 
 1. **A closed JSON catalog limits brainstorming and taxes maintenance.** A2UI JSON restricts designs to 40 pre-wired component slots, blocking custom `Canvas` graphics, editorial overlaps, and bespoke `RoundedPolygon` compositions. Maintaining that intermediate language requires `Catalog.kt` and `WearCatalog.kt` (2,280 lines), 25+ interpreter files, JSON schemas, `export/` (8,071 lines), and a 71 KB `compose-mapping.md`, all updated whenever Material 3 changes.
-2. **Generation is slow (~160 s median) because of dual-language model overhead.** In v3's timed trace, MCP tools took 2.5 s while 157.5 s was the model reading ~120 KB of Kotlin plus JSON documentation, reasoning in an unfamiliar flat ID-pointer JSON dialect across 17 to 36 turns ([script-ban-eval.md](script-ban-eval.md)), and making sequential `status`, `get_catalog`, `open_proposal`, `check_proposal`, and `render_view` calls.
+2. **Generation is slow (~160 s median) because of dual-language model overhead.** In v3's timed trace, MCP tools took 2.5 s while 157.5 s was the model reading ~120 KB of Kotlin plus JSON documentation, reasoning in an unfamiliar flat ID-pointer JSON dialect across 17 to 36 turns ([script-ban-eval.md](../design/script-ban-eval.md)), and making sequential `status`, `get_catalog`, `open_proposal`, `check_proposal`, and `render_view` calls.
 3. **Native desktop packaging and split installs add friction.** `jpackage` cannot cross-compile `.dmg`/`.deb`/`.msi` bundles, `compose.desktop.currentOs` binds builds to one host OS, macOS users hit unsigned Gatekeeper quarantine (`xattr`) and `AppNap`, and installing skills separately from the MCP binary requires manual setup.
 
 ### Why Code-First works without Gradle
@@ -29,7 +31,7 @@ Measured on Apple Silicon inside an already-booted headless JDK process (excludi
 - **JetBrains `compose-hot-reload` (`1.2.0`) in a scratch Gradle module:** Avoids writing a ~180-line `K2JVMCompiler` host, at the cost of reopening a native desktop Swing window, requiring Gradle and Kotlin daemons plus a ~200 MB JBR 25 download (~1.5 to 2.5 GB RAM), and checking one live window per tool call rather than batch-checking all five views in one turn.
 - **Pure Compose Multiplatform Wasm (`wasmJs`) or WebMCP:** `skiko.wasm` requires a browser WebGL canvas, so Node.js cannot run `HeadlessRenderer` without ~170 MB per-OS headless Chromium binaries or stalling on closed/backgrounded tabs. Coding harnesses also do not speak `navigator.modelContext` directly and still require a local stdio server and file watcher.
 - **Building exploration directly on `kakao/prevue`:** Adopted on macOS for iterating inside target Android repositories after exploration (0.2 to 0.9 s `@Preview` hot-swap), while unsuitable as the exploration engine itself (macOS-only, requires `ANDROID_HOME` and an Android Gradle module, ~1.4 GB RAM per daemon, and no deterministic M3 layout or contrast rules).
-- **CLI commands instead of MCP:** `claude -p` blocks granting `Bash` to spawned eval generators ([script-ban-eval.md](script-ban-eval.md)), interactive harnesses prompt on shell commands, and CLI stdout cannot return inline `ImageContent`, adding extra `Read` turns per PNG.
+- **CLI commands instead of MCP:** `claude -p` blocks granting `Bash` to spawned eval generators ([script-ban-eval.md](../design/script-ban-eval.md)), interactive harnesses prompt on shell commands, and CLI stdout cannot return inline `ImageContent`, adding extra `Read` turns per PNG.
 
 ### Runtime: bundled Node supervisor and disposable JVM worker
 
@@ -56,7 +58,7 @@ node ${PLUGIN_ROOT}/scripts/android-design-preview.js   (~93 KB pure-JS Node sup
 
 ### Security and sandbox boundary
 
-Compiling `.kt` files executes JVM bytecode, which changes v3's data-only trust model and interacts with [script-ban-eval.md](script-ban-eval.md). Three controls bound that surface:
+Compiling `.kt` files executes JVM bytecode, which changes v3's data-only trust model and interacts with [script-ban-eval.md](../design/script-ban-eval.md). Three controls bound that surface:
 
 1. **No network-reachable compile surface.** The JVM worker opens zero network ports. Node's HTTP server serves the browser board only: it requires `Host: 127.0.0.1:<port>` (blocking DNS rebinding), validates `Origin` plus a 256-bit per-session token (`http://127.0.0.1:<port>/?token=<secret>`) on state-changing requests, and exposes no endpoint that compiles arbitrary paths or source strings. Only the agent's stdio MCP pipe can call `check_design(path)`.
 2. **Constant-pool bytecode verification, `SandboxClassLoader`, and inert UI locals.** Before loading compiled `.class` files, the worker inspects each classfile's constant pool and loads classes through an allowlisting `SandboxClassLoader` permitting only:
@@ -150,7 +152,7 @@ After fixing synthetic `$WhenMappings` `NoSuchFieldError` allowlisting in `Sandb
 
 ## Links
 
-- [Visual design exploration v3](../archive/visual-design-exploration-v3.md): archived JSON-interpreted macOS previewer design superseded by v4
-- [Wear OS in the previewer](wear-os-previewer.md): the upstream `androidx.wear.compose` desktop port reused on the worker classpath
-- [Script ban eval baseline](script-ban-eval.md): the 8-case v3 baseline (17 to 36 turns, 6/8 rubric) and why `claude -p` generators use MCP rather than `Bash`
+- [Visual design exploration v3](visual-design-exploration-v3.md): archived JSON-interpreted macOS previewer design superseded by v4
+- [Wear OS in the previewer](../design/wear-os-previewer.md): the upstream `androidx.wear.compose` desktop port reused on the worker classpath
+- [Script ban eval baseline](../design/script-ban-eval.md): the 8-case v3 baseline (17 to 36 turns, 6/8 rubric) and why `claude -p` generators use MCP rather than `Bash`
 - [`kakao/prevue`](https://github.com/kakao/prevue): browser-based `@Preview` hot-swap tool used on macOS when wiring approved screens into an Android app
