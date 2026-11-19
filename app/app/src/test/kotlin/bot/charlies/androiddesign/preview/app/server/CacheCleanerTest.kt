@@ -53,10 +53,13 @@ class CacheCleanerTest {
       val liveRec = liveServer.start()
       val liveRecPath = ServerPaths.recordPath(liveRepo, cacheRoot)
 
-      // Dead server record with no timeouts (+ paired log file).
+      // Dead server record with no timeouts (+ paired log file created first, matching spawn
+      // order).
       val deadRecPath = ServerPaths.recordPath(deadRepo, cacheRoot)
       val deadLogPath =
         ServerPaths.serversDir(cacheRoot).resolve("${ServerPaths.repoHash(deadRepo)}.log")
+      Files.createDirectories(deadLogPath.parent)
+      Files.writeString(deadLogPath, "old log\n")
       ServerPaths.writeRecord(
         deadRecPath,
         ServerRecord(
@@ -69,7 +72,6 @@ class CacheCleanerTest {
           viewToken = "dead-view",
         ),
       )
-      Files.writeString(deadLogPath, "old log\n")
 
       // Dead server record holding a timeout for its repo's CURRENT content hash -> MUST BE KEPT.
       val activeTimeoutPath = ServerPaths.recordPath(activeTimeoutRepo, cacheRoot)
@@ -123,18 +125,19 @@ class CacheCleanerTest {
         }
 
       // Render hash directories older than 7 days -> deleted even when <= 20 exist.
+      // Create freshDir before backdating oldDir so agedRepoRenders is never transiently empty.
       val agedRepoRenders = cacheRoot.resolve("renders/repo-aged")
-      val oldDir = agedRepoRenders.resolve("oldhash00001").also { Files.createDirectories(it) }
-      val oldPng = oldDir.resolve("view.png").also { Files.write(it, byteArrayOf(4, 5, 6)) }
-      val eightDaysAgo = FileTime.from(now.minus(Duration.ofDays(8)))
-      Files.setLastModifiedTime(oldPng, eightDaysAgo)
-      Files.setLastModifiedTime(oldDir, eightDaysAgo)
-
       val freshDir = agedRepoRenders.resolve("freshhash001").also { Files.createDirectories(it) }
       val freshPng = freshDir.resolve("view.png").also { Files.write(it, byteArrayOf(7, 8, 9)) }
       val twoDaysAgo = FileTime.from(now.minus(Duration.ofDays(2)))
       Files.setLastModifiedTime(freshPng, twoDaysAgo)
       Files.setLastModifiedTime(freshDir, twoDaysAgo)
+
+      val oldDir = agedRepoRenders.resolve("oldhash00001").also { Files.createDirectories(it) }
+      val oldPng = oldDir.resolve("view.png").also { Files.write(it, byteArrayOf(4, 5, 6)) }
+      val eightDaysAgo = FileTime.from(now.minus(Duration.ofDays(8)))
+      Files.setLastModifiedTime(oldPng, eightDaysAgo)
+      Files.setLastModifiedTime(oldDir, eightDaysAgo)
 
       // Starting another server triggers cache cleanup.
       startingServer.start()
