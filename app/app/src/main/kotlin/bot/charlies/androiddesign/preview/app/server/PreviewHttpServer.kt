@@ -197,6 +197,16 @@ class PreviewHttpServer(
       )
     ServerPaths.writeRecord(recordPath, rec)
 
+    housekeepExecutor.execute {
+      if (!closed.get()) {
+        try {
+          CacheCleaner.clean(cacheRoot = cacheRoot, currentRecordPath = recordPath)
+        } catch (_: Exception) {
+          // Best-effort startup cleanup must never crash the server.
+        }
+      }
+    }
+
     if (idleTimeoutMs > 0L) {
       val checkEvery = (idleTimeoutMs / 4L).coerceIn(100L, 15_000L)
       housekeepExecutor.scheduleAtFixedRate(
