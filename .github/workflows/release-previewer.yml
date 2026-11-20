@@ -1,31 +1,72 @@
-# Builds the cross-OS headless Skiko previewer JAR and its SHA-256 checksum on a version tag
-# and attaches both to a GitHub release so plugin/bin/android-design-preview downloads and verifies them.
+# Publishes the previewer JAR when the plugin version changes on main. It builds the cross-OS
+# headless Skiko JAR and its SHA-256 checksum, then creates the `v<version>` tag and GitHub release
+# that plugin/bin/android-design-preview downloads and verifies. A push publishes only when it
+# changes the version in plugin/plugin.json, and a version that already has a release is skipped.
+# A manual run (workflow_dispatch) on main publishes the current version if it has no release yet.
 name: Release previewer worker
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths: ["plugin/plugin.json"]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-previewer
+  cancel-in-progress: false
+
 jobs:
   worker-jar:
+    # A manual run from another branch must not publish that branch's code.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Read plugin version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          version=$(jq -r .version plugin/plugin.json)
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          previous=""
+          if [ "$EVENT" = "push" ]; then
+            previous=$(git show "$BEFORE:plugin/plugin.json" 2>/dev/null | jq -r .version 2>/dev/null || true)
+          fi
+          if [ "$EVENT" = "push" ] && [ "$previous" = "$version" ]; then
+            echo "Version stayed at $version, nothing to publish."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif gh release view "v$version" >/dev/null 2>&1; then
+            echo "Release v$version already exists, nothing to publish."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-java@v4
+        if: steps.version.outputs.exists == 'false'
         with:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+        if: steps.version.outputs.exists == 'false'
       - name: Build worker JAR
+        if: steps.version.outputs.exists == 'false'
         working-directory: app
         run: ./gradlew :app:workerJar --no-daemon
       - name: Generate SHA-256 and publish release
+        if: steps.version.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           cp app/app/build/libs/android-design-preview.jar android-design-preview.jar
           sha256sum android-design-preview.jar > android-design-preview.jar.sha256
-          gh release create "$GITHUB_REF_NAME" android-design-preview.jar android-design-preview.jar.sha256 --generate-notes
+          gh release create "$TAG" android-design-preview.jar android-design-preview.jar.sha256 \
+            --target "$GITHUB_SHA" --title "$TAG" --generate-notes
