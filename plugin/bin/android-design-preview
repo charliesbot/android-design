@@ -137,42 +137,68 @@ resolve_jar() {
     return 0
   fi
 
-  jar_url="${ANDROID_DESIGN_PREVIEW_JAR_URL:-https://github.com/$DEFAULT_REPO/releases/download/v$version/android-design-preview.jar}"
-  sha_url="${ANDROID_DESIGN_PREVIEW_SHA_URL:-$jar_url.sha256}"
-
-  mkdir -p "$CACHE_ROOT/$version"
-  tmp_jar="$cached_jar.tmp.$$"
-  tmp_sha="$cached_jar.sha.$$"
-  trap 'rm -f "$tmp_jar" "$tmp_sha"' EXIT HUP INT TERM
-
-  download_file "$sha_url" "$tmp_sha" || {
-    printf '{"ok":false,"error":"jar_download_failed","message":"Failed downloading JAR checksum from GitHub Release"}\n'
+  # Releases ship one artifact per OS and JVM CPU (scripts/package_release.py): a .tar.xz holding
+  # an uncompressed JAR with only that platform's Skiko library.
+  target=$(release_target) || {
+    printf '{"ok":false,"error":"unsupported_platform","message":"No previewer release for this OS and Java CPU. Build it with cd app && ./gradlew :app:workerJar and set ANDROID_DESIGN_PREVIEW_JAR."}\n'
     exit 3
   }
-  expected=$(grep -Eo '[A-Fa-f0-9]{64}' "$tmp_sha" | head -n 1 | tr '[:upper:]' '[:lower:]')
+  artifact="android-design-preview-$target.tar.xz"
+  release_url="${ANDROID_DESIGN_PREVIEW_RELEASE_URL:-https://github.com/$DEFAULT_REPO/releases/download/v$version}"
+
+  mkdir -p "$CACHE_ROOT/$version"
+  tmp_dir="$CACHE_ROOT/$version/.download.$$"
+  trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
+  mkdir -p "$tmp_dir"
+
+  download_file "$release_url/$artifact.sha256" "$tmp_dir/sha" || {
+    printf '{"ok":false,"error":"jar_download_failed","message":"Failed downloading the previewer checksum from GitHub Release"}\n'
+    exit 3
+  }
+  expected=$(grep -Eo '[A-Fa-f0-9]{64}' "$tmp_dir/sha" | head -n 1 | tr '[:upper:]' '[:lower:]')
   if [ -z "$expected" ]; then
     printf '{"ok":false,"error":"jar_checksum_invalid","message":"Invalid SHA-256 checksum file from release"}\n'
     exit 3
   fi
 
-  download_file "$jar_url" "$tmp_jar" || {
-    printf '{"ok":false,"error":"jar_download_failed","message":"Failed downloading android-design-preview.jar from GitHub Release"}\n'
+  download_file "$release_url/$artifact" "$tmp_dir/$artifact" || {
+    printf '{"ok":false,"error":"jar_download_failed","message":"Failed downloading the previewer from GitHub Release"}\n'
     exit 3
   }
-  actual=$(sha256_of "$tmp_jar") || {
-    printf '{"ok":false,"error":"sha_tool_missing","message":"shasum or sha256sum is required to verify android-design-preview.jar"}\n'
+  actual=$(sha256_of "$tmp_dir/$artifact") || {
+    printf '{"ok":false,"error":"sha_tool_missing","message":"shasum or sha256sum is required to verify the previewer download"}\n'
     exit 3
   }
   if [ "$actual" != "$expected" ]; then
-    rm -f "$tmp_jar" "$tmp_sha"
-    printf '{"ok":false,"error":"jar_checksum_mismatch","message":"SHA-256 verification failed for android-design-preview.jar"}\n'
+    printf '{"ok":false,"error":"jar_checksum_mismatch","message":"SHA-256 verification failed for the previewer download"}\n'
     exit 3
   fi
 
-  mv "$tmp_jar" "$cached_jar"
-  rm -f "$tmp_sha"
+  tar -xmJf "$tmp_dir/$artifact" -C "$tmp_dir" android-design-preview.jar 2>/dev/null || {
+    printf '{"ok":false,"error":"jar_extract_failed","message":"Failed unpacking the previewer download; tar needs xz support (install xz-utils on Linux)"}\n'
+    exit 3
+  }
+  mv "$tmp_dir/android-design-preview.jar" "$cached_jar"
+  rm -rf "$tmp_dir"
   trap - EXIT HUP INT TERM
   JAR_PATH="$cached_jar"
+}
+
+# Prints the release target (for example macos-arm64) for this OS and the Java CPU. The JVM's CPU
+# decides which Skiko library loads, so an x64 JDK on Apple Silicon needs the x64 build.
+release_target() {
+  case "$(uname -s)" in
+    Darwin) os=macos ;;
+    Linux) os=linux ;;
+    *) return 1 ;;
+  esac
+  jvm_arch=$("$JAVA_BIN" -XshowSettings:properties -version 2>&1 | sed -n 's/^[[:space:]]*os\.arch = //p' | head -n 1)
+  case "$jvm_arch" in
+    aarch64|arm64) arch=arm64 ;;
+    amd64|x86_64) arch=x64 ;;
+    *) return 1 ;;
+  esac
+  printf '%s-%s\n' "$os" "$arch"
 }
 
 JAVA_BIN=""

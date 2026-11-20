@@ -1,6 +1,7 @@
-# Publishes the previewer JAR when the plugin version changes on main. It builds the cross-OS
-# headless Skiko JAR and its SHA-256 checksum, then creates the `v<version>` tag and GitHub release
-# that plugin/bin/android-design-preview downloads and verifies. A push publishes only when it
+# Publishes the previewer when the plugin version changes on main. It builds the headless Skiko
+# JAR, packages one artifact per OS and CPU with its SHA-256 checksum (scripts/package_release.py),
+# then creates the `v<version>` tag and GitHub release that plugin/bin/android-design-preview
+# downloads and verifies. A push publishes only when it
 # changes the version in plugin/plugin.json, and a version that already has a release is skipped.
 # A manual run (workflow_dispatch) on main publishes the current version if it has no release yet.
 name: Release previewer worker
@@ -60,13 +61,14 @@ jobs:
         if: steps.version.outputs.exists == 'false'
         working-directory: app
         run: ./gradlew :app:workerJar --no-daemon
-      - name: Generate SHA-256 and publish release
+      - name: Package one artifact per OS and CPU
+        if: steps.version.outputs.exists == 'false'
+        run: python3 scripts/package_release.py app/app/build/libs/android-design-preview.jar dist
+      - name: Publish release
         if: steps.version.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          cp app/app/build/libs/android-design-preview.jar android-design-preview.jar
-          sha256sum android-design-preview.jar > android-design-preview.jar.sha256
-          gh release create "$TAG" android-design-preview.jar android-design-preview.jar.sha256 \
+          gh release create "$TAG" dist/* \
             --target "$GITHUB_SHA" --title "$TAG" --generate-notes
