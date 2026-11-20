@@ -33,7 +33,7 @@ When there is an app, read its relevant screens, theme, assets, and any existing
 
 Work in the app's repository root or the folder the user names; never write into this skill's own repository.
 
-- `DESIGN.md` at the repo root holds shared defaults (`colors.primary`, `material.scheme.variant`, bundled typography roles). Create when missing; edit only for shared changes.
+- Keep the board's tokens on the board: `designBoard(seed = ..., variant = ..., brandFont = ...)` (or `wearBoard(seed = ...)`). Do not create or edit `DESIGN.md` while exploring, because it records settled decisions: an existing one is a constraint you read in the brief, and it changes only when the person approves a direction (step 6).
 - `design/<slug>.explore.kt` holds the board (`design/<slug>-wear.explore.kt` for Wear OS using `wearBoard(...)`).
 - Read [references/compose-signatures.md](references/compose-signatures.md) for pinned Material 3 Expressive, Wear M3, and Exploration Kit signatures. Do **not** read `references/porting.md` until the user approves a direction and asks to wire it into the app.
 - Follow the kit rules: tag the single primary CTA with `Modifier.testTag("ad:primary")`; keep raw `Color(...)` hex literals and `.copy(alpha = ...)` out of screen code; use `SymbolIcon(...)` and `designPainter("assets/...")`; author one adaptive screen (`listDetail`, `supportingPane`, or `BoxWithConstraints`) instead of duplicating per-breakpoint screens (aim for ~150 to 300 lines per direction).
@@ -64,6 +64,7 @@ Run `android-design-preview open <file>` on interactive runs (or share `boardUrl
 
 ## 6. Approve, port, or delete
 
-- **Explore-only:** approval in chat ends the task; do not touch app source code.
+- **Record the approved direction:** when the person approves a direction, write its seed, scheme variant, and brand font into `DESIGN.md` at the repo root (create it when missing; change only those shared defaults). This is the only step that writes `DESIGN.md`, and porting reads it.
+- **Explore-only:** after recording it, approval ends the task; do not touch app source code.
 - **Build / port:** once the user approves a direction for implementation, read [references/porting.md](references/porting.md) and follow the host project's planning, branch, verification, and review workflow.
 - **Delete:** remove `design/<slug>.explore.kt` (or `-wear.explore.kt`) when asked; keep `DESIGN.md` unless asked to remove it too.

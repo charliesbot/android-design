@@ -14,7 +14,7 @@ Each revision in this session is an approved edit for this disposable evaluation
 ## Files and tools
 
 - `{{PROPOSAL}}`: existing two-direction Compose exploration board (`Editorial split` and `Quick pantry`).
-- `{{DESIGN_MD}}`: shared design system at the repo root.
+- `{{DESIGN_MD}}`: shared design system at the repo root. Read it as a constraint; do not edit it, because no revision approves a direction.
 - Verify edits using the `android-design-preview` CLI (already on `PATH`):
   - For each targeted revision (revisions 1 to 9), apply your edit first (do not run a pre-edit `check` or `tree`), then run ONE clean scoped check on the single changed direction, screen (when applicable), and view (`android-design-preview check {{PROPOSAL}} --direction "<dir>" --screen "<screen>" --view <view>`). Open that single returned 1x PNG with `Read` to verify the visual result; do not check or open 3 to 4 views per turn.
   - On the final revision only, run ONE unscoped `android-design-preview check {{PROPOSAL}}` to verify all views and open its returned `light` and `desktop` PNGs.
