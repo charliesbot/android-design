@@ -15,12 +15,10 @@ SKIKO = {
     "macos-x64": "libskiko-macos-x64.dylib",
     "linux-arm64": "libskiko-linux-arm64.so",
     "linux-x64": "libskiko-linux-x64.so",
-    "windows-arm64": "skiko-windows-arm64.dll",
-    "windows-x64": "skiko-windows-x64.dll",
 }
 
 
-@unittest.skipUnless(shutil.which("xz"), "xz is required to package Unix artifacts")
+@unittest.skipUnless(shutil.which("xz"), "xz is required to package the release artifacts")
 class PackageReleaseTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -33,6 +31,8 @@ class PackageReleaseTest(unittest.TestCase):
             for name in SKIKO.values():
                 jar.writestr(name, name.encode())
                 jar.writestr(name + ".sha256", "hash")
+            # A Windows library that slipped into the fat JAR must not reach any artifact.
+            jar.writestr("skiko-windows-x64.dll", b"dll")
         self.out = self.tmp / "dist"
         package_release.package(self.jar, self.out)
 
@@ -57,8 +57,8 @@ class PackageReleaseTest(unittest.TestCase):
             line = (self.out / (artifact.name + ".sha256")).read_text()
             self.assertEqual(line, f"{hashlib.sha256(artifact.read_bytes()).hexdigest()}  {artifact.name}\n")
 
-    def test_unix_jars_are_stored_and_keep_only_their_own_skiko(self):
-        for target in ["macos-arm64", "macos-x64", "linux-arm64", "linux-x64"]:
+    def test_jars_are_stored_and_keep_only_their_own_skiko(self):
+        for target in SKIKO:
             with zipfile.ZipFile(self.read_unix_jar(target)) as jar:
                 names = set(jar.namelist())
                 self.assertIn(SKIKO[target], names)
@@ -68,13 +68,6 @@ class PackageReleaseTest(unittest.TestCase):
                 self.assertIn("icudtl.dat", names)
                 self.assertTrue(all(i.compress_type == zipfile.ZIP_STORED for i in jar.infolist()))
                 self.assertEqual(jar.read("META-INF/MANIFEST.MF"), b"Main-Class: Main\n")
-
-    def test_windows_jars_stay_deflated_and_keep_only_their_own_skiko(self):
-        for target in ["windows-arm64", "windows-x64"]:
-            with zipfile.ZipFile(self.out / f"android-design-preview-{target}.jar") as jar:
-                names = set(jar.namelist())
-                self.assertEqual({n for n in names if "skiko" in n}, {SKIKO[target], SKIKO[target] + ".sha256"})
-                self.assertEqual(jar.getinfo("bot/Main.class").compress_type, zipfile.ZIP_DEFLATED)
 
     def test_rejects_a_jar_missing_a_targets_skiko(self):
         broken = self.tmp / "broken.jar"

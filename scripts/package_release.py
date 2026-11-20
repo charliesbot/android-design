@@ -1,10 +1,9 @@
 """Packages the previewer JAR into one release artifact per OS and CPU.
 
-The fat JAR from `./gradlew :app:workerJar` carries Skiko's native library for six platforms and
-compresses each class file on its own. Each artifact keeps only its platform's Skiko library.
-macOS and Linux artifacts store the JAR uncompressed inside a `.tar.xz`, so xz compresses the
-whole archive as one stream and the download is about a third of the fat JAR. Windows artifacts
-stay plain deflated JARs, because Windows' built-in tools cannot be relied on to unpack xz.
+The fat JAR from `./gradlew :app:workerJar` carries Skiko's native library for four platforms and
+compresses each class file on its own. Each artifact keeps only its platform's Skiko library and
+stores the JAR uncompressed inside a `.tar.xz`, so xz compresses the whole archive as one stream
+and the download is about a third of the fat JAR. Only macOS and Linux are supported.
 
 Usage: python3 scripts/package_release.py <android-design-preview.jar> <out-dir>
 """
@@ -26,34 +25,33 @@ TARGETS = {
     "macos-x64": "libskiko-macos-x64.dylib",
     "linux-arm64": "libskiko-linux-arm64.so",
     "linux-x64": "libskiko-linux-x64.so",
-    "windows-arm64": "skiko-windows-arm64.dll",
-    "windows-x64": "skiko-windows-x64.dll",
 }
 
 ALL_SKIKO = set(TARGETS.values())
 
 
 def artifact_name(target):
-    if target.startswith("windows-"):
-        return f"android-design-preview-{target}.jar"
     return f"android-design-preview-{target}.tar.xz"
 
 
 def _skiko_library(entry):
-    """Returns the Skiko library an entry belongs to (the library or its `.sha256`), else None."""
+    """Returns the Skiko library a JAR-root entry belongs to (the library or its `.sha256`), else
+    None. Any platform's library counts, so one this script does not target is never shipped."""
     name = entry[: -len(".sha256")] if entry.endswith(".sha256") else entry
-    return name if name in ALL_SKIKO else None
+    if "/" in name or not name.startswith(("libskiko-", "skiko-")):
+        return None
+    return name if name.endswith((".dylib", ".so", ".dll")) else None
 
 
-def _write_jar(source, dest, keep_skiko, compression):
-    with zipfile.ZipFile(source) as src, zipfile.ZipFile(dest, "w", compression) as out:
+def _write_jar(source, dest, keep_skiko):
+    with zipfile.ZipFile(source) as src, zipfile.ZipFile(dest, "w", zipfile.ZIP_STORED) as out:
         for info in src.infolist():
             library = _skiko_library(info.filename)
             if library is not None and library != keep_skiko:
                 continue
             copy = zipfile.ZipInfo(info.filename, date_time=info.date_time)
             copy.external_attr = info.external_attr
-            copy.compress_type = compression
+            copy.compress_type = zipfile.ZIP_STORED
             out.writestr(copy, src.read(info))
 
 
@@ -83,7 +81,7 @@ def package(fat_jar, out_dir):
     if missing:
         sys.exit(f"{fat_jar} is missing Skiko libraries: {', '.join(missing)}")
     if shutil.which("xz") is None:
-        sys.exit("xz is required to package the macOS and Linux artifacts")
+        sys.exit("xz is required to package the release artifacts")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     work = out_dir / ".work"
@@ -91,13 +89,10 @@ def package(fat_jar, out_dir):
     try:
         for target, skiko in TARGETS.items():
             artifact = out_dir / artifact_name(target)
-            if target.startswith("windows-"):
-                _write_jar(fat_jar, artifact, skiko, zipfile.ZIP_DEFLATED)
-            else:
-                stored = work / f"{target}.jar"
-                _write_jar(fat_jar, stored, skiko, zipfile.ZIP_STORED)
-                _write_tar_xz(stored, artifact)
-                stored.unlink()
+            stored = work / f"{target}.jar"
+            _write_jar(fat_jar, stored, skiko)
+            _write_tar_xz(stored, artifact)
+            stored.unlink()
             _write_checksum(artifact)
     finally:
         shutil.rmtree(work, ignore_errors=True)

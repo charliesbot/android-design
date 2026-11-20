@@ -538,7 +538,6 @@ class OpenCommand(private val client: PreviewClient = PreviewClient()) : Command
     val cmd =
       when {
         "mac" in os -> listOf("open", url)
-        "win" in os -> listOf("cmd", "/c", "start", "", url)
         else -> listOf("xdg-open", url)
       }
     return try {
@@ -727,20 +726,14 @@ class InstallCommand : Command {
       parsed.flags["--bin-dir"]?.let { Path.of(it).toAbsolutePath().normalize() }
         ?: Path.of(System.getProperty("user.home"), ".local", "bin").toAbsolutePath().normalize()
     Files.createDirectories(binDir)
-    val isWindows = System.getProperty("os.name").orEmpty().lowercase().contains("win")
-    val targetName = if (isWindows) "android-design-preview.cmd" else "android-design-preview"
-    val target = binDir.resolve(targetName)
+    val target = binDir.resolve("android-design-preview")
     if (target != source) {
       Files.deleteIfExists(target)
       try {
         Files.createSymbolicLink(target, source)
       } catch (_: Exception) {
-        if (isWindows) {
-          Files.writeString(target, "@echo off\r\ncall \"$source\" %*\r\n")
-        } else {
-          Files.writeString(target, "#!/bin/sh\nexec \"$source\" \"\$@\"\n")
-          target.toFile().setExecutable(true)
-        }
+        Files.writeString(target, "#!/bin/sh\nexec \"$source\" \"\$@\"\n")
+        target.toFile().setExecutable(true)
       }
     }
     val pathEnv = System.getenv("PATH").orEmpty()

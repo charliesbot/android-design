@@ -189,7 +189,7 @@ object ServerPaths {
     try {
       Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rw-------"))
     } catch (_: UnsupportedOperationException) {
-      // Non-POSIX filesystem (Windows).
+      // Non-POSIX filesystem, such as a FAT or network volume.
       path.toFile().setReadable(false, false)
       path.toFile().setReadable(true, true)
       path.toFile().setWritable(false, false)
