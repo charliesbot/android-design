@@ -10,7 +10,7 @@ Agent skills for designing Android UI with Material 3 Expressive and Wear OS Jet
 Runs on macOS and Linux (Windows is unsupported) and requires **Java 17+** (JDK or Android Studio's bundled JBR). No Node.js or Android SDK is required.
 
 - **Claude Code:** installing the plugin puts `plugin/bin/` on `PATH` automatically.
-- **Antigravity (from a local clone):** run `agy plugin install ./plugin` and `./plugin/bin/android-design-preview install` (or `./scripts/install_local_plugin.sh` when developing locally to also build `:app:workerJar` into `~/.cache/android-design-preview/<version>/`).
+- **From a local clone:** `./scripts/install_local_plugin.sh` installs this checkout's plugin into Claude Code, Codex, and Antigravity (whichever are on `PATH`), links the CLI into `~/.local/bin`, and builds `:app:workerJar` into `~/.cache/android-design-preview/<version>/` so every harness runs the local build. Pass `--skip-build` to reuse the last build, and rerun it after changing `plugin/` or `app/`.
 - **Standalone skills (`npx skills` or Chai):**
 
 ```bash

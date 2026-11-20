@@ -63,8 +63,9 @@ class PluginManifestsTest(unittest.TestCase):
         claude_mkt = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text())
         entry = claude_mkt["plugins"][0]
         self.assertEqual(entry["version"], version)
-        self.assertEqual(entry["source"]["source"], "git-subdir")
-        self.assertEqual(entry["source"]["path"], "plugin")
+        # A relative source installs the checkout's own plugin/, so adding the marketplace from a
+        # local clone (scripts/install_local_plugin.sh) installs local files, not GitHub's.
+        self.assertEqual(entry["source"], "./plugin")
 
         codex_mkt = json.loads((ROOT / ".agents/plugins/marketplace.json").read_text())
         self.assertEqual(codex_mkt["plugins"][0]["version"], version)
