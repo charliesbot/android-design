@@ -2,7 +2,7 @@
 
 Briefs, rendering, code checks, and rubric judgments are independent of any agent provider. Run the evals after changing the skill, not on a schedule. The current chat, a human, or an optional CLI adapter can supply implementations and judgments.
 
-An eval case is the skill's current output: one Compose exploration (`design/proposal.explore.kt` on phone or `design/proposal-wear.explore.kt` on Wear) plus a root `DESIGN.md` (see [exploration workflow checks](exploration.md)). Requirements: Java 17+ (`cd app && ./gradlew :app:workerJar` for a local JAR, or let `plugin/bin/android-design-preview` download the release JAR into `~/.cache/android-design-preview/`). The runner finds the CLI bootstrap script and previewer JAR through `app_binary()` and `worker_jar()` in `preview_app.py`: `$ANDROID_DESIGN_PREVIEW` (default `plugin/bin/android-design-preview`) and `$ANDROID_DESIGN_PREVIEW_JAR` (falling back to `app/app/build/libs/android-design-preview.jar` then `~/.cache/android-design-preview/<version>/android-design-preview.jar`).
+An eval case is the skill's current output: one Compose exploration (`design/proposal.explore.kt` on phone or `design/proposal-wear.explore.kt` on Wear), with no `DESIGN.md` because no direction is approved yet (see [exploration workflow checks](exploration.md)). Requirements: Java 17+ (`cd app && ./gradlew :app:workerJar` for a local JAR, or let `plugin/bin/android-design-preview` download the release JAR into `~/.cache/android-design-preview/`). The runner finds the CLI bootstrap script and previewer JAR through `app_binary()` and `worker_jar()` in `preview_app.py`: `$ANDROID_DESIGN_PREVIEW` (default `plugin/bin/android-design-preview`) and `$ANDROID_DESIGN_PREVIEW_JAR` (falling back to `app/app/build/libs/android-design-preview.jar` then `~/.cache/android-design-preview/<version>/android-design-preview.jar`).
 
 ## Use the current chat or another agent
 
@@ -12,7 +12,7 @@ From this directory:
 python3 run.py prepare --out /tmp/design-eval --cases music
 ```
 
-Preparation makes `music/` a fresh Git repository fixture (one empty commit) with `design/` holding the brief's assets in `design/assets/`, and a snapshot of both skills (copied from `plugin/skills/` into `skills/android-design` and `skills/android-design-explore`). There is no starter and no `DESIGN.md`: the agent writes `DESIGN.md` at the fixture root and the exploration at `design/proposal.explore.kt`. `music/case.json` records the exploration path and title, and the command prints the target path.
+Preparation makes `music/` a fresh Git repository fixture (one empty commit) with `design/` holding the brief's assets in `design/assets/`, and a snapshot of both skills (copied from `plugin/skills/` into `skills/android-design` and `skills/android-design-explore`). There is no starter and no `DESIGN.md`: the agent writes only the exploration at `design/proposal.explore.kt`, keeping its tokens on the board. `music/case.json` records the exploration path and title, and the command prints the target path.
 
 Read `/tmp/design-eval/music/prompt.md` in the agent session you want to test. Have that agent design the brief using the copied skills. The agent verifies its work through the `android-design-preview` CLI (`check` and `tree`); the runner compiles and renders again headlessly. The output directory must be new; preparation never overwrites existing work. Omit `--cases` to prepare all eight cases: the phone cases music, finance, settings, trek, and recipes, and the Wear cases workout, player, and reminder.
 

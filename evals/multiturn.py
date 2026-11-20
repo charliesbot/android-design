@@ -40,7 +40,7 @@ REVISIONS = (
     (
         'Theme and contrast adjustment (shared)',
         'Shift the board seed color from warm terracotta to deep forest olive (#3F6240 / 0xFF3F6240L) with '
-        'PaletteVariant.TonalSpot in both DESIGN.md and designBoard(...), and confirm light and dark views pass '
+        'PaletteVariant.TonalSpot in designBoard(...), and confirm light and dark views pass '
         'contrast checks.',
     ),
     (
