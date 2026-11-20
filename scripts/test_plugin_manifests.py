@@ -28,12 +28,11 @@ class PluginManifestsTest(unittest.TestCase):
         self.assertTrue((PLUGIN_DIR / agy_plugin["logo"]).is_file())
         self.assertTrue(1 <= len(agy_plugin["suggestedPrompts"]) <= 3)
 
-        # v5 bootstrap scripts exist (POSIX script must be executable).
+        # The v5 bootstrap script exists and is executable. Windows is unsupported, so no .cmd ships.
         posix_bin = PLUGIN_DIR / "bin/android-design-preview"
-        win_bin = PLUGIN_DIR / "bin/android-design-preview.cmd"
         self.assertTrue(posix_bin.is_file())
         self.assertTrue(os.access(posix_bin, os.X_OK), "plugin/bin/android-design-preview must be executable")
-        self.assertTrue(win_bin.is_file())
+        self.assertFalse((PLUGIN_DIR / "bin/android-design-preview.cmd").exists())
 
         # v4 Node MCP supervisor and MCP configs are retired.
         for removed in (
@@ -76,7 +75,7 @@ class PluginManifestsTest(unittest.TestCase):
 
     def test_no_em_dashes_in_plugin(self):
         for path in PLUGIN_DIR.rglob("*"):
-            if path.is_file() and path.suffix in {".md", ".json", ".svg", ".cmd", ""}:
+            if path.is_file() and path.suffix in {".md", ".json", ".svg", ""}:
                 self.assertNotIn(
                     "\u2014",
                     path.read_text(encoding="utf-8"),

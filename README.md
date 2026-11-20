@@ -7,7 +7,7 @@ Agent skills for designing Android UI with Material 3 Expressive and Wear OS Jet
 
 ## Install the plugin
 
-Requires **Java 17+** (JDK or Android Studio's bundled JBR). No Node.js or Android SDK is required.
+Runs on macOS and Linux (Windows is unsupported) and requires **Java 17+** (JDK or Android Studio's bundled JBR). No Node.js or Android SDK is required.
 
 - **Claude Code:** installing the plugin puts `plugin/bin/` on `PATH` automatically.
 - **Antigravity (from a local clone):** run `agy plugin install ./plugin` and `./plugin/bin/android-design-preview install` (or `./scripts/install_local_plugin.sh` when developing locally to also build `:app:workerJar` into `~/.cache/android-design-preview/<version>/`).
@@ -19,4 +19,4 @@ npx skills add charliesbot/android-design
 
 `plugin/skills/` holds `android-design` and `android-design-explore` directly for `npx skills` or copying into `~/.claude/skills/`. To put `android-design-preview` on `PATH`, run `./plugin/bin/android-design-preview install` once (symlinks into `~/.local/bin/android-design-preview`).
 
-If `~/.cache/android-design-preview/0.5.0/android-design-preview.jar` is absent, the first CLI invocation downloads and SHA-256 verifies the previewer for your OS and Java CPU from the matching GitHub Release (about 50 MB on macOS and Linux, unpacked to an uncompressed JAR). Merging a version bump to `main` publishes that release: CI builds the JAR and creates the `v<version>` tag and release. To use a local build (`cd app && ./gradlew :app:workerJar`), run `./scripts/install_local_plugin.sh` or set `ANDROID_DESIGN_PREVIEW_JAR` to `app/app/build/libs/android-design-preview.jar`.
+If `~/.cache/android-design-preview/0.5.0/android-design-preview.jar` is absent, the first CLI invocation downloads and SHA-256 verifies the previewer for your OS and Java CPU from the matching GitHub Release (about 50 MB, unpacked to an uncompressed JAR). Merging a version bump to `main` publishes that release: CI builds the JAR and creates the `v<version>` tag and release. To use a local build (`cd app && ./gradlew :app:workerJar`), run `./scripts/install_local_plugin.sh` or set `ANDROID_DESIGN_PREVIEW_JAR` to `app/app/build/libs/android-design-preview.jar`.

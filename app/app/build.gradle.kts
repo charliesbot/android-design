@@ -87,7 +87,8 @@ val mergeWorkerServices =
 val workerJar =
   tasks.register<Jar>("workerJar") {
     group = "distribution"
-    description = "Builds the standalone cross-OS headless Skiko + Kotlin sandbox worker JAR."
+    description =
+      "Builds the standalone macOS and Linux headless Skiko + Kotlin sandbox worker JAR."
     archiveFileName.set("android-design-preview.jar")
     isZip64 = true
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -115,6 +116,8 @@ val workerJar =
                 "META-INF/*.RSA",
                 "META-INF/MANIFEST.MF",
                 "module-info.class",
+                // Windows is unsupported, so its Skiko libraries would only add download size.
+                "skiko-windows-*",
               )
             }
           }
