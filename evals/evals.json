@@ -16,7 +16,7 @@
       "assertions": [
         {
           "id": "C-valid",
-          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
+          "text": "The proposal (and DESIGN.md when present) is valid: the previewer app's `render` accepted it (`valid` in report.json)",
           "type": "code"
         },
         {
@@ -96,7 +96,7 @@
       "assertions": [
         {
           "id": "C-valid",
-          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
+          "text": "The proposal (and DESIGN.md when present) is valid: the previewer app's `render` accepted it (`valid` in report.json)",
           "type": "code"
         },
         {
@@ -176,7 +176,7 @@
       "assertions": [
         {
           "id": "C-valid",
-          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
+          "text": "The proposal (and DESIGN.md when present) is valid: the previewer app's `render` accepted it (`valid` in report.json)",
           "type": "code"
         },
         {
@@ -261,7 +261,7 @@
       "assertions": [
         {
           "id": "C-valid",
-          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
+          "text": "The proposal (and DESIGN.md when present) is valid: the previewer app's `render` accepted it (`valid` in report.json)",
           "type": "code"
         },
         {
@@ -366,7 +366,7 @@
       "assertions": [
         {
           "id": "C-valid",
-          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
+          "text": "The proposal (and DESIGN.md when present) is valid: the previewer app's `render` accepted it (`valid` in report.json)",
           "type": "code"
         },
         {
@@ -446,7 +446,7 @@
       "assertions": [
         {
           "id": "C-valid",
-          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
+          "text": "The proposal (and DESIGN.md when present) is valid: the previewer app's `render` accepted it (`valid` in report.json)",
           "type": "code"
         },
         {
@@ -511,7 +511,7 @@
       "assertions": [
         {
           "id": "C-valid",
-          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
+          "text": "The proposal (and DESIGN.md when present) is valid: the previewer app's `render` accepted it (`valid` in report.json)",
           "type": "code"
         },
         {
@@ -576,7 +576,7 @@
       "assertions": [
         {
           "id": "C-valid",
-          "text": "The proposal and DESIGN.md are valid: the previewer app's `render` accepted them (`valid` in report.json)",
+          "text": "The proposal (and DESIGN.md when present) is valid: the previewer app's `render` accepted it (`valid` in report.json)",
           "type": "code"
         },
         {

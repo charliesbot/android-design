@@ -123,7 +123,7 @@ Compiling `.kt` files executes JVM bytecode. Three controls bound that surface:
 
 ### Exploration files and the `DesignBoard` kit
 
-Explorations are tracked files at `design/<slug>.explore.kt`, optionally reading shared defaults from `DESIGN.md` front matter at the repository root.
+Explorations are tracked files at `design/<slug>.explore.kt`, optionally reading shared defaults from `DESIGN.md` front matter at the repository root. While exploring, a board carries its own tokens (`designBoard(seed, variant, brandFont)`); the agent writes `DESIGN.md` only when the person approves a direction, so it records settled decisions rather than drafts.
 
 Screen composables use standard AndroidX imports, marking the primary CTA with a namespaced `Modifier.testTag("ad:primary")` so copied screens never collide with an app's own `"primary"` test tags. The top-level `designBoard` or `wearBoard` block in `bot.charlies.androiddesign.preview.kit` wires bundled variable fonts (`ProposalFonts`), seed schemes, Navigation 3 adaptive panes (`ListDetailSceneStrategy`, `SupportingPaneSceneStrategy`), overlays, inert `LocalUriHandler`/`LocalClipboard` stubs, and safe relative image loading (`designPainter("assets/cover.jpg")`, confined beneath the exploration directory with `..` traversal blocked):
 

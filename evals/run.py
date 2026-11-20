@@ -24,7 +24,7 @@ SKILL_DIR = ROOT / "plugin" / "skills" / "android-design"
 EXPLORE_DIR = ROOT / "plugin" / "skills" / "android-design-explore"
 # Where prepare() copies both skills inside a case directory.
 CASE_SKILLS = "skills"
-# Names inside a case directory. The agent writes DESIGN.md and the exploration; `render` writes renders/.
+# Names inside a case directory. The agent writes the exploration (DESIGN.md is written only on approval); `render` writes renders/.
 PROPOSAL = "design/proposal.explore.kt"
 WEAR_PROPOSAL = "design/proposal-wear.explore.kt"
 DESIGN_MD = "DESIGN.md"
@@ -48,7 +48,7 @@ def proposal_path(case_dir):
 
 
 def prepare(case, case_dir):
-    """A fresh fixture repository with design/ holding the brief's assets. The agent writes the proposal and DESIGN.md."""
+    """A fresh fixture repository with design/ holding the brief's assets. The agent writes the proposal."""
     case_dir.mkdir(parents=True)
     # Give the agent copies, not repository paths. This is not a security sandbox.
     for skill in (SKILL_DIR, EXPLORE_DIR):
@@ -368,7 +368,7 @@ def main():
         if not cases or any(not re.fullmatch(r'[a-z0-9-]+', c['name']) for c in cases):
             raise ValueError('Invalid or empty case list')
         if args.command == 'prepare':
-            print(f'Prepared {len(cases)} cases in {out}. Read each <case>/prompt.md; the agent writes only the DESIGN.md and design/ proposal it names.')
+            print(f'Prepared {len(cases)} cases in {out}. Read each <case>/prompt.md; the agent writes only the design/ proposal it names.')
             for case in cases:
                 print(f"  {case['name']}: {proposal_path(out / case['name'])}")
             return 0
