@@ -33,6 +33,9 @@ data class ServerRecord(
   val viewToken: String,
   val timeouts: List<TimeoutEntry> = emptyList(),
   val haltedAt: Long? = null,
+  /** The JAR this server runs and its modification time, so a rebuild replaces the server. */
+  val jarPath: String? = null,
+  val jarModified: Long? = null,
 ) {
   fun boardUrl(): String = "http://127.0.0.1:$port/?view=$viewToken"
 
@@ -120,6 +123,30 @@ object ServerPaths {
 
   fun rendersDir(repoRoot: Path, cacheRoot: Path = cacheRoot()): Path =
     cacheRoot.resolve("renders").resolve(repoHash(repoRoot))
+
+  /**
+   * The real path of the JAR this process runs from, or null when it runs from class directories
+   * (tests, IDE). Real paths keep a symlinked directory (macOS `/var`) from looking like another
+   * JAR.
+   */
+  fun runningJar(): Path? =
+    try {
+      val location = ServerPaths::class.java.protectionDomain?.codeSource?.location?.toURI()
+      location
+        ?.let(Path::of)
+        ?.takeIf { Files.isRegularFile(it) && it.toString().endsWith(".jar") }
+        ?.toRealPath()
+    } catch (_: Exception) {
+      null
+    }
+
+  /** [jar]'s modification time in milliseconds, or null when it cannot be read. */
+  fun jarModified(jar: Path): Long? =
+    try {
+      Files.getLastModifiedTime(jar).toMillis()
+    } catch (_: Exception) {
+      null
+    }
 
   fun randomToken(): String {
     val bytes = ByteArray(32)

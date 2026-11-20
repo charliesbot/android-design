@@ -54,6 +54,7 @@ class PreviewHttpServer(
   private val onWatchdogHalt: () -> Unit = { Runtime.getRuntime().halt(1) },
   private val onProcessExit: (() -> Unit)? = null,
   private val enableFileWatcher: Boolean = true,
+  private val jar: Path? = ServerPaths.runningJar(),
 ) {
   data class FocusTarget(
     val direction: String,
@@ -71,6 +72,7 @@ class PreviewHttpServer(
   private val clientSecret: String = existingClientSecret ?: ServerPaths.randomToken()
   private val viewToken: String = existingViewToken ?: ServerPaths.randomToken()
   private val startedAt: Long = System.currentTimeMillis()
+  private val jarModified: Long? = jar?.let(ServerPaths::jarModified)
   private val lastActivityMs = AtomicLong(startedAt)
   private val closed = AtomicBoolean(false)
   private val recycleScheduled = AtomicBoolean(false)
@@ -145,6 +147,8 @@ class PreviewHttpServer(
         repoRoot = repoRoot.toAbsolutePath().normalize().toString(),
         clientSecret = clientSecret,
         viewToken = viewToken,
+        jarPath = jar?.toString(),
+        jarModified = jarModified,
       )
 
   fun boardUrl(): String = "http://127.0.0.1:$boundPort/?view=$viewToken"
@@ -194,6 +198,8 @@ class PreviewHttpServer(
         viewToken = viewToken,
         timeouts = priorTimeouts,
         haltedAt = null,
+        jarPath = jar?.toString(),
+        jarModified = jarModified,
       )
     ServerPaths.writeRecord(recordPath, rec)
 

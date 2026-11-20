@@ -385,10 +385,12 @@ class CliEndToEndTest {
           pid = dummyProc.pid(),
           port = stubPort,
           jarVersion = AppInfo.VERSION,
-          startedAt = 1L,
+          startedAt = dummyProc.toHandle().info().startInstant().get().toEpochMilli(),
           repoRoot = repo.toAbsolutePath().normalize().toString(),
           clientSecret = stubSecret,
           viewToken = stubView,
+          jarPath = jarPath.toRealPath().toString(),
+          jarModified = Files.getLastModifiedTime(jarPath).toMillis(),
         ),
       )
 
@@ -484,6 +486,8 @@ class CliEndToEndTest {
           repoRoot = repo.toAbsolutePath().normalize().toString(),
           clientSecret = stubSecret,
           viewToken = stubView,
+          jarPath = jarPath.toRealPath().toString(),
+          jarModified = Files.getLastModifiedTime(jarPath).toMillis(),
         ),
       )
       val res =
