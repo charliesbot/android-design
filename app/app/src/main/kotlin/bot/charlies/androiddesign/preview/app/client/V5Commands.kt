@@ -647,25 +647,14 @@ class StopCommand(private val client: PreviewClient = PreviewClient()) : Command
       parsed.positionals.firstOrNull()?.let { Path.of(it).toAbsolutePath().normalize() }
         ?: Path.of(".").toAbsolutePath().normalize()
     val repoRoot = ServerPaths.resolveRepoRoot(target)
-    val lookup = client.probe(repoRoot)
+    val stopped = client.stop(repoRoot)
     val resp =
-      when (lookup) {
-        is PreviewClient.ServerLookup.Ready -> {
-          try {
-            client.postJson(lookup.record, "/api/stop", "{}", readTimeoutMs = 2_000)
-          } catch (_: Exception) {
-            ProcessHandle.of(lookup.record.pid).ifPresent { it.destroyForcibly() }
-          }
-          StopResponse(
-            ok = true,
-            stopped = true,
-            pid = lookup.record.pid,
-            repoRoot = repoRoot.toString(),
-          )
-        }
-        is PreviewClient.ServerLookup.NotReady ->
-          StopResponse(ok = true, stopped = false, pid = null, repoRoot = repoRoot.toString())
-      }
+      StopResponse(
+        ok = true,
+        stopped = stopped != null,
+        pid = stopped?.pid,
+        repoRoot = repoRoot.toString(),
+      )
     emitJson(out, PreviewJson.compact.encodeToString(StopResponse.serializer(), resp))
     return V5ExitCode.OK
   }

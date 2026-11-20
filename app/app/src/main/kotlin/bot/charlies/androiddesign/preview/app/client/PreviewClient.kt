@@ -12,6 +12,7 @@ import java.net.SocketTimeoutException
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
 
 /**
  * Short-lived CLI HTTP client using [HttpURLConnection] (~0.05 s startup; never uses
@@ -61,26 +62,20 @@ class PreviewClient(
   }
 
   /**
-   * Finds a live, version-matching server for [repoRoot] or spawns a fresh one, reusing the old
-   * record's port and viewToken so open browser `EventSource` connections reconnect cleanly.
+   * Finds a live server for [repoRoot] running this client's JAR, or spawns a fresh one, reusing
+   * the old record's port and viewToken so open browser `EventSource` connections reconnect
+   * cleanly. An outdated server (another version, or a rebuilt JAR) and one that is alive but not
+   * answering are stopped first, so a repository never runs two servers.
    */
   fun ensureServer(repoRoot: Path): ServerLookup {
     val recordPath = ServerPaths.recordPath(repoRoot, cacheRoot)
     val existing = ServerPaths.readRecord(recordPath)
     if (existing != null) {
       val live = probeRecord(existing)
-      if (live != null) {
-        if (live.jarVersion == AppInfo.VERSION) {
-          return ServerLookup.Ready(existing, live)
-        }
-        // Version mismatch: stop old server gracefully before respawning.
-        try {
-          postJson(existing, "/api/stop", "{}", readTimeoutMs = 1_500)
-          Thread.sleep(150)
-        } catch (_: Exception) {
-          killPid(existing.pid)
-        }
+      if (live != null && runsCurrentJar(existing, live)) {
+        return ServerLookup.Ready(existing, live)
       }
+      stopServer(existing, graceful = live != null)
     }
     return spawnServer(
       repoRoot = repoRoot,
@@ -89,9 +84,15 @@ class PreviewClient(
     )
   }
 
+  /** Stops [repoRoot]'s server, answering or not. Returns its record, or null when none ran. */
+  fun stop(repoRoot: Path): ServerRecord? {
+    val record = ServerPaths.readRecord(ServerPaths.recordPath(repoRoot, cacheRoot)) ?: return null
+    val stopped = stopServer(record, graceful = probeRecord(record) != null)
+    return if (stopped) record else null
+  }
+
   fun killAndRespawn(repoRoot: Path, deadRecord: ServerRecord): ServerLookup {
-    killPid(deadRecord.pid)
-    Thread.sleep(120)
+    stopServer(deadRecord, graceful = false)
     return spawnServer(
       repoRoot = repoRoot,
       reusePort = deadRecord.port,
@@ -118,6 +119,88 @@ class PreviewClient(
       else -> WARM_FULL_CLIENT_DEADLINE_MS
     }
   }
+
+  /**
+   * True when [record]'s server runs the JAR this client would start: the same version and, when
+   * the client runs from a JAR, the same path and modification time, so a rebuild at the same
+   * version still replaces the server.
+   */
+  private fun runsCurrentJar(record: ServerRecord, status: StatusResponse): Boolean {
+    if (status.jarVersion != AppInfo.VERSION) return false
+    val jar = resolveJarPath() ?: return true
+    val real =
+      try {
+        jar.toRealPath()
+      } catch (_: Exception) {
+        return false
+      }
+    return record.jarPath == real.toString() && record.jarModified == ServerPaths.jarModified(real)
+  }
+
+  /**
+   * Stops the server [record] describes and waits for it to go, asking it to stop first when
+   * [graceful]. The authenticated stop request needs no pid check, since only the recorded server
+   * holds the secret, but forcing a process does: only one [serverProcess] vouches for is killed.
+   * Returns whether the server stopped.
+   */
+  private fun stopServer(record: ServerRecord, graceful: Boolean): Boolean {
+    val handle = serverProcess(record)
+    if (graceful) {
+      val asked =
+        try {
+          postJson(record, "/api/stop", "{}", readTimeoutMs = 1_500)
+          true
+        } catch (_: Exception) {
+          false
+        }
+      if (handle != null && waitForExit(handle)) return true
+      if (handle == null && asked && waitUntilSilent(record)) return true
+    }
+    if (handle == null) return false
+    handle.destroyForcibly()
+    return waitForExit(handle)
+  }
+
+  /**
+   * The live process [record] describes, or null. A server that exited long ago may have left its
+   * pid to an unrelated process, so the process must have started just before the server recorded
+   * `startedAt` (or, where the OS hides start times, run this JAR's `server` command).
+   */
+  private fun serverProcess(record: ServerRecord): ProcessHandle? {
+    val handle = ProcessHandle.of(record.pid).orElse(null)?.takeIf { it.isAlive } ?: return null
+    val info = handle.info()
+    val started = info.startInstant().orElse(null)?.toEpochMilli()
+    val isServer =
+      if (started != null) {
+        record.startedAt - started in -START_CLOCK_SLACK_MS..MAX_SERVER_BOOT_MS
+      } else {
+        info.commandLine().orElse("").let { it.contains(" server ") && it.contains("--repo") }
+      }
+    return if (isServer) handle else null
+  }
+
+  /**
+   * Waits for [record]'s server, whose process [serverProcess] could not vouch for, to stop
+   * answering and then for its recorded pid to exit. Waiting harms nothing even if the pid now
+   * belongs to another process; it only frees the port before a replacement binds it.
+   */
+  private fun waitUntilSilent(record: ServerRecord): Boolean {
+    val deadline = System.currentTimeMillis() + STOP_WAIT_MS
+    while (probeRecord(record) != null) {
+      if (System.currentTimeMillis() >= deadline) return false
+      Thread.sleep(50)
+    }
+    ProcessHandle.of(record.pid).ifPresent { waitForExit(it) }
+    return true
+  }
+
+  private fun waitForExit(handle: ProcessHandle): Boolean =
+    try {
+      handle.onExit().get(STOP_WAIT_MS, TimeUnit.MILLISECONDS)
+      true
+    } catch (_: Exception) {
+      !handle.isAlive
+    }
 
   private fun probeRecord(record: ServerRecord): StatusResponse? {
     return try {
@@ -200,7 +283,7 @@ class PreviewClient(
         break
       }
     }
-    killPid(targetPid)
+    proc.destroyForcibly()
     return ServerLookup.NotReady("Timed out waiting for preview server to start on $repoRoot")
   }
 
@@ -271,17 +354,6 @@ class PreviewClient(
     return "java"
   }
 
-  private fun killPid(pid: Long) {
-    if (pid <= 0) return
-    try {
-      ProcessHandle.of(pid).ifPresent { handle ->
-        handle.destroyForcibly()
-      }
-    } catch (_: Exception) {
-      // Best-effort process cleanup.
-    }
-  }
-
   companion object {
     const val JAR_ENV = "ANDROID_DESIGN_PREVIEW_JAR"
     const val NO_OPEN_ENV = "ANDROID_DESIGN_NO_OPEN"
@@ -291,5 +363,10 @@ class PreviewClient(
     private const val COLD_CLIENT_DEADLINE_MS = 35_000
     private const val WARM_SCOPED_CLIENT_DEADLINE_MS = 8_000
     private const val WARM_FULL_CLIENT_DEADLINE_MS = 35_000
+    private const val STOP_WAIT_MS = 3_000L
+    /** How far the process clock may run ahead of the server's recorded `startedAt`. */
+    private const val START_CLOCK_SLACK_MS = 2_000L
+    /** The longest a server takes from process start to recording `startedAt`. */
+    private const val MAX_SERVER_BOOT_MS = 120_000L
   }
 }
