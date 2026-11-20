@@ -8,11 +8,7 @@
       "name": "android-design",
       "version": "0.5.0",
       "description": "Material 3 Expressive design judgment and live Compose board explorations for Android phone, tablet, desktop, and Wear OS screens.",
-      "source": {
-        "source": "git-subdir",
-        "url": "https://github.com/charliesbot/android-design.git",
-        "path": "plugin"
-      }
+      "source": "./plugin"
     }
   ]
 }
