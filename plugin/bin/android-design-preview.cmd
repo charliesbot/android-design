@@ -95,16 +95,27 @@ if exist "%REPO_DIR%\app\app\build\libs\android-design-preview.jar" (
   exit /b 0
 )
 
-if defined ANDROID_DESIGN_PREVIEW_JAR_URL (
-  set "JAR_URL=%ANDROID_DESIGN_PREVIEW_JAR_URL%"
-) else (
-  set "JAR_URL=https://github.com/charliesbot/android-design/releases/download/v%VERSION%/android-design-preview.jar"
+rem Releases ship one JAR per JVM CPU with only that platform's Skiko library (scripts/package_release.py).
+rem The JVM's CPU decides which Skiko library loads, so ask Java rather than Windows.
+set "JVM_ARCH="
+for /f "tokens=2 delims==" %%A in ('"%JAVA_BIN%" -XshowSettings:properties -version 2^>^&1 ^| findstr /c:"os.arch"') do set "JVM_ARCH=%%A"
+set "JVM_ARCH=%JVM_ARCH: =%"
+set "TARGET="
+if /I "%JVM_ARCH%"=="amd64" set "TARGET=windows-x64"
+if /I "%JVM_ARCH%"=="x86_64" set "TARGET=windows-x64"
+if /I "%JVM_ARCH%"=="aarch64" set "TARGET=windows-arm64"
+if /I "%JVM_ARCH%"=="arm64" set "TARGET=windows-arm64"
+if not defined TARGET (
+  echo {"ok":false,"error":"unsupported_platform","message":"No previewer release for this Java CPU. Build it with cd app && gradlew :app:workerJar and set ANDROID_DESIGN_PREVIEW_JAR."}
+  exit /b 3
 )
-if defined ANDROID_DESIGN_PREVIEW_SHA_URL (
-  set "SHA_URL=%ANDROID_DESIGN_PREVIEW_SHA_URL%"
+if defined ANDROID_DESIGN_PREVIEW_RELEASE_URL (
+  set "RELEASE_URL=%ANDROID_DESIGN_PREVIEW_RELEASE_URL%"
 ) else (
-  set "SHA_URL=%JAR_URL%.sha256"
+  set "RELEASE_URL=https://github.com/charliesbot/android-design/releases/download/v%VERSION%"
 )
+set "JAR_URL=%RELEASE_URL%/android-design-preview-%TARGET%.jar"
+set "SHA_URL=%JAR_URL%.sha256"
 
 if not exist "%CACHE_ROOT%\%VERSION%" mkdir "%CACHE_ROOT%\%VERSION%"
 set "TMP_JAR=%CACHED_JAR%.tmp.%RANDOM%"

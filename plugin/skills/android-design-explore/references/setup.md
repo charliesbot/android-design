@@ -6,7 +6,7 @@ Read this when `android-design-preview` is not on `PATH` or exits `3` (missing J
 
 - **Java 17+** (system `java` on `PATH`, `JAVA_HOME`, or Android Studio's bundled JBR)
 
-On first run, if `~/.cache/android-design-preview/<version>/android-design-preview.jar` is missing, the bootstrap script downloads `android-design-preview.jar` from GitHub Releases and verifies its SHA-256 checksum automatically.
+On first run, if `~/.cache/android-design-preview/<version>/android-design-preview.jar` is missing, the bootstrap script downloads the previewer for your OS and Java CPU from GitHub Releases and verifies its SHA-256 checksum automatically.
 
 ## Put `android-design-preview` on `PATH`
 
