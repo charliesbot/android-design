@@ -225,10 +225,19 @@ def artifact_hashes(case_dir):
             for p in sorted(files)}
 
 
+def proposal_source(case_dir):
+    """The proposal's `.explore.kt` text, for the rubric's code items; None when the case has no proposal file."""
+    if not (case_dir / 'case.json').is_file():
+        return None
+    proposal = proposal_path(case_dir)
+    return proposal.read_text() if proposal.is_file() else None
+
+
 def make_request(case, case_dir, rubric):
     ids = [a['id'] for a in case['assertions'] if a['type'] == 'rubric']
     images = [str(p.resolve()) for p in rendered_images(case_dir)]
-    prompt = judge_prompt(case['name'], images, ids, case=case, rubric=rubric, labels=image_labels(case_dir))
+    prompt = judge_prompt(case['name'], images, ids, case=case, rubric=rubric, labels=image_labels(case_dir),
+                          source=proposal_source(case_dir))
     request = {'case': case['name'], 'item_ids': ids, 'images': images,
                'prompt': prompt, 'schema': SCHEMA, 'artifacts': artifact_hashes(case_dir)}
     request['request_id'] = hashlib.sha256(json.dumps(request, sort_keys=True).encode()).hexdigest()

@@ -22,7 +22,7 @@ Each case in `evals.json` has a `surface`. A `.explore.kt` file declares `design
 
 | Surface | Cases | Views | Checks | Rubric |
 | --- | --- | --- | --- | --- |
-| `phone` | music, finance, settings, trek, recipes | five, below | `C-valid`, `C-review`, `C-palette` | General items plus the case's own |
+| `phone` | music, finance, settings, trek, recipes | five, below | `C-valid`, `C-review`, `C-palette` | General items, the four code items, and the case's own |
 | `wear` | workout, player, reminder | `watch` (204x204) and `watch-large` (227x227), both round and dark | `C-valid`, `C-review` | `R-hierarchy`, `R-controls`, `R-text`, the five `R-wear-*` items, and the case's own |
 
 Wear is the Wear OS port hosted in the previewer JAR (`docs/design/wear-os-previewer.md`). `agent-prompt.md` is shared; `SURFACE_PROMPT` in `run.py` fills in where the exploration must work and how to interpret `android-design-preview check` layout summaries for each surface. `C-palette` is skipped for Wear on purpose: it guards the phone theme variant against neon surfaces, while a Wear board builds from black through Wear's own color mapping, and `R-wear-color` judges the rendered color directly. `rubric.md` says which items each surface judges. To test a local JAR build, set `ANDROID_DESIGN_PREVIEW_JAR=/path/to/android-design-preview.jar`.
@@ -47,7 +47,7 @@ The deterministic checks all read `report.json`:
 | `C-review` | Every render passes the worker's finding rules, overlay renders included. The detail lists each failure as `screen/view: rule` (`screen+overlay/view: rule` for an overlay render). No renders is a failure. |
 | `C-palette` | The merged theme's `variant` is not `expressive` or `vibrant`. Phone cases only. |
 
-For visual assessment, give each `judge-request.json` to your chosen reviewer. They must inspect every listed screenshot (each is labeled `screen/view`) against its included rubric. The layout trees stay out of the request: the judge sees one PNG per screen and view, one per overlay and view, and the end of each scrolling Wear list. Prefer a separate session for a blind judgment; the current chat is useful for interactive checks but is not a controlled independent evaluation.
+For visual assessment, give each `judge-request.json` to your chosen reviewer. They must inspect every listed screenshot (each is labeled `screen/view`) against its included rubric. The layout trees stay out of the request: the judge sees one PNG per screen and view, one per overlay and view, and the end of each scrolling Wear list. The request also carries the proposal's `.explore.kt` source, which the rubric's code items (`R-semantics`, `R-fields`, `R-visibility`, `R-blur`) are judged from, because semantics, text field state, and how content is hidden never show in a screenshot. Prefer a separate session for a blind judgment; the current chat is useful for interactive checks but is not a controlled independent evaluation.
 
 The reviewer writes `<case>/judge-ballot.json`:
 
@@ -96,7 +96,7 @@ python3 calibrate.py prepare --out /tmp/design-calibration
 python3 calibrate.py score --out /tmp/design-calibration
 ```
 
-The Wear calibration images (`calibration/wear-*.png`) are frozen renders matched to `calibration/labels.json`.
+The Wear calibration images (`calibration/wear-*.png`) are frozen renders matched to `calibration/labels.json`. The `calibration/code-*` labels each pair a light render with the `.explore.kt` it came from (`source` in the label), so the code items are calibrated against real code.
 
 Calibration and eval artifacts use the same judging prompt, including the screen brief as task context rather than proof of implementation. Keep calibration labels out of the judging session. Manual calibration imports one ballot per image; automatic calibration defaults to three. Promotion is explicit:
 
