@@ -23,9 +23,10 @@ History: the first audit found 266 distilled, 133 partial, and 13 missing routes
 | developer.android.com/design/ui: Wear OS (current guides) | 46 | 0 | 0 | 4 |
 | developer.android.com/design/ui: Wear OS (components and M2.5 guides) | 38 | 0 | 0 | 17 |
 | developer.android.com/develop: Adaptive apps | 41 | 0 | 0 | 18 |
-| developer.android.com/develop: Compose UI (not yet audited) | 0 | 0 | 386 | 0 |
+| developer.android.com/develop: Compose UI (accessibility, animation, design systems, graphics, text) | 40 | 0 | 0 | 22 |
+| developer.android.com/develop: Compose UI (not yet audited) | 0 | 0 | 324 | 0 |
 | Out of scope: developer.android.com platforms | 0 | 0 | 0 | 150 |
-| **Total** | **455** | **0** | **386** | **335** |
+| **Total** | **495** | **0** | **324** | **357** |
 
 ## m3.material.io: Foundations (excluding Layout)
 
@@ -1098,25 +1099,105 @@ Result: 59 routes checked. 41 are distilled and 18 are skipped. Before this pass
 9. /develop/adaptive-apps/guides/support-different-display-sizes: read the window size class once at the top and let nested composables adapt to their own constraints. Why: it keeps reusable components correct inside panes.
 10. /develop/adaptive-apps/guides/foldables/learn-about-foldables: keep dialogs and menus off the fold; split content top and bottom in tabletop, left and right in book posture. Why: it is the fold rule agents most often break.
 
+## developer.android.com/develop: Compose UI (accessibility, animation, design systems, graphics, text)
+
+Audited from the Compose UI crawl (see the next batch): the accessibility, animation, design systems, graphics, styles, and text pages.
+
+Result: 62 routes checked. 40 are distilled and 22 are skipped. The research had Material's design view of these topics but not the Compose code decisions: which semantics to merge or hide, which animation API fits a change, what blur and custom shadows can and cannot do, and how text fields are built. Those went into a new section of android-ui-design-guides.md, Compose UI (developer guides), which says that Material's guidance leads and the pages' baseline Material 3 snippets are overridden by the Expressive guidance.
+
+### /develop/ui/compose/accessibility
+- [-] /develop/ui/compose/accessibility; link hub to the accessibility pages, no guidance
+- [x] /develop/ui/compose/accessibility/api-defaults → android-ui-design-guides.md (Compose UI: Accessibility semantics)
+- [-] /develop/ui/compose/accessibility/inspect-debug; Layout Inspector, Accessibility Scanner, and TalkBack debugging, tooling only
+- [x] /develop/ui/compose/accessibility/merging-clearing → android-ui-design-guides.md (Compose UI: Accessibility semantics)
+- [x] /develop/ui/compose/accessibility/scalable-content → android-ui-design-guides.md (Compose UI: Accessibility semantics); the scaling implementation code is mechanics
+- [x] /develop/ui/compose/accessibility/semantics → android-ui-design-guides.md (Compose UI: Accessibility semantics)
+- [-] /develop/ui/compose/accessibility/testing; accessibility checks in UI tests, testing only
+- [x] /develop/ui/compose/accessibility/traversal → android-ui-design-guides.md (Compose UI: Accessibility semantics)
+
+### /develop/ui/compose/animation
+- [x] /develop/ui/compose/animation/advanced → android-ui-design-guides.md (Compose UI: Motion in code); the gesture sample code is mechanics
+- [x] /develop/ui/compose/animation/choose-api → android-ui-design-guides.md (Compose UI: Motion in code)
+- [x] /develop/ui/compose/animation/composables-modifiers → android-ui-design-guides.md (Compose UI: Motion in code)
+- [x] /develop/ui/compose/animation/customize → android-ui-design-guides.md (Compose UI: Motion in code); the samples' `tween` durations are API demos and do not override the `MotionScheme` springs
+- [-] /develop/ui/compose/animation/introduction; overview linking the animation pages; its API choice is on choose-api
+- [x] /develop/ui/compose/animation/quick-guide → android-ui-design-guides.md (Compose UI: Motion in code)
+- [-] /develop/ui/compose/animation/resources; list of codelabs, blogs, and videos, no guidance
+- [x] /develop/ui/compose/animation/shared-elements → android-ui-design-guides.md (Compose UI: Motion in code)
+- [-] /develop/ui/compose/animation/shared-elements/additional-samples; links to sample apps, no guidance
+- [x] /develop/ui/compose/animation/shared-elements/common-use-cases → android-ui-design-guides.md (Compose UI: Motion in code)
+- [x] /develop/ui/compose/animation/shared-elements/customize → android-ui-design-guides.md (Compose UI: Motion in code)
+- [x] /develop/ui/compose/animation/shared-elements/navigation → android-ui-design-guides.md (Compose UI: Motion in code); Navigation 2 setup skipped (the skills target Navigation 3)
+- [-] /develop/ui/compose/animation/testing; animation test clock APIs, testing only
+- [-] /develop/ui/compose/animation/tooling; Android Studio Animation Preview, tooling only
+- [x] /develop/ui/compose/animation/value-based → android-ui-design-guides.md (Compose UI: Motion in code)
+- [-] /develop/ui/compose/animation/vectors; one-line choice among animated vector drawables, `ImageVector`, and Lottie, already in the choose-api tree
+
+### /develop/ui/compose/designsystems
+- [-] /develop/ui/compose/designsystems; link hub to the design system pages, no guidance
+- [x] /develop/ui/compose/designsystems/anatomy → android-ui-design-guides.md (Compose UI: Theming in code)
+- [x] /develop/ui/compose/designsystems/custom → android-ui-design-guides.md (Compose UI: Theming in code)
+- [-] /develop/ui/compose/designsystems/material; Material 2 theming; the library is deprecated, which the research already records (Compose API reference)
+- [x] /develop/ui/compose/designsystems/material2-material3 → android-ui-design-guides.md (Compose UI: Theming in code); the M2 to M3 API rename table is migration mechanics
+- [x] /develop/ui/compose/designsystems/material3 → android-ui-design-guides.md (Compose UI: Theming in code); baseline M3 snippets are overridden by the Expressive guidance
+- [-] /develop/ui/compose/designsystems/migrate-xml-theme-to-compose; XML theme conversion steps; its one principle (name colors by role, not hex) is already in Tokens and theming model
+- [-] /develop/ui/compose/designsystems/views-to-compose; duplicate of /develop/ui/compose/designsystems/migrate-xml-theme-to-compose (same text)
+
+### /develop/ui/compose/graphics
+- [-] /develop/ui/compose/graphics; link hub to the graphics pages, no guidance
+- [x] /develop/ui/compose/graphics/blur/examples → android-ui-design-guides.md (Compose UI: Graphics)
+- [x] /develop/ui/compose/graphics/blur/overview → android-ui-design-guides.md (Compose UI: Graphics)
+- [x] /develop/ui/compose/graphics/draw/brush → android-ui-design-guides.md (Compose UI: Graphics)
+- [x] /develop/ui/compose/graphics/draw/mesh-gradient → android-ui-design-guides.md (Compose UI: Graphics)
+- [x] /develop/ui/compose/graphics/draw/modifiers → android-ui-design-guides.md (Compose UI: Graphics); `drawWithCache` and `drawBehind` mechanics skipped
+- [-] /develop/ui/compose/graphics/draw/overview; `DrawScope`, coordinate system, and draw call mechanics, no UI decision
+- [x] /develop/ui/compose/graphics/draw/shadows → android-ui-design-guides.md (Compose UI: Graphics); the neumorphic, neobrutalist, and realistic styles are recorded as outside Material
+- [x] /develop/ui/compose/graphics/draw/shapes → android-ui-design-guides.md (Compose UI: Graphics)
+- [-] /develop/ui/compose/graphics/images; link hub to the image pages, no guidance
+- [-] /develop/ui/compose/graphics/images/compare; explains `ImageBitmap` and `ImageVector` formats; the design rule (Material Symbols vectors for icons) is in Graphics
+- [x] /develop/ui/compose/graphics/images/customize → android-ui-design-guides.md (Compose UI: Graphics)
+- [-] /develop/ui/compose/graphics/images/custompainter; custom `Painter` versus draw modifier mechanics, no UI decision
+- [x] /develop/ui/compose/graphics/images/loading → android-ui-design-guides.md (Compose UI: Graphics); the loader library setup is mechanics
+- [x] /develop/ui/compose/graphics/images/material → android-ui-design-guides.md (Compose UI: Graphics)
+- [x] /develop/ui/compose/graphics/images/optimization → android-ui-design-guides.md (Compose UI: Graphics); bitmap config, recycling, and stability advice skipped (performance)
+
+### /develop/ui/compose/styles
+- [x] /develop/ui/compose/styles → android-ui-design-guides.md (Compose UI: Theming in code); the API stays experimental and is being redesigned, so the research says not to use it
+- [-] /develop/ui/compose/styles/styles-update; duplicate of /develop/ui/compose/styles (same text)
+
+### /develop/ui/compose/text
+- [-] /develop/ui/compose/text; overview of `Text` and `TextField` versus the basic variants; the choice is on user-input
+- [x] /develop/ui/compose/text/autofill → android-ui-design-guides.md (Compose UI: Text and input)
+- [x] /develop/ui/compose/text/configure-layout → material-3.md (Typography: Text resizing and truncation); adds only the `maxLines` and `TextOverflow` APIs
+- [-] /develop/ui/compose/text/display-text; a basic `Text` sample and the string resource convention, no UI decision
+- [x] /develop/ui/compose/text/emoji → android-ui-design-guides.md (Compose UI: Text and input)
+- [x] /develop/ui/compose/text/fonts → android-ui-design-guides.md (Compose UI: Text and input); downloadable font setup skipped (every face is bundled)
+- [x] /develop/ui/compose/text/migrate-state-based → android-ui-design-guides.md (Compose UI: Text and input); the per-API migration steps are mechanics
+- [-] /develop/ui/compose/text/rich-text-input; `TextFieldState` span and formatting mechanics for editors, no design decision
+- [x] /develop/ui/compose/text/style-paragraph → android-ui-design-guides.md (Compose UI: Text and input)
+- [x] /develop/ui/compose/text/style-text → android-ui-design-guides.md (Compose UI: Text and input); color, size, weight, and shadow samples add nothing beyond the type scale
+- [x] /develop/ui/compose/text/user-input → android-ui-design-guides.md (Compose UI: Text and input)
+- [x] /develop/ui/compose/text/user-interactions → android-ui-design-guides.md (Compose UI: Text and input)
+
+### Gaps worth distilling
+1. /develop/ui/compose/accessibility/merging-clearing: clickables, toggleables, buttons, and `ListItem` already merge their children, so `mergeDescendants` is redundant on them; decorative content uses `hideFromAccessibility()`, and `clearAndSetSemantics` only when merging cannot describe the control. Why: agents over-apply both modifiers.
+2. /develop/ui/compose/accessibility/api-defaults: a toggling row carries `toggleable` or `selectable` with a role, and its control gets a `null` callback; the 48dp minimum applies only to controls with a callback. Why: it is the most common list-row accessibility bug.
+3. /develop/ui/compose/animation/choose-api and /develop/ui/compose/animation/quick-guide: pick the API by the change (`AnimatedVisibility`, `AnimatedContent`, `animateContentSize`, `animateItem`, `updateTransition`, `Animatable`), and hide with `AnimatedVisibility` rather than alpha. Why: an alpha-faded element still takes space and is read by screen readers.
+4. /develop/ui/compose/animation/shared-elements: container transform is `sharedBounds`, hero is `sharedElement`, text uses `sharedBounds` with `scaleToBounds`, and shared elements cannot cross into a `Dialog` or `ModalBottomSheet`. Why: it settles how Material's transition patterns are built.
+5. /develop/ui/compose/graphics/blur/overview: blur needs Android 12 (progressive Android 13), draws unblurred below, and blurs only the composable's own content. Why: agents reach for blur to make frosted panels, which it cannot do.
+6. /develop/ui/compose/graphics/draw/shadows: `dropShadow` and `innerShadow` take radius, spread, and any shape; `innerShadow` goes after the background; neumorphic and similar styles are not Material. Why: it bounds when a custom shadow is allowed.
+7. /develop/ui/compose/text/user-input and /develop/ui/compose/text/migrate-state-based: build fields on `TextFieldState`, use `SecureTextField` for passwords, and set `ImeAction.Next` on every field but the last. Why: Google recommends state-based fields, and value-based `BasicTextField` and `VisualTransformation` are deprecated from Compose 1.13.
+8. /develop/ui/compose/designsystems/custom: extend `MaterialTheme` with extension properties or an `@Immutable` class in a `staticCompositionLocalOf` before building a custom design system. Why: it keeps brand tokens inside Material's theming model.
+
 ## developer.android.com/develop: Compose UI
 
-Fetched November 2026 by crawling outward from /develop/ui: every Compose UI page. Views pages are left out because the skills target Compose. These pages are fetched but not yet audited, so every row is `[ ]` until a pass reads the page, distills what changes agent-built UI, and gives it a verdict.
+Fetched November 2026 by crawling outward from /develop/ui: every Compose UI page. Views pages are left out because the skills target Compose. These pages are fetched but not yet audited, so every row is `[ ]` until a pass reads the page, distills what changes agent-built UI, and gives it a verdict. The accessibility, animation, design systems, graphics, styles, and text pages are audited in the batch above.
 
 ### /develop/ui
 - [ ] /develop/ui
 
 ### /develop/ui/compose
 - [ ] /develop/ui/compose
-
-### /develop/ui/compose/accessibility
-- [ ] /develop/ui/compose/accessibility
-- [ ] /develop/ui/compose/accessibility/api-defaults
-- [ ] /develop/ui/compose/accessibility/inspect-debug
-- [ ] /develop/ui/compose/accessibility/merging-clearing
-- [ ] /develop/ui/compose/accessibility/scalable-content
-- [ ] /develop/ui/compose/accessibility/semantics
-- [ ] /develop/ui/compose/accessibility/testing
-- [ ] /develop/ui/compose/accessibility/traversal
 
 ### /develop/ui/compose/adopt
 - [ ] /develop/ui/compose/adopt
@@ -1129,24 +1210,6 @@ Fetched November 2026 by crawling outward from /develop/ui: every Compose UI pag
 - [ ] /develop/ui/compose/agentic/manage-catalogs
 - [ ] /develop/ui/compose/agentic/render-surfaces
 - [ ] /develop/ui/compose/agentic/testing
-
-### /develop/ui/compose/animation
-- [ ] /develop/ui/compose/animation/advanced
-- [ ] /develop/ui/compose/animation/choose-api
-- [ ] /develop/ui/compose/animation/composables-modifiers
-- [ ] /develop/ui/compose/animation/customize
-- [ ] /develop/ui/compose/animation/introduction
-- [ ] /develop/ui/compose/animation/quick-guide
-- [ ] /develop/ui/compose/animation/resources
-- [ ] /develop/ui/compose/animation/shared-elements
-- [ ] /develop/ui/compose/animation/shared-elements/additional-samples
-- [ ] /develop/ui/compose/animation/shared-elements/common-use-cases
-- [ ] /develop/ui/compose/animation/shared-elements/customize
-- [ ] /develop/ui/compose/animation/shared-elements/navigation
-- [ ] /develop/ui/compose/animation/testing
-- [ ] /develop/ui/compose/animation/tooling
-- [ ] /develop/ui/compose/animation/value-based
-- [ ] /develop/ui/compose/animation/vectors
 
 ### /develop/ui/compose/api-guidelines
 - [ ] /develop/ui/compose/api-guidelines
@@ -1214,16 +1277,6 @@ Fetched November 2026 by crawling outward from /develop/ui: every Compose UI pag
 ### /develop/ui/compose/custom-modifiers-node
 - [ ] /develop/ui/compose/custom-modifiers-node
 
-### /develop/ui/compose/designsystems
-- [ ] /develop/ui/compose/designsystems
-- [ ] /develop/ui/compose/designsystems/anatomy
-- [ ] /develop/ui/compose/designsystems/custom
-- [ ] /develop/ui/compose/designsystems/material
-- [ ] /develop/ui/compose/designsystems/material2-material3
-- [ ] /develop/ui/compose/designsystems/material3
-- [ ] /develop/ui/compose/designsystems/migrate-xml-theme-to-compose
-- [ ] /develop/ui/compose/designsystems/views-to-compose
-
 ### /develop/ui/compose/documentation
 - [ ] /develop/ui/compose/documentation
 
@@ -1246,24 +1299,6 @@ Fetched November 2026 by crawling outward from /develop/ui: every Compose UI pag
 - [ ] /develop/ui/compose/glance/testing
 - [ ] /develop/ui/compose/glance/theme
 - [ ] /develop/ui/compose/glance/user-interaction
-
-### /develop/ui/compose/graphics
-- [ ] /develop/ui/compose/graphics
-- [ ] /develop/ui/compose/graphics/blur/examples
-- [ ] /develop/ui/compose/graphics/blur/overview
-- [ ] /develop/ui/compose/graphics/draw/brush
-- [ ] /develop/ui/compose/graphics/draw/mesh-gradient
-- [ ] /develop/ui/compose/graphics/draw/modifiers
-- [ ] /develop/ui/compose/graphics/draw/overview
-- [ ] /develop/ui/compose/graphics/draw/shadows
-- [ ] /develop/ui/compose/graphics/draw/shapes
-- [ ] /develop/ui/compose/graphics/images
-- [ ] /develop/ui/compose/graphics/images/compare
-- [ ] /develop/ui/compose/graphics/images/customize
-- [ ] /develop/ui/compose/graphics/images/custompainter
-- [ ] /develop/ui/compose/graphics/images/loading
-- [ ] /develop/ui/compose/graphics/images/material
-- [ ] /develop/ui/compose/graphics/images/optimization
 
 ### /develop/ui/compose/interop
 - [ ] /develop/ui/compose/interop
@@ -1478,10 +1513,6 @@ Fetched November 2026 by crawling outward from /develop/ui: every Compose UI pag
 ### /develop/ui/compose/state-saving
 - [ ] /develop/ui/compose/state-saving
 
-### /develop/ui/compose/styles
-- [ ] /develop/ui/compose/styles
-- [ ] /develop/ui/compose/styles/styles-update
-
 ### /develop/ui/compose/system
 - [ ] /develop/ui/compose/system/cutouts
 - [ ] /develop/ui/compose/system/evaluate-rulers
@@ -1524,20 +1555,6 @@ Fetched November 2026 by crawling outward from /develop/ui: every Compose UI pag
 
 ### /develop/ui/compose/testing-cheatsheet
 - [ ] /develop/ui/compose/testing-cheatsheet
-
-### /develop/ui/compose/text
-- [ ] /develop/ui/compose/text
-- [ ] /develop/ui/compose/text/autofill
-- [ ] /develop/ui/compose/text/configure-layout
-- [ ] /develop/ui/compose/text/display-text
-- [ ] /develop/ui/compose/text/emoji
-- [ ] /develop/ui/compose/text/fonts
-- [ ] /develop/ui/compose/text/migrate-state-based
-- [ ] /develop/ui/compose/text/rich-text-input
-- [ ] /develop/ui/compose/text/style-paragraph
-- [ ] /develop/ui/compose/text/style-text
-- [ ] /develop/ui/compose/text/user-input
-- [ ] /develop/ui/compose/text/user-interactions
 
 ### /develop/ui/compose/tooling
 - [ ] /develop/ui/compose/tooling

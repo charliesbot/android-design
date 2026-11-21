@@ -134,6 +134,7 @@ Rules for both:
 - Checkboxes for multiple related options in a list; radio buttons for one of five or fewer, listed vertically, one always selected; switches for standalone settings that take effect immediately. Opposing options (list or map view) use a connected button group, not a switch. "A switch can't replace a button."
 - Sliders take effect immediately and show the full range; "XL sliders should be reserved for hero moments, where the slider itself is the most important element on the page."
 - Text fields always have a visible label that never truncates; filled and outlined differ by style only, but never both in one form. Error text replaces supporting text; fields never span the full width of a large screen.
+- Build fields on `TextFieldState` (`TextField(state = rememberTextFieldState(), ...)`) with `InputTransformation` and `OutputTransformation`, which Google recommends; value-based `BasicTextField` and `VisualTransformation` are deprecated from Compose 1.13. Expressive styling: `shape = TextFieldDefaults.roundedShape` with `colors = TextFieldDefaults.tonalColors()`; the outlined variant (`OutlinedTextFieldDefaults`) adds `labelPosition = TextFieldLabelPosition.Inside()`. Passwords use `SecureTextField`. Set `keyboardOptions` per field (keyboard type, capitalization, `ImeAction.Next` on every field but the last, `Done` on the last) and autofill `contentType` semantics on credential fields. Format display-only values (phone numbers) with an `OutputTransformation` (Google).
 
 ### Feedback and status
 

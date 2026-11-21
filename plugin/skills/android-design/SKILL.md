@@ -86,7 +86,7 @@ Code checks:
 
 ### Theme setup
 
-Wrap the app in `MaterialExpressiveTheme` with `MotionScheme.expressive()`, the chosen color scheme, and the type scale from [Typography](#typography). Requires `androidx.compose.material3:material3` **1.5.0** or later (Compose BOM `2026.11.01`; 1.4.0 lacks almost all Expressive APIs). Read [references/theming.md](references/theming.md) for theme code, toolchain requirements, opt-in APIs, seed schemes, type voices, shape morphing, motion specs, and spacing.
+Wrap the app in `MaterialExpressiveTheme` with `MotionScheme.expressive()`, the chosen color scheme, and the type scale from [Typography](#typography). Requires `androidx.compose.material3:material3` **1.5.0** or later (Compose BOM `2026.11.01`; 1.4.0 lacks almost all Expressive APIs). Read [references/theming.md](references/theming.md) for theme code, toolchain requirements, opt-in APIs, seed schemes, type voices, shape morphing, motion specs, blur and shadows, and spacing.
 
 ### Emphasis and hierarchy
 
@@ -187,6 +187,7 @@ Stock code reaches for the left column; lint will not flag it.
 
 - Contrast: 4.5:1 small text, 3:1 large text, icons, and controls. Generated/static schemes must honor system contrast ([references/theming.md](references/theming.md#contrast-levels)). Pair color with icon, label, or underline for every state/link.
 - Touch targets 48dp with 8dp separation. Support 200% text scaling (text grows, padding/icons/controls do not, layouts reflow). Ellipsize only when full text is reachable (tooltip, link, expanded view); otherwise wrap (Google).
+- Semantics in Compose (Google): section titles take `Modifier.semantics { heading() }`. A row that toggles carries `toggleable` or `selectable` with a `role`, and its `Checkbox`, `Switch`, or `RadioButton` gets a `null` callback, so the row is one 48dp target. Clickables, buttons, and `ListItem` already merge their children; don't add `mergeDescendants`. Decorative or repeated text uses `hideFromAccessibility()`; `clearAndSetSemantics` only when merging can't describe the control. Custom `Canvas` controls need semantics added by hand.
 - Content descriptions state purpose ("Voice search"), not appearance or role. Sentence case, second person, no periods on single-sentence labels, contractions, exclamation points only for real celebrations.
 
 ### Android conventions
