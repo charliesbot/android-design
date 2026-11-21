@@ -257,7 +257,7 @@ enum class FindingRule(val wire: String, val reference: String, val hint: String
     wire = "overflow",
     reference = "layout.md#breakpoints",
     hint =
-      "Prevent horizontal overflow past the parent or window width (use FlowRow, weight, widthIn, or horizontal scrolling).",
+      "Prevent horizontal overflow past the parent or window width (use FlexBox with FlexWrap.Wrap, weight, widthIn, or horizontal scrolling).",
   ),
   @SerialName("round-edge-clipped")
   RoundEdgeClipped(

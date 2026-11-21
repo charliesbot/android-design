@@ -116,6 +116,8 @@ internal object CallNameMapper {
       "RadioButton" to M3Component.RadioButton.wire,
       "TextField" to M3Component.TextField.wire,
       "OutlinedTextField" to M3Component.TextField.wire,
+      "SecureTextField" to M3Component.TextField.wire,
+      "OutlinedSecureTextField" to M3Component.TextField.wire,
       "SearchBar" to M3Component.SearchBar.wire,
       "AppBarWithSearch" to M3Component.SearchBar.wire,
       "TopSearchBar" to M3Component.SearchBar.wire,

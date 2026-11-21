@@ -61,6 +61,7 @@ Moving up a breakpoint, ask five questions. For control-based layouts like media
 ## Grids and max widths
 
 - Compact screens use a 4-column grid. Pick the grid by content: hierarchical for editorial and detail screens, modular for equal items (galleries), column for flexible one-direction flow. Break it only when content needs it.
+- **Compose 1.13 layout primitives:** use `Grid` for 2D structure (give a track holding a lazy list `GridTrackSize.MinMax(0.dp, 1.fr)`), and `FlexBox(config = { wrap(FlexWrap.Wrap); gap(8.dp) })` instead of `FlowRow` or `FlowColumn` for small wrapping sets of chips or badges (`FlexBox` defaults to `NoWrap`) (Google).
 - 8dp grid for layout and components, 4dp for icons, type, and small elements.
 - Image ratios: 16:9, 3:2, 4:3, 1:1, 3:4, 2:3. Decide per breakpoint whether an image keeps its ratio, changes it, or keeps a fixed height.
 - **Never stretch** buttons, text fields, bottom sheets, tabs, or single-pane content across a wide window; give them a max width and change presentation instead (bottom sheet to side sheet, list to cards, FAB to extended FAB).
