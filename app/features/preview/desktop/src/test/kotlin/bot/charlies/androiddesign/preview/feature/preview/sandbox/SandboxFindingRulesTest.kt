@@ -990,4 +990,367 @@ class SandboxFindingRulesTest {
     assertNotNull(dateNode?.colors, "Expected DatePicker sampled colors")
     assertNotNull(groupNode?.colors, "Expected ButtonGroup sampled colors")
   }
+
+  @Test
+  fun `enforces contrast on M3 1_5 ColorProducer Text`() {
+    val src =
+      """
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.runtime.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("ColorProducer Text") {
+        screen {
+          val bg = MaterialTheme.colorScheme.inverseSurface
+          val fg = MaterialTheme.colorScheme.inverseOnSurface
+          Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            Surface(color = bg) {
+              Box(modifier = Modifier.padding(16.dp)) {
+                Text(text = "ColorProducer readable", color = { fg })
+              }
+            }
+            Surface(color = bg) {
+              Box(modifier = Modifier.padding(16.dp)) {
+                Text(text = "ColorProducer low", color = { bg })
+              }
+            }
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val res = renderSource(src, fileName = "color-producer.explore.kt")
+    val readable = res.tree.nodes.first { it.text?.value == "ColorProducer readable" }
+    val low = res.tree.nodes.first { it.text?.value == "ColorProducer low" }
+    assertNotNull(readable.colors, "Expected sampled colors on ColorProducer readable Text")
+    val contrastIds = res.tree.findings.filter { it.rule == FindingRule.Contrast }.map { it.id }
+    assertTrue(
+      readable.id !in contrastIds,
+      "Expected zero Contrast findings on readable ColorProducer Text, got ${res.tree.findings}",
+    )
+    assertTrue(
+      low.id in contrastIds,
+      "Expected Contrast finding on low-contrast ColorProducer Text, got ${res.tree.findings}",
+    )
+  }
+
+  @Test
+  fun `maps static BottomSheet and standalone Scrim as non-modal nodes`() {
+    val staticSheetSrc =
+      """
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.runtime.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.platform.testTag
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("Static BottomSheet") {
+        screen {
+          Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            Button(
+              onClick = {},
+              modifier = Modifier.testTag(AD_PRIMARY_TAG).height(48.dp),
+            ) {
+              Text("Primary")
+            }
+            FilledIconButton(
+              onClick = {},
+              modifier = Modifier.size(72.dp),
+            ) {
+              SymbolIcon("star")
+            }
+            BottomSheet(
+              state = rememberBottomSheetState(initialValue = SheetValue.Expanded),
+              onDismissRequest = {},
+            ) {
+              Column(modifier = Modifier.padding(16.dp)) { Text("Static sheet") }
+            }
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val sheetRes = renderSource(staticSheetSrc, fileName = "static-sheet.explore.kt")
+    val sheetLine =
+      staticSheetSrc.lines().indexOfFirst { it.trimStart().startsWith("BottomSheet(") } + 1
+    val sheetRules = sheetRes.tree.findings.map { it.rule }.toSet()
+    assertTrue(
+      sheetRes.tree.nodes.any { it.type == "Column" && it.sourceLine == sheetLine },
+      "Expected Column node for static BottomSheet at L$sheetLine, got ${sheetRes.tree.nodes.map { it.type to it.sourceLine }}",
+    )
+    assertTrue(
+      FindingRule.PrimaryLargest in sheetRules,
+      "Expected PrimaryLargest for non-modal static BottomSheet, got ${sheetRes.tree.findings}",
+    )
+    assertTrue(
+      sheetRes.tree.nodes.none { it.type == "BottomSheet" },
+      "Expected static BottomSheet mapped to non-modal Column, got ${sheetRes.tree.nodes.map { it.type }}",
+    )
+
+    val scrimSrc =
+      """
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.runtime.*
+      import androidx.compose.ui.Modifier
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("Standalone Scrim") {
+        screen {
+          Box(modifier = Modifier.fillMaxSize()) {
+            Scrim(contentDescription = "Dismiss", onClick = {}, alpha = { 0.32f })
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val scrimRes = renderSource(scrimSrc, fileName = "scrim.explore.kt")
+    val scrimLine = scrimSrc.lines().indexOfFirst { it.trimStart().startsWith("Scrim(") } + 1
+    assertTrue(
+      scrimRes.tree.nodes.none { it.type == "Scrim" },
+      "Expected Scrim mapped to Box instead of raw Scrim, got ${scrimRes.tree.nodes.map { it.type }}",
+    )
+    assertTrue(
+      scrimRes.tree.nodes.any { it.type == "Box" && it.sourceLine == scrimLine },
+      "Expected Box node from mapped Scrim at L$scrimLine, got ${scrimRes.tree.nodes.map { it.type to it.sourceLine }}",
+    )
+  }
+
+  @Test
+  fun `maps M3 1_5 VibrantTimePickerDialog as modal and inline TimeScroll with ScrollField as non-modal`() {
+    val vibrantSrc =
+      """
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.runtime.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.platform.testTag
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("Vibrant TimePicker Dialog") {
+        screen {
+          Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+              modifier = Modifier.padding(16.dp),
+              verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+              Button(
+                onClick = {},
+                modifier = Modifier.testTag(AD_PRIMARY_TAG).height(48.dp),
+              ) {
+                Text("Primary")
+              }
+              FilledIconButton(
+                onClick = {},
+                modifier = Modifier.size(72.dp),
+              ) {
+                SymbolIcon("star")
+              }
+            }
+            VibrantTimePickerDialog(
+              onDismissRequest = {},
+              confirmButton = { TextButton(onClick = {}) { Text("OK") } },
+              modeToggleButton = {
+                TimePickerDialogDefaults.ScrollDisplayModeToggle(
+                  onDisplayModeChange = {},
+                  displayMode = TimePickerDisplayMode.Scroll,
+                )
+              },
+            ) {
+              TimeScroll(state = rememberTimePickerState(), shapes = TimePickerDefaults.shapes())
+            }
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val vibrantRes = renderSource(vibrantSrc, fileName = "vibrant-time-dialog.explore.kt")
+    assertTrue(
+      vibrantRes.tree.nodes.any { it.type == "TimePicker" },
+      "Expected VibrantTimePickerDialog mapped to TimePicker, got ${vibrantRes.tree.nodes.map { it.type }}",
+    )
+    assertTrue(
+      FindingRule.PrimaryLargest !in vibrantRes.tree.findings.map { it.rule },
+      "VibrantTimePickerDialog must suppress behind-scrim PrimaryLargest, got ${vibrantRes.tree.findings}",
+    )
+
+    val inlineSrc =
+      """
+      import androidx.compose.foundation.*
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.runtime.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.platform.testTag
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("Inline TimeScroll and ScrollField") {
+        screen {
+          Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            TimeScroll(
+              state = rememberTimePickerState(),
+              shapes = TimePickerDefaults.shapes(),
+              toggle = {
+                TimePickerDialogDefaults.ScrollDisplayModeToggle(
+                  onDisplayModeChange = {},
+                  displayMode = TimePickerDisplayMode.Scroll,
+                )
+              },
+            )
+            ScrollField(
+              state = rememberScrollFieldState(itemCount = 12, index = 0),
+              contentDescription = "Hours",
+              modifier = Modifier.width(120.dp).height(140.dp),
+            ) { index, _, _ ->
+              Box(modifier = Modifier.size(48.dp)) { Text("${'$'}index") }
+            }
+            Button(
+              onClick = {},
+              modifier = Modifier.testTag(AD_PRIMARY_TAG).height(48.dp),
+            ) {
+              Text("Save")
+            }
+            FilledIconButton(
+              onClick = {},
+              modifier = Modifier.size(72.dp),
+            ) {
+              SymbolIcon("check")
+            }
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val inlineRes = renderSource(inlineSrc, fileName = "inline-scroll-pickers.explore.kt")
+    assertTrue(
+      FindingRule.PrimaryLargest in inlineRes.tree.findings.map { it.rule },
+      "Inline TimeScroll/ScrollField must not suppress PrimaryLargest, got ${inlineRes.tree.findings}",
+    )
+    assertTrue(
+      inlineRes.tree.nodes.any { it.type == "Row" } &&
+        inlineRes.tree.nodes.any { it.type == "Column" },
+      "Expected mapped Row and Column nodes for inline TimeScroll/ScrollField, got ${inlineRes.tree.nodes.map { it.type }}",
+    )
+  }
+
+  @Test
+  fun `handles M3 1_5 Expressive segmented list, menu items, secure field, search bar, and hero carousel`() {
+    val src =
+      """
+      import androidx.compose.foundation.*
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.foundation.text.input.rememberTextFieldState
+      import androidx.compose.material3.*
+      import androidx.compose.material3.carousel.*
+      import androidx.compose.runtime.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("Expressive 1.5 Components") {
+        screen {
+          Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            SegmentedListItem(
+              onClick = {},
+              shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+            ) {
+              Text("Segmented")
+            }
+            OutlinedSecureTextField(state = rememberTextFieldState())
+            HorizontalCenteredHeroCarousel(
+              state = rememberCarouselState { 3 },
+              preferredItemWidth = 180.dp,
+              modifier = Modifier.fillMaxWidth().height(120.dp),
+            ) { i ->
+              Box(modifier = Modifier.size(180.dp, 120.dp)) { Text("Card ${'$'}i") }
+            }
+            Box {
+              DropdownMenuPopup(expanded = true, onDismissRequest = {}) {
+                DropdownMenuGroup(shapes = MenuDefaults.groupShape(0, 1)) {
+                  SelectableDropdownMenuItem(
+                    selected = true,
+                    onClick = {},
+                    text = { Text("Opt A") },
+                    shapes = MenuDefaults.itemShape(0, 2),
+                  )
+                  CheckableDropdownMenuItem(
+                    checked = true,
+                    onCheckedChange = {},
+                    text = { Text("Opt B") },
+                    shapes = MenuDefaults.itemShape(1, 2),
+                  )
+                }
+              }
+            }
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val res = renderSource(src, fileName = "expressive-15.explore.kt")
+    val types = res.tree.nodes.map { it.type }.toSet()
+    for (expected in listOf("ListItem", "TextField", "Carousel", "Menu", "MenuGroup", "MenuItem")) {
+      assertTrue(
+        expected in types,
+        "Expected $expected in rendered tree nodes, got $types",
+      )
+    }
+
+    val searchSrc =
+      """
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.foundation.text.input.rememberTextFieldState
+      import androidx.compose.material3.*
+      import androidx.compose.runtime.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("Docked SearchBar With Gap") {
+        screen {
+          val searchState = rememberSearchBarState(initialValue = SearchBarValue.Expanded)
+          val queryState = rememberTextFieldState()
+          Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            ExpandedDockedSearchBarWithGap(
+              state = searchState,
+              inputField = {
+                SearchBarDefaults.InputField(
+                  textFieldState = queryState,
+                  searchBarState = searchState,
+                  onSearch = {},
+                )
+              },
+            ) {
+              Text("Result")
+            }
+          }
+        }
+      }
+      """
+        .trimIndent()
+    val searchRes = renderSource(searchSrc, fileName = "search-gap.explore.kt")
+    assertTrue(
+      searchRes.tree.nodes.any { it.type == "SearchView" },
+      "Expected ExpandedDockedSearchBarWithGap mapped to SearchView, got ${searchRes.tree.nodes.map { it.type }}",
+    )
+  }
 }

@@ -30,7 +30,7 @@ REASONS = {"retired", "no-compose-api"}
 M3_PAGE_CLAIMS = {
     "app-bars": ["TopAppBar", "CenterAlignedTopAppBar", "MediumFlexibleTopAppBar", "LargeFlexibleTopAppBar"],
     "badges": ["Badge", "BadgedBox"],
-    "bottom-sheets": ["ModalBottomSheet"],
+    "bottom-sheets": ["ModalBottomSheet", "BottomSheet"],
     "button-groups": ["ButtonGroup"],
     "buttons": [
         "Button",
