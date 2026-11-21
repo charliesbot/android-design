@@ -1,8 +1,8 @@
 # Pinned toolchain for the v4 previewer worker. Change versions only on purpose.
 [versions]
 kotlin = "2.4.21"
-composeMultiplatform = "1.13.0-beta01"
-material3 = "1.13.0-beta01"
+composeMultiplatform = "1.13.0-rc01"
+material3 = "1.13.0-rc01"
 navigation3 = "1.2.0"
 adaptiveNavigation3 = "1.3.0"
 materialKolor = "5.0.1"

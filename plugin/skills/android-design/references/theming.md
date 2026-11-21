@@ -1,13 +1,13 @@
 # Theming
 
-Theme setup for Material 3 Expressive in Compose: versions, color schemes, typography, shapes, motion, and spacing. API names were checked against androidx sources (material3 1.5.0-alpha28) in September 2026.
+Theme setup for Material 3 Expressive in Compose: versions, color schemes, typography, shapes, motion, and spacing. API names were checked against androidx sources (material3 1.5.0 stable) in November 2026.
 
 ## Versions
 
-- `androidx.compose.material3:material3`: Expressive requires **1.5.0-alpha** or later. Stable 1.4.0 only has `ShortNavigationBar`, `WideNavigationRail`, and `ModalWideNavigationRail` from this skill.
-- Toolchain: 1.5.0-alpha29 (and Wear Compose 1.7) require **compileSdk 37 and AGP 9.1+**; AGP 9.4 in turn needs Gradle 9.6. The `android create` template ships AGP 9.0.1, so raise these first or the build fails on dependency metadata checks.
-- Check the newest version in [Maven metadata](https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3/maven-metadata.xml) before adding it; alpha APIs still change (for example `Slider`'s `onValueChange` became required on main after alpha28, so pass it by name).
-- Still `@ExperimentalMaterial3ExpressiveApi`: `MaterialShapes`, `RoundedPolygon.toShape()` / `toPath()`, `Morph.toPath()`, `LoadingIndicator`, `ContainedLoadingIndicator`, the pull-to-refresh loading indicator. Still `@ExperimentalMaterial3Api`: `AppBarWithSearch`, `carouselParallaxScrollEffect`, sheets, tooltips.
+- `androidx.compose.material3:material3`: Expressive requires **1.5.0** or later (stable via Compose BOM `2026.11.01`). Older 1.4.0 only has `ShortNavigationBar`, `WideNavigationRail`, and `ModalWideNavigationRail` from this skill.
+- Toolchain: Compose `1.13` / Material 3 `1.5.0` require **Kotlin 2.2+**, **compileSdk 37.1**, and **AGP 9.1+** (AGP 9.4 in turn needs Gradle 9.6). Raise these first if a starter template ships an older SDK or AGP, or dependency metadata checks will fail.
+- Check the newest version in [Maven metadata](https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3/maven-metadata.xml) when upgrading beyond `1.5.0` (Compose Material 2 `androidx.compose.material` is deprecated).
+- Still `@ExperimentalMaterial3ExpressiveApi`: `MaterialShapes`, `RoundedPolygon.toShape()` / `toPath()`, `Morph.toPath()`, `LoadingIndicator`, `ContainedLoadingIndicator`, `LoadingIndicatorDefaults`, and the pull-to-refresh loading indicator. Still `@ExperimentalMaterial3Api`: `AppBarWithSearch`, `carouselParallaxScrollEffect`, sheets (`BottomSheet`, `ModalBottomSheet`, `BottomSheetScaffold`), tooltips.
 - Shape morphing uses `androidx.graphics:graphics-shapes`, which material3 already exposes.
 
 ## Theme
