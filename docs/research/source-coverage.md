@@ -1044,7 +1044,7 @@ Result: 59 routes checked. 41 are distilled and 18 are skipped. Before this pass
 - [x] /develop/adaptive-apps/guides/build-a-supporting-pane-layout → android-ui-design-guides.md (Adaptive apps: Navigation and canonical layouts in code); dependency and manifest setup skipped
 - [x] /develop/adaptive-apps/guides/build-adaptive-navigation → android-ui-design-guides.md (Adaptive apps: Navigation and canonical layouts in code)
 - [-] /develop/adaptive-apps/guides/camera-form-factors-support; CameraX sensor orientation and preview plumbing; the design rule (use CameraX so previews scale and rotate) is already in Windows, orientation, and continuity
-- [x] /develop/adaptive-apps/guides/canonical-layouts → android-ui-design-guides.md (Adaptive apps: Navigation and canonical layouts in code); the 50/50 and 70/30 supporting pane split is recorded beside Material's fixed 360dp pane
+- [x] /develop/adaptive-apps/guides/canonical-layouts → android-ui-design-guides.md (Adaptive apps: Navigation and canonical layouts in code); its 50/50 and 70/30 supporting pane split is overruled by Material's spec and the scaffold's 360dp default
 - [x] /develop/adaptive-apps/guides/chromeos/build-adaptive-apps-for-chromeos → android-ui-design-guides.md (Adaptive apps: Window size classes in code) plus Desktop and large screens; a short overview restating window size classes, shortcuts, right-click, hover, list-detail, and the rail
 - [-] /develop/adaptive-apps/guides/custom; tutorial on the `layout` modifier and `Layout` composable, code mechanics with no UI decision
 - [x] /develop/adaptive-apps/guides/flexbox → android-ui-design-guides.md (Adaptive apps: Grid, FlexBox, and lazy grids)
