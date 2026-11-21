@@ -3,6 +3,8 @@
 import json
 import os
 import re
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -95,3 +97,18 @@ class PluginManifestsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BinWrapperTest(unittest.TestCase):
+    def test_wrapper_runs_the_skill_script_through_a_symlink(self):
+        # Older installs linked ~/.local/bin/android-design-preview to plugin/bin, so the wrapper must
+        # find the skill script from its real location, not the link's folder.
+        with tempfile.TemporaryDirectory() as tmp:
+            link = Path(tmp) / "android-design-preview"
+            link.symlink_to(PLUGIN_DIR / "bin/android-design-preview")
+            env = dict(os.environ, ANDROID_DESIGN_PREVIEW_JAR=str(Path(tmp) / "missing.jar"))
+            result = subprocess.run([str(link), "status"], capture_output=True, text=True, env=env)
+        # Reaching the script ends in its JSON error (missing JAR, or missing Java), never exec's 127.
+        self.assertEqual(result.returncode, 3, result.stderr)
+        self.assertIn('"ok":false', result.stdout)
+

@@ -1,4 +1,13 @@
 #!/bin/sh
 # Claude Code puts this folder on PATH. The bootstrap script lives in the explore skill, so every
-# install route (plugin or skills only) ships it; this wrapper runs it.
-exec "$(dirname -- "$0")/../skills/android-design-explore/scripts/android-design-preview" "$@"
+# install route (plugin or skills only) ships it; this wrapper runs it. Follow symlinks first, since
+# older installs linked ~/.local/bin/android-design-preview to this file.
+self="$0"
+while [ -L "$self" ]; do
+  link=$(readlink "$self")
+  case "$link" in
+    /*) self="$link" ;;
+    *) self="$(dirname -- "$self")/$link" ;;
+  esac
+done
+exec "$(dirname -- "$self")/../skills/android-design-explore/scripts/android-design-preview" "$@"
