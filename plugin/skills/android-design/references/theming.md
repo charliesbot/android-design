@@ -358,7 +358,29 @@ object ReducedMotionScheme : MotionScheme {
 
 ## Blur, shadows, and gradients
 
-- **Blur** (Google): `Modifier.blur` needs Android 12 (progressive blur Android 13, `ui` 1.13); older devices draw the content unblurred, so legibility and hierarchy never depend on it. It blurs the composable's own content, not what sits behind it, so it cannot make a frosted panel over other content. Use it as a focus device: soften list or picker edges around a sharp center, or blur the part of a hero image behind overlaid text, always paired with a scrim, gradient, or solid or tonal surface behind the text so it stays readable when blur is absent. On images use `BlurredEdgeTreatment(shape)`.
+- **Blur** (Google): `Modifier.blur` needs Android 12 (progressive blur Android 13, `ui` 1.13); older devices draw the content unblurred, so legibility and hierarchy never depend on it. It is a surface blur of the composable's own content, not a backdrop blur of what sits behind it, so it cannot make a frosted or glass panel over other content. Use it as a focus device:
+  - Soften list, carousel, or picker edges around a sharp center. The active item still needs its own cue (color, weight, an indicator), because the sharp band vanishes below Android 13.
+  - Blur the part of a hero image behind overlaid text, always with a scrim, gradient, or solid or tonal surface behind the text so it stays readable when blur is absent.
+  - A radial spotlight that follows a drag, only over content the user does not need to read in full.
+- **Progressive blur API:** pass `blurRadiusSpec = BlurRadiusSpec.verticalGradient(...)`, `horizontalGradient`, `linearGradient(start, end)`, or `radialGradient(center, fallOffRadius)`. For a sharp band or several blurred edges, give 2 to 16 `BlurStop(fraction, radius)` stops with `0.dp` across the band. Use the `Modifier.blur { }` block when geometry depends on the layer `size` (a corner-to-corner diagonal); it runs in the layer phase without recomposing. Progressive radii clamp at 150px (about 50dp on a 3x screen), so larger values look no stronger. `radiusX`/`radiusY` give a directional motion blur and both must be above `0.dp`.
+- **Edge treatment:** `BlurredEdgeTreatment(shape)` on images and cards, matching their corner shape; `BlurredEdgeTreatment.Unbounded` for edge fades on scrolling or drawn content (`LazyColumn`, `Canvas`) so the outer items dissolve instead of ending at a hard line.
+
+```kotlin
+LazyColumn(
+    modifier = Modifier.blur(
+        blurRadiusSpec = BlurRadiusSpec.verticalGradient(
+            stops = listOf(
+                BlurStop(fraction = 0f, radius = 16.dp),
+                BlurStop(fraction = 0.3f, radius = 0.dp),
+                BlurStop(fraction = 0.7f, radius = 0.dp),
+                BlurStop(fraction = 1f, radius = 16.dp),
+            ),
+        ),
+        edgeTreatment = BlurredEdgeTreatment.Unbounded,
+    ),
+) { /* items */ }
+```
+
 - **Shadows:** Material 3 shows elevation mainly with tonal surface color, so add a shadow only where a component's spec has one (Google). `Modifier.shadow(elevation, shape)` is the Material elevation shadow. `dropShadow()` and `innerShadow()` add radius, spread, color, or a brush and follow any shape, `MaterialShapes` included; `dropShadow` goes before `background`, `innerShadow` after it. Neumorphic, neobrutalist, and stacked "realistic" shadows are not Material; use them only when the direction asks for that look (Google shows them as styles).
 - **Gradients** (Google): for organic multi-point backgrounds use a mesh gradient (`MeshGradientPainter`) instead of stacking radial or linear brushes. `RuntimeShader` brushes need Android 13 and a fallback. A sweep gradient ends on its start color to close seamlessly.
 
