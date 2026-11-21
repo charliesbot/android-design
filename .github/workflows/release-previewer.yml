@@ -1,6 +1,6 @@
 # Publishes the previewer when the plugin version changes on main. It builds the headless Skiko
 # JAR, packages one artifact per OS and CPU with its SHA-256 checksum (scripts/package_release.py),
-# then creates the `v<version>` tag and GitHub release that plugin/bin/android-design-preview
+# then creates the `v<version>` tag and GitHub release that the explore skill's scripts/android-design-preview
 # downloads and verifies. A push publishes only when it
 # changes the version in plugin/plugin.json, and a version that already has a release is skipped.
 # A manual run (workflow_dispatch) on main publishes the current version if it has no release yet.

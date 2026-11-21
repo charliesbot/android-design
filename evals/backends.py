@@ -1,6 +1,6 @@
 """Optional CLI adapters. Evaluation artifacts do not depend on these launchers.
 
-A generator invokes the `android-design-preview` CLI from `plugin/bin/` placed on `PATH`, passing
+A generator invokes the `android-design-preview` CLI from the explore skill's `scripts/` placed on `PATH`, passing
 `ANDROID_DESIGN_NO_OPEN=1` and `ANDROID_DESIGN_PREVIEW_JAR` when provided. Judges never receive the
 preview CLI or shell access.
 """
@@ -337,7 +337,11 @@ def _segment_command_and_args(segment):
         idx += 1
     if idx >= len(segment):
         return '', []
-    return Path(segment[idx]).name, segment[idx + 1:]
+    name, args = Path(segment[idx]).name, segment[idx + 1:]
+    # The skill runs its bundled copy as `sh <skill-dir>/scripts/android-design-preview ...`.
+    if name in ('sh', 'bash') and args and Path(args[0]).name == PREVIEW_CLI_NAME:
+        return PREVIEW_CLI_NAME, args[1:]
+    return name, args
 
 
 def _sed_has_inplace_flag(args):

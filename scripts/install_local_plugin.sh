@@ -20,9 +20,9 @@ mkdir -p "$CACHE_DIR"
 cp "$ROOT/app/app/build/libs/android-design-preview.jar" "$CACHE_DIR/android-design-preview.jar"
 echo "Cached the local JAR as $CACHE_DIR/android-design-preview.jar"
 
-# Claude Code puts the plugin's bin/ on PATH itself; Codex and Antigravity need this link.
-"$PLUGIN/bin/android-design-preview" install >/dev/null
-echo "Linked android-design-preview into ~/.local/bin"
+# Agents run the skill's bundled script directly; this link gives your own shell the bare command.
+"$PLUGIN/skills/android-design-explore/scripts/android-design-preview" install >/dev/null
+echo "Linked android-design-preview into ~/.local/bin for your shell"
 
 installed=()
 skipped=()

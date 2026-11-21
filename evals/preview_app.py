@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CLI_BIN = ROOT / "plugin/bin/android-design-preview"
+CLI_BIN = ROOT / "plugin/skills/android-design-explore/scripts/android-design-preview"
 SUPERVISOR_BIN = CLI_BIN
 PLUGIN_MANIFEST = ROOT / "plugin/plugin.json"
 REPO_JAR = ROOT / "app/app/build/libs/android-design-preview.jar"
@@ -22,7 +22,7 @@ def _plugin_version():
 
 
 def app_binary(environ=None, home=None):
-    """The previewer CLI executable: $ANDROID_DESIGN_PREVIEW, then plugin/bin/android-design-preview."""
+    """The previewer CLI executable: $ANDROID_DESIGN_PREVIEW, then the explore skill's bundled scripts/android-design-preview."""
     environ = os.environ if environ is None else environ
     override = environ.get(EXECUTABLE_ENV)
     if override:

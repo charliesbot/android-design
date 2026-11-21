@@ -28,10 +28,19 @@ class PluginManifestsTest(unittest.TestCase):
         self.assertTrue((PLUGIN_DIR / agy_plugin["logo"]).is_file())
         self.assertTrue(1 <= len(agy_plugin["suggestedPrompts"]) <= 3)
 
-        # The v5 bootstrap script exists and is executable. Windows is unsupported, so no .cmd ships.
+        # The bootstrap script ships inside the explore skill, so every install route (plugin or
+        # skills only) brings it, and it carries the version because a skills-only install has no
+        # plugin.json. Claude Code's bin/ holds a wrapper that runs it. Windows is unsupported.
+        skill_script = PLUGIN_DIR / "skills/android-design-explore/scripts/android-design-preview"
+        self.assertTrue(skill_script.is_file())
+        self.assertTrue(os.access(skill_script, os.X_OK), f"{skill_script.relative_to(ROOT)} must be executable")
+        script_version = re.search(r'^VERSION="([^"]+)"$', skill_script.read_text(), re.MULTILINE)
+        self.assertIsNotNone(script_version, "the bootstrap script must set VERSION")
+        self.assertEqual(script_version.group(1), version)
         posix_bin = PLUGIN_DIR / "bin/android-design-preview"
         self.assertTrue(posix_bin.is_file())
         self.assertTrue(os.access(posix_bin, os.X_OK), "plugin/bin/android-design-preview must be executable")
+        self.assertIn("skills/android-design-explore/scripts/android-design-preview", posix_bin.read_text())
         self.assertFalse((PLUGIN_DIR / "bin/android-design-preview.cmd").exists())
 
         # v4 Node MCP supervisor and MCP configs are retired.

@@ -134,6 +134,8 @@ tasks.test {
   systemProperty("preview.jar", workerJar.flatMap { it.archiveFile }.get().asFile.absolutePath)
   systemProperty(
     "preview.bin",
-    rootProject.projectDir.parentFile.resolve("plugin/bin/android-design-preview").absolutePath,
+    rootProject.projectDir.parentFile
+      .resolve("plugin/skills/android-design-explore/scripts/android-design-preview")
+      .absolutePath,
   )
 }

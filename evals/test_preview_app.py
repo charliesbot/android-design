@@ -22,7 +22,7 @@ class PreviewAppTests(unittest.TestCase):
 
     def test_repo_cli_bin_is_used_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
-            cli = make_file(tmp, "plugin/bin/android-design-preview")
+            cli = make_file(tmp, "plugin/skills/android-design-explore/scripts/android-design-preview")
             original = preview_app.CLI_BIN
             preview_app.CLI_BIN = cli
             try:
