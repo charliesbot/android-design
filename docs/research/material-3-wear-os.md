@@ -15,6 +15,9 @@ Implementation (Compose for Wear OS APIs, `AppScaffold`, `ScreenScaffold`,
   41 current pages, fetched September 2026: get started, foundations (adaptive
   design, quality tiers, common layouts), styles (color, typography), surfaces
   (apps, tiles), patterns (gestures, media).
+- **Wear app quality guidelines**
+  (`/develop/adaptive-apps/quality-guidelines/wear-app-quality`), fetched
+  November 2026: the checkable app criteria, in Adaptive sizes.
 - **m3.material.io Design for watches** (Overview, Foundations, Styles,
   Layout tabs), content version `2026-09-16_06-10-03`.
 - **Gaps:** the M3 design guide has no component or motion pages yet (APIs and spring values below come from androidx sources); component URLs
@@ -223,6 +226,18 @@ never all filled primary buttons.
   layouts past 225dp).
 
 - Concrete value to add past the breakpoint on non-scrolling screens: "Media players can gain additional buttons or larger controls. Confirmation dialogs can gain an illustration or more information. Fitness screens can gain additional metrics." Non-scrolling layouts gain the most from extra space.
+
+- **Wear app quality criteria** (`/develop/adaptive-apps/quality-guidelines/wear-app-quality`):
+  - Text size (WO-V14): "Use a minimum font size of 12sp for essential text and 10sp for non-essential text."
+  - Font scaling (WO-V1): "If the user selects a larger font size, ensure that text and controls do not overlap, and are not cut off by screen edges."
+  - Round layouts (WO-V16): "No text or controls overlap with each other." "No text or controls are cut off by the screen edges." This holds on screens "Larger or equal to a 192dp circle." The quality emulators are small round 192dp and large round 227dp.
+  - Scrolling (WO-V8): "Display the scroll bar when the user interacts with a scrollable view."
+  - Swipe to close (WO-V3): ongoing fitness activities and panning screens such as maps are exempt, "but you must provide a clear call to action to close the view."
+  - Long-running work (WO-V4): "you must use an `OngoingActivity` or Live Update notification."
+  - Startup (WO-V15): "Show a 48x48dp app icon on a black background during app startup." "The splash screen icon must match the app launcher icon."
+  - Background (WO-V13): "Use a black background for all apps and tiles."
+  - Sign-in (WO-P6): "Your app must not ask the user to input a username or password directly on the Wear OS device."
+  - Tile and watch face criteria are skipped (out of scope).
 
 ### App layout sections (surfaces/apps/layouts)
 

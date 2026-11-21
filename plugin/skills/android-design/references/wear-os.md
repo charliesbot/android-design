@@ -57,6 +57,7 @@ fun WearAppTheme(content: @Composable () -> Unit) {
 - Roboto Flex everywhere. Weight and width are the useful axes: narrow width fits long names and numbers; no wide type in headers; no very light weights at small sizes.
 - Roles: `display*` (hero information and metrics), `title*` (wayfinding), `label*` (inside components), `bodyLarge` to `bodyExtraSmall`, `numeralExtraLarge` to `numeralExtraSmall` (tabular by default, can take expressive width), `arcLarge/Medium/Small` (curved text at the top or bottom edge).
 - Curved text: `curvedText(text, style = MaterialTheme.typography.arcMedium)` inside a `CurvedScope`.
+- Minimum text size: 12sp for essential text, 10sp for non-essential text (Google, Wear app quality). At the largest font setting, text and controls never overlap or run off the round edge.
 - Line height about 1.1x. The user font setting moves styles in 6% steps, but a style never scales at 20sp or larger: display, numeral, and `labelLarge` stay fixed, and title, `labelMedium`, `labelSmall`, body, and arc scale below that. Design for the largest and smallest settings, and for Bold text.
 - Numerals are for a few digits that need no localization (timer, step count, picker); use tabular spacing wherever digits change or animate.
 
@@ -101,6 +102,6 @@ Custom `TransformationSpec` effects (rotating or morphing items at the edges) ar
 - **Ongoing activities:** the Recents entry states type and status (track, workout duration, ETA); the tile shows a glanceable summary.
 - **Clipping:** test with Bold text, larger text, and long languages; calls to action fit the smallest screen; compact chips beat cards in dense layouts.
 - **Offline:** an indicator at the top when features are unavailable (gray them out or hide them), at the end of a list when nothing more can load.
-- **Sign-in:** passkeys through Credential Manager first, at least two methods total; sign-in-only apps ask immediately, others wait until needed and explain the benefit.
+- **Sign-in:** passkeys through Credential Manager first, at least two methods total; sign-in-only apps ask immediately, others wait until needed and explain the benefit. Never ask for a typed username or password on the watch (Google).
 - **Dialogs:** alerts are full-screen interruptions, used sparingly, with text left-aligned past three lines. Confirmations only acknowledge a finished action; they never ask a question. Usually skip them: "A visible change in the UI is enough to show that an action succeeded."
 - **Swipe to reveal** (delete, archive in lists): a partial left swipe reveals a primary and optional secondary action; a swipe past 75% commits the primary; destructive actions leave an undo chip.

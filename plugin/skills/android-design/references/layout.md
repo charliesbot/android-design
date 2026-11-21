@@ -6,6 +6,8 @@ Adaptive layout for phones, foldables, tablets, and desktop windows, from Materi
 
 Design for window size, not devices; orientation, folding, split screen, and free-form windows change it at runtime.
 
+**Height counts too.** A window under 480dp tall (a phone or open flippable in landscape) is compact height: it reports medium width, but "two pane layouts are not practical" there, so keep one pane (Google). Compose's `NavigationSuiteScaffold` shows the navigation bar when width or height is compact or the device is in tabletop posture, and the rail otherwise.
+
 | Breakpoint | Width | Panes | Navigation | Margins |
 | --- | --- | --- | --- | --- |
 | Compact | under 600dp | 1 | Navigation bar (or modal expanded rail) | 16dp |
@@ -60,14 +62,16 @@ Moving up a breakpoint, ask five questions. For control-based layouts like media
 - Compact screens use a 4-column grid. Pick the grid by content: hierarchical for editorial and detail screens, modular for equal items (galleries), column for flexible one-direction flow. Break it only when content needs it.
 - 8dp grid for layout and components, 4dp for icons, type, and small elements.
 - Image ratios: 16:9, 3:2, 4:3, 1:1, 3:4, 2:3. Decide per breakpoint whether an image keeps its ratio, changes it, or keeps a fixed height.
-- **Never stretch** buttons, text fields, tabs, or single-pane content across a wide window; give them a max width and change presentation instead (bottom sheet to side sheet, list to cards, FAB to extended FAB).
+- **Never stretch** buttons, text fields, bottom sheets, tabs, or single-pane content across a wide window; give them a max width and change presentation instead (bottom sheet to side sheet, list to cards, FAB to extended FAB).
+- **Keep context on large screens:** small menus and edit modals don't cover the whole window, and context menus open next to the item the user selected (Google).
 - Pin critical actions and inputs (FAB, message field) instead of letting them scroll away. If content didn't scroll in portrait, it shouldn't in landscape.
 
 ## Postures and landscape
 
 - Landscape phones are medium width with compact height: a rail, or horizontal navigation bar items.
 - Tabletop (half-folded): content on the top half, large controls on the bottom; suits video and calls.
-- Keep text and controls out of the hinge; widen the gutter there.
+- Keep text and controls out of the hinge; widen the gutter there. Place dialogs and pop-up menus so they don't overlay the fold (Google).
+- Book posture (half open, vertical fold) suits reading long text: split content left and right.
 - Cover screens stay focused: hero art as the background, one big anchor control (play), a rail if navigation is needed.
 
 ## Desktop windows and input
@@ -76,7 +80,8 @@ Moving up a breakpoint, ask five questions. For control-based layouts like media
 
 - **Scale:** type one or two steps larger for viewing distance; short copy around 60 characters; reveal more with progressive disclosure as the window grows. Faster motion for small nearby changes, slower or simpler for large movements.
 - **Pointer:** every primary journey works with left click alone. Right-click opens a context menu (not long press). Hover shows state, tooltips, and secondary actions (selection checkboxes appear on hover). Cursor icons signal what's possible; dragging starts immediately. Precise pointers allow tighter targets for secondary hover actions.
-- **Keyboard:** Tab follows reading order, arrow keys move within a component, Escape closes temporary UI, initial focus lands on the key element (search, the primary action), focus is always visible. Standard shortcuts: Enter sends, Space plays; list them in the Keyboard Shortcuts Helper.
+- **Keyboard:** Tab follows reading order, arrow keys move within a component, Escape closes temporary UI (it also clears search, deselects all, and cancels an edit without saving), initial focus lands on the key element (search, the primary action, the first field of a task), focus is always visible. Standard shortcuts: Enter sends, Space plays and pauses media, Ctrl plus scroll zooms content; list them in the Keyboard Shortcuts Helper.
+- **States:** custom interactive elements show a visible focused state and a hover state, both with accessible contrast. Show a scrollbar while a mouse or trackpad scrolls (Google).
 - **Windows:** support multiple instances, drag and drop between apps, and picture-in-picture for playback; put navigation or search in a custom window header bar where it helps.
 
 | App type | Large-window pattern |
