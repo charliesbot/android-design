@@ -27,7 +27,7 @@ See the Android System Bars for fundamental system bar design guidance. The foll
 
 #### Scrolling content
 
-Top app bars should collapse while scrolling. Learn how to collapse the Material 3 TopAppBar. In Material 3, small top app bars can collapse to status bar height or scroll offscreen. Medium and large top app bars can collapse to a smaller app bar. See the [Material guidance][10].
+Top app bars should collapse while scrolling. Learn how to collapse the Material 3 TopAppBar. In Material 3, small top app bars can collapse to status bar height or scroll offscreen. Medium and large top app bars can collapse to a smaller app bar. See the Material guidance.
 
 check_circle
 
@@ -68,7 +68,7 @@ See the Android System Bars for fundamental navigation bar design guidance. The 
 
 #### Scrolling content
 
-[`BottomAppBar`][10] should collapse while scrolling using the `scrollBehavior` parameter.
+`BottomAppBar` should collapse while scrolling using the `scrollBehavior` parameter.
 
 check_circle
 
@@ -80,7 +80,7 @@ check_circle
 ###### Do
 Keep gesture navigation transparent and don't add an additional scrim.
 
-However, keep [`NavigationBar`]11 visible while scrolling because it doesn't have a `scrollBehavior` parameter.
+However, keep `NavigationBar` (and the `NavigationBar` used in the `NavigationSuiteScaffold` while folded) visible while scrolling because it doesn't have a `scrollBehavior` parameter.
 
 ### Display cutouts
 

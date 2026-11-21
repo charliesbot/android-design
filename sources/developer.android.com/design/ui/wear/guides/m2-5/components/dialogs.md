@@ -9,7 +9,7 @@ Dialogs should appear in response to a user task or an action, with relevant or 
 
 Dialogs support a swipe-to-dismiss gesture. When the user performs this swipe gesture, the system reveals the parent content in the background.
 
-Dialogs have a single slot for opinionated dialog content, such as an  Alert or Confirmation.
+Dialogs have a single slot for opinionated dialog content, such as an `Alert` or `Confirmation`.
 
 **Alert**
 

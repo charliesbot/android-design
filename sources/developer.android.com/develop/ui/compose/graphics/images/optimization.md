@@ -1,0 +1,100 @@
+# Optimizing bitmap images
+Source: https://developer.android.com/develop/ui/compose/graphics/images/optimization
+
+Working with images can quickly introduce performance issues if you aren't careful. Even a small graphic in a compressed format like JPG or PNG can turn into a large bitmap when it's decoded for display. If you aren't efficient with how you use graphics, you can run into memory problems that can hurt the performance of your app and other apps on the device. Follow these best practices to ensure your app performs at its best.
+
+## Use image loading libraries
+
+You can improve your app's efficiency by using image loading libraries like Coil (for Kotlin-first projects) or Glide (for Java projects). These libraries reduce your app's memory usage by doing things like caching images, downsampling graphics when needed, and recycling graphic objects.
+
+## Downsample images
+
+Make sure to use the appropriate image size for your needs. You should avoid loading a large, high-resolution image into a small container (such as a thumbnail). Instead, use downsampling to scale the image down before decoding it into memory.
+
+### Client-side downsampling
+
+Image loading libraries like Coil and Glide handle downsampling for you automatically. You can configure their downsampling strategies by using `ImageLoader` (for Coil) or `DownsampleStrategy` (for Glide). If you're managing bitmaps manually, you can use `inSampleSize` to decode a smaller version. To do this safely, you should first set `inJustDecodeBounds` to `true` to read the image dimensions without allocating memory, calculate the sample size, set `inSampleSize` to that value, set `inJustDecodeBounds` to `false`, and then decode the image.
+
+### Prefer server-side resizing
+
+Where possible, request the exact image dimensions you need directly from your backend server. This reduces network usage and your disk cache footprint, while providing lighter memory usage by avoiding the memory overhead of resizing images on the device.
+
+You can configure libraries to dynamically append the target view size to the image URL. For example, Coil allows this using custom interceptors, and Glide supports it using custom model loaders (such as `BaseGlideUrlLoader`).
+
+### Avoid unconstrained layout sizes
+
+For image loaders to downsample (client-side or server-side) effectively, they must know the target size _before_ executing the request.
+
+Avoid using `wrapContentSize` or leaving dimensions unconstrained on composables that load remote images. If these libraries cannot infer the target bounds, they fall back to loading the original full-size image. This can lead to loading a substantially larger image than necessary, increasing memory usage and latency.
+
+Instead, set explicit dimensions on your image composable (for example, using `Modifier.size`) or define an aspect ratio. This allows the layout engine to calculate the exact pixel target upfront, which the image loader can then use to request and decode the correctly sized asset.
+
+### Supply alternative resources for different screen sizes
+
+If you are shipping images with your app, consider supplying different sized assets for different device resolutions. This can help reduce the download size of your app on devices, and improve performance as it'll load up a lower resolution image on a lower resolution device. For more information on providing alternative bitmaps for different device sizes, check out the alternative bitmap documentation.
+
+## Don't apply padding directly
+
+Sometimes you might need to add padding to an image. For example, you might want to have the image surrounded by a transparent border for letterboxing. In those situations, _don't_ add the padding directly to the image, changing the image's dimensions. Instead, leave the image's dimensions as they are, and adjust the image's location on the screen by using `InsetDrawable`. Alternatively, you can add padding into the Composable or View holding the image.
+
+## Choose the right pixel format
+
+Balance memory and quality by choosing the right pixel format. Use `RGB_565` when you don't need transparency; this format uses half the memory of the default `ARGB_8888` format.
+
+In Glide you can configure this by using `DecodeFormat`. In Coil, you can use the `bitmapConfig` property.
+
+## Use vectors where possible
+
+For images made up of geometric shapes, a vector graphic is much smaller than a bitmap and scales smoothly for any display density. When suitable, use elements like `ShapeDrawable` to represent graphics.
+
+## Release and reuse bitmaps when you can
+
+Large graphic files can take up a lot of memory. To reduce their impact, you should release or reuse the graphic objects whenever you can.
+
+If you use an image loading library, make sure to release bitmaps to the library's managed pool when you no longer need them. The library can reuse the objects when needed, and keeps a memory buffer available for future needs.
+
+If you're managing graphics manually, you should release bitmaps when you're done with them by calling `Bitmap.recycle` and immediately discarding the `Bitmap` reference, instead of relying on garbage collection.
+
+## Other tips and tricks
+
+This section lists a few other ways to improve your app's performance when handling graphics.
+
+### Don't package large images with your AAB/APK file
+
+One of the top causes for large app download size is graphics that are packaged inside the AAB or APK file. Use the APK analyzer tool to ensure that you aren't packaging larger than required image files. Reduce the sizes or consider placing the images on a server and only downloading them when required.
+
+### Find redundant bitmaps
+
+If you have several copies of the same image, that wastes memory. You can use the Android Studio profiler to identify redundant graphics. Use the heap dump analyzer to capture a heap dump, and filter the results by choosing the **duplicate bitmaps** setting.
+
+### When using `ImageBitmap`, call `prepareToDraw` before drawing
+
+When using `ImageBitmap`, to start the process of uploading the texture to the GPU, call `ImageBitmap#prepareToDraw()` before actually drawing it. This helps the GPU prepare the texture and improve the performance of showing a visual on screen. Most image loading libraries already do this optimization, but if you are working with the `ImageBitmap` class yourself, it is something to keep in mind.
+
+### Prefer passing a `Int` `DrawableRes` or URL as parameters into your composable instead of `Painter`
+
+Due to the complexities of dealing with images (for example, writing an equals function for `Bitmaps` would be computationally expensive), the `Painter` API is explicitly not marked as stable with the `@Stable` annotation. Unstable classes can lead to unnecessary recompositions because the compiler cannot easily infer if the data has changed.
+
+Therefore, we recommend passing a URL or drawable resource ID as parameters to your composable, instead of passing a `Painter` as a parameter.
+
+```
+// Prefer this:
+@Composable
+fun MyImage(url: String) {
+
+}
+// Over this:
+@Composable
+fun MyImage(painter: Painter) {
+
+}
+
+```
+
+## Recommended for you
+- Note: link text is displayed when JavaScript is off
+- ImageBitmap versus ImageVector {:#bitmap-vs-vector}
+- Save UI state in Compose
+- Jetpack Compose Phases
+
+Previous  arrow_back   Custom painter

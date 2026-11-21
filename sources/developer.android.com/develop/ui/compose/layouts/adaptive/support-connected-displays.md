@@ -1,0 +1,92 @@
+# Support connected displays
+Source: https://developer.android.com/develop/ui/compose/layouts/adaptive/support-connected-displays
+
+Connected displays extend the desktop windowing experience to standard phones, giving users access to large screens from their mobile devices. This capability opens up new possibilities for app interaction and user productivity.
+
+All the unique features of desktop windowing apply to connected displays. When you connect a phone to a display, the phone's state remains unchanged, and a blank desktop session starts on the connected display. The device and the display act as two individual systems, with apps specific to each display.    Your browser doesn't support the video tag.
+**Figure 1.** Phone connected to an external display, with a desktop session on the display while the phone maintains its own state.
+
+If you connect a desktop windowing–enabled device, such as a tablet, to an external monitor, the desktop session extends across both displays. The two displays then function as one continuous system. This setup allows windows, content, and the cursor to move freely between the two displays.    Your browser doesn't support the video tag.
+**Figure 2.** Tablet connected to an external monitor, extending the desktop session across both displays.
+
+Supporting connected displays effectively requires attention to several aspects of your app's design and implementation. The following best practices ensure a smooth and productive user experience.
+
+## Handle dynamic display changes
+
+Many apps are built with the assumption that the `Display` object and its characteristics won't change during the app's lifecycle. However, when a user connects or disconnects an external monitor, or even moves an app window between displays, the underlying `Display` object associated with your app's context or window can change. The display's properties, such as size, resolution, refresh rate, HDR support, and density, can all be different. If you hardcode values based on the phone's screen, for example, your layouts will likely break on an external display.
+
+External displays can also have vastly different pixel densities. You need to make sure your app responds correctly to density changes. This involves using density-independent pixels (dp) for layouts, providing density-specific resources, and ensuring your UI scales appropriately.
+
+If an activity is running on an external display when the display is disconnected, the system moves the activity to the primary display. The move triggers configuration changes—such as screen size and density changes—which can cause the activity to be recreated. Your app must handle the configuration change by saving and restoring UI state to prevent data loss or a confusing user experience.
+
+### Use the right context
+
+Using the right context is crucial in multi-display environments. When accessing resources, the activity context (which is displayed) is different from the application context (which is not displayed).
+
+The activity context contains information about the display and is always adjusted for the display area in which the activity appears. This lets you get the correct information about the display density or window metrics of your app. Always use the activity context (or another UI-based context) to get information about the current window or display. This also affects some system APIs that use information from the context.
+
+In Jetpack Compose, you can access display-specific information using `CompositionLocal` objects like `LocalConfiguration.current` and `LocalDensity.current`. When an activity or window moves between displays, the device configuration changes, triggering recomposition with new display metrics. `CompositionLocal` objects enable your UI to adapt seamlessly.
+
+### Get display information
+
+You can use the `Display` class to get information such as display size, density, or flags. Use the `DisplayManager` system service to get the available displays. To identify external displays, filter out the `Display.DEFAULT_DISPLAY`, which is typically the built-in phone or tablet screen:
+
+```
+val displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+val displays = displayManager.getDisplays()
+// The default display is 0. External displays have other IDs.
+val externalDisplays = displays.filter { it.displayId != Display.DEFAULT_DISPLAY }
+```
+
+## Manage activity launch and configuration
+
+With connected displays, apps can specify which display an app should run on when it launches or when it creates another activity. This behavior depends on the activity launch mode defined in the manifest file and on the intent flags and options set by the entity launching the activity.
+
+When an activity moves to a secondary display, your app can experience a context update, window resizing, and configuration and resource changes. If the activity handles the configuration change, it is notified in `onConfigurationChanged()`. Otherwise, the activity is relaunched.
+
+If the selected launch mode for an activity allows multiple instances, launching on a secondary screen can create a new instance of the activity. Both activities are resumed at the same time, which can be beneficial for certain multitasking scenarios.
+
+You can launch an activity on a particular display using `ActivityOptions`. Note that `launchDisplayId` requires Android 8 (API level 26) or higher.
+
+```
+// Get DisplayManager and find the first external display.
+val displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+val externalDisplayId = displayManager.displays
+.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
+?.displayId
+
+// If an external display is found, launch the activity on it.
+if (externalDisplayId != null) {
+val intent = Intent(this, MySecondaryActivity::class.java)
+val options = ActivityOptions.makeBasic()
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+options.launchDisplayId = externalDisplayId
+}
+startActivity(intent, options.toBundle())
+} else {
+// Optionally, handle the case where no external display is connected.
+}
+```
+
+## Avoid device allowlists
+
+Apps sometimes restrict large-screen UI and features to select devices through an allowlist or by checking `BUILD.MODEL` and the built-in display size. This approach is not effective for connected displays because virtually any device can be connected to a large screen, and the device model doesn't change when an external display is connected.
+
+Instead of using allowlists or checking `BUILD.MODEL` and the built-in display size, check window metrics or device capabilities at runtime to make UI decisions. Use Jetpack WindowManager APIs or window size classes to build responsive and adaptive layouts for various screen sizes and densities.
+
+## Support external peripherals
+
+When users connect to an external display, they often create a more desktop-like environment. This frequently involves using external keyboards, mice, trackpads, webcams, microphones, and speakers. You need to ensure your app works seamlessly with these peripherals. This includes handling keyboard shortcuts, managing mouse pointer interactions, correctly supporting external cameras or microphones, and respecting audio output routing. For more details, see Input compatibility on large screens.
+
+## Enhance user productivity
+
+Connected displays provide a significant opportunity to improve user productivity. You now have the tools to build mobile apps that can offer experiences comparable to desktop applications. Consider implementing the following features to boost user productivity:
+- Allow users to open multiple instances of the same app. This is invaluable for tasks like comparing documents, managing different conversations, or viewing multiple files simultaneously.
+- Enable users to share rich data in and out of your app with drag and drop.
+- Help users maintain their workflow across configuration changes by implementing a robust state management system.
+
+By following these guidelines and utilizing the provided code examples, you can create apps that seamlessly adapt to connected displays, offering users a richer and more productive experience.
+
+Previous  arrow_back   Increase app availability
+
+Next  Support desktop windowing   arrow_forward

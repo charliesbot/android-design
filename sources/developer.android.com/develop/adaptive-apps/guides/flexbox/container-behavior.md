@@ -1,0 +1,190 @@
+# Set container behavior
+Source: https://developer.android.com/develop/adaptive-apps/guides/flexbox/container-behavior
+
+To configure the behavior of the `FlexBox` container, create a `FlexBoxConfig` block and supply it using the `config` parameter.
+
+```
+FlexBox(
+config = {
+direction(FlexDirection.Column)
+wrap(FlexWrap.Wrap)
+alignItems(FlexAlignItems.Center)
+alignContent(FlexAlignContent.SpaceAround)
+justifyContent(FlexJustifyContent.Center)
+gap(16.dp)
+}
+) { // child items
+}
+```
+
+Use `FlexBoxConfig` to define the layout direction, wrapping behavior, alignment, and gaps between items.
+
+## Layout direction
+
+The `direction` function sets the main axis, which dictates the direction items are laid out in. It accepts the following values:
+- `Row` (default): Sets the main axis to be horizontal. In left-to-right locales this will be left-to-right, with the opposite in right-to-left.
+- `RowReverse`: Reverses the direction of `Row`.
+- `Column`: Sets the main axis to be vertical, top-to-bottom.
+- `ColumnReverse`: Reverses the direction of `Column`.
+
+## Align items and distribute extra space
+
+The following sections describe how to align items and distribute extra space along the main and cross axes.
+
+### Along the main axis
+
+Use `justifyContent` to distribute items along the main axis. The following table shows the behavior when the direction is `Row`.
+|   |
+[IMAGE] Illustration of a horizontal main axis.
+
+|
+
+`Start`  |
+[IMAGE] Items aligned to the start of the main axis.
+
+|
+
+`Center`  |
+[IMAGE] Items aligned to the center of the main axis.
+
+|
+
+`End`  |
+[IMAGE] Items aligned to the end of the main axis.
+
+|
+
+`SpaceBetween`  |
+[IMAGE] Items distributed along the main axis with space between them.
+
+|
+
+`SpaceAround`  |
+[IMAGE] Items distributed along the main axis with space around them.
+
+|
+
+`SpaceEvenly`  |
+[IMAGE] Items distributed along the main axis with space evenly around them.
+
+### Along the cross axis
+
+Use `alignItems` to align items along the cross axis within a single line. This behavior can be overridden by individual items using the `alignSelf` modifier.
+
+The following images show the behavior when the direction is `Row`:
+|
+[IMAGE] Illustration of a vertical cross axis.
+|
+[IMAGE] Items aligned to the start of the cross axis.
+|
+[IMAGE] Items aligned to the end of the cross axis.
+|
+[IMAGE] Items aligned to the center of the cross axis.
+|
+[IMAGE] Items stretched to fill the cross axis.
+|
+[IMAGE] Items aligned to their baseline along the cross axis.
+
+|   |
+
+`Start`  |
+
+`End`  |
+
+`Center`  |
+
+`Stretch`  |
+
+`Baseline`
+
+Use `alignContent` to align lines to the cross axis and to distribute extra space between lines. This property only applies when there are multiple lines (wrapping is enabled). The following images show the behavior when the direction is `Row`:
+|
+[IMAGE] Illustration of a vertical cross axis.
+|
+[IMAGE] Multiple lines of items aligned to the start of the cross axis.
+|
+[IMAGE] Multiple lines of items aligned to the end of the cross axis.
+|
+[IMAGE] Multiple lines of items aligned to the center of the cross axis.
+|
+[IMAGE] Multiple lines of items stretched to fill the cross axis.
+|
+[IMAGE] Multiple lines of items distributed along the cross axis with space between them.
+|
+[IMAGE] Multiple lines of items distributed along the cross axis with space around them.
+
+|   |
+
+`Start`  |
+
+`End`  |
+
+`Center`  |
+
+`Stretch`  |
+
+`SpaceBetween`  |
+
+`SpaceAround`
+
+## Wrap items
+
+Wrapping lets a `FlexBox` container become multi-line, moving items that don't fit onto a new row or column along the cross-axis. Configure wrapping behavior using `wrap`.
+|
+
+**`FlexWrap` value**  |
+
+**Example using direction `Row`**
+|
+
+`NoWrap` (default): Prevents items from wrapping. Items overflow if the main size is insufficient.  |
+[IMAGE] Items in a single line overflowing the container because wrapping is disabled.
+
+|
+
+`Wrap`: When there is insufficient space for an item (plus any gap), a new line is created in the direction of the cross axis. For example, if the direction is `Row`, a new line is added **below**.  |
+[IMAGE] Items wrapping onto a new line below because wrapping is enabled.
+
+|
+
+`WrapReverse`: The same as `Wrap`, except the new line is added in the opposite direction to the cross axis. For example, if the direction is `Row`, a new line is added **above**.  |
+[IMAGE] Items wrapping onto a new line above because reverse wrapping is enabled.
+
+The following example shows how the `FlexBox` wrapping algorithm works. The `FlexBox` container has a main size of `100dp`, with `wrap` set to `FlexWrap.Wrap` and a gap of `8dp`. It contains three items with `basis` `20dp`, `40dp`, and `50dp`, respectively.
+
+There is `100dp` available space in the line. Child 1 is `20dp`. There is space, so Child 1 is placed into the line.
+[IMAGE] First item placed in the FlexBox container.
+
+**Figure 1.** First item placed in the `FlexBox` container.
+
+There is `80dp` available space in the line. The gap is `8dp`. Child 2 is `40dp`. The required space is `48dp`. There is space, so the gap and Child 2 are placed into the line.
+[IMAGE] Second item placed in the FlexBox container after the first item.
+
+**Figure 2.** Second item placed in the `FlexBox` container after the first item.
+
+There is `32dp` available space in the line. The gap is `8dp`. Child 3 is `50dp`. The required space is `58dp`. There is not enough space in the current line, so Child 3 is placed in a new line.
+[IMAGE] Third item placed on a new line because it doesn't fit on the first line.
+
+**Figure 3.** Third item placed on a new line because it doesn't fit on the first line.
+
+## Add gaps between items
+
+Add gaps between rows and columns using `rowGap` and `columnGap`. This is useful to avoid adding spacing modifiers to children.
+|
+[IMAGE] Row gap adds vertical space between items.
+|
+[IMAGE] Column gap adds horizontal space between items.
+|
+[IMAGE] Gap adds both horizontal and vertical space between items.
+
+|
+
+`rowGap`
+
+adds vertical space between items and lines.  |
+
+`columnGap`
+
+adds horizontal space between items and lines.  |
+
+`gap` is a convenience function that adds both `columnGap` and `rowGap`.

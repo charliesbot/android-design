@@ -21,9 +21,10 @@ History: the first audit found 266 distilled, 133 partial, and 13 missing routes
 | developer.android.com/design/ui: Mobile, desktop, large screens, widgets | 41 | 0 | 0 | 10 |
 | developer.android.com/design/ui: Gallery | 33 | 0 | 0 | 9 |
 | developer.android.com/design/ui: Wear OS (current guides) | 46 | 0 | 0 | 4 |
-| developer.android.com/design/ui: Wear OS (components and M2.5 guides) | 37 | 0 | 0 | 17 |
+| developer.android.com/design/ui: Wear OS (components and M2.5 guides) | 38 | 0 | 0 | 17 |
+| developer.android.com/develop: Compose UI and adaptive apps (not yet audited) | 0 | 0 | 443 | 0 |
 | Out of scope: developer.android.com/design/ui platforms | 0 | 0 | 0 | 144 |
-| **Total** | **413** | **0** | **0** | **311** |
+| **Total** | **414** | **0** | **443** | **311** |
 
 ## m3.material.io: Foundations (excluding Layout)
 
@@ -736,7 +737,7 @@ Result: 48 routes checked. 25 are fully distilled, 17 are partly distilled, 6 ar
 
 ### Widget hub and quality
 - [-] /design/ui/widget; hub page with links only
-- [x] /docs/quality-guidelines/widget-quality → android-ui-design-guides.md (Widgets)
+- [x] /develop/adaptive-apps/quality-guidelines/widget-quality → android-ui-design-guides.md (Widgets)
 - [x] /develop/ui/views/appwidgets/layouts → android-ui-design-guides.md (Widgets: Sizes); fetched through `EXTRA_ANDROID_ROUTES` for its "Determine a size for your widget" cell table, which the design sizing page now points to; the rest of this Views page (RemoteViews sizing APIs, Android 12 attributes) is code mechanics, not design guidance
 
 ### Gaps worth distilling
@@ -745,7 +746,7 @@ Result: 48 routes checked. 25 are fully distilled, 17 are partly distilled, 6 ar
 3. /design/ui/mobile/guides/foundations/system-bars: "Use transparent three-button navigation bars when there is a bottom app bar or bottom app navigation bar," via setNavigationBarContrastEnforced(false) with bottom bars padded to draw underneath. Why: this is the one case where the default scrim is wrong, and a Compose NavigationBar sits right in it.
 4. /design/ui/desktop/guides/interaction/keyboard: keep focus inside modal dialogs; "when keyboard focus lands on a slider, users expect the Left and Right arrow keys to adjust the value"; arrow keys move focus as a 2D grid. Why: these are the keyboard behaviors most often broken in Compose on tablets, ChromeOS and desktop.
 5. /design/ui/mobile/guides/layout-and-content/images-graphics: "Avoid including immutable text in assets," "Use vector formats first," "Provide sufficient scrim between background images and text," and blur "can affect performance and [is] only available on devices running Android 12 and higher." Why: this governs image choice, text-over-image legibility and Modifier.blur use.
-6. /docs/quality-guidelines/widget-quality (WL-3): header rules (recommended for scrolling content or useful context; optional for full-bleed or tight space; icon always, title when space allows; actions from widget context) and WL-4.1 (set a maximum size only if a larger size just adds blank space). Why: these are differentiated-tier criteria that directly change Glance layout code.
+6. /develop/adaptive-apps/quality-guidelines/widget-quality (WL-3): header rules (recommended for scrolling content or useful context; optional for full-bleed or tight space; icon always, title when space allows; actions from widget context) and WL-4.1 (set a maximum size only if a larger size just adds blank space). Why: these are differentiated-tier criteria that directly change Glance layout code.
 7. /design/ui/mobile/guides/foundations/translate-designs: "Your primary navigation should always be present on parent views"; child views keep it unless modal; parent views without a drawer or rail show no navigation icon. Why: it settles when a Compose screen shows the nav bar and the leading app bar icon.
 8. /design/ui/mobile/guides/patterns/passkeys: offer passkey creation at account creation, after a password reset, after a password sign-in and in settings; lead with benefits; always confirm creation; the management list shows the password manager name and icon, created and last-used times, and "delete." Why: agents building sign-in or account screens otherwise invent their own flow.
 9. /design/ui/mobile/guides/widgets/configuration: "If configuration is not completed, don't cancel adding the widget. Provide a state to allow for restoring or configuring within the widget," plus an empty state with an onboarding or sign-in reminder. Why: it prevents widgets that silently vanish or stay blank.
@@ -931,6 +932,7 @@ Summary: 54 URLs checked. 20 fully distilled, 14 partly distilled, 3 not distill
 
 ### Current components
 - [-] /design/ui/wear/guides/components/dialogs; now redirects to /design/ui/wear/guides/m2-5/components/dialogs, covered below
+- [x] /design/ui/wear/guides/components/swipe-to-dismiss → material-3-wear-os.md (Behaviors: Swipe to dismiss)
 
 ### M2.5 behaviors and patterns
 - [x] /design/ui/wear/guides/m2-5/behaviors-and-patterns/clipping → material-3-wear-os.md (Behaviors: Clipping; Adaptive sizes)
@@ -1009,6 +1011,577 @@ Summary: 54 URLs checked. 20 fully distilled, 14 partly distilled, 3 not distill
 13. /wear/guides/m2-5/components/chips: "Design each screen to contain a single prominent chip for the primary action." Why: it gives a hierarchy rule for app screens (the doc only states it for tiles).
 14. /wear/guides/m2-5/components/expandable-item: use a centered "Show more" chip for dense lists or text; collapse to 3 items or 8 lines. Why: it gives a concrete default for long content on a watch.
 15. /wear/guides/m2-5/surfaces/tiles-design-system: the bottom CTA is "a word that's short but specific to a particular action or destination", with "More" as the fallback, about 6 characters below 225dp and no truncation. Why: it keeps tile CTAs from truncating on small screens.
+
+## developer.android.com/develop: Compose UI and adaptive apps
+
+Fetched November 2026 by crawling outward from /develop/ui and /develop/adaptive-apps: every Compose UI page and every adaptive apps guide, cookbook recipe, and quality guideline. Views pages are left out because the skills target Compose, and the cars, TV, and XR adaptive guides are out of scope. These 443 pages are fetched but not yet audited, so every row is `[ ]` until a pass reads the page, distills what changes agent-built UI, and gives it a verdict.
+
+### /develop/adaptive-apps
+- [ ] /develop/adaptive-apps
+
+### /develop/adaptive-apps/cookbook
+- [ ] /develop/adaptive-apps/cookbook/chromebook-camera
+- [ ] /develop/adaptive-apps/cookbook/detachable-keyboard
+- [ ] /develop/adaptive-apps/cookbook/grid-table-layout
+- [ ] /develop/adaptive-apps/cookbook/grid-ui-overlay
+- [ ] /develop/adaptive-apps/cookbook/lazy-list-in-grid
+- [ ] /develop/adaptive-apps/cookbook/media-playback-spacebar
+- [ ] /develop/adaptive-apps/cookbook/orientation-restriction
+- [ ] /develop/adaptive-apps/cookbook/preface
+- [ ] /develop/adaptive-apps/cookbook/stylus-palm-rejection
+- [ ] /develop/adaptive-apps/cookbook/tabletop-posture-media-query-grid
+- [ ] /develop/adaptive-apps/cookbook/wide-classic-card-layout-with-grid
+
+### /develop/adaptive-apps/guides
+- [ ] /develop/adaptive-apps/guides/adaptive-dos-and-donts
+- [ ] /develop/adaptive-apps/guides/app-orientation-aspect-ratio-resizability
+- [ ] /develop/adaptive-apps/guides/build-a-supporting-pane-layout
+- [ ] /develop/adaptive-apps/guides/build-adaptive-navigation
+- [ ] /develop/adaptive-apps/guides/camera-form-factors-support
+- [ ] /develop/adaptive-apps/guides/canonical-layouts
+- [ ] /develop/adaptive-apps/guides/chromeos/build-adaptive-apps-for-chromeos
+- [ ] /develop/adaptive-apps/guides/custom
+- [ ] /develop/adaptive-apps/guides/flexbox
+- [ ] /develop/adaptive-apps/guides/flexbox/container-behavior
+- [ ] /develop/adaptive-apps/guides/flexbox/get-started
+- [ ] /develop/adaptive-apps/guides/flexbox/item-behavior
+- [ ] /develop/adaptive-apps/guides/foldables/learn-about-foldables
+- [ ] /develop/adaptive-apps/guides/foldables/make-your-app-fold-aware
+- [ ] /develop/adaptive-apps/guides/foldables/support-foldable-display-modes
+- [ ] /develop/adaptive-apps/guides/foldables/trifolds-and-landscape-foldables
+- [ ] /develop/adaptive-apps/guides/get-started-with-adaptive-apps
+- [ ] /develop/adaptive-apps/guides/googlebook/adb-debugging
+- [ ] /develop/adaptive-apps/guides/googlebook/cross-device-continuity
+- [ ] /develop/adaptive-apps/guides/googlebook/keyboard-apps-and-launcher-compatibility
+- [ ] /develop/adaptive-apps/guides/googlebook/overview
+- [ ] /develop/adaptive-apps/guides/grid
+- [ ] /develop/adaptive-apps/guides/grid/container-properties
+- [ ] /develop/adaptive-apps/guides/grid/get-started
+- [ ] /develop/adaptive-apps/guides/grid/item-properties
+- [ ] /develop/adaptive-apps/guides/increase-app-availability
+- [ ] /develop/adaptive-apps/guides/list-detail
+- [ ] /develop/adaptive-apps/guides/mediaquery
+- [ ] /develop/adaptive-apps/guides/support-bubbles
+- [ ] /develop/adaptive-apps/guides/support-connected-displays
+- [ ] /develop/adaptive-apps/guides/support-desktop-windowing
+- [ ] /develop/adaptive-apps/guides/support-different-display-sizes
+- [ ] /develop/adaptive-apps/guides/support-multi-window-mode
+- [ ] /develop/adaptive-apps/guides/use-window-size-classes
+
+### /develop/adaptive-apps/quality-guidelines
+- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality
+- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/experiences/camera-audio
+- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/experiences/desktop
+- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/experiences/foldables
+- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/experiences/stylus
+- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/tier-1
+- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/tier-2
+- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/tier-3
+- [ ] /develop/adaptive-apps/quality-guidelines/core-app-quality
+- [ ] /develop/adaptive-apps/quality-guidelines/wear-app-quality
+
+### /develop/adaptive-apps/samples
+- [ ] /develop/adaptive-apps/samples
+
+### /develop/ui
+- [ ] /develop/ui
+
+### /develop/ui/compose
+- [ ] /develop/ui/compose
+
+### /develop/ui/compose/accessibility
+- [ ] /develop/ui/compose/accessibility
+- [ ] /develop/ui/compose/accessibility/api-defaults
+- [ ] /develop/ui/compose/accessibility/inspect-debug
+- [ ] /develop/ui/compose/accessibility/merging-clearing
+- [ ] /develop/ui/compose/accessibility/scalable-content
+- [ ] /develop/ui/compose/accessibility/semantics
+- [ ] /develop/ui/compose/accessibility/testing
+- [ ] /develop/ui/compose/accessibility/traversal
+
+### /develop/ui/compose/adopt
+- [ ] /develop/ui/compose/adopt
+- [ ] /develop/ui/compose/adopt/for-large-teams
+
+### /develop/ui/compose/agentic
+- [ ] /develop/ui/compose/agentic
+- [ ] /develop/ui/compose/agentic/api-naming
+- [ ] /develop/ui/compose/agentic/implement-components
+- [ ] /develop/ui/compose/agentic/manage-catalogs
+- [ ] /develop/ui/compose/agentic/render-surfaces
+- [ ] /develop/ui/compose/agentic/testing
+
+### /develop/ui/compose/animation
+- [ ] /develop/ui/compose/animation/advanced
+- [ ] /develop/ui/compose/animation/choose-api
+- [ ] /develop/ui/compose/animation/composables-modifiers
+- [ ] /develop/ui/compose/animation/customize
+- [ ] /develop/ui/compose/animation/introduction
+- [ ] /develop/ui/compose/animation/quick-guide
+- [ ] /develop/ui/compose/animation/resources
+- [ ] /develop/ui/compose/animation/shared-elements
+- [ ] /develop/ui/compose/animation/shared-elements/additional-samples
+- [ ] /develop/ui/compose/animation/shared-elements/common-use-cases
+- [ ] /develop/ui/compose/animation/shared-elements/customize
+- [ ] /develop/ui/compose/animation/shared-elements/navigation
+- [ ] /develop/ui/compose/animation/testing
+- [ ] /develop/ui/compose/animation/tooling
+- [ ] /develop/ui/compose/animation/value-based
+- [ ] /develop/ui/compose/animation/vectors
+
+### /develop/ui/compose/api-guidelines
+- [ ] /develop/ui/compose/api-guidelines
+
+### /develop/ui/compose/architecture
+- [ ] /develop/ui/compose/architecture
+
+### /develop/ui/compose/bom
+- [ ] /develop/ui/compose/bom
+- [ ] /develop/ui/compose/bom/bom-mapping
+
+### /develop/ui/compose/build-adaptive-apps
+- [ ] /develop/ui/compose/build-adaptive-apps
+
+### /develop/ui/compose/compiler
+- [ ] /develop/ui/compose/compiler
+
+### /develop/ui/compose/components
+- [ ] /develop/ui/compose/components
+- [ ] /develop/ui/compose/components/app-bars
+- [ ] /develop/ui/compose/components/app-bars-dynamic
+- [ ] /develop/ui/compose/components/app-bars-navigate
+- [ ] /develop/ui/compose/components/badges
+- [ ] /develop/ui/compose/components/bottom-sheets
+- [ ] /develop/ui/compose/components/bottom-sheets-partial
+- [ ] /develop/ui/compose/components/button
+- [ ] /develop/ui/compose/components/button-group
+- [ ] /develop/ui/compose/components/card
+- [ ] /develop/ui/compose/components/carousel
+- [ ] /develop/ui/compose/components/checkbox
+- [ ] /develop/ui/compose/components/chip
+- [ ] /develop/ui/compose/components/datepickers
+- [ ] /develop/ui/compose/components/dialog
+- [ ] /develop/ui/compose/components/divider
+- [ ] /develop/ui/compose/components/drawer
+- [ ] /develop/ui/compose/components/fab
+- [ ] /develop/ui/compose/components/fab-menu
+- [ ] /develop/ui/compose/components/floating-toolbar
+- [ ] /develop/ui/compose/components/icon-button
+- [ ] /develop/ui/compose/components/loading-indicator
+- [ ] /develop/ui/compose/components/menu
+- [ ] /develop/ui/compose/components/navigation-bar
+- [ ] /develop/ui/compose/components/navigation-rail
+- [ ] /develop/ui/compose/components/progress
+- [ ] /develop/ui/compose/components/pull-to-refresh
+- [ ] /develop/ui/compose/components/radio-button
+- [ ] /develop/ui/compose/components/scaffold
+- [ ] /develop/ui/compose/components/search-bar
+- [ ] /develop/ui/compose/components/segmented-button
+- [ ] /develop/ui/compose/components/slider
+- [ ] /develop/ui/compose/components/snackbar
+- [ ] /develop/ui/compose/components/split-button
+- [ ] /develop/ui/compose/components/switch
+- [ ] /develop/ui/compose/components/tabs
+- [ ] /develop/ui/compose/components/time-pickers
+- [ ] /develop/ui/compose/components/time-pickers-dialogs
+- [ ] /develop/ui/compose/components/tooltip
+
+### /develop/ui/compose/compositionlocal
+- [ ] /develop/ui/compose/compositionlocal
+
+### /develop/ui/compose/custom-modifiers
+- [ ] /develop/ui/compose/custom-modifiers
+
+### /develop/ui/compose/custom-modifiers-node
+- [ ] /develop/ui/compose/custom-modifiers-node
+
+### /develop/ui/compose/designsystems
+- [ ] /develop/ui/compose/designsystems
+- [ ] /develop/ui/compose/designsystems/anatomy
+- [ ] /develop/ui/compose/designsystems/custom
+- [ ] /develop/ui/compose/designsystems/material
+- [ ] /develop/ui/compose/designsystems/material2-material3
+- [ ] /develop/ui/compose/designsystems/material3
+- [ ] /develop/ui/compose/designsystems/migrate-xml-theme-to-compose
+- [ ] /develop/ui/compose/designsystems/views-to-compose
+
+### /develop/ui/compose/documentation
+- [ ] /develop/ui/compose/documentation
+
+### /develop/ui/compose/first
+- [ ] /develop/ui/compose/first
+
+### /develop/ui/compose/glance
+- [ ] /develop/ui/compose/glance
+- [ ] /develop/ui/compose/glance/additional-resources
+- [ ] /develop/ui/compose/glance/build-ui
+- [ ] /develop/ui/compose/glance/configuration
+- [ ] /develop/ui/compose/glance/create-app-widget
+- [ ] /develop/ui/compose/glance/enhance
+- [ ] /develop/ui/compose/glance/error-handling
+- [ ] /develop/ui/compose/glance/generated-previews
+- [ ] /develop/ui/compose/glance/glance-app-widget
+- [ ] /develop/ui/compose/glance/interoperability
+- [ ] /develop/ui/compose/glance/metrics
+- [ ] /develop/ui/compose/glance/pin-in-app
+- [ ] /develop/ui/compose/glance/testing
+- [ ] /develop/ui/compose/glance/theme
+- [ ] /develop/ui/compose/glance/user-interaction
+
+### /develop/ui/compose/graphics
+- [ ] /develop/ui/compose/graphics
+- [ ] /develop/ui/compose/graphics/blur/examples
+- [ ] /develop/ui/compose/graphics/blur/overview
+- [ ] /develop/ui/compose/graphics/draw/brush
+- [ ] /develop/ui/compose/graphics/draw/mesh-gradient
+- [ ] /develop/ui/compose/graphics/draw/modifiers
+- [ ] /develop/ui/compose/graphics/draw/overview
+- [ ] /develop/ui/compose/graphics/draw/shadows
+- [ ] /develop/ui/compose/graphics/draw/shapes
+- [ ] /develop/ui/compose/graphics/images
+- [ ] /develop/ui/compose/graphics/images/compare
+- [ ] /develop/ui/compose/graphics/images/customize
+- [ ] /develop/ui/compose/graphics/images/custompainter
+- [ ] /develop/ui/compose/graphics/images/loading
+- [ ] /develop/ui/compose/graphics/images/material
+- [ ] /develop/ui/compose/graphics/images/optimization
+
+### /develop/ui/compose/interop
+- [ ] /develop/ui/compose/interop
+
+### /develop/ui/compose/kotlin
+- [ ] /develop/ui/compose/kotlin
+
+### /develop/ui/compose/layering
+- [ ] /develop/ui/compose/layering
+
+### /develop/ui/compose/layouts
+- [ ] /develop/ui/compose/layouts
+- [ ] /develop/ui/compose/layouts/adaptive
+- [ ] /develop/ui/compose/layouts/adaptive/adaptive-dos-and-donts
+- [ ] /develop/ui/compose/layouts/adaptive/app-orientation-aspect-ratio-resizability
+- [ ] /develop/ui/compose/layouts/adaptive/build-a-supporting-pane-layout
+- [ ] /develop/ui/compose/layouts/adaptive/build-adaptive-navigation
+- [ ] /develop/ui/compose/layouts/adaptive/camera-form-factors-support
+- [ ] /develop/ui/compose/layouts/adaptive/canonical-layouts
+- [ ] /develop/ui/compose/layouts/adaptive/flexbox
+- [ ] /develop/ui/compose/layouts/adaptive/flexbox/container-behavior
+- [ ] /develop/ui/compose/layouts/adaptive/flexbox/get-started
+- [ ] /develop/ui/compose/layouts/adaptive/flexbox/item-behavior
+- [ ] /develop/ui/compose/layouts/adaptive/foldables/learn-about-foldables
+- [ ] /develop/ui/compose/layouts/adaptive/foldables/make-your-app-fold-aware
+- [ ] /develop/ui/compose/layouts/adaptive/foldables/support-foldable-display-modes
+- [ ] /develop/ui/compose/layouts/adaptive/foldables/trifolds-and-landscape-foldables
+- [ ] /develop/ui/compose/layouts/adaptive/get-started-with-adaptive-apps
+- [ ] /develop/ui/compose/layouts/adaptive/grid
+- [ ] /develop/ui/compose/layouts/adaptive/grid/container-properties
+- [ ] /develop/ui/compose/layouts/adaptive/grid/get-started
+- [ ] /develop/ui/compose/layouts/adaptive/grid/item-properties
+- [ ] /develop/ui/compose/layouts/adaptive/increase-app-availability
+- [ ] /develop/ui/compose/layouts/adaptive/list-detail
+- [ ] /develop/ui/compose/layouts/adaptive/mediaquery
+- [ ] /develop/ui/compose/layouts/adaptive/support-bubbles
+- [ ] /develop/ui/compose/layouts/adaptive/support-connected-displays
+- [ ] /develop/ui/compose/layouts/adaptive/support-desktop-windowing
+- [ ] /develop/ui/compose/layouts/adaptive/support-different-display-sizes
+- [ ] /develop/ui/compose/layouts/adaptive/support-different-screen-sizes
+- [ ] /develop/ui/compose/layouts/adaptive/support-multi-window-mode
+- [ ] /develop/ui/compose/layouts/adaptive/use-window-size-classes
+- [ ] /develop/ui/compose/layouts/adaptive/window-size-classes
+- [ ] /develop/ui/compose/layouts/alignment-lines
+- [ ] /develop/ui/compose/layouts/basics
+- [ ] /develop/ui/compose/layouts/constraintlayout
+- [ ] /develop/ui/compose/layouts/constraints-modifiers
+- [ ] /develop/ui/compose/layouts/containers
+- [ ] /develop/ui/compose/layouts/custom
+- [ ] /develop/ui/compose/layouts/flow
+- [ ] /develop/ui/compose/layouts/insets
+- [ ] /develop/ui/compose/layouts/intrinsic-measurements
+- [ ] /develop/ui/compose/layouts/pager
+- [ ] /develop/ui/compose/layouts/system-bars
+- [ ] /develop/ui/compose/layouts/visibility-modifiers
+
+### /develop/ui/compose/libraries
+- [ ] /develop/ui/compose/libraries
+
+### /develop/ui/compose/lifecycle
+- [ ] /develop/ui/compose/lifecycle
+
+### /develop/ui/compose/lists
+- [ ] /develop/ui/compose/lists
+
+### /develop/ui/compose/mental-model
+- [ ] /develop/ui/compose/mental-model
+
+### /develop/ui/compose/migrate
+- [ ] /develop/ui/compose/migrate
+- [ ] /develop/ui/compose/migrate/compare-metrics
+- [ ] /develop/ui/compose/migrate/interoperability-apis
+- [ ] /develop/ui/compose/migrate/interoperability-apis/compose-in-views
+- [ ] /develop/ui/compose/migrate/interoperability-apis/views-in-compose
+- [ ] /develop/ui/compose/migrate/interoperability-apis/wrap-webview-in-compose
+- [ ] /develop/ui/compose/migrate/migrate-xml-views-to-jetpack-compose
+- [ ] /develop/ui/compose/migrate/migration-scenarios/coordinator-layout
+- [ ] /develop/ui/compose/migrate/migration-scenarios/navigation
+- [ ] /develop/ui/compose/migrate/migration-scenarios/recycler-view
+- [ ] /develop/ui/compose/migrate/other-considerations
+- [ ] /develop/ui/compose/migrate/strategy
+
+### /develop/ui/compose/modifiers
+- [ ] /develop/ui/compose/modifiers
+
+### /develop/ui/compose/modifiers-list
+- [ ] /develop/ui/compose/modifiers-list
+
+### /develop/ui/compose/navigation
+- [ ] /develop/ui/compose/navigation
+
+### /develop/ui/compose/notifications
+- [ ] /develop/ui/compose/notifications
+- [ ] /develop/ui/compose/notifications/bubbles
+- [ ] /develop/ui/compose/notifications/call-style
+- [ ] /develop/ui/compose/notifications/channels
+- [ ] /develop/ui/compose/notifications/create-notification
+- [ ] /develop/ui/compose/notifications/expanded
+- [ ] /develop/ui/compose/notifications/live-update
+- [ ] /develop/ui/compose/notifications/notification-permission
+- [ ] /develop/ui/compose/notifications/progress-centric
+
+### /develop/ui/compose/performance
+- [ ] /develop/ui/compose/performance
+- [ ] /develop/ui/compose/performance/backwards-write
+- [ ] /develop/ui/compose/performance/baseline-profiles
+- [ ] /develop/ui/compose/performance/bestpractices
+- [ ] /develop/ui/compose/performance/herobenchmark
+- [ ] /develop/ui/compose/performance/modifier-phases
+- [ ] /develop/ui/compose/performance/phases
+- [ ] /develop/ui/compose/performance/stability
+- [ ] /develop/ui/compose/performance/stability/diagnose
+- [ ] /develop/ui/compose/performance/stability/fix
+- [ ] /develop/ui/compose/performance/stability/strongskipping
+- [ ] /develop/ui/compose/performance/tooling
+
+### /develop/ui/compose/phases
+- [ ] /develop/ui/compose/phases
+
+### /develop/ui/compose/quick-guides
+- [ ] /develop/ui/compose/quick-guides
+- [ ] /develop/ui/compose/quick-guides/collections/compose-basics
+- [ ] /develop/ui/compose/quick-guides/collections/create-a-home-screen-scaffold
+- [ ] /develop/ui/compose/quick-guides/collections/display-a-list-or-grid
+- [ ] /develop/ui/compose/quick-guides/collections/display-images
+- [ ] /develop/ui/compose/quick-guides/collections/display-interactive-components
+- [ ] /develop/ui/compose/quick-guides/collections/display-text
+- [ ] /develop/ui/compose/quick-guides/collections/request-user-input
+- [ ] /develop/ui/compose/quick-guides/content/add-toggle-switch
+- [ ] /develop/ui/compose/quick-guides/content/animate-text
+- [ ] /develop/ui/compose/quick-guides/content/auto-format-phone-number
+- [ ] /develop/ui/compose/quick-guides/content/build-list-multiple-item-types
+- [ ] /develop/ui/compose/quick-guides/content/clipped-image
+- [ ] /develop/ui/compose/quick-guides/content/create-bottom-sheet
+- [ ] /develop/ui/compose/quick-guides/content/create-button
+- [ ] /develop/ui/compose/quick-guides/content/create-card-as-container
+- [ ] /develop/ui/compose/quick-guides/content/create-chip
+- [ ] /develop/ui/compose/quick-guides/content/create-floating-action-button
+- [ ] /develop/ui/compose/quick-guides/content/create-navigation-drawer
+- [ ] /develop/ui/compose/quick-guides/content/create-progress-indicator
+- [ ] /develop/ui/compose/quick-guides/content/create-range-slider
+- [ ] /develop/ui/compose/quick-guides/content/create-scaffold
+- [ ] /develop/ui/compose/quick-guides/content/create-scrollable-grid
+- [ ] /develop/ui/compose/quick-guides/content/create-snackbar-notification
+- [ ] /develop/ui/compose/quick-guides/content/display-animated-image
+- [ ] /develop/ui/compose/quick-guides/content/display-app-bar
+- [ ] /develop/ui/compose/quick-guides/content/display-bottom-app-bar
+- [ ] /develop/ui/compose/quick-guides/content/display-layered-image
+- [ ] /develop/ui/compose/quick-guides/content/display-nested-list
+- [ ] /develop/ui/compose/quick-guides/content/display-paging-list
+- [ ] /develop/ui/compose/quick-guides/content/display-top-app-bar
+- [ ] /develop/ui/compose/quick-guides/content/display-user-input
+- [ ] /develop/ui/compose/quick-guides/content/enable-snap-scrolling
+- [ ] /develop/ui/compose/quick-guides/content/filter-list-while-typing
+- [ ] /develop/ui/compose/quick-guides/content/finite-scrolling-list
+- [ ] /develop/ui/compose/quick-guides/content/lazily-load-list
+- [ ] /develop/ui/compose/quick-guides/content/load-images
+- [ ] /develop/ui/compose/quick-guides/content/parallax-scrolling
+- [ ] /develop/ui/compose/quick-guides/content/show-hide-password
+- [ ] /develop/ui/compose/quick-guides/content/style-parts-text
+- [ ] /develop/ui/compose/quick-guides/content/support-multiple-links
+- [ ] /develop/ui/compose/quick-guides/content/validate-input
+- [ ] /develop/ui/compose/quick-guides/content/video/accessibility-in-compose
+- [ ] /develop/ui/compose/quick-guides/content/video/advanced-layouts-compose
+- [ ] /develop/ui/compose/quick-guides/content/video/animation-in-compose
+- [ ] /develop/ui/compose/quick-guides/content/video/debugging-recomposition
+- [ ] /develop/ui/compose/quick-guides/content/video/draw-text-compose
+- [ ] /develop/ui/compose/quick-guides/content/video/drawing-in-compose
+- [ ] /develop/ui/compose/quick-guides/content/video/five-animations-compose
+- [ ] /develop/ui/compose/quick-guides/content/video/insets-in-compose
+- [ ] /develop/ui/compose/quick-guides/content/video/lazy-lists-compose
+- [ ] /develop/ui/compose/quick-guides/content/video/lists-in-compose
+- [ ] /develop/ui/compose/quick-guides/content/video/state-in-compose
+- [ ] /develop/ui/compose/quick-guides/content/video/testing-in-compose
+
+### /develop/ui/compose/resources
+- [ ] /develop/ui/compose/resources
+
+### /develop/ui/compose/samples
+- [ ] /develop/ui/compose/samples
+
+### /develop/ui/compose/semantics
+- [ ] /develop/ui/compose/semantics
+
+### /develop/ui/compose/setup
+- [ ] /develop/ui/compose/setup
+
+### /develop/ui/compose/setup-compose-dependencies-and-compiler
+- [ ] /develop/ui/compose/setup-compose-dependencies-and-compiler
+
+### /develop/ui/compose/sharing
+- [ ] /develop/ui/compose/sharing
+- [ ] /develop/ui/compose/sharing/direct-share-targets
+- [ ] /develop/ui/compose/sharing/receive
+- [ ] /develop/ui/compose/sharing/send
+
+### /develop/ui/compose/side-effects
+- [ ] /develop/ui/compose/side-effects
+
+### /develop/ui/compose/state
+- [ ] /develop/ui/compose/state
+
+### /develop/ui/compose/state-callbacks
+- [ ] /develop/ui/compose/state-callbacks
+
+### /develop/ui/compose/state-hoisting
+- [ ] /develop/ui/compose/state-hoisting
+
+### /develop/ui/compose/state-lifespans
+- [ ] /develop/ui/compose/state-lifespans
+
+### /develop/ui/compose/state-saving
+- [ ] /develop/ui/compose/state-saving
+
+### /develop/ui/compose/styles
+- [ ] /develop/ui/compose/styles
+- [ ] /develop/ui/compose/styles/styles-update
+
+### /develop/ui/compose/system
+- [ ] /develop/ui/compose/system/cutouts
+- [ ] /develop/ui/compose/system/evaluate-rulers
+- [ ] /develop/ui/compose/system/icon_design_adaptive
+- [ ] /develop/ui/compose/system/insets
+- [ ] /develop/ui/compose/system/insets-ui
+- [ ] /develop/ui/compose/system/insets-views-compose
+- [ ] /develop/ui/compose/system/keyboard-animations
+- [ ] /develop/ui/compose/system/material-insets
+- [ ] /develop/ui/compose/system/picture-in-picture
+- [ ] /develop/ui/compose/system/pip-add
+- [ ] /develop/ui/compose/system/pip-enter
+- [ ] /develop/ui/compose/system/pip-jetpack
+- [ ] /develop/ui/compose/system/pip-remote-actions
+- [ ] /develop/ui/compose/system/pip-setup
+- [ ] /develop/ui/compose/system/predictive-back
+- [ ] /develop/ui/compose/system/predictive-back-progress
+- [ ] /develop/ui/compose/system/predictive-back-setup
+- [ ] /develop/ui/compose/system/predictive-back-test
+- [ ] /develop/ui/compose/system/remote-compose
+- [ ] /develop/ui/compose/system/setup-e2e
+- [ ] /develop/ui/compose/system/shortcuts
+- [ ] /develop/ui/compose/system/shortcuts/adding-capabilities
+- [ ] /develop/ui/compose/system/shortcuts/best-practices
+- [ ] /develop/ui/compose/system/shortcuts/creating-shortcuts
+- [ ] /develop/ui/compose/system/shortcuts/managing-shortcuts
+- [ ] /develop/ui/compose/system/system-bars
+- [ ] /develop/ui/compose/system/test-cutouts
+
+### /develop/ui/compose/testing
+- [ ] /develop/ui/compose/testing
+- [ ] /develop/ui/compose/testing/apis
+- [ ] /develop/ui/compose/testing/common-patterns
+- [ ] /develop/ui/compose/testing/debug
+- [ ] /develop/ui/compose/testing/interoperability
+- [ ] /develop/ui/compose/testing/migrate-v2
+- [ ] /develop/ui/compose/testing/semantics
+- [ ] /develop/ui/compose/testing/synchronization
+- [ ] /develop/ui/compose/testing/testing-cheatsheet
+
+### /develop/ui/compose/testing-cheatsheet
+- [ ] /develop/ui/compose/testing-cheatsheet
+
+### /develop/ui/compose/text
+- [ ] /develop/ui/compose/text
+- [ ] /develop/ui/compose/text/autofill
+- [ ] /develop/ui/compose/text/configure-layout
+- [ ] /develop/ui/compose/text/display-text
+- [ ] /develop/ui/compose/text/emoji
+- [ ] /develop/ui/compose/text/fonts
+- [ ] /develop/ui/compose/text/migrate-state-based
+- [ ] /develop/ui/compose/text/rich-text-input
+- [ ] /develop/ui/compose/text/style-paragraph
+- [ ] /develop/ui/compose/text/style-text
+- [ ] /develop/ui/compose/text/user-input
+- [ ] /develop/ui/compose/text/user-interactions
+
+### /develop/ui/compose/tooling
+- [ ] /develop/ui/compose/tooling
+- [ ] /develop/ui/compose/tooling/animation-preview
+- [ ] /develop/ui/compose/tooling/debug
+- [ ] /develop/ui/compose/tooling/editor-actions
+- [ ] /develop/ui/compose/tooling/iterative-development
+- [ ] /develop/ui/compose/tooling/lint
+- [ ] /develop/ui/compose/tooling/previews
+- [ ] /develop/ui/compose/tooling/stacktraces
+- [ ] /develop/ui/compose/tooling/tracing
+
+### /develop/ui/compose/touch-input
+- [ ] /develop/ui/compose/touch-input
+- [ ] /develop/ui/compose/touch-input/copy-and-paste
+- [ ] /develop/ui/compose/touch-input/focus
+- [ ] /develop/ui/compose/touch-input/focus/capture-and-release-focus
+- [ ] /develop/ui/compose/touch-input/focus/focus-group
+- [ ] /develop/ui/compose/touch-input/focus/focus-in-text-fields
+- [ ] /develop/ui/compose/touch-input/focus/focus-restoration
+- [ ] /develop/ui/compose/touch-input/focus/focus-target
+- [ ] /develop/ui/compose/touch-input/focus/focus-traversal
+- [ ] /develop/ui/compose/touch-input/focus/focused-state
+- [ ] /develop/ui/compose/touch-input/focus/move-focus
+- [ ] /develop/ui/compose/touch-input/focus/react-to-focus
+- [ ] /develop/ui/compose/touch-input/focus/request-focus
+- [ ] /develop/ui/compose/touch-input/focus/testing-focus
+- [ ] /develop/ui/compose/touch-input/input-compatibility-on-large-screens
+- [ ] /develop/ui/compose/touch-input/keyboard-input/commands
+- [ ] /develop/ui/compose/touch-input/keyboard-input/keyboard-shortcuts-helper
+- [ ] /develop/ui/compose/touch-input/pointer-input
+- [ ] /develop/ui/compose/touch-input/pointer-input/drag-composables
+- [ ] /develop/ui/compose/touch-input/pointer-input/drag-swipe-fling
+- [ ] /develop/ui/compose/touch-input/pointer-input/multi-touch
+- [ ] /develop/ui/compose/touch-input/pointer-input/scroll
+- [ ] /develop/ui/compose/touch-input/pointer-input/tap-and-press
+- [ ] /develop/ui/compose/touch-input/pointer-input/understand-gestures
+- [ ] /develop/ui/compose/touch-input/scroll/nested-scroll-modifiers
+- [ ] /develop/ui/compose/touch-input/scroll/scroll-modifiers
+- [ ] /develop/ui/compose/touch-input/scroll/scroll-phases
+- [ ] /develop/ui/compose/touch-input/scroll/two-dimensional-scrolling
+- [ ] /develop/ui/compose/touch-input/stylus-input
+- [ ] /develop/ui/compose/touch-input/stylus-input/about-ink-api
+- [ ] /develop/ui/compose/touch-input/stylus-input/advanced-stylus-features
+- [ ] /develop/ui/compose/touch-input/stylus-input/create-a-note-taking-app
+- [ ] /develop/ui/compose/touch-input/stylus-input/ink-api-brush-apis
+- [ ] /develop/ui/compose/touch-input/stylus-input/ink-api-coordinate-system
+- [ ] /develop/ui/compose/touch-input/stylus-input/ink-api-draw-stroke
+- [ ] /develop/ui/compose/touch-input/stylus-input/ink-api-geometry-apis
+- [ ] /develop/ui/compose/touch-input/stylus-input/ink-api-modules
+- [ ] /develop/ui/compose/touch-input/stylus-input/ink-api-setup
+- [ ] /develop/ui/compose/touch-input/stylus-input/ink-api-state-preservation
+- [ ] /develop/ui/compose/touch-input/stylus-input/stylus-input-in-text-fields
+- [ ] /develop/ui/compose/touch-input/user-interactions/drag-and-drop
+- [ ] /develop/ui/compose/touch-input/user-interactions/handling-interactions
+- [ ] /develop/ui/compose/touch-input/user-interactions/migrate-indication-ripple
+- [ ] /develop/ui/compose/touch-input/user-interactions/swipe-to-dismiss
+
+### /develop/ui/compose/tutorial
+- [ ] /develop/ui/compose/tutorial
+
+### /develop/ui/compose/why-adopt
+- [ ] /develop/ui/compose/why-adopt
 
 ## Out of scope: developer.android.com/design/ui platforms
 

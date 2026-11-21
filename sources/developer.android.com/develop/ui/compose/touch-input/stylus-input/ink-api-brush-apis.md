@@ -1,0 +1,82 @@
+# Brush APIs
+Source: https://developer.android.com/develop/ui/compose/touch-input/stylus-input/ink-api-brush-apis
+
+The `Brush` APIs provide you with the tools to define the visual style of your strokes. You can create brushes with different colors, sizes, and families to achieve a variety of looks.
+
+## Create a brush
+
+To create a brush, use the Compose `Brush` companion methods with named arguments such as `Brush.Companion.createWithComposeColor`. This class lets you set the following properties:
+- `family`: The style of the brush, analogous to a typeface or font in text. See `StockBrushes` for available `BrushFamily` values.
+- `color`: The color of the brush. You can set the color using a `ColorLong`.
+- `size`: The overall thickness of strokes created with the brush.
+- `epsilon`: The smallest distance for which two points should be considered visually distinct for stroke generation geometry purposes. The ratio of epsilon and stroke points controls how much a stroke can be zoomed in on without artifacts, at the cost of memory. A good starting point for stroke units is 1 px, and a good starting point for epsilon is 0.1. Higher epsilon values use less memory but allow for less zoom before triangle artifacts appear. Experiment to find the right value for your use case.
+
+```
+val brush = Brush.createWithComposeColor(
+family = StockBrushes.pressurePen(),
+color = Color.Black,
+size = 5F,
+epsilon = 0.1F
+)
+```
+
+## Modify brush properties
+
+You can create a copy of an existing brush using the `copyWithComposeColor()` method, which lets you change any of the brush's properties.
+
+```
+val redBrush = Brush.createWithComposeColor(
+family = StockBrushes.pressurePen(),
+color = Color.Red,
+size = 5F,
+epsilon = 0.1F
+)
+
+val blueBrush = redBrush.copyWithComposeColor(color = Color.Blue)
+```
+
+## Custom Brushes
+
+While `StockBrushes` provides a versatile set of common brushes, Ink API also offers an advanced path for creating entirely new brush behaviors for unique artistic effects or to replicate specific existing brushes for backward compatibility.
+
+A custom `BrushFamily` is loaded from its serialized format. The required format is the gzipped binary encoding of the BrushFamily protocol buffer. This lets you load and use custom brush files today. Once deserialized, the custom `BrushFamily` can be used to create a new `Brush` with a specific color and size, just like any of the `StockBrushes` families. **Note:** This interface is experimental and is subject to change.
+
+```
+class CustomBrushes(val context: Context) {
+
+companion object {
+private const val TAG = "CustomBrushes"
+}
+
+val brushes by lazy { loadCustomBrushes() }
+
+@OptIn(ExperimentalInkCustomBrushApi::class)
+private fun loadCustomBrushes(): List<CustomBrush> {
+val brushFiles = mapOf(
+"Calligraphy" to (R.raw.calligraphy to R.drawable.draw_24px),
+"Flag Banner" to (R.raw.flag_banner to R.drawable.flag_24px),
+"Graffiti" to (R.raw.graffiti to R.drawable.format_paint_24px),
+// ...
+)
+
+val loadedBrushes = brushFiles.mapNotNull { (name, pair) ->
+val (resourceId, icon) = pair
+val brushFamily = context.resources.openRawResource(resourceId).use { inputStream ->
+BrushFamily.decode(inputStream)
+}
+CustomBrush(name, icon, brushFamily)
+}
+return loadedBrushes
+}
+}
+
+data class CustomBrush(
+val name: String,
+val icon: Int,
+val brushFamily: BrushFamily
+)
+```
+
+Previous  arrow_back   Pick your module
+
+Next  Draw a stroke   arrow_forward

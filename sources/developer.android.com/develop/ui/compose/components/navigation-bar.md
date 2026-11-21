@@ -1,0 +1,168 @@
+# Navigation bar
+Source: https://developer.android.com/develop/ui/compose/components/navigation-bar
+
+The navigation bar allows users to switch between destinations in an app. You should use navigation bars for:
+- Three to five destinations of equal importance
+- Compact window sizes
+- Consistent destinations across app screens
+
+[IMAGE] A navigation bar with 4 destinations. Each destination has a placeholder name called "Label", with the selected destination appearing with a circle icon, and the rest of the destinations as triangles.
+
+**Figure 1.** A navigation bar with 4 destinations.
+
+This page shows you how to display a navigation bar in your app with related screens and basic navigation.
+
+## API surface
+
+Use the `NavigationBar` and `NavigationBarItem` composables to implement destination switching logic. Each `NavigationBarItem` represents a singular destination.
+
+`NavigationBarItem` includes the following key parameters:
+- `selected`: Determines whether the current item is visually highlighted.
+- `onClick()`: Defines the action to be performed when the user clicks on the item. Logic for handling navigation events, updating the selected item state, or loading corresponding content belongs here.
+- `label`: Displays text within the item. Optional.
+- `icon`: Displays an icon within the item. Optional.
+
+## Example: Bottom navigation bar
+
+The following snippet implements a bottom navigation bar with items so users can navigate between different screens in an app: **Note:** The full source code includes the code that establishes the basic navigation structure for the following example.
+
+```
+@Composable
+fun NavigationBarExample(modifier: Modifier = Modifier) {
+val navController = rememberNavController()
+val startDestination = Destination.SONGS
+var selectedDestination by rememberSaveable { mutableIntStateOf(startDestination.ordinal) }
+
+Scaffold(
+modifier = modifier,
+bottomBar = {
+NavigationBar(windowInsets = NavigationBarDefaults.windowInsets) {
+Destination.entries.forEachIndexed { index, destination ->
+NavigationBarItem(
+selected = selectedDestination == index,
+onClick = {
+navController.navigate(route = destination.route)
+selectedDestination = index
+},
+icon = {
+Icon(
+destination.icon,
+contentDescription = destination.contentDescription
+)
+},
+label = { Text(destination.label) }
+)
+}
+}
+}
+) { contentPadding ->
+AppNavHost(navController, startDestination, modifier = Modifier.padding(contentPadding))
+}
+}
+```
+
+### Key points
+- `NavigationBar` displays a collection of items, with each item corresponding to a `Destination`.
+- `val navController = rememberNavController()` creates and remembers an instance of `NavHostController`, which manages the navigation within a `NavHost`.
+- `var selectedDestination by rememberSaveable { mutableIntStateOf(startDestination.ordinal) }` manages the state of the selected item.
+  - `startDestination.ordinal` gets the numerical index (position) of the `Destination.SONGS` enum entry.
+
+- When an item is clicked, `navController.navigate(route = destination.route)` is called to navigate to the corresponding screen.
+- The `onClick` lambda of the `NavigationBarItem` updates the `selectedDestination` state to visually highlight the clicked item.
+- The navigation logic calls the `AppNavHost` composable, passing the `navController` and `startDestination`, to display the actual content of the selected screen.
+
+### Result
+
+The following image shows the navigation bar resulting from the previous snippet:
+[IMAGE] A screen that reads 'Songs Screen' above a navigation bar with Songs, Album and Playlist destinations; Songs is selected.
+
+**Figure 2.** A navigation bar that contains 3 destinations with associated icons: Songs, Album, and Playlist.
+
+## M3 Expressive update
+
+Material 3 Expressive introduces `ShortNavigationBar` and `ShortNavigationBarItem` as additional, flexible options alongside the standard `NavigationBar`.
+[IMAGE] Example of a Material 3 flexible navigation bar, with shorter height and icons with labels.
+
+**Figure 3.** A flexible navigation bar.
+
+For more information about the M3 Expressive updates for navigation bars, see the Material Design 3 navigation bar guidelines.
+
+The navigation items in `ShortNavigationBar` can be arranged **vertically** or **horizontally**.
+
+### Navigation bar with vertical items
+
+Use vertical items in compact windows, such as on mobile devices. The following snippet demonstrates how to implement a `ShortNavigationBar` with vertical items:
+
+```
+@Composable
+fun ShortNavigationBarSample() {
+var selectedItem by remember { mutableIntStateOf(0) }
+val items = listOf("Songs", "Artists", "Playlists")
+
+ShortNavigationBar {
+items.forEachIndexed { index, item ->
+ShortNavigationBarItem(
+icon = {
+Icon(
+painter = rememberVectorPainter(if (selectedItem == index) AppIcons.FavoriteFilled else AppIcons.Favorite),
+contentDescription = null,
+)
+},
+label = { Text(item) },
+selected = selectedItem == index,
+onClick = { selectedItem = index },
+)
+}
+}
+}
+```
+
+[IMAGE] A short navigation bar with three vertical items showing heart icons above the labels 'Songs' (selected), 'Artists', and 'Playlists'.
+
+A short navigation bar with vertical items.
+
+### Navigation bar with horizontal items
+
+Use horizontal items in medium windows, such as on tablets. The following snippet demonstrates how to implement a `ShortNavigationBar` with horizontal items centered in the bar:
+
+```
+@Composable
+fun ShortNavigationBarWithHorizontalItemsSample() {
+var selectedItem by remember { mutableIntStateOf(0) }
+val items = listOf("Songs", "Artists", "Playlists")
+
+Column {
+Text(
+"Note: this configuration is better displayed in medium screen sizes.",
+Modifier.padding(16.dp),
+)
+
+Spacer(Modifier.height(32.dp))
+
+ShortNavigationBar(arrangement = ShortNavigationBarArrangement.Centered) {
+items.forEachIndexed { index, item ->
+ShortNavigationBarItem(
+iconPosition = NavigationItemIconPosition.Start,
+icon = {
+Icon(
+painter = rememberVectorPainter(if (selectedItem == index) AppIcons.FavoriteFilled else AppIcons.Favorite),
+contentDescription = null,
+)
+},
+label = { Text(item) },
+selected = selectedItem == index,
+onClick = { selectedItem = index },
+)
+}
+}
+}
+}
+```
+
+[IMAGE] A note about medium screen sizes above a short navigation bar with three centered horizontal items labeled 'Songs' (selected), 'Artists', and 'Playlists' with leading heart icons.
+
+A short navigation bar with horizontal items.
+
+## Additional resources
+- Material 3 - Navigation Bar
+- Navigation with Compose

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fetches every official source page into sources/ as Markdown.
 
-Usage: fetch.py [--only m3,blog,design-ui,articles,videos] [--allow-shrink]
+Usage: fetch.py [--only m3,blog,android,articles,videos] [--allow-shrink]
 
 Each page becomes one file at sources/<domain>/<route>.md whose first lines are its title and URL.
 Output is deterministic (no dates, stable ordering), so `git diff sources/` after a fetch shows
@@ -25,9 +25,16 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ROOT / "sources"
 M3 = "https://m3.material.io"
 ANDROID = "https://developer.android.com"
-# developer.android.com/design/ui platforms outside the skill's scope (see docs/research/source-coverage.md).
-OUT_OF_SCOPE = ("/design/ui/ai-glasses", "/design/ui/cars", "/design/ui/tv", "/design/ui/xr")
-EXTRA_ANDROID_ROUTES = ["/docs/quality-guidelines/widget-quality", "/develop/ui/views/appwidgets/layouts"]
+# developer.android.com sections the crawl follows: the design guides, the Compose UI docs, and the adaptive apps
+# guides. Views docs are left out because the skills target Compose.
+ANDROID_SECTIONS = ("/design/ui", "/develop/ui/compose", "/develop/adaptive-apps")
+# Platforms outside the skill's scope (see docs/research/source-coverage.md), and Views-only cookbook recipes.
+OUT_OF_SCOPE = ("/design/ui/ai-glasses", "/design/ui/cars", "/design/ui/tv", "/design/ui/xr",
+                "/develop/adaptive-apps/guides/cars", "/develop/adaptive-apps/guides/tv", "/develop/adaptive-apps/guides/xr",
+                "/develop/adaptive-apps/quality-guidelines/android-xr", "/develop/adaptive-apps/quality-guidelines/car-app-quality",
+                "/develop/adaptive-apps/quality-guidelines/tv-app-quality", "/develop/adaptive-apps/cookbook/recyclerview-state",
+                "/develop/adaptive-apps/cookbook/webview-state")
+EXTRA_ANDROID_ROUTES = ["/develop/ui/views/appwidgets/layouts"]
 ARTICLES = [
     "https://design.google/library/google-sans-flex-font",
     "https://design.google/library/expressive-material-design-google-research",
@@ -270,19 +277,21 @@ def fetch_blog(allow_shrink):
     write_all(SOURCES / "m3.material.io" / "blog", fetch_parallel(posts, one), allow_shrink)
 
 
-# developer.android.com: the design/ui navigation is only rendered into hub pages, and the sitemaps list a
-# fraction of the guides, so routes come from crawling in-page links outward from the section hubs.
+# developer.android.com: the navigation is only rendered into hub pages, and the sitemaps list a fraction of the
+# guides, so routes come from crawling in-page links outward from the section hubs.
 
 HUBS = ["/design/ui", "/design/ui/mobile", "/design/ui/mobile/guides/foundations/system-bars", "/design/ui/large-screens",
         "/design/ui/desktop", "/design/ui/mobile/guides/widgets", "/design/ui/gallery", "/design/ui/wear",
-        "/design/ui/wear/guides/get-started"]
+        "/design/ui/wear/guides/get-started", "/develop/ui", "/develop/adaptive-apps"]
 
 
 def in_scope(route):
-    return route.startswith("/design/ui") and not route.startswith(OUT_OF_SCOPE) and "/reference/" not in route
+    # The site also serves each page as `<route>.md.txt`, a plain copy of the same text.
+    return (route.startswith(ANDROID_SECTIONS) and not route.startswith(OUT_OF_SCOPE) and "/reference/" not in route
+            and not route.endswith(".md.txt"))
 
 
-def crawl_design_ui():
+def crawl_android():
     """Returns {route: html} for every in-scope page reachable from the hubs. Dead links are skipped."""
     html, dead, frontier = {}, set(), list(HUBS) + EXTRA_ANDROID_ROUTES
 
@@ -300,15 +309,15 @@ def crawl_design_ui():
         html.update(fetched)
         links = set()
         for page_html in fetched.values():
-            for link in re.findall(r'href="(?:https://developer\.android\.com)?(/design/ui[^"#?]*)"', page_html):
+            for link in re.findall(r'href="(?:https://developer\.android\.com)?(/(?:design|develop)/[^"#?]*)"', page_html):
                 links.add(link.rstrip("/") or link)
         frontier = sorted(link for link in links if in_scope(link) and link not in html and link not in dead)
     return html
 
 
-def fetch_design_ui(allow_shrink):
+def fetch_android(allow_shrink):
     pages = {}
-    for route, html in sorted(crawl_design_ui().items()):
+    for route, html in sorted(crawl_android().items()):
         # Guides wrap their text in the article body; hub and landing pages only have <main>.
         body = (re.search(r'<div class="devsite-article-body[^"]*"[^>]*>(.*?)<devsite-content-footer', html, re.S)
                 or re.search(r"<main[^>]*>(.*?)</main>", html, re.S))
@@ -354,7 +363,7 @@ def fetch_videos(allow_shrink):
     write_all(SOURCES / "youtube.com", fetch_parallel(VIDEOS, one, workers=3), allow_shrink)
 
 
-FETCHERS = {"m3": fetch_m3, "blog": fetch_blog, "design-ui": fetch_design_ui, "articles": fetch_articles, "videos": fetch_videos}
+FETCHERS = {"m3": fetch_m3, "blog": fetch_blog, "android": fetch_android, "articles": fetch_articles, "videos": fetch_videos}
 
 
 def main():
