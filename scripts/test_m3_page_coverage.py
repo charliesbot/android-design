@@ -121,6 +121,7 @@ M3_PAGE_CLAIMS = {
     "side-sheets": ["Surface"],
     "sliders": ["Slider", "VerticalSlider", "RangeSlider"],
     "snackbar": ["SnackbarHost", "Snackbar"],
+    # TODO(https://github.com/charliesbot/android-design/issues/153): Update if Compose Multiplatform 1.13.0 stable ships SplitButton replacing SplitButtonLayout.
     "split-button": ["SplitButtonLayout"],
     "switch": ["Switch"],
     "tabs": [

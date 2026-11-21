@@ -80,6 +80,8 @@ internal object CallNameMapper {
       "ButtonGroup" to M3Component.ButtonGroup.wire,
       "SingleChoiceSegmentedButtonRow" to M3Component.ButtonGroup.wire,
       "MultiChoiceSegmentedButtonRow" to M3Component.ButtonGroup.wire,
+      // TODO(https://github.com/charliesbot/android-design/issues/153): Verify whether SplitButton
+      // replaces SplitButtonLayout on Compose Multiplatform 1.13.0 stable.
       "SplitButtonLayout" to M3Component.SplitButton.wire,
       "SplitButton" to M3Component.SplitButton.wire,
       "IconButton" to M3Component.IconButton.wire,
