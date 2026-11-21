@@ -22,9 +22,10 @@ History: the first audit found 266 distilled, 133 partial, and 13 missing routes
 | developer.android.com/design/ui: Gallery | 33 | 0 | 0 | 9 |
 | developer.android.com/design/ui: Wear OS (current guides) | 46 | 0 | 0 | 4 |
 | developer.android.com/design/ui: Wear OS (components and M2.5 guides) | 38 | 0 | 0 | 17 |
-| developer.android.com/develop: Compose UI and adaptive apps (not yet audited) | 0 | 0 | 443 | 2 |
+| developer.android.com/develop: Adaptive apps | 41 | 0 | 0 | 18 |
+| developer.android.com/develop: Compose UI (not yet audited) | 0 | 0 | 386 | 0 |
 | Out of scope: developer.android.com platforms | 0 | 0 | 0 | 150 |
-| **Total** | **414** | **0** | **443** | **319** |
+| **Total** | **455** | **0** | **386** | **335** |
 
 ## m3.material.io: Foundations (excluding Layout)
 
@@ -1012,78 +1013,94 @@ Summary: 54 URLs checked. 20 fully distilled, 14 partly distilled, 3 not distill
 14. /wear/guides/m2-5/components/expandable-item: use a centered "Show more" chip for dense lists or text; collapse to 3 items or 8 lines. Why: it gives a concrete default for long content on a watch.
 15. /wear/guides/m2-5/surfaces/tiles-design-system: the bottom CTA is "a word that's short but specific to a particular action or destination", with "More" as the fallback, about 6 characters below 225dp and no truncation. Why: it keeps tile CTAs from truncating on small screens.
 
-## developer.android.com/develop: Compose UI and adaptive apps
+## developer.android.com/develop: Adaptive apps
 
-Fetched November 2026 by crawling outward from /develop/ui and /develop/adaptive-apps: every Compose UI page and every adaptive apps guide, cookbook recipe, and quality guideline. Views pages are left out because the skills target Compose, and the cars, TV, and XR adaptive guides are out of scope. These 443 pages are fetched but not yet audited, so every row is `[ ]` until a pass reads the page, distills what changes agent-built UI, and gives it a verdict.
+Fetched November 2026 by crawling outward from /develop/adaptive-apps: every adaptive apps guide, cookbook recipe, and quality guideline. The cars, TV, and XR guides are out of scope (see the last batch).
+
+Result: 59 routes checked. 41 are distilled and 18 are skipped. Before this pass the research had the design-guide view of adaptive layout (panes, breakpoints, postures, desktop input) but none of the developer guides' thresholds, API choices, or quality criteria. That material went into a new section of android-ui-design-guides.md, Adaptive apps (developer guides), and the Wear criteria into material-3-wear-os.md (Adaptive sizes). Pages that only restate the design guides point at the section that already holds their guidance.
 
 ### /develop/adaptive-apps
-- [-] /develop/adaptive-apps/cookbook/recyclerview-state; Views-only recipe, the skills target Compose
-- [-] /develop/adaptive-apps/cookbook/webview-state; Views-only recipe, the skills target Compose
-- [ ] /develop/adaptive-apps
+- [-] /develop/adaptive-apps; landing page of links and feature blurbs, no guidance
+- [-] /develop/adaptive-apps/samples; list of three sample apps with links, no guidance
 
 ### /develop/adaptive-apps/cookbook
-- [ ] /develop/adaptive-apps/cookbook/chromebook-camera
-- [ ] /develop/adaptive-apps/cookbook/detachable-keyboard
-- [ ] /develop/adaptive-apps/cookbook/grid-table-layout
-- [ ] /develop/adaptive-apps/cookbook/grid-ui-overlay
-- [ ] /develop/adaptive-apps/cookbook/lazy-list-in-grid
-- [ ] /develop/adaptive-apps/cookbook/media-playback-spacebar
-- [ ] /develop/adaptive-apps/cookbook/orientation-restriction
-- [ ] /develop/adaptive-apps/cookbook/preface
-- [ ] /develop/adaptive-apps/cookbook/stylus-palm-rejection
-- [ ] /develop/adaptive-apps/cookbook/tabletop-posture-media-query-grid
-- [ ] /develop/adaptive-apps/cookbook/wide-classic-card-layout-with-grid
+- [-] /develop/adaptive-apps/cookbook/chromebook-camera; manifest `uses-feature` declarations for store availability, no UI decision
+- [x] /develop/adaptive-apps/cookbook/detachable-keyboard → android-ui-design-guides.md (Adaptive apps: Context-aware UI with MediaQuery); manifest `configChanges` mechanics skipped
+- [x] /develop/adaptive-apps/cookbook/grid-table-layout → android-ui-design-guides.md (Adaptive apps: Grid, FlexBox, and lazy grids)
+- [x] /develop/adaptive-apps/cookbook/grid-ui-overlay → android-ui-design-guides.md (Adaptive apps: Grid, FlexBox, and lazy grids)
+- [x] /develop/adaptive-apps/cookbook/lazy-list-in-grid → android-ui-design-guides.md (Adaptive apps: Grid, FlexBox, and lazy grids)
+- [x] /develop/adaptive-apps/cookbook/media-playback-spacebar → android-ui-design-guides.md (Adaptive apps: Input)
+- [x] /develop/adaptive-apps/cookbook/orientation-restriction → android-ui-design-guides.md (Adaptive apps: Window size classes in code); manifest and `requestedOrientation` mechanics skipped
+- [-] /develop/adaptive-apps/cookbook/preface; explains the recipe star ratings, no UI decision
+- [-] /develop/adaptive-apps/cookbook/recyclerview-state; Views-only recipe, the skills target Compose
+- [x] /develop/adaptive-apps/cookbook/stylus-palm-rejection → android-ui-design-guides.md (Adaptive apps: Input); `MotionEvent` flag handling is code mechanics
+- [x] /develop/adaptive-apps/cookbook/tabletop-posture-media-query-grid → android-ui-design-guides.md (Adaptive apps: Foldables and postures)
+- [-] /develop/adaptive-apps/cookbook/webview-state; Views-only recipe, the skills target Compose
+- [-] /develop/adaptive-apps/cookbook/wide-classic-card-layout-with-grid; TV wide classic card built with Grid named areas (TV is out of scope); the Grid mechanics are in grid-ui-overlay and container-properties
 
 ### /develop/adaptive-apps/guides
-- [ ] /develop/adaptive-apps/guides/adaptive-dos-and-donts
-- [ ] /develop/adaptive-apps/guides/app-orientation-aspect-ratio-resizability
-- [ ] /develop/adaptive-apps/guides/build-a-supporting-pane-layout
-- [ ] /develop/adaptive-apps/guides/build-adaptive-navigation
-- [ ] /develop/adaptive-apps/guides/camera-form-factors-support
-- [ ] /develop/adaptive-apps/guides/canonical-layouts
-- [ ] /develop/adaptive-apps/guides/chromeos/build-adaptive-apps-for-chromeos
-- [ ] /develop/adaptive-apps/guides/custom
-- [ ] /develop/adaptive-apps/guides/flexbox
-- [ ] /develop/adaptive-apps/guides/flexbox/container-behavior
-- [ ] /develop/adaptive-apps/guides/flexbox/get-started
-- [ ] /develop/adaptive-apps/guides/flexbox/item-behavior
-- [ ] /develop/adaptive-apps/guides/foldables/learn-about-foldables
-- [ ] /develop/adaptive-apps/guides/foldables/make-your-app-fold-aware
-- [ ] /develop/adaptive-apps/guides/foldables/support-foldable-display-modes
-- [ ] /develop/adaptive-apps/guides/foldables/trifolds-and-landscape-foldables
-- [ ] /develop/adaptive-apps/guides/get-started-with-adaptive-apps
-- [ ] /develop/adaptive-apps/guides/googlebook/adb-debugging
-- [ ] /develop/adaptive-apps/guides/googlebook/cross-device-continuity
-- [ ] /develop/adaptive-apps/guides/googlebook/keyboard-apps-and-launcher-compatibility
-- [ ] /develop/adaptive-apps/guides/googlebook/overview
-- [ ] /develop/adaptive-apps/guides/grid
-- [ ] /develop/adaptive-apps/guides/grid/container-properties
-- [ ] /develop/adaptive-apps/guides/grid/get-started
-- [ ] /develop/adaptive-apps/guides/grid/item-properties
-- [ ] /develop/adaptive-apps/guides/increase-app-availability
-- [ ] /develop/adaptive-apps/guides/list-detail
-- [ ] /develop/adaptive-apps/guides/mediaquery
-- [ ] /develop/adaptive-apps/guides/support-bubbles
-- [ ] /develop/adaptive-apps/guides/support-connected-displays
-- [ ] /develop/adaptive-apps/guides/support-desktop-windowing
-- [ ] /develop/adaptive-apps/guides/support-different-display-sizes
-- [ ] /develop/adaptive-apps/guides/support-multi-window-mode
-- [ ] /develop/adaptive-apps/guides/use-window-size-classes
+- [x] /develop/adaptive-apps/guides/adaptive-dos-and-donts → android-ui-design-guides.md (Adaptive apps: Window size classes in code; Navigation and canonical layouts in code; Input); deprecated `Display` APIs and manifest attributes skipped
+- [x] /develop/adaptive-apps/guides/app-orientation-aspect-ratio-resizability → android-ui-design-guides.md (Adaptive apps: Window size classes in code); opt-out property, test flags, and timeline skipped (configuration and tooling)
+- [x] /develop/adaptive-apps/guides/build-a-supporting-pane-layout → android-ui-design-guides.md (Adaptive apps: Navigation and canonical layouts in code); dependency and manifest setup skipped
+- [x] /develop/adaptive-apps/guides/build-adaptive-navigation → android-ui-design-guides.md (Adaptive apps: Navigation and canonical layouts in code)
+- [-] /develop/adaptive-apps/guides/camera-form-factors-support; CameraX sensor orientation and preview plumbing; the design rule (use CameraX so previews scale and rotate) is already in Windows, orientation, and continuity
+- [x] /develop/adaptive-apps/guides/canonical-layouts → android-ui-design-guides.md (Adaptive apps: Navigation and canonical layouts in code); its 50/50 and 70/30 supporting pane split is overruled by Material's spec and the scaffold's 360dp default
+- [x] /develop/adaptive-apps/guides/chromeos/build-adaptive-apps-for-chromeos → android-ui-design-guides.md (Adaptive apps: Window size classes in code) plus Desktop and large screens; a short overview restating window size classes, shortcuts, right-click, hover, list-detail, and the rail
+- [-] /develop/adaptive-apps/guides/custom; tutorial on the `layout` modifier and `Layout` composable, code mechanics with no UI decision
+- [x] /develop/adaptive-apps/guides/flexbox → android-ui-design-guides.md (Adaptive apps: Grid, FlexBox, and lazy grids)
+- [x] /develop/adaptive-apps/guides/flexbox/container-behavior → android-ui-design-guides.md (Adaptive apps: Grid, FlexBox, and lazy grids)
+- [-] /develop/adaptive-apps/guides/flexbox/get-started; dependency setup and two basic examples; the stable version (Compose 1.13) is noted in Grid, FlexBox, and lazy grids
+- [x] /develop/adaptive-apps/guides/flexbox/item-behavior → android-ui-design-guides.md (Adaptive apps: Grid, FlexBox, and lazy grids); `alignSelf` is the per-item `alignItems` override, not a decision
+- [x] /develop/adaptive-apps/guides/foldables/learn-about-foldables → android-ui-design-guides.md (Adaptive apps: Foldables and postures); emulator profile names skipped
+- [x] /develop/adaptive-apps/guides/foldables/make-your-app-fold-aware → android-ui-design-guides.md (Adaptive apps: Foldables and postures)
+- [-] /develop/adaptive-apps/guides/foldables/support-foldable-display-modes; `WindowAreaController` plumbing for rear display and dual-screen modes, hardware-specific and camera-centric
+- [x] /develop/adaptive-apps/guides/foldables/trifolds-and-landscape-foldables → android-ui-design-guides.md (Adaptive apps: Foldables and postures); camera preview, sensor remapping, and `configChanges` steps skipped (hardware and configuration)
+- [x] /develop/adaptive-apps/guides/get-started-with-adaptive-apps → android-ui-design-guides.md (Adaptive apps: Navigation and canonical layouts in code; Input); Play badge, store screenshots, emulators, and testing skipped
+- [-] /develop/adaptive-apps/guides/googlebook/adb-debugging; adb connection setup for Googlebook hardware, tooling only
+- [x] /develop/adaptive-apps/guides/googlebook/cross-device-continuity → android-ui-design-guides.md (Adaptive apps: Desktop windowing and connected displays); the handoff API, web fallback, extras limit, and test setup are platform plumbing
+- [-] /develop/adaptive-apps/guides/googlebook/keyboard-apps-and-launcher-compatibility; distribution note for keyboard and launcher developers, no UI decision for other apps
+- [x] /develop/adaptive-apps/guides/googlebook/overview → android-ui-design-guides.md (Adaptive apps: Navigation and canonical layouts in code) plus Desktop and large screens; Play badging, program incentives, and Linux tooling skipped
+- [x] /develop/adaptive-apps/guides/grid → android-ui-design-guides.md (Adaptive apps: Grid, FlexBox, and lazy grids); grid terminology skipped
+- [x] /develop/adaptive-apps/guides/grid/container-properties → android-ui-design-guides.md (Adaptive apps: Grid, FlexBox, and lazy grids)
+- [-] /develop/adaptive-apps/guides/grid/get-started; dependency setup; the stable version (Compose 1.13) is noted in Grid, FlexBox, and lazy grids
+- [x] /develop/adaptive-apps/guides/grid/item-properties → android-ui-design-guides.md (Adaptive apps: Grid, FlexBox, and lazy grids)
+- [x] /develop/adaptive-apps/guides/increase-app-availability → android-ui-design-guides.md (Adaptive apps: Input) plus Window size classes in code; the rest is manifest and Play filtering
+- [x] /develop/adaptive-apps/guides/list-detail → android-ui-design-guides.md (Adaptive apps: Navigation and canonical layouts in code); dependencies and the predictive back opt-in skipped
+- [x] /develop/adaptive-apps/guides/mediaquery → android-ui-design-guides.md (Adaptive apps: Context-aware UI with MediaQuery); preview override mechanics skipped
+- [-] /develop/adaptive-apps/guides/support-bubbles; manifest requirements for app bubbles, no UI decision
+- [x] /develop/adaptive-apps/guides/support-connected-displays → android-ui-design-guides.md (Adaptive apps: Desktop windowing and connected displays); `DisplayManager` and launch display code skipped
+- [x] /develop/adaptive-apps/guides/support-desktop-windowing → android-ui-design-guides.md (Adaptive apps: Desktop windowing and connected displays); entry gestures and camera compatibility mode skipped
+- [x] /develop/adaptive-apps/guides/support-different-display-sizes → android-ui-design-guides.md (Adaptive apps: Window size classes in code)
+- [x] /develop/adaptive-apps/guides/support-multi-window-mode → android-ui-design-guides.md (Adaptive apps: Desktop windowing and connected displays); per-API-level history, manifest attributes, camera and microphone access, and the test matrix skipped
+- [x] /develop/adaptive-apps/guides/use-window-size-classes → android-ui-design-guides.md (Adaptive apps: Window size classes in code)
 
 ### /develop/adaptive-apps/quality-guidelines
-- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality
-- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/experiences/camera-audio
-- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/experiences/desktop
-- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/experiences/foldables
-- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/experiences/stylus
-- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/tier-1
-- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/tier-2
-- [ ] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/tier-3
-- [ ] /develop/adaptive-apps/quality-guidelines/core-app-quality
-- [ ] /develop/adaptive-apps/quality-guidelines/wear-app-quality
+- [-] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality; overview of the tiers, test devices, and Play listing advice; its criteria live on the tier pages
+- [-] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/experiences/camera-audio; camera and audio device switching and background audio, hardware routing with no layout or style decision
+- [x] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/experiences/desktop → android-ui-design-guides.md (Adaptive apps: Quality criteria); printing, file handlers, handoff, and offline support skipped (functionality)
+- [x] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/experiences/foldables → android-ui-design-guides.md (Adaptive apps: Quality criteria) plus Foldables and postures
+- [x] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/experiences/stylus → android-ui-design-guides.md (Adaptive apps: Quality criteria)
+- [-] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/tier-1; landing page linking the tier 1 experience pages, no criteria of its own
+- [x] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/tier-2 → android-ui-design-guides.md (Adaptive apps: Quality criteria)
+- [x] /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/tier-3 → android-ui-design-guides.md (Adaptive apps: Quality criteria); Unity steps and test choreography skipped
+- [x] /develop/adaptive-apps/quality-guidelines/core-app-quality → android-ui-design-guides.md (Adaptive apps: Quality criteria); performance, SDK, battery, privacy, security, backup, and Play policy criteria skipped (not UI)
+- [x] /develop/adaptive-apps/quality-guidelines/wear-app-quality → material-3-wear-os.md (Adaptive sizes: Wear app quality criteria); tile, watch face, Play listing, and packaging criteria skipped (out of scope or not UI)
 
-### /develop/adaptive-apps/samples
-- [ ] /develop/adaptive-apps/samples
+### Gaps worth distilling
+1. /develop/adaptive-apps/guides/use-window-size-classes: compact height (under 480dp) means no two-pane layout even at medium width. Why: a landscape phone reports medium width, so width-only checks give it a cramped list-detail.
+2. /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/tier-2: bottom sheets, buttons, and text fields are never full width on large screens; small menus and modals keep context; context menus open next to the selected item. Why: these are the per-component failures of scaled-up phone UI.
+3. /develop/adaptive-apps/guides/grid and /develop/adaptive-apps/guides/flexbox: Grid for 2D structure, FlexBox (not FlowRow) for wrapping rows, lazy grids only for large homogeneous data; FlexBox does not wrap by default. Why: it settles which layout API an agent reaches for.
+4. /develop/adaptive-apps/guides/grid/container-properties: a lazy list in a flexible Grid track crashes unless the track is `MinMax(0.dp, 1.fr)`. Why: agents combining Grid and scrolling content hit it at runtime.
+5. /develop/adaptive-apps/guides/build-adaptive-navigation: `NavigationSuiteScaffold` picks the bar when width or height is compact or in tabletop posture. Why: it is the default to match when a hand-rolled switch decides between bar and rail; checking width alone ignores compact height and tabletop.
+6. /develop/adaptive-apps/quality-guidelines/core-app-quality: line length 45 to 75 characters, functional parity across orientations and fold states, no custom on-screen back buttons. Why: concrete pass or fail criteria for reading layouts and navigation.
+7. /develop/adaptive-apps/quality-guidelines/wear-app-quality: 12sp minimum for essential text and 10sp for the rest; no overlap or clipping down to a 192dp circle; never ask for a username or password on the watch. Why: hard limits for Wear boards.
+8. /develop/adaptive-apps/quality-guidelines/adaptive-app-quality/experiences/desktop: a scrollbar while scrolling with a mouse, hover and focus states with accessible contrast, cursor targets equal to visual size. Why: desktop windows of agent-built UI otherwise miss these.
+9. /develop/adaptive-apps/guides/support-different-display-sizes: read the window size class once at the top and let nested composables adapt to their own constraints. Why: it keeps reusable components correct inside panes.
+10. /develop/adaptive-apps/guides/foldables/learn-about-foldables: keep dialogs and menus off the fold; split content top and bottom in tabletop, left and right in book posture. Why: it is the fold rule agents most often break.
+
+## developer.android.com/develop: Compose UI
+
+Fetched November 2026 by crawling outward from /develop/ui: every Compose UI page. Views pages are left out because the skills target Compose. These pages are fetched but not yet audited, so every row is `[ ]` until a pass reads the page, distills what changes agent-built UI, and gives it a verdict.
 
 ### /develop/ui
 - [ ] /develop/ui
