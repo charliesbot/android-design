@@ -6,7 +6,7 @@ Adaptive layout for phones, foldables, tablets, and desktop windows, from Materi
 
 Design for window size, not devices; orientation, folding, split screen, and free-form windows change it at runtime.
 
-**Height counts too.** A window under 480dp tall (a phone or open flippable in landscape) is compact height: it reports medium width, but "two pane layouts are not practical" there, so keep one pane (Google). Compose's `NavigationSuiteScaffold` shows the navigation bar when width or height is compact or the device is in tabletop posture, and the rail otherwise.
+**Height counts too.** A window under 480dp tall (a phone or open flippable in landscape) is compact height: it reports medium width, but "two pane layouts are not practical" there, so keep one pane (Google).
 
 | Breakpoint | Width | Panes | Navigation | Margins |
 | --- | --- | --- | --- | --- |
@@ -49,7 +49,7 @@ Moving up a breakpoint, ask five questions. For control-based layouts like media
 - Compact: `ShortNavigationBar` with vertical items (icon above label).
 - Medium: `ShortNavigationBar` with horizontal items (`NavigationItemIconPosition.Start`) for two-pane layouts, or a collapsed `WideNavigationRail` for one pane.
 - Expanded and up: `WideNavigationRail`, collapsed or expanded; the expanded rail replaces the navigation drawer. `ModalWideNavigationRail` for compact screens that need more than five destinations.
-- `NavigationSuiteScaffold` switches automatically.
+- `NavigationSuiteScaffold` switches automatically: the navigation bar when width or height is compact or the device is in tabletop posture, the rail otherwise.
 - One navigation component per screen; never a rail and a bar together.
 
 ## Density and text
