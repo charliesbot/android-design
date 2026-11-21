@@ -350,6 +350,16 @@ object ReducedMotionScheme : MotionScheme {
 ```
 
 - A custom brand scheme overrides the same six functions with `spring(dampingRatio, stiffness)`; keep effects specs at `Spring.DampingRatioNoBouncy`.
+- Pick the API by the change (Google): `AnimatedVisibility` to show or hide, `AnimatedContent` to swap content in place (fade through by default), `Modifier.animateContentSize()` for size (before any size modifier), `Modifier.animateItem()` for list items, `updateTransition` for properties that move together, `Animatable` for gesture-driven values. Pass a `MotionScheme` spec to each; Google's samples use `tween()` only as API demos.
+- Hide with `AnimatedVisibility`, not an alpha animation: a faded element stays in layout and in the accessibility tree (Google).
+- Animate in the draw phase where possible: lambda modifiers (`offset { }`, `graphicsLayer { }`), `drawBehind` for a changing color, `graphicsLayer { shadowElevation }` for a changing shadow (Google).
+- Container transform is `Modifier.sharedBounds()`; a hero image is `Modifier.sharedElement()`; shared text uses `sharedBounds` with `scaleToBounds()`. Return the theme's spatial spec from `boundsTransform`, keep a bottom bar or FAB above the transition with `renderInSharedTransitionScopeOverlay()`, and don't expect shared elements to cross into a `Dialog` or `ModalBottomSheet` (Google).
+
+## Blur, shadows, and gradients
+
+- **Blur** (Google): `Modifier.blur` needs Android 12 (progressive blur Android 13, `ui` 1.13); older devices draw the content unblurred, so legibility and hierarchy never depend on it. It blurs the composable's own content, not what sits behind it, so it cannot make a frosted panel over other content. Use it as a focus device: soften list or picker edges around a sharp center, or blur the part of a hero image behind overlaid text. On images use `BlurredEdgeTreatment(shape)`.
+- **Shadows:** Material 3 shows elevation mainly with tonal surface color, so add a shadow only where a component's spec has one (Google). `Modifier.shadow(elevation, shape)` is the Material elevation shadow. `dropShadow()` and `innerShadow()` add radius, spread, color, or a brush and follow any shape, `MaterialShapes` included; `dropShadow` goes before `background`, `innerShadow` after it. Neumorphic, neobrutalist, and stacked "realistic" shadows are not Material; use them only when the direction asks for that look (Google shows them as styles).
+- **Gradients** (Google): for organic multi-point backgrounds use a mesh gradient (`MeshGradientPainter`) instead of stacking radial or linear brushes. `RuntimeShader` brushes need Android 13 and a fallback. A sweep gradient ends on its start color to close seamlessly.
 
 ## Spacing
 
