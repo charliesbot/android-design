@@ -13,9 +13,6 @@ JAR = '/Apps/android-design-preview.jar'
 VIEWS = ('light', 'dark', 'foldable', 'tablet', 'desktop')
 
 
-CODE_ITEMS = ('R-semantics', 'R-fields', 'R-visibility', 'R-blur')
-
-
 def fake_case(directory):
     """A case directory shaped like prepare() leaves it, without running git."""
     design = directory / 'design'
@@ -176,7 +173,7 @@ class PrepareTest(unittest.TestCase):
             self.assertTrue((run.HERE / 'calibration' / label['image']).is_file(), label['image'])
             ids = {a['id'] for a in cases[label['case']]['assertions']}
             self.assertLessEqual(set(label['expect']), ids, label['source'])
-        for item in CODE_ITEMS:
+        for item in judge.CODE_ITEMS:
             verdicts = {label['expect'][item] for label in coded if item in label['expect']}
             self.assertEqual(verdicts, {True, False}, f'{item} needs a passing and a failing fixture')
 
@@ -184,9 +181,9 @@ class PrepareTest(unittest.TestCase):
         for case in json.loads((run.HERE / 'evals.json').read_text())['evals']:
             ids = {a['id'] for a in case['assertions'] if a['type'] == 'rubric'}
             if case['surface'] == 'phone':
-                self.assertLessEqual(set(CODE_ITEMS), ids, case['name'])
+                self.assertLessEqual(set(judge.CODE_ITEMS), ids, case['name'])
             else:
-                self.assertFalse(set(CODE_ITEMS) & ids, case['name'])
+                self.assertFalse(set(judge.CODE_ITEMS) & ids, case['name'])
 
     def test_the_judge_request_carries_the_proposal_source(self):
         case = next(iter(run.select_cases('settings')))
@@ -199,6 +196,17 @@ class PrepareTest(unittest.TestCase):
             self.assertIn(proposal.read_text(), request['prompt'])
             self.assertLess(request['prompt'].index('## Proposal source'), request['prompt'].index('## Items to answer'))
             self.assertIn('R-semantics', request['item_ids'])
+
+    def test_a_request_without_code_items_leaves_the_source_out(self):
+        case = next(iter(run.select_cases('workout')))
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            proposal = fake_case(directory)
+            write_report(directory, views=('watch', 'watch-large'))
+            request = run.make_request(case, directory, (run.HERE / 'rubric.md').read_text())
+            self.assertNotIn('## Proposal source', request['prompt'])
+            self.assertNotIn(proposal.read_text(), request['prompt'])
+            self.assertIn('design/proposal.explore.kt', request['artifacts'])
 
     def test_wear_calibration_labels_match_their_sources_and_cases(self):
         src = run.HERE / 'calibration/wear-src'
