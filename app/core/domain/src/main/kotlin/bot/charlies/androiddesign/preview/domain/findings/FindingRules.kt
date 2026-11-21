@@ -37,6 +37,9 @@ object FindingRules {
   /** Rounding slack for the touch target. */
   private const val TARGET_SLACK_DP = 0.05f
 
+  /** The accessibility action of a node that takes taps, its own or for the controls inside it. */
+  private const val CLICK_ACTION = "click"
+
   /** The primary may be this much shorter than the tallest action. */
   private const val PRIMARY_SLACK_DP = 1f
 
@@ -150,8 +153,9 @@ object FindingRules {
         it.type in view.surface.interactiveTypes && it.isLaidOut && !view.isBehindModal(it)
       }
       .mapNotNull { node ->
-        val width = maxOf(node.bounds.width, node.touch?.width ?: 0f)
-        val height = maxOf(node.bounds.height, node.touch?.height ?: 0f)
+        val target = view.clickTarget(node)
+        val width = maxOf(target.bounds.width, target.touch?.width ?: 0f)
+        val height = maxOf(target.bounds.height, target.touch?.height ?: 0f)
         val min = view.surface.minTouchTargetDp
         if (width < min - TARGET_SLACK_DP || height < min - TARGET_SLACK_DP) {
           errorFinding(
@@ -163,6 +167,17 @@ object FindingRules {
           null
         }
       }
+
+  /**
+   * The node whose touch area a tap on [node] lands in. A control with no actions of its own, such
+   * as a `RadioButton(onClick = null)` in a `selectable` row, takes its taps through the nearest
+   * parent that is clickable, so that parent's area is the target. Any other node is its own
+   * target.
+   */
+  private fun View.clickTarget(node: LayoutNode): LayoutNode {
+    if (!node.a11y?.actions.isNullOrEmpty()) return node
+    return ancestors(node).firstOrNull { CLICK_ACTION in it.a11y?.actions.orEmpty() } ?: node
+  }
 
   // endregion
 

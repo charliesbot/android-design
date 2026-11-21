@@ -1,5 +1,6 @@
 package bot.charlies.androiddesign.preview.domain.findings
 
+import bot.charlies.androiddesign.preview.model.A11yInfo
 import bot.charlies.androiddesign.preview.model.Axis
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.CornerClip
@@ -58,6 +59,65 @@ class FindingRulesTest {
   fun `touch-target tolerates a rounding sliver under 48 dp`() {
     val almost = node("go", "Button", w = 100f, h = 47.96f)
     assertEquals(emptyList(), evaluate(tree(nodes = arrayOf(almost))))
+  }
+
+  @Test
+  fun `touch-target measures a control with a null callback by the row that takes its click`() {
+    val row =
+      node(
+        "row",
+        "ListItem",
+        w = 379f,
+        h = 56f,
+        a11y = A11yInfo(role = "RadioButton", actions = listOf("click")),
+      )
+    val radio =
+      node(
+        "radio",
+        "RadioButton",
+        x = 18f,
+        y = 18f,
+        w = 20f,
+        h = 20f,
+        parent = "row",
+        a11y = A11yInfo(actions = emptyList()),
+      )
+    val toggle = node("switch", "Switch", x = 300f, y = 12f, w = 52f, h = 32f, parent = "row")
+    assertEquals(
+      emptyList(),
+      evaluate(tree(nodes = arrayOf(row, radio, toggle))).of(FindingRule.TouchTarget),
+    )
+  }
+
+  @Test
+  fun `touch-target still fails a small control that takes its own click inside a clickable row`() {
+    val row = node("row", "ListItem", w = 379f, h = 56f, a11y = A11yInfo(actions = listOf("click")))
+    val small =
+      node(
+        "more",
+        "IconButton",
+        w = 32f,
+        h = 32f,
+        parent = "row",
+        a11y = A11yInfo(actions = listOf("click")),
+      )
+    val finding = evaluate(tree(nodes = arrayOf(row, small))).of(FindingRule.TouchTarget).single()
+    assertEquals("more", finding.id)
+  }
+
+  @Test
+  fun `touch-target still fails a control with no action when no parent takes its click`() {
+    val row = node("row", "Row", w = 379f, h = 56f)
+    val radio =
+      node(
+        "radio",
+        "RadioButton",
+        w = 20f,
+        h = 20f,
+        parent = "row",
+        a11y = A11yInfo(actions = emptyList()),
+      )
+    assertEquals(1, evaluate(tree(nodes = arrayOf(row, radio))).of(FindingRule.TouchTarget).size)
   }
 
   @Test
