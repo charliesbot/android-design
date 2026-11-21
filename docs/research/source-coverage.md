@@ -22,9 +22,9 @@ History: the first audit found 266 distilled, 133 partial, and 13 missing routes
 | developer.android.com/design/ui: Gallery | 33 | 0 | 0 | 9 |
 | developer.android.com/design/ui: Wear OS (current guides) | 46 | 0 | 0 | 4 |
 | developer.android.com/design/ui: Wear OS (components and M2.5 guides) | 38 | 0 | 0 | 17 |
-| developer.android.com/develop: Compose UI and adaptive apps (not yet audited) | 0 | 0 | 443 | 0 |
-| Out of scope: developer.android.com/design/ui platforms | 0 | 0 | 0 | 144 |
-| **Total** | **414** | **0** | **443** | **311** |
+| developer.android.com/develop: Compose UI and adaptive apps (not yet audited) | 0 | 0 | 443 | 2 |
+| Out of scope: developer.android.com platforms | 0 | 0 | 0 | 150 |
+| **Total** | **414** | **0** | **443** | **319** |
 
 ## m3.material.io: Foundations (excluding Layout)
 
@@ -1017,6 +1017,8 @@ Summary: 54 URLs checked. 20 fully distilled, 14 partly distilled, 3 not distill
 Fetched November 2026 by crawling outward from /develop/ui and /develop/adaptive-apps: every Compose UI page and every adaptive apps guide, cookbook recipe, and quality guideline. Views pages are left out because the skills target Compose, and the cars, TV, and XR adaptive guides are out of scope. These 443 pages are fetched but not yet audited, so every row is `[ ]` until a pass reads the page, distills what changes agent-built UI, and gives it a verdict.
 
 ### /develop/adaptive-apps
+- [-] /develop/adaptive-apps/cookbook/recyclerview-state; Views-only recipe, the skills target Compose
+- [-] /develop/adaptive-apps/cookbook/webview-state; Views-only recipe, the skills target Compose
 - [ ] /develop/adaptive-apps
 
 ### /develop/adaptive-apps/cookbook
@@ -1583,9 +1585,18 @@ Fetched November 2026 by crawling outward from /develop/ui and /develop/adaptive
 ### /develop/ui/compose/why-adopt
 - [ ] /develop/ui/compose/why-adopt
 
-## Out of scope: developer.android.com/design/ui platforms
+## Out of scope: developer.android.com platforms
 
 Skipped by the owner's decision: the skill targets phones, tablets, foldables, desktop windows, widgets, and Wear OS.
+
+### Adaptive apps for cars, TV, and XR (6 routes)
+
+- [-] /develop/adaptive-apps/guides/cars/build-adaptive-apps-for-cars; out of scope
+- [-] /develop/adaptive-apps/guides/tv/build-adaptive-apps-for-tv; out of scope
+- [-] /develop/adaptive-apps/guides/xr/build-adaptive-apps-for-xr; out of scope
+- [-] /develop/adaptive-apps/quality-guidelines/android-xr; out of scope
+- [-] /develop/adaptive-apps/quality-guidelines/car-app-quality; out of scope
+- [-] /develop/adaptive-apps/quality-guidelines/tv-app-quality; out of scope
 
 ### AI glasses (31 routes)
 
