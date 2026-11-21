@@ -80,6 +80,8 @@ Code checks:
 - [ ] Components from the right column of [Components](#components).
 - [ ] Intended color role pairs only: no `copy(alpha = ...)`, no hard-coded hex colors.
 - [ ] Custom animations use `MaterialTheme.motionScheme`, not `tween()`.
+- [ ] Text fields use `TextFieldState` (`rememberTextFieldState()`) with `SecureTextField` / `OutlinedSecureTextField` for passwords, and search bars back `SearchBarDefaults.InputField` with `TextFieldState`.
+- [ ] Show/hide uses `AnimatedVisibility`, `AnimatedContent`, or conditional composition (never `alpha = 0f` alone); text over blurred images still sits on a scrim, gradient, or solid/tonal surface.
 - [ ] Platform semantics match [Android conventions](#android-conventions); content draws edge-to-edge.
 
 ## Reference
@@ -187,7 +189,7 @@ Stock code reaches for the left column; lint will not flag it.
 
 - Contrast: 4.5:1 small text, 3:1 large text, icons, and controls. Generated/static schemes must honor system contrast ([references/theming.md](references/theming.md#contrast-levels)). Pair color with icon, label, or underline for every state/link.
 - Touch targets 48dp with 8dp separation. Support 200% text scaling (text grows, padding/icons/controls do not, layouts reflow). Ellipsize only when full text is reachable (tooltip, link, expanded view); otherwise wrap (Google).
-- Semantics in Compose (Google): section titles take `Modifier.semantics { heading() }`. A row that toggles carries `toggleable` or `selectable` with a `role`, and its `Checkbox`, `Switch`, or `RadioButton` gets a `null` callback, so the row is one 48dp target. Clickables, buttons, and `ListItem` already merge their children; don't add `mergeDescendants`. Decorative or repeated text uses `hideFromAccessibility()`; `clearAndSetSemantics` only when merging can't describe the control. Custom `Canvas` controls need semantics added by hand.
+- Semantics in Compose (Google): section titles take `Modifier.semantics { heading() }`. A row that toggles carries `toggleable` or `selectable` with a `role` (or `SegmentedListItem(onClick = ...)` with `Modifier.semantics { role = Role.Switch; toggleableState = ToggleableState(checked) }` for switch rows, or its `checked` / `selected` overloads), and its `Checkbox`, `Switch`, or `RadioButton` gets a `null` callback, so the row is one 48dp target. Clickables, buttons, and `ListItem` already merge their children; don't add `mergeDescendants`. Decorative or repeated text uses `hideFromAccessibility()`; `clearAndSetSemantics` only when merging can't describe the control. Custom `Canvas` controls need semantics added by hand.
 - Content descriptions state purpose ("Voice search"), not appearance or role. Sentence case, second person, no periods on single-sentence labels, contractions, exclamation points only for real celebrations.
 
 ### Android conventions

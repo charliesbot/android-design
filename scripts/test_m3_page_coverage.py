@@ -130,7 +130,7 @@ M3_PAGE_CLAIMS = {
         "Tab",
         "LeadingIconTab",
     ],
-    "text-fields": ["TextField", "OutlinedTextField"],
+    "text-fields": ["TextField", "OutlinedTextField", "SecureTextField", "OutlinedSecureTextField"],
     "time-pickers": ["TimePicker", "TimePickerDialog", "TimeInput"],
     "toolbars": ["HorizontalFloatingToolbar", "VerticalFloatingToolbar", "FlexibleBottomAppBar"],
     "tooltips": ["TooltipBox", "PlainTooltip", "RichTooltip"],
