@@ -8,7 +8,7 @@ It is charliesbot's personal repository. Optimize for the owner's workflow, not 
 
 ## Layout
 
-- `plugin/` holds the distributable bundle: `plugin/skills/`, `plugin/bin/` (the `android-design-preview` POSIX `sh` bootstrap script; macOS and Linux only, Windows is unsupported), Antigravity `plugin/plugin.json`, Claude Code `.claude-plugin/`, and Codex `.codex-plugin/`. Root marketplace manifests (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) point to `plugin/`. Changing the version in `plugin/plugin.json` on `main` publishes: `.github/workflows/release-previewer.yml` builds the JAR, packages one artifact per OS and CPU (`scripts/package_release.py`), and creates the `v<version>` tag and GitHub release, so bump the version only when the owner asks for a release.
+- `plugin/` holds the distributable bundle: `plugin/skills/`, `plugin/skills/android-design-explore/scripts/android-design-preview` (the POSIX `sh` bootstrap script, bundled in the skill so every install route ships it; macOS and Linux only, Windows is unsupported), `plugin/bin/` (Claude Code's wrapper that puts it on `PATH`), Antigravity `plugin/plugin.json`, Claude Code `.claude-plugin/`, and Codex `.codex-plugin/`. Root marketplace manifests (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) point to `plugin/`. Changing the version in `plugin/plugin.json` on `main` publishes (the bootstrap script's `VERSION` and the other manifests must match, which `scripts/test_plugin_manifests.py` checks): `.github/workflows/release-previewer.yml` builds the JAR, packages one artifact per OS and CPU (`scripts/package_release.py`), and creates the `v<version>` tag and GitHub release, so bump the version only when the owner asks for a release.
 - `plugin/skills/android-design/` is the installable design judgment skill (`SKILL.md` and `references/`): building, refining, and reviewing real Compose.
 - `plugin/skills/android-design-explore/` is the installable exploration skill (`SKILL.md` and `references/`): live `.explore.kt` Compose boards checked through the `android-design-preview` CLI and long-running Kotlin HTTP/SSE server, viewed in the browser board, and wired into an app. It builds on `android-design`.
 - Chai and `npx skills` install both from `plugin/skills/`, so keep anything that is not skill content out of these folders.
@@ -53,7 +53,7 @@ Run the check for every kind of change you made:
 - **A skill's `description`:** the trigger evals (`evals/README.md`, Trigger evals).
 - **The rubric:** `evals/calibrate.py` first.
 - **`evals/`:** `python3 -m unittest discover evals`.
-- **`plugin/bin/` or manifests:** `python3 -m unittest discover scripts` and `cd app && ./gradlew build spotlessCheck`.
+- **The bootstrap script, `plugin/bin/`, or manifests:** `python3 -m unittest discover scripts` and `cd app && ./gradlew build spotlessCheck`.
 - **`scripts/`:** `python3 -m unittest discover scripts`.
 - **The app:** `cd app && ./gradlew build spotlessCheck`.
 - **The pinned `material3` version in `app/gradle/libs.versions.toml`:** run `python3 scripts/material3_inventory.py`, regenerate `compose-signatures.md` with `python3 scripts/generate_signatures.py`, update `scripts/test_m3_page_coverage.py` / `CallNameMapper.kt` for any new components, and run `python3 -m unittest discover scripts`.

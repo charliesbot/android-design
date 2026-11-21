@@ -704,7 +704,7 @@ class InstallCommand : Command {
         out,
         V5ExitCode.NOT_READY,
         "missing_script",
-        "Run install through plugin/bin/android-design-preview or pass --script <path>",
+        "Run install through the explore skill's scripts/android-design-preview or pass --script <path>",
       )
     }
     val source = Path.of(scriptPathStr).toAbsolutePath().normalize()

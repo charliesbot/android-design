@@ -13,11 +13,11 @@ Follow `android-design` for every design decision: its design questions, compone
 
 ## Tooling
 
-Run `android-design-preview` from the shell (`android-design-preview <command> --help` documents every flag, exit code, and JSON field).
+Run `android-design-preview` from the shell (`android-design-preview <command> --help` documents every flag, exit code, and JSON field). When it is not on `PATH`, run this skill's bundled copy instead: `sh <skill-dir>/scripts/android-design-preview`, where `<skill-dir>` is the absolute path of the folder holding this `SKILL.md`. Every `android-design-preview` command below means whichever of the two works.
 
 - Commands: `check`, `tree`, `selection`, `open`, `status`, `stop`, `render`, `install`.
 - Exit codes: `0` success, `1` compile/render/check failure or no selection, `2` usage or choice, `3` server or prerequisites not ready.
-- If `android-design-preview` is missing or exits `3`, stop, give the user [references/setup.md](references/setup.md), and wait. Never change user sandbox config unasked.
+- If the bundled script is missing too, or the command exits `3`, stop, give the user [references/setup.md](references/setup.md), and wait. Never change user sandbox config unasked.
 
 ## 1. Brief
 

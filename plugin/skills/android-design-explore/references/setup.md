@@ -1,6 +1,6 @@
 # Previewer setup
 
-Read this when `android-design-preview` is not on `PATH` or exits `3` (missing Java or server prerequisites). Tell the user these steps, then wait. Never edit the user's harness config unasked.
+Read this when `android-design-preview` cannot be found (neither on `PATH` nor bundled in the skill's `scripts/` folder) or exits `3` (missing Java or server prerequisites). Tell the user these steps, then wait. Never edit the user's harness config unasked.
 
 ## Prerequisites
 
@@ -9,16 +9,15 @@ Read this when `android-design-preview` is not on `PATH` or exits `3` (missing J
 
 On first run, if `~/.cache/android-design-preview/<version>/android-design-preview.jar` is missing, the bootstrap script downloads the previewer for your OS and Java CPU from GitHub Releases and verifies its SHA-256 checksum automatically.
 
-## Put `android-design-preview` on `PATH`
+## Where `android-design-preview` comes from
 
-- **Claude Code:** installing the plugin puts `plugin/bin/` on `PATH` automatically.
-- **Antigravity, Codex, `npx skills`, and Chai:** run `install` once from the plugin or repository checkout to link the bootstrap script into `~/.local/bin`:
+The bootstrap script ships inside this skill at `scripts/android-design-preview`, so every install route brings it and agents run it from there. Claude Code also puts it on `PATH` as a bare command through the plugin's `bin/` folder.
 
-  ```sh
-  <path-to-plugin>/bin/android-design-preview install
-  ```
+If the skill folder is missing `scripts/android-design-preview`, the skill was copied without it: reinstall it from https://github.com/charliesbot/android-design. To type the bare command in your own shell, run `install` once to link it into `~/.local/bin` (which must be on your `PATH`):
 
-  Make sure `~/.local/bin` is on your `PATH`, then retry.
+```sh
+<skill-dir>/scripts/android-design-preview install
+```
 
 ## Codex sandbox settings (only if the command fails in Codex)
 

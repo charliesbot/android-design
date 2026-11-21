@@ -278,6 +278,19 @@ class BackendTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'agy script-ban audit failed'):
                 backends.execute('agy', 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY)
 
+    def test_audits_allow_the_skills_bundled_preview_script(self):
+        bundled = [
+            'sh /work/skills/android-design-explore/scripts/android-design-preview check design/proposal.explore.kt',
+            '/work/skills/android-design-explore/scripts/android-design-preview status',
+        ]
+        for ok in bundled:
+            self.assertIsNone(backends.audit_agy_shell_command(ok), f'should pass agy audit: {ok}')
+            self.assertIsNone(backends.audit_codex_shell_command(ok), f'should pass codex audit: {ok}')
+
+        for bad in ('sh gen.sh', 'sh -c "python3 gen.py"', 'sh'):
+            self.assertIsNotNone(backends.audit_agy_shell_command(bad), f'should fail agy audit: {bad}')
+            self.assertIsNotNone(backends.audit_codex_shell_command(bad), f'should fail codex audit: {bad}')
+
     def test_codex_transcript_audit_allows_readonly_and_preview_cli_and_rejects_writes_or_interpreters(self):
         allowed = [
             'android-design-preview check design/proposal.explore.kt --direction "Editorial split" --view light',

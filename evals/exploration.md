@@ -19,7 +19,7 @@ The Gradle tests cover source linting, bytecode/classloader sandbox policy, Comp
 
 ## Exploration smoke check
 
-Run in an expendable folder (a Git repository or not). Needs Java 17+ and `android-design-preview` on `PATH` (via Claude Code plugin `bin/` or `plugin/bin/android-design-preview install`).
+Run in an expendable folder (a Git repository or not). Needs Java 17+. Install the plugin with one command and nothing else: the agent runs `android-design-preview` from `PATH` (Claude Code's plugin `bin/`) or the explore skill's bundled `scripts/android-design-preview`.
 
 1. Start an interactive session: verify `android-design-preview status` works. When missing or exiting `3`, the agent reports the missing prerequisite and links `plugin/skills/android-design-explore/references/setup.md` rather than falling back to HTML or editing user sandbox config unasked.
 2. Have the agent author `<fixture-folder>/design/<slug>.explore.kt` with its own seed color in `designBoard(...)` using verified signatures from `plugin/skills/android-design-explore/references/compose-signatures.md`. Ask for three ideas in one exploration: expect three `direction(...)` blocks inside `<slug>.explore.kt` or cleanly distinct directions, each compiled and verified with `android-design-preview check`.
