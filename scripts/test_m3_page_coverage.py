@@ -111,6 +111,7 @@ M3_PAGE_CLAIMS = {
         "CircularWavyProgressIndicator",
     ],
     "radio-button": ["RadioButton"],
+    "scroll-fields": ["ScrollField"],
     "search": [
         "SearchBar",
         "DockedSearchBar",
@@ -131,7 +132,7 @@ M3_PAGE_CLAIMS = {
         "LeadingIconTab",
     ],
     "text-fields": ["TextField", "OutlinedTextField", "SecureTextField", "OutlinedSecureTextField"],
-    "time-pickers": ["TimePicker", "TimePickerDialog", "TimeInput"],
+    "time-pickers": ["TimePicker", "TimePickerDialog", "VibrantTimePickerDialog", "TimeInput", "TimeScroll"],
     "toolbars": ["HorizontalFloatingToolbar", "VerticalFloatingToolbar", "FlexibleBottomAppBar"],
     "tooltips": ["TooltipBox", "PlainTooltip", "RichTooltip"],
 }

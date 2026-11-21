@@ -538,6 +538,24 @@ Also:
 - Text needs both RTL alignment and RTL directionality, or word order scrambles. Emails keep username before domain ("The domain should always be to the right of the username"). Watch cursor position, punctuation, phone numbers, and URLs.
 - Swipe actions mirror (a delete revealed from the right in LTR is revealed from the left in RTL), and so does predictive back.
 
+### Design for desktop
+
+From `/foundations/desktop` (fetched November 2026):
+
+- **Principles:** adaptive from the start, "More screen, more done" (denser layouts that show more information rather than scaling mobile elements), refine motion (faster for small elements over short unobstructed distances; slower or simpler for large elements over long distances), multitasking at the core (in-app panels plus multi-window), balance efficiency with visual clarity, and treat touch, pointer, and physical keyboard as equally important.
+- **Layout:** desktop apps typically open at medium or large and expand to extra-large. Prefer multi-column or multi-pane canonical layouts (feed, list-detail, supporting pane). If keeping a single pane on desktop, **cap and center** the content width so it does not look like a stretched phone UI.
+- **Adapting components for desktop:**
+  - Don't overstretch buttons or text fields across wide panes; maintain default widths and padding.
+  - Switch navigation bar to navigation rail at medium and above; consider expanding the rail by default at extra-large.
+  - **Replace bottom sheets on desktop:** bottom sheets cause excessive cursor travel and obstruct content. Replace press-and-hold or overflow bottom sheets with **right-click context menus**; replace tool/configuration sheets with **side sheets with no scrim**; replace decision modal bottom sheets with **dialogs** (keeping decisions higher in the user's line of sight). If a bottom sheet is still used on desktop, it **must be detached from the bottom edge** of the window.
+  - **Carousels on desktop:** only hero carousels have built-in next and previous actions; on other carousels show next/previous buttons on hover or focus. Add a **Show all** button; hero and full-screen carousels may add pagination dots. Support mouse wheel on vertical hero carousels, Shift + scroll on horizontal carousels, two-finger touchpad swipe, and a single-pointer alternative.
+- **Desktop interactions:**
+  - **Drag and drop:** instantaneous on pointer (unlike long press on touch); apply dragged state and elevation; make the dragged item translucent so drop targets remain visible; highlight valid targets with a border or insertion point; show a prohibitive cursor over invalid targets (return or dissolve on invalid drop); always include a single-click alternative (such as a `+` upload button).
+  - **Zooming and panning:** scroll to zoom on zoom-first content (maps), Ctrl/Cmd + scroll on pan-first content (canvases), dedicated `+` and `-` buttons for single-pointer zoom, two-finger pinch on touchpads; pan via click-and-drag when zoomed or Shift + scroll horizontally / two-finger swipe.
+  - **Secondary actions:** hide to reduce clutter; open context menus via right-click, long press, or overflow icon button; reveal secondary actions on hover, but never make hover the only way to reach them.
+  - **Multi-select:** Ctrl/Cmd + click (one by one), Shift + click (range), click + drag (group), Ctrl/Cmd + A (select all).
+  - **Refresh:** Ctrl/Cmd + R plus a dedicated refresh button for non-touch pointer and assistive-technology users.
+
 ## Interaction
 
 - **States:** enabled, disabled, hover, focused, pressed, dragged. State layers
@@ -1306,9 +1324,12 @@ Verified against the released `material3-android-1.5.0` sources jar (Nov 18,
 
 - `androidx.compose.material3:material3`: **1.5.0** is stable (Nov 18, 2026,
   bundled in Compose BOM `2026.11.01`, requiring Kotlin 2.2+ and `compileSdk`
-  37.1) and graduates almost all Expressive APIs to stable. Older stable
-  **1.4.0** (Sep 2025) only has `WideNavigationRail`, `ModalWideNavigationRail`,
-  and `ShortNavigationBar`.
+  37.1; announced on `/compose-material-3-is-stable`) and graduates almost all
+  Expressive APIs to stable, giving every core Material 2 component a stable
+  Material 3 equivalent alongside improved keyboard focus and accessibility
+  navigation across date and time pickers, sliders, scaffolds, and navigation.
+  Older stable **1.4.0** (Sep 2025) only has `WideNavigationRail`,
+  `ModalWideNavigationRail`, and `ShortNavigationBar`.
 - Promoted to stable in `1.5.0`: `MaterialExpressiveTheme`, `MotionScheme`,
   emphasized typography, extended `Shapes`, wavy progress indicators, sized
   buttons, toggles, button groups, `SplitButtonLayout`, FABs and FAB menus,
@@ -1463,6 +1484,8 @@ private class MorphShape(val morph: Morph, val progress: Float) : Shape {
 | Collapsed / expanded rail | `WideNavigationRail(state = rememberWideNavigationRailState())`, `ModalWideNavigationRail` | Stable since 1.4.0; `NavigationSuiteScaffold` adapts bar and rail |
 | Slider | `Slider(state = s, onValueChange = { ... })`, `VerticalSlider` | **No XS to XL size presets**; inset icons are custom-drawn |
 | Carousel | `HorizontalMultiBrowseCarousel`, `HorizontalUncontainedCarousel`, `HorizontalCenteredHeroCarousel` | Stable |
+| Scroll field | `ScrollField(state = rememberScrollFieldState(itemCount, index), contentDescription = ...)` | Stable in `1.5.0`; `ScrollFieldDefaults.colors()`, `ScrollFieldDefaults.shape`, `ScrollFieldDefaults.ScrollFieldHeight` |
+| Time pickers | `TimeScroll`, `TimeInput`, `TimePicker`, `VibrantTimePickerDialog` | Stable in `1.5.0`; Expressive styling uses `TimePickerDefaults.vibrantColors()`, `TimeInputDefaults.vibrantColors()`, and `TimePickerDefaults.shapes()` |
 
 ```kotlin
 // Flexible app bar

@@ -33,6 +33,8 @@ Which component to use, how Google says to use it, and the Expressive Compose AP
 | Value in a range | Slider: standard, centered, range | Takes effect immediately; no vertical range sliders |
 | Text entry | Text field, filled or outlined | Don't mix the two in one form |
 | Search | Search bar, search app bar (global), or search icon button | Group results with gaps; full screen on phones, docked on tablets |
+| Numeric or measurement value | Scroll field | Up to 4 digits (small 100dp, medium 144dp, large 186dp); inline preferred; always include a keyboard input toggle; 48dp inactive targets |
+| Time selection | Time picker: scroll, input, dial (vibrant) | Prefer inline scroll picker; dial is modal only; always keep the keyboard input toggle; use button groups or menus for preset slots |
 
 ## Component details
 
@@ -181,6 +183,13 @@ Rules for both:
 - Full-screen results on compact, docked results on medium and up; keep the query visible after searching.
 - Back releases focus, dismisses suggestions and results, and returns the bar to its resting state. Label results ("Results") so it's clear search is active, and announce new results to screen readers (a live region on the results list). Cap the bar at 720dp wide.
 
+### Time pickers and scroll fields
+
+- **Scroll fields:** expressive pickers for numbers and measurements (up to four digits: small 100dp, medium 144dp, large 186dp minimum width; avoid consecutive five-digit lists). Place inline when possible; crop inactive values slightly to signal scrollability, keep corner radius >= 16dp, keep inactive value targets >= 48dp tall, and always offer a nearby keyboard input toggle (or a separate text field). Use a time picker instead for time.
+- **Time pickers (Expressive "vibrant" style; baseline dial and input are no longer recommended):** choose between **scroll** (compact, inline preferred), **input** (keyboard entry, inline or modal), and **dial** (modal only, never scrolled). For preset times or fixed intervals (such as 15-minute slots), use a button group, menu, or combo box instead.
+- **Always keep the keyboard input toggle:** both scroll and dial pickers require an icon button to swap to input (Compose does not render it automatically: pass `modeToggleButton = { TimePickerDialogDefaults.ScrollDisplayModeToggle(...) }` or `DisplayModeToggle(...)` in `VibrantTimePickerDialog` / `TimePickerDialog`, or pass `toggle = { TimePickerDialogDefaults.ScrollDisplayModeToggle(...) }` to the inline `TimeScroll(state, shapes, toggle)` and `TimeInput(state, shapes, toggle)` overloads). For 24-hour locales, default to digital input while keeping the dial available.
+- **Adapt dial orientation:** swap from vertical to horizontal dial at wider breakpoints or landscape, and fall back from dial to scroll or input when vertical height is tight or zoomed so the dial never scrolls or clips.
+
 ## Patterns from shipped Expressive apps
 
 Recurring moves in Google's showcases and well-reviewed Expressive apps. Read them for examples after choosing the composition (SKILL.md, Compose the screen), not to choose it; use one only when it serves the screen's direction.
@@ -234,6 +243,8 @@ Their v1-to-v2 lesson: ungrouped settings of similar size and inconsistent color
 | Navigation rail | `WideNavigationRail(state = rememberWideNavigationRailState())`, `WideNavigationRailItem(railExpanded = ...)`, `ModalWideNavigationRail` | `NavigationSuiteScaffold` swaps bar and rail by window size |
 | Slider | `Slider(state = s, onValueChange = { ... })` with `val s = remember { SliderState(value, steps, trackRange = 0f..1f) }`, `VerticalSlider` | The stateless `value =` overload is deprecated in `1.5.0`, and `SliderState.valueRange` is now `trackRange`. Custom tracks (a wavy seek bar, inset icons) go in the state overload's `track = { ... }` slot; no XS to XL presets |
 | Carousel | `HorizontalMultiBrowseCarousel`, `HorizontalUncontainedCarousel`, `HorizontalCenteredHeroCarousel` | `rememberCarouselState` |
+| Scroll field | `ScrollField(state = rememberScrollFieldState(itemCount, index), contentDescription = ...)` | `ScrollFieldDefaults.colors()`, `ScrollFieldDefaults.shape`, `ScrollFieldDefaults.ScrollFieldHeight` |
+| Time pickers | `TimeScroll`, `TimeInput`, `TimePicker`, `VibrantTimePickerDialog` | Expressive styling: `TimePickerDefaults.vibrantColors()`, `TimeInputDefaults.vibrantColors()`, `TimePickerDefaults.shapes()`; toggle input with `TimePickerDialogDefaults.ScrollDisplayModeToggle` or `DisplayModeToggle` |
 
 ## Customize without forking
 

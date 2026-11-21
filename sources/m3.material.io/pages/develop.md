@@ -9,9 +9,13 @@ Source: https://m3.material.io/develop
 
 The latest in Material development
 
+[IMAGE DO] Nov 18, 2026
+
+**DO:** _Build production-ready UIs with expressive components, theming, and improved accessibility_
+
 [IMAGE DO] May 19, 2026
 
-**DO:** _Jetpack Compose is the modern toolkit for building Material UI on Android. The Material Views (MDC-Android) library is in maintenance mode and will only receive critical fixes._
+**DO:** _Material Android is all-in on Compose. Read about upcoming Material Compose features like stable Expressive components_
 
 #### Material platforms
 

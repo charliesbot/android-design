@@ -141,6 +141,8 @@ internal object CallNameMapper {
       "HorizontalTimePicker" to M3Component.Row.wire,
       "VerticalTimePicker" to M3Component.Column.wire,
       "TimeInput" to M3Component.Row.wire,
+      "TimeScroll" to M3Component.Row.wire,
+      "ScrollField" to M3Component.Column.wire,
       "DropdownMenu" to M3Component.Menu.wire,
       "DropdownMenuPopup" to M3Component.Menu.wire,
       "ExposedDropdownMenu" to M3Component.Menu.wire,

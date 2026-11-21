@@ -9,9 +9,13 @@ Source: https://m3.material.io/develop/android/jetpack-compose
 
 The latest from Jetpack Compose
 
+[IMAGE DO] Nov 18, 2026
+
+**DO:** _Build production-ready UIs with expressive components, theming, and improved accessibility_
+
 [IMAGE DO] May 19, 2026
 
-**DO:** _Material Android is all-in on Compose. Read about upcoming Material Compose features like stable Expressive components, a Styles API for easier customization, and Navigation3 integration into the adaptive library._
+**DO:** _Material Android is all-in on Compose. Read about upcoming Material Compose features like stable Expressive components_
 
 [IMAGE DO] May 13, 2025
 
