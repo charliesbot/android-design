@@ -40,16 +40,18 @@ FlexBox(config = { wrap(FlexWrap.Wrap); gap(8.dp) }) { ... } // wrapping chips/b
 - `BundledFont`: `GoogleSansFlex`, `GoogleSansCode`, `Fraunces`, `BricolageGrotesque`, `BigShouldersDisplay`, `Doto` (`Doto` at Display only; brand faces only on Display/Headline/`titleLarge`; `GoogleSansCode` on any role)
 - Primary CTA tag: `Modifier.testTag("ad:primary")` (alias `AD_PRIMARY_TAG`).
 
-## Material 3 Expressive (`LoadingIndicator` and `MaterialShapes` need `@OptIn(ExperimentalMaterial3ExpressiveApi::class)`)
+## Material 3 Expressive (`LoadingIndicator` and `MaterialShapes` need `@OptIn(ExperimentalMaterial3ExpressiveApi::class)`; `AppBarWithSearch`, `BottomSheet`, `ModalBottomSheet`, `TooltipBox`, and `carouselParallaxScrollEffect` need `@OptIn(ExperimentalMaterial3Api::class)`)
 
 ```kotlin
 // Theme & Motion
 MaterialExpressiveTheme(colorScheme = ..., motionScheme = MotionScheme.expressive(), shapes = ..., typography = ...) { ... }
 MaterialTheme.motionScheme.fastSpatialSpec() // defaultSpatialSpec(), slowSpatialSpec(), fastEffectsSpec()
+Typography(fontFamily = ...) // propagates family to unset roles; Text("...", color = { animatedColor }) // ColorProducer; LocalRippleThemeConfiguration
 
 // App Bars & Toolbars (subtitle only on Flexible bars)
 MediumFlexibleTopAppBar(title = { Text(...) }, modifier = Modifier, subtitle = { Text(...) }, navigationIcon = {}, actions = {}, scrollBehavior = ...)
 LargeFlexibleTopAppBar(title = { Text(...) }, modifier = Modifier, subtitle = { Text(...) }, navigationIcon = {}, actions = {}, scrollBehavior = ...)
+val topBarBehavior = TopAppBarDefaults.pinnedScrollBehavior(listState) // or enterAlwaysScrollBehavior(listState) (takes ScrollableState; custom lambda uses isScrollingContentAtStart)
 FlexibleBottomAppBar(modifier = Modifier, horizontalArrangement = ..., content = { ... })
 HorizontalFloatingToolbar(expanded = true, floatingActionButton = { FloatingToolbarDefaults.StandardFloatingActionButton(...) }, colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors()) { ... }
 VerticalFloatingToolbar(expanded = true, colors = FloatingToolbarDefaults.standardFloatingToolbarColors()) { ... }
@@ -59,27 +61,34 @@ ShortNavigationBar { ShortNavigationBarItem(selected = ..., onClick = {}, icon =
 WideNavigationRail(state = rememberWideNavigationRailState(), header = { ... }) { WideNavigationRailItem(railExpanded = false, icon = { ... }, label = { Text(...) }, selected = ..., onClick = {}, colors = WideNavigationRailItemDefaults.colors()) }
 ModalWideNavigationRail(state = rememberWideNavigationRailState(), hideOnCollapse = false, header = { ... }) { ... }
 
-// Buttons, Connected Toggle Groups, Slider & FABs (XS 32.dp, S 40.dp, M 56.dp, L 96.dp, XL 136.dp)
+// Buttons, Toggle/Split/Button Groups, Chips, Sliders & FABs (XS 32.dp, S 40.dp, M 56.dp, L 96.dp, XL 136.dp)
 Button(onClick = {}, shapes = ButtonDefaults.shapesFor(56.dp), contentPadding = ButtonDefaults.contentPaddingFor(56.dp)) { ... }
 FilledTonalButton(onClick = {}, shapes = ButtonDefaults.shapesFor(40.dp)) { ... }
+ButtonGroup(overflowIndicator = { ButtonGroupDefaults.OverflowIndicator(it) }) { clickableItem(onClick = {}, label = "...") }
 Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
   ToggleButton(checked = ..., onCheckedChange = {}, shapes = ButtonGroupDefaults.connectedLeadingButtonShapes()) { ... }
   ToggleButton(checked = ..., onCheckedChange = {}, shapes = ButtonGroupDefaults.connectedMiddleButtonShapes()) { ... }
   FilledTonalToggleButton(checked = ..., onCheckedChange = {}, shapes = ButtonGroupDefaults.connectedTrailingButtonShapes()) { ... }
 }
-val sliderState = rememberSliderState(value = 0.5f); Slider(state = sliderState, onValueChange = { sliderState.value = it }, modifier = Modifier.heightIn(min = 48.dp))
+SplitButtonLayout(leadingButton = { SplitButtonDefaults.LeadingButton(onClick = {}) { Text("...") } }, trailingButton = { SplitButtonDefaults.TrailingButton(checked = ..., onCheckedChange = {}) { ... } })
+FilterChip(selected = ..., onClick = {}, label = { Text("...") }, shapes = FilterChipDefaults.shapes()) // also ElevatedFilterChip, InputChip(shapes = InputChipDefaults.shapes())
+val sliderState = rememberSliderState(value = 0.5f); Slider(state = sliderState, onValueChange = { sliderState.value = it }, modifier = Modifier.heightIn(min = 48.dp)) // also VerticalSlider
+val rangeState = rememberRangeSliderState(startValue = 0.2f, endValue = 0.8f); RangeSlider(state = rangeState, onValueChange = { rangeState.startValue = it.start; rangeState.endValue = it.endInclusive }) // startValue/endValue replace activeRangeStart/End
 MediumFloatingActionButton(onClick = {}) { ... } // or LargeFloatingActionButton
 FloatingActionButtonMenu(expanded = ..., button = { ToggleFloatingActionButton(checked = ..., onCheckedChange = {}) { ... } }) { FloatingActionButtonMenuItem(onClick = {}, text = {}, icon = {}) }
 
-// Segmented Lists (main body uses trailing `content` lambda, never headlineContent), Indicators & Menus
+// Lists (main body uses trailing `content` lambda, never headlineContent), Indicators & Menus
+ListItem(onClick = {}, verticalAlignment = ListItemDefaults.verticalAlignment()) { Text("...") }
 Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
   SegmentedListItem(onClick = {}, shapes = ListItemDefaults.segmentedShapes(index = i, count = n), leadingContent = {}, supportingContent = {}, trailingContent = {}) { Text("...") }
 }
 LoadingIndicator(modifier = Modifier.size(48.dp)) // or ContainedLoadingIndicator()
 LinearWavyProgressIndicator(progress = { 0.65f }) // or CircularWavyProgressIndicator(progress = { 0.65f })
-DropdownMenuPopup(expanded = ..., onDismissRequest = {}) {
+DropdownMenuPopup(expanded = ..., onDismissRequest = {}) { // submenus: popupPositionProvider = MenuDefaults.rememberDropdownMenuPopupPositionProvider(MenuAnchorPosition.End)
   DropdownMenuGroup(shapes = MenuDefaults.groupShape(index = 0, count = 2)) {
-    DropdownMenuItem(onClick = {}, text = { Text(...) }, shape = MenuDefaults.itemShape(0, 2).shape)
+    DropdownMenuItem(onClick = {}, text = { Text(...) }, shape = MenuDefaults.itemShape(0, 3).shape)
+    SelectableDropdownMenuItem(selected = ..., onClick = {}, text = { Text(...) }, shapes = MenuDefaults.itemShape(1, 3))
+    CheckableDropdownMenuItem(checked = ..., onCheckedChange = {}, text = { Text(...) }, shapes = MenuDefaults.itemShape(2, 3))
   }
 }
 Modifier.clip(MaterialShapes.Cookie9Sided.toShape()) // shapes below
@@ -89,6 +98,14 @@ TextField(state = rememberTextFieldState(), label = { Text(...) }, shape = TextF
 OutlinedTextField(state = rememberTextFieldState(), label = { Text(...) }, shape = OutlinedTextFieldDefaults.roundedShape, colors = OutlinedTextFieldDefaults.tonalColors(), labelPosition = TextFieldLabelPosition.Inside())
 OutlinedSecureTextField(state = rememberTextFieldState(), label = { Text("Password") }) // or SecureTextField(...)
 val searchState = rememberSearchBarState(); SearchBar(state = searchState, inputField = { SearchBarDefaults.InputField(textFieldState = rememberTextFieldState(), searchBarState = searchState, onSearch = {}) })
+ExpandedDockedSearchBarWithGap(state = searchState, inputField = { ... }) { ... } // tablet; phone: ExpandedFullScreenContainedSearchBar(...)
+AppBarWithSearch(state = searchState, inputField = { ... })
+
+// Sheets, Scrim, Carousels & Tooltips
+BottomSheet(state = rememberBottomSheetState(initialValue = SheetValue.Expanded), onDismissRequest = {}) { ... } // static non-modal; modal: ModalBottomSheet(...)
+Scrim(contentDescription = "Dismiss", onClick = {}, alpha = { 0.32f })
+HorizontalCenteredHeroCarousel(state = rememberCarouselState { n }, preferredItemWidth = 220.dp, itemSpacing = CarouselDefaults.ItemSpacing, contentPadding = CarouselDefaults.ContentPadding) { i -> ... } // preferredItemWidth replaces maxItemWidth; also HorizontalMultiBrowseCarousel, HorizontalUncontainedCarousel
+TooltipBox(positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above), tooltip = { PlainTooltip(caretShape = TooltipDefaults.caretShape()) { Text("...") } }, state = rememberTooltipState()) { ... } // or RichTooltip
 
 // Scroll Fields & Expressive Time Pickers (inline ScrollField / TimeScroll preferred; vibrantColors for Expressive style)
 val scrollState = rememberScrollFieldState(itemCount = 60, index = 0); ScrollField(state = scrollState, contentDescription = "Minutes") { index, _, _ -> Text("$index") }

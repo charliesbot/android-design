@@ -45,6 +45,7 @@ fun AppTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> U
 - At the top level, nulls become `expressiveLightColorScheme()`, `MotionScheme.expressive()`, `Shapes()`, and `Typography()`. Nested, nulls inherit from the outer theme.
 - `expressiveLightColorScheme()` is `lightColorScheme()` with more colorful `on*Container` roles. There is no dark counterpart; use `darkColorScheme()` or a generated scheme.
 - Plain `MaterialTheme(...)` still works but defaults to `MotionScheme.standard()`.
+- Material 3 1.5.0 adds `LocalRippleThemeConfiguration` (`androidx.compose.material3:material3-ripple`, supports inset focus rings), `Typography(fontFamily = ...)` to propagate a plain font family to unset roles, and `Text(..., color = { ... })` (`ColorProducer`) for draw-phase color updates without recomposition.
 
 ## Color schemes
 
