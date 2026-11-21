@@ -12,11 +12,11 @@ History: the first audit found 266 distilled, 133 partial, and 13 missing routes
 
 | Batch | Distilled | Partial | Missing | Skipped |
 | --- | --- | --- | --- | --- |
-| m3.material.io: Foundations (excluding Layout) | 31 | 0 | 0 | 16 |
+| m3.material.io: Foundations (excluding Layout) | 35 | 0 | 0 | 16 |
 | m3.material.io: Foundations > Layout | 19 | 0 | 0 | 2 |
-| m3.material.io: Styles, Develop, and articles | 39 | 0 | 0 | 11 |
+| m3.material.io: Styles, Develop, and articles | 40 | 0 | 0 | 12 |
 | m3.material.io: Components (A to L) | 69 | 0 | 0 | 0 |
-| m3.material.io: Components (L to T) | 76 | 0 | 0 | 0 |
+| m3.material.io: Components (L to T) | 80 | 0 | 0 | 0 |
 | m3.material.io blog, videos, and articles | 22 | 0 | 0 | 98 |
 | developer.android.com/design/ui: Mobile, desktop, large screens, widgets | 41 | 0 | 0 | 10 |
 | developer.android.com/design/ui: Gallery | 33 | 0 | 0 | 9 |
@@ -26,7 +26,7 @@ History: the first audit found 266 distilled, 133 partial, and 13 missing routes
 | developer.android.com/develop: Compose UI (accessibility, animation, design systems, graphics, text) | 40 | 0 | 0 | 22 |
 | developer.android.com/develop: Compose UI (not yet audited) | 0 | 0 | 324 | 0 |
 | Out of scope: developer.android.com platforms | 0 | 0 | 0 | 150 |
-| **Total** | **495** | **0** | **324** | **357** |
+| **Total** | **504** | **0** | **324** | **358** |
 
 ## m3.material.io: Foundations (excluding Layout)
 
@@ -53,6 +53,12 @@ History: the first audit found 266 distilled, 133 partial, and 13 missing routes
 ### Design tokens
 - [x] /foundations/design-tokens/overview → material-3.md (Tokens and theming model)
 - [-] /foundations/design-tokens/how-to-use-tokens; Figma plugin and DSP download steps, tooling procedure only
+
+### Desktop
+- [x] /foundations/desktop/overview → material-3.md (Layout > Design for desktop)
+- [x] /foundations/desktop/layout → material-3.md (Layout > Design for desktop)
+- [x] /foundations/desktop/components → material-3.md (Layout > Design for desktop)
+- [x] /foundations/desktop/interaction → material-3.md (Layout > Design for desktop)
 
 ### Designing (accessibility)
 - [x] /foundations/designing/overview → material-3.md (Accessibility: native components; custom dialogs need extra testing)
@@ -200,6 +206,8 @@ The Styles pages are mostly distilled. The biggest gap is the transition-pattern
 
 ### Expressive articles
 - [x] /building-with-m3-expressive → material-3.md (What it is and why; The seven expressive tactics, color mixing for key components only; Hero moments)
+- [x] /compose-material-3-is-stable → material-3.md (Versions and stability)
+- [-] /enhance-your-component-designs-with-parametric-prototyping; design-process article on prototyping components with sliders and AI tools, no UI design rule
 - [x] /m3-expressive-motion-theming → material-3.md (Motion: schemes, spatial vs effects, speeds, springs vs tween, custom `MotionScheme`, custom components using `MaterialTheme.motionScheme`)
 - [x] /material-is-compose-first → material-3.md (Versions and stability)
 
@@ -435,6 +443,12 @@ Checked 69 URLs. 57 are fully distilled, 12 are partly distilled, and none are s
 - [x] /components/radio-button/guidelines → material-3-components.md (Radio button)
 - [x] /components/radio-button/accessibility → material-3-components.md (Radio button, Accessibility)
 
+### Scroll fields
+- [x] /components/scroll-fields/overview → material-3-components.md (Scroll fields)
+- [x] /components/scroll-fields/specs → material-3-components.md (Scroll fields: 100/144/186dp min widths, color roles, states)
+- [x] /components/scroll-fields/guidelines → material-3-components.md (Scroll fields)
+- [x] /components/scroll-fields/accessibility → material-3-components.md (Scroll fields, Accessibility)
+
 ### Search
 - [x] /components/search/overview → material-3-components.md (Search)
 - [x] /components/search/specs → material-3-components.md (Search: 360 to 720dp, 56dp, docked 240dp to 2/3 height, color roles, 24/12dp margins)
@@ -491,7 +505,7 @@ Checked 69 URLs. 57 are fully distilled, 12 are partly distilled, and none are s
 
 ### Time pickers
 - [x] /components/time-pickers/overview → material-3-components.md (Time pickers)
-- [x] /components/time-pickers/specs → material-3-components.md (Time pickers: 256dp dial, 48dp handle, color roles)
+- [x] /components/time-pickers/specs → material-3-components.md (Time pickers: expressive scroll, input, and dial specs, vibrant colors)
 - [x] /components/time-pickers/guidelines → material-3-components.md (Time pickers)
 - [x] /components/time-pickers/accessibility → material-3-components.md (Time pickers, Accessibility)
 

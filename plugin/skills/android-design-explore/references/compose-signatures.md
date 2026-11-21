@@ -89,6 +89,10 @@ TextField(state = rememberTextFieldState(), label = { Text(...) }, shape = TextF
 OutlinedTextField(state = rememberTextFieldState(), label = { Text(...) }, shape = OutlinedTextFieldDefaults.roundedShape, colors = OutlinedTextFieldDefaults.tonalColors(), labelPosition = TextFieldLabelPosition.Inside())
 OutlinedSecureTextField(state = rememberTextFieldState(), label = { Text("Password") }) // or SecureTextField(...)
 val searchState = rememberSearchBarState(); SearchBar(state = searchState, inputField = { SearchBarDefaults.InputField(textFieldState = rememberTextFieldState(), searchBarState = searchState, onSearch = {}) })
+
+// Scroll Fields & Expressive Time Pickers (inline ScrollField / TimeScroll preferred; vibrantColors for Expressive style)
+val scrollState = rememberScrollFieldState(itemCount = 60, index = 0); ScrollField(state = scrollState, contentDescription = "Minutes") { index, _, _ -> Text("$index") }
+val timeState = rememberTimePickerState(); TimeScroll(state = timeState, shapes = TimePickerDefaults.shapes(), toggle = { TimePickerDialogDefaults.ScrollDisplayModeToggle(...) }, colors = TimePickerDefaults.vibrantColors()) // modal: VibrantTimePickerDialog(...)
 ```
 
 Available `MaterialShapes`: `Arch, Arrow, Boom, Bun, Burst, Circle, ClamShell, Clover4Leaf, Clover8Leaf, Cookie12Sided, Cookie4Sided, Cookie6Sided, Cookie7Sided, Cookie9Sided, Diamond, Fan, Flower, Gem, Ghostish, Heart, Oval, Pentagon, Pill, PixelCircle, PixelTriangle, Puffy, PuffyDiamond, SemiCircle, Slanted, SoftBoom, SoftBurst, Square, Sunny, Triangle, VerySunny`.

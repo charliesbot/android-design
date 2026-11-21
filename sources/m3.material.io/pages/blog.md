@@ -7,19 +7,23 @@ Source: https://m3.material.io/blog
 
 #### Featured
 
+[IMAGE DO] Nov 18, 2026
+
+**DO:** _Build production-ready UIs with expressive components, theming, and improved accessibility_
+
+[IMAGE DO] Nov 16, 2026
+
+**DO:** _Use AI tools to visualize your design explorations in real time_
+
 [IMAGE DO] May 19, 2026
 
 **DO:** _Material’s latest updates make it easier to create expressive, adaptive products_
 
-[IMAGE DO] May 19, 2026
-
-**DO:** _Start migrating to Compose to get the latest from Material_
-
 [IMAGE DO] May 13, 2025
 
-**DO:** _Material’s latest evolution helps you make products even more engaging and easier to use._
+**DO:** _Material’s latest evolution helps you make products even more engaging and easier to use_
 
-#### Featured in Google Design
+#### Read more on Google Design
 
 [IMAGE DO]
 
@@ -33,23 +37,31 @@ Source: https://m3.material.io/blog
 
 #### 2026
 
-[IMAGE DO]
+[IMAGE DO] Nov 18, 2026
 
-**DO:** _Start migrating to Compose to get the latest from Material_
+**DO:** _Build production-ready UIs with expressive components, theming, and improved accessibility_
+
+[IMAGE DO] Nov 16, 2026
+
+**DO:** _Use AI tools to visualize your design explorations in real time_
 
 [IMAGE DO] May 19, 2026
 
 **DO:** _Material’s latest updates make it easier to create expressive, adaptive products_
 
+[IMAGE DO] May 19, 2026
+
+**DO:** _Start migrating to Compose to get the latest from Material_
+
 #### 2025
 
 [IMAGE DO] May 20, 2025
 
-**DO:** _Supercharge your Android transitions and animations with the new M3 Expressive motion theming system._
+**DO:** _Supercharge your Android transitions and animations with the new M3 Expressive motion theming system_
 
 [IMAGE DO] May 13, 2025
 
-**DO:** _Material’s latest evolution helps you make products even more engaging and easier to use._
+**DO:** _Material’s latest evolution helps you make products even more engaging and easier to use_
 
 #### 2024
 

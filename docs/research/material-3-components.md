@@ -1105,35 +1105,56 @@ Source: m3.material.io scrapes (Overview, Specs, Guidelines, Accessibility). Onl
   - Weekday headers aren't focusable, and their full-name tooltip shows only on hover.
   - Roles: previous and next month or year are Button, the month and year dropdowns are Button, weekdays are column headers, and the month grid is Grid.
 
-### Time pickers
+### Scroll fields
+- **M3 Expressive addition:** new expressive component for selecting measurements and numeric values (height, weight, distance, temperature, ISO, calories). Finite or infinitely looping list.
 - **Use when / avoid when:**
-  - Time pickers are modal and "cover the main content." Use them for alarms and meetings.
-  - They are "not ideal for nuanced or granular time selection, such as milliseconds."
-- **Variants and how to choose:**
-  - Dial or input. Input "should be accessible from any other mobile time picker interface by tapping the keyboard icon."
-  - Make input the default when a dial isn't needed.
-  - 12h vs 24h is set outside the component, usually in system settings. A 24h dial puts even numbers on the inner ring. There is no AM/PM selector in 24h.
+  - Best for choosing from a list of numbers; can be customized for strings or paired side by side (clearly label each field when tracking different values) or paired with button groups.
+  - "If using scroll fields to choose time, use a time picker instead."
+  - Recommend up to four digits. DON'T: "Using five or more digits implies a long scroll time, unless values aren't consecutive." For long ranges, add intervals between values or use a text field for precise entry.
+- **Sizes and customizations:**
+  - Three recommended sizes with minimum widths: small (1 to 2 digits, 100dp), medium (3 digits, 144dp), large (4 digits, 186dp).
+  - Hugs contents by default; in larger windows, increase height and width to fill containers comfortably.
+  - Visually crop inactive values to indicate scrollability; keep corner radius at least 16dp.
 - **Emphasis and color:**
-  - The selected field is Primary container.
-  - The period selector is Tertiary container.
-  - The dial is Surface container highest with a Primary handle.
-- **Layout and placement:**
-  - Shown above a scrim and never obscured or cropped.
-  - The dial is 256dp with 48dp handle targets.
-  - Landscape places the parts side by side.
+  - Container `surfaceContainerLowest`, inactive value `onSurface` / `outline`, active value darker and larger, selected container, active number, and cursor in `primary`.
+  - Eight states: enabled, hovered, focused, disabled in both inactive and active states.
+- **Placement:**
+  - Inline is preferred so surrounding content stays visible.
+  - Use a non-modal dialog when space is limited; use modal dialogs rarely, only when UI is too cluttered.
+- **Behavior and accessibility:**
+  - Swipe to scroll or tap the inactive value above or below; scrolled items snap vertically centered.
+  - **Keyboard input required:** always provide an option to swap to text input for keyboard users (a keyboard toggle button nearby or a separate text field; built into scroll time pickers). Strings auto-complete by initial character; errors appear below and highlight the invalid value.
+  - Targets for inactive values must be at least 48dp high.
+  - Keys: Tab focuses, Space or Enter activates, Up/Down selects option above or below.
+
+### Time pickers
+- **M3 Expressive overhaul (Oct 2026):** added the **scroll time picker** and updated **input** and **dial** time pickers with expressive styles (higher contrast on hour/minute fields and dial selector, expressive AM/PM toggle shape and color, removed "Select time" label). In Jetpack Compose, the Expressive styling is called **"vibrant"** (`TimeScroll`, `TimePickerDefaults.vibrantColors()`, `TimeInputDefaults.vibrantColors()`, `VibrantTimePickerDialog`).
+- **Baseline variants are no longer recommended.**
+- **Use when / avoid when:**
+  - Use only for choosing specific hours and minutes when any minute can be chosen (alarms, meetings, time ranges).
+  - If users only choose from preset times or fixed intervals (e.g. 15-minute slots or reservation times), use a simpler component such as a button group, menu, or combo box.
+  - Avoid dial time pickers for granular sub-minute selection such as stopwatch milliseconds.
+- **Variants and how to choose:**
+  - **Scroll time picker:** compact, best placed **inline** with page content (also works on sheets, menus, or modals). Use instead of dial when surrounding content should stay visible.
+  - **Input time picker:** keyboard entry, available inline or modal on any surface.
+  - **Dial time picker:** most engaging, takes the most space, **modal only** (never inline).
+  - 12h vs 24h adjusts automatically (24h removes AM/PM buttons; 24h dial puts 0 to 11 on the outer ring and 12 to 23 on the inner ring, returning to 00 on the outer ring).
+- **Placement:**
+  - **Inline is preferred** whenever possible (scroll or input) so surrounding content remains visible; inline pickers need no modal container.
+  - On touch devices when inline does not fit, consider a scroll time picker in a menu.
+  - Use modal dialogs rarely (dial is modal only), always with a visible container above a scrim; OK confirms, Cancel or scrim tap dismisses.
+- **Built-in input toggle:**
+  - Both scroll and dial time pickers must keep a keyboard icon button to swap to input (clock icon returns to dial, swipe icon returns to scroll). DON'T: remove the built-in toggle without providing another toggle nearby.
+- **Color and customization:**
+  - Scroll picker: `surfaceContainerLowest`, `onSurface`, `outline`, `primaryContainer`/`onPrimaryContainer` for selected period, `onSurfaceVariant` for icons. Dial/input: `primary` active highlights and dial selector, `primaryContainer`/`onPrimaryContainer` period selector, `surfaceContainerLowest` containers.
+  - When customizing typography (narrower or larger numerals), increase scroll field height so surrounding options stay at least half-visible. Keep contrast on both active and inactive values.
 - **Behavior (adaptive):**
-  - Switch orientation or variant to avoid scrolling. Fall back to input when there isn't enough height.
-  - Doesn't scroll with the background.
-  - Exits via OK, Cancel, or tapping outside, with dialog transitions.
-  - Dial and fields update each other.
-- **Do / Don't:**
-  - DO: "Hour selection in a mobile calendar picker"
-  - DON'T: "Don't apply density to the time picker dial when the viewport is constrained. Instead, use an input picker."
+  - Scroll and input pickers resize evenly to fill larger containers and give larger tap targets.
+  - Never add scrolling to a dial time picker: swap from vertical to horizontal dial at wider breakpoints or landscape, and swap from dial to scroll or input when vertical space is very limited or zoomed.
 - **Accessibility:**
-  - Always allow manual text entry.
-  - 48x48dp dial targets.
-  - The dial reads "Hour 7 of 12".
-  - AM/PM uses the radio button role.
+  - Scroll field inactive value targets >= 48dp tall; AM/PM buttons, input toggle, and dial items >= 48x48dp.
+  - Roles: hour/minute are **Rotor** (scroll), **Text input** (input), **Toggle** (dial); AM/PM is a **radio group**. Dial reads "Hour 7 of 12" (12h) or "Hour 23" (24h) and "Minute 24 of 60".
+  - Keys: initial focus lands on hour; Tab moves across hour, minute, AM/PM; arrows move options or AM/PM (on dial, Right/Down clockwise, Left/Up counter-clockwise); Space/Enter activates or confirms.
 
 - **24-hour default (research):** "Even participants who currently use 24 hour clocks found all 24 hour analog designs unfamiliar and confusing." "An overwhelming majority of participants perceived a simple digital input as the least confusing and indeed made fewer errors."
   - Material's resulting direction: "digital input by default for 24hr users" with the dual-ring analog dial as an option.
