@@ -28,7 +28,7 @@ Distill from the files in `sources/`, not from memory or a fresh web fetch, so e
 
 ## Updating from upstream
 
-1. Run `python3 scripts/fetch.py` (about 90 seconds; `--only m3,blog,design-ui,articles,videos` for a subset). Output is deterministic, so any change in `git diff --stat sources/` is a real upstream change.
+1. Run `python3 scripts/fetch.py` (about 90 seconds; `--only m3,blog,android,articles,videos` for a subset). Output is deterministic, so any change in `git diff --stat sources/` is a real upstream change.
 2. For each changed page, read its diff and update the research docs, then the skill, where the guidance changed. Deleted pages usually moved; find the new route before dropping anything. For Material 3 component pages (`sources/m3.material.io/pages/components/`), keep `scripts/test_m3_page_coverage.py` (`M3_PAGE_CLAIMS` / `M3_OMISSIONS`) and `CallNameMapper.kt` aligned: a new component page fails `python3 -m unittest discover scripts` until you map its Compose API or add it to `M3_OMISSIONS` with a reason.
 3. Run `python3 scripts/check_coverage.py`. It fails when a distilled ledger row has no source file or a source file has no ledger row. Give each new page a row with a verdict.
 4. Commit `sources/` together with the research and skill changes it caused, so the history shows what changed upstream and what it changed here.

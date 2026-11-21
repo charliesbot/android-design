@@ -12,7 +12,7 @@ When creating your widget, complete the following steps:
 - Check out the Widget template examples on Figma.
 - Design the UI within the sizing guidelines.
 - Test for multiple screen sizes.
-- Test your widget on multiple form factors, such as Android Auto.
+- Test that your widget adapts to multiple form factors, such as Android Auto.
 - Ensure your widget meets the Widget quality guides.
 
 ###### Canonical widget layouts

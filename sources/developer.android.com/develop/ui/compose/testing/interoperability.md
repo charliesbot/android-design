@@ -1,0 +1,118 @@
+# Interoperability
+Source: https://developer.android.com/develop/ui/compose/testing/interoperability
+
+Compose integrates with common testing frameworks.
+
+## Interoperability with Espresso
+
+In a hybrid app, you can find Compose components inside view hierarchies and views inside Compose composables (via the `AndroidView` composable).
+
+There are no special steps needed to match either type. You match views with Espresso's `onView`, and Compose elements with the `ComposeTestRule`.
+
+```
+@Test
+fun androidViewInteropTest() {
+// Check the initial state of a TextView that depends on a Compose state.
+Espresso.onView(withText("Hello Views")).check(matches(isDisplayed()))
+// Click on the Compose button that changes the state.
+composeTestRule.onNodeWithText("Click here").performClick()
+// Check the new value.
+Espresso.onView(withText("Hello Compose")).check(matches(isDisplayed()))
+}
+```
+
+## Add View-scoped semantics for Compose interop testing **Note:** The `onRootWithViewInteraction` API is included in `androidx.compose.ui:ui-test-junit4:1.12.0-alpha01+` and `androidx.compose.ui:ui-test:1.12.0-alpha01+`. This API is experimental and subject to change.
+
+### Scope Compose searches to specific Views
+
+When migrating complex UIs to Compose, you might encounter identical Compose elements nested inside multiple traditional Android Views—such as within a `RecyclerView` or a `ViewPager`. In these scenarios, a standard Compose search like `onNodeWithText("Save")` might fail with a "Multiple nodes found" error.
+
+Instead of modifying your production code to inject dynamic test tags to distinguish these elements, you can scope your Compose test directly to a specific Android View.
+
+Use the `onRootWithViewInteraction` API on your test rule. This function accepts an Espresso `ViewInteraction`, allowing you to leverage Espresso to isolate a specific container View and perform Compose interactions exclusively within that scoped hierarchy. **Note:** This API is specifically designed for testing Compose components nested inside Views. To test Views nested inside Compose, continue using standard Espresso interactions.
+
+#### Interact with a list item
+
+If you need to interact with a Compose element inside a specific `RecyclerView` row, use Espresso to locate the row, then scope your Compose interaction to it. This ignores identical Compose elements in all other rows.
+
+```
+@Test
+fun testComposeButtonInsideRecyclerViewItem() = runComposeUiTest {
+// Scroll to the desired position using Espresso
+Espresso.onView(withId(recyclerViewId))
+.perform(RecyclerViewActions.scrollToPosition<MyViewHolder>(3))
+
+// Define an Espresso ViewInteraction that uniquely identifies the row
+val rowView = Espresso.onView(
+allOf(
+withId(rootViewId),
+hasDescendant(withText("Item #3"))
+)
+)
+
+// Scope the Compose search strictly to that specific row View
+onRootWithViewInteraction(rowView)
+.onNode(hasText("Like"))
+.performClick()
+}
+```
+
+#### Resolve ambiguity in ViewPagers
+
+When multiple fragments with identical Compose layouts are in memory simultaneously, you can scope the search to the specific fragment's root View ID to prevent matching ambiguity.
+
+```
+@Test
+fun testComposeButtonInsideViewPagerItem() = runComposeUiTest {
+// Swipe to the desired page using Espresso
+Espresso.onView(withId(viewPagerViewId)).perform(swipeLeft())
+
+// Identify the specific container view using Espresso
+val fragmentB = Espresso.onView(withId(fragmentRootViewId))
+
+// The generic text "Save" is now unique within this view scope
+onRootWithViewInteraction(fragmentB)
+.onNode(hasText("Save"))
+.assertIsDisplayed()
+}
+```
+
+## Interoperability with UiAutomator
+
+By default, composables are accessible from UiAutomator only by their convenient descriptors (displayed text, content description, etc.). If you want to access any composable that uses `Modifier.testTag`, you need to enable the semantic property `testTagsAsResourceId` for the particular composable's subtree. Enabling this behavior is useful for composables that don't have any other unique handle, such as scrollable composables (for example, `LazyColumn`). **Note:** This feature is available in Jetpack Compose version 1.2.0-alpha08 and higher.
+
+Enable the semantic property only once high in your composables hierarchy to ensure all nested composables with `Modifier.testTag` are accessible from UiAutomator.
+
+```
+Scaffold(
+// Enables for all composables in the hierarchy.
+modifier = Modifier.semantics {
+testTagsAsResourceId = true
+}
+){
+// Modifier.testTag is accessible from UiAutomator for composables nested here.
+LazyColumn(
+modifier = Modifier.testTag("myLazyColumn")
+){
+// Content
+}
+}
+```
+
+Any composable with the `Modifier.testTag(tag)` can be accessible with the use of `By.res(resourceName)` using the same `tag` as the `resourceName`. **Caution:** Make sure you don't use `By.res(resourcePackage, resourceId)` as this formats the argument as `$resourcePackage:id/$resourceId`, which is different from `Modifier.testTag`.
+
+```
+val device = UiDevice.getInstance(getInstrumentation())
+
+val lazyColumn: UiObject2 = device.findObject(By.res("myLazyColumn"))
+// Some interaction with the lazyColumn.
+```
+
+## Additional Resources
+- **Test apps on Android**: The main Android testing landing page provides a broader view of testing fundamentals and techniques.
+- **Fundamentals of testing:** Learn more about the core concepts behind testing an Android app.
+- **Local tests:** You can run some tests locally, on your own workstation.
+- **Instrumented tests:** It is good practice to also run instrumented tests. That is, tests that run directly on-device.
+- **Continuous integration:** Continuous integration lets you integrate your tests into your deployment pipeline.
+- **Test different screen sizes:** With some many devices available to users, you should test for different screen sizes.
+- **Espresso**: While intended for View-based UIs, Espresso knowledge can still be helpful for some aspects of Compose testing.

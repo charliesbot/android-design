@@ -12,7 +12,7 @@ findings live in [material-3-wear-os.md](material-3-wear-os.md).
 
 Fetched September 2026: Mobile guides (foundations, styles, layout and content,
 patterns, home screen, widgets), the widget hub and the widget quality
-guidelines (`/docs/quality-guidelines/widget-quality`), Desktop guides, the
+guidelines (`/develop/adaptive-apps/quality-guidelines/widget-quality`), Desktop guides, the
 large screens hub, and the 41-page Gallery of large-screen case studies. Cars,
 TV, XR, and AI glasses were skipped as out of scope.
 
@@ -101,7 +101,7 @@ behavior Material leaves out. The most useful additions for a design skill:
 - **Small top app bar:** if the bar is sticky, collapse it to status bar height. If it is not sticky, "add a matching background color gradient" behind the status bar. Medium and large bars collapse to a smaller app bar.
 - **Scrolling protection:** use the built-in protection of Material 3 `TopAppBar`, or a custom gradient composable (`GradientProtection` in Views).
 - **Navigation drawer:** "navigation drawers should also have a separate protection from the rest of the app." The drawer's status bar area gets its own translucent protection.
-- **Bottom app bars:** `BottomAppBar` should collapse while scrolling through its `scrollBehavior` parameter. When the bar animates away, add a system bar scrim for three-button navigation. Gesture navigation stays transparent with no added scrim. `NavigationBar` has no `scrollBehavior` parameter, so keep it visible while scrolling.
+- **Bottom app bars:** `BottomAppBar` should collapse while scrolling through its `scrollBehavior` parameter. When the bar animates away, add a system bar scrim for three-button navigation. Gesture navigation stays transparent with no added scrim. `NavigationBar` has no `scrollBehavior` parameter, so keep it visible while scrolling, including the navigation bar `NavigationSuiteScaffold` shows while a foldable is folded.
 - **Display cutouts:** solid app bar backgrounds draw into the cutout, while important UI is inset. Never place critical UI at the very edge of the screen.
 
 ## Layout
@@ -332,7 +332,7 @@ Secondary navigation (overflow, bottom of a drawer, settings). Standard labels
 - **Picker:** accurate previews at the real size (and in dynamic colors), a
   clear description, 6 to 8 variations at most. Promote pinning in-app at
   relevant moments, subtly, never blocking the main task.
-- **Quality tiers** (`/docs/quality-guidelines/widget-quality`):
+- **Quality tiers** (`/develop/adaptive-apps/quality-guidelines/widget-quality`):
   - Low quality: doesn't fill bounds, poor contrast, no name in the design, no
     preview, stale content, doesn't update after actions, cropped content.
   - Standard: aligned, sensible min and max sizes (min shows a clear use case
