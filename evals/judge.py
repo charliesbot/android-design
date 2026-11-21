@@ -11,6 +11,9 @@ from backends import BACKENDS, execute
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+# The rubric's code items (rubric.md, "Code items"): judged from the proposal source, so a request carries
+# the source only when it asks for one of these.
+CODE_ITEMS = ("R-semantics", "R-fields", "R-visibility", "R-blur")
 
 
 def load_case(name):
@@ -24,7 +27,8 @@ def case_items(case_name):
 
 def prompt_for(case_name, images, item_ids, *, case=None, rubric=None, labels=None, source=None):
     """`labels` maps an image path to its `screen/view`; an image without one is listed by its file name.
-    `source` is the proposal's `.explore.kt` text, which the rubric's code items are judged from."""
+    `source` is the proposal's `.explore.kt` text, which the rubric's code items are judged from; it is
+    left out when no requested item is a code item."""
     labels = labels or {}
     if case is None:
         case = load_case(case_name)
@@ -34,7 +38,8 @@ def prompt_for(case_name, images, item_ids, *, case=None, rubric=None, labels=No
         f"- {a['id']}" + ("" if a.get("text", "See rubric.md") == "See rubric.md" else f": {a['text']}") for a in items
     )
     shots = "\n".join(f"- {labels.get(str(p)) or Path(p).stem}: {Path(p).resolve()}" for p in images)
-    code = "" if source is None else f"""## Proposal source (the code items are judged from this)
+    judges_code = any(key in CODE_ITEMS for key in item_ids)
+    code = "" if source is None or not judges_code else f"""## Proposal source (the code items are judged from this)
 
 ```kotlin
 {source}
