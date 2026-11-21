@@ -1,6 +1,7 @@
 # Pinned toolchain for the v4 previewer worker. Change versions only on purpose.
 [versions]
 kotlin = "2.4.21"
+# TODO(https://github.com/charliesbot/android-design/issues/153): Bump to 1.13.0 stable once JetBrains publishes it and check if SplitButton replaces SplitButtonLayout.
 composeMultiplatform = "1.13.0-rc01"
 material3 = "1.13.0-rc01"
 navigation3 = "1.2.0"
