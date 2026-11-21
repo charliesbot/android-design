@@ -62,6 +62,12 @@ class ArtifactCliTests(unittest.TestCase):
                 self.assertEqual(request['images'], [str(i.resolve()) for i in images])
                 for image in images:
                     self.assertIn(str(image.relative_to(directory)), request['artifacts'])
+                if label.get('source'):
+                    code = (Path(calibrate.HERE) / 'calibration' / label['source']).read_text()
+                    self.assertIn(code, request['prompt'])
+                    self.assertIn('design/proposal.explore.kt', request['artifacts'])
+                else:
+                    self.assertNotIn('## Proposal source', request['prompt'])
                 image = images[0]
                 ballot = {'request_id': request['request_id'], 'items': [
                     {'id': item, 'pass': True, 'reason': 'Fixture verdict'}

@@ -22,8 +22,9 @@ def case_items(case_name):
     return [a for a in load_case(case_name)["assertions"] if a["type"] == "rubric"]
 
 
-def prompt_for(case_name, images, item_ids, *, case=None, rubric=None, labels=None):
-    """`labels` maps an image path to its `screen/view`; an image without one is listed by its file name."""
+def prompt_for(case_name, images, item_ids, *, case=None, rubric=None, labels=None, source=None):
+    """`labels` maps an image path to its `screen/view`; an image without one is listed by its file name.
+    `source` is the proposal's `.explore.kt` text, which the rubric's code items are judged from."""
     labels = labels or {}
     if case is None:
         case = load_case(case_name)
@@ -33,6 +34,13 @@ def prompt_for(case_name, images, item_ids, *, case=None, rubric=None, labels=No
         f"- {a['id']}" + ("" if a.get("text", "See rubric.md") == "See rubric.md" else f": {a['text']}") for a in items
     )
     shots = "\n".join(f"- {labels.get(str(p)) or Path(p).stem}: {Path(p).resolve()}" for p in images)
+    code = "" if source is None else f"""## Proposal source (the code items are judged from this)
+
+```kotlin
+{source}
+```
+
+"""
     return f"""You are grading screenshots of an Android screen against a design rubric.
 
 {rubric}
@@ -45,7 +53,7 @@ def prompt_for(case_name, images, item_ids, *, case=None, rubric=None, labels=No
 
 {shots}
 
-## Items to answer (only these)
+{code}## Items to answer (only these)
 
 {listed}
 
@@ -103,19 +111,19 @@ SCHEMA = {
 }
 
 
-def judge_once(case_name, images, item_ids, *, backend, model=None, prompt=None):
+def judge_once(case_name, images, item_ids, *, backend, model=None, prompt=None, source=None):
     if not images:
         raise ValueError("cannot judge without images")
-    prompt = prompt if prompt is not None else prompt_for(case_name, images, item_ids)
+    prompt = prompt if prompt is not None else prompt_for(case_name, images, item_ids, source=source)
     reply = execute(backend, prompt, Path(images[0]).resolve().parent, role="judge",
                     images=images, schema=SCHEMA, model=model, timeout=600)
     return parse(reply["message"], item_ids)
 
 
-def judge(case_name, images, item_ids=None, runs=1, *, backend, model=None, prompt=None):
+def judge(case_name, images, item_ids=None, runs=1, *, backend, model=None, prompt=None, source=None):
     validate_runs(runs)
     item_ids = item_ids if item_ids is not None else [a["id"] for a in case_items(case_name)]
-    ballots = [judge_once(case_name, images, item_ids, backend=backend, model=model, prompt=prompt)
+    ballots = [judge_once(case_name, images, item_ids, backend=backend, model=model, prompt=prompt, source=source)
                for _ in range(runs)]
     return aggregate(ballots, item_ids)
 

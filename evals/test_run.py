@@ -13,6 +13,9 @@ JAR = '/Apps/android-design-preview.jar'
 VIEWS = ('light', 'dark', 'foldable', 'tablet', 'desktop')
 
 
+CODE_ITEMS = ('R-semantics', 'R-fields', 'R-visibility', 'R-blur')
+
+
 def fake_case(directory):
     """A case directory shaped like prepare() leaves it, without running git."""
     design = directory / 'design'
@@ -163,6 +166,39 @@ class PrepareTest(unittest.TestCase):
             request = json.loads((directory / 'judge-request.json').read_text())
             self.assertIn('main/watch-large', request['prompt'])
             self.assertEqual(result['status'], 'pending')
+
+    def test_code_calibration_labels_have_sources_and_cover_every_code_item(self):
+        labels = json.loads((run.HERE / 'calibration/labels.json').read_text())['images']
+        coded = [label for label in labels if label.get('source')]
+        cases = {c['name']: c for c in json.loads((run.HERE / 'evals.json').read_text())['evals']}
+        for label in coded:
+            self.assertTrue((run.HERE / 'calibration' / label['source']).is_file(), label['source'])
+            self.assertTrue((run.HERE / 'calibration' / label['image']).is_file(), label['image'])
+            ids = {a['id'] for a in cases[label['case']]['assertions']}
+            self.assertLessEqual(set(label['expect']), ids, label['source'])
+        for item in CODE_ITEMS:
+            verdicts = {label['expect'][item] for label in coded if item in label['expect']}
+            self.assertEqual(verdicts, {True, False}, f'{item} needs a passing and a failing fixture')
+
+    def test_every_phone_case_judges_the_code_items_and_no_wear_case_does(self):
+        for case in json.loads((run.HERE / 'evals.json').read_text())['evals']:
+            ids = {a['id'] for a in case['assertions'] if a['type'] == 'rubric'}
+            if case['surface'] == 'phone':
+                self.assertLessEqual(set(CODE_ITEMS), ids, case['name'])
+            else:
+                self.assertFalse(set(CODE_ITEMS) & ids, case['name'])
+
+    def test_the_judge_request_carries_the_proposal_source(self):
+        case = next(iter(run.select_cases('settings')))
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            proposal = fake_case(directory)
+            write_report(directory)
+            request = run.make_request(case, directory, (run.HERE / 'rubric.md').read_text())
+            self.assertIn('## Proposal source', request['prompt'])
+            self.assertIn(proposal.read_text(), request['prompt'])
+            self.assertLess(request['prompt'].index('## Proposal source'), request['prompt'].index('## Items to answer'))
+            self.assertIn('R-semantics', request['item_ids'])
 
     def test_wear_calibration_labels_match_their_sources_and_cases(self):
         src = run.HERE / 'calibration/wear-src'

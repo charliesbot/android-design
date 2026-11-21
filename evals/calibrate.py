@@ -17,6 +17,11 @@ def label_images(label):
     return label.get('images') or [label['image']]
 
 
+def label_source(label):
+    """The `.explore.kt` text a code-item label is judged from, or None for a screenshot-only label."""
+    return (HERE / 'calibration' / label['source']).read_text() if label.get('source') else None
+
+
 def report(labels, verdicts):
     misses = 0
     for label, verdict in zip(labels, verdicts):
@@ -44,7 +49,8 @@ def main():
         if args.command == 'run':
             validate_runs(args.runs)
             verdicts = [judge(label['case'], [str(HERE / 'calibration' / name) for name in label_images(label)],
-                              list(label['expect']), args.runs, backend=args.judge, model=args.model)
+                              list(label['expect']), args.runs, backend=args.judge, model=args.model,
+                              source=label_source(label))
                         for label in labels]
             return report(labels, verdicts)
         out = args.out.resolve()
@@ -58,6 +64,12 @@ def main():
                     shutil.copy2(HERE / 'calibration' / name, directory / 'renders' / Path(name).name)
                 case = dict(cases[label['case']])
                 case['assertions'] = [a for a in case['assertions'] if a['id'] in label['expect']]
+                if label.get('source'):
+                    # Shaped like a prepared case, so make_request reads and hashes the proposal source.
+                    proposal = directory / 'design' / 'proposal.explore.kt'
+                    proposal.parent.mkdir()
+                    shutil.copy2(HERE / 'calibration' / label['source'], proposal)
+                    (directory / 'case.json').write_text(json.dumps({'proposal': str(proposal), 'title': label['case']}))
                 request = make_request(case, directory, (HERE / 'rubric.md').read_text())
                 (directory / 'judge-request.json').write_text(json.dumps(request, indent=2))
             # Expected labels stay out of individual judge requests.

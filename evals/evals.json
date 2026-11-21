@@ -80,6 +80,26 @@
           "type": "rubric"
         },
         {
+          "id": "R-semantics",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-fields",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-visibility",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-blur",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
           "id": "R-music-actions",
           "text": "Lyrics, queue, and credits read as three separate, tappable controls: icon buttons in a floating toolbar, or at most two in the app bar. Not loose text buttons, and not one wide pill that looks like a single button.",
           "type": "rubric"
@@ -160,6 +180,26 @@
           "type": "rubric"
         },
         {
+          "id": "R-semantics",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-fields",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-visibility",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-blur",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
           "id": "R-finance-categories",
           "text": "Each category keeps one visible color everywhere it appears (chart, legend, list badges), and the four categories are distinguishable by hue. Chart segments are clearly visible against their background.",
           "type": "rubric"
@@ -236,6 +276,26 @@
         },
         {
           "id": "R-idea",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-semantics",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-fields",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-visibility",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-blur",
           "text": "See rubric.md",
           "type": "rubric"
         },
@@ -321,6 +381,26 @@
         },
         {
           "id": "R-idea",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-semantics",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-fields",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-visibility",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-blur",
           "text": "See rubric.md",
           "type": "rubric"
         },
@@ -426,6 +506,26 @@
         },
         {
           "id": "R-idea",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-semantics",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-fields",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-visibility",
+          "text": "See rubric.md",
+          "type": "rubric"
+        },
+        {
+          "id": "R-blur",
           "text": "See rubric.md",
           "type": "rubric"
         },
