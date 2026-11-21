@@ -1,4 +1,4 @@
-# org.jetbrains.compose.material3:material3-desktop:1.13.0-beta01
+# org.jetbrains.compose.material3:material3-desktop:1.13.0-rc01
 ActionLabelBottomPadding
 ActionLabelMinHeight
 AdaptiveStyleScope

@@ -7,7 +7,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MotionScheme
@@ -272,7 +271,6 @@ val LocalResolvedTheme =
  * variant, contrast, 2025 spec) with explicit role colors on top, the type scale, the corner scale
  * and the expressive motion scheme.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ProposalTheme(design: DesignSystem, dark: Boolean, content: @Composable () -> Unit) {
   val resolved = remember(design, dark) { ThemeResolver.resolve(design, dark) }

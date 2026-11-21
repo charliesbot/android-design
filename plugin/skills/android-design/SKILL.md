@@ -86,7 +86,7 @@ Code checks:
 
 ### Theme setup
 
-Wrap the app in `MaterialExpressiveTheme` with `MotionScheme.expressive()`, the chosen color scheme, and the type scale from [Typography](#typography). Requires `androidx.compose.material3:material3` **1.5.0-alpha** or later (1.4.0 lacks almost all Expressive APIs). Read [references/theming.md](references/theming.md) for theme code, toolchain requirements, opt-in APIs, seed schemes, type voices, shape morphing, motion specs, and spacing.
+Wrap the app in `MaterialExpressiveTheme` with `MotionScheme.expressive()`, the chosen color scheme, and the type scale from [Typography](#typography). Requires `androidx.compose.material3:material3` **1.5.0** or later (Compose BOM `2026.11.01`; 1.4.0 lacks almost all Expressive APIs). Read [references/theming.md](references/theming.md) for theme code, toolchain requirements, opt-in APIs, seed schemes, type voices, shape morphing, motion specs, and spacing.
 
 ### Emphasis and hierarchy
 

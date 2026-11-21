@@ -30,9 +30,10 @@ lives in [material-3-wear-os.md](material-3-wear-os.md).
   `HbAFGivZ158`), "The future unfolds! How to optimize Android apps for
   adaptive layouts" (Jul 2026, `pLNJ-fNYTKU`), and "WearOS Material 3 shape
   morphing" (Jul 2025, `qEEo6AwgBjU`).
-- **androidx sources** at commit `bf95ca5` (Sep 22, 2026), the released
-  `material3-android-1.5.0-alpha28` sources jar, and Maven metadata. See
-  [Compose API reference](#compose-api-reference-verified-september-2026).
+- **androidx sources** for the released `material3-android-1.5.0` sources jar
+  (Nov 18, 2026, Compose BOM `2026.11.01`), official release notes, and Maven
+  metadata. See
+  [Compose API reference](#compose-api-reference-verified-november-2026).
 
 The most valuable pages for the skill:
 
@@ -1295,38 +1296,48 @@ accessible UX layer.
   animation on task completion, because rewarding the user is core to the
   brand; Clip uses "oversized graphic components" for a bold, distinct look.
 
-## Compose API reference (verified September 2026)
+## Compose API reference (verified November 2026)
 
-Verified against androidx-main (`bf95ca5`, Sep 22, 2026) and the released
-`material3-android-1.5.0-alpha28` sources, whose public API matches main
-except `Slider`. Source root:
+Verified against the released `material3-android-1.5.0` sources jar (Nov 18,
+2026; Compose BOM `2026.11.01`). Source root:
 `compose/material3/material3/src/commonMain/kotlin/androidx/compose/material3/`.
 
 ### Versions and stability
 
-- `androidx.compose.material3:material3`: stable **1.4.0** (Sep 2025) has
-  **no Expressive APIs** except `WideNavigationRail`, `ModalWideNavigationRail`,
-  and `ShortNavigationBar`. Expressive requires **1.5.0-alpha28** (Sep 9, 2026);
-  1.5.0 has no beta yet.
-- Within 1.5.0 alphas nearly everything was promoted out of experimental:
-  motion (alpha15), typography (alpha16), `MaterialExpressiveTheme` and
-  wavy progress (alpha18), buttons, toggles, menus, FABs (alpha19), split
-  button (alpha20), floating toolbar and button groups (alpha22), flexible app
-  bars, expressive list items, contained search (alpha23).
+- `androidx.compose.material3:material3`: **1.5.0** is stable (Nov 18, 2026,
+  bundled in Compose BOM `2026.11.01`, requiring Kotlin 2.2+ and `compileSdk`
+  37.1) and graduates almost all Expressive APIs to stable. Older stable
+  **1.4.0** (Sep 2025) only has `WideNavigationRail`, `ModalWideNavigationRail`,
+  and `ShortNavigationBar`.
+- Promoted to stable in `1.5.0`: `MaterialExpressiveTheme`, `MotionScheme`,
+  emphasized typography, extended `Shapes`, wavy progress indicators, sized
+  buttons, toggles, button groups, `SplitButtonLayout`, FABs and FAB menus,
+  floating toolbars, flexible top and bottom app bars, expressive and segmented
+  list items, vertical menus, contained search (`SearchBar`,
+  `ExpandedFullScreenContainedSearchBar`, `ExpandedDockedSearchBarWithGap`),
+  stateful `Slider` / `RangeSlider`, `TimePicker` / `VibrantTimePickerDialog` /
+  `ScrollField`, and carousels (`HorizontalCenteredHeroCarousel` uses
+  `preferredItemWidth`).
 - **Still `@ExperimentalMaterial3ExpressiveApi`:** `MaterialShapes`,
   `RoundedPolygon.toShape()` / `toPath()`, `Morph.toPath()`, `LoadingIndicator`,
-  `ContainedLoadingIndicator`, and the pull-to-refresh loading indicator.
+  `ContainedLoadingIndicator`, `LoadingIndicatorDefaults`, and the
+  pull-to-refresh loading indicator.
   **Still `@ExperimentalMaterial3Api`:** `AppBarWithSearch`,
-  `carouselParallaxScrollEffect`, sheets, tooltips.
-- Other versions: adaptive 1.3.0 stable (1.4.0-alpha02); Wear compose-material3
-  1.6.2 stable (1.7.0-rc01); graphics-shapes 1.1.0; MDC Views 1.14.0.
+  `carouselParallaxScrollEffect`, sheets (`BottomSheet`, `ModalBottomSheet`,
+  `BottomSheetScaffold`), tooltips.
+- Other versions: `material3-adaptive-navigation-suite` 1.5.0 stable
+  (1.6.0-alpha01); adaptive 1.3.0 stable (1.4.0-alpha03); Wear
+  compose-material3 1.7.2 stable (1.8.0-alpha04); graphics-shapes 1.1.0; MDC
+  Views 1.14.0.
 - **Replaced components are not deprecated.** Lint won't flag medium/large top
   app bars, the bottom app bar, or segmented buttons, so the skill has to steer.
-  Exception: `ListItem(headlineContent = ...)` is deprecated.
+  Exceptions: `ListItem(headlineContent = ...)` and stateless `Slider` /
+  `RangeSlider` (`value =`) overloads are deprecated in `1.5.0`, and Compose
+  Material 2 (`androidx.compose.material`) is deprecated.
 
 - **Views is in maintenance mode.** "Material Views 1.14.0 (MDC-Android) will be our final stable release for the Views library." The library "won't get any new features, but will receive critical bug fixes." Views 1.14.0 did ship Expressive themes, an expressive list, the emphasized type scale and expressive styles for 11 components.
-- **Compose is the only target.** Material Android is "all-in" on Compose and moves all feature work to Material Compose. Material Compose 1.5.0, due later in 2026 (H2), promotes the M3 Expressive experimental APIs to stable. The Figma kit and guidelines follow the Compose library. Generate Compose only. Google offers a migration skill for moving Views screens to Compose screen by screen.
-- The Styles API integration will skip "the composition phase during style updates," which improves performance.
+- **Compose is the only target.** Material Android is "all-in" on Compose and moves all feature work to Material Compose. Material Compose 1.5.0 (Nov 2026) promoted the M3 Expressive APIs to stable. The Figma kit and guidelines follow the Compose library. Generate Compose only. Google offers a migration skill for moving Views screens to Compose screen by screen.
+- The Styles API integration will skip "the composition phase during style updates," which improves performance. (Styles remains experimental in Compose 1.13.)
 
 ### Theme
 
@@ -1497,8 +1508,8 @@ Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
 - Styles API integration for Material components is announced but in progress.
 
 - **Checkable menu items:** "use the check parameter and check leading icon. This swaps the icon from outlined to filled when an option is toggled."
-- **Scroll-based number input:** a new "scroll-based input component" powers a tactile time picker variant. It is "a standalone primitive" usable for any number-based input, and is experimental in the 1.5 alphas.
-- **Expanded search bars:** "expanded docked search bar with gap" animates together with `AppBarWithSearch`. The exact API name is unverified in source.
+- **Scroll-based number input:** `ScrollField` and the scrollable `TimePicker` / `VibrantTimePickerDialog` variants shipped stable in `1.5.0`.
+- **Expanded search bars:** `ExpandedDockedSearchBarWithGap` (stable in `1.5.0`) animates together with `AppBarWithSearch` on medium and larger screens.
 
 ## Open questions
 

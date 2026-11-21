@@ -1,6 +1,6 @@
 # Components
 
-Which component to use, how Google says to use it, and the Expressive Compose API. Names and parameters were checked against androidx sources (material3 1.5.0-alpha28) in September 2026. Components marked (experimental) need `@OptIn(ExperimentalMaterial3ExpressiveApi::class)`.
+Which component to use, how Google says to use it, and the Expressive Compose API. Names and parameters were checked against androidx sources (material3 1.5.0 stable) in November 2026. Components marked (experimental) need `@OptIn(ExperimentalMaterial3ExpressiveApi::class)`.
 
 ## Selection guide
 
@@ -230,7 +230,7 @@ Their v1-to-v2 lesson: ungrouped settings of similar size and inconsistent color
 | Vertical menus | `DropdownMenuPopup`, `DropdownMenuGroup(shapes = MenuDefaults.groupShape(i, n))`; items: `DropdownMenuItem(onClick, text, shape)` for actions, `SelectableDropdownMenuItem` for single choice (radio role), `CheckableDropdownMenuItem` for multi-choice | `MenuDefaults.itemShape(i, n)`; vibrant: `itemVibrantColors()`, `selectableItemVibrantColors()`, `groupVibrantContainerColor`; submenus by nesting `DropdownMenuPopup` with `MenuDefaults.rememberDropdownMenuPopupPositionProvider(...)` |
 | Navigation bar | `ShortNavigationBar`, `ShortNavigationBarItem(iconPosition = NavigationItemIconPosition.Top)` | `Start` icon position for medium windows |
 | Navigation rail | `WideNavigationRail(state = rememberWideNavigationRailState())`, `WideNavigationRailItem(railExpanded = ...)`, `ModalWideNavigationRail` | `NavigationSuiteScaffold` swaps bar and rail by window size |
-| Slider | `Slider(state = s, onValueChange = { ... })` with `val s = remember { SliderState(value, steps, trackRange = 0f..1f) }`, `VerticalSlider` | The `value =` overload is deprecated in the 1.5 alphas, and `SliderState.valueRange` is now `trackRange`. Custom tracks (a wavy seek bar, inset icons) go in the state overload's `track = { ... }` slot; no XS to XL presets |
+| Slider | `Slider(state = s, onValueChange = { ... })` with `val s = remember { SliderState(value, steps, trackRange = 0f..1f) }`, `VerticalSlider` | The stateless `value =` overload is deprecated in `1.5.0`, and `SliderState.valueRange` is now `trackRange`. Custom tracks (a wavy seek bar, inset icons) go in the state overload's `track = { ... }` slot; no XS to XL presets |
 | Carousel | `HorizontalMultiBrowseCarousel`, `HorizontalUncontainedCarousel`, `HorizontalCenteredHeroCarousel` | `rememberCarouselState` |
 
 ## Customize without forking
@@ -439,4 +439,4 @@ NavigationSuiteScaffold(
 ) { /* current destination */ }
 ```
 
-Use the `navigationItems` + `NavigationSuiteItem` overload (from `material3-adaptive-navigation-suite`, same 1.5.0 versions) rather than the older `navigationSuiteItems` scope overload. For explicit control, use `ShortNavigationBar` on compact and `WideNavigationRail` on medium and up.
+Use the `navigationItems` + `NavigationSuiteItem` overload (from `material3-adaptive-navigation-suite` `1.5.0` stable) rather than the older `navigationSuiteItems` scope overload. For explicit control, use `ShortNavigationBar` on compact and `WideNavigationRail` on medium and up.
