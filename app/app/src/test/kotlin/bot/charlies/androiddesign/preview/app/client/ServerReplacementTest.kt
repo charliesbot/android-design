@@ -47,7 +47,7 @@ class ServerReplacementTest {
 
   /** Rewrites the record's secret so the live server answers 403: alive but not answering. */
   private fun makeUnresponsive(f: Fixture) {
-    val path = ServerPaths.recordPath(f.repo, f.cache)
+    val path = ServerPaths.sharedRecordPath(f.cache)
     val record = assertNotNull(ServerPaths.readRecord(path))
     ServerPaths.writeRecord(path, record.copy(clientSecret = "not-the-secret"))
   }
@@ -55,7 +55,7 @@ class ServerReplacementTest {
   @Test
   fun `record names the JAR the server runs`() = withFixture { f ->
     f.client.start(f.repo)
-    val record = assertNotNull(ServerPaths.readRecord(ServerPaths.recordPath(f.repo, f.cache)))
+    val record = assertNotNull(ServerPaths.readRecord(ServerPaths.sharedRecordPath(f.cache)))
     assertEquals(f.jar.toRealPath().toString(), record.jarPath)
     assertEquals(Files.getLastModifiedTime(f.jar).toMillis(), record.jarModified)
   }
@@ -103,7 +103,7 @@ class ServerReplacementTest {
 
   /** Moves the record's start time outside the pid guard's window, as a clock step would. */
   private fun skewStartTime(f: Fixture) {
-    val path = ServerPaths.recordPath(f.repo, f.cache)
+    val path = ServerPaths.sharedRecordPath(f.cache)
     val record = assertNotNull(ServerPaths.readRecord(path))
     ServerPaths.writeRecord(path, record.copy(startedAt = record.startedAt + 3_600_000))
   }
@@ -137,7 +137,7 @@ class ServerReplacementTest {
   fun `a stale record never kills an unrelated process that reused its pid`() = withFixture { f ->
     val bystander = ProcessBuilder("sleep", "60").start()
     try {
-      val path = ServerPaths.recordPath(f.repo, f.cache)
+      val path = ServerPaths.sharedRecordPath(f.cache)
       f.client.start(f.repo)
       val record = assertNotNull(ServerPaths.readRecord(path))
       f.client.stop(f.repo)

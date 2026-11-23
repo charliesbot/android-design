@@ -4,13 +4,14 @@ import bot.charlies.androiddesign.preview.app.AppInfo
 import bot.charlies.androiddesign.preview.app.cli.ExploreRenderRunner
 import bot.charlies.androiddesign.preview.app.cli.ReportTheme
 import bot.charlies.androiddesign.preview.domain.ViewCheck
+import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.kit.BoardSurface
+import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.ValidationError
-import bot.charlies.androiddesign.preview.model.ViewSpec
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import java.io.OutputStream
@@ -23,34 +24,42 @@ import java.nio.file.Path
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * Long-running per-repository HTTP + SSE server owning compilation, 1-view-per-job queued
- * rendering, content-hash result caching, file watching, click selection, and the browser board.
+ * Long-running shared HTTP + SSE server owning compilation, queued rendering across repositories,
+ * content-hash result caching, speculative file watching, click selection, and the browser board.
  */
 class PreviewHttpServer(
   val repoRoot: Path,
   private val cacheRoot: Path = ServerPaths.cacheRoot(),
-  private val preferredPort: Int = ServerPaths.preferredPort(repoRoot),
+  private val preferredPort: Int = ServerPaths.SHARED_PREFERRED_PORT,
   private val existingViewToken: String? = null,
   private val existingClientSecret: String? = null,
   private val maxCompilesBeforeRecycle: Int = MAX_COMPILES_BEFORE_RECYCLE,
   private val idleTimeoutMs: Long = DEFAULT_IDLE_TIMEOUT_MS,
   private val coldBudgetMs: Long = Watchdog.COLD_BUDGET_MS,
   private val warmBudgetMs: Long = Watchdog.WARM_BUDGET_MS,
+  private val backend: PreviewBackend? = null,
   private val loader: ExplorationLoader = ExplorationLoader { src, design ->
     ExploreRenderRunner.loadAndCompile(src, design)
   },
   private val renderer: DensityTargetRenderer? = null,
+  private val runtimeIdentity: RuntimeIdentity? = null,
+  private val deviceSerial: String? = null,
+  private val adbForwardPort: Int? = null,
+  private val apkSha256: String? = null,
   private val onWatchdogHalt: () -> Unit = { Runtime.getRuntime().halt(1) },
   private val onProcessExit: (() -> Unit)? = null,
   private val enableFileWatcher: Boolean = true,
@@ -63,10 +72,28 @@ class PreviewHttpServer(
     val view: String,
   )
 
-  private class SseClient(val exchange: HttpExchange, val out: OutputStream)
+  private class RepoState(
+    val repoId: String,
+    val repoRoot: Path,
+  ) {
+    @Volatile var activeSourcePath: Path? = null
+    @Volatile var activeDesignPath: Path? = null
+    @Volatile var currentFocus: FocusTarget? = null
+    @Volatile var latestBoardPayload: BoardPayload? = null
+    val lastBoardQueuedHash = ConcurrentHashMap<String, String>()
+  }
 
-  val recordPath: Path = ServerPaths.recordPath(repoRoot, cacheRoot)
-  val rendersRoot: Path = ServerPaths.rendersDir(repoRoot, cacheRoot)
+  private class SseClient(
+    val repoId: String?,
+    val exchange: HttpExchange,
+    val out: OutputStream,
+  )
+
+  private val defaultRepoRoot: Path = repoRoot.toAbsolutePath().normalize()
+  private val defaultRepoId: String = ServerPaths.repoHash(defaultRepoRoot)
+
+  val recordPath: Path = ServerPaths.sharedRecordPath(cacheRoot)
+  val rendersRoot: Path = ServerPaths.rendersDir(defaultRepoRoot, cacheRoot)
   val selectionStore = SelectionStore()
 
   private val clientSecret: String = existingClientSecret ?: ServerPaths.randomToken()
@@ -76,16 +103,47 @@ class PreviewHttpServer(
   private val lastActivityMs = AtomicLong(startedAt)
   private val closed = AtomicBoolean(false)
   private val recycleScheduled = AtomicBoolean(false)
+  private val replacementSignal = CompletableFuture<String>()
+  private val inFlightChecks = AtomicInteger(0)
   private val sseClients = CopyOnWriteArrayList<SseClient>()
-  private val lastBoardQueuedHash = ConcurrentHashMap<String, String>()
+  private val repos = ConcurrentHashMap<String, RepoState>()
   private val nonceRng = SecureRandom()
 
   @Volatile private var httpServer: HttpServer? = null
   @Volatile private var boundPort: Int = 0
-  @Volatile private var activeSourcePath: Path? = null
-  @Volatile private var activeDesignPath: Path? = null
-  @Volatile private var currentFocus: FocusTarget? = null
-  @Volatile private var latestBoardPayload: BoardPayload? = null
+  @Volatile private var lastActiveRepoId: String = defaultRepoId
+  @Volatile private var liveOwnerRepoId: String = defaultRepoId
+
+  init {
+    repos[defaultRepoId] = RepoState(defaultRepoId, defaultRepoRoot)
+  }
+
+  private val effectiveRenderer: DensityTargetRenderer =
+    renderer
+      ?: DensityTargetRenderer { compiled, dir, screenId, view, system, overlayId, density ->
+        bot.charlies.androiddesign.preview.feature.preview.sandbox.SandboxHeadlessRenderer.render(
+          compiled = compiled,
+          direction = dir,
+          screenId = screenId,
+          view = view,
+          designSystem = system,
+          overlayId = overlayId,
+          density = density,
+          encodePng = true,
+        )
+      }
+
+  private val effectiveBackend: PreviewBackend =
+    backend ?: SkikoPreviewBackend(loader, effectiveRenderer)
+
+  private val effectiveMaxCompiles: Int =
+    if (
+      backend?.supportsBatchCheck == true && maxCompilesBeforeRecycle == MAX_COMPILES_BEFORE_RECYCLE
+    ) {
+      Int.MAX_VALUE
+    } else {
+      maxCompilesBeforeRecycle
+    }
 
   private val watchdog =
     Watchdog(
@@ -98,31 +156,23 @@ class PreviewHttpServer(
   val renderQueue: RenderQueue =
     RenderQueue(
       rendersRoot = rendersRoot,
+      cacheRoot = cacheRoot,
       watchdog = watchdog,
+      backend = effectiveBackend,
       loader = loader,
-      renderer =
-        renderer
-          ?: DensityTargetRenderer { compiled, dir, screenId, view, system, overlayId, density ->
-            bot.charlies.androiddesign.preview.feature.preview.sandbox.SandboxHeadlessRenderer
-              .render(
-                compiled = compiled,
-                direction = dir,
-                screenId = screenId,
-                view = view,
-                designSystem = system,
-                overlayId = overlayId,
-                density = density,
-                encodePng = true,
-              )
-          },
-      onViewRendered = { sourcePath, contentHash, artifact ->
-        handleViewRendered(sourcePath, contentHash, artifact)
+      renderer = effectiveRenderer,
+      onViewRendered = { rRoot, sourcePath, contentHash, artifact ->
+        handleViewRendered(rRoot, sourcePath, contentHash, artifact)
       },
     )
 
   private val fileWatcher = FileWatcher { src, design ->
-    if (sseClients.isNotEmpty()) {
-      handleFileChanged(src, design)
+    val repoState = resolveRepoForSource(src)
+    val hasBoardListeners = sseClients.any { it.repoId == null || it.repoId == repoState.repoId }
+    if (hasBoardListeners) {
+      handleFileChanged(repoState, src, design)
+    } else if (effectiveBackend.supportsHeadlessSpeculativePrecompile) {
+      handleSpeculativePrecompile(repoState, src, design)
     }
   }
 
@@ -137,21 +187,19 @@ class PreviewHttpServer(
   val port: Int
     get() = boundPort
 
-  fun record(): ServerRecord =
-    ServerPaths.readRecord(recordPath)
-      ?: ServerRecord(
-        pid = ProcessHandle.current().pid(),
-        port = boundPort,
-        jarVersion = AppInfo.VERSION,
-        startedAt = startedAt,
-        repoRoot = repoRoot.toAbsolutePath().normalize().toString(),
-        clientSecret = clientSecret,
-        viewToken = viewToken,
-        jarPath = jar?.toString(),
-        jarModified = jarModified,
-      )
+  fun record(): ServerRecord = ServerPaths.readRecord(recordPath) ?: buildRecord(boundPort)
 
-  fun boardUrl(): String = "http://127.0.0.1:$boundPort/?view=$viewToken"
+  fun boardUrlForRepoId(repoId: String?): String =
+    if (!repoId.isNullOrBlank()) {
+      "http://127.0.0.1:$boundPort/?repo=$repoId&view=$viewToken"
+    } else {
+      "http://127.0.0.1:$boundPort/?view=$viewToken"
+    }
+
+  fun boardUrl(repoRootForUrl: Path? = null): String {
+    val rid = repoRootForUrl?.let { ServerPaths.repoHash(it.toAbsolutePath().normalize()) }
+    return boardUrlForRepoId(rid)
+  }
 
   fun origin(): String = "http://127.0.0.1:$boundPort"
 
@@ -187,20 +235,7 @@ class PreviewHttpServer(
     server.start()
 
     val priorTimeouts = ServerPaths.readRecord(recordPath)?.timeouts.orEmpty()
-    val rec =
-      ServerRecord(
-        pid = ProcessHandle.current().pid(),
-        port = boundPort,
-        jarVersion = AppInfo.VERSION,
-        startedAt = startedAt,
-        repoRoot = repoRoot.toAbsolutePath().normalize().toString(),
-        clientSecret = clientSecret,
-        viewToken = viewToken,
-        timeouts = priorTimeouts,
-        haltedAt = null,
-        jarPath = jar?.toString(),
-        jarModified = jarModified,
-      )
+    val rec = buildRecord(boundPort, timeouts = priorTimeouts)
     ServerPaths.writeRecord(recordPath, rec)
 
     housekeepExecutor.execute {
@@ -233,6 +268,30 @@ class PreviewHttpServer(
     return rec
   }
 
+  private fun buildRecord(
+    portValue: Int,
+    timeouts: List<TimeoutEntry> = emptyList(),
+  ): ServerRecord =
+    ServerRecord(
+      pid = ProcessHandle.current().pid(),
+      port = portValue,
+      jarVersion = AppInfo.VERSION,
+      startedAt = startedAt,
+      repoRoot = defaultRepoRoot.toString(),
+      clientSecret = clientSecret,
+      viewToken = viewToken,
+      timeouts = timeouts,
+      haltedAt = null,
+      jarPath = jar?.toString(),
+      jarModified = jarModified,
+      runtimeHash = runtimeIdentity?.runtimeHash,
+      sourceDir = runtimeIdentity?.sourceDir,
+      backend = effectiveBackend.name,
+      deviceSerial = deviceSerial,
+      adbForwardPort = adbForwardPort,
+      apkSha256 = apkSha256 ?: runtimeIdentity?.apkSha256,
+    )
+
   fun stop(triggerExit: Boolean = false) {
     if (!closed.compareAndSet(false, true)) return
     fileWatcher.stop()
@@ -252,6 +311,7 @@ class PreviewHttpServer(
       // Ignore stop errors.
     }
     httpServer = null
+    runCatching { effectiveBackend.close() }
     httpExecutor.shutdownNow()
     housekeepExecutor.shutdownNow()
     if (triggerExit) {
@@ -261,20 +321,48 @@ class PreviewHttpServer(
 
   /** Trigger a file-change cycle directly (used by [FileWatcher] and tests). */
   fun handleFileChanged(sourcePath: Path, designPath: Path?) {
-    if (closed.get()) return
+    val state = resolveRepoForSource(sourcePath)
+    handleFileChanged(state, sourcePath, designPath)
+  }
+
+  private fun handleSpeculativePrecompile(
+    state: RepoState,
+    sourcePath: Path,
+    designPath: Path?,
+  ) {
+    if (closed.get() || replacementSignal.isDone) return
+    val normSource = sourcePath.toAbsolutePath().normalize()
+    val snapshot = ContentHasher.snapshot(normSource, designPath)
+    if (
+      renderQueue.latestCompiled(state.repoRoot, normSource)?.contentHash == snapshot.contentHash
+    ) {
+      return
+    }
+    renderQueue.cancelStaleJobs(state.repoRoot, normSource, snapshot.contentHash)
+    renderQueue.submitCompile(state.repoRoot, snapshot, QueuePriority.SPECULATIVE)
+  }
+
+  private fun handleFileChanged(
+    state: RepoState,
+    sourcePath: Path,
+    designPath: Path?,
+  ) {
+    if (closed.get() || replacementSignal.isDone) return
     val normSource = sourcePath.toAbsolutePath().normalize()
     val snapshot = ContentHasher.snapshot(normSource, designPath)
     val fileKey = normSource.toString()
-    if (lastBoardQueuedHash[fileKey] == snapshot.contentHash) return
+    if (state.lastBoardQueuedHash[fileKey] == snapshot.contentHash) return
 
-    val latest = renderQueue.latestCompiled(normSource)
-    clearTimeoutsIfHashChanged(snapshot.contentHash)
-    renderQueue.cancelStaleJobs(normSource, snapshot.contentHash)
+    val latest = renderQueue.latestCompiled(state.repoRoot, normSource)
+    clearTimeoutsIfHashChanged(state.repoRoot, snapshot.contentHash)
+    renderQueue.cancelStaleJobs(state.repoRoot, normSource, snapshot.contentHash)
     broadcastSse(
+      state.repoId,
       "stale",
       PreviewJson.compact.encodeToString(
         StaleEventPayload.serializer(),
         StaleEventPayload(
+          repoId = state.repoId,
           contentHash = snapshot.contentHash,
           sourcePath = fileKey,
           views = buildStaleViewRefs(latest),
@@ -282,11 +370,15 @@ class PreviewHttpServer(
       ),
     )
 
-    renderQueue.submitCompile(snapshot, QueuePriority.BOARD_FOCUS).whenComplete { compiledEntry, err
-      ->
+    renderQueue.submitCompile(state.repoRoot, snapshot, QueuePriority.BOARD_FOCUS).whenComplete {
+      compiledEntry,
+      err ->
       if (err != null || compiledEntry == null) {
-        if (!renderQueue.isCurrentHash(normSource, snapshot.contentHash)) return@whenComplete
+        if (!renderQueue.isCurrentHash(state.repoRoot, normSource, snapshot.contentHash)) {
+          return@whenComplete
+        }
         broadcastSse(
+          state.repoId,
           "error_event",
           PreviewJson.compact.encodeToString(
             JsonObject.serializer(),
@@ -297,35 +389,49 @@ class PreviewHttpServer(
         )
         return@whenComplete
       }
-      if (!renderQueue.isCurrentHash(normSource, compiledEntry.contentHash)) return@whenComplete
-      enqueueBoardRenders(compiledEntry, overallPass = null)
+      if (!renderQueue.isCurrentHash(state.repoRoot, normSource, compiledEntry.contentHash)) {
+        return@whenComplete
+      }
+      enqueueBoardRenders(state, compiledEntry, overallPass = null)
     }
   }
 
-  private fun enqueueBoardRenders(compiledEntry: CompileEntry, overallPass: Boolean?) {
+  private fun enqueueBoardRenders(
+    state: RepoState,
+    compiledEntry: CompileEntry,
+    overallPass: Boolean?,
+  ) {
     val normSource = compiledEntry.sourcePath.toAbsolutePath().normalize()
     val fileKey = normSource.toString()
-    if (!renderQueue.isCurrentHash(normSource, compiledEntry.contentHash)) return
-    lastBoardQueuedHash[fileKey] = compiledEntry.contentHash
+    if (!renderQueue.isCurrentHash(state.repoRoot, normSource, compiledEntry.contentHash)) return
+    state.lastBoardQueuedHash[fileKey] = compiledEntry.contentHash
 
-    val compiled = compiledEntry.loaded.compiled
-    if (compiled == null || compiledEntry.loaded.errors.isNotEmpty()) {
-      val payload = buildBoardPayload(compiledEntry, emptyList(), emptyList(), overallPass = false)
-      latestBoardPayload = payload
+    val meta = compiledEntry.boardMeta
+    if (meta == null || compiledEntry.loaded.errors.isNotEmpty()) {
+      val payload =
+        buildBoardPayload(
+          state.repoId,
+          compiledEntry,
+          emptyList(),
+          emptyList(),
+          overallPass = false,
+        )
+      state.latestBoardPayload = payload
       broadcastSse(
+        state.repoId,
         "board",
         PreviewJson.compact.encodeToString(BoardPayload.serializer(), payload),
       )
       maybeScheduleRecycle()
       return
     }
-    val allTargets = enumerateBoardTargets(compiled)
-    val focus = currentFocus
+    val allTargets = enumerateBoardTargets(meta)
+    val focus = state.currentFocus
     val ordered =
       if (focus != null) {
         val (focused, rest) =
           allTargets.partition { t ->
-            t.direction.name == focus.direction &&
+            t.direction == focus.direction &&
               (focus.screen == null || t.screenId == focus.screen) &&
               t.overlayId == focus.overlay &&
               t.view.name == focus.view
@@ -341,19 +447,23 @@ class PreviewHttpServer(
         }
       }
     val staleRefs = ordered.map { (t, _) ->
-      BoardViewRef(t.direction.name, t.screenId, t.overlayId, t.view.name)
+      BoardViewRef(t.direction, t.screenId, t.overlayId, t.view.name)
     }
-    val existing2x = renderQueue.completedBoardArtifacts(normSource).values.toList()
-    val metaPayload = buildBoardPayload(compiledEntry, existing2x, staleRefs, overallPass)
-    latestBoardPayload = metaPayload
+    val existing2x = renderQueue.completedBoardArtifacts(state.repoRoot, normSource).values.toList()
+    val metaPayload =
+      buildBoardPayload(state.repoId, compiledEntry, existing2x, staleRefs, overallPass)
+    state.latestBoardPayload = metaPayload
     broadcastSse(
+      state.repoId,
       "board",
       PreviewJson.compact.encodeToString(BoardPayload.serializer(), metaPayload),
     )
 
+    val cardFrameFormat =
+      if (effectiveBackend.supportsBatchCheck) FrameFormat.WEBP_LOSSLESS else FrameFormat.LZ4_RGBA
     ordered.forEachIndexed { idx, (target, prio) ->
       val fut =
-        renderQueue.submitRender(
+        renderQueue.submitSingleRender(
           entry = compiledEntry,
           direction = target.direction,
           screenId = target.screenId,
@@ -363,6 +473,8 @@ class PreviewHttpServer(
           densityScale = 2,
           baseCheck = null,
           priority = prio,
+          writeFiles = !effectiveBackend.supportsBatchCheck,
+          frameFormat = cardFrameFormat,
         )
       if (idx == 0) {
         fut.whenComplete { _, _ -> maybeScheduleRecycle() }
@@ -390,7 +502,7 @@ class PreviewHttpServer(
     when {
       path == "/api/status" && method == "GET" -> {
         if (!requireClientSecret(exchange)) return
-        handleStatus(exchange)
+        handleStatus(exchange, query)
       }
       path == "/api/check" && method == "POST" -> {
         if (!requireClientSecret(exchange)) return
@@ -404,10 +516,13 @@ class PreviewHttpServer(
         if (!requireClientSecret(exchange)) return
         handleGetSelection(exchange, query)
       }
+      path == "/api/live" && method == "POST" -> {
+        if (!requireClientSecret(exchange)) return
+        handleLiveUpdate(exchange)
+      }
       path == "/api/stop" && method == "POST" -> {
         if (!requireClientSecret(exchange)) return
-        sendRawJson(exchange, 200, """{"ok":true,"status":"stopping"}""")
-        housekeepExecutor.schedule({ stop(triggerExit = true) }, 30, TimeUnit.MILLISECONDS)
+        handleStop(exchange)
       }
       (path == "/" || path == "/index.html") && method == "GET" -> {
         if (!requireViewToken(exchange, query)) return
@@ -415,26 +530,26 @@ class PreviewHttpServer(
       }
       path == "/api/board" && method == "GET" -> {
         if (!requireViewToken(exchange, query)) return
-        handleGetBoard(exchange)
+        handleGetBoard(exchange, query)
       }
       path == "/api/events" && method == "GET" -> {
         if (!requireViewToken(exchange, query)) return
-        handleSse(exchange)
+        handleSse(exchange, query)
       }
       path == "/api/board/render" && method == "POST" -> {
         if (!requireViewToken(exchange, query)) return
         if (!requireBoardOrigin(exchange)) return
-        handleBoardRender(exchange)
+        handleBoardRender(exchange, query)
       }
       path == "/api/board/focus" && method == "POST" -> {
         if (!requireViewToken(exchange, query)) return
         if (!requireBoardOrigin(exchange)) return
-        handleBoardFocus(exchange)
+        handleBoardFocus(exchange, query)
       }
       path == "/api/board/selection" && method == "POST" -> {
         if (!requireViewToken(exchange, query)) return
         if (!requireBoardOrigin(exchange)) return
-        handleBoardSelection(exchange)
+        handleBoardSelection(exchange, query)
       }
       else -> {
         sendJson(
@@ -446,7 +561,26 @@ class PreviewHttpServer(
     }
   }
 
-  private fun handleStatus(exchange: HttpExchange) {
+  private fun handleStatus(exchange: HttpExchange, query: Map<String, String>) {
+    val requestedRepoId = query["repo"]?.takeIf { it.isNotBlank() }
+    val reqRepo =
+      if (requestedRepoId != null) {
+        repos[requestedRepoId]
+      } else {
+        repos[lastActiveRepoId] ?: repos[defaultRepoId]
+      }
+    val url =
+      when {
+        reqRepo != null -> boardUrlForRepoId(reqRepo.repoId)
+        requestedRepoId != null -> boardUrlForRepoId(requestedRepoId)
+        else -> boardUrlForRepoId(null)
+      }
+    val reportedRepoRoot =
+      when {
+        reqRepo != null -> reqRepo.repoRoot.toString()
+        requestedRepoId != null -> ""
+        else -> defaultRepoRoot.toString()
+      }
     val resp =
       StatusResponse(
         pid = ProcessHandle.current().pid(),
@@ -454,14 +588,108 @@ class PreviewHttpServer(
         jarVersion = AppInfo.VERSION,
         startedAt = startedAt,
         compileCount = renderQueue.compileCount,
-        repoRoot = repoRoot.toAbsolutePath().normalize().toString(),
-        boardUrl = boardUrl(),
-        activeFile = activeSourcePath?.toString(),
+        repoRoot = reportedRepoRoot,
+        boardUrl = url,
+        activeFile = reqRepo?.activeSourcePath?.toString(),
+        backend = effectiveBackend.name,
+        runtimeHash = runtimeIdentity?.runtimeHash,
+        deviceSerial = deviceSerial,
+        adbForwardPort = adbForwardPort,
+        activeRepos = repos.values.map { it.repoRoot.toString() }.sorted(),
       )
     sendRawJson(
       exchange,
       200,
       PreviewJson.compact.encodeToString(StatusResponse.serializer(), resp),
+    )
+  }
+
+  private fun handleStop(exchange: HttpExchange) {
+    val raw =
+      try {
+        exchange.requestBody.use { it.readNBytes(MAX_BODY_BYTES) }.toString(Charsets.UTF_8).trim()
+      } catch (_: Exception) {
+        ""
+      }
+    val req =
+      if (raw.isNotEmpty()) {
+        runCatching { PreviewJson.compact.decodeFromString(StopRequest.serializer(), raw) }
+          .getOrNull()
+      } else {
+        null
+      }
+    val repVersion = req?.replacedByVersion?.takeIf { it.isNotBlank() }
+    if (repVersion != null) {
+      ServerPaths.updateRecord(recordPath) { it.copy(replacedByVersion = repVersion) }
+      replacementSignal.complete(repVersion)
+      renderQueue.cancelForReplacement(repVersion)
+      val waitDeadline = System.currentTimeMillis() + REPLACEMENT_DRAIN_WAIT_MS
+      while (inFlightChecks.get() > 0 && System.currentTimeMillis() < waitDeadline) {
+        try {
+          Thread.sleep(5)
+        } catch (_: InterruptedException) {
+          break
+        }
+      }
+      sendRawJson(
+        exchange,
+        200,
+        """{"ok":true,"status":"stopping","replacedByVersion":"$repVersion"}""",
+      )
+      housekeepExecutor.schedule({ stop(triggerExit = true) }, 20, TimeUnit.MILLISECONDS)
+    } else {
+      sendRawJson(exchange, 200, """{"ok":true,"status":"stopping"}""")
+      housekeepExecutor.schedule({ stop(triggerExit = true) }, 30, TimeUnit.MILLISECONDS)
+    }
+  }
+
+  private fun handleLiveUpdate(exchange: HttpExchange) {
+    val body = readBodyString(exchange, MAX_BODY_BYTES) ?: return
+    val req =
+      try {
+        PreviewJson.compact.decodeFromString(LiveFocusRequest.serializer(), body)
+      } catch (e: Exception) {
+        sendJson(
+          exchange,
+          400,
+          ErrorEnvelope(error = "bad_request", message = e.message ?: "Invalid JSON body"),
+        )
+        return
+      }
+    val targetPath =
+      req.path?.takeIf { it.isNotBlank() }?.let { Path.of(it).toAbsolutePath().normalize() }
+    val state =
+      when {
+        !req.repoRoot.isNullOrBlank() -> getOrCreateRepo(Path.of(req.repoRoot))
+        targetPath != null -> resolveRepoForSource(targetPath)
+        else -> repos[lastActiveRepoId] ?: getOrCreateRepo(defaultRepoRoot)
+      }
+    lastActiveRepoId = state.repoId
+    liveOwnerRepoId = state.repoId
+
+    val src = targetPath ?: state.activeSourcePath
+    val entry = src?.let { renderQueue.latestCompiled(state.repoRoot, it) }
+    if (entry != null && entry.boardMeta != null) {
+      val dir =
+        req.direction
+          ?: state.currentFocus?.direction
+          ?: entry.boardMeta.directions.firstOrNull()?.name
+      val screen =
+        req.screen
+          ?: state.currentFocus?.screen
+          ?: entry.boardMeta.directions.firstOrNull { it.name == dir }?.startScreen
+      val ov = req.overlay ?: state.currentFocus?.overlay
+      effectiveBackend.updateLive(
+        entry = entry,
+        direction = dir,
+        screenId = screen,
+        overlayId = ov,
+      )
+    }
+    sendRawJson(
+      exchange,
+      200,
+      """{"ok":true,"repoId":"${state.repoId}","boardUrl":"${boardUrl(state.repoRoot)}"}""",
     )
   }
 
@@ -479,7 +707,23 @@ class PreviewHttpServer(
         return
       }
 
+    inFlightChecks.incrementAndGet()
+    try {
+      handleCheckBody(exchange, req)
+    } finally {
+      inFlightChecks.decrementAndGet()
+    }
+  }
+
+  private fun handleCheckBody(exchange: HttpExchange, req: CheckRequest) {
     val sourcePath = Path.of(req.path).toAbsolutePath().normalize()
+    val reqRepoRoot =
+      req.repoRoot?.takeIf { it.isNotBlank() }?.let(Path::of)
+        ?: ServerPaths.resolveRepoRoot(sourcePath)
+    val state = getOrCreateRepo(reqRepoRoot)
+    val repoBoardUrl = boardUrl(state.repoRoot)
+    lastActiveRepoId = state.repoId
+
     if (!Files.isRegularFile(sourcePath)) {
       sendJson(
         exchange,
@@ -496,7 +740,7 @@ class PreviewHttpServer(
           pass = false,
           scoped = isScoped(req),
           sourcePath = sourcePath.toString(),
-          boardUrl = boardUrl(),
+          boardUrl = repoBoardUrl,
           errors =
             listOf(
               ValidationError(sourcePath.toString(), "Expected an .explore.kt exploration file"),
@@ -534,7 +778,7 @@ class PreviewHttpServer(
           contentHash = snapshot.contentHash,
           sourcePath = sourcePath.toString(),
           designPath = snapshot.designPath?.toString(),
-          boardUrl = boardUrl(),
+          boardUrl = repoBoardUrl,
           error = "timeout",
           tell =
             "Previous attempt for this exact file timed out ($scopeKey). Edit and save the file to clear the timeout.",
@@ -547,21 +791,24 @@ class PreviewHttpServer(
       return
     }
 
-    clearTimeoutsIfHashChanged(snapshot.contentHash)
-    val previousHash = renderQueue.latestCompiled(sourcePath)?.contentHash
+    clearTimeoutsIfHashChanged(state.repoRoot, snapshot.contentHash)
+    val previousHash = renderQueue.latestCompiled(state.repoRoot, sourcePath)?.contentHash
     if (previousHash != null && previousHash != snapshot.contentHash) {
-      renderQueue.cancelStaleJobs(sourcePath, snapshot.contentHash)
+      renderQueue.cancelStaleJobs(state.repoRoot, sourcePath, snapshot.contentHash)
     }
 
-    activeSourcePath = sourcePath
-    activeDesignPath = snapshot.designPath
+    state.activeSourcePath = sourcePath
+    state.activeDesignPath = snapshot.designPath
     if (enableFileWatcher) {
-      fileWatcher.watch(sourcePath, snapshot.designPath)
+      fileWatcher.watchForRepo(state.repoId, sourcePath, snapshot.designPath)
     }
 
     val compileEntry =
       try {
-        renderQueue.submitCompile(snapshot, QueuePriority.AGENT).get()
+        awaitOrReplaced(renderQueue.submitCompile(state.repoRoot, snapshot, QueuePriority.AGENT))
+      } catch (e: ServerReplacedException) {
+        sendReplacedCheckResponse(exchange, isScoped(req), sourcePath, e.replacedByVersion)
+        return
       } catch (e: Exception) {
         val cause = e.cause ?: e
         sendJson(
@@ -573,12 +820,13 @@ class PreviewHttpServer(
       }
 
     val loaded = compileEntry.loaded
-    val compiled = loaded.compiled
-    if (compiled == null || loaded.errors.isNotEmpty()) {
+    val boardMeta = compileEntry.boardMeta
+    if (boardMeta == null || loaded.errors.isNotEmpty()) {
       val pendingSel = selectionStore.consumePending(sourcePath)
-      val boardPayload = buildBoardPayload(compileEntry, emptyList(), emptyList())
-      latestBoardPayload = boardPayload
+      val boardPayload = buildBoardPayload(state.repoId, compileEntry, emptyList(), emptyList())
+      state.latestBoardPayload = boardPayload
       broadcastSse(
+        state.repoId,
         "board",
         PreviewJson.compact.encodeToString(BoardPayload.serializer(), boardPayload),
       )
@@ -592,9 +840,11 @@ class PreviewHttpServer(
           compileMs = loaded.compileMs,
           compileCount = renderQueue.compileCount,
           cached = compileEntry.fromCache,
+          surface = if (compileEntry.surface == BoardSurface.Wear) "wear" else "phone",
+          boardName = compileEntry.boardName,
           sourcePath = sourcePath.toString(),
           designPath = loaded.designPath?.toString(),
-          boardUrl = boardUrl(),
+          boardUrl = repoBoardUrl,
           errors = loaded.errors,
           selection = pendingSel,
         )
@@ -607,11 +857,9 @@ class PreviewHttpServer(
       return
     }
 
-    val board = compiled.board
-    val surface = board.surfaceSpec
     val directionFilter = req.direction?.takeIf { it.isNotBlank() }?.let { setOf(it.trim()) }
-    if (directionFilter != null && board.directions.none { it.name in directionFilter }) {
-      val known = board.directions.joinToString { it.name }
+    if (directionFilter != null && boardMeta.directions.none { it.name in directionFilter }) {
+      val known = boardMeta.directions.joinToString { it.name }
       sendJson(
         exchange,
         400,
@@ -623,8 +871,7 @@ class PreviewHttpServer(
       return
     }
     val screenFilter = req.screen?.takeIf { it.isNotBlank() }?.let { listOf(it.trim()) }
-    val targets =
-      ExploreRenderRunner.resolveTargets(board.directions, screenFilter, directionFilter)
+    val targets = resolveMetaTargets(boardMeta.directions, screenFilter, directionFilter)
     if (targets.isEmpty()) {
       sendJson(
         exchange,
@@ -639,9 +886,9 @@ class PreviewHttpServer(
     val views =
       if (!req.view.isNullOrBlank()) {
         val wanted = req.view.trim()
-        val match = surface.views.firstOrNull { it.name == wanted }
+        val match = boardMeta.views.firstOrNull { it.name == wanted }
         if (match == null) {
-          val known = surface.views.joinToString { it.name }
+          val known = boardMeta.views.joinToString { it.name }
           sendJson(
             exchange,
             400,
@@ -654,13 +901,12 @@ class PreviewHttpServer(
         }
         listOf(match)
       } else {
-        surface.views
+        boardMeta.views
       }
 
     val scoped = isScoped(req)
-    // Remember most recent agent scope as fallback board focus when no browser is open.
-    if (currentFocus == null) {
-      currentFocus =
+    if (state.currentFocus == null) {
+      state.currentFocus =
         FocusTarget(
           direction = targets.first().direction.name,
           screen = targets.first().screenId,
@@ -669,55 +915,127 @@ class PreviewHttpServer(
         )
     }
 
-    val densityScale = if (scoped) 1 else 2
     val renderStartNs = System.nanoTime()
-    val artifacts = mutableListOf<RenderArtifact>()
-    for (target in targets) {
-      val baseChecks = HashMap<String, ViewCheck>()
-      for (view in views) {
-        val art =
-          renderQueue
-            .submitRender(
-              entry = compileEntry,
-              direction = target.direction,
-              screenId = target.screenId,
-              prefix = target.prefix,
-              overlayId = null,
-              view = view,
-              densityScale = densityScale,
-              baseCheck = null,
-              priority = QueuePriority.AGENT,
-            )
-            .get()
-        baseChecks[view.name] = art.check
-        artifacts += art
-      }
-      if (!scoped) {
-        for (overlay in target.direction.overlaysFor(target.screenId)) {
-          for (view in views) {
-            val art =
-              renderQueue
-                .submitRender(
-                  entry = compileEntry,
-                  direction = target.direction,
-                  screenId = target.screenId,
-                  prefix = target.prefix,
-                  overlayId = overlay.id,
-                  view = view,
-                  densityScale = densityScale,
-                  baseCheck = baseChecks[view.name],
-                  priority = QueuePriority.AGENT,
+    val artifacts =
+      try {
+        if (effectiveBackend.supportsBatchCheck) {
+          val planned = buildList {
+            for (target in targets) {
+              for (view in views) {
+                add(
+                  CheckTargetSpec(
+                    target.direction.name,
+                    target.screenId,
+                    target.prefix,
+                    null,
+                    view,
+                  ),
                 )
-                .get()
-            artifacts += art
+              }
+              if (!scoped) {
+                for (overlay in target.direction.overlaysFor(target.screenId)) {
+                  for (view in views) {
+                    add(
+                      CheckTargetSpec(
+                        target.direction.name,
+                        target.screenId,
+                        target.prefix,
+                        overlay.id,
+                        view,
+                      ),
+                    )
+                  }
+                }
+              }
+            }
           }
+          awaitOrReplaced(
+            renderQueue.submitBatchCheck(compileEntry, planned, scoped, QueuePriority.AGENT),
+          )
+        } else {
+          val densityScale = if (scoped) 1 else 2
+          val out = mutableListOf<RenderArtifact>()
+          for (target in targets) {
+            val baseChecks = HashMap<String, ViewCheck>()
+            for (view in views) {
+              val art =
+                awaitOrReplaced(
+                  renderQueue.submitSingleRender(
+                    entry = compileEntry,
+                    direction = target.direction.name,
+                    screenId = target.screenId,
+                    prefix = target.prefix,
+                    overlayId = null,
+                    view = view,
+                    densityScale = densityScale,
+                    baseCheck = null,
+                    priority = QueuePriority.AGENT,
+                  ),
+                )
+              baseChecks[view.name] = art.check
+              out += art
+            }
+            if (!scoped) {
+              for (overlay in target.direction.overlaysFor(target.screenId)) {
+                for (view in views) {
+                  val art =
+                    awaitOrReplaced(
+                      renderQueue.submitSingleRender(
+                        entry = compileEntry,
+                        direction = target.direction.name,
+                        screenId = target.screenId,
+                        prefix = target.prefix,
+                        overlayId = overlay.id,
+                        view = view,
+                        densityScale = densityScale,
+                        baseCheck = baseChecks[view.name],
+                        priority = QueuePriority.AGENT,
+                      ),
+                    )
+                  out += art
+                }
+              }
+            }
+          }
+          out
         }
+      } catch (e: ServerReplacedException) {
+        sendReplacedCheckResponse(exchange, scoped, sourcePath, e.replacedByVersion)
+        return
+      } catch (e: SandboxWatchdogException) {
+        handleWatchdogTimeout(
+          Watchdog.ActiveJob(
+            contentHash = snapshot.contentHash,
+            scope = scopeKey,
+            budgetMs = warmBudgetMs,
+            startedAtMs = System.currentTimeMillis(),
+            repoRoot = state.repoRoot.toString(),
+          ),
+        )
+        val resp =
+          CheckResponse(
+            ok = false,
+            valid = false,
+            pass = false,
+            scoped = scoped,
+            contentHash = snapshot.contentHash,
+            sourcePath = sourcePath.toString(),
+            designPath = snapshot.designPath?.toString(),
+            boardUrl = repoBoardUrl,
+            error = "timeout",
+            tell = e.message ?: "Render timed out inside Android sandbox",
+          )
+        sendRawJson(
+          exchange,
+          200,
+          PreviewJson.compact.encodeToString(CheckResponse.serializer(), resp),
+        )
+        return
       }
-    }
     val totalRenderMs = (System.nanoTime() - renderStartNs) / 1_000_000L
 
     val allPass = artifacts.all { it.pass }
-    val selectedImages = selectImagesForResponse(artifacts, scoped, allPass, board.surface)
+    val selectedImages = selectImagesForResponse(artifacts, scoped, allPass, compileEntry.surface)
     val summaries = artifacts.map { art ->
       CheckRenderSummary(
         direction = art.direction,
@@ -731,27 +1049,40 @@ class PreviewHttpServer(
       )
     }
 
-    // Refresh board payload; on 2x full checks the board has fresh renders immediately.
-    // On scoped 1x checks, keep board status accurate and schedule focus-first 2x redraws for any
-    // open browser clients without blocking the agent response.
     val fileKey = sourcePath.toString()
+    val hasBoardListeners = sseClients.any { it.repoId == null || it.repoId == state.repoId }
     val needBackgroundBoard =
-      scoped && sseClients.isNotEmpty() && lastBoardQueuedHash[fileKey] != snapshot.contentHash
+      scoped && hasBoardListeners && state.lastBoardQueuedHash[fileKey] != snapshot.contentHash
     if (!scoped) {
-      lastBoardQueuedHash[fileKey] = snapshot.contentHash
+      state.lastBoardQueuedHash[fileKey] = snapshot.contentHash
     }
     val boardRenders =
-      if (densityScale == 2) artifacts
-      else renderQueue.completedBoardArtifacts(sourcePath).values.toList()
+      if (!scoped || effectiveBackend.supportsBatchCheck) artifacts
+      else renderQueue.completedBoardArtifacts(state.repoRoot, sourcePath).values.toList()
     val boardPayload =
-      buildBoardPayload(compileEntry, boardRenders, emptyList(), overallPass = allPass)
-    latestBoardPayload = boardPayload
-    if (!needBackgroundBoard) {
+      buildBoardPayload(
+        state.repoId,
+        compileEntry,
+        boardRenders,
+        emptyList(),
+        overallPass = allPass,
+      )
+    state.latestBoardPayload = boardPayload
+    if (!needBackgroundBoard && hasBoardListeners) {
       broadcastSse(
+        state.repoId,
         "board",
         PreviewJson.compact.encodeToString(BoardPayload.serializer(), boardPayload),
       )
     }
+
+    liveOwnerRepoId = state.repoId
+    effectiveBackend.updateLive(
+      entry = compileEntry,
+      direction = targets.first().direction.name,
+      screenId = targets.first().screenId,
+      overlayId = null,
+    )
 
     val pendingSelection = selectionStore.consumePending(sourcePath)
     val resp =
@@ -765,11 +1096,11 @@ class PreviewHttpServer(
         renderMs = totalRenderMs,
         compileCount = renderQueue.compileCount,
         cached = compileEntry.fromCache,
-        surface = if (board.surface == BoardSurface.Wear) "wear" else "phone",
-        boardName = board.name,
+        surface = if (compileEntry.surface == BoardSurface.Wear) "wear" else "phone",
+        boardName = compileEntry.boardName,
         sourcePath = sourcePath.toString(),
         designPath = loaded.designPath?.toString(),
-        boardUrl = boardUrl(),
+        boardUrl = repoBoardUrl,
         errors = emptyList(),
         renders = summaries,
         images = selectedImages,
@@ -778,20 +1109,42 @@ class PreviewHttpServer(
     sendRawJson(exchange, 200, PreviewJson.compact.encodeToString(CheckResponse.serializer(), resp))
     if (needBackgroundBoard) {
       broadcastSse(
+        state.repoId,
         "stale",
         PreviewJson.compact.encodeToString(
           StaleEventPayload.serializer(),
           StaleEventPayload(
+            repoId = state.repoId,
             contentHash = snapshot.contentHash,
             sourcePath = fileKey,
             views = buildStaleViewRefs(compileEntry),
           ),
         ),
       )
-      enqueueBoardRenders(compileEntry, overallPass = allPass)
+      enqueueBoardRenders(state, compileEntry, overallPass = allPass)
     } else {
       maybeScheduleRecycle()
     }
+  }
+
+  private fun sendReplacedCheckResponse(
+    exchange: HttpExchange,
+    scoped: Boolean,
+    sourcePath: Path,
+    replacedByVersion: String,
+  ) {
+    val msg = "replaced by v$replacedByVersion, rerun"
+    val resp =
+      CheckResponse(
+        ok = false,
+        valid = false,
+        pass = false,
+        scoped = scoped,
+        sourcePath = sourcePath.toString(),
+        error = "server_replaced",
+        tell = msg,
+      )
+    sendRawJson(exchange, 409, PreviewJson.compact.encodeToString(CheckResponse.serializer(), resp))
   }
 
   private fun handleTree(exchange: HttpExchange) {
@@ -808,6 +1161,10 @@ class PreviewHttpServer(
         return
       }
     val sourcePath = Path.of(req.path).toAbsolutePath().normalize()
+    val reqRepoRoot =
+      req.repoRoot?.takeIf { it.isNotBlank() }?.let(Path::of)
+        ?: ServerPaths.resolveRepoRoot(sourcePath)
+    val state = getOrCreateRepo(reqRepoRoot)
     if (!Files.isRegularFile(sourcePath)) {
       sendJson(
         exchange,
@@ -817,9 +1174,22 @@ class PreviewHttpServer(
       return
     }
     val snapshot = ContentHasher.snapshot(sourcePath)
-    val compileEntry = renderQueue.submitCompile(snapshot, QueuePriority.AGENT).get()
-    val compiled = compileEntry.loaded.compiled
-    if (compiled == null) {
+    val compileEntry =
+      try {
+        awaitOrReplaced(renderQueue.submitCompile(state.repoRoot, snapshot, QueuePriority.AGENT))
+      } catch (e: ServerReplacedException) {
+        sendJson(
+          exchange,
+          409,
+          ErrorEnvelope(
+            error = "server_replaced",
+            message = "replaced by v${e.replacedByVersion}, rerun",
+          ),
+        )
+        return
+      }
+    val meta = compileEntry.boardMeta
+    if (meta == null) {
       sendJson(
         exchange,
         422,
@@ -830,12 +1200,11 @@ class PreviewHttpServer(
       )
       return
     }
-    val board = compiled.board
     val dir =
       req.direction
         ?.takeIf { it.isNotBlank() }
         ?.let { name ->
-          board.directions.firstOrNull { it.name == name }
+          meta.directions.firstOrNull { it.name == name }
             ?: run {
               sendJson(
                 exchange,
@@ -844,9 +1213,9 @@ class PreviewHttpServer(
               )
               return
             }
-        } ?: board.directions.first()
+        } ?: meta.directions.first()
     val screenId = req.screen?.takeIf { it.isNotBlank() } ?: dir.startScreen
-    if (screenId !in dir.screenIds) {
+    if (screenId !in dir.screens) {
       sendJson(
         exchange,
         400,
@@ -866,12 +1235,11 @@ class PreviewHttpServer(
       )
       return
     }
-    val surface = board.surfaceSpec
     val view =
       req.view
         ?.takeIf { it.isNotBlank() }
         ?.let { name ->
-          surface.views.firstOrNull { it.name == name }
+          meta.views.firstOrNull { it.name == name }
             ?: run {
               sendJson(
                 exchange,
@@ -880,23 +1248,38 @@ class PreviewHttpServer(
               )
               return
             }
-        } ?: surface.views.first()
+        } ?: meta.views.first()
 
-    val prefix = if (board.directions.size == 1) screenId else "${dir.name}__$screenId"
+    val prefix = if (meta.directions.size == 1) screenId else "${dir.name}__$screenId"
     val artifact =
-      renderQueue
-        .submitRender(
-          entry = compileEntry,
-          direction = dir,
-          screenId = screenId,
-          prefix = prefix,
-          overlayId = overlayId,
-          view = view,
-          densityScale = 1,
-          baseCheck = null,
-          priority = QueuePriority.AGENT,
+      try {
+        awaitOrReplaced(
+          renderQueue.submitSingleRender(
+            entry = compileEntry,
+            direction = dir.name,
+            screenId = screenId,
+            prefix = prefix,
+            overlayId = overlayId,
+            view = view,
+            densityScale = if (effectiveBackend.supportsBatchCheck) 2 else 1,
+            baseCheck = null,
+            priority = QueuePriority.AGENT,
+            writeFiles = false,
+            frameFormat =
+              if (effectiveBackend.supportsBatchCheck) FrameFormat.NONE else FrameFormat.LZ4_RGBA,
+          ),
         )
-        .get()
+      } catch (e: ServerReplacedException) {
+        sendJson(
+          exchange,
+          409,
+          ErrorEnvelope(
+            error = "server_replaced",
+            message = "replaced by v${e.replacedByVersion}, rerun",
+          ),
+        )
+        return
+      }
     val tree = artifact.tree
     if (tree == null) {
       sendJson(
@@ -921,7 +1304,8 @@ class PreviewHttpServer(
   }
 
   private fun handleGetSelection(exchange: HttpExchange, query: Map<String, String>) {
-    val rawPath = query["path"] ?: activeSourcePath?.toString()
+    val activeRepo = repos[lastActiveRepoId] ?: repos[defaultRepoId]
+    val rawPath = query["path"] ?: activeRepo?.activeSourcePath?.toString()
     if (rawPath.isNullOrBlank()) {
       val resp =
         SelectionResponse(
@@ -978,8 +1362,11 @@ class PreviewHttpServer(
     exchange.responseBody.use { it.write(html) }
   }
 
-  private fun handleGetBoard(exchange: HttpExchange) {
-    val payload = latestBoardPayload
+  private fun handleGetBoard(exchange: HttpExchange, query: Map<String, String>) {
+    val repoId = query["repo"]?.takeIf { it.isNotBlank() }
+    val state =
+      if (repoId != null) repos[repoId] else (repos[lastActiveRepoId] ?: repos[defaultRepoId])
+    val payload = state?.latestBoardPayload
     if (payload == null) {
       sendRawJson(exchange, 200, "{}")
       return
@@ -991,23 +1378,30 @@ class PreviewHttpServer(
     )
   }
 
-  private fun handleSse(exchange: HttpExchange) {
+  private fun handleSse(exchange: HttpExchange, query: Map<String, String>) {
+    val requestedRepoId = query["repo"]?.takeIf { it.isNotBlank() }
     exchange.responseHeaders.set("Content-Type", "text/event-stream; charset=utf-8")
     exchange.responseHeaders.set("Cache-Control", "no-store")
     exchange.responseHeaders.set("Connection", "keep-alive")
     exchange.responseHeaders.set("X-Content-Type-Options", "nosniff")
     exchange.sendResponseHeaders(200, 0L)
     val out = exchange.responseBody
-    val client = SseClient(exchange, out)
+    val client = SseClient(requestedRepoId, exchange, out)
     try {
       out.write(": connected\n\n".toByteArray(Charsets.UTF_8))
-      latestBoardPayload?.let { payload ->
+      val state =
+        if (requestedRepoId != null) repos[requestedRepoId]
+        else (repos[lastActiveRepoId] ?: repos[defaultRepoId])
+      state?.latestBoardPayload?.let { payload ->
         val json = PreviewJson.compact.encodeToString(BoardPayload.serializer(), payload)
         out.write("event: board\ndata: $json\n\n".toByteArray(Charsets.UTF_8))
       }
       out.flush()
       sseClients.add(client)
-      activeSourcePath?.let { src -> handleFileChanged(src, activeDesignPath) }
+      val activeSrc = state?.activeSourcePath
+      if (state != null && activeSrc != null) {
+        handleFileChanged(state, activeSrc, state.activeDesignPath)
+      }
       while (!closed.get()) {
         try {
           Thread.sleep(20_000L)
@@ -1031,7 +1425,7 @@ class PreviewHttpServer(
     }
   }
 
-  private fun handleBoardRender(exchange: HttpExchange) {
+  private fun handleBoardRender(exchange: HttpExchange, query: Map<String, String>) {
     val body = readBodyString(exchange, MAX_BODY_BYTES) ?: return
     val req =
       try {
@@ -1044,10 +1438,18 @@ class PreviewHttpServer(
         )
         return
       }
-    val sourcePath = activeSourcePath
-    val entry = sourcePath?.let { renderQueue.latestCompiled(it) }
-    val compiled = entry?.loaded?.compiled
-    if (entry == null || compiled == null) {
+    val requestedRepo =
+      req.repo?.takeIf { it.isNotBlank() } ?: query["repo"]?.takeIf { it.isNotBlank() }
+    val state =
+      if (requestedRepo != null) repos[requestedRepo]
+      else (repos[lastActiveRepoId] ?: repos[defaultRepoId])
+    val sourcePath = state?.activeSourcePath
+    val entry =
+      if (state != null && sourcePath != null)
+        renderQueue.latestCompiled(state.repoRoot, sourcePath)
+      else null
+    val meta = entry?.boardMeta
+    if (state == null || entry == null || meta == null) {
       sendJson(
         exchange,
         409,
@@ -1058,12 +1460,11 @@ class PreviewHttpServer(
       )
       return
     }
-    val board = compiled.board
     val dir =
       req.direction
         ?.takeIf { it.isNotBlank() }
         ?.let { name ->
-          board.directions.firstOrNull { it.name == name }
+          meta.directions.firstOrNull { it.name == name }
             ?: run {
               sendJson(
                 exchange,
@@ -1072,9 +1473,9 @@ class PreviewHttpServer(
               )
               return
             }
-        } ?: board.directions.first()
+        } ?: meta.directions.first()
     val screenId = req.screen?.takeIf { it.isNotBlank() } ?: dir.startScreen
-    if (screenId !in dir.screenIds) {
+    if (screenId !in dir.screens) {
       sendJson(
         exchange,
         400,
@@ -1094,12 +1495,11 @@ class PreviewHttpServer(
       )
       return
     }
-    val surface = board.surfaceSpec
     val baseView =
       req.view
         ?.takeIf { it.isNotBlank() }
         ?.let { name ->
-          surface.views.firstOrNull { it.name == name }
+          meta.views.firstOrNull { it.name == name }
             ?: run {
               sendJson(
                 exchange,
@@ -1108,16 +1508,32 @@ class PreviewHttpServer(
               )
               return
             }
-        } ?: surface.views.first()
+        } ?: meta.views.first()
 
-    val hasThemeOverride = req.seed != null || req.variant != null || req.dark != null
-    val prefix = if (board.directions.size == 1) screenId else "${dir.name}__$screenId"
+    val variantOverride =
+      req.variant?.let { wire ->
+        PaletteVariant.fromWire(wire)
+          ?: run {
+            sendJson(
+              exchange,
+              400,
+              ErrorEnvelope(error = "invalid_variant", message = "Unknown variant '$wire'"),
+            )
+            return
+          }
+      }
+    val fontScale = (req.fontScale ?: 1f).coerceIn(0.5f, 2.5f)
+    val hasThemeOverride =
+      req.seed != null || req.variant != null || req.dark != null || fontScale != 1f
+    val prefix = if (meta.directions.size == 1) screenId else "${dir.name}__$screenId"
+    val cardFormat =
+      if (effectiveBackend.supportsBatchCheck) FrameFormat.WEBP_LOSSLESS else FrameFormat.LZ4_RGBA
     val artifact =
       if (!hasThemeOverride) {
         renderQueue
-          .submitRender(
+          .submitSingleRender(
             entry = entry,
-            direction = dir,
+            direction = dir.name,
             screenId = screenId,
             prefix = prefix,
             overlayId = overlayId,
@@ -1125,44 +1541,52 @@ class PreviewHttpServer(
             densityScale = 2,
             baseCheck = null,
             priority = QueuePriority.BOARD_FOCUS,
+            writeFiles = !effectiveBackend.supportsBatchCheck,
+            frameFormat = cardFormat,
           )
           .get()
       } else {
         val effectiveView =
-          if (req.dark != null && board.surface == BoardSurface.Phone) {
+          if (req.dark != null && entry.surface == BoardSurface.Phone) {
             baseView.copy(dark = req.dark)
           } else {
             baseView
           }
-        val variantOverride =
-          req.variant?.let { wire ->
-            PaletteVariant.fromWire(wire)
-              ?: run {
-                sendJson(
-                  exchange,
-                  400,
-                  ErrorEnvelope(error = "invalid_variant", message = "Unknown variant '$wire'"),
-                )
-                return
-              }
-          }
         val system =
-          board.resolveDesignSystem(
-            designMd = entry.loaded.designTheme,
+          DesignSystemResolver.resolveWithOverrides(
+            entry = entry,
             seedOverride = req.seed,
             variantOverride = variantOverride,
           )
         renderQueue.renderOverride(
           entry = entry,
-          direction = dir,
+          direction = dir.name,
           screenId = screenId,
           prefix = prefix,
           overlayId = overlayId,
           view = effectiveView,
           designSystem = system,
           densityScale = 2,
+          frameFormat = cardFormat,
+          fontScale = fontScale,
+          seedOverride = req.seed,
+          variantOverride = variantOverride?.wire,
+          darkOverride = if (entry.surface == BoardSurface.Phone) req.dark else null,
         )
       }
+
+    liveOwnerRepoId = state.repoId
+    effectiveBackend.updateLive(
+      entry = entry,
+      direction = dir.name,
+      screenId = screenId,
+      overlayId = overlayId,
+      darkOverride = if (entry.surface == BoardSurface.Phone) req.dark else null,
+      seedOverride = req.seed,
+      variantOverride = variantOverride?.wire,
+      fontScale = fontScale,
+    )
+
     val response = toBoardRenderResponse(artifact, entry.contentHash)
     sendRawJson(
       exchange,
@@ -1171,7 +1595,7 @@ class PreviewHttpServer(
     )
   }
 
-  private fun handleBoardFocus(exchange: HttpExchange) {
+  private fun handleBoardFocus(exchange: HttpExchange, query: Map<String, String>) {
     val body = readBodyString(exchange, MAX_BODY_BYTES) ?: return
     val req =
       try {
@@ -1184,17 +1608,37 @@ class PreviewHttpServer(
         )
         return
       }
-    currentFocus =
+    val requestedRepo =
+      req.repo?.takeIf { it.isNotBlank() } ?: query["repo"]?.takeIf { it.isNotBlank() }
+    val state =
+      when {
+        requestedRepo != null -> repos[requestedRepo]
+        !req.path.isNullOrBlank() -> resolveRepoForSource(Path.of(req.path))
+        else -> repos[lastActiveRepoId] ?: repos[defaultRepoId]
+      } ?: getOrCreateRepo(defaultRepoRoot)
+
+    state.currentFocus =
       FocusTarget(
         direction = req.direction,
         screen = req.screen?.takeIf { it.isNotBlank() },
         overlay = req.overlay?.takeIf { it.isNotBlank() },
         view = req.view,
       )
+    liveOwnerRepoId = state.repoId
+    state.activeSourcePath?.let { src ->
+      renderQueue.latestCompiled(state.repoRoot, src)?.let { entry ->
+        effectiveBackend.updateLive(
+          entry = entry,
+          direction = req.direction,
+          screenId = req.screen?.takeIf { it.isNotBlank() },
+          overlayId = req.overlay?.takeIf { it.isNotBlank() },
+        )
+      }
+    }
     sendRawJson(exchange, 200, """{"ok":true}""")
   }
 
-  private fun handleBoardSelection(exchange: HttpExchange) {
+  private fun handleBoardSelection(exchange: HttpExchange, query: Map<String, String>) {
     val body = readBodyString(exchange, MAX_BODY_BYTES) ?: return
     val req =
       try {
@@ -1207,9 +1651,14 @@ class PreviewHttpServer(
         )
         return
       }
+    val requestedRepo =
+      req.repo?.takeIf { it.isNotBlank() } ?: query["repo"]?.takeIf { it.isNotBlank() }
+    val state =
+      if (requestedRepo != null) repos[requestedRepo]
+      else (repos[lastActiveRepoId] ?: repos[defaultRepoId])
     val targetPath =
       req.path?.takeIf { it.isNotBlank() }?.let(Path::of)
-        ?: activeSourcePath
+        ?: state?.activeSourcePath
         ?: run {
           sendJson(
             exchange,
@@ -1246,10 +1695,12 @@ class PreviewHttpServer(
   }
 
   private fun handleViewRendered(
+    repoRoot: Path,
     sourcePath: Path,
     contentHash: String,
     artifact: RenderArtifact,
   ) {
+    val repoId = ServerPaths.repoHash(repoRoot.toAbsolutePath().normalize())
     val tree = artifact.tree
     if (tree != null && Files.isRegularFile(sourcePath)) {
       val lines =
@@ -1269,9 +1720,15 @@ class PreviewHttpServer(
         sourceLines = lines,
       )
     }
-    if (artifact.densityScale == 2 && sseClients.isNotEmpty()) {
+    if (
+      artifact.densityScale == 2 &&
+        sseClients.any { it.repoId == null || it.repoId == repoId } &&
+        artifact.pngBytes != null &&
+        artifact.pngBytes.isNotEmpty()
+    ) {
       val resp = toBoardRenderResponse(artifact, contentHash)
       broadcastSse(
+        repoId,
         "view_updated",
         PreviewJson.compact.encodeToString(BoardRenderResponse.serializer(), resp),
       )
@@ -1280,12 +1737,14 @@ class PreviewHttpServer(
 
   private fun handleWatchdogTimeout(job: Watchdog.ActiveJob) {
     val now = System.currentTimeMillis()
+    val jobRepoRoot = job.repoRoot ?: defaultRepoRoot.toString()
     val entry =
       TimeoutEntry(
         contentHash = job.contentHash,
         scope = job.scope,
         recordedAt = now,
         reason = "Exceeded ${job.budgetMs} ms budget",
+        repoRoot = jobRepoRoot,
       )
     ServerPaths.updateRecord(recordPath) { rec ->
       val updatedTimeouts =
@@ -1296,10 +1755,12 @@ class PreviewHttpServer(
         }
       rec.copy(timeouts = updatedTimeouts, haltedAt = now)
     }
+    val state = repos[ServerPaths.repoHash(Path.of(jobRepoRoot))] ?: repos[defaultRepoId]
     val restartCmd =
-      activeSourcePath?.let { "android-design-preview open $it" }
+      state?.activeSourcePath?.let { "android-design-preview open $it" }
         ?: "android-design-preview open <file>"
     broadcastSse(
+      null,
       "halted",
       PreviewJson.compact.encodeToString(
         HaltedEventPayload.serializer(),
@@ -1308,11 +1769,15 @@ class PreviewHttpServer(
     )
   }
 
-  private fun clearTimeoutsIfHashChanged(newHash: String) {
+  private fun clearTimeoutsIfHashChanged(repoRoot: Path, newHash: String) {
+    val repoStr = repoRoot.toAbsolutePath().normalize().toString()
     ServerPaths.updateRecord(recordPath) { rec ->
       if (rec.timeouts.isEmpty()) rec
       else {
-        val kept = rec.timeouts.filter { it.contentHash == newHash }
+        val kept =
+          rec.timeouts.filter {
+            (it.repoRoot != null && it.repoRoot != repoStr) || it.contentHash == newHash
+          }
         if (kept.size == rec.timeouts.size) rec else rec.copy(timeouts = kept, haltedAt = null)
       }
     }
@@ -1320,18 +1785,21 @@ class PreviewHttpServer(
 
   private fun maybeScheduleRecycle() {
     if (
-      renderQueue.compileCount >= maxCompilesBeforeRecycle &&
+      renderQueue.compileCount >= effectiveMaxCompiles &&
         recycleScheduled.compareAndSet(false, true)
     ) {
-      broadcastSse("recycling", """{"reason":"compile_limit"}""")
+      broadcastSse(null, "recycling", """{"reason":"compile_limit"}""")
       housekeepExecutor.schedule({ stop(triggerExit = true) }, 50, TimeUnit.MILLISECONDS)
     }
   }
 
-  private fun broadcastSse(event: String, dataJson: String) {
+  private fun broadcastSse(targetRepoId: String?, event: String, dataJson: String) {
     if (sseClients.isEmpty()) return
     val frame = "event: $event\ndata: $dataJson\n\n".toByteArray(Charsets.UTF_8)
     for (client in sseClients) {
+      if (targetRepoId != null && client.repoId != null && client.repoId != targetRepoId) {
+        continue
+      }
       try {
         synchronized(client.out) {
           client.out.write(frame)
@@ -1341,6 +1809,36 @@ class PreviewHttpServer(
         sseClients.remove(client)
       }
     }
+  }
+
+  private fun <T> awaitOrReplaced(future: CompletableFuture<T>): T {
+    CompletableFuture.anyOf(future, replacementSignal).get()
+    if (replacementSignal.isDone) {
+      throw ServerReplacedException(replacementSignal.getNow("new"))
+    }
+    return try {
+      future.get()
+    } catch (e: ExecutionException) {
+      when (val cause = e.cause) {
+        is ServerReplacedException -> throw cause
+        is RuntimeException -> throw cause
+        is Error -> throw cause
+        else -> throw e
+      }
+    }
+  }
+
+  private fun getOrCreateRepo(repoRoot: Path): RepoState {
+    val norm = repoRoot.toAbsolutePath().normalize()
+    val rid = ServerPaths.repoHash(norm)
+    return repos.computeIfAbsent(rid) { RepoState(rid, norm) }
+  }
+
+  private fun resolveRepoForSource(sourcePath: Path): RepoState {
+    val norm = sourcePath.toAbsolutePath().normalize()
+    val matched = repos.values.firstOrNull { it.activeSourcePath == norm }
+    if (matched != null) return matched
+    return getOrCreateRepo(ServerPaths.resolveRepoRoot(norm))
   }
 
   private fun requireClientSecret(exchange: HttpExchange): Boolean {
@@ -1414,78 +1912,91 @@ class PreviewHttpServer(
     exchange.responseBody.use { it.write(bytes) }
   }
 
-  private data class BoardTarget(
-    val direction: bot.charlies.androiddesign.preview.kit.DirectionSpec,
+  private data class MetaScreenTarget(
+    val direction: DirectionMeta,
     val screenId: String,
     val prefix: String,
-    val overlayId: String?,
-    val view: ViewSpec,
   )
 
-  private fun enumerateBoardTargets(
-    compiled: bot.charlies.androiddesign.preview.feature.preview.sandbox.CompileResult.Compiled,
-  ): List<BoardTarget> {
-    val surface = compiled.board.surfaceSpec
-    val targets =
-      ExploreRenderRunner.resolveTargets(compiled.board.directions, null, directionFilter = null)
+  private fun DirectionMeta.overlaysFor(screenId: String): List<OverlayMeta> = overlays.filter {
+    (it.screen ?: startScreen) == screenId
+  }
+
+  private fun resolveMetaTargets(
+    directions: List<DirectionMeta>,
+    screenFilter: List<String>?,
+    directionFilter: Set<String>?,
+  ): List<MetaScreenTarget> {
+    val activeDirections =
+      if (directionFilter.isNullOrEmpty()) directions
+      else directions.filter { it.name in directionFilter }
+    val singleDirection = activeDirections.size == 1 && directions.size == 1
+    val filterSet = screenFilter?.toSet()
+    return buildList {
+      for (dir in activeDirections) {
+        for (screenId in dir.screens) {
+          val sanitizedDir =
+            dir.name.trim().replace(Regex("""[^A-Za-z0-9._-]+"""), "_").ifBlank { "direction" }
+          val prefix = if (singleDirection) screenId else "${sanitizedDir}__$screenId"
+          val slashName = "${dir.name}/$screenId"
+          if (
+            filterSet == null ||
+              screenId in filterSet ||
+              prefix in filterSet ||
+              slashName in filterSet
+          ) {
+            add(MetaScreenTarget(dir, screenId, prefix))
+          }
+        }
+      }
+    }
+  }
+
+  private fun enumerateBoardTargets(meta: BoardMeta): List<CheckTargetSpec> {
+    val targets = resolveMetaTargets(meta.directions, null, directionFilter = null)
     return buildList {
       for (t in targets) {
-        for (view in surface.views) {
-          add(BoardTarget(t.direction, t.screenId, t.prefix, null, view))
+        for (view in meta.views) {
+          add(CheckTargetSpec(t.direction.name, t.screenId, t.prefix, null, view))
         }
       }
     }
   }
 
   private fun buildStaleViewRefs(entry: CompileEntry?): List<BoardViewRef> {
-    val compiled = entry?.loaded?.compiled ?: return emptyList()
-    return enumerateBoardTargets(compiled).map {
-      BoardViewRef(it.direction.name, it.screenId, it.overlayId, it.view.name)
+    val meta = entry?.boardMeta ?: return emptyList()
+    return enumerateBoardTargets(meta).map {
+      BoardViewRef(it.direction, it.screenId, it.overlayId, it.view.name)
     }
   }
 
   private fun buildBoardPayload(
+    repoId: String,
     entry: CompileEntry,
     artifacts: List<RenderArtifact>,
     staleViews: List<BoardViewRef>,
     overallPass: Boolean? = null,
   ): BoardPayload {
     val loaded = entry.loaded
-    val compiled = loaded.compiled
-    val board = compiled?.board
-    val meta = board?.let { b ->
-      BoardMeta(
-        directions =
-          b.directions.map { dir ->
-            DirectionMeta(
-              name = dir.name,
-              surface = if (dir.surface == BoardSurface.Wear) "wear" else "phone",
-              startScreen = dir.startScreen,
-              screens = dir.screenIds,
-              overlays = dir.overlays.map { ov -> OverlayMeta(ov.id, ov.screen) },
-            )
-          },
-        views = b.surfaceSpec.views,
-      )
-    }
     val system = loaded.designSystem
-    val valid = compiled != null && loaded.errors.isEmpty()
+    val valid = entry.boardMeta != null && loaded.errors.isEmpty()
     val pass = valid && (overallPass ?: (artifacts.isNotEmpty() && artifacts.all { it.pass }))
     return BoardPayload(
+      repoId = repoId,
       valid = valid,
       pass = pass,
       contentHash = entry.contentHash,
       compileMs = loaded.compileMs,
       renderMs = artifacts.sumOf { it.renderMs },
       compileCount = renderQueue.compileCount,
-      surface = if (board?.surface == BoardSurface.Wear) "wear" else "phone",
-      boardName = board?.name,
+      surface = if (entry.surface == BoardSurface.Wear) "wear" else "phone",
+      boardName = entry.boardName,
       sourcePath = entry.sourcePath.toString(),
       sourceFile = entry.sourcePath.fileName.toString(),
       designPath = loaded.designPath?.toString(),
       theme = ReportTheme(system.seed, system.variant.wire, system.contrast),
       errors = loaded.errors,
-      boardMeta = meta,
+      boardMeta = entry.boardMeta,
       renders = artifacts.map { toBoardRenderResponse(it, entry.contentHash) },
       staleViews = staleViews,
       updatedAt = System.currentTimeMillis(),
@@ -1511,6 +2022,7 @@ class PreviewHttpServer(
       tree = artifact.tree,
       pngBase64 = artifact.pngBytes?.takeIf { it.isNotEmpty() }?.let(b64::encodeToString),
       endPngBase64 = artifact.endPngBytes?.takeIf { it.isNotEmpty() }?.let(b64::encodeToString),
+      imageMime = artifact.imageMime,
       failures = artifact.entry.failures,
     )
   }
@@ -1546,6 +2058,7 @@ class PreviewHttpServer(
     const val MAX_COMPILES_BEFORE_RECYCLE = 25
     const val DEFAULT_IDLE_TIMEOUT_MS = 15 * 60 * 1000L
     private const val MAX_BODY_BYTES = 64 * 1024
+    private const val REPLACEMENT_DRAIN_WAIT_MS = 450L
 
     fun constantTimeEquals(a: String, b: String): Boolean {
       if (a.isEmpty() || b.isEmpty()) return false
@@ -1554,7 +2067,7 @@ class PreviewHttpServer(
 
     /**
      * Image output policy from `visual-design-exploration-v5.md`:
-     * - Scoped checks always return their 1x PNG path(s), whether findings pass or fail.
+     * - Scoped checks always return their PNG path(s), whether findings pass or fail.
      * - Failing full checks return at most 2 failing view paths, deduplicating identical PNGs.
      * - Passing full checks return `light` and `desktop` (`watch` and `watch-large` on Wear).
      */

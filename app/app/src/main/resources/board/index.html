@@ -288,6 +288,17 @@
           <select id="ctrl-view"></select>
         </div>
         <div class="field">
+          <label for="ctrl-font-scale">Font Scale</label>
+          <select id="ctrl-font-scale">
+            <option value="0.85">0.85x</option>
+            <option value="1" selected>1.0x</option>
+            <option value="1.15">1.15x</option>
+            <option value="1.3">1.3x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2.0x</option>
+          </select>
+        </div>
+        <div class="field">
           <label>Inspector</label>
           <div class="field-row">
             <button id="btn-toggle-boxes" type="button" class="active">Boxes</button>
@@ -340,7 +351,9 @@
       { value: "rainbow", label: "Rainbow" },
       { value: "fruit-salad", label: "Fruit Salad" }
     ];
-    const VIEW_TOKEN = new URLSearchParams(window.location.search).get("view") || "";
+    const QUERY_PARAMS = new URLSearchParams(window.location.search);
+    const VIEW_TOKEN = QUERY_PARAMS.get("view") || "";
+    const REPO_ID = QUERY_PARAMS.get("repo") || "";
 
     const state = {
       board: null,
@@ -352,6 +365,7 @@
       dark: null,
       seed: null,
       variant: null,
+      fontScale: 1,
       showBoxes: true,
       showEndFrame: false,
       stageRender: null,
@@ -382,6 +396,7 @@
       ctrlScreen: document.getElementById("ctrl-screen"),
       ctrlOverlay: document.getElementById("ctrl-overlay"),
       ctrlView: document.getElementById("ctrl-view"),
+      ctrlFontScale: document.getElementById("ctrl-font-scale"),
       btnToggleBoxes: document.getElementById("btn-toggle-boxes"),
       btnScrollFrame: document.getElementById("btn-scroll-frame"),
       frameBox: document.getElementById("frame-box"),
@@ -426,6 +441,7 @@
       if (!state.board?.sourcePath) return;
       const defaultView = state.board.surface === "wear" ? "watch" : "light";
       apiPost("/api/board/focus", {
+        ...(REPO_ID ? { repo: REPO_ID } : {}),
         path: state.board.sourcePath,
         direction: state.direction || state.board.boardMeta?.directions?.[0]?.name || "",
         screen: state.screen || currentDirectionMeta()?.startScreen || "",
@@ -465,6 +481,7 @@
       if (state.board?.sourcePath && node.sourceLine) {
         const chain = buildCallChain(node, render?.tree?.nodes || []);
         apiPost("/api/board/selection", {
+          ...(REPO_ID ? { repo: REPO_ID } : {}),
           path: state.board.sourcePath,
           file: node.sourceFile || state.board.sourceFile || "",
           line: node.sourceLine,
@@ -661,17 +678,19 @@
         img.alt = dir.name + " preview";
         preview.appendChild(img);
 
+        const imgSrc = (r) => "data:" + (r.imageMime || "image/png") + ";base64," + r.pngBase64;
         if (cached?.pngBase64) {
-          img.src = "data:image/png;base64," + cached.pngBase64;
+          img.src = imgSrc(cached);
         } else {
           apiPost("/api/board/render", {
+            ...(REPO_ID ? { repo: REPO_ID } : {}),
             direction: dir.name,
             screen: dir.startScreen,
             view: defaultView,
           }).then((res) => {
             state.viewsByKey.set(cardKey, res);
             state.staleKeys.delete(cardKey);
-            img.src = "data:image/png;base64," + res.pngBase64;
+            if (res.pngBase64) img.src = imgSrc(res);
             card.classList.remove("is-stale");
           }).catch(() => {});
         }
@@ -843,7 +862,8 @@
       state.stageRender = render;
       els.frameBox.classList.remove("is-stale");
       const b64 = state.showEndFrame && render.endPngBase64 ? render.endPngBase64 : render.pngBase64;
-      if (b64) els.stageImg.src = "data:image/png;base64," + b64;
+      const mime = render.imageMime || "image/png";
+      if (b64) els.stageImg.src = "data:" + mime + ";base64," + b64;
       els.btnScrollFrame.classList.toggle("hidden", !render.endPngBase64);
       els.btnScrollFrame.textContent = state.showEndFrame ? "Scrolled End" : "Top Frame";
       els.renderMeta.textContent = render.view + " | " + render.renderMs + " ms";
@@ -855,6 +875,7 @@
       if (!state.board?.valid || !state.direction) return;
       try {
         const params = {
+          ...(REPO_ID ? { repo: REPO_ID } : {}),
           direction: state.direction,
           screen: state.screen,
           ...(state.overlay ? { overlay: state.overlay } : {}),
@@ -862,6 +883,7 @@
           ...(state.seed ? { seed: state.seed } : {}),
           ...(state.variant ? { variant: state.variant } : {}),
           ...(state.dark !== null && state.board.surface !== "wear" ? { dark: state.dark } : {}),
+          ...(state.fontScale !== 1 ? { fontScale: state.fontScale } : {}),
         };
         const render = await apiPost("/api/board/render", params);
         applyStageRender(render);
@@ -926,7 +948,7 @@
         render.screen === state.screen &&
         (render.overlay || "") === (state.overlay || "") &&
         render.view === state.view &&
-        !state.seed && !state.variant && state.dark === null;
+        !state.seed && !state.variant && state.dark === null && state.fontScale === 1;
       if (matchesStage) {
         applyStageRender(render);
       }
@@ -971,7 +993,13 @@
         state.seed = null;
         state.variant = null;
         state.dark = null;
+        state.fontScale = 1;
+        els.ctrlFontScale.value = "1";
         syncControlsFromBoard();
+        refreshStageRender();
+      };
+      els.ctrlFontScale.onchange = () => {
+        state.fontScale = parseFloat(els.ctrlFontScale.value) || 1;
         refreshStageRender();
       };
       els.ctrlVariant.onchange = () => {
@@ -1004,8 +1032,10 @@
         if (state.stageRender) applyStageRender(state.stageRender);
       };
 
+      const repoQuery = REPO_ID ? "?repo=" + encodeURIComponent(REPO_ID) : "";
+      const eventsQuery = "?view=" + encodeURIComponent(VIEW_TOKEN) + (REPO_ID ? "&repo=" + encodeURIComponent(REPO_ID) : "");
       try {
-        const res = await fetch("/api/board", {
+        const res = await fetch("/api/board" + repoQuery, {
           headers: { "X-View-Token": VIEW_TOKEN },
         });
         if (res.ok) {
@@ -1017,7 +1047,7 @@
         els.errorBanner.classList.remove("hidden");
       }
 
-      const events = new EventSource("/api/events?view=" + encodeURIComponent(VIEW_TOKEN));
+      const events = new EventSource("/api/events" + eventsQuery);
       events.onopen = () => {
         els.livePill.textContent = "SSE live";
         els.livePill.className = "pill pass";

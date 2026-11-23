@@ -21,6 +21,26 @@ data class StatusResponse(
   val repoRoot: String,
   val boardUrl: String,
   val activeFile: String? = null,
+  val backend: String = "skiko",
+  val runtimeHash: String? = null,
+  val deviceSerial: String? = null,
+  val adbForwardPort: Int? = null,
+  val activeRepos: List<String> = emptyList(),
+)
+
+@Serializable
+data class StopRequest(
+  val replacedByVersion: String? = null,
+  val reason: String? = null,
+)
+
+@Serializable
+data class LiveFocusRequest(
+  val path: String? = null,
+  val repoRoot: String? = null,
+  val direction: String? = null,
+  val screen: String? = null,
+  val overlay: String? = null,
 )
 
 @Serializable
@@ -30,6 +50,7 @@ data class CheckRequest(
   val direction: String? = null,
   val screen: String? = null,
   val view: String? = null,
+  val repoRoot: String? = null,
 )
 
 @Serializable
@@ -90,6 +111,7 @@ data class TreeRequest(
   val overlay: String? = null,
   val view: String? = null,
   val maxDepth: Int? = null,
+  val repoRoot: String? = null,
 )
 
 @Serializable
@@ -117,6 +139,7 @@ data class SelectionResponse(
 
 @Serializable
 data class BoardFocusRequest(
+  val repo: String? = null,
   val path: String? = null,
   val direction: String,
   val screen: String? = null,
@@ -126,6 +149,7 @@ data class BoardFocusRequest(
 
 @Serializable
 data class BoardSelectionRequest(
+  val repo: String? = null,
   val path: String? = null,
   val file: String,
   val line: Int,
@@ -141,6 +165,7 @@ data class BoardSelectionRequest(
 
 @Serializable
 data class BoardRenderRequest(
+  val repo: String? = null,
   val direction: String? = null,
   val screen: String? = null,
   val overlay: String? = null,
@@ -148,6 +173,7 @@ data class BoardRenderRequest(
   val seed: String? = null,
   val variant: String? = null,
   val dark: Boolean? = null,
+  val fontScale: Float? = null,
 )
 
 @Serializable
@@ -165,6 +191,7 @@ data class BoardRenderResponse(
   val tree: LayoutTree? = null,
   val pngBase64: String? = null,
   val endPngBase64: String? = null,
+  val imageMime: String? = null,
   val failures: List<String> = emptyList(),
 )
 
@@ -195,6 +222,7 @@ data class BoardMeta(
 
 @Serializable
 data class BoardPayload(
+  val repoId: String? = null,
   val valid: Boolean,
   val pass: Boolean,
   val contentHash: String,
@@ -216,6 +244,7 @@ data class BoardPayload(
 
 @Serializable
 data class StaleEventPayload(
+  val repoId: String? = null,
   val contentHash: String,
   val sourcePath: String,
   val views: List<BoardViewRef> = emptyList(),

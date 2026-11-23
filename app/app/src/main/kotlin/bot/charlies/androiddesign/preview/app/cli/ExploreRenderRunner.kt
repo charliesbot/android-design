@@ -1,8 +1,5 @@
 package bot.charlies.androiddesign.preview.app.cli
 
-import bot.charlies.androiddesign.preview.data.DesignMdLocator
-import bot.charlies.androiddesign.preview.data.DesignMdParse
-import bot.charlies.androiddesign.preview.data.DesignMdParser
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.domain.layout.LayoutSummary
@@ -78,7 +75,7 @@ object ExploreRenderRunner {
 
   fun loadAndCompile(sourcePath: Path, explicitDesign: Path?): LoadedExploration {
     val normalized = sourcePath.toAbsolutePath().normalize()
-    val (designPath, designTheme, designErrors) = loadDesignMd(normalized, explicitDesign)
+    val (designPath, designTheme, designErrors) = DesignMdLoader.load(normalized, explicitDesign)
     if (designErrors.isNotEmpty()) {
       return LoadedExploration(
         sourcePath = normalized,
@@ -114,49 +111,6 @@ object ExploreRenderRunner {
           errors = emptyList(),
         )
       }
-    }
-  }
-
-  private data class DesignLoadResult(
-    val path: Path?,
-    val theme: ThemeOverride?,
-    val errors: List<ValidationError>,
-  )
-
-  private fun loadDesignMd(sourcePath: Path, explicitDesign: Path?): DesignLoadResult {
-    val designPath =
-      if (explicitDesign != null) {
-        val norm = explicitDesign.toAbsolutePath().normalize()
-        if (!Files.isRegularFile(norm)) {
-          return DesignLoadResult(
-            norm,
-            null,
-            listOf(ValidationError(norm.toString(), "no such file")),
-          )
-        }
-        norm
-      } else {
-        DesignMdLocator.find(sourcePath)
-      }
-    if (designPath == null) return DesignLoadResult(null, null, emptyList())
-    val text =
-      try {
-        Files.readString(designPath)
-      } catch (e: Exception) {
-        return DesignLoadResult(
-          designPath,
-          null,
-          listOf(ValidationError(designPath.toString(), e.message ?: "cannot read DESIGN.md")),
-        )
-      }
-    return when (val parsed = DesignMdParser.parse(text)) {
-      is DesignMdParse.Parsed -> DesignLoadResult(designPath, parsed.theme, emptyList())
-      is DesignMdParse.Failed ->
-        DesignLoadResult(
-          designPath,
-          null,
-          listOf(ValidationError(designPath.toString(), parsed.message)),
-        )
     }
   }
 

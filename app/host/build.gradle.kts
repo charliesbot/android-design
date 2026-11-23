@@ -1,4 +1,5 @@
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import java.util.Properties
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
@@ -182,6 +183,7 @@ val exportCompileBundle =
     val outBundleJar = layout.buildDirectory.file("bootstrap/androidx-compile-bundle.jar")
     val outHostApk = layout.buildDirectory.file("bootstrap/host-preview.apk")
     val outMetaFile = layout.buildDirectory.file("bootstrap/bootstrap-meta.properties")
+    val outPathsFile = layout.buildDirectory.file("bootstrap/bootstrap-paths.txt")
 
     inputs.file(builtApk).withPropertyName("builtPreviewReleaseApk")
     inputs
@@ -202,9 +204,10 @@ val exportCompileBundle =
     outputs.file(outBundleJar)
     outputs.file(outHostApk)
     outputs.file(outMetaFile)
+    outputs.file(outPathsFile)
 
     doLast {
-      val dir = outDir.get().asFile.apply { mkdirs() }
+      outDir.get().asFile.mkdirs()
       val bundleFile = outBundleJar.get().asFile
       val copiedApk = outHostApk.get().asFile
       val sourceApk = builtApk.get().asFile
@@ -311,21 +314,46 @@ val exportCompileBundle =
           ?.firstOrNull { it.isFile }
           ?.absolutePath ?: ""
       val composePluginJar = composePluginFiles.files.singleOrNull()?.absolutePath ?: ""
+      val apkDigest = MessageDigest.getInstance("SHA-256")
+      copiedApk.inputStream().buffered().use { input ->
+        val buf = ByteArray(8192)
+        while (true) {
+          val n = input.read(buf)
+          if (n <= 0) break
+          apkDigest.update(buf, 0, n)
+        }
+      }
+      val apkSha256 = apkDigest.digest().joinToString("") { "%02x".format(it) }
 
       val props = Properties()
       props.setProperty("androidJar", androidJar)
       props.setProperty("d8Jar", d8Jar)
       props.setProperty("bundleJar", bundleFile.absolutePath)
       props.setProperty("apkPath", copiedApk.absolutePath)
+      props.setProperty("apkSha256", apkSha256)
       props.setProperty("composeCompilerPluginJar", composePluginJar)
       props.setProperty("jarCount", jarCount.toString())
       props.setProperty("classEntries", classEntries.toString())
       props.setProperty("kotlinModuleEntries", kotlinModuleEntries.toString())
       props.setProperty("kotlinBuiltinEntries", kotlinBuiltinEntries.toString())
       props.setProperty("bundleSizeBytes", bundleFile.length().toString())
-      dir.resolve("bootstrap-meta.properties").bufferedWriter().use { writer ->
+      outMetaFile.get().asFile.bufferedWriter().use { writer ->
         props.store(writer, "android-design-preview bootstrap metadata")
       }
+      outPathsFile
+        .get()
+        .asFile
+        .writeText(
+          listOf(
+              androidJar,
+              d8Jar,
+              bundleFile.absolutePath,
+              copiedApk.absolutePath,
+              composePluginJar,
+            )
+            .filter { it.isNotEmpty() }
+            .joinToString("\n") + "\n",
+        )
 
       logger.lifecycle(
         "Exported compile bundle: ${bundleFile.length() / (1024 * 1024)} MiB from $jarCount jars ($classEntries classes, $kotlinModuleEntries .kotlin_module, $kotlinBuiltinEntries .kotlin_builtins)",

@@ -17,23 +17,29 @@ import bot.charlies.androiddesign.preview.model.DeviceHasAssetsResponse
 import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
 import bot.charlies.androiddesign.preview.model.DeviceOp
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
+import bot.charlies.androiddesign.preview.model.DevicePreloadResponse
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
-import java.io.EOFException
+import java.io.IOException
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 class RenderForegroundService : Service() {
   private val workerExecutor = Executors.newSingleThreadExecutor()
+  private val clientExecutor = Executors.newCachedThreadPool { runnable ->
+    Thread(runnable, "adp-tcp-client").apply { isDaemon = true }
+  }
   private val watchdogExecutor = Executors.newSingleThreadScheduledExecutor()
+  private val activeSockets = ConcurrentHashMap.newKeySet<Socket>()
   private var serverSocket: ServerSocket? = null
   @Volatile private var running = true
   private lateinit var renderer: VirtualClockComposeRenderer
@@ -53,7 +59,10 @@ class RenderForegroundService : Service() {
   override fun onDestroy() {
     running = false
     runCatching { serverSocket?.close() }
+    activeSockets.forEach { sock -> runCatching { sock.close() } }
+    activeSockets.clear()
     watchdogExecutor.shutdownNow()
+    clientExecutor.shutdownNow()
     workerExecutor.shutdownNow()
     super.onDestroy()
   }
@@ -93,7 +102,8 @@ class RenderForegroundService : Service() {
             while (running) {
               val client = server.accept()
               client.tcpNoDelay = true
-              workerExecutor.submit { handleClient(client) }
+              activeSockets.add(client)
+              clientExecutor.submit { handleClient(client) }
             }
           } catch (t: Throwable) {
             if (running) {
@@ -108,32 +118,72 @@ class RenderForegroundService : Service() {
 
   private fun handleClient(socket: Socket) {
     val writeLock = Any()
-    socket.use { s ->
-      val input = DataInputStream(BufferedInputStream(s.getInputStream(), 65536))
-      val output = DataOutputStream(BufferedOutputStream(s.getOutputStream(), 65536))
-      while (running) {
-        val op =
-          try {
-            input.readByte().toInt()
-          } catch (_: EOFException) {
-            break
-          }
-        when (op) {
-          DeviceOp.PING -> handlePing(output, writeLock)
-          DeviceOp.PRELOAD_DEX -> handlePreloadDex(input, output, writeLock)
-          DeviceOp.PUT_ASSETS -> handlePutAssets(input, output, writeLock)
-          DeviceOp.HAS_ASSETS -> handleHasAssets(input, output, writeLock)
-          DeviceOp.RENDER_BATCH -> handleRenderBatch(s, input, output, writeLock)
-          DeviceOp.SET_LIVE -> handleSetLive(input, output, writeLock)
-          DeviceOp.RECYCLE -> {
-            handleRecycle(output, writeLock)
-            return
-          }
-          else -> {
-            writeJsonPacket(output, writeLock, """{"ok":false,"error":"unknown op $op"}""")
+    try {
+      socket.use { s ->
+        val input = DataInputStream(BufferedInputStream(s.getInputStream(), 65536))
+        val output = DataOutputStream(BufferedOutputStream(s.getOutputStream(), 65536))
+        while (running) {
+          val op =
+            try {
+              input.readByte().toInt()
+            } catch (_: IOException) {
+              break
+            }
+          when (op) {
+            DeviceOp.PING -> handlePing(output, writeLock)
+            DeviceOp.PRELOAD_DEX -> {
+              val dexHash = readUtfBytes(input)
+              val entryClass = readUtfBytes(input)
+              val dexBytes = readSizedBytes(input)
+              runOnWorker { executePreloadDex(dexHash, entryClass, dexBytes, output, writeLock) }
+            }
+            DeviceOp.PUT_ASSETS -> {
+              val count = input.readInt()
+              val items =
+                ArrayList<Pair<String, ByteArray>>(count).apply {
+                  for (i in 0 until count) {
+                    add(readUtfBytes(input) to readSizedBytes(input))
+                  }
+                }
+              runOnWorker { executePutAssets(items, output, writeLock) }
+            }
+            DeviceOp.HAS_ASSETS -> {
+              val reqJson = readUtfBytes(input)
+              runOnWorker { executeHasAssets(reqJson, output, writeLock) }
+            }
+            DeviceOp.RENDER_BATCH -> {
+              val dexBytes = readOptionalSizedBytes(input)
+              val entryClass = readUtfBytes(input)
+              val reqJson = readUtfBytes(input)
+              runOnWorker {
+                executeRenderBatch(s, dexBytes, entryClass, reqJson, output, writeLock)
+              }
+            }
+            DeviceOp.SET_LIVE -> {
+              val dexBytes = readOptionalSizedBytes(input)
+              val reqJson = readUtfBytes(input)
+              runOnWorker { executeSetLive(dexBytes, reqJson, output, writeLock) }
+            }
+            DeviceOp.RECYCLE -> {
+              handleRecycle(output, writeLock)
+              return
+            }
+            else -> {
+              writeJsonPacket(output, writeLock, """{"ok":false,"error":"unknown op $op"}""")
+            }
           }
         }
       }
+    } finally {
+      activeSockets.remove(socket)
+    }
+  }
+
+  private fun runOnWorker(block: () -> Unit) {
+    try {
+      workerExecutor.submit(block).get()
+    } catch (e: java.util.concurrent.ExecutionException) {
+      throw e.cause ?: e
     }
   }
 
@@ -151,45 +201,53 @@ class RenderForegroundService : Service() {
     writeJsonPacket(output, writeLock, json)
   }
 
-  private fun handlePreloadDex(
-    input: DataInputStream,
+  private fun executePreloadDex(
+    dexHash: String,
+    entryClass: String,
+    dexBytes: ByteArray,
     output: DataOutputStream,
     writeLock: Any,
   ) {
-    val dexHash = readUtfBytes(input)
-    val entryClass = readUtfBytes(input)
-    val dexBytes = readSizedBytes(input)
-    val json =
+    val resp =
       try {
-        renderer.preloadDex(dexHash, entryClass, dexBytes)
-        """{"ok":true,"dexHash":"${escapeJson(dexHash)}"}"""
+        val board = renderer.preloadDex(dexHash, entryClass, dexBytes)
+        val defaultSystem = board.resolveDesignSystem(null)
+        DevicePreloadResponse(
+          ok = true,
+          dexHash = dexHash,
+          boardMeta = renderer.buildBoardMeta(board),
+          boardTheme = board.toThemeOverride(),
+          defaultSeed = defaultSystem.seed,
+          defaultVariant = defaultSystem.variant.wire,
+          defaultContrast = defaultSystem.contrast,
+        )
       } catch (t: Throwable) {
         Log.e(TAG, "PRELOAD_DEX failed", t)
-        """{"ok":false,"error":"${escapeJson("${t::class.java.name}: ${t.message}")}"}"""
+        DevicePreloadResponse(ok = false, error = "${t::class.java.name}: ${t.message}")
       }
-    writeJsonPacket(output, writeLock, json)
+    writeJsonPacket(
+      output,
+      writeLock,
+      PreviewJson.compact.encodeToString(DevicePreloadResponse.serializer(), resp),
+    )
   }
 
-  private fun handlePutAssets(
-    input: DataInputStream,
+  private fun executePutAssets(
+    items: List<Pair<String, ByteArray>>,
     output: DataOutputStream,
     writeLock: Any,
   ) {
-    val count = input.readInt()
-    for (i in 0 until count) {
-      val hash = readUtfBytes(input)
-      val bytes = readSizedBytes(input)
+    for ((hash, bytes) in items) {
       renderer.assetCache.put(hash, bytes)
     }
-    writeJsonPacket(output, writeLock, """{"ok":true,"stored":$count}""")
+    writeJsonPacket(output, writeLock, """{"ok":true,"stored":${items.size}}""")
   }
 
-  private fun handleHasAssets(
-    input: DataInputStream,
+  private fun executeHasAssets(
+    reqJson: String,
     output: DataOutputStream,
     writeLock: Any,
   ) {
-    val reqJson = readUtfBytes(input)
     val req = PreviewJson.compact.decodeFromString(DeviceHasAssetsRequest.serializer(), reqJson)
     val missing = renderer.assetCache.missing(req.hashes)
     val resp = DeviceHasAssetsResponse(missing = missing)
@@ -197,15 +255,14 @@ class RenderForegroundService : Service() {
     writeJsonPacket(output, writeLock, json)
   }
 
-  private fun handleRenderBatch(
+  private fun executeRenderBatch(
     socket: Socket,
-    input: DataInputStream,
+    dexBytes: ByteArray?,
+    entryClass: String,
+    reqJson: String,
     output: DataOutputStream,
     writeLock: Any,
   ) {
-    val dexBytes = readOptionalSizedBytes(input)
-    val entryClass = readUtfBytes(input)
-    val reqJson = readUtfBytes(input)
     val request = PreviewJson.compact.decodeFromString(DeviceBatchRequest.serializer(), reqJson)
 
     val responded = AtomicBoolean(false)
@@ -259,13 +316,12 @@ class RenderForegroundService : Service() {
     }
   }
 
-  private fun handleSetLive(
-    input: DataInputStream,
+  private fun executeSetLive(
+    dexBytes: ByteArray?,
+    reqJson: String,
     output: DataOutputStream,
     writeLock: Any,
   ) {
-    val dexBytes = readOptionalSizedBytes(input)
-    val reqJson = readUtfBytes(input)
     val req = PreviewJson.compact.decodeFromString(DeviceLiveStateRequest.serializer(), reqJson)
     val json =
       try {

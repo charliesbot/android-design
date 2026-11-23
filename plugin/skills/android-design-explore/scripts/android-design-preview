@@ -1,214 +1,327 @@
 #!/bin/sh
 set -eu
 
-# The previewer release this script runs. scripts/test_plugin_manifests.py keeps it equal to
-# plugin/plugin.json, which a skills-only install does not have.
 VERSION="0.5.0"
+DEFAULT_GIT_URL="https://github.com/charliesbot/android-design.git"
+CACHE_ROOT="${ANDROID_DESIGN_CACHE_DIR:-${ANDROID_DESIGN_PREVIEW_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/android-design-preview}}"
 
-# Resolve symlinks so ~/.local/bin/android-design-preview finds this checkout's local build.
-resolve_script() {
-  target="$1"
-  while [ -L "$target" ]; do
-    dir=$(CDPATH= cd -- "$(dirname -- "$target")" && pwd)
-    link=$(readlink "$target")
-    case "$link" in
-      /*) target="$link" ;;
-      *) target="$dir/$link" ;;
+resolve_script_path() {
+  _path="$1"
+  while [ -L "$_path" ]; do
+    _dir="$(CDPATH= cd -- "$(dirname -- "$_path")" && pwd -P)"
+    _target="$(readlink "$_path")"
+    case "$_target" in
+      /*) _path="$_target" ;;
+      *) _path="$_dir/$_target" ;;
     esac
   done
-  dir=$(CDPATH= cd -- "$(dirname -- "$target")" && pwd)
-  printf '%s/%s\n' "$dir" "$(basename -- "$target")"
+  _dir="$(CDPATH= cd -- "$(dirname -- "$_path")" && pwd -P)"
+  printf '%s/%s\n' "$_dir" "$(basename -- "$_path")"
 }
 
-# This script lives at <repo>/plugin/skills/android-design-explore/scripts/ in a checkout.
-SCRIPT_PATH=$(resolve_script "$0")
-SCRIPTS_DIR=$(dirname -- "$SCRIPT_PATH")
-REPO_DIR=$(CDPATH= cd -- "$SCRIPTS_DIR/../../../.." 2>/dev/null && pwd || printf '')
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n\r\t' '   '
+}
 
-CACHE_ROOT="${ANDROID_DESIGN_CACHE_DIR:-${ANDROID_DESIGN_PREVIEW_CACHE_DIR:-$HOME/.cache/android-design-preview}}"
-DEFAULT_REPO="charliesbot/android-design"
+fail_json() {
+  _code="$1"
+  _msg="$2"
+  _esc_msg="$(json_escape "$_msg")"
+  printf '{"ok":false,"errors":[{"code":"%s","message":"%s"}]}\n' "$_code" "$_esc_msg"
+  exit 3
+}
 
 java_major() {
-  bin="$1"
-  [ -x "$bin" ] || return 1
-  ver=$("$bin" -version 2>&1 | sed -n 's/.*version "\([^"]*\)".*/\1/p' | head -n 1)
-  [ -n "$ver" ] || return 1
-  case "$ver" in
-    1.*) major=$(printf '%s' "$ver" | cut -d. -f2) ;;
-    *) major=$(printf '%s' "$ver" | cut -d. -f1 | sed 's/[^0-9].*//') ;;
+  _ver="$("$1" -version 2>&1 | sed -n 's/.*version "\([^"]*\)".*/\1/p' | head -n 1)"
+  case "$_ver" in
+    1.*)
+      _rest="${_ver#1.}"
+      printf '%s\n' "${_rest%%.*}"
+      ;;
+    "")
+      printf '0\n'
+      ;;
+    *)
+      printf '%s\n' "${_ver%%.*}"
+      ;;
   esac
-  [ -n "$major" ] && [ "$major" -ge 17 ] 2>/dev/null
+}
+
+is_java_17_plus() {
+  [ -x "$1" ] || return 1
+  _maj="$(java_major "$1")"
+  case "$_maj" in
+    ""|*[!0-9]*) return 1 ;;
+  esac
+  [ "$_maj" -ge 17 ]
 }
 
 find_java() {
-  cache_file="$CACHE_ROOT/.java-bin"
-  if [ -f "$cache_file" ]; then
-    cached=$(cat "$cache_file" 2>/dev/null || true)
-    if [ -n "$cached" ] && [ -x "$cached" ]; then
-      JAVA_BIN="$cached"
+  if [ -n "${ANDROID_DESIGN_PREVIEW_JAVA:-}" ]; then
+    is_java_17_plus "$ANDROID_DESIGN_PREVIEW_JAVA" || return 1
+    printf '%s\n' "$ANDROID_DESIGN_PREVIEW_JAVA"
+    return 0
+  fi
+
+  _java_cache="$CACHE_ROOT/java-bin"
+  if [ -f "$_java_cache" ]; then
+    IFS= read -r _cached_java < "$_java_cache" || _cached_java=""
+    if [ -n "$_cached_java" ] && [ -x "$_cached_java" ]; then
+      printf '%s\n' "$_cached_java"
       return 0
     fi
   fi
 
-  # 1. Explicit JAVA_HOME
-  if [ -n "${JAVA_HOME:-}" ] && java_major "$JAVA_HOME/bin/java"; then
-    found="$JAVA_HOME/bin/java"
-  # 2. PATH
-  elif path_java=$(command -v java 2>/dev/null) && java_major "$path_java"; then
-    found="$path_java"
-  # 3. macOS java_home
-  elif [ -x /usr/libexec/java_home ] && mac_home=$(/usr/libexec/java_home -v 17+ 2>/dev/null) && java_major "$mac_home/bin/java"; then
-    found="$mac_home/bin/java"
-  else
-    found=""
-    # 4. Android Studio bundled JBR (macOS & Linux)
-    for candidate in \
+  _picked=""
+  if [ -n "${JAVA_HOME:-}" ] && is_java_17_plus "$JAVA_HOME/bin/java"; then
+    _picked="$JAVA_HOME/bin/java"
+  fi
+
+  if [ -z "$_picked" ] && [ -x /usr/libexec/java_home ]; then
+    _mac_home="$(/usr/libexec/java_home -v 17+ 2>/dev/null || true)"
+    if [ -n "$_mac_home" ] && is_java_17_plus "$_mac_home/bin/java"; then
+      _picked="$_mac_home/bin/java"
+    fi
+  fi
+
+  if [ -z "$_picked" ] && command -v java >/dev/null 2>&1; then
+    _cmd_java="$(command -v java)"
+    if is_java_17_plus "$_cmd_java"; then
+      _picked="$_cmd_java"
+    fi
+  fi
+
+  if [ -z "$_picked" ]; then
+    for _cand in \
       "/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java" \
-      "$HOME/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java" \
-      "/Applications/Android Studio Preview.app/Contents/jbr/Contents/Home/bin/java" \
-      "/opt/android-studio/jbr/bin/java" \
-      "$HOME/android-studio/jbr/bin/java" \
-      "$HOME/.local/share/JetBrains/Toolbox/apps/android-studio/jbr/bin/java"
-    do
-      if java_major "$candidate"; then
-        found="$candidate"
+      /opt/homebrew/opt/openjdk*/libexec/openjdk.jdk/Contents/Home/bin/java \
+      /Library/Java/JavaVirtualMachines/*.jdk/Contents/Home/bin/java \
+      /usr/lib/jvm/java-*-openjdk*/bin/java \
+      /usr/lib/jvm/jdk-*/bin/java; do
+      if is_java_17_plus "$_cand"; then
+        _picked="$_cand"
         break
       fi
     done
   fi
 
-  if [ -z "${found:-}" ]; then
-    printf '{"ok":false,"error":"java_not_found","message":"Java 17+ is required. Install JDK 17+ or Android Studio and retry."}\n'
-    exit 3
-  fi
-
-  mkdir -p "$CACHE_ROOT" 2>/dev/null || true
-  printf '%s\n' "$found" > "$cache_file" 2>/dev/null || true
-  JAVA_BIN="$found"
+  [ -n "$_picked" ] || return 1
+  mkdir -p "$CACHE_ROOT"
+  printf '%s\n' "$_picked" > "$_java_cache"
+  printf '%s\n' "$_picked"
 }
 
-sha256_of() {
-  if command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$1" | awk '{print tolower($1)}'
-  elif command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | awk '{print tolower($1)}'
-  else
-    return 1
-  fi
+is_sdk_dir() {
+  [ -n "$1" ] && [ -d "$1" ] && {
+    [ -d "$1/platforms" ] || [ -d "$1/platform-tools" ] || [ -x "$1/platform-tools/adb" ]
+  }
 }
 
-download_file() {
-  url="$1"
-  dest="$2"
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL --retry 2 -o "$dest" "$url"
-  elif command -v wget >/dev/null 2>&1; then
-    wget -qO "$dest" "$url"
-  else
-    printf '{"ok":false,"error":"download_tool_missing","message":"curl or wget is required to download android-design-preview.jar"}\n'
-    exit 3
-  fi
-}
-
-resolve_jar() {
-  if [ -n "${ANDROID_DESIGN_PREVIEW_JAR:-}" ]; then
-    if [ ! -f "$ANDROID_DESIGN_PREVIEW_JAR" ]; then
-      printf '{"ok":false,"error":"jar_not_found","message":"ANDROID_DESIGN_PREVIEW_JAR points to a missing file"}\n'
-      exit 3
+find_android_sdk() {
+  if [ -n "${ANDROID_HOME:-}" ]; then
+    if is_sdk_dir "$ANDROID_HOME"; then
+      printf '%s\n' "$ANDROID_HOME"
+      return 0
     fi
-    JAR_PATH="$ANDROID_DESIGN_PREVIEW_JAR"
-    return 0
   fi
-
-  version="$VERSION"
-  cached_jar="$CACHE_ROOT/$version/android-design-preview.jar"
-  if [ -f "$cached_jar" ]; then
-    JAR_PATH="$cached_jar"
-    return 0
+  if [ -n "${ANDROID_SDK_ROOT:-}" ]; then
+    if is_sdk_dir "$ANDROID_SDK_ROOT"; then
+      printf '%s\n' "$ANDROID_SDK_ROOT"
+      return 0
+    fi
   fi
-
-  if [ -n "$REPO_DIR" ] && [ -f "$REPO_DIR/app/app/build/libs/android-design-preview.jar" ]; then
-    JAR_PATH="$REPO_DIR/app/app/build/libs/android-design-preview.jar"
-    return 0
-  fi
-
-  # Releases ship one artifact per OS and JVM CPU (scripts/package_release.py): a .tar.xz holding
-  # an uncompressed JAR with only that platform's Skiko library.
-  target=$(release_target) || {
-    printf '{"ok":false,"error":"unsupported_platform","message":"No previewer release for this OS and Java CPU. Build it with cd app && ./gradlew :app:workerJar and set ANDROID_DESIGN_PREVIEW_JAR."}\n'
-    exit 3
-  }
-  artifact="android-design-preview-$target.tar.xz"
-  release_url="${ANDROID_DESIGN_PREVIEW_RELEASE_URL:-https://github.com/$DEFAULT_REPO/releases/download/v$version}"
-
-  mkdir -p "$CACHE_ROOT/$version"
-  tmp_dir="$CACHE_ROOT/$version/.download.$$"
-  trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
-  mkdir -p "$tmp_dir"
-
-  download_file "$release_url/$artifact.sha256" "$tmp_dir/sha" || {
-    printf '{"ok":false,"error":"jar_download_failed","message":"Failed downloading the previewer checksum from GitHub Release"}\n'
-    exit 3
-  }
-  expected=$(grep -Eo '[A-Fa-f0-9]{64}' "$tmp_dir/sha" | head -n 1 | tr '[:upper:]' '[:lower:]')
-  if [ -z "$expected" ]; then
-    printf '{"ok":false,"error":"jar_checksum_invalid","message":"Invalid SHA-256 checksum file from release"}\n'
-    exit 3
-  fi
-
-  download_file "$release_url/$artifact" "$tmp_dir/$artifact" || {
-    printf '{"ok":false,"error":"jar_download_failed","message":"Failed downloading the previewer from GitHub Release"}\n'
-    exit 3
-  }
-  actual=$(sha256_of "$tmp_dir/$artifact") || {
-    printf '{"ok":false,"error":"sha_tool_missing","message":"shasum or sha256sum is required to verify the previewer download"}\n'
-    exit 3
-  }
-  if [ "$actual" != "$expected" ]; then
-    printf '{"ok":false,"error":"jar_checksum_mismatch","message":"SHA-256 verification failed for the previewer download"}\n'
-    exit 3
-  fi
-
-  tar -xmJf "$tmp_dir/$artifact" -C "$tmp_dir" android-design-preview.jar 2>/dev/null || {
-    printf '{"ok":false,"error":"jar_extract_failed","message":"Failed unpacking the previewer download; tar needs xz support (install xz-utils on Linux)"}\n'
-    exit 3
-  }
-  mv "$tmp_dir/android-design-preview.jar" "$cached_jar"
-  rm -rf "$tmp_dir"
-  trap - EXIT HUP INT TERM
-  JAR_PATH="$cached_jar"
+  for _cand in \
+    "$HOME/Library/Android/sdk" \
+    "$HOME/Android/Sdk" \
+    "/opt/android-sdk"; do
+    if is_sdk_dir "$_cand"; then
+      printf '%s\n' "$_cand"
+      return 0
+    fi
+  done
+  return 1
 }
 
-# Prints the release target (for example macos-arm64) for this OS and the Java CPU. The JVM's CPU
-# decides which Skiko library loads, so an x64 JDK on Apple Silicon needs the x64 build.
-release_target() {
-  case "$(uname -s)" in
-    Darwin) os=macos ;;
-    Linux) os=linux ;;
-    *) return 1 ;;
-  esac
-  jvm_arch=$("$JAVA_BIN" -XshowSettings:properties -version 2>&1 | sed -n 's/^[[:space:]]*os\.arch = //p' | head -n 1)
-  case "$jvm_arch" in
-    aarch64|arm64) arch=arm64 ;;
-    amd64|x86_64) arch=x64 ;;
-    *) return 1 ;;
-  esac
-  printf '%s-%s\n' "$os" "$arch"
+resolve_app_dir() {
+  _script_dir="$1"
+
+  if [ -n "${ANDROID_DESIGN_PREVIEW_SRC:-}" ]; then
+    if [ -f "$ANDROID_DESIGN_PREVIEW_SRC/settings.gradle.kts" ]; then
+      APP_DIR="$(CDPATH= cd -- "$ANDROID_DESIGN_PREVIEW_SRC" && pwd -P)"
+      return 0
+    elif [ -f "$ANDROID_DESIGN_PREVIEW_SRC/app/settings.gradle.kts" ]; then
+      APP_DIR="$(CDPATH= cd -- "$ANDROID_DESIGN_PREVIEW_SRC/app" && pwd -P)"
+      return 0
+    fi
+    fail_json "invalid_source_dir" "ANDROID_DESIGN_PREVIEW_SRC ($ANDROID_DESIGN_PREVIEW_SRC) does not contain settings.gradle.kts or app/settings.gradle.kts"
+  fi
+
+  if [ "${ANDROID_DESIGN_PREVIEW_FORCE_SPARSE:-0}" != "1" ]; then
+    _repo_cand="$(CDPATH= cd -- "$_script_dir/../../../.." 2>/dev/null && pwd -P || true)"
+    if [ -n "$_repo_cand" ] && [ -f "$_repo_cand/app/settings.gradle.kts" ]; then
+      APP_DIR="$_repo_cand/app"
+      return 0
+    fi
+  fi
+
+  _src_root="$CACHE_ROOT/$VERSION/src"
+  _src_app="$_src_root/app"
+  if [ -f "$_src_app/settings.gradle.kts" ] && [ -f "$_src_app/gradlew" ]; then
+    APP_DIR="$_src_app"
+    return 0
+  fi
+
+  command -v git >/dev/null 2>&1 || fail_json "missing_git" "git is required to sparse-checkout android-design app sources"
+  _git_url="${ANDROID_DESIGN_PREVIEW_GIT_URL:-$DEFAULT_GIT_URL}"
+  _git_ref="${ANDROID_DESIGN_PREVIEW_GIT_REF:-v$VERSION}"
+  _tmp_src="$CACHE_ROOT/$VERSION/src.tmp.$$"
+  rm -rf "$_tmp_src"
+  mkdir -p "$CACHE_ROOT/$VERSION"
+
+  _cloned=0
+  if git clone --depth 1 --filter=blob:none --no-checkout --branch "$_git_ref" "$_git_url" "$_tmp_src" 1>&2; then
+    _cloned=1
+  elif git clone --depth 1 --no-checkout --branch "$_git_ref" "$_git_url" "$_tmp_src" 1>&2; then
+    _cloned=1
+  fi
+  if [ "$_cloned" -ne 1 ]; then
+    rm -rf "$_tmp_src"
+    fail_json "git_checkout_failed" "Failed to clone $_git_url at $_git_ref"
+  fi
+
+  if ! (
+    git -C "$_tmp_src" sparse-checkout init --no-cone &&
+    git -C "$_tmp_src" sparse-checkout set '/app/' &&
+    git -C "$_tmp_src" checkout
+  ) 1>&2; then
+    rm -rf "$_tmp_src"
+    fail_json "sparse_checkout_failed" "Failed to sparse-checkout app/ from $_git_url at $_git_ref"
+  fi
+
+  if [ ! -f "$_tmp_src/app/settings.gradle.kts" ]; then
+    rm -rf "$_tmp_src"
+    fail_json "sparse_checkout_incomplete" "Sparse checkout succeeded but app/settings.gradle.kts is missing"
+  fi
+
+  rm -rf "$_src_root"
+  mv "$_tmp_src" "$_src_root"
+  APP_DIR="$_src_app"
 }
 
-JAVA_BIN=""
-JAR_PATH=""
-find_java
-resolve_jar
+validate_paths_file() {
+  _paths_file="$1"
+  [ -s "$_paths_file" ] || return 1
+  _saw_path=0
+  while IFS= read -r _p || [ -n "$_p" ]; do
+    case "$_p" in
+      ""|\#*) continue ;;
+    esac
+    [ -e "$_p" ] || return 1
+    _saw_path=1
+  done < "$_paths_file"
+  [ "$_saw_path" -eq 1 ]
+}
+
+validate_cp_file() {
+  _cp_file="$1"
+  [ -s "$_cp_file" ] || return 1
+  _saw_cp=0
+  while IFS= read -r _line || [ -n "$_line" ]; do
+    case "$_line" in
+      ""|-cp) continue ;;
+    esac
+    _old_ifs="$IFS"
+    IFS=":"
+    set -f
+    for _entry in $_line; do
+      [ -n "$_entry" ] || continue
+      if [ ! -e "$_entry" ]; then
+        set +f
+        IFS="$_old_ifs"
+        return 1
+      fi
+      _saw_cp=1
+    done
+    set +f
+    IFS="$_old_ifs"
+  done < "$_cp_file"
+  [ "$_saw_cp" -eq 1 ]
+}
+
+bootstrap_valid() {
+  _bdir="$1"
+  [ -s "$_bdir/bootstrap-meta.properties" ] || return 1
+  [ -f "$_bdir/host-preview.apk" ] || return 1
+  [ -f "$_bdir/androidx-compile-bundle.jar" ] || return 1
+  validate_paths_file "$_bdir/bootstrap-paths.txt" || return 1
+  validate_cp_file "$_bdir/client.cp" || return 1
+  validate_cp_file "$_bdir/server.cp" || return 1
+  return 0
+}
+
+run_gradle_bootstrap() {
+  _app_dir="$1"
+  [ -x "$_app_dir/gradlew" ] || fail_json "missing_gradlew" "Expected executable gradlew in $_app_dir"
+  if ! (cd "$_app_dir" && ./gradlew --no-daemon :host:exportBootstrap) 1>&2; then
+    fail_json "gradle_bootstrap_failed" "Gradle :host:exportBootstrap failed in $_app_dir"
+  fi
+}
+
+SCRIPT_PATH="$(resolve_script_path "$0")"
+SCRIPT_DIR="$(dirname -- "$SCRIPT_PATH")"
 export ANDROID_DESIGN_PREVIEW_SCRIPT="$SCRIPT_PATH"
-export ANDROID_DESIGN_PREVIEW_JAR="$JAR_PATH"
+
+JAVA_BIN="$(find_java)" || fail_json "missing_java" "Java 17 or newer not found. Install JDK 17+ or set JAVA_HOME."
+
+if [ -n "${ANDROID_DESIGN_PREVIEW_JAR:-}" ]; then
+  if [ ! -f "$ANDROID_DESIGN_PREVIEW_JAR" ]; then
+    fail_json "jar_not_found" "ANDROID_DESIGN_PREVIEW_JAR points to missing file: $ANDROID_DESIGN_PREVIEW_JAR"
+  fi
+  cmd="${1:-}"
+  case "$cmd" in
+    server|render)
+      exec "$JAVA_BIN" -Djava.awt.headless=true -jar "$ANDROID_DESIGN_PREVIEW_JAR" "$@"
+      ;;
+    *)
+      exec "$JAVA_BIN" -Djava.awt.headless=true -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -jar "$ANDROID_DESIGN_PREVIEW_JAR" "$@"
+      ;;
+  esac
+fi
+
+SDK_DIR="$(find_android_sdk)" || fail_json "missing_android_sdk" "Android SDK not found. Set ANDROID_HOME or ANDROID_SDK_ROOT or install it under ~/Library/Android/sdk."
+export ANDROID_HOME="$SDK_DIR"
+export ANDROID_SDK_ROOT="$SDK_DIR"
+
+if [ -z "${JAVA_HOME:-}" ]; then
+  _resolved_java="$(resolve_script_path "$JAVA_BIN")"
+  _java_home_cand="$(CDPATH= cd -- "$(dirname -- "$_resolved_java")/.." && pwd -P)"
+  if [ -f "$_java_home_cand/release" ] || [ -x "$_java_home_cand/bin/javac" ]; then
+    JAVA_HOME="$_java_home_cand"
+    export JAVA_HOME
+  fi
+fi
+
+APP_DIR=""
+resolve_app_dir "$SCRIPT_DIR"
+BOOTSTRAP_DIR="${ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR:-$APP_DIR/host/build/bootstrap}"
+
+if ! bootstrap_valid "$BOOTSTRAP_DIR"; then
+  run_gradle_bootstrap "$APP_DIR"
+  bootstrap_valid "$BOOTSTRAP_DIR" || fail_json "bootstrap_invalid" "Gradle bootstrap completed but outputs in $BOOTSTRAP_DIR are incomplete"
+fi
+
+export ANDROID_DESIGN_CACHE_DIR="$CACHE_ROOT"
+export ANDROID_DESIGN_PREVIEW_SRC="$APP_DIR"
+export ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR="$BOOTSTRAP_DIR"
+export ANDROID_DESIGN_PREVIEW_SERVER_CP="$BOOTSTRAP_DIR/server.cp"
+export ANDROID_DESIGN_PREVIEW_CLIENT_CP="$BOOTSTRAP_DIR/client.cp"
 
 cmd="${1:-}"
 case "$cmd" in
   server|render)
-    exec "$JAVA_BIN" -Djava.awt.headless=true -jar "$JAR_PATH" "$@"
+    exec "$JAVA_BIN" -Djava.awt.headless=true "@$BOOTSTRAP_DIR/server.cp" bot.charlies.androiddesign.preview.app.MainKt "$@"
     ;;
   *)
-    exec "$JAVA_BIN" -Djava.awt.headless=true -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -jar "$JAR_PATH" "$@"
+    exec "$JAVA_BIN" -Djava.awt.headless=true -XX:+TieredCompilation -XX:TieredStopAtLevel=1 "@$BOOTSTRAP_DIR/client.cp" bot.charlies.androiddesign.preview.app.MainKt "$@"
     ;;
 esac

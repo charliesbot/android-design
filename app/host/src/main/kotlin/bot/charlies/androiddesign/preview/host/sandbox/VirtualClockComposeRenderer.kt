@@ -545,7 +545,7 @@ internal class VirtualClockComposeRenderer(
     return loaded
   }
 
-  private fun buildBoardMeta(board: ExplorationBoard): DeviceBoardMeta =
+  internal fun buildBoardMeta(board: ExplorationBoard): DeviceBoardMeta =
     DeviceBoardMeta(
       surface = board.surfaceSpec.key,
       boardName = board.name,

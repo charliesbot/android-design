@@ -102,6 +102,18 @@ data class DeviceBoardMeta(
 )
 
 @Serializable
+data class DevicePreloadResponse(
+  val ok: Boolean,
+  val dexHash: String? = null,
+  val error: String? = null,
+  val boardMeta: DeviceBoardMeta? = null,
+  val boardTheme: ThemeOverride? = null,
+  val defaultSeed: String? = null,
+  val defaultVariant: String? = null,
+  val defaultContrast: Double? = null,
+)
+
+@Serializable
 data class DeviceTargetResult(
   val direction: String,
   val screen: String,
