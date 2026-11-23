@@ -8,6 +8,7 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.attributes.Attribute
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.tasks.ClasspathNormalizer
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.PathSensitive
@@ -170,26 +171,47 @@ val exportCompileBundle =
         .sdkComponents
     val builtApk = layout.buildDirectory.file("outputs/apk/previewRelease/host-previewRelease.apk")
     val compileTaskOutputs = compileKotlin.map { it.outputs.files }
+    val compileArtifactView =
+      compileClasspath.incoming
+        .artifactView {
+          attributes {
+            attribute(Attribute.of("artifactType", String::class.java), "android-classes-jar")
+          }
+        }
+        .files
+    val outBundleJar = layout.buildDirectory.file("bootstrap/androidx-compile-bundle.jar")
+    val outHostApk = layout.buildDirectory.file("bootstrap/host-preview.apk")
+    val outMetaFile = layout.buildDirectory.file("bootstrap/bootstrap-meta.properties")
 
-    outputs.dir(outDir)
+    inputs.file(builtApk).withPropertyName("builtPreviewReleaseApk")
+    inputs
+      .files(compileTaskOutputs)
+      .withPropertyName("compilePreviewReleaseOutputs")
+      .withNormalizer(ClasspathNormalizer::class.java)
+    inputs
+      .files(compileArtifactView)
+      .withPropertyName("previewReleaseCompileJars")
+      .withNormalizer(ClasspathNormalizer::class.java)
+    inputs
+      .files(composePluginFiles)
+      .withPropertyName("composeCompilerPlugin")
+      .withNormalizer(ClasspathNormalizer::class.java)
+    inputs.files(sdkComponents.bootClasspath).withPropertyName("sdkBootClasspath")
+    inputs.property("sdkDirectoryPath", sdkComponents.sdkDirectory.map { it.asFile.absolutePath })
+
+    outputs.file(outBundleJar)
+    outputs.file(outHostApk)
+    outputs.file(outMetaFile)
 
     doLast {
       val dir = outDir.get().asFile.apply { mkdirs() }
-      val bundleFile = dir.resolve("androidx-compile-bundle.jar")
-      val copiedApk = dir.resolve("host-preview.apk")
+      val bundleFile = outBundleJar.get().asFile
+      val copiedApk = outHostApk.get().asFile
       val sourceApk = builtApk.get().asFile
       check(sourceApk.isFile) { "Built APK missing at ${sourceApk.absolutePath}" }
       sourceApk.copyTo(copiedApk, overwrite = true)
 
-      val artifactFiles =
-        compileClasspath.incoming
-          .artifactView {
-            attributes {
-              attribute(Attribute.of("artifactType", String::class.java), "android-classes-jar")
-            }
-          }
-          .files
-          .files
+      val artifactFiles = compileArtifactView.files
 
       val seenEntries = HashSet<String>()
       var jarCount = 0
@@ -346,24 +368,60 @@ val exportBootstrap =
     val debugUnitTestOutputs = compileDebugUnitTestKotlin.map { it.outputs.files }
     val testConfigOutputs = genTestConfig.map { it.outputs.files }
     val appJarOutputs = appJarTask.map { it.outputs.files }
-    val outDir = layout.buildDirectory.dir("bootstrap")
+    val unitTestArtifactView =
+      unitTestConfig.incoming
+        .artifactView {
+          attributes {
+            attribute(Attribute.of("artifactType", String::class.java), "android-classes-jar")
+          }
+        }
+        .files
+    val outRobolectricConfigDir = layout.buildDirectory.dir("bootstrap/robolectric-config")
+    val outRobolectricCp = layout.buildDirectory.file("bootstrap/robolectric.cp")
+    val outServerCp = layout.buildDirectory.file("bootstrap/server.cp")
+    val outClientCp = layout.buildDirectory.file("bootstrap/client.cp")
 
-    outputs.dir(outDir)
+    inputs
+      .files(unitTestArtifactView)
+      .withPropertyName("debugUnitTestArtifactJars")
+      .withNormalizer(ClasspathNormalizer::class.java)
+    inputs
+      .files(debugMainOutputs)
+      .withPropertyName("debugMainOutputs")
+      .withNormalizer(ClasspathNormalizer::class.java)
+    inputs
+      .files(debugBundleOutputs)
+      .withPropertyName("debugBundleOutputs")
+      .withNormalizer(ClasspathNormalizer::class.java)
+    inputs
+      .files(debugUnitTestOutputs)
+      .withPropertyName("debugUnitTestOutputs")
+      .withNormalizer(ClasspathNormalizer::class.java)
+    inputs
+      .files(testConfigOutputs)
+      .withPropertyName("testConfigOutputs")
+      .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs
+      .files(appJarOutputs)
+      .withPropertyName("appJarOutputs")
+      .withNormalizer(ClasspathNormalizer::class.java)
+    inputs
+      .files(appRuntimeConfig)
+      .withPropertyName("appRuntimeClasspath")
+      .withNormalizer(ClasspathNormalizer::class.java)
+    inputs.files(sdkComponents.bootClasspath).withPropertyName("sdkBootClasspath")
+    inputs.property("projectDirPath", project.projectDir.absolutePath)
+
+    outputs.dir(outRobolectricConfigDir)
+    outputs.file(outRobolectricCp)
+    outputs.file(outServerCp)
+    outputs.file(outClientCp)
 
     doLast {
-      val dir = outDir.get().asFile.apply { mkdirs() }
+      val unitTestClasspath = unitTestArtifactView.files
 
-      val unitTestClasspath =
-        unitTestConfig.incoming
-          .artifactView {
-            attributes {
-              attribute(Attribute.of("artifactType", String::class.java), "android-classes-jar")
-            }
-          }
-          .files
-          .files
-
-      val robolectricConfigDir = dir.resolve("robolectric-config")
+      val robolectricConfigDir = outRobolectricConfigDir.get().asFile
+      robolectricConfigDir.deleteRecursively()
       val rawConfigFile =
         testConfigOutputs
           .get()
@@ -399,7 +457,10 @@ val exportBootstrap =
       addExisting(debugMainOutputs.get().files)
       addExisting(sdkComponents.bootClasspath.get().map { it.asFile })
       addExisting(unitTestClasspath)
-      dir.resolve("robolectric.cp").writeText("-cp\n${robolectricEntries.joinToString(":")}\n")
+      outRobolectricCp.get().asFile.apply {
+        parentFile.mkdirs()
+        writeText("-cp\n${robolectricEntries.joinToString(":")}\n")
+      }
 
       val appEntries = linkedSetOf<String>()
       for (f in appJarOutputs.get().files) {
@@ -409,8 +470,8 @@ val exportBootstrap =
         if (f.exists()) appEntries.add(f.absolutePath)
       }
       val appCpContent = "-cp\n${appEntries.joinToString(":")}\n"
-      dir.resolve("server.cp").writeText(appCpContent)
-      dir.resolve("client.cp").writeText(appCpContent)
+      outServerCp.get().asFile.writeText(appCpContent)
+      outClientCp.get().asFile.writeText(appCpContent)
     }
   }
 

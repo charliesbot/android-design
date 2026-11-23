@@ -1,9 +1,21 @@
 package bot.charlies.androiddesign.preview.host.robolectric
 
+import android.os.Looper
+import androidx.activity.ComponentActivity
+import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ComposeView
+import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
 import bot.charlies.androiddesign.preview.host.HostTestFixtures
+import bot.charlies.androiddesign.preview.kit.BoardContent
+import bot.charlies.androiddesign.preview.kit.designBoard
 import bot.charlies.androiddesign.preview.model.RobolectricRenderRequest
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -11,6 +23,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -133,5 +147,106 @@ class RobolectricBoardRendererTest {
     assertTrue(missing.ok)
     assertFalse(missing.valid)
     assertTrue(missing.errors.isNotEmpty())
+  }
+
+  @Test
+  fun recomposerExceptionReturnsStructuredFailureInsteadOfCrashing() {
+    val workDir = tempFolder.newFolder("recomp-fail").toPath()
+    val boomFile = workDir.resolve("Boom.explore.kt")
+    Files.writeString(
+      boomFile,
+      """
+      import androidx.compose.material3.Text
+      import androidx.compose.runtime.LaunchedEffect
+      import androidx.compose.runtime.getValue
+      import androidx.compose.runtime.mutableStateOf
+      import androidx.compose.runtime.remember
+      import androidx.compose.runtime.setValue
+      import bot.charlies.androiddesign.preview.kit.designBoard
+      val preview = designBoard("Boom") {
+        screen("main") {
+          var trigger by remember { mutableStateOf(false) }
+          LaunchedEffect(Unit) { trigger = true }
+          if (trigger) error("boom in recomposition")
+          Text("initial")
+        }
+      }
+      """
+        .trimIndent(),
+    )
+    val resp =
+      RobolectricBoardRenderer.handleRequest(
+        RobolectricRenderRequest(
+          id = "recomp-boom",
+          sourcePath = boomFile.toString(),
+          views = listOf("light"),
+          screens = listOf("main"),
+          encodePng = false,
+        ),
+      )
+    assertFalse("Expected ok=false when recomposition throws: $resp", resp.ok)
+    assertTrue(
+      "Expected recomposition error message in errors: ${resp.errors}",
+      resp.errors.any { it.message.contains("boom in recomposition") },
+    )
+  }
+
+  @Test
+  fun switchingDirectionsResetsNavBackStackWithoutNoSuchElementException() {
+    var detailComposed = false
+    var switchedComposed = false
+    val board =
+      designBoard("DirSwitch") {
+        direction("DirA") {
+          listDetail(
+            id = "list",
+            detailId = "detail",
+            list = { onOpenDetail ->
+              LaunchedEffect(Unit) { onOpenDetail() }
+              Text("A List")
+            },
+            detail = {
+              detailComposed = true
+              Text("A Detail")
+            },
+          )
+        }
+        direction("DirB") {
+          screen("list") {
+            switchedComposed = true
+            Text("B List")
+          }
+        }
+      }
+    var activeDir by mutableStateOf(board.directions[0])
+    val controller = Robolectric.buildActivity(ComponentActivity::class.java)
+    val activity = controller.setup().get()
+    ProposalFonts.init(activity.assets)
+    val cv = ComposeView(activity)
+    cv.setContent {
+      BoardContent(
+        board = board,
+        direction = activeDir,
+        screenId = "list",
+        frameWidthDp = 360,
+        frameHeightDp = 640,
+        fillContainer = false,
+        dark = false,
+        roundClip = false,
+        designSystem = board.resolveDesignSystem(),
+        explorationDir = null,
+      )
+    }
+    activity.setContentView(cv)
+    try {
+      repeat(5) { shadowOf(Looper.getMainLooper()).idleFor(16, TimeUnit.MILLISECONDS) }
+      assertTrue("Expected DirA to navigate to detail before switching", detailComposed)
+      activeDir = board.directions[1]
+      repeat(5) { shadowOf(Looper.getMainLooper()).idleFor(16, TimeUnit.MILLISECONDS) }
+      assertTrue("Expected DirB list screen to compose after direction switch", switchedComposed)
+    } finally {
+      controller.pause().stop().destroy()
+      shadowOf(Looper.getMainLooper()).idle()
+    }
   }
 }

@@ -19,10 +19,8 @@ import android.os.Handler
 import android.os.Looper
 import android.util.LruCache
 import android.view.ContextThemeWrapper
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.inspector.WindowInspector
 import android.widget.FrameLayout
@@ -49,7 +47,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.node.RootForTest
 import androidx.compose.ui.platform.AndroidUiDispatcher
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
@@ -80,6 +77,8 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import bot.charlies.androiddesign.preview.domain.findings.ScrolledTree
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.AndroidSlotTreeExtractor
+import bot.charlies.androiddesign.preview.feature.preview.sandbox.InsetConsumingFrameLayout
+import bot.charlies.androiddesign.preview.feature.preview.sandbox.OverlayWindowHelper
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.RawRgbaFrame
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.WearScrollHelper
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
@@ -113,6 +112,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -156,17 +156,6 @@ internal class ActiveRenderSession(
   val onEmptyDetail: (String?) -> Unit,
 )
 
-/** Container that absorbs Display 0 physical system bar insets so offscreen views never shift. */
-private class InsetConsumingFrameLayout(context: Context) : FrameLayout(context) {
-  override fun dispatchApplyWindowInsets(insets: WindowInsets): WindowInsets = WindowInsets.CONSUMED
-
-  override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets = WindowInsets.CONSUMED
-}
-
-/**
- * Persistent opaque back-stacked Activity on Display 0 providing real WindowManager hosting for
- * overlays (`AlertDialog`, `ModalBottomSheet`, `DropdownMenu`) without leaking visible chrome.
- */
 class HostRenderActivity : ComponentActivity() {
   internal var composeView: ComposeView? = null
   internal var container: FrameLayout? = null
@@ -174,6 +163,7 @@ class HostRenderActivity : ComponentActivity() {
   internal var virtualClock: BroadcastFrameClock? = null
   internal var recomposer: Recomposer? = null
   internal var virtualTimeNanos: Long = 0L
+  @Volatile internal var recomposerFailure: Throwable? = null
   private var recomposerJob: Job? = null
   private val alwaysResumedOwners = ServiceViewTreeOwners()
   private var movedToBack = false
@@ -229,12 +219,18 @@ class HostRenderActivity : ComponentActivity() {
 
   private fun ensureRecomposerPipeline() {
     if (recomposer != null) return
+    recomposerFailure = null
     val clock = BroadcastFrameClock()
     val recomp = Recomposer(AndroidUiDispatcher.Main + clock)
     window.decorView.compositionContext = recomp
     recomposerJob =
       CoroutineScope(AndroidUiDispatcher.Main + clock).launch {
-        recomp.runRecomposeAndApplyChanges()
+        try {
+          recomp.runRecomposeAndApplyChanges()
+        } catch (t: Throwable) {
+          if (t is CancellationException) throw t
+          recomposerFailure = t
+        }
       }
     virtualClock = clock
     recomposer = recomp
@@ -302,6 +298,7 @@ class HostRenderActivity : ComponentActivity() {
 
   internal fun resetComposeHost() {
     activeSession.value = null
+    recomposerFailure = null
     runCatching { composeView?.disposeComposition() }
     composeView = null
     activeViewKey = null
@@ -813,79 +810,6 @@ internal class VirtualClockComposeRenderer(
     }
   }
 
-  private fun forceLayoutTree(v: View) {
-    v.forceLayout()
-    if (v is ViewGroup) {
-      for (i in 0 until v.childCount) {
-        forceLayoutTree(v.getChildAt(i))
-      }
-    }
-  }
-
-  private data class OverlayMeasureResult(val offset: Offset, val width: Int, val height: Int)
-
-  private fun measureAndLayoutOverlayWindow(
-    win: View,
-    mainLoc: IntArray,
-    widthPx: Int,
-    heightPx: Int,
-  ): OverlayMeasureResult {
-    val lp = win.layoutParams as? WindowManager.LayoutParams
-    fun specFor(lpDim: Int, maxSize: Int): Int =
-      when {
-        lpDim == ViewGroup.LayoutParams.MATCH_PARENT ->
-          View.MeasureSpec.makeMeasureSpec(maxSize, View.MeasureSpec.EXACTLY)
-        lpDim == ViewGroup.LayoutParams.WRAP_CONTENT ->
-          View.MeasureSpec.makeMeasureSpec(maxSize, View.MeasureSpec.AT_MOST)
-        lpDim > 0 ->
-          View.MeasureSpec.makeMeasureSpec(lpDim.coerceAtMost(maxSize), View.MeasureSpec.EXACTLY)
-        else -> View.MeasureSpec.makeMeasureSpec(maxSize, View.MeasureSpec.AT_MOST)
-      }
-    forceLayoutTree(win)
-    val wSpec = specFor(lp?.width ?: ViewGroup.LayoutParams.WRAP_CONTENT, widthPx)
-    val hSpec = specFor(lp?.height ?: ViewGroup.LayoutParams.WRAP_CONTENT, heightPx)
-    win.measure(wSpec, hSpec)
-    var w = win.measuredWidth.coerceIn(0, widthPx)
-    var h = win.measuredHeight.coerceIn(0, heightPx)
-    if ((w == 0 || h == 0) && win is ViewGroup && win.childCount > 0) {
-      val child = win.getChildAt(0)
-      forceLayoutTree(child)
-      child.measure(
-        View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.AT_MOST),
-        View.MeasureSpec.makeMeasureSpec(heightPx, View.MeasureSpec.AT_MOST),
-      )
-      val cw = child.measuredWidth.coerceIn(0, widthPx)
-      val ch = child.measuredHeight.coerceIn(0, heightPx)
-      if (cw > 0 && ch > 0) {
-        w = cw
-        h = ch
-        win.layout(0, 0, w, h)
-        child.layout(0, 0, w, h)
-      } else {
-        win.layout(0, 0, w, h)
-      }
-    } else {
-      win.layout(0, 0, w, h)
-    }
-
-    if (
-      lp != null &&
-        lp.type in
-          WindowManager.LayoutParams.FIRST_SUB_WINDOW..WindowManager.LayoutParams.LAST_SUB_WINDOW
-    ) {
-      val left = (lp.x - mainLoc[0]).coerceIn(0, (widthPx - w).coerceAtLeast(0))
-      val top = (lp.y - mainLoc[1]).coerceIn(0, (heightPx - h).coerceAtLeast(0))
-      return OverlayMeasureResult(Offset(left.toFloat(), top.toFloat()), w, h)
-    }
-
-    val containerRect = android.graphics.Rect(0, 0, widthPx, heightPx)
-    val outRect = android.graphics.Rect()
-    Gravity.apply(lp?.gravity ?: Gravity.CENTER, w, h, containerRect, outRect)
-    val left = (outRect.left + (lp?.x ?: 0)).coerceIn(0, (widthPx - w).coerceAtLeast(0))
-    val top = (outRect.top + (lp?.y ?: 0)).coerceIn(0, (heightPx - h).coerceAtLeast(0))
-    return OverlayMeasureResult(Offset(left.toFloat(), top.toFloat()), w, h)
-  }
-
   private fun collectOverlayWindows(activity: HostRenderActivity): List<View> {
     val mainDecor = activity.window.decorView
     return WindowInspector.getGlobalWindowViews().filter { win ->
@@ -940,20 +864,24 @@ internal class VirtualClockComposeRenderer(
         activity.virtualTimeNanos += SETTLE_FRAME_NS
         clock.sendFrame(activity.virtualTimeNanos)
         Snapshot.sendApplyNotifications()
+        activity.recomposerFailure?.let { throw it }
       }
       var needsAttachWait = false
       val hasMore =
         withContext(Dispatchers.Main) {
+          activity.recomposerFailure?.let { throw it }
           measureMainActivityTarget(activity, widthPx, heightPx)
           activity.window.decorView.getLocationOnScreen(mainLoc)
           val overlays = collectOverlayWindows(activity)
           if (overlays.isNotEmpty()) hadOverlay = true
           for (win in overlays) {
-            val m = measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
+            val m =
+              OverlayWindowHelper.measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
             if (!win.isAttachedToWindow || m.width == 0) {
               needsAttachWait = true
             }
           }
+          activity.recomposerFailure?.let { throw it }
           clock.hasAwaiters || recomp.hasPendingWork
         }
       if (step >= 1 && needsAttachWait && attachYields < 6) {
@@ -969,11 +897,13 @@ internal class VirtualClockComposeRenderer(
       }
     }
     withContext(Dispatchers.Main) {
+      activity.recomposerFailure?.let { throw it }
       measureMainActivityTarget(activity, widthPx, heightPx)
       activity.window.decorView.getLocationOnScreen(mainLoc)
       for (win in collectOverlayWindows(activity)) {
-        measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
+        OverlayWindowHelper.measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
       }
+      activity.recomposerFailure?.let { throw it }
     }
   }
 
@@ -1035,7 +965,7 @@ internal class VirtualClockComposeRenderer(
             dimPaint.color = Color.argb(alpha, 0, 0, 0)
             canvas.drawRect(0f, 0f, widthPx.toFloat(), heightPx.toFloat(), dimPaint)
           }
-          val m = measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
+          val m = OverlayWindowHelper.measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
           val offset = m.offset
           overlayOffsets[win] = offset
           canvas.save()
@@ -1163,71 +1093,16 @@ internal class VirtualClockComposeRenderer(
   ): AndroidSlotTreeExtractor.ExtractionOutput {
     val globalViews =
       WindowInspector.getGlobalWindowViews().filter { belongsToOffscreenTree(activity, it) }
-    val composeRoots = mutableListOf<RootForTest>()
-    fun collectComposeRoots(v: View) {
-      if (v is RootForTest) composeRoots += v
-      if (v is ViewGroup) {
-        for (i in 0 until v.childCount) collectComposeRoots(v.getChildAt(i))
-      }
-    }
-    for (win in globalViews) {
-      collectComposeRoots(win)
-    }
-
+    val composeRoots = OverlayWindowHelper.collectComposeRoots(globalViews)
     val mergedRoots = composeRoots.map { it.semanticsOwner.rootSemanticsNode }
     val unmergedRoots = composeRoots.map { it.semanticsOwner.unmergedRootSemanticsNode }
-    val mainDecorView = activity.window.decorView
-    val mainLoc = IntArray(2)
-    mainDecorView.getLocationOnScreen(mainLoc)
-
-    val rootLayoutOffsets = IdentityHashMap<androidx.compose.ui.layout.LayoutInfo, Offset>()
-    for (r in composeRoots) {
-      val rv = r as? View ?: continue
-      var winRoot: View = rv
-      while (winRoot.parent is View) {
-        winRoot = winRoot.parent as View
-      }
-      if (winRoot !== mainDecorView) {
-        val offset =
-          explicitWindowOffsets[winRoot]
-            ?: run {
-              val vLoc = IntArray(2)
-              winRoot.getLocationOnScreen(vLoc)
-              Offset((vLoc[0] - mainLoc[0]).toFloat(), (vLoc[1] - mainLoc[1]).toFloat())
-            }
-        rootLayoutOffsets[r.semanticsOwner.unmergedRootSemanticsNode.layoutInfo] = offset
-        rootLayoutOffsets[r.semanticsOwner.rootSemanticsNode.layoutInfo] = offset
-      }
-    }
-
-    val layoutWindowOffsets = IdentityHashMap<androidx.compose.ui.layout.LayoutInfo, Offset>()
-    fun resolveOffset(li: androidx.compose.ui.layout.LayoutInfo): Offset? {
-      var cur: androidx.compose.ui.layout.LayoutInfo? = li
-      while (cur != null) {
-        rootLayoutOffsets[cur]?.let {
-          return it
-        }
-        cur = cur.parentInfo
-      }
-      return null
-    }
-    fun indexSemanticsOffsets(node: SemanticsNode) {
-      resolveOffset(node.layoutInfo)?.let { layoutWindowOffsets[node.layoutInfo] = it }
-      node.children.forEach(::indexSemanticsOffsets)
-    }
-    for (r in composeRoots) {
-      indexSemanticsOffsets(r.semanticsOwner.unmergedRootSemanticsNode)
-      indexSemanticsOffsets(r.semanticsOwner.rootSemanticsNode)
-    }
-    fun indexGroupOffsets(g: androidx.compose.runtime.tooling.CompositionGroup) {
-      (g.node as? androidx.compose.ui.layout.LayoutInfo)?.let { li ->
-        resolveOffset(li)?.let { layoutWindowOffsets[li] = it }
-      }
-      g.compositionGroups.forEach(::indexGroupOffsets)
-    }
-    for (table in inspectionTables) {
-      table.compositionGroups.forEach(::indexGroupOffsets)
-    }
+    val layoutWindowOffsets =
+      OverlayWindowHelper.buildLayoutWindowOffsets(
+        mainDecorView = activity.window.decorView,
+        composeRoots = composeRoots,
+        tables = inspectionTables,
+        explicitWindowOffsets = explicitWindowOffsets,
+      )
 
     return AndroidSlotTreeExtractor.extract(
       tables = inspectionTables,
@@ -1248,18 +1123,11 @@ internal class VirtualClockComposeRenderer(
   }
 
   private fun collectUnmergedRoots(activity: HostRenderActivity): List<SemanticsNode> {
-    val roots = mutableListOf<SemanticsNode>()
-    fun walk(v: View) {
-      if (v is RootForTest) roots += v.semanticsOwner.unmergedRootSemanticsNode
-      if (v is ViewGroup) {
-        for (i in 0 until v.childCount) walk(v.getChildAt(i))
-      }
+    val globalViews =
+      WindowInspector.getGlobalWindowViews().filter { belongsToOffscreenTree(activity, it) }
+    return OverlayWindowHelper.collectComposeRoots(globalViews).map {
+      it.semanticsOwner.unmergedRootSemanticsNode
     }
-    for (win in
-      WindowInspector.getGlobalWindowViews().filter { belongsToOffscreenTree(activity, it) }) {
-      walk(win)
-    }
-    return roots
   }
 
   private fun buildOverrideContext(

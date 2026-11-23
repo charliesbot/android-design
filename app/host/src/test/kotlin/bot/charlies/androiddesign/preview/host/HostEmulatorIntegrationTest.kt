@@ -386,6 +386,58 @@ class HostEmulatorIntegrationTest {
         malResp.error.orEmpty().contains("SecurityException"),
       )
 
+      // 5b. Uncaught recomposition exception returns structured error without crashing :sandbox
+      val recompBoomSource =
+        """
+        import androidx.compose.material3.Text
+        import androidx.compose.runtime.LaunchedEffect
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.setValue
+        import bot.charlies.androiddesign.preview.kit.designBoard
+        val preview = designBoard("RecompBoom") {
+          screen("main") {
+            var trigger by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) { trigger = true }
+            if (trigger) error("boom in recomposition")
+            Text("initial")
+          }
+        }
+        """
+          .trimIndent()
+      val boomClasses =
+        HostClassCompiler.compileToClasses("Boom.explore.kt", recompBoomSource)
+          as HostCompileOutcome.Classes
+      val boomDex = HostClassCompiler.compileToDex(boomClasses, meta)
+      val (boomResp, _) =
+        sendBatch(
+          output = output,
+          input = input,
+          dexBytes = boomDex,
+          entryClass = boomClasses.entryClass,
+          request =
+            DeviceBatchRequest(
+              dexHash = sha256Hex(boomDex).take(16),
+              entryClass = boomClasses.entryClass,
+              sourceFile = "Boom.explore.kt",
+              sourceText = recompBoomSource,
+              targets =
+                listOf(DeviceRenderTarget("RecompBoom", "main", "light", densityScale = 1f)),
+            ),
+        )
+      assertFalse("Expected ok=false when recomposition throws: ${boomResp.error}", boomResp.ok)
+      assertTrue(
+        "Expected recomposition error message: ${boomResp.error}",
+        boomResp.error.orEmpty().contains("boom in recomposition"),
+      )
+      val afterBoomPing = sendPing(output, input)
+      assertEquals(
+        ":sandbox must remain alive with same PID after recomposition error",
+        ping.pid,
+        afterBoomPing.pid,
+      )
+
       // 6. Simulated hang triggers watchdog timeout + :sandbox process kill + clean restart
       val oldPid = ping.pid
       val hangSource =

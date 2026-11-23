@@ -455,28 +455,30 @@ internal fun BoardContent(
         val shapeMod = if (roundClip) Modifier.clip(CircleShape) else Modifier
         val contentBox: @Composable () -> Unit = {
           Box(Modifier.size(frameSize).background(Color.Black).then(shapeMod)) {
-            val backStack =
-              remember(screen.id, screen.backStack) {
-                mutableStateListOf<String>().apply { addAll(screen.backStack) }
-              }
-            NavDisplay(
-              backStack = backStack,
-              modifier = Modifier.fillMaxSize(),
-              sceneStrategies = listOf(rememberSwipeDismissableSceneStrategy<String>()),
-              onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
-              entryProvider = { entryId ->
-                val entryScreen = direction.screens.getValue(entryId)
-                NavEntry(entryId) {
-                  Box(Modifier.fillMaxSize()) {
-                    entryScreen.content { next ->
-                      if (next in direction.screens && backStack.lastOrNull() != next) {
-                        backStack.add(next)
+            key(direction.name) {
+              val backStack =
+                remember(direction.name, screen.id, screen.backStack) {
+                  mutableStateListOf<String>().apply { addAll(screen.backStack) }
+                }
+              NavDisplay(
+                backStack = backStack,
+                modifier = Modifier.fillMaxSize(),
+                sceneStrategies = listOf(rememberSwipeDismissableSceneStrategy<String>()),
+                onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
+                entryProvider = { entryId ->
+                  val entryScreen = direction.screens.getValue(entryId)
+                  NavEntry(entryId) {
+                    Box(Modifier.fillMaxSize()) {
+                      entryScreen.content { next ->
+                        if (next in direction.screens && backStack.lastOrNull() != next) {
+                          backStack.add(next)
+                        }
                       }
                     }
                   }
-                }
-              },
-            )
+                },
+              )
+            }
             activeOverlay?.content?.invoke()
           }
         }
@@ -515,7 +517,7 @@ internal fun BoardContent(
     ProposalTheme(designSystem, dark) {
       Surface(containerModifier, color = MaterialTheme.colorScheme.background) {
         val sizeClass = SizeClass.forWidth(frameWidthDp)
-        key(sizeClass) {
+        key(sizeClass, direction.name) {
           val listDetailStrategy = rememberListDetailSceneStrategy<String>(directive = directive)
           val supportingStrategy =
             rememberSupportingPaneSceneStrategy<String>(directive = directive)
@@ -526,7 +528,7 @@ internal fun BoardContent(
               PaneStrategyKind.Single -> emptyList()
             }
           val backStack =
-            remember(screen.id, screen.backStack) {
+            remember(direction.name, screen.id, screen.backStack) {
               mutableStateListOf<String>().apply { addAll(screen.backStack) }
             }
           val placeholder = direction.placeholder
