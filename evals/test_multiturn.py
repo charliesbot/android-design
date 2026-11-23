@@ -102,7 +102,7 @@ class MultiTurnTests(unittest.TestCase):
         calls = []
 
         def fake_execute(backend, prompt, cwd, **kwargs):
-            calls.append((backend, kwargs.get('resume_session'), prompt))
+            calls.append((backend, kwargs.get('resume_session'), kwargs.get('preview_backend'), kwargs.get('cache_dir'), prompt))
             turn_idx = len(calls)
             return {
                 'backend': 'claude',
@@ -126,15 +126,20 @@ class MultiTurnTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / 'run'
+            cache_dir = Path(tmp) / 'cache'
             with mock.patch.object(multiturn, 'execute', side_effect=fake_execute), \
-                    mock.patch.object(multiturn.eval_run, '_stop_preview_server'), \
+                    mock.patch.object(multiturn.eval_run, '_stop_preview_server') as stopper, \
                     mock.patch.object(multiturn.eval_run, 'render', return_value=(['/tmp/a.png'], None)), \
                     mock.patch.object(multiturn, 'run_checks', return_value={'C-valid': {'pass': True}}):
                 report = multiturn.run_multiturn(
-                    out, max_turns=3, binary='/tmp/bin', jar='/tmp/w.jar',
+                    out, max_turns=3, binary='/tmp/bin', src='/tmp/app', bdir='/tmp/bdir', cache_dir=cache_dir,
                 )
             self.assertEqual([c[0] for c in calls], ['claude', 'claude', 'claude'])
             self.assertEqual([c[1] for c in calls], [None, 'sess-fixed-1', 'sess-fixed-1'])
+            self.assertEqual([c[2] for c in calls], ['robolectric', 'robolectric', 'robolectric'])
+            self.assertEqual(len({c[3] for c in calls}), 1)
+            stopper.assert_called_once()
+            self.assertEqual(report['pipeline'], 'v6')
             self.assertEqual(report['turns_count'], 3)
             self.assertEqual(report['totals']['check_calls'], 3)
             self.assertEqual(report['totals']['cost'], 0.15)

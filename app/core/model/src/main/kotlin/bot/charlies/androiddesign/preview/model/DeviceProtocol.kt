@@ -163,9 +163,24 @@ data class DeviceLiveStateRequest(
 )
 
 @Serializable
+data class RobolectricTargetResult(
+  val direction: String,
+  val screen: String,
+  val viewName: String,
+  val overlayId: String? = null,
+  val densityScale: Float = 2f,
+  val renderMs: Long = 0L,
+  val tree: LayoutTree? = null,
+  val endTree: LayoutTree? = null,
+  val pngPath: String? = null,
+  val endPngPath: String? = null,
+  val error: String? = null,
+)
+
+@Serializable
 data class RobolectricRenderRequest(
   val id: String = "1",
-  val sourcePath: String,
+  val sourcePath: String = "",
   val designPath: String? = null,
   val views: List<String>? = null,
   val screens: List<String>? = null,
@@ -174,6 +189,10 @@ data class RobolectricRenderRequest(
   val outDir: String? = null,
   val density: Float = 2f,
   val encodePng: Boolean = true,
+  val mode: String = "render",
+  val includeOverlays: Boolean = false,
+  val targets: List<DeviceRenderTarget>? = null,
+  val writeReport: Boolean = false,
 )
 
 @Serializable
@@ -191,4 +210,8 @@ data class RobolectricRenderResponse(
   val endTrees: List<LayoutTree> = emptyList(),
   val writtenFiles: List<String> = emptyList(),
   val error: String? = null,
+  val boardMeta: DeviceBoardMeta? = null,
+  val boardTheme: ThemeOverride? = null,
+  val designTheme: ThemeOverride? = null,
+  val results: List<RobolectricTargetResult> = emptyList(),
 )

@@ -17,6 +17,7 @@ import androidx.compose.material3.adaptive.navigation3.SupportingPaneSceneStrate
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberSupportingPaneSceneStrategy
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
@@ -25,9 +26,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.WindowInfo
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
@@ -452,122 +457,143 @@ internal fun BoardContent(
       "No screen '$screenId' in direction '${direction.name}'"
     }
   val frameSize = DpSize(frameWidthDp.dp, frameHeightDp.dp)
+  val density = LocalDensity.current
+  val boardWindowInfo =
+    remember(frameWidthDp, frameHeightDp, density.density) {
+      BoardWindowInfo(
+        containerSize =
+          IntSize(
+            width = (frameWidthDp * density.density).roundToInt().coerceAtLeast(1),
+            height = (frameHeightDp * density.density).roundToInt().coerceAtLeast(1),
+          ),
+        containerDpSize = frameSize,
+      )
+    }
   val containerModifier = if (fillContainer) Modifier.fillMaxSize() else Modifier.size(frameSize)
   val activeOverlay = overlayId?.let { id -> direction.overlays.firstOrNull { it.id == id } }
   ProvideInertLocals(explorationDir, assetResolver) {
-    if (board.surface == BoardSurface.Wear) {
-      ProvideWearTheme(designSystem) {
-        val shapeMod = if (roundClip) Modifier.clip(CircleShape) else Modifier
-        val contentBox: @Composable () -> Unit = {
-          Box(Modifier.size(frameSize).background(Color.Black).then(shapeMod)) {
-            key(direction.name) {
-              val backStack =
-                remember(direction.name, screen.id, screen.backStack) {
-                  mutableStateListOf<String>().apply { addAll(screen.backStack) }
-                }
-              NavDisplay(
-                backStack = backStack,
-                modifier = Modifier.fillMaxSize(),
-                sceneStrategies = listOf(rememberSwipeDismissableSceneStrategy<String>()),
-                onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
-                entryProvider = { entryId ->
-                  val entryScreen = direction.screens.getValue(entryId)
-                  NavEntry(entryId) {
-                    Box(Modifier.fillMaxSize()) {
-                      entryScreen.content { next ->
-                        if (next in direction.screens && backStack.lastOrNull() != next) {
-                          backStack.add(next)
+    CompositionLocalProvider(LocalWindowInfo provides boardWindowInfo) {
+      if (board.surface == BoardSurface.Wear) {
+        ProvideWearTheme(designSystem) {
+          val shapeMod = if (roundClip) Modifier.clip(CircleShape) else Modifier
+          val contentBox: @Composable () -> Unit = {
+            Box(Modifier.size(frameSize).background(Color.Black).then(shapeMod)) {
+              key(direction.name) {
+                val backStack =
+                  remember(direction.name, screen.id, screen.backStack) {
+                    mutableStateListOf<String>().apply { addAll(screen.backStack) }
+                  }
+                NavDisplay(
+                  backStack = backStack,
+                  modifier = Modifier.fillMaxSize(),
+                  sceneStrategies = listOf(rememberSwipeDismissableSceneStrategy<String>()),
+                  onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
+                  entryProvider = { entryId ->
+                    val entryScreen = direction.screens.getValue(entryId)
+                    NavEntry(entryId) {
+                      Box(Modifier.fillMaxSize()) {
+                        entryScreen.content { next ->
+                          if (next in direction.screens && backStack.lastOrNull() != next) {
+                            backStack.add(next)
+                          }
                         }
                       }
                     }
-                  }
-                },
-              )
+                  },
+                )
+              }
+              activeOverlay?.content?.invoke()
             }
-            activeOverlay?.content?.invoke()
           }
-        }
-        if (fillContainer) {
-          Box(
-            Modifier.fillMaxSize().background(Color.Black),
-            contentAlignment = androidx.compose.ui.Alignment.Center,
-          ) {
+          if (fillContainer) {
+            Box(
+              Modifier.fillMaxSize().background(Color.Black),
+              contentAlignment = androidx.compose.ui.Alignment.Center,
+            ) {
+              contentBox()
+            }
+          } else {
             contentBox()
           }
-        } else {
-          contentBox()
         }
+        return@CompositionLocalProvider
       }
-      return@ProvideInertLocals
-    }
 
-    val directive = rememberBoardDirective(frameSize)
-    val twoPanes = directive.maxHorizontalPartitions >= 2
-    val emptyDetailScreen =
-      if (
-        direction.strategyKind == PaneStrategyKind.ListDetail &&
-          screen.isListPane &&
-          !screen.hasPlaceholder &&
-          twoPanes
-      ) {
-        screen.id
-      } else {
-        null
+      val directive = rememberBoardDirective(frameSize)
+      val twoPanes = directive.maxHorizontalPartitions >= 2
+      val emptyDetailScreen =
+        if (
+          direction.strategyKind == PaneStrategyKind.ListDetail &&
+            screen.isListPane &&
+            !screen.hasPlaceholder &&
+            twoPanes
+        ) {
+          screen.id
+        } else {
+          null
+        }
+      DisposableEffect(emptyDetailScreen) {
+        onEmptyDetail?.invoke(emptyDetailScreen)
+        onDispose { onEmptyDetail?.invoke(null) }
       }
-    DisposableEffect(emptyDetailScreen) {
-      onEmptyDetail?.invoke(emptyDetailScreen)
-      onDispose { onEmptyDetail?.invoke(null) }
-    }
 
-    ProposalTheme(designSystem, dark) {
-      Surface(containerModifier, color = MaterialTheme.colorScheme.background) {
-        val sizeClass = SizeClass.forWidth(frameWidthDp)
-        key(sizeClass, direction.name) {
-          val listDetailStrategy = rememberListDetailSceneStrategy<String>(directive = directive)
-          val supportingStrategy =
-            rememberSupportingPaneSceneStrategy<String>(directive = directive)
-          val strategies =
-            when (direction.strategyKind) {
-              PaneStrategyKind.ListDetail -> listOf(listDetailStrategy)
-              PaneStrategyKind.SupportingPane -> listOf(supportingStrategy)
-              PaneStrategyKind.Single -> emptyList()
-            }
-          val backStack =
-            remember(direction.name, screen.id, screen.backStack) {
-              mutableStateListOf<String>().apply { addAll(screen.backStack) }
-            }
-          val placeholder = direction.placeholder
-          NavDisplay(
-            backStack = backStack,
-            modifier = Modifier.fillMaxSize(),
-            sceneStrategies = strategies,
-            onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
-            entryProvider = { entryId ->
-              val entryScreen = direction.screens.getValue(entryId)
-              val metadata = paneMetadata(entryScreen.paneRole, direction.strategyKind, placeholder)
-              NavEntry(entryId, metadata = metadata) {
-                val paneMod =
-                  if (tagPanesForInspection) {
-                    Modifier.fillMaxSize().semantics { set(ExplorePaneKey, entryId) }
-                  } else {
-                    Modifier.fillMaxSize()
-                  }
-                Box(paneMod) {
-                  entryScreen.content { next ->
-                    if (next in direction.screens && backStack.lastOrNull() != next) {
-                      backStack.add(next)
+      ProposalTheme(designSystem, dark) {
+        Surface(containerModifier, color = MaterialTheme.colorScheme.background) {
+          val sizeClass = SizeClass.forWidth(frameWidthDp)
+          key(sizeClass, direction.name) {
+            val listDetailStrategy = rememberListDetailSceneStrategy<String>(directive = directive)
+            val supportingStrategy =
+              rememberSupportingPaneSceneStrategy<String>(directive = directive)
+            val strategies =
+              when (direction.strategyKind) {
+                PaneStrategyKind.ListDetail -> listOf(listDetailStrategy)
+                PaneStrategyKind.SupportingPane -> listOf(supportingStrategy)
+                PaneStrategyKind.Single -> emptyList()
+              }
+            val backStack =
+              remember(direction.name, screen.id, screen.backStack) {
+                mutableStateListOf<String>().apply { addAll(screen.backStack) }
+              }
+            val placeholder = direction.placeholder
+            NavDisplay(
+              backStack = backStack,
+              modifier = Modifier.fillMaxSize(),
+              sceneStrategies = strategies,
+              onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
+              entryProvider = { entryId ->
+                val entryScreen = direction.screens.getValue(entryId)
+                val metadata =
+                  paneMetadata(entryScreen.paneRole, direction.strategyKind, placeholder)
+                NavEntry(entryId, metadata = metadata) {
+                  val paneMod =
+                    if (tagPanesForInspection) {
+                      Modifier.fillMaxSize().semantics { set(ExplorePaneKey, entryId) }
+                    } else {
+                      Modifier.fillMaxSize()
+                    }
+                  Box(paneMod) {
+                    entryScreen.content { next ->
+                      if (next in direction.screens && backStack.lastOrNull() != next) {
+                        backStack.add(next)
+                      }
                     }
                   }
                 }
-              }
-            },
-          )
+              },
+            )
+          }
+          activeOverlay?.content?.invoke()
         }
-        activeOverlay?.content?.invoke()
       }
     }
   }
 }
+
+private class BoardWindowInfo(
+  override val containerSize: IntSize,
+  override val containerDpSize: DpSize,
+  override val isWindowFocused: Boolean = true,
+) : WindowInfo
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable

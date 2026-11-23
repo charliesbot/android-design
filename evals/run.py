@@ -15,7 +15,23 @@ from pathlib import Path
 from checks import read_report, run as run_checks
 from judge import judge, parse, aggregate, validate_runs, SCHEMA, prompt_for as judge_prompt
 from backends import BACKENDS, execute
-from preview_app import JAR_ENV, NO_OPEN_ENV, app_binary, worker_jar
+from preview_app import (
+    BACKEND_ENV,
+    BOOTSTRAP_DIR_ENV,
+    CACHE_DIR_ENV,
+    DEFAULT_EVAL_BACKEND,
+    JAR_ENV,
+    NO_OPEN_ENV,
+    ROBOLECTRIC_CP_ENV,
+    RobolectricWorker,
+    SERVER_CP_ENV,
+    SRC_ENV,
+    app_binary,
+    bootstrap_dir,
+    preview_src,
+    robolectric_cp,
+    server_cp,
+)
 from report import METRIC_KEYS, generator_medians, label, write_report, write_summary
 
 HERE = Path(__file__).resolve().parent
@@ -114,8 +130,25 @@ def generator_metrics_from(reply):
     return {key: reply.get(key) for key in METRIC_KEYS}
 
 
-def _stop_preview_server(case_dir, binary, jar):
-    env = {**os.environ, JAR_ENV: str(jar), NO_OPEN_ENV: '1'}
+def _stop_preview_server(case_dir, binary, *, src=None, bdir=None, backend=DEFAULT_EVAL_BACKEND, cache_dir=None):
+    env = dict(os.environ)
+    env.pop(JAR_ENV, None)
+    env[NO_OPEN_ENV] = '1'
+    if src is not None:
+        env[SRC_ENV] = str(src)
+    if bdir is not None:
+        bpath = Path(bdir)
+        env[BOOTSTRAP_DIR_ENV] = str(bpath)
+        env.pop(SERVER_CP_ENV, None)
+        env.pop(ROBOLECTRIC_CP_ENV, None)
+        if (bpath / 'server.cp').is_file():
+            env[SERVER_CP_ENV] = str(bpath / 'server.cp')
+        if (bpath / 'robolectric.cp').is_file():
+            env[ROBOLECTRIC_CP_ENV] = str(bpath / 'robolectric.cp')
+    if backend is not None:
+        env[BACKEND_ENV] = str(backend)
+    if cache_dir is not None:
+        env[CACHE_DIR_ENV] = str(cache_dir)
     try:
         subprocess.run(
             [str(binary), 'stop', str(case_dir)],
@@ -125,25 +158,66 @@ def _stop_preview_server(case_dir, binary, jar):
         pass
 
 
-def generate(case_dir, backend, model=None):
+def _resolve_bootstrap_context():
     binary = app_binary()
-    jar = worker_jar()
+    src = preview_src()
+    bdir = bootstrap_dir()
+    server_cp()
+    robolectric_cp()
+    return binary, src, bdir
+
+
+def generate(case_dir, backend, model=None, *, cache_dir=None, stop_server=True):
+    binary, src, bdir = _resolve_bootstrap_context()
     try:
-        reply = execute(backend, (case_dir / 'prompt.md').read_text(), case_dir,
-                        role='generator', model=model, mcp_binary=binary, mcp_jar=jar)
+        reply = execute(
+            backend,
+            (case_dir / 'prompt.md').read_text(),
+            case_dir,
+            role='generator',
+            model=model,
+            mcp_binary=binary,
+            preview_src=src,
+            bootstrap_dir=bdir,
+            preview_backend=DEFAULT_EVAL_BACKEND,
+            cache_dir=cache_dir,
+            client_timeout_ms=120000,
+        )
     finally:
-        _stop_preview_server(case_dir, binary, jar)
+        if stop_server:
+            _stop_preview_server(
+                case_dir,
+                binary,
+                src=src,
+                bdir=bdir,
+                backend=DEFAULT_EVAL_BACKEND,
+                cache_dir=cache_dir,
+            )
     (case_dir / 'agent.json').write_text(json.dumps(reply, indent=2))
     (case_dir / 'generator-metrics.json').write_text(json.dumps(generator_metrics_from(reply), indent=2))
     return reply
 
 
-def render(case_dir):
-    """Renders the exploration headlessly with the supervisor + worker into <case>/renders/ (PNGs, trees, report.json).
+def _format_render_log(resp):
+    lines = [
+        f"ok={resp.get('ok')} valid={resp.get('valid')} pass={resp.get('pass')} "
+        f"compileMs={resp.get('compileMs', 0)} renderMs={resp.get('renderMs', 0)}"
+    ]
+    if resp.get('error'):
+        lines.append(f"error: {resp['error']}")
+    for err in resp.get('errors') or []:
+        if isinstance(err, dict):
+            lines.append(f"validation: {err.get('path', '')}: {err.get('message', '')}")
+    return '\n'.join(lines) + '\n'
 
-    Stale renders are removed first. Returns (images, error). An invalid exploration (exit 2) or failing findings
-    (exit 1) are not errors here: report.json records them and checks.py reports them. Only an infrastructure
-    failure (no report.json, timeout) is an error. Missing supervisor or JAR raises RuntimeError.
+
+def render(case_dir, *, worker=None):
+    """Renders the exploration headlessly via the persistent Robolectric worker into <case>/renders/.
+
+    Stale renders are removed first. Returns (images, error). An invalid exploration (valid=false
+    written to report.json) or failing findings are not infrastructure errors here: report.json records
+    them and checks.py reports them. Only missing prerequisites, worker crashes, or missing report.json
+    count as infrastructure errors. Missing CLI/bootstrap files raise RuntimeError.
     """
     renders = case_dir / 'renders'
     if renders.is_symlink():
@@ -151,23 +225,24 @@ def render(case_dir):
     if renders.exists():
         shutil.rmtree(renders)
     (case_dir / 'render.log').unlink(missing_ok=True)
-    binary = app_binary()
-    jar = worker_jar()
-    command = [str(binary), 'render', str(proposal_path(case_dir)), '--out', str(renders)]
     design = case_dir / DESIGN_MD
-    if design.is_file():
-        command += ['--design', str(design)]
-    env = {**os.environ, JAR_ENV: str(jar), NO_OPEN_ENV: '1'}
+    design_arg = design if design.is_file() else None
+    if worker is None:
+        bdir = bootstrap_dir()
+        rcp = robolectric_cp()
     try:
-        done = subprocess.run(command, cwd=case_dir, env=env, capture_output=True, text=True, timeout=900,
-                              stdin=subprocess.DEVNULL)
-    except (OSError, subprocess.TimeoutExpired) as error:
+        if worker is not None:
+            resp = worker.render_report(proposal_path(case_dir), renders, design_path=design_arg)
+        else:
+            with RobolectricWorker(robolectric_cp_path=rcp, bootstrap_dir_path=bdir) as oneshot:
+                resp = oneshot.render_report(proposal_path(case_dir), renders, design_path=design_arg)
+    except (OSError, RuntimeError, ValueError) as error:
         (case_dir / 'render.log').write_text(str(error))
         return [], f'render failed: {error}'
-    log = done.stdout + done.stderr
+    log = _format_render_log(resp)
     (case_dir / 'render.log').write_text(log)
-    if done.returncode not in (0, 1, 2) or not (renders / 'report.json').is_file():
-        return [], f'render exited {done.returncode} without report.json: {log[-1500:]}'
+    if resp.get('ok') is False or not (renders / 'report.json').is_file():
+        return [], f"render failed without report.json: {log[-1500:]}"
     return [r['png_path'] for r in report_renders(case_dir)], None
 
 
@@ -272,10 +347,10 @@ def overall_status(checks, verdict):
     return 'passed' if all(v['pass'] for v in verdict.values()) else 'failed'
 
 
-def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1):
+def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1, *, worker=None):
     started = time.time()
     directory = out / case['name']
-    images, render_error = render(directory)
+    images, render_error = render(directory, worker=worker)
     renders = [{k: r.get(k) for k in ('screen', 'view', 'png', 'pass', 'end') if k in r} for r in report_renders(directory)]
     checks = run_checks(directory, case['surface'])
     if render_error:
@@ -394,20 +469,64 @@ def main():
                               status=overall_status(result['checks'], verdict))
                 (out / result['name'] / 'judge.json').write_text(json.dumps(verdict, indent=2))
         else:
-            def work(case):
-                generation_error = None
-                if args.command == 'run':
-                    try:
-                        generate(out / case['name'], args.generator, args.generator_model)
-                    except RuntimeError as error:
-                        generation_error = str(error)
-                result = evaluate_case(case, out, None if generation_error else args.judge, args.judge_model, args.judge_runs)
-                if generation_error:
-                    result['checks']['C-generation'] = {'pass': False, 'detail': generation_error}
-                    result['status'] = 'failed'
-                return result
-            with ThreadPoolExecutor(max_workers=args.parallel) as pool:
-                results = list(pool.map(work, cases))
+            eval_cache_dir = None
+            binary = None
+            src = None
+            bdir = None
+            if args.command == 'run':
+                binary, src, bdir = _resolve_bootstrap_context()
+                eval_cache_dir = (
+                    Path.home() / '.cache' / 'android-design-preview' / f'eval-run-{os.getpid()}-{int(time.time())}'
+                ).resolve()
+                eval_cache_dir.mkdir(parents=True, exist_ok=True)
+            else:
+                bdir = bootstrap_dir()
+                robolectric_cp()
+
+            try:
+                with RobolectricWorker(
+                    robolectric_cp_path=robolectric_cp(),
+                    bootstrap_dir_path=bdir,
+                ) as shared_worker:
+                    def work(case):
+                        generation_error = None
+                        if args.command == 'run':
+                            try:
+                                generate(
+                                    out / case['name'],
+                                    args.generator,
+                                    args.generator_model,
+                                    cache_dir=eval_cache_dir,
+                                    stop_server=False,
+                                )
+                            except RuntimeError as error:
+                                generation_error = str(error)
+                        result = evaluate_case(
+                            case,
+                            out,
+                            None if generation_error else args.judge,
+                            args.judge_model,
+                            args.judge_runs,
+                            worker=shared_worker,
+                        )
+                        if generation_error:
+                            result['checks']['C-generation'] = {'pass': False, 'detail': generation_error}
+                            result['status'] = 'failed'
+                        return result
+
+                    with ThreadPoolExecutor(max_workers=args.parallel) as pool:
+                        results = list(pool.map(work, cases))
+            finally:
+                if args.command == 'run' and binary is not None and eval_cache_dir is not None:
+                    _stop_preview_server(
+                        out,
+                        binary,
+                        src=src,
+                        bdir=bdir,
+                        backend=DEFAULT_EVAL_BACKEND,
+                        cache_dir=eval_cache_dir,
+                    )
+                    shutil.rmtree(eval_cache_dir, ignore_errors=True)
         write_results(out, results, args.no_open)
         return exit_code(results)
     except (OSError, ValueError, RuntimeError) as error:

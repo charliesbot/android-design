@@ -60,6 +60,7 @@ data class BackendCompileOutput(
   val boardName: String?,
   val boardMeta: BoardMeta?,
   val androidData: AndroidCompiledData?,
+  val boardTheme: ThemeOverride? = null,
 )
 
 class SandboxWatchdogException(message: String) : RuntimeException(message)
@@ -393,6 +394,7 @@ class AndroidPreviewBackend(
           boardName = devMeta.boardName,
           boardMeta = boardMeta,
           androidData = androidData,
+          boardTheme = preload.boardTheme,
         )
       }
     }
@@ -884,7 +886,7 @@ internal fun DesignSystemResolver.resolveWithOverrides(
     )
   }
   val android = entry.androidData
-  val baseTheme = android?.boardTheme
+  val baseTheme = entry.boardTheme ?: android?.boardTheme
   val surfaceSpec = if (entry.surface == BoardSurface.Wear) WearSurface else PhoneSurface
   val overriddenBoard =
     if (seedOverride == null && variantOverride == null) {

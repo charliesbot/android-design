@@ -42,9 +42,27 @@ class BackendTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'denied'):
                 backends.execute('claude', 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY)
 
-    def test_claude_generator_uses_cli_allowlist_and_case_folder_edits_without_mcp(self):
-        with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, '{"result": "ok"}', '')) as call:
-            backends.execute('claude', 'brief', Path('/tmp/case'), role='generator', mcp_binary=BINARY, mcp_jar='/tmp/w.jar')
+    def test_claude_generator_uses_cli_allowlist_and_v6_env_and_strips_stale_jar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bdir = Path(tmp) / 'bootstrap'
+            bdir.mkdir()
+            (bdir / 'server.cp').write_text('-cp\na.jar\n')
+            (bdir / 'robolectric.cp').write_text('-cp\nb.jar\n')
+            custom_cache = Path(tmp) / 'eval-cache'
+            with patch.dict('backends.os.environ', {'ANDROID_DESIGN_PREVIEW_JAR': '/stale/legacy.jar'}), \
+                    patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, '{"result": "ok"}', '')) as call:
+                backends.execute(
+                    'claude',
+                    'brief',
+                    Path('/tmp/case'),
+                    role='generator',
+                    mcp_binary=BINARY,
+                    preview_src='/tmp/repo/app',
+                    bootstrap_dir=bdir,
+                    preview_backend='robolectric',
+                    cache_dir=custom_cache,
+                    client_timeout_ms=120000,
+                )
         cmd = call.call_args.args[0]
         env = call.call_args.kwargs['env']
         self.assertNotIn('--mcp-config', cmd)
@@ -60,9 +78,17 @@ class BackendTests(unittest.TestCase):
                 f'Write(/{Path("/tmp/case").resolve()}/**)',
             ],
         )
+        self.assertIn(str(custom_cache.resolve()), cmd)
         self.assertEqual(env['PATH'].split(os.pathsep)[0], str(Path(BINARY).resolve().parent))
         self.assertEqual(env['ANDROID_DESIGN_NO_OPEN'], '1')
-        self.assertEqual(env['ANDROID_DESIGN_PREVIEW_JAR'], '/tmp/w.jar')
+        self.assertNotIn('ANDROID_DESIGN_PREVIEW_JAR', env)
+        self.assertEqual(env['ANDROID_DESIGN_PREVIEW_SRC'], '/tmp/repo/app')
+        self.assertEqual(env['ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR'], str(bdir))
+        self.assertEqual(env['ANDROID_DESIGN_PREVIEW_SERVER_CP'], str(bdir / 'server.cp'))
+        self.assertEqual(env['ANDROID_DESIGN_PREVIEW_ROBOLECTRIC_CP'], str(bdir / 'robolectric.cp'))
+        self.assertEqual(env['ANDROID_DESIGN_PREVIEW_BACKEND'], 'robolectric')
+        self.assertEqual(env['ANDROID_DESIGN_CACHE_DIR'], str(custom_cache))
+        self.assertEqual(env['ANDROID_DESIGN_CLIENT_TIMEOUT_MS'], '120000')
 
     def test_claude_judge_gets_no_mcp_or_bash(self):
         with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, '{"result": "ok"}', '')) as call:
@@ -77,16 +103,27 @@ class BackendTests(unittest.TestCase):
             return subprocess.CompletedProcess(cmd, 0, '', '')
 
         with patch('backends.subprocess.run', side_effect=execute) as call:
-            backends.execute('codex', 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY, mcp_jar='/tmp/w.jar')
+            backends.execute(
+                'codex',
+                'brief',
+                Path('/tmp'),
+                role='generator',
+                mcp_binary=BINARY,
+                preview_src='/tmp/repo/app',
+                preview_backend='robolectric',
+            )
         cmd = call.call_args.args[0]
         env = call.call_args.kwargs['env']
         overrides = [cmd[i + 1] for i, part in enumerate(cmd) if part == '-c']
         self.assertIn('sandbox_workspace_write.network_access=true', overrides)
-        self.assertTrue(any(o.startswith('sandbox_workspace_write.writable_roots=') for o in overrides))
+        roots_override = next(o for o in overrides if o.startswith('sandbox_workspace_write.writable_roots='))
+        roots = json.loads(roots_override.split('=', 1)[1])
+        self.assertIn(str((Path.home() / '.gradle').resolve()), roots)
         self.assertFalse(any('mcp_servers' in o for o in overrides))
         self.assertEqual(env['PATH'].split(os.pathsep)[0], str(Path(BINARY).resolve().parent))
         self.assertEqual(env['ANDROID_DESIGN_NO_OPEN'], '1')
-        self.assertEqual(env['ANDROID_DESIGN_PREVIEW_JAR'], '/tmp/w.jar')
+        self.assertEqual(env['ANDROID_DESIGN_PREVIEW_SRC'], '/tmp/repo/app')
+        self.assertEqual(env['ANDROID_DESIGN_PREVIEW_BACKEND'], 'robolectric')
         self.assertEqual(cmd[-1], '-')
 
     def test_codex_judge_gets_no_sandbox_network_override(self):

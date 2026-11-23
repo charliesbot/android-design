@@ -150,7 +150,10 @@ class PreviewHttpServer(
       coldBudgetMs = coldBudgetMs,
       warmBudgetMs = warmBudgetMs,
       onTimeout = { job -> handleWatchdogTimeout(job) },
-      onHalt = onWatchdogHalt,
+      onHalt = {
+        runCatching { effectiveBackend.close() }
+        onWatchdogHalt()
+      },
     )
 
   val renderQueue: RenderQueue =

@@ -9,7 +9,10 @@ import judge
 import run
 
 BINARY = '/Apps/AndroidDesignPreview'
-JAR = '/Apps/android-design-preview.jar'
+SRC_DIR = '/Apps/app'
+BOOTSTRAP_DIR = '/Apps/app/host/build/bootstrap'
+ROBOLECTRIC_CP = '/Apps/app/host/build/bootstrap/robolectric.cp'
+SERVER_CP = '/Apps/app/host/build/bootstrap/server.cp'
 VIEWS = ('light', 'dark', 'foldable', 'tablet', 'desktop')
 
 
@@ -51,11 +54,33 @@ def write_report(directory, screens=('plates',), views=VIEWS, *, valid=True, fai
     return [str(p.resolve()) for p in sorted(out.glob('*.png'))]
 
 
+def fake_worker(directory, *, ok=True, valid=True, report_kwargs=None):
+    calls = []
+
+    class Worker:
+        def render_report(self, source_path, out_dir, *, design_path=None, timeout=900):
+            calls.append({'source_path': Path(source_path), 'out_dir': Path(out_dir), 'design_path': design_path})
+            if report_kwargs is not False:
+                write_report(directory, valid=valid, **(report_kwargs or {}))
+            return {'id': 'eval-1', 'ok': ok, 'valid': valid, 'pass': ok and valid, 'compileMs': 5, 'renderMs': 12}
+
+        def close(self):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    return Worker(), calls
+
+
 def fake_render(directory, **kwargs):
-    def fake_run(command, **options):
-        write_report(directory, **kwargs)
-        return subprocess.CompletedProcess(command, 0, 'ok', '')
-    return fake_run
+    def fake_render_fn(case_dir, *, worker=None):
+        images = write_report(directory, **kwargs)
+        return images, None
+    return fake_render_fn
 
 
 class PrepareTest(unittest.TestCase):
@@ -153,7 +178,7 @@ class PrepareTest(unittest.TestCase):
             directory = out / 'workout'
             fake_case(directory)
             (out / 'rubric.md').write_text('Rubric')
-            with mock.patch('subprocess.run', fake_render(directory, screens=('main',), views=('watch', 'watch-large'))):
+            with mock.patch.object(run, 'render', fake_render(directory, screens=('main',), views=('watch', 'watch-large'))):
                 result = run.evaluate_case(case, out)
             self.assertEqual(set(result['checks']), {'C-valid', 'C-review'})
             self.assertEqual(result['surface'], 'wear')
@@ -235,22 +260,15 @@ class ArtifactPipelineTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 run.prepare_run([case], out)
 
-    def test_render_runs_the_app_headlessly_into_the_case_renders(self):
+    def test_render_runs_robolectric_worker_into_the_case_renders(self):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             proposal = fake_case(directory)
-            calls = []
-
-            def fake_run(command, **kwargs):
-                calls.append(command)
-                return fake_render(directory, screens=('plates', 'detail'))(command, **kwargs)
-
-            with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
-                    mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
-                    mock.patch.object(run.subprocess, 'run', side_effect=fake_run):
-                images, error = run.render(directory)
+            worker, calls = fake_worker(directory, report_kwargs={'screens': ('plates', 'detail')})
+            images, error = run.render(directory, worker=worker)
             self.assertIsNone(error)
-            self.assertEqual(calls[0], [BINARY, 'render', str(proposal), '--out', str(directory / 'renders')])
+            self.assertEqual(calls[0]['source_path'].resolve(), proposal.resolve())
+            self.assertEqual(calls[0]['out_dir'].resolve(), (directory / 'renders').resolve())
             self.assertEqual(len(images), 10)
             self.assertTrue(all(p.endswith('.png') for p in images))
             self.assertTrue(run.render_complete(run.report_renders(directory)))
@@ -259,13 +277,11 @@ class ArtifactPipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             fake_case(directory)
-            (directory / 'DESIGN.md').write_text('---\nversion: alpha\n---\n')
-            with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
-                    mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
-                    mock.patch.object(run.subprocess, 'run', side_effect=fake_render(directory)) as call:
-                run.render(directory)
-            command = call.call_args.args[0]
-            self.assertEqual(command[command.index('--design') + 1], str(directory / 'DESIGN.md'))
+            design = directory / 'DESIGN.md'
+            design.write_text('---\nversion: alpha\n---\n')
+            worker, calls = fake_worker(directory)
+            run.render(directory, worker=worker)
+            self.assertEqual(calls[0]['design_path'], design)
 
     def test_render_clears_stale_renders(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -274,10 +290,9 @@ class ArtifactPipelineTests(unittest.TestCase):
             write_report(directory, views=('light',))
             stale = directory / 'renders/old.png'
             stale.write_bytes(b'old')
-            with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
-                    mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
-                    mock.patch.object(run.subprocess, 'run', side_effect=fake_render(directory, views=('dark',))):
-                images, error = run.render(directory)
+            worker, _ = fake_worker(directory, report_kwargs={'views': ('dark',)})
+            images, error = run.render(directory, worker=worker)
+            self.assertIsNone(error)
             self.assertFalse(stale.exists())
             self.assertEqual([Path(p).name for p in images], ['plates-dark.png'])
 
@@ -285,15 +300,8 @@ class ArtifactPipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             fake_case(directory)
-
-            def invalid(command, **kwargs):
-                write_report(directory, views=(), valid=False)
-                return subprocess.CompletedProcess(command, 2, '', 'invalid')
-
-            with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
-                    mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
-                    mock.patch.object(run.subprocess, 'run', side_effect=invalid):
-                images, error = run.render(directory)
+            worker, _ = fake_worker(directory, ok=True, valid=False, report_kwargs={'views': ()})
+            images, error = run.render(directory, worker=worker)
             self.assertEqual(images, [])
             self.assertIsNone(error)
             self.assertFalse(run.render_complete(run.report_renders(directory)))
@@ -302,35 +310,71 @@ class ArtifactPipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             fake_case(directory)
-            crashed = subprocess.CompletedProcess([], 1, '', 'JVM crashed')
-            with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
-                    mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
-                    mock.patch.object(run.subprocess, 'run', return_value=crashed):
-                images, error = run.render(directory)
+            worker, _ = fake_worker(directory, ok=False, valid=False, report_kwargs=False)
+            images, error = run.render(directory, worker=worker)
             self.assertEqual(images, [])
-            self.assertIn('JVM crashed', error)
+            self.assertIn('without report.json', error)
 
-    def test_a_missing_app_stops_the_render_with_the_install_hint(self):
+    def test_a_missing_bootstrap_stops_the_render_with_the_bootstrap_hint(self):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             fake_case(directory)
-            hint = RuntimeError('The preview supervisor is missing')
-            with mock.patch.object(run, 'app_binary', side_effect=hint), self.assertRaisesRegex(RuntimeError, 'supervisor'):
+            hint = RuntimeError('Run `./gradlew :host:exportBootstrap` from app/')
+            with mock.patch.object(run, 'robolectric_cp', side_effect=hint), \
+                    self.assertRaisesRegex(RuntimeError, 'exportBootstrap'):
                 run.render(directory)
 
-    def test_generation_hands_the_app_to_the_agent_over_mcp(self):
+    def test_generation_hands_the_v6_cli_and_bootstrap_context_to_the_agent(self):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             (directory / 'prompt.md').write_text('brief')
             reply = {'message': 'done'}
             with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
-                    mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
-                    mock.patch.object(run, '_stop_preview_server'), \
+                    mock.patch.object(run, 'preview_src', return_value=Path(SRC_DIR)), \
+                    mock.patch.object(run, 'bootstrap_dir', return_value=Path(BOOTSTRAP_DIR)), \
+                    mock.patch.object(run, 'server_cp', return_value=Path(SERVER_CP)), \
+                    mock.patch.object(run, 'robolectric_cp', return_value=Path(ROBOLECTRIC_CP)), \
+                    mock.patch.object(run, '_stop_preview_server') as stopper, \
                     mock.patch.object(run, 'execute', return_value=reply) as agent:
-                run.generate(directory, 'claude')
+                run.generate(directory, 'claude', cache_dir=Path(tmp) / 'cache')
             self.assertEqual(agent.call_args.kwargs['mcp_binary'], Path(BINARY))
-            self.assertEqual(agent.call_args.kwargs['mcp_jar'], Path(JAR))
+            self.assertEqual(agent.call_args.kwargs['preview_src'], Path(SRC_DIR))
+            self.assertEqual(agent.call_args.kwargs['bootstrap_dir'], Path(BOOTSTRAP_DIR))
+            self.assertEqual(agent.call_args.kwargs['preview_backend'], 'robolectric')
+            self.assertEqual(agent.call_args.kwargs['cache_dir'], Path(tmp) / 'cache')
             self.assertEqual(agent.call_args.kwargs['role'], 'generator')
+            stopper.assert_called_once()
+
+    def test_run_main_shares_one_cache_dir_and_stops_server_once(self):
+        cases = [{'name': 'music', 'surface': 'phone', 'prompt': 'music', 'files': [], 'assertions': [{'type': 'code', 'id': 'C-valid'}, {'type': 'rubric', 'id': 'R-one'}]},
+                 {'name': 'settings', 'surface': 'phone', 'prompt': 'settings', 'files': [], 'assertions': [{'type': 'code', 'id': 'C-valid'}, {'type': 'rubric', 'id': 'R-one'}]}]
+        gen_calls = []
+
+        def fake_gen(case_dir, backend, model=None, *, cache_dir=None, stop_server=True):
+            gen_calls.append((case_dir.name, cache_dir, stop_server))
+            return {'wall_seconds': 5.0, 'turns': 1, 'message': 'ok'}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'run-out'
+            worker, _ = fake_worker(out / 'music', report_kwargs={'views': ('light',)})
+            with mock.patch.object(run, 'select_cases', return_value=cases), \
+                    mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
+                    mock.patch.object(run, 'preview_src', return_value=Path(SRC_DIR)), \
+                    mock.patch.object(run, 'bootstrap_dir', return_value=Path(BOOTSTRAP_DIR)), \
+                    mock.patch.object(run, 'server_cp', return_value=Path(SERVER_CP)), \
+                    mock.patch.object(run, 'robolectric_cp', return_value=Path(ROBOLECTRIC_CP)), \
+                    mock.patch.object(run, 'RobolectricWorker', return_value=worker), \
+                    mock.patch.object(run, 'generate', side_effect=fake_gen), \
+                    mock.patch.object(run, 'render', return_value=([], None)), \
+                    mock.patch.object(run, 'run_checks', return_value={'C-valid': {'pass': True}}), \
+                    mock.patch.object(run, '_stop_preview_server') as stopper, \
+                    mock.patch.object(run.sys, 'argv', ['run.py', 'run', '--out', str(out), '--generator', 'agy', '--judge', 'agy', '--parallel', '2', '--no-open']):
+                rc = run.main()
+        self.assertEqual(rc, 2)
+        self.assertEqual(len(gen_calls), 2)
+        self.assertTrue(all(stop is False for _, _, stop in gen_calls))
+        self.assertEqual(len({c for _, c, _ in gen_calls}), 1)
+        stopper.assert_called_once()
 
     def test_missing_judge_is_pending_not_passed(self):
         case = {'name': 'music', 'surface': 'phone', 'assertions': [{'type': 'rubric', 'id': 'R-one'}]}
@@ -503,7 +547,10 @@ class ArtifactPipelineTests(unittest.TestCase):
             (out / 'rubric.md').write_text('Rubric')
             images = write_report(directory)
             with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
-                    mock.patch.object(run, 'worker_jar', return_value=Path(JAR)), \
+                    mock.patch.object(run, 'preview_src', return_value=Path(SRC_DIR)), \
+                    mock.patch.object(run, 'bootstrap_dir', return_value=Path(BOOTSTRAP_DIR)), \
+                    mock.patch.object(run, 'server_cp', return_value=Path(SERVER_CP)), \
+                    mock.patch.object(run, 'robolectric_cp', return_value=Path(ROBOLECTRIC_CP)), \
                     mock.patch.object(run, '_stop_preview_server'), \
                     mock.patch.object(run, 'execute', return_value=reply):
                 run.generate(directory, 'agy')

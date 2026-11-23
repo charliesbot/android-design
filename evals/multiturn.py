@@ -3,14 +3,16 @@
 import argparse
 import datetime
 import json
+import os
 import shutil
 import statistics
 import subprocess
+import time
 from pathlib import Path
 
 from backends import execute
 from checks import run as run_checks
-from preview_app import app_binary, worker_jar
+from preview_app import DEFAULT_EVAL_BACKEND, app_binary, bootstrap_dir, preview_src, robolectric_cp, server_cp
 import run as eval_run
 
 HERE = Path(__file__).resolve().parent
@@ -196,7 +198,7 @@ def _sum_optional(values, round_digits=None):
     return int(total) if all(isinstance(v, int) for v in nums) else round(float(total), 2)
 
 
-def aggregate_multiturn(turn_records, *, model=None, commit_sha=None, pipeline='v4', final_checks=None, captured_at=None):
+def aggregate_multiturn(turn_records, *, model=None, commit_sha=None, pipeline='v6', final_checks=None, captured_at=None):
     """Aggregate per-turn records into session totals and per-turn means/medians."""
     merged_files = {}
     for rec in turn_records:
@@ -276,48 +278,76 @@ def format_summary(report):
     return '\n'.join(lines) + '\n'
 
 
-def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v4', timeout=1200,
-                  binary=None, jar=None):
+def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout=1200,
+                  binary=None, src=None, bdir=None, backend=DEFAULT_EVAL_BACKEND, cache_dir=None):
     out_dir = Path(out_dir).resolve()
     prepare_multiturn(out_dir)
     revisions = REVISIONS[:max_turns] if max_turns is not None else REVISIONS
     total = len(revisions)
     mcp_binary = app_binary() if binary is None else Path(binary)
-    mcp_jar = worker_jar() if jar is None else Path(jar)
+    resolved_src = preview_src() if src is None else Path(src)
+    resolved_bdir = bootstrap_dir() if bdir is None else Path(bdir)
+    if bdir is None:
+        server_cp()
+        robolectric_cp()
+
+    created_cache = cache_dir is None
+    active_cache_dir = (
+        Path(cache_dir).resolve()
+        if cache_dir is not None
+        else (Path.home() / '.cache' / 'android-design-preview' / f'eval-mt-{os.getpid()}-{int(time.time())}').resolve()
+    )
+    active_cache_dir.mkdir(parents=True, exist_ok=True)
 
     session_id = None
     prev_cumulative_cost = None
     turn_records = []
     try:
-        for idx, (title, body) in enumerate(revisions, start=1):
-            prompt = (
-                first_turn_prompt(out_dir, body, total)
-                if idx == 1
-                else followup_turn_prompt(idx, total, title, body)
-            )
-            reply = execute(
-                'claude', prompt, out_dir,
-                role='generator', model=model, timeout=timeout,
-                mcp_binary=mcp_binary, mcp_jar=mcp_jar,
-                resume_session=session_id,
-            )
-            if idx == 1:
-                session_id = reply.get('session_id')
-                if not session_id:
-                    raise RuntimeError('Claude did not return a session_id on turn 1; cannot resume session')
-            (out_dir / f'turn-{idx:02d}.json').write_text(json.dumps(reply, indent=2))
-            rec = _turn_record(idx, title, reply, prev_cumulative_cost=prev_cumulative_cost)
-            if isinstance(reply.get('cost'), (int, float)):
-                prev_cumulative_cost = reply['cost']
-            turn_records.append(rec)
-            print(
-                f"[turn {idx:02d}/{total}] {title}: {rec['wall_seconds']}s, "
-                f"in+cache={rec['total_input_tokens']}, out={rec['output_tokens']}, "
-                f"checks={rec['check_calls']}, retries={rec['compile_retries']}, skill_B={rec['skill_bytes_read']}",
-                flush=True,
+        try:
+            for idx, (title, body) in enumerate(revisions, start=1):
+                prompt = (
+                    first_turn_prompt(out_dir, body, total)
+                    if idx == 1
+                    else followup_turn_prompt(idx, total, title, body)
+                )
+                reply = execute(
+                    'claude', prompt, out_dir,
+                    role='generator', model=model, timeout=timeout,
+                    mcp_binary=mcp_binary,
+                    preview_src=resolved_src,
+                    bootstrap_dir=resolved_bdir,
+                    preview_backend=backend,
+                    cache_dir=active_cache_dir,
+                    client_timeout_ms=120000,
+                    resume_session=session_id,
+                )
+                if idx == 1:
+                    session_id = reply.get('session_id')
+                    if not session_id:
+                        raise RuntimeError('Claude did not return a session_id on turn 1; cannot resume session')
+                (out_dir / f'turn-{idx:02d}.json').write_text(json.dumps(reply, indent=2))
+                rec = _turn_record(idx, title, reply, prev_cumulative_cost=prev_cumulative_cost)
+                if isinstance(reply.get('cost'), (int, float)):
+                    prev_cumulative_cost = reply['cost']
+                turn_records.append(rec)
+                print(
+                    f"[turn {idx:02d}/{total}] {title}: {rec['wall_seconds']}s, "
+                    f"in+cache={rec['total_input_tokens']}, out={rec['output_tokens']}, "
+                    f"checks={rec['check_calls']}, retries={rec['compile_retries']}, skill_B={rec['skill_bytes_read']}",
+                    flush=True,
+                )
+        finally:
+            eval_run._stop_preview_server(
+                out_dir,
+                mcp_binary,
+                src=resolved_src,
+                bdir=resolved_bdir,
+                backend=backend,
+                cache_dir=active_cache_dir,
             )
     finally:
-        eval_run._stop_preview_server(out_dir, mcp_binary, mcp_jar)
+        if created_cache:
+            shutil.rmtree(active_cache_dir, ignore_errors=True)
 
     images, render_error = eval_run.render(out_dir)
     checks = run_checks(out_dir, 'phone')
@@ -345,7 +375,7 @@ def main():
     parser.add_argument('--out', required=True, type=Path, help='Output directory for the fixture and turn artifacts')
     parser.add_argument('--model', help='Optional Claude model override')
     parser.add_argument('--turns', type=int, default=len(REVISIONS), help='Number of revision turns to run (default: 10)')
-    parser.add_argument('--pipeline', default='v4', choices=('v4', 'v5'), help='Label recorded in the report')
+    parser.add_argument('--pipeline', default='v6', choices=('v4', 'v5', 'v6'), help='Label recorded in the report')
     parser.add_argument('--timeout', type=int, default=1200, help='Per-turn timeout in seconds')
     parser.add_argument('--write-baseline', type=Path, help='Copy aggregated metrics JSON to this committed baseline path')
     args = parser.parse_args()

@@ -4,6 +4,7 @@ import bot.charlies.androiddesign.preview.app.AppInfo
 import bot.charlies.androiddesign.preview.app.server.ContentHasher
 import bot.charlies.androiddesign.preview.app.server.LiveFocusRequest
 import bot.charlies.androiddesign.preview.app.server.RuntimeIdentity
+import bot.charlies.androiddesign.preview.app.server.ServerCommand
 import bot.charlies.androiddesign.preview.app.server.ServerPaths
 import bot.charlies.androiddesign.preview.app.server.ServerRecord
 import bot.charlies.androiddesign.preview.app.server.StatusResponse
@@ -201,6 +202,7 @@ class PreviewClient(
     if (status.backend != identity.backend) return false
     val usesBootstrapOrOverride =
       identity.backend == RuntimeIdentity.BACKEND_ANDROID ||
+        identity.backend == RuntimeIdentity.BACKEND_ROBOLECTRIC ||
         identity.serverCpFile != null ||
         identity.sourceDir != null ||
         !env[RuntimeIdentity.RUNTIME_HASH_ENV].isNullOrBlank()
@@ -304,7 +306,9 @@ class PreviewClient(
   ): ServerLookup {
     val bootstrapCp =
       identity.serverCpFile?.takeIf {
-        identity.backend == RuntimeIdentity.BACKEND_ANDROID || identity.jarPath == null
+        identity.backend == RuntimeIdentity.BACKEND_ANDROID ||
+          identity.backend == RuntimeIdentity.BACKEND_ROBOLECTRIC ||
+          identity.jarPath == null
       }
 
     val javaBin = resolveJavaBinary()
@@ -391,16 +395,23 @@ class PreviewClient(
     if (bootstrapCp != null) {
       identity.bootstrapDir?.let { childEnv[BootstrapMeta.BOOTSTRAP_DIR_ENV] = it.toString() }
       childEnv[RuntimeIdentity.SERVER_CP_ENV] = bootstrapCp.toString()
+      identity.robolectricCpFile?.let {
+        childEnv[RuntimeIdentity.ROBOLECTRIC_CP_ENV] = it.toString()
+      }
       identity.sourceDir?.let { childEnv[RuntimeIdentity.SRC_ENV] = it }
       env["ANDROID_HOME"]?.let { childEnv["ANDROID_HOME"] = it }
       env["ANDROID_SDK_ROOT"]?.let { childEnv["ANDROID_SDK_ROOT"] = it }
       env["ANDROID_DESIGN_ADB_BIN"]?.let { childEnv["ANDROID_DESIGN_ADB_BIN"] = it }
       env["ANDROID_DESIGN_ANDROID_CLI"]?.let { childEnv["ANDROID_DESIGN_ANDROID_CLI"] = it }
+      env["ANDROID_DESIGN_PREVIEW_JAVA"]?.let { childEnv["ANDROID_DESIGN_PREVIEW_JAVA"] = it }
     } else {
       childEnv.remove(BootstrapMeta.BOOTSTRAP_DIR_ENV)
       childEnv.remove(RuntimeIdentity.SERVER_CP_ENV)
+      childEnv.remove(RuntimeIdentity.ROBOLECTRIC_CP_ENV)
     }
     env[RuntimeIdentity.RUNTIME_HASH_ENV]?.let { childEnv[RuntimeIdentity.RUNTIME_HASH_ENV] = it }
+    env[ServerCommand.COLD_BUDGET_ENV]?.let { childEnv[ServerCommand.COLD_BUDGET_ENV] = it }
+    env[ServerCommand.WARM_BUDGET_ENV]?.let { childEnv[ServerCommand.WARM_BUDGET_ENV] = it }
 
     val proc =
       try {
@@ -411,8 +422,14 @@ class PreviewClient(
 
     val recordPath = ServerPaths.sharedRecordPath(cacheRoot)
     val waitMs =
-      if (identity.backend == RuntimeIdentity.BACKEND_ANDROID) ANDROID_STARTUP_WAIT_MS
-      else STARTUP_WAIT_MS
+      if (
+        identity.backend == RuntimeIdentity.BACKEND_ANDROID ||
+          identity.backend == RuntimeIdentity.BACKEND_ROBOLECTRIC
+      ) {
+        ANDROID_STARTUP_WAIT_MS
+      } else {
+        STARTUP_WAIT_MS
+      }
     val deadline = System.currentTimeMillis() + waitMs
     val targetPid = proc.pid()
     while (System.currentTimeMillis() < deadline) {

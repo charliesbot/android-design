@@ -1,7 +1,8 @@
 """Optional CLI adapters. Evaluation artifacts do not depend on these launchers.
 
 A generator invokes the `android-design-preview` CLI from the explore skill's `scripts/` placed on `PATH`, passing
-`ANDROID_DESIGN_NO_OPEN=1` and `ANDROID_DESIGN_PREVIEW_JAR` when provided. Judges never receive the
+`ANDROID_DESIGN_NO_OPEN=1` and v6 bootstrap environment variables (`ANDROID_DESIGN_PREVIEW_SRC`,
+`ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR`, `ANDROID_DESIGN_PREVIEW_BACKEND`, etc.). Judges never receive the
 preview CLI or shell access.
 """
 import json
@@ -14,7 +15,18 @@ import time
 import tomllib
 from pathlib import Path
 
-from preview_app import JAR_ENV, NO_OPEN_ENV, SERVER_NAME
+from preview_app import (
+    BACKEND_ENV,
+    BOOTSTRAP_DIR_ENV,
+    CACHE_DIR_ENV,
+    CLIENT_TIMEOUT_ENV,
+    JAR_ENV,
+    NO_OPEN_ENV,
+    ROBOLECTRIC_CP_ENV,
+    SERVER_CP_ENV,
+    SERVER_NAME,
+    SRC_ENV,
+)
 
 BACKENDS = ('agy', 'claude', 'codex')
 
@@ -742,7 +754,8 @@ def _parse_agy(stdout, role, model, cwd=None):
 
 
 def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, timeout=3600,
-            mcp_binary=None, mcp_jar=None, resume_session=None):
+            mcp_binary=None, preview_src=None, bootstrap_dir=None, preview_backend=None,
+            cache_dir=None, client_timeout_ms=None, mcp_jar=None, resume_session=None):
     if backend not in BACKENDS:
         raise ValueError(f'Unknown backend: {backend}')
     if role not in ('generator', 'judge'):
@@ -761,6 +774,25 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
             proc_env[NO_OPEN_ENV] = '1'
             if mcp_jar is not None:
                 proc_env[JAR_ENV] = str(mcp_jar)
+            else:
+                proc_env.pop(JAR_ENV, None)
+            if preview_src is not None:
+                proc_env[SRC_ENV] = str(preview_src)
+            if bootstrap_dir is not None:
+                bdir = Path(bootstrap_dir)
+                proc_env[BOOTSTRAP_DIR_ENV] = str(bdir)
+                proc_env.pop(SERVER_CP_ENV, None)
+                proc_env.pop(ROBOLECTRIC_CP_ENV, None)
+                if (bdir / 'server.cp').is_file():
+                    proc_env[SERVER_CP_ENV] = str(bdir / 'server.cp')
+                if (bdir / 'robolectric.cp').is_file():
+                    proc_env[ROBOLECTRIC_CP_ENV] = str(bdir / 'robolectric.cp')
+            if preview_backend is not None:
+                proc_env[BACKEND_ENV] = str(preview_backend)
+            if cache_dir is not None:
+                proc_env[CACHE_DIR_ENV] = str(cache_dir)
+            if client_timeout_ms is not None:
+                proc_env[CLIENT_TIMEOUT_ENV] = str(client_timeout_ms)
 
         stdin_input = prompt
         cwd_path = Path(cwd).resolve()
@@ -776,8 +808,8 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
                 # `claude -p` enforces the script ban directly via --allowedTools: only
                 # `android-design-preview` shell commands, edits/writes inside the case folder,
                 # and reading files including rendered PNGs in ~/.cache/android-design-preview.
-                cache_dir = (Path.home() / '.cache' / 'android-design-preview').resolve()
-                cache_dir.mkdir(parents=True, exist_ok=True)
+                default_cache = (Path.home() / '.cache' / 'android-design-preview').resolve()
+                default_cache.mkdir(parents=True, exist_ok=True)
                 command += [
                     '--allowedTools',
                     f'Bash({PREVIEW_CLI_NAME}:*)',
@@ -785,8 +817,13 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
                     f'Write(/{cwd_path}/**)',
                     'Read',
                     '--add-dir',
-                    str(cache_dir),
+                    str(default_cache),
                 ]
+                if cache_dir is not None:
+                    resolved_cache = Path(cache_dir).resolve()
+                    resolved_cache.mkdir(parents=True, exist_ok=True)
+                    if resolved_cache != default_cache and default_cache not in resolved_cache.parents:
+                        command += ['--add-dir', str(resolved_cache)]
             if role == 'judge':
                 command += ['--tools', 'Read', '--allowedTools', 'Read']
                 for folder in sorted({str(Path(p).resolve().parent) for p in images}):
@@ -798,10 +835,17 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
                        '--sandbox', 'read-only' if role == 'judge' else 'workspace-write',
                        '--output-last-message', str(final)]
             if role == 'generator':
-                cache_dir = Path.home() / '.cache' / 'android-design-preview'
+                default_cache = (Path.home() / '.cache' / 'android-design-preview').resolve()
+                gradle_dir = (Path.home() / '.gradle').resolve()
+                writable_roots = [str(default_cache)]
+                if cache_dir is not None:
+                    rc = str(Path(cache_dir).resolve())
+                    if rc not in writable_roots:
+                        writable_roots.append(rc)
+                writable_roots.append(str(gradle_dir))
                 command += [
                     '-c', 'sandbox_workspace_write.network_access=true',
-                    '-c', f'sandbox_workspace_write.writable_roots={json.dumps([str(cache_dir)])}',
+                    '-c', f'sandbox_workspace_write.writable_roots={json.dumps(writable_roots)}',
                 ]
             for image in images:
                 command += ['--image', str(Path(image).resolve())]
