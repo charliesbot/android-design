@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Dev preview APK installed directly via adb across phone, tablet, desktop, and Wear devices. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <application
+        android:allowBackup="false"
+        android:hardwareAccelerated="true"
+        android:label="Android Design Preview"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.PreviewHost">
+
+        <activity
+            android:name=".LivePreviewActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|uiMode|keyboard|keyboardHidden|navigation"
+            android:exported="true"
+            android:process=":sandbox"
+            android:resizeableActivity="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".sandbox.HostRenderActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|uiMode|keyboard|keyboardHidden|navigation"
+            android:exported="true"
+            android:launchMode="singleInstance"
+            android:process=":sandbox"
+            android:resizeableActivity="true"
+            android:taskAffinity="bot.charlies.androiddesign.preview.host.offscreen"
+            android:theme="@style/Theme.PreviewHost.Offscreen" />
+
+        <service
+            android:name=".sandbox.RenderForegroundService"
+            android:exported="true"
+            android:foregroundServiceType="specialUse"
+            android:process=":sandbox">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Local design preview offscreen renderer" />
+        </service>
+
+    </application>
+
+</manifest>

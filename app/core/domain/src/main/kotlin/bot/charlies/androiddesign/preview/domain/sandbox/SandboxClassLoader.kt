@@ -1,4 +1,4 @@
-package bot.charlies.androiddesign.preview.feature.preview.sandbox
+package bot.charlies.androiddesign.preview.domain.sandbox
 
 import java.io.InputStream
 import java.net.URL
@@ -9,7 +9,7 @@ import java.util.Enumeration
  * Isolated classloader that defines compiled exploration classes in memory and blocks resolution of
  * any disallowed JDK, reflection, thread-creation, or I/O class at link time.
  */
-internal class SandboxClassLoader(
+class SandboxClassLoader(
   private val compiledClasses: Map<String, ByteArray>,
   parent: ClassLoader,
 ) : ClassLoader(parent) {

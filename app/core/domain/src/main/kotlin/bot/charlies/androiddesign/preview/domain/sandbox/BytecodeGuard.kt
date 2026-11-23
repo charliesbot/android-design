@@ -1,4 +1,4 @@
-package bot.charlies.androiddesign.preview.feature.preview.sandbox
+package bot.charlies.androiddesign.preview.domain.sandbox
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -8,7 +8,7 @@ import java.nio.ByteOrder
  * rejecting disallowed classes, thread-pool coroutine dispatchers, direct `MethodHandles` use, and
  * reflective `java.lang.Class` lookups.
  */
-internal object BytecodeGuard {
+object BytecodeGuard {
   private const val CAFEBABE = 0xCAFEBABE.toInt()
   private const val TAG_UTF8 = 1
   private const val TAG_INTEGER = 3
@@ -184,7 +184,7 @@ internal object BytecodeGuard {
     return violations.toList()
   }
 
-  internal fun internalToDotClass(raw: String): String? {
+  fun internalToDotClass(raw: String): String? {
     var s = raw
     while (s.startsWith('[')) s = s.substring(1)
     if (s.startsWith('L') && s.endsWith(';')) {
