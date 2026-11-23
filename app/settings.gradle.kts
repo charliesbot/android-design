@@ -34,10 +34,6 @@ include(":core:domain")
 
 include(":core:data")
 
-include(":features:preview:desktop")
-
 include(":app")
-
-include(":wear:compose")
 
 include(":host")

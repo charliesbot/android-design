@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
 """Generates plugin/skills/android-design-explore/references/compose-signatures.md from pinned sources.
 
-Reads versions from app/gradle/libs.versions.toml and app/wear/compose/upstream/VERSION, validates
-Material 3 names against scripts/material3-inventory.txt, verifies Kit DSL declarations in
-app/features/preview/desktop/.../kit/, and checks Wear M3 upstream signatures from app/wear/compose/upstream/.
+Reads versions from app/gradle/libs.versions.toml, validates Material 3 names against
+scripts/material3-inventory.txt, verifies Kit DSL declarations in app/host/.../kit/, and checks
+Wear M3 and Foundation symbols from cached AndroidX Wear AARs.
 """
 
 import argparse
+import io
 import re
+import zipfile
 from pathlib import Path
+
+from material3_inventory import find_aar
 
 ROOT = Path(__file__).resolve().parent.parent
 APP_TOML = ROOT / "app/gradle/libs.versions.toml"
-WEAR_VERSION = ROOT / "app/wear/compose/upstream/VERSION"
 INVENTORY_PATH = ROOT / "scripts/material3-inventory.txt"
-KIT_DIR = ROOT / "app/features/preview/desktop/src/main/kotlin/bot/charlies/androiddesign/preview/kit"
+KIT_DIR = ROOT / "app/host/src/main/kotlin/bot/charlies/androiddesign/preview/kit"
 TOKENS_KT = ROOT / "app/core/model/src/main/kotlin/bot/charlies/androiddesign/preview/model/Tokens.kt"
-WEAR_M3_DIR = ROOT / "app/wear/compose/upstream/material3/androidx/wear/compose/material3"
-WEAR_FOUNDATION_DIR = ROOT / "app/wear/compose/upstream/foundation/androidx/wear/compose/foundation"
+GRADLE_FILES = Path.home() / ".gradle/caches/modules-2/files-2.1"
 OUT_PATH = ROOT / "plugin/skills/android-design-explore/references/compose-signatures.md"
 
 REQUIRED_M3_INVENTORY_SYMBOLS = (
@@ -195,27 +197,51 @@ def verify_kit_declarations() -> None:
         raise RuntimeError("Missing 'fun designPainter(' in DesignAssets.kt")
 
 
-def verify_wear_upstream() -> None:
-    expected = {
-        WEAR_M3_DIR / "AppScaffold.kt": "fun AppScaffold(",
-        WEAR_M3_DIR / "ScreenScaffold.kt": "fun ScreenScaffold(",
-        WEAR_M3_DIR / "EdgeButton.kt": "fun EdgeButton(",
-        WEAR_M3_DIR / "Button.kt": "fun FilledTonalButton(",
-        WEAR_M3_DIR / "Card.kt": "fun TitleCard(",
-        WEAR_M3_DIR / "SwitchButton.kt": "fun SwitchButton(",
-        WEAR_M3_DIR / "AlertDialog.kt": "fun AlertDialog(",
-        WEAR_M3_DIR / "ConfirmationDialog.kt": "fun ConfirmationDialog(",
-        WEAR_M3_DIR / "TimeText.kt": "fun TimeText(",
-        WEAR_M3_DIR / "ListHeader.kt": "fun ListHeader(",
-        WEAR_M3_DIR / "CircularProgressIndicator.kt": "fun CircularProgressIndicator(",
-        WEAR_M3_DIR / "CheckboxButton.kt": "fun CheckboxButton(",
-        WEAR_FOUNDATION_DIR / "lazy/TransformingLazyColumn.kt": "fun TransformingLazyColumn(",
-    }
-    for path, marker in expected.items():
-        if not path.is_file():
-            raise RuntimeError(f"Missing Wear upstream source: {path}")
-        if marker not in path.read_text(encoding="utf-8"):
-            raise RuntimeError(f"Missing '{marker}' in {path}")
+def verify_wear_aars(
+    wear_version: str,
+    gradle_files: Path = GRADLE_FILES,
+    require_cache: bool = True,
+) -> None:
+    _, m3_aar = find_aar(
+        "androidx.wear.compose", "compose-material3", wear_version, gradle_files=gradle_files
+    )
+    _, fn_aar = find_aar(
+        "androidx.wear.compose", "compose-foundation", wear_version, gradle_files=gradle_files
+    )
+    if m3_aar is None or fn_aar is None:
+        if require_cache:
+            raise RuntimeError(
+                f"Missing androidx.wear.compose {wear_version} AARs in {gradle_files}; run `cd app && ./gradlew :host:exportBootstrap`"
+            )
+        return
+
+    m3_checks = (
+        ("androidx/wear/compose/material3/AppScaffoldKt.class", b"AppScaffold"),
+        ("androidx/wear/compose/material3/ScreenScaffoldKt.class", b"ScreenScaffold"),
+        ("androidx/wear/compose/material3/EdgeButtonKt.class", b"EdgeButton"),
+        ("androidx/wear/compose/material3/ButtonKt.class", b"FilledTonalButton"),
+        ("androidx/wear/compose/material3/CardKt.class", b"TitleCard"),
+        ("androidx/wear/compose/material3/SwitchButtonKt.class", b"SwitchButton"),
+        ("androidx/wear/compose/material3/AlertDialogKt.class", b"AlertDialog"),
+        ("androidx/wear/compose/material3/ConfirmationDialogKt.class", b"ConfirmationDialog"),
+        ("androidx/wear/compose/material3/TimeTextKt.class", b"TimeText"),
+        ("androidx/wear/compose/material3/ListHeaderKt.class", b"ListHeader"),
+        ("androidx/wear/compose/material3/CircularProgressIndicatorKt.class", b"CircularProgressIndicator"),
+        ("androidx/wear/compose/material3/CheckboxButtonKt.class", b"CheckboxButton"),
+    )
+    fn_checks = (
+        ("androidx/wear/compose/foundation/lazy/TransformingLazyColumnKt.class", b"TransformingLazyColumn"),
+    )
+    for aar_path, checks in ((m3_aar, m3_checks), (fn_aar, fn_checks)):
+        with zipfile.ZipFile(aar_path) as aar:
+            classes_bytes = aar.read("classes.jar")
+        with zipfile.ZipFile(io.BytesIO(classes_bytes)) as jar:
+            names = set(jar.namelist())
+            for cls_name, sym in checks:
+                if cls_name not in names:
+                    raise RuntimeError(f"Missing Wear class {cls_name} in {aar_path}")
+                if sym not in jar.read(cls_name):
+                    raise RuntimeError(f"Missing symbol {sym.decode()} in {cls_name} ({aar_path})")
 
 
 def verify_inventory(inventory: set[str]) -> list[str]:
@@ -223,7 +249,7 @@ def verify_inventory(inventory: set[str]) -> list[str]:
     return missing
 
 
-def render_markdown() -> str:
+def render_markdown(require_wear_cache: bool = False) -> str:
     inventory = load_inventory()
     missing = verify_inventory(inventory)
     if missing:
@@ -232,11 +258,11 @@ def render_markdown() -> str:
         )
 
     verify_kit_declarations()
-    verify_wear_upstream()
     variants, fonts = extract_kit_enums()
 
-    desktop_m3 = read_toml_version(APP_TOML, "material3")
-    wear_m3 = WEAR_VERSION.read_text(encoding="utf-8").strip()
+    androidx_m3 = read_toml_version(APP_TOML, "androidxMaterial3")
+    wear_m3 = read_toml_version(APP_TOML, "androidxWearCompose")
+    verify_wear_aars(wear_m3, require_cache=require_wear_cache)
 
     shape_samples = ", ".join(
         name.removeprefix("MaterialShapes.")
@@ -247,7 +273,7 @@ def render_markdown() -> str:
     lines = [
         "# Compose Expressive Signature Reference",
         "",
-        f"Generated by `scripts/generate_signatures.py` from pinned Compose M3 `{desktop_m3}` and Wear M3 `{wear_m3}`.",
+        f"Generated by `scripts/generate_signatures.py` from pinned AndroidX M3 `{androidx_m3}` and Wear M3 `{wear_m3}`.",
         "Use exact signatures below rather than guessing parameter names from older Material versions.",
         "",
         "## `DESIGN.md` Front Matter",
@@ -278,7 +304,7 @@ def render_markdown() -> str:
         "@Composable fun SymbolIcon(name: String, contentDescription: String? = null, modifier: Modifier = Modifier, filled: Boolean = false, size: Dp = 24.dp, tint: Color = LocalContentColor.current)",
         "@Composable fun designPainter(relativePath: String): Painter // confined beneath .explore.kt dir, e.g. \"assets/cover.jpg\"",
         "fun bundledFontFamily(font: BundledFont, weight: Int = 400, variation: String? = null): FontFamily",
-        "// Responsive breakpoints (LocalConfiguration/android.content.* are blocked in desktop sandbox):",
+        "// Responsive breakpoints (LocalConfiguration/android.content.* are blocked in preview sandbox):",
         "BoxWithConstraints { val compact = maxWidth < 600.dp; val expanded = maxWidth >= 840.dp; ... }",
         "FlexBox(config = { wrap(FlexWrap.Wrap); gap(8.dp) }) { ... } // wrapping chips/badges (NoWrap default; replaces FlowRow)",
         "```",
@@ -407,7 +433,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, default=OUT_PATH)
     args = parser.parse_args()
-    markdown = render_markdown()
+    markdown = render_markdown(require_wear_cache=True)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(markdown, encoding="utf-8")
     print(f"Wrote {args.out.relative_to(ROOT)} ({len(markdown.splitlines())} lines)")

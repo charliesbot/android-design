@@ -537,4 +537,112 @@ class RobolectricBoardRendererTest {
       shadowOf(Looper.getMainLooper()).idle()
     }
   }
+
+  @Test
+  fun sequentialTargetsRendersPreserveTopLevelAndScaffoldNodes() {
+    val workDir = tempFolder.newFolder("seq-targets").toPath()
+    HostTestFixtures.writeSampleCoverPng(workDir)
+    val columnFile = workDir.resolve("Columns.explore.kt")
+    Files.writeString(
+      columnFile,
+      """
+      import androidx.compose.foundation.layout.*
+      import androidx.compose.material3.*
+      import androidx.compose.ui.Modifier
+      import androidx.compose.ui.platform.testTag
+      import androidx.compose.ui.unit.dp
+      import bot.charlies.androiddesign.preview.kit.*
+
+      val preview = designBoard("Plates", seed = 0xFFB5523BL, variant = PaletteVariant.TonalSpot) {
+        direction("Editorial") {
+          screen("home") {
+            Column(
+              modifier = Modifier.fillMaxSize().padding(16.dp),
+              verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+              Text("Dinner")
+              Button(onClick = {}, modifier = Modifier.testTag(AD_PRIMARY_TAG).height(56.dp)) {
+                Text("Open")
+              }
+            }
+          }
+        }
+      }
+      """
+        .trimIndent(),
+    )
+
+    val firstCol =
+      RobolectricBoardRenderer.handleRequest(
+        RobolectricRenderRequest(
+          id = "seq-col-1",
+          sourcePath = columnFile.toString(),
+          targets =
+            listOf(
+              DeviceRenderTarget(
+                direction = "Editorial",
+                screen = "home",
+                viewName = "light",
+                densityScale = 1f,
+                frameFormat = FrameFormat.NONE,
+              ),
+            ),
+        ),
+      )
+    assertTrue("First Column call ok & valid: $firstCol", firstCol.ok && firstCol.valid)
+    val firstColTypes = firstCol.results.single().tree!!.nodes.map { it.type }
+    assertTrue(
+      "Expected Column, Text, Button on call #1, got $firstColTypes",
+      listOf("Column", "Text", "Button").all { it in firstColTypes },
+    )
+
+    val secondCol =
+      RobolectricBoardRenderer.handleRequest(
+        RobolectricRenderRequest(
+          id = "seq-col-2",
+          sourcePath = columnFile.toString(),
+          targets =
+            listOf(
+              DeviceRenderTarget(
+                direction = "Editorial",
+                screen = "home",
+                viewName = "light",
+                densityScale = 2f,
+                frameFormat = FrameFormat.NONE,
+              ),
+            ),
+        ),
+      )
+    assertTrue("Second Column call ok & valid: $secondCol", secondCol.ok && secondCol.valid)
+    val secondColTypes = secondCol.results.single().tree!!.nodes.map { it.type }
+    assertTrue(
+      "Expected Column, Text, Button on call #2, got $secondColTypes",
+      listOf("Column", "Text", "Button").all { it in secondColTypes },
+    )
+
+    val scaffoldFile = workDir.resolve(HostTestFixtures.PHONE_EXPLORE_FILE)
+    Files.writeString(scaffoldFile, HostTestFixtures.PHONE_EXPLORE_SOURCE)
+    for (viewName in listOf("light", "dark")) {
+      val resp =
+        RobolectricBoardRenderer.handleRequest(
+          RobolectricRenderRequest(
+            id = "seq-scaf-$viewName",
+            sourcePath = scaffoldFile.toString(),
+            targets =
+              listOf(
+                DeviceRenderTarget(
+                  direction = "Editorial",
+                  screen = "home",
+                  viewName = viewName,
+                  densityScale = 1f,
+                  frameFormat = FrameFormat.NONE,
+                ),
+              ),
+          ),
+        )
+      assertTrue("Scaffold $viewName ok & valid: $resp", resp.ok && resp.valid)
+      val types = resp.results.single().tree!!.nodes.map { it.type }
+      assertTrue("Expected Scaffold on $viewName, got $types", "Scaffold" in types)
+    }
+  }
 }

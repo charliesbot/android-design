@@ -17,7 +17,7 @@ PAGES = ROOT / "sources/m3.material.io/pages/components"
 INVENTORY = ROOT / "scripts/material3-inventory.txt"
 CALL_MAPPER = (
     ROOT
-    / "app/features/preview/desktop/src/main/kotlin/bot/charlies/androiddesign/preview/feature/preview/sandbox/CallNameMapper.kt"
+    / "app/host/src/main/kotlin/bot/charlies/androiddesign/preview/feature/preview/sandbox/CallNameMapper.kt"
 )
 
 # Component pages that choose between components instead of describing one.
@@ -121,7 +121,6 @@ M3_PAGE_CLAIMS = {
     "side-sheets": ["Surface"],
     "sliders": ["Slider", "VerticalSlider", "RangeSlider"],
     "snackbar": ["SnackbarHost", "Snackbar"],
-    # TODO(https://github.com/charliesbot/android-design/issues/153): Update if Compose Multiplatform 1.13.0 stable ships SplitButton replacing SplitButtonLayout.
     "split-button": ["SplitButtonLayout"],
     "switch": ["Switch"],
     "tabs": [

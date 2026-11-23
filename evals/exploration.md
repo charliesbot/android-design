@@ -13,7 +13,7 @@ python3 scripts/check_coverage.py
 (cd app && ./gradlew build spotlessCheck)
 ```
 
-Requires Java 17+ (`./gradlew :app:workerJar` builds `app/app/build/libs/android-design-preview.jar`). No Node.js, Android SDK, or Chrome binary is required.
+Requires Java 17+ and Android SDK (`./gradlew :host:exportBootstrap` builds the Android Host APK, compile bundle, and classpath argfiles). No Node.js or Chrome binary is required.
 
 The Gradle tests cover source linting, bytecode/classloader sandbox policy, Compose tooling slot extraction, pixel contrast sampling, finding rules with reference anchors, the Kotlin HTTP/SSE server, per-view priority queue, browser board security and selection re-resolution, `HttpURLConnection` CLI commands, and headless `render`. The Python tests cover manifests, source coverage, eval runner, `report.json` checks, multi-turn aggregation, and per-harness transcript audits without model calls.
 

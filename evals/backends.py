@@ -20,7 +20,6 @@ from preview_app import (
     BOOTSTRAP_DIR_ENV,
     CACHE_DIR_ENV,
     CLIENT_TIMEOUT_ENV,
-    JAR_ENV,
     NO_OPEN_ENV,
     ROBOLECTRIC_CP_ENV,
     SERVER_CP_ENV,
@@ -755,7 +754,7 @@ def _parse_agy(stdout, role, model, cwd=None):
 
 def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, timeout=3600,
             mcp_binary=None, preview_src=None, bootstrap_dir=None, preview_backend=None,
-            cache_dir=None, client_timeout_ms=None, mcp_jar=None, resume_session=None):
+            cache_dir=None, client_timeout_ms=None, resume_session=None):
     if backend not in BACKENDS:
         raise ValueError(f'Unknown backend: {backend}')
     if role not in ('generator', 'judge'):
@@ -772,10 +771,6 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
             bin_dir = str(Path(mcp_binary).resolve().parent)
             proc_env['PATH'] = bin_dir + os.pathsep + proc_env.get('PATH', '')
             proc_env[NO_OPEN_ENV] = '1'
-            if mcp_jar is not None:
-                proc_env[JAR_ENV] = str(mcp_jar)
-            else:
-                proc_env.pop(JAR_ENV, None)
             if preview_src is not None:
                 proc_env[SRC_ENV] = str(preview_src)
             if bootstrap_dir is not None:

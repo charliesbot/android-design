@@ -97,7 +97,7 @@ class PreviewClient(
     val normRepo = repoRoot.toAbsolutePath().normalize()
     val repoId = ServerPaths.repoHash(normRepo)
     val recordPath = ServerPaths.sharedRecordPath(cacheRoot)
-    val identity = RuntimeIdentity.compute(env, jar = resolveJarPath())
+    val identity = RuntimeIdentity.compute(env)
     val existing = ServerPaths.readRecord(recordPath)
     var apkChanged = forceReinstallApk
     if (existing != null) {
@@ -144,7 +144,7 @@ class PreviewClient(
 
   fun killAndRespawn(repoRoot: Path, deadRecord: ServerRecord): ServerLookup = withServerLock {
     val normRepo = repoRoot.toAbsolutePath().normalize()
-    val identity = RuntimeIdentity.compute(env, jar = resolveJarPath())
+    val identity = RuntimeIdentity.compute(env)
     stopServer(deadRecord, graceful = false, replacedByVersion = null)
     spawnServer(
       repoRoot = normRepo,
@@ -200,25 +200,16 @@ class PreviewClient(
   ): Boolean {
     if (status.jarVersion != AppInfo.VERSION) return false
     if (status.backend != identity.backend) return false
-    val usesBootstrapOrOverride =
-      identity.backend == RuntimeIdentity.BACKEND_ANDROID ||
-        identity.backend == RuntimeIdentity.BACKEND_ROBOLECTRIC ||
-        identity.serverCpFile != null ||
-        identity.sourceDir != null ||
-        !env[RuntimeIdentity.RUNTIME_HASH_ENV].isNullOrBlank()
-    if (usesBootstrapOrOverride) {
-      if (record.runtimeHash != identity.runtimeHash) return false
-      if (
+    if (record.runtimeHash != identity.runtimeHash) return false
+    if (
+      identity.backend == RuntimeIdentity.BACKEND_ANDROID &&
         identity.apkSha256 != null &&
-          record.apkSha256 != null &&
-          record.apkSha256 != identity.apkSha256
-      ) {
-        return false
-      }
-      return true
+        record.apkSha256 != null &&
+        record.apkSha256 != identity.apkSha256
+    ) {
+      return false
     }
-    val jar = identity.jarPath ?: return true
-    return record.jarPath == jar.toString() && record.jarModified == identity.jarModified
+    return true
   }
 
   private fun stopServer(
@@ -305,80 +296,49 @@ class PreviewClient(
     headless: Boolean,
   ): ServerLookup {
     val bootstrapCp =
-      identity.serverCpFile?.takeIf {
-        identity.backend == RuntimeIdentity.BACKEND_ANDROID ||
-          identity.backend == RuntimeIdentity.BACKEND_ROBOLECTRIC ||
-          identity.jarPath == null
-      }
+      identity.serverCpFile
+        ?: return ServerLookup.NotReady(
+          "Cannot locate bootstrap server.cp; run `android-design-preview start` or `./gradlew :host:exportBootstrap` from app/.",
+        )
 
     val javaBin = resolveJavaBinary()
-    val cmd =
-      if (bootstrapCp != null) {
-        buildList {
-          add(javaBin)
-          add("-Djava.awt.headless=true")
-          add("@${bootstrapCp.toAbsolutePath().normalize()}")
-          add("bot.charlies.androiddesign.preview.app.MainKt")
-          add("server")
-          add("--repo")
-          add(repoRoot.toString())
-          add("--backend")
-          add(identity.backend)
-          add("--runtime-hash")
-          add(identity.runtimeHash)
-          if (reusePort != null && reusePort > 0) {
-            add("--preferred-port")
-            add(reusePort.toString())
-          }
-          if (!reuseViewToken.isNullOrBlank()) {
-            add("--view-token")
-            add(reuseViewToken)
-          }
-          if (!deviceSerial.isNullOrBlank()) {
-            add("--device-serial")
-            add(deviceSerial)
-          }
-          if (!avdName.isNullOrBlank()) {
-            add("--avd")
-            add(avdName)
-          }
-          if (headless) {
-            add("--headless")
-            add("true")
-          }
-          if (forceReinstallApk) {
-            add("--force-reinstall-apk")
-            add("true")
-          }
-        }
-      } else {
-        val jarPath =
-          identity.jarPath
-            ?: return ServerLookup.NotReady(
-              "Cannot locate android-design-preview.jar or bootstrap server.cp; run `android-design-preview start` or set ANDROID_DESIGN_PREVIEW_JAR.",
-            )
-        buildList {
-          add(javaBin)
-          add("-Djava.awt.headless=true")
-          add("-jar")
-          add(jarPath.toString())
-          add("server")
-          add("--repo")
-          add(repoRoot.toString())
-          add("--backend")
-          add(identity.backend)
-          add("--runtime-hash")
-          add(identity.runtimeHash)
-          if (reusePort != null && reusePort > 0) {
-            add("--preferred-port")
-            add(reusePort.toString())
-          }
-          if (!reuseViewToken.isNullOrBlank()) {
-            add("--view-token")
-            add(reuseViewToken)
-          }
-        }
+    val cmd = buildList {
+      add(javaBin)
+      add("-Djava.awt.headless=true")
+      add("@${bootstrapCp.toAbsolutePath().normalize()}")
+      add("bot.charlies.androiddesign.preview.app.MainKt")
+      add("server")
+      add("--repo")
+      add(repoRoot.toString())
+      add("--backend")
+      add(identity.backend)
+      add("--runtime-hash")
+      add(identity.runtimeHash)
+      if (reusePort != null && reusePort > 0) {
+        add("--preferred-port")
+        add(reusePort.toString())
       }
+      if (!reuseViewToken.isNullOrBlank()) {
+        add("--view-token")
+        add(reuseViewToken)
+      }
+      if (!deviceSerial.isNullOrBlank()) {
+        add("--device-serial")
+        add(deviceSerial)
+      }
+      if (!avdName.isNullOrBlank()) {
+        add("--avd")
+        add(avdName)
+      }
+      if (headless) {
+        add("--headless")
+        add("true")
+      }
+      if (forceReinstallApk) {
+        add("--force-reinstall-apk")
+        add("true")
+      }
+    }
 
     val logDir = ServerPaths.serversDir(cacheRoot)
     Files.createDirectories(logDir)
@@ -392,23 +352,17 @@ class PreviewClient(
     val childEnv = pb.environment()
     childEnv[ServerPaths.CACHE_DIR_ENV] = cacheRoot.toString()
     childEnv[RuntimeIdentity.BACKEND_ENV] = identity.backend
-    if (bootstrapCp != null) {
-      identity.bootstrapDir?.let { childEnv[BootstrapMeta.BOOTSTRAP_DIR_ENV] = it.toString() }
-      childEnv[RuntimeIdentity.SERVER_CP_ENV] = bootstrapCp.toString()
-      identity.robolectricCpFile?.let {
-        childEnv[RuntimeIdentity.ROBOLECTRIC_CP_ENV] = it.toString()
-      }
-      identity.sourceDir?.let { childEnv[RuntimeIdentity.SRC_ENV] = it }
-      env["ANDROID_HOME"]?.let { childEnv["ANDROID_HOME"] = it }
-      env["ANDROID_SDK_ROOT"]?.let { childEnv["ANDROID_SDK_ROOT"] = it }
-      env["ANDROID_DESIGN_ADB_BIN"]?.let { childEnv["ANDROID_DESIGN_ADB_BIN"] = it }
-      env["ANDROID_DESIGN_ANDROID_CLI"]?.let { childEnv["ANDROID_DESIGN_ANDROID_CLI"] = it }
-      env["ANDROID_DESIGN_PREVIEW_JAVA"]?.let { childEnv["ANDROID_DESIGN_PREVIEW_JAVA"] = it }
-    } else {
-      childEnv.remove(BootstrapMeta.BOOTSTRAP_DIR_ENV)
-      childEnv.remove(RuntimeIdentity.SERVER_CP_ENV)
-      childEnv.remove(RuntimeIdentity.ROBOLECTRIC_CP_ENV)
+    identity.bootstrapDir?.let { childEnv[BootstrapMeta.BOOTSTRAP_DIR_ENV] = it.toString() }
+    childEnv[RuntimeIdentity.SERVER_CP_ENV] = bootstrapCp.toString()
+    identity.robolectricCpFile?.let {
+      childEnv[RuntimeIdentity.ROBOLECTRIC_CP_ENV] = it.toString()
     }
+    identity.sourceDir?.let { childEnv[RuntimeIdentity.SRC_ENV] = it }
+    env["ANDROID_HOME"]?.let { childEnv["ANDROID_HOME"] = it }
+    env["ANDROID_SDK_ROOT"]?.let { childEnv["ANDROID_SDK_ROOT"] = it }
+    env["ANDROID_DESIGN_ADB_BIN"]?.let { childEnv["ANDROID_DESIGN_ADB_BIN"] = it }
+    env["ANDROID_DESIGN_ANDROID_CLI"]?.let { childEnv["ANDROID_DESIGN_ANDROID_CLI"] = it }
+    env["ANDROID_DESIGN_PREVIEW_JAVA"]?.let { childEnv["ANDROID_DESIGN_PREVIEW_JAVA"] = it }
     env[RuntimeIdentity.RUNTIME_HASH_ENV]?.let { childEnv[RuntimeIdentity.RUNTIME_HASH_ENV] = it }
     env[ServerCommand.COLD_BUDGET_ENV]?.let { childEnv[ServerCommand.COLD_BUDGET_ENV] = it }
     env[ServerCommand.WARM_BUDGET_ENV]?.let { childEnv[ServerCommand.WARM_BUDGET_ENV] = it }
@@ -421,15 +375,7 @@ class PreviewClient(
       }
 
     val recordPath = ServerPaths.sharedRecordPath(cacheRoot)
-    val waitMs =
-      if (
-        identity.backend == RuntimeIdentity.BACKEND_ANDROID ||
-          identity.backend == RuntimeIdentity.BACKEND_ROBOLECTRIC
-      ) {
-        ANDROID_STARTUP_WAIT_MS
-      } else {
-        STARTUP_WAIT_MS
-      }
+    val waitMs = ANDROID_STARTUP_WAIT_MS
     val deadline = System.currentTimeMillis() + waitMs
     val targetPid = proc.pid()
     while (System.currentTimeMillis() < deadline) {
@@ -496,25 +442,6 @@ class PreviewClient(
     }
   }
 
-  private fun resolveJarPath(): Path? {
-    val fromEnv = env[JAR_ENV]?.takeIf { it.isNotBlank() }?.let(Path::of)
-    if (fromEnv != null && Files.isRegularFile(fromEnv)) return fromEnv.toAbsolutePath().normalize()
-    val codeSource =
-      try {
-        PreviewClient::class.java.protectionDomain?.codeSource?.location?.toURI()?.let(Path::of)
-      } catch (_: Exception) {
-        null
-      }
-    if (
-      codeSource != null &&
-        Files.isRegularFile(codeSource) &&
-        codeSource.toString().endsWith(".jar")
-    ) {
-      return codeSource.toAbsolutePath().normalize()
-    }
-    return null
-  }
-
   private fun resolveJavaBinary(): String {
     val home = System.getProperty("java.home")
     if (!home.isNullOrBlank()) {
@@ -542,11 +469,9 @@ class PreviewClient(
   }
 
   companion object {
-    const val JAR_ENV = "ANDROID_DESIGN_PREVIEW_JAR"
     const val NO_OPEN_ENV = "ANDROID_DESIGN_NO_OPEN"
     const val SCRIPT_ENV = "ANDROID_DESIGN_PREVIEW_SCRIPT"
     const val CLIENT_TIMEOUT_ENV = "ANDROID_DESIGN_CLIENT_TIMEOUT_MS"
-    private const val STARTUP_WAIT_MS = 15_000L
     private const val ANDROID_STARTUP_WAIT_MS = 90_000L
     private const val COLD_CLIENT_DEADLINE_MS = 35_000
     private const val WARM_SCOPED_CLIENT_DEADLINE_MS = 10_000

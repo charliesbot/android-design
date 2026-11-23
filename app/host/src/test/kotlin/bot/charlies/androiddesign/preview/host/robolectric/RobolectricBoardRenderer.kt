@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.compositionContext
+import androidx.compose.ui.platform.isDebugInspectorInfoEnabled
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -107,6 +108,10 @@ internal data class RobolectricRenderOutcome(
  * `DesignBoard` kit directly with `:host`.
  */
 internal object RobolectricBoardRenderer {
+  init {
+    isDebugInspectorInfoEnabled = true
+  }
+
   private const val NANOS_PER_MS = 1_000_000L
   private const val BASE_DPI = 160f
   private const val FRAME_NS = 16_000_000L

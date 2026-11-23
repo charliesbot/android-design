@@ -5,53 +5,15 @@ import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
-import org.gradle.api.DefaultTask
 import org.gradle.api.attributes.Attribute
-import org.gradle.api.file.ConfigurableFileCollection
-import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.tasks.ClasspathNormalizer
-import org.gradle.api.tasks.InputFiles
-import org.gradle.api.tasks.OutputDirectory
-import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
-import org.gradle.api.tasks.TaskAction
 
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.kotlin.serialization)
 }
-
-abstract class SyncFontsTask : DefaultTask() {
-  @get:InputFiles
-  @get:PathSensitive(PathSensitivity.RELATIVE)
-  abstract val fontFiles: ConfigurableFileCollection
-
-  @get:OutputDirectory abstract val outputDir: DirectoryProperty
-
-  @TaskAction
-  fun sync() {
-    val fontsOut = outputDir.get().asFile.resolve("fonts")
-    fontsOut.deleteRecursively()
-    fontsOut.mkdirs()
-    for (src in fontFiles.files) {
-      if (src.isFile) {
-        src.copyTo(fontsOut.resolve(src.name), overwrite = true)
-      }
-    }
-  }
-}
-
-val syncBundledFonts =
-  tasks.register<SyncFontsTask>("syncBundledFonts") {
-    fontFiles.from(
-      rootProject.fileTree("features/preview/desktop/src/main/resources/fonts") {
-        include("*.ttf")
-      },
-      rootProject.file("wear/compose/src/main/resources/fonts/roboto_flex.ttf"),
-    )
-    outputDir.set(layout.buildDirectory.dir("generated/assets/bundledFonts"))
-  }
 
 val composeCompilerPlugin = configurations.create("composeCompilerPlugin") { isTransitive = false }
 
@@ -109,10 +71,6 @@ android {
 androidComponents {
   beforeVariants(selector().withBuildType("previewRelease")) { variantBuilder ->
     variantBuilder.hostTests.forEach { (_, hostTest) -> hostTest.enable = false }
-  }
-
-  onVariants { variant ->
-    variant.sources.assets?.addGeneratedSourceDirectory(syncBundledFonts, SyncFontsTask::outputDir)
   }
 }
 

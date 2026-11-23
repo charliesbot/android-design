@@ -1,11 +1,10 @@
 package bot.charlies.androiddesign.preview.app.server
 
 import bot.charlies.androiddesign.preview.app.AppInfo
-import bot.charlies.androiddesign.preview.app.cli.ExploreRenderRunner
 import bot.charlies.androiddesign.preview.app.cli.ReportTheme
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
-import bot.charlies.androiddesign.preview.kit.BoardSurface
+import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
@@ -51,11 +50,7 @@ class PreviewHttpServer(
   private val idleTimeoutMs: Long = DEFAULT_IDLE_TIMEOUT_MS,
   private val coldBudgetMs: Long = Watchdog.COLD_BUDGET_MS,
   private val warmBudgetMs: Long = Watchdog.WARM_BUDGET_MS,
-  private val backend: PreviewBackend? = null,
-  private val loader: ExplorationLoader = ExplorationLoader { src, design ->
-    ExploreRenderRunner.loadAndCompile(src, design)
-  },
-  private val renderer: DensityTargetRenderer? = null,
+  private val backend: PreviewBackend,
   private val runtimeIdentity: RuntimeIdentity? = null,
   private val deviceSerial: String? = null,
   private val adbForwardPort: Int? = null,
@@ -63,7 +58,6 @@ class PreviewHttpServer(
   private val onWatchdogHalt: () -> Unit = { Runtime.getRuntime().halt(1) },
   private val onProcessExit: (() -> Unit)? = null,
   private val enableFileWatcher: Boolean = true,
-  private val jar: Path? = ServerPaths.runningJar(),
 ) {
   data class FocusTarget(
     val direction: String,
@@ -99,7 +93,6 @@ class PreviewHttpServer(
   private val clientSecret: String = existingClientSecret ?: ServerPaths.randomToken()
   private val viewToken: String = existingViewToken ?: ServerPaths.randomToken()
   private val startedAt: Long = System.currentTimeMillis()
-  private val jarModified: Long? = jar?.let(ServerPaths::jarModified)
   private val lastActivityMs = AtomicLong(startedAt)
   private val closed = AtomicBoolean(false)
   private val recycleScheduled = AtomicBoolean(false)
@@ -118,28 +111,10 @@ class PreviewHttpServer(
     repos[defaultRepoId] = RepoState(defaultRepoId, defaultRepoRoot)
   }
 
-  private val effectiveRenderer: DensityTargetRenderer =
-    renderer
-      ?: DensityTargetRenderer { compiled, dir, screenId, view, system, overlayId, density ->
-        bot.charlies.androiddesign.preview.feature.preview.sandbox.SandboxHeadlessRenderer.render(
-          compiled = compiled,
-          direction = dir,
-          screenId = screenId,
-          view = view,
-          designSystem = system,
-          overlayId = overlayId,
-          density = density,
-          encodePng = true,
-        )
-      }
-
-  private val effectiveBackend: PreviewBackend =
-    backend ?: SkikoPreviewBackend(loader, effectiveRenderer)
+  private val effectiveBackend: PreviewBackend = backend
 
   private val effectiveMaxCompiles: Int =
-    if (
-      backend?.supportsBatchCheck == true && maxCompilesBeforeRecycle == MAX_COMPILES_BEFORE_RECYCLE
-    ) {
+    if (backend.supportsBatchCheck && maxCompilesBeforeRecycle == MAX_COMPILES_BEFORE_RECYCLE) {
       Int.MAX_VALUE
     } else {
       maxCompilesBeforeRecycle
@@ -159,11 +134,9 @@ class PreviewHttpServer(
   val renderQueue: RenderQueue =
     RenderQueue(
       rendersRoot = rendersRoot,
+      backend = effectiveBackend,
       cacheRoot = cacheRoot,
       watchdog = watchdog,
-      backend = effectiveBackend,
-      loader = loader,
-      renderer = effectiveRenderer,
       onViewRendered = { rRoot, sourcePath, contentHash, artifact ->
         handleViewRendered(rRoot, sourcePath, contentHash, artifact)
       },
@@ -285,8 +258,6 @@ class PreviewHttpServer(
       viewToken = viewToken,
       timeouts = timeouts,
       haltedAt = null,
-      jarPath = jar?.toString(),
-      jarModified = jarModified,
       runtimeHash = runtimeIdentity?.runtimeHash,
       sourceDir = runtimeIdentity?.sourceDir,
       backend = effectiveBackend.name,
@@ -1921,10 +1892,6 @@ class PreviewHttpServer(
     val prefix: String,
   )
 
-  private fun DirectionMeta.overlaysFor(screenId: String): List<OverlayMeta> = overlays.filter {
-    (it.screen ?: startScreen) == screenId
-  }
-
   private fun resolveMetaTargets(
     directions: List<DirectionMeta>,
     screenFilter: List<String>?,
@@ -2069,7 +2036,7 @@ class PreviewHttpServer(
     }
 
     /**
-     * Image output policy from `visual-design-exploration-v5.md`:
+     * Image output policy (`visual-design-exploration-v6.md`):
      * - Scoped checks always return their PNG path(s), whether findings pass or fail.
      * - Failing full checks return at most 2 failing view paths, deduplicating identical PNGs.
      * - Passing full checks return `light` and `desktop` (`watch` and `watch-large` on Wear).

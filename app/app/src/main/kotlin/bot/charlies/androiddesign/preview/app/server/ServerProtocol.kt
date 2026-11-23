@@ -21,7 +21,7 @@ data class StatusResponse(
   val repoRoot: String,
   val boardUrl: String,
   val activeFile: String? = null,
-  val backend: String = "skiko",
+  val backend: String = RuntimeIdentity.BACKEND_ANDROID,
   val runtimeHash: String? = null,
   val deviceSerial: String? = null,
   val adbForwardPort: Int? = null,
@@ -212,7 +212,11 @@ data class DirectionMeta(
   val startScreen: String,
   val screens: List<String>,
   val overlays: List<OverlayMeta>,
-)
+) {
+  fun overlaysFor(screenId: String): List<OverlayMeta> = overlays.filter {
+    (it.screen ?: startScreen) == screenId
+  }
+}
 
 @Serializable
 data class BoardMeta(

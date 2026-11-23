@@ -20,7 +20,6 @@ from preview_app import (
     BOOTSTRAP_DIR_ENV,
     CACHE_DIR_ENV,
     DEFAULT_EVAL_BACKEND,
-    JAR_ENV,
     NO_OPEN_ENV,
     ROBOLECTRIC_CP_ENV,
     RobolectricWorker,
@@ -132,7 +131,6 @@ def generator_metrics_from(reply):
 
 def _stop_preview_server(case_dir, binary, *, src=None, bdir=None, backend=DEFAULT_EVAL_BACKEND, cache_dir=None):
     env = dict(os.environ)
-    env.pop(JAR_ENV, None)
     env[NO_OPEN_ENV] = '1'
     if src is not None:
         env[SRC_ENV] = str(src)

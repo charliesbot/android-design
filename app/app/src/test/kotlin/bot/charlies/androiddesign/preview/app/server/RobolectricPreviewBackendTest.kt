@@ -122,13 +122,13 @@ class RobolectricPreviewBackendTest {
         RuntimeIdentity.ROBOLECTRIC_CP_ENV to bdir.resolve("robolectric.cp").toString(),
       )
     assertEquals(RuntimeIdentity.BACKEND_ROBOLECTRIC, RuntimeIdentity.resolveBackend(env))
-    val id1 = RuntimeIdentity.compute(env = env, jar = null, meta = null)
+    val id1 = RuntimeIdentity.compute(env = env, meta = null)
     assertEquals(RuntimeIdentity.BACKEND_ROBOLECTRIC, id1.backend)
     assertNull(id1.apkSha256)
     assertEquals(bdir.resolve("robolectric.cp"), id1.robolectricCpFile)
 
     Files.writeString(bdir.resolve("robolectric.cp"), "-cp\n$dep:$dep\n")
-    val id2 = RuntimeIdentity.compute(env = env, jar = null, meta = null)
+    val id2 = RuntimeIdentity.compute(env = env, meta = null)
     assertFalse(
       id1.runtimeHash == id2.runtimeHash,
       "Changing robolectric.cp must change runtimeHash",
@@ -260,8 +260,6 @@ class RobolectricPreviewBackendTest {
         runtimeHash = "test-robo-hash",
         sourceDir = null,
         apkSha256 = null,
-        jarPath = null,
-        jarModified = null,
         serverCpFile = null,
         bootstrapDir = null,
       )
@@ -524,8 +522,6 @@ class RobolectricPreviewBackendTest {
         runtimeHash = "wd-hash",
         sourceDir = null,
         apkSha256 = null,
-        jarPath = null,
-        jarModified = null,
         serverCpFile = null,
         bootstrapDir = null,
       )

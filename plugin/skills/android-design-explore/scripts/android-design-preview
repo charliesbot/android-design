@@ -254,13 +254,14 @@ validate_cp_file() {
 
 bootstrap_valid() {
   _bdir="$1"
+  _cmd="${2:-}"
   [ -s "$_bdir/bootstrap-meta.properties" ] || return 1
   [ -f "$_bdir/host-preview.apk" ] || return 1
   [ -f "$_bdir/androidx-compile-bundle.jar" ] || return 1
   validate_paths_file "$_bdir/bootstrap-paths.txt" || return 1
   validate_cp_file "$_bdir/client.cp" || return 1
   validate_cp_file "$_bdir/server.cp" || return 1
-  if [ "${ANDROID_DESIGN_PREVIEW_BACKEND:-}" = "robolectric" ]; then
+  if [ "${ANDROID_DESIGN_PREVIEW_BACKEND:-}" = "robolectric" ] || [ "$_cmd" = "render" ]; then
     validate_cp_file "$_bdir/robolectric.cp" || return 1
   fi
   return 0
@@ -280,21 +281,6 @@ export ANDROID_DESIGN_PREVIEW_SCRIPT="$SCRIPT_PATH"
 
 JAVA_BIN="$(find_java)" || fail_json "missing_java" "Java 17 or newer not found. Install JDK 17+ or set JAVA_HOME."
 
-if [ -n "${ANDROID_DESIGN_PREVIEW_JAR:-}" ]; then
-  if [ ! -f "$ANDROID_DESIGN_PREVIEW_JAR" ]; then
-    fail_json "jar_not_found" "ANDROID_DESIGN_PREVIEW_JAR points to missing file: $ANDROID_DESIGN_PREVIEW_JAR"
-  fi
-  cmd="${1:-}"
-  case "$cmd" in
-    server|render)
-      exec "$JAVA_BIN" -Djava.awt.headless=true -jar "$ANDROID_DESIGN_PREVIEW_JAR" "$@"
-      ;;
-    *)
-      exec "$JAVA_BIN" -Djava.awt.headless=true -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -jar "$ANDROID_DESIGN_PREVIEW_JAR" "$@"
-      ;;
-  esac
-fi
-
 SDK_DIR="$(find_android_sdk)" || fail_json "missing_android_sdk" "Android SDK not found. Set ANDROID_HOME or ANDROID_SDK_ROOT or install it under ~/Library/Android/sdk."
 export ANDROID_HOME="$SDK_DIR"
 export ANDROID_SDK_ROOT="$SDK_DIR"
@@ -311,10 +297,11 @@ fi
 APP_DIR=""
 resolve_app_dir "$SCRIPT_DIR"
 BOOTSTRAP_DIR="${ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR:-$APP_DIR/host/build/bootstrap}"
+cmd="${1:-}"
 
-if ! bootstrap_valid "$BOOTSTRAP_DIR"; then
+if ! bootstrap_valid "$BOOTSTRAP_DIR" "$cmd"; then
   run_gradle_bootstrap "$APP_DIR"
-  bootstrap_valid "$BOOTSTRAP_DIR" || fail_json "bootstrap_invalid" "Gradle bootstrap completed but outputs in $BOOTSTRAP_DIR are incomplete"
+  bootstrap_valid "$BOOTSTRAP_DIR" "$cmd" || fail_json "bootstrap_invalid" "Gradle bootstrap completed but outputs in $BOOTSTRAP_DIR are incomplete"
 fi
 
 export ANDROID_DESIGN_CACHE_DIR="$CACHE_ROOT"
@@ -326,7 +313,6 @@ if [ -f "$BOOTSTRAP_DIR/robolectric.cp" ]; then
   export ANDROID_DESIGN_PREVIEW_ROBOLECTRIC_CP="$BOOTSTRAP_DIR/robolectric.cp"
 fi
 
-cmd="${1:-}"
 case "$cmd" in
   server|render)
     exec "$JAVA_BIN" -Djava.awt.headless=true "@$BOOTSTRAP_DIR/server.cp" bot.charlies.androiddesign.preview.app.MainKt "$@"

@@ -164,8 +164,8 @@ Validation spike ([#159](https://github.com/charliesbot/android-design/issues/15
 
 ## Links
 
-- [Visual design exploration v5](visual-design-exploration-v5.md)
-- [Wear OS in the previewer](wear-os-previewer.md)
+- [Visual design exploration v5](../archive/visual-design-exploration-v5.md)
+- [Wear OS in the previewer](../archive/wear-os-previewer.md)
 - [Visual design exploration v4](../archive/visual-design-exploration-v4.md)
 - [Visual design exploration v3](../archive/visual-design-exploration-v3.md)
 - [Script ban eval baseline](script-ban-eval.md)

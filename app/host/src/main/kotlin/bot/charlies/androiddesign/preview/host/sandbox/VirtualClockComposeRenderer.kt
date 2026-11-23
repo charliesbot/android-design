@@ -53,6 +53,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.compositionContext
+import androidx.compose.ui.platform.isDebugInspectorInfoEnabled
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -258,6 +259,7 @@ class HostRenderActivity : ComponentActivity() {
       activeSession.value = null
       composeView?.disposeComposition()
       root.removeAllViews()
+      isDebugInspectorInfoEnabled = true
       val cv = ComposeView(overrideCtx)
       ViewCompat.setOnApplyWindowInsetsListener(cv) { _, _ -> WindowInsetsCompat.CONSUMED }
       cv.setViewTreeLifecycleOwner(alwaysResumedOwners)
@@ -345,14 +347,15 @@ internal fun InspectedSubcomposition(
   tables: MutableSet<CompositionData>,
   content: @Composable () -> Unit,
 ) {
+  // Enable source/parameter markers only on the outer composer if root didn't enable them.
+  // Calling collectParameterInformation() inside subcompose(Unit) resets an already-populated
+  // SlotTable.sourceInformationMap mid-composition and drops child source info.
+  if (LocalInspectionTables.current == null) {
+    currentComposer.collectParameterInformation()
+  }
   CompositionLocalProvider(LocalInspectionTables provides tables) {
     SubcomposeLayout { constraints ->
-      val placeables =
-        subcompose(Unit) {
-            currentComposer.collectParameterInformation()
-            content()
-          }
-          .map { it.measure(constraints) }
+      val placeables = subcompose(Unit) { content() }.map { it.measure(constraints) }
       val width = placeables.maxOfOrNull { it.width } ?: constraints.minWidth
       val height = placeables.maxOfOrNull { it.height } ?: constraints.minHeight
       layout(width, height) { placeables.forEach { it.placeRelative(0, 0) } }

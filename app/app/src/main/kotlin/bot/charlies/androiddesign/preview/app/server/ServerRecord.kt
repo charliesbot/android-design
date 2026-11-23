@@ -28,14 +28,11 @@ data class RuntimeIdentity(
   val runtimeHash: String,
   val sourceDir: String?,
   val apkSha256: String?,
-  val jarPath: Path?,
-  val jarModified: Long?,
   val serverCpFile: Path?,
   val bootstrapDir: Path?,
   val robolectricCpFile: Path? = null,
 ) {
   companion object {
-    const val BACKEND_SKIKO = "skiko"
     const val BACKEND_ANDROID = "android"
     const val BACKEND_ROBOLECTRIC = "robolectric"
     const val BACKEND_ENV = "ANDROID_DESIGN_PREVIEW_BACKEND"
@@ -46,25 +43,11 @@ data class RuntimeIdentity(
 
     fun resolveBackend(env: Map<String, String> = System.getenv()): String {
       val explicit = env[BACKEND_ENV]?.trim()?.lowercase()
-      if (
-        explicit == BACKEND_ANDROID || explicit == BACKEND_ROBOLECTRIC || explicit == BACKEND_SKIKO
-      ) {
-        return explicit
-      }
-      val hasBootstrap =
-        !env[BootstrapMeta.BOOTSTRAP_DIR_ENV].isNullOrBlank() || !env[SERVER_CP_ENV].isNullOrBlank()
-      val hasLegacyJar = !env["ANDROID_DESIGN_PREVIEW_JAR"].isNullOrBlank()
-      return when {
-        hasLegacyJar && !hasBootstrap -> BACKEND_SKIKO
-        hasBootstrap -> BACKEND_ANDROID
-        ServerPaths.runningJar() != null -> BACKEND_SKIKO
-        else -> BACKEND_SKIKO
-      }
+      return if (explicit == BACKEND_ROBOLECTRIC) BACKEND_ROBOLECTRIC else BACKEND_ANDROID
     }
 
     fun compute(
       env: Map<String, String> = System.getenv(),
-      jar: Path? = ServerPaths.runningJar(),
       meta: BootstrapMeta? =
         env[BootstrapMeta.BOOTSTRAP_DIR_ENV]
           ?.takeIf { it.isNotBlank() }
@@ -87,7 +70,6 @@ data class RuntimeIdentity(
       val robolectricCpFile =
         env[ROBOLECTRIC_CP_ENV]?.trim()?.takeIf { it.isNotBlank() }?.let(Path::of)
           ?: bootstrapDir?.resolve("robolectric.cp")?.takeIf { Files.isRegularFile(it) }
-      val jarMod = jar?.let(ServerPaths::jarModified)
       val apkSha =
         if (backend == BACKEND_ANDROID) runCatching { meta?.apkSha256OrCompute() }.getOrNull()
         else null
@@ -119,9 +101,6 @@ data class RuntimeIdentity(
             feed("ver:$version")
             feed("backend:$backend")
             feed("src:${sourceDir.orEmpty()}")
-            if (jar != null) {
-              feed("jar:$jar:${jarMod ?: -1L}")
-            }
             if (apkSha != null) {
               feed("apk:$apkSha")
             }
@@ -137,8 +116,6 @@ data class RuntimeIdentity(
         runtimeHash = runtimeHash,
         sourceDir = sourceDir,
         apkSha256 = apkSha,
-        jarPath = jar,
-        jarModified = jarMod,
         serverCpFile = serverCpFile,
         bootstrapDir = bootstrapDir,
         robolectricCpFile = robolectricCpFile,
@@ -162,13 +139,10 @@ data class ServerRecord(
   val viewToken: String,
   val timeouts: List<TimeoutEntry> = emptyList(),
   val haltedAt: Long? = null,
-  /** The JAR this server runs and its modification time (v5 JAR mode). */
-  val jarPath: String? = null,
-  val jarModified: Long? = null,
   /** Shared runtime version/checkout hash, backend mode, and active Android device metadata. */
   val runtimeHash: String? = null,
   val sourceDir: String? = null,
-  val backend: String = RuntimeIdentity.BACKEND_SKIKO,
+  val backend: String = RuntimeIdentity.BACKEND_ANDROID,
   val deviceSerial: String? = null,
   val adbForwardPort: Int? = null,
   val apkSha256: String? = null,
@@ -279,30 +253,6 @@ object ServerPaths {
 
   fun rendersDir(repoRoot: Path, cacheRoot: Path = cacheRoot()): Path =
     cacheRoot.resolve("renders").resolve(repoHash(repoRoot))
-
-  /**
-   * The real path of the JAR this process runs from, or null when it runs from class directories
-   * (tests, IDE). Real paths keep a symlinked directory (macOS `/var`) from looking like another
-   * JAR.
-   */
-  fun runningJar(): Path? =
-    try {
-      val location = ServerPaths::class.java.protectionDomain?.codeSource?.location?.toURI()
-      location
-        ?.let(Path::of)
-        ?.takeIf { Files.isRegularFile(it) && it.toString().endsWith(".jar") }
-        ?.toRealPath()
-    } catch (_: Exception) {
-      null
-    }
-
-  /** [jar]'s modification time in milliseconds, or null when it cannot be read. */
-  fun jarModified(jar: Path): Long? =
-    try {
-      Files.getLastModifiedTime(jar).toMillis()
-    } catch (_: Exception) {
-      null
-    }
 
   fun randomToken(): String {
     val bytes = ByteArray(32)

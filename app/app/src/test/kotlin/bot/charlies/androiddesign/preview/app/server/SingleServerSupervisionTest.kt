@@ -1,14 +1,11 @@
 package bot.charlies.androiddesign.preview.app.server
 
 import bot.charlies.androiddesign.preview.app.AppInfo
-import bot.charlies.androiddesign.preview.app.cli.ExploreRenderRunner
 import bot.charlies.androiddesign.preview.app.cli.RenderEntry
 import bot.charlies.androiddesign.preview.app.client.PreviewClient
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.CompileResult
-import bot.charlies.androiddesign.preview.kit.BoardSurface
-import bot.charlies.androiddesign.preview.kit.designBoard
+import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutNode
@@ -71,17 +68,8 @@ class SingleServerSupervisionTest {
       views = PhoneSurface.views,
     )
 
-  private fun fakeLoaded(sourcePath: Path): ExploreRenderRunner.LoadedExploration {
-    val board = designBoard(name = "Board") { direction("Dir") { screen("home") {} } }
-    val compiled =
-      CompileResult.Compiled(
-        board = board,
-        sourceFile = sourcePath.fileName.toString(),
-        sourceText = Files.readString(sourcePath),
-        compileMs = 1L,
-        explorationDir = sourcePath.parent,
-      )
-    return ExploreRenderRunner.LoadedExploration(
+  private fun fakeLoaded(sourcePath: Path): LoadedExploration {
+    return LoadedExploration(
       sourcePath = sourcePath,
       designPath = null,
       designTheme = null,
@@ -91,7 +79,6 @@ class SingleServerSupervisionTest {
           null,
           PhoneSurface,
         ),
-      compiled = compiled,
       compileMs = 1L,
       errors = emptyList(),
     )

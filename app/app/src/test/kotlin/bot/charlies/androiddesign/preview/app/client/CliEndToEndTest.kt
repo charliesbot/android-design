@@ -4,12 +4,14 @@ import bot.charlies.androiddesign.preview.app.AppInfo
 import bot.charlies.androiddesign.preview.app.server.BoardSelectionRequest
 import bot.charlies.androiddesign.preview.app.server.CheckResponse
 import bot.charlies.androiddesign.preview.app.server.ContentHasher
+import bot.charlies.androiddesign.preview.app.server.RuntimeIdentity
 import bot.charlies.androiddesign.preview.app.server.SelectionResponse
 import bot.charlies.androiddesign.preview.app.server.ServerPaths
 import bot.charlies.androiddesign.preview.app.server.ServerRecord
 import bot.charlies.androiddesign.preview.app.server.StatusResponse
 import bot.charlies.androiddesign.preview.app.server.TimeoutEntry
 import bot.charlies.androiddesign.preview.app.server.TreeResponse
+import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import com.sun.net.httpserver.HttpServer
@@ -29,13 +31,26 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CliEndToEndTest {
-  private val jarPath: Path =
+  private val appDir: Path =
     Path.of(
-      System.getProperty("preview.jar") ?: error("preview.jar system property missing"),
+      System.getProperty("preview.app.dir") ?: error("preview.app.dir system property missing"),
+    )
+  private val bootstrapDir: Path =
+    Path.of(
+      System.getProperty("adp.bootstrap.dir") ?: error("adp.bootstrap.dir system property missing"),
     )
   private val binPath: Path =
     Path.of(
       System.getProperty("preview.bin") ?: error("preview.bin system property missing"),
+    )
+
+  private fun robolectricEnv(): Map<String, String> =
+    mapOf(
+      RuntimeIdentity.SRC_ENV to appDir.toString(),
+      BootstrapMeta.BOOTSTRAP_DIR_ENV to bootstrapDir.toString(),
+      RuntimeIdentity.SERVER_CP_ENV to bootstrapDir.resolve("server.cp").toString(),
+      RuntimeIdentity.ROBOLECTRIC_CP_ENV to bootstrapDir.resolve("robolectric.cp").toString(),
+      RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_ROBOLECTRIC,
     )
 
   private data class CliResult(val exitCode: Int, val stdout: String, val stderr: String)
@@ -47,12 +62,12 @@ class CliEndToEndTest {
     extraEnv: Map<String, String> = emptyMap(),
   ): CliResult {
     val pb = ProcessBuilder(listOf(binPath.toString()) + args).directory(cwd.toFile())
-    pb.environment()[PreviewClient.JAR_ENV] = jarPath.toString()
+    robolectricEnv().forEach { (k, v) -> pb.environment()[k] = v }
     pb.environment()[PreviewClient.NO_OPEN_ENV] = "1"
     pb.environment()[ServerPaths.CACHE_DIR_ENV] = cacheDir.toString()
     extraEnv.forEach { (k, v) -> pb.environment()[k] = v }
     val proc = pb.start()
-    val finished = proc.waitFor(60, TimeUnit.SECONDS)
+    val finished = proc.waitFor(120, TimeUnit.SECONDS)
     if (!finished) {
       proc.destroyForcibly()
       error("CLI timed out: ${args.joinToString(" ")}")
@@ -76,7 +91,10 @@ class CliEndToEndTest {
     val preview = designBoard("Plates", seed = 0xFFB5523BL, variant = PaletteVariant.TonalSpot) {
       direction("Editorial") {
         screen("home") {
-          Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+          Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
             Text("Dinner")
             Button(onClick = {}, modifier = Modifier.testTag(AD_PRIMARY_TAG).height(56.dp)) {
               Text("Open")
@@ -91,9 +109,13 @@ class CliEndToEndTest {
   @Test
   fun `end-to-end bin script covers all subcommands, exit codes 0 to 3, and check selection delivery`() {
     assertTrue(Files.isExecutable(binPath), "bootstrap script must be executable: $binPath")
-    assertTrue(Files.isRegularFile(jarPath), "workerJar must exist: $jarPath")
+    assertTrue(Files.isRegularFile(bootstrapDir.resolve("server.cp")), "server.cp must exist")
+    assertTrue(
+      Files.isRegularFile(bootstrapDir.resolve("robolectric.cp")),
+      "robolectric.cp must exist",
+    )
 
-    val tmp = createTempDirectory("v5-e2e-")
+    val tmp = createTempDirectory("v6-e2e-")
     val cacheDir = tmp.resolve("cache")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
     val source = repo.resolve("plates.explore.kt").also { Files.writeString(it, sampleBoard()) }
@@ -175,11 +197,11 @@ class CliEndToEndTest {
           "--view",
           "light",
         )
-      assertEquals(0, treeRes.exitCode, treeRes.stdout)
+      assertEquals(0, treeRes.exitCode, "${treeRes.stdout} ${treeRes.stderr}")
       val treeJson =
         PreviewJson.compact.decodeFromString(TreeResponse.serializer(), treeRes.stdout.trim())
-      assertTrue(treeJson.ok)
-      assertTrue(treeJson.tree?.nodes?.isNotEmpty() == true)
+      assertTrue(treeJson.ok, treeRes.stdout)
+      assertTrue(treeJson.tree?.nodes?.isNotEmpty() == true, "empty tree: ${treeRes.stdout}")
 
       // Simulate a board click selection via HTTP (viewToken + Origin), then verify check includes
       // it ONCE.
@@ -299,7 +321,7 @@ class CliEndToEndTest {
 
   @Test
   fun `dead server record with recorded timeout fast-fails before respawn and clears on edit`() {
-    val tmp = createTempDirectory("v5-e2e-timeout-record-")
+    val tmp = createTempDirectory("v6-e2e-timeout-record-")
     val cacheDir = tmp.resolve("cache")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
     val source = repo.resolve("hang.explore.kt").also { Files.writeString(it, sampleBoard()) }
@@ -317,6 +339,7 @@ class CliEndToEndTest {
           repoRoot = repo.toAbsolutePath().normalize().toString(),
           clientSecret = ServerPaths.randomToken(),
           viewToken = ServerPaths.randomToken(),
+          backend = RuntimeIdentity.BACKEND_ROBOLECTRIC,
           timeouts = listOf(TimeoutEntry(snap.contentHash, "compile", System.currentTimeMillis())),
           haltedAt = System.currentTimeMillis(),
         ),
@@ -363,10 +386,11 @@ class CliEndToEndTest {
 
   @Test
   fun `external client timeout kills wedged server, respawns fresh server, and returns timeout`() {
-    val tmp = createTempDirectory("v5-e2e-ext-timeout-")
+    val tmp = createTempDirectory("v6-e2e-ext-timeout-")
     val cacheDir = tmp.resolve("cache")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
     val source = repo.resolve("wedged.explore.kt").also { Files.writeString(it, sampleBoard()) }
+    val identity = RuntimeIdentity.compute(robolectricEnv())
     // Launch a real dummy sleeper subprocess whose PID the client can kill, paired with a stub HTTP
     // server that hangs on /api/check.
     val dummyProc = ProcessBuilder("sleep", "60").start()
@@ -376,7 +400,7 @@ class CliEndToEndTest {
     val stubPort = stubServer.address.port
     stubServer.createContext("/api/status") { ex ->
       val body =
-        """{"ok":true,"running":true,"pid":${dummyProc.pid()},"port":$stubPort,"jarVersion":"${AppInfo.VERSION}","startedAt":1,"compileCount":1,"repoRoot":"$repo","boardUrl":"http://127.0.0.1:$stubPort/?view=$stubView"}"""
+        """{"ok":true,"running":true,"pid":${dummyProc.pid()},"port":$stubPort,"jarVersion":"${AppInfo.VERSION}","startedAt":1,"compileCount":1,"repoRoot":"$repo","boardUrl":"http://127.0.0.1:$stubPort/?view=$stubView","backend":"${identity.backend}","runtimeHash":"${identity.runtimeHash}"}"""
           .toByteArray()
       ex.sendResponseHeaders(200, body.size.toLong())
       ex.responseBody.use { it.write(body) }
@@ -399,8 +423,8 @@ class CliEndToEndTest {
           repoRoot = repo.toAbsolutePath().normalize().toString(),
           clientSecret = stubSecret,
           viewToken = stubView,
-          jarPath = jarPath.toRealPath().toString(),
-          jarModified = Files.getLastModifiedTime(jarPath).toMillis(),
+          backend = identity.backend,
+          runtimeHash = identity.runtimeHash,
         ),
       )
 
@@ -438,18 +462,19 @@ class CliEndToEndTest {
   }
 
   @Test
-  fun `bootstrap script emits JSON error line on stdout when JAR prerequisite is missing`() {
-    val tmp = createTempDirectory("v5-e2e-missing-jar-")
+  fun `bootstrap script emits JSON error line on stdout when Java prerequisite is missing`() {
+    val tmp = createTempDirectory("v6-e2e-missing-java-")
     val cacheDir = tmp.resolve("cache")
     try {
       val pb = ProcessBuilder(binPath.toString(), "status").directory(tmp.toFile())
-      pb.environment()[PreviewClient.JAR_ENV] = tmp.resolve("does-not-exist.jar").toString()
+      pb.environment()["ANDROID_DESIGN_PREVIEW_JAVA"] =
+        tmp.resolve("does-not-exist-java").toString()
       pb.environment()[ServerPaths.CACHE_DIR_ENV] = cacheDir.toString()
       val proc = pb.start()
       assertTrue(proc.waitFor(10, TimeUnit.SECONDS))
       val stdout = proc.inputStream.bufferedReader(Charsets.UTF_8).readText().trim()
-      assertEquals(3, proc.exitValue(), "missing JAR should exit 3")
-      assertTrue("\"jar_not_found\"" in stdout, "stdout must carry JSON error line, got: '$stdout'")
+      assertEquals(3, proc.exitValue(), "missing Java should exit 3")
+      assertTrue("\"missing_java\"" in stdout, "stdout must carry JSON error line, got: '$stdout'")
     } finally {
       tmp.toFile().deleteRecursively()
     }
@@ -457,11 +482,12 @@ class CliEndToEndTest {
 
   @Test
   fun `watchdog TCP drop after recording timeout causes check to return exit 1 timeout`() {
-    val tmp = createTempDirectory("v5-e2e-watchdog-drop-")
+    val tmp = createTempDirectory("v6-e2e-watchdog-drop-")
     val cacheDir = tmp.resolve("cache")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
     val source = repo.resolve("hang2.explore.kt").also { Files.writeString(it, sampleBoard()) }
     val snap = ContentHasher.snapshot(source)
+    val identity = RuntimeIdentity.compute(robolectricEnv())
     val stubSecret = ServerPaths.randomToken()
     val stubView = ServerPaths.randomToken()
     val recordPath = ServerPaths.sharedRecordPath(cacheDir)
@@ -469,7 +495,7 @@ class CliEndToEndTest {
     val stubPort = stubServer.address.port
     stubServer.createContext("/api/status") { ex ->
       val body =
-        """{"ok":true,"running":true,"pid":${ProcessHandle.current().pid()},"port":$stubPort,"jarVersion":"${AppInfo.VERSION}","startedAt":1,"compileCount":1,"repoRoot":"$repo","boardUrl":"http://127.0.0.1:$stubPort/?view=$stubView"}"""
+        """{"ok":true,"running":true,"pid":${ProcessHandle.current().pid()},"port":$stubPort,"jarVersion":"${AppInfo.VERSION}","startedAt":1,"compileCount":1,"repoRoot":"$repo","boardUrl":"http://127.0.0.1:$stubPort/?view=$stubView","backend":"${identity.backend}","runtimeHash":"${identity.runtimeHash}"}"""
           .toByteArray()
       ex.sendResponseHeaders(200, body.size.toLong())
       ex.responseBody.use { it.write(body) }
@@ -496,8 +522,8 @@ class CliEndToEndTest {
           repoRoot = repo.toAbsolutePath().normalize().toString(),
           clientSecret = stubSecret,
           viewToken = stubView,
-          jarPath = jarPath.toRealPath().toString(),
-          jarModified = Files.getLastModifiedTime(jarPath).toMillis(),
+          backend = identity.backend,
+          runtimeHash = identity.runtimeHash,
         ),
       )
       val res =

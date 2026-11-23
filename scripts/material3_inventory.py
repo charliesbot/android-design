@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Lists the public names of the pinned Material 3 Compose artifact.
+"""Lists the public names of the pinned AndroidX Material 3 Compose artifact.
 
 Usage: material3_inventory.py
 
-Reads the material3 version from app/gradle/libs.versions.toml, finds the matching material3-desktop JAR in the
-local Gradle cache, and writes scripts/material3-inventory.txt: one name per line (`Class`, `Class.member`, or a bare
+Reads the androidxMaterial3 version from app/gradle/libs.versions.toml, finds the matching
+androidx.compose.material3:material3-android AAR in the local Gradle cache, reads its classes.jar,
+and writes scripts/material3-inventory.txt: one name per line (`Class`, `Class.member`, or a bare
 top-level function name), no signatures.
 
-Needs `javap` from a JDK. Build `app/` (`cd app && ./gradlew build`) once so Gradle downloads the artifact.
+Needs `javap` from a JDK. Run `cd app && ./gradlew :host:exportBootstrap` once so Gradle caches it.
 """
+import io
 import re
 import subprocess
 import sys
@@ -31,9 +33,9 @@ class MissingArtifact(Exception):
 
 
 def material3_version(toml_text):
-    match = re.search(r'^material3\s*=\s*"([^"]+)"', toml_text, re.M)
+    match = re.search(r'^androidxMaterial3\s*=\s*"([^"]+)"', toml_text, re.M)
     if not match:
-        raise MissingArtifact(f"No material3 version in {LIBS_TOML}")
+        raise MissingArtifact(f"No androidxMaterial3 version in {LIBS_TOML}")
     return match.group(1)
 
 
@@ -41,19 +43,35 @@ def version_key(version):
     return [int(part) if part.isdigit() else part for part in re.split(r"[.\-]", version)]
 
 
-def find_jar(group, artifact, version=None):
-    """Finds the binary JAR of an artifact in the Gradle cache; without a version, the newest cached one."""
-    base = GRADLE_FILES / group / artifact
-    versions = [version] if version else sorted((p.name for p in base.glob("*")), key=version_key, reverse=True) if base.exists() else []
+def find_aar(group, artifact, version=None, gradle_files=GRADLE_FILES):
+    """Finds the binary AAR of an artifact in the Gradle cache; without a version, the newest cached one."""
+    base = gradle_files / group / artifact
+    versions = (
+        [version]
+        if version
+        else sorted((p.name for p in base.glob("*")), key=version_key, reverse=True)
+        if base.exists()
+        else []
+    )
     for candidate in versions:
-        jars = [
+        aars = [
             p
-            for p in (base / candidate).glob("*/*.jar")
-            if not p.name.endswith("-sources.jar") and not p.name.endswith("-javadoc.jar")
+            for p in (base / candidate).glob("*/*.aar")
+            if not p.name.endswith("-sources.aar") and not p.name.endswith("-javadoc.aar")
         ]
-        if jars:
-            return candidate, jars[0]
+        if aars:
+            return candidate, aars[0]
     return None, None
+
+
+def extract_classes_from_aar(aar_path, target_dir):
+    """Extracts filtered material3 classes from an Android AAR's classes.jar into [target_dir]."""
+    with zipfile.ZipFile(aar_path) as aar:
+        classes_bytes = aar.read("classes.jar")
+    with zipfile.ZipFile(io.BytesIO(classes_bytes)) as jar:
+        wanted = material3_class_names(jar)
+        jar.extractall(target_dir, [n.replace(".", "/") + ".class" for n in wanted])
+    return wanted
 
 
 def strip_mangling(name):
@@ -198,25 +216,22 @@ def material3_entries(classes_dir, class_names):
 
 def main():
     version = material3_version(LIBS_TOML.read_text())
-    _, jar_path = find_jar("org.jetbrains.compose.material3", "material3-desktop", version)
-    if not jar_path:
+    _, aar_path = find_aar("androidx.compose.material3", "material3-android", version)
+    if not aar_path:
         sys.exit(
-            f"material3-desktop {version} is not in {GRADLE_FILES}. Build `app/` (`cd app && ./gradlew build`) once so Gradle downloads it."
+            f"material3-android {version} is not in {GRADLE_FILES}. Run `cd app && ./gradlew :host:exportBootstrap` once so Gradle caches it."
         )
 
     with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        with zipfile.ZipFile(jar_path) as jar:
-            wanted = material3_class_names(jar)
-            jar.extractall(tmp / "material3" / "classes", [n.replace(".", "/") + ".class" for n in wanted])
-        classes = tmp / "material3" / "classes"
+        classes = Path(tmp) / "material3" / "classes"
+        wanted = extract_classes_from_aar(aar_path, classes)
         entries = material3_entries(classes, wanted)
 
-    header = f"# org.jetbrains.compose.material3:material3-desktop:{version}"
+    header = f"# androidx.compose.material3:material3-android:{version}"
     lines = [header, *sorted(entries)]
     INVENTORY.write_text("\n".join(lines) + "\n")
 
-    print(f"{INVENTORY.relative_to(ROOT)}: {len(entries)} material3 names from {jar_path.name} {version}")
+    print(f"{INVENTORY.relative_to(ROOT)}: {len(entries)} material3 names from {aar_path.name} {version}")
 
 
 if __name__ == "__main__":

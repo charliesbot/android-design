@@ -125,7 +125,14 @@ class BootstrapCliTest(unittest.TestCase):
 
   def test_no_skiko_tarball_or_curl_downloads_remain(self) -> None:
     text = SKILL_SCRIPT.read_text(encoding="utf-8")
-    for forbidden in (".tar.xz", "curl", "wget", "release_target", "archive_url"):
+    for forbidden in (
+        ".tar.xz",
+        "curl",
+        "wget",
+        "release_target",
+        "archive_url",
+        "ANDROID_DESIGN_PREVIEW_JAR",
+    ):
       self.assertNotIn(forbidden, text)
 
   def test_warm_cache_skips_gradle_and_selects_client_or_server_cp(self) -> None:

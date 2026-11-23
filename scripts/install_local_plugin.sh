@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Installs this checkout's plugin (both skills and the CLI) into every harness found on PATH:
-# Claude Code, Codex, and Antigravity. It builds the previewer JAR and caches it as this version's
-# JAR, so every harness runs the local build instead of downloading a release. Rerun it after
-# changing plugin/ or app/ to refresh each install.
+# Claude Code, Codex, and Antigravity. It runs :host:exportBootstrap and links app/ into the
+# local version cache so every harness runs this checkout instead of cloning a release tag from
+# GitHub. Rerun it after changing plugin/ or app/ to refresh each install.
 #
 # Usage: ./scripts/install_local_plugin.sh [--skip-build]
 set -euo pipefail
@@ -14,11 +14,13 @@ VERSION="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["ver
 CACHE_DIR="${ANDROID_DESIGN_CACHE_DIR:-${ANDROID_DESIGN_PREVIEW_CACHE_DIR:-$HOME/.cache/android-design-preview}}/$VERSION"
 
 if [ "${1:-}" != "--skip-build" ]; then
-  (cd "$ROOT/app" && ./gradlew :app:workerJar --console=plain -q)
+  (cd "$ROOT/app" && ./gradlew --no-daemon :host:exportBootstrap --console=plain -q)
 fi
-mkdir -p "$CACHE_DIR"
-cp "$ROOT/app/app/build/libs/android-design-preview.jar" "$CACHE_DIR/android-design-preview.jar"
-echo "Cached the local JAR as $CACHE_DIR/android-design-preview.jar"
+rm -f "$CACHE_DIR/android-design-preview.jar"
+mkdir -p "$CACHE_DIR/src"
+rm -rf "$CACHE_DIR/src/app"
+ln -s "$ROOT/app" "$CACHE_DIR/src/app"
+echo "Linked local app/ checkout into $CACHE_DIR/src/app"
 
 # Agents run the skill's bundled script directly; this link gives your own shell the bare command.
 "$PLUGIN/skills/android-design-explore/scripts/android-design-preview" install >/dev/null

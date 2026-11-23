@@ -2,8 +2,11 @@
 
 Needs no JDK: reads the committed scripts/material3-inventory.txt. Run: python3 -m unittest discover scripts
 """
+import io
 import re
+import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 import material3_inventory as inventory
@@ -38,12 +41,34 @@ class InventoryTest(unittest.TestCase):
 
     def test_inventory_has_a_versioned_header(self):
         first = inventory.INVENTORY.read_text(encoding="utf-8").splitlines()[0]
-        self.assertRegex(first, r"^# org\.jetbrains\.compose\.material3:material3-desktop:\S+$")
+        self.assertRegex(first, r"^# androidx\.compose\.material3:material3-android:\S+$")
         pinned = inventory.material3_version(inventory.LIBS_TOML.read_text(encoding="utf-8"))
         self.assertTrue(
             first.endswith(":" + pinned),
-            "Run scripts/material3_inventory.py after changing the material3 version",
+            "Run scripts/material3_inventory.py after changing the androidxMaterial3 version",
         )
+
+    def test_find_aar_and_extract_classes_from_classes_jar(self):
+        with tempfile.TemporaryDirectory() as td:
+            gradle_files = Path(td)
+            aar_dir = gradle_files / "androidx.compose.material3/material3-android/1.5.0/abc"
+            aar_dir.mkdir(parents=True)
+            classes_buf = io.BytesIO()
+            with zipfile.ZipFile(classes_buf, "w") as jar:
+                jar.writestr("androidx/compose/material3/ButtonKt.class", b"cafe")
+                jar.writestr("androidx/compose/material3/internal/Helper.class", b"skip")
+            with zipfile.ZipFile(aar_dir / "material3-android-1.5.0.aar", "w") as aar:
+                aar.writestr("classes.jar", classes_buf.getvalue())
+
+            ver, found = inventory.find_aar(
+                "androidx.compose.material3", "material3-android", "1.5.0", gradle_files=gradle_files
+            )
+            self.assertEqual(ver, "1.5.0")
+            self.assertIsNotNone(found)
+            out_dir = Path(td) / "out"
+            wanted = inventory.extract_classes_from_aar(found, out_dir)
+            self.assertEqual(wanted, ["androidx.compose.material3.ButtonKt"])
+            self.assertTrue((out_dir / "androidx/compose/material3/ButtonKt.class").is_file())
 
     def test_every_model_token_exists_in_compose_inventory(self):
         names = [f"ColorScheme.{role}" for role in _kotlin_enum_wires("ColorRole")]

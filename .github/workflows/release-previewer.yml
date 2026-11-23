@@ -1,10 +1,8 @@
-# Publishes the previewer when the plugin version changes on main. It builds the headless Skiko
-# JAR, packages one artifact per OS and CPU with its SHA-256 checksum (scripts/package_release.py),
-# then creates the `v<version>` tag and GitHub release that the explore skill's scripts/android-design-preview
-# downloads and verifies. A push publishes only when it
-# changes the version in plugin/plugin.json, and a version that already has a release is skipped.
-# A manual run (workflow_dispatch) on main publishes the current version if it has no release yet.
-name: Release previewer worker
+# Publishes a lightweight git tag v<version> when the plugin version changes on main, so the
+# explore skill's scripts/android-design-preview sparse-checkouts app/ from that version tag. A push
+# runs only when it changes plugin/plugin.json, and a version that already has a tag is skipped. A
+# manual run (workflow_dispatch) on main tags the current version if it has no tag yet.
+name: Tag previewer release
 
 on:
   push:
@@ -20,55 +18,40 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  worker-jar:
-    # A manual run from another branch must not publish that branch's code.
+  tag-release:
+    # A manual run from another branch must not tag that branch's code.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Read plugin version
+      - name: Check plugin version tag
         id: version
         env:
-          GH_TOKEN: ${{ github.token }}
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
         run: |
           version=$(jq -r .version plugin/plugin.json)
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          tag="v$version"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
           previous=""
           if [ "$EVENT" = "push" ]; then
             previous=$(git show "$BEFORE:plugin/plugin.json" 2>/dev/null | jq -r .version 2>/dev/null || true)
           fi
           if [ "$EVENT" = "push" ] && [ "$previous" = "$version" ]; then
-            echo "Version stayed at $version, nothing to publish."
+            echo "Version stayed at $version, nothing to tag."
             echo "exists=true" >> "$GITHUB_OUTPUT"
-          elif gh release view "v$version" >/dev/null 2>&1; then
-            echo "Release v$version already exists, nothing to publish."
+          elif git rev-parse -q --verify "refs/tags/$tag" >/dev/null 2>&1 || [ -n "$(git ls-remote --tags origin "refs/tags/$tag")" ]; then
+            echo "Tag $tag already exists, nothing to tag."
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/setup-java@v4
-        if: steps.version.outputs.exists == 'false'
-        with:
-          distribution: temurin
-          java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
-        if: steps.version.outputs.exists == 'false'
-      - name: Build worker JAR
-        if: steps.version.outputs.exists == 'false'
-        working-directory: app
-        run: ./gradlew :app:workerJar --no-daemon
-      - name: Package one artifact per OS and CPU
-        if: steps.version.outputs.exists == 'false'
-        run: python3 scripts/package_release.py app/app/build/libs/android-design-preview.jar dist
-      - name: Publish release
+      - name: Create lightweight tag
         if: steps.version.outputs.exists == 'false'
         env:
-          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          gh release create "$TAG" dist/* \
-            --target "$GITHUB_SHA" --title "$TAG" --generate-notes
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG"
