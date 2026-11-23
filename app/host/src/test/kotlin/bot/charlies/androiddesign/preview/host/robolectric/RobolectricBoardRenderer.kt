@@ -39,6 +39,11 @@ import androidx.core.view.WindowInsetsCompat
 import bot.charlies.androiddesign.preview.data.DesignMdLocator
 import bot.charlies.androiddesign.preview.data.DesignMdParse
 import bot.charlies.androiddesign.preview.data.DesignMdParser
+import bot.charlies.androiddesign.preview.domain.RenderEntry
+import bot.charlies.androiddesign.preview.domain.RenderReport
+import bot.charlies.androiddesign.preview.domain.ReportTheme
+import bot.charlies.androiddesign.preview.domain.ViewCheck
+import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.domain.findings.ScrolledTree
 import bot.charlies.androiddesign.preview.domain.image.FastPngEncoder
 import bot.charlies.androiddesign.preview.domain.sandbox.SandboxClassLoader
@@ -55,16 +60,27 @@ import bot.charlies.androiddesign.preview.kit.BoardSurface
 import bot.charlies.androiddesign.preview.kit.DirectionSpec
 import bot.charlies.androiddesign.preview.kit.ExplorationBoard
 import bot.charlies.androiddesign.preview.kit.ExploreBoardFrame
+import bot.charlies.androiddesign.preview.model.DeviceBoardMeta
+import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
+import bot.charlies.androiddesign.preview.model.DeviceOverlayMeta
+import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
+import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.PaletteVariant
+import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.RobolectricRenderRequest
 import bot.charlies.androiddesign.preview.model.RobolectricRenderResponse
+import bot.charlies.androiddesign.preview.model.RobolectricTargetResult
 import bot.charlies.androiddesign.preview.model.ThemeOverride
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
+import bot.charlies.androiddesign.preview.model.Views
 import java.lang.reflect.Modifier as JavaModifier
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.security.MessageDigest
 import java.util.Collections
 import java.util.IdentityHashMap
 import java.util.concurrent.atomic.AtomicReference
@@ -95,59 +111,306 @@ internal object RobolectricBoardRenderer {
   private const val BASE_DPI = 160f
   private const val FRAME_NS = 16_000_000L
   private const val MAX_SCROLL_STEPS = 30
+  private const val MAX_COMPILED_CACHE = 8
+
+  private data class CompiledCacheKey(val sourcePath: String, val sourceSha256: String)
+
+  private data class CompiledBoardEntry(
+    val classes: HostCompileOutcome.Classes,
+    val board: ExplorationBoard,
+  )
+
+  private val compiledCache =
+    object : LinkedHashMap<CompiledCacheKey, CompiledBoardEntry>(16, 0.75f, true) {
+      override fun removeEldestEntry(
+        eldest: MutableMap.MutableEntry<CompiledCacheKey, CompiledBoardEntry>?,
+      ): Boolean = size > MAX_COMPILED_CACHE
+    }
+
+  private fun writeReportFile(
+    outDir: Path,
+    sourcePath: Path,
+    designPath: Path?,
+    designTheme: ThemeOverride?,
+    boardTheme: ThemeOverride?,
+    board: ExplorationBoard?,
+    errors: List<ValidationError>,
+    renders: List<RenderEntry>,
+  ): RenderReport {
+    val system =
+      if (board != null) {
+        board.resolveDesignSystem(designMd = designTheme)
+      } else {
+        DesignSystemResolver.resolve(designTheme, boardTheme)
+      }
+    val valid = errors.isEmpty()
+    val report =
+      RenderReport(
+        proposal = sourcePath.toString(),
+        design = designPath?.toString(),
+        theme = ReportTheme(system.seed, system.variant.wire, system.contrast),
+        valid = valid,
+        errors = errors,
+        renders = renders,
+        pass = valid && renders.all { it.pass },
+      )
+    Files.createDirectories(outDir)
+    Files.writeString(
+      outDir.resolve("report.json"),
+      PreviewJson.pretty.encodeToString(RenderReport.serializer(), report) + "\n",
+    )
+    return report
+  }
+
+  private fun invalidResponse(
+    request: RobolectricRenderRequest,
+    srcPath: Path,
+    outDir: Path?,
+    writeReport: Boolean,
+    designPath: Path?,
+    designTheme: ThemeOverride?,
+    errors: List<ValidationError>,
+    compileMs: Long = 0L,
+  ): RobolectricRenderResponse {
+    if (writeReport && outDir != null) {
+      writeReportFile(
+        outDir = outDir,
+        sourcePath = srcPath,
+        designPath = designPath,
+        designTheme = designTheme,
+        boardTheme = null,
+        board = null,
+        errors = errors,
+        renders = emptyList(),
+      )
+    }
+    return RobolectricRenderResponse(
+      id = request.id,
+      ok = true,
+      valid = false,
+      pass = false,
+      compileMs = compileMs,
+      designTheme = designTheme,
+      errors = errors,
+    )
+  }
+
+  private fun compileCached(
+    srcPath: Path,
+    sourceFile: String,
+    sourceText: String,
+    loadImmediately: Boolean,
+  ): CompileOrLoadOutcome {
+    val key = CompiledCacheKey(srcPath.toString(), sha256Hex(sourceText))
+    val cached = synchronized(compiledCache) { compiledCache[key] }
+    if (cached != null) {
+      return CompileOrLoadOutcome.Ready(cached.classes, cached.board, compileMs = 0L)
+    }
+    val compiled = HostClassCompiler.compileToClasses(sourceFile, sourceText)
+    if (compiled is HostCompileOutcome.Failed) {
+      return CompileOrLoadOutcome.Failed(compiled.errors, compiled.compileMs, ok = true)
+    }
+    val classes = compiled as HostCompileOutcome.Classes
+    val board =
+      try {
+        loadBoard(sourceFile, classes)
+      } catch (t: Throwable) {
+        val msg = "${t::class.java.name}: ${t.message}"
+        return CompileOrLoadOutcome.Failed(
+          errors = listOf(ValidationError(sourceFile, msg)),
+          compileMs = classes.compileMs,
+          ok = !loadImmediately,
+          errorMessage = msg,
+        )
+      }
+    synchronized(compiledCache) {
+      compiledCache[key] = CompiledBoardEntry(classes, board)
+    }
+    return CompileOrLoadOutcome.Ready(classes, board, compileMs = classes.compileMs)
+  }
+
+  private sealed interface CompileOrLoadOutcome {
+    data class Ready(
+      val classes: HostCompileOutcome.Classes,
+      val board: ExplorationBoard,
+      val compileMs: Long,
+    ) : CompileOrLoadOutcome
+
+    data class Failed(
+      val errors: List<ValidationError>,
+      val compileMs: Long,
+      val ok: Boolean,
+      val errorMessage: String? = null,
+    ) : CompileOrLoadOutcome
+  }
+
+  private fun buildDeviceBoardMeta(board: ExplorationBoard): DeviceBoardMeta =
+    DeviceBoardMeta(
+      surface = board.surfaceSpec.key,
+      boardName = board.name,
+      directions =
+        board.directions.map { d ->
+          DeviceDirectionMeta(
+            name = d.name,
+            surface = board.surfaceSpec.key,
+            startScreen = d.startScreen,
+            screens = d.screenIds,
+            overlays = d.overlays.map { o -> DeviceOverlayMeta(o.id, o.screen) },
+          )
+        },
+      views = board.surfaceSpec.views,
+    )
 
   fun handleRequest(request: RobolectricRenderRequest): RobolectricRenderResponse {
-    val srcPath = Paths.get(request.sourcePath).toAbsolutePath().normalize()
-    if (!Files.isRegularFile(srcPath)) {
+    if (request.mode == "ping") {
+      return RobolectricRenderResponse(id = request.id, ok = true, valid = true, pass = true)
+    }
+
+    val writeReport = request.mode == "report" || request.writeReport
+    val outDir = request.outDir?.let { Paths.get(it).toAbsolutePath().normalize() }
+    if (writeReport && outDir == null) {
       return RobolectricRenderResponse(
         id = request.id,
-        ok = true,
+        ok = false,
         valid = false,
         pass = false,
+        error = "outDir is required for report mode",
+      )
+    }
+
+    val srcPath = Paths.get(request.sourcePath).toAbsolutePath().normalize()
+    if (!Files.isRegularFile(srcPath)) {
+      return invalidResponse(
+        request = request,
+        srcPath = srcPath,
+        outDir = outDir,
+        writeReport = writeReport,
+        designPath = null,
+        designTheme = null,
         errors = listOf(ValidationError(request.sourcePath, "File not found: $srcPath")),
       )
     }
 
-    val designOverride =
-      resolveDesignOverride(
-        request.designPath?.let { Paths.get(it) } ?: DesignMdLocator.find(srcPath),
+    val sourceFile = srcPath.fileName.toString()
+    if ((request.mode == "compile" || writeReport) && !sourceFile.endsWith(".explore.kt")) {
+      return invalidResponse(
+        request = request,
+        srcPath = srcPath,
+        outDir = outDir,
+        writeReport = writeReport,
+        designPath = null,
+        designTheme = null,
+        errors =
+          listOf(ValidationError(srcPath.toString(), "Expected an .explore.kt exploration file")),
       )
+    }
+
+    val explicitDesign = request.designPath?.let { Paths.get(it).toAbsolutePath().normalize() }
+    val resolvedDesignPath = explicitDesign ?: DesignMdLocator.find(srcPath)
+    val designOverride =
+      resolveDesignOverride(resolvedDesignPath, explicit = explicitDesign != null)
     when (designOverride) {
       is DesignOutcome.Invalid ->
-        return RobolectricRenderResponse(
-          id = request.id,
-          ok = true,
-          valid = false,
-          pass = false,
+        return invalidResponse(
+          request = request,
+          srcPath = srcPath,
+          outDir = outDir,
+          writeReport = writeReport,
+          designPath = designOverride.path,
+          designTheme = null,
           errors = listOf(designOverride.error),
         )
       is DesignOutcome.Ok -> Unit
     }
 
-    val sourceFile = srcPath.fileName.toString()
     val sourceText = Files.readString(srcPath)
-    val compileResult = HostClassCompiler.compileToClasses(sourceFile, sourceText)
-    if (compileResult is HostCompileOutcome.Failed) {
+    val loadInSandboxError = request.mode == "render" && !writeReport && request.targets == null
+    val compiled =
+      compileCached(srcPath, sourceFile, sourceText, loadImmediately = loadInSandboxError)
+    if (compiled is CompileOrLoadOutcome.Failed) {
+      if (!compiled.ok) {
+        return RobolectricRenderResponse(
+          id = request.id,
+          ok = false,
+          valid = false,
+          pass = false,
+          compileMs = compiled.compileMs,
+          error = compiled.errorMessage,
+          errors = compiled.errors,
+        )
+      }
+      return invalidResponse(
+        request = request,
+        srcPath = srcPath,
+        outDir = outDir,
+        writeReport = writeReport,
+        designPath = designOverride.path,
+        designTheme = designOverride.theme,
+        errors = compiled.errors,
+        compileMs = compiled.compileMs,
+      )
+    }
+
+    val ready = compiled as CompileOrLoadOutcome.Ready
+    val board = ready.board
+    val boardMeta = buildDeviceBoardMeta(board)
+    val boardTheme = board.toThemeOverride()
+
+    if (request.mode == "compile") {
       return RobolectricRenderResponse(
         id = request.id,
         ok = true,
-        valid = false,
-        pass = false,
-        compileMs = compileResult.compileMs,
-        errors = compileResult.errors,
+        valid = true,
+        pass = true,
+        compileMs = ready.compileMs,
+        surface = board.surfaceSpec.key,
+        boardName = board.name,
+        boardMeta = boardMeta,
+        boardTheme = boardTheme,
+        designTheme = designOverride.theme,
       )
     }
-    val classes = (compileResult as HostCompileOutcome.Classes)
-    val outDir = request.outDir?.let { Paths.get(it).toAbsolutePath().normalize() }
+
     if (outDir != null) {
       Files.createDirectories(outDir)
     }
 
+    val requestedTargets = request.targets
+    if (requestedTargets != null) {
+      return handleTargetsRequest(
+        request = request,
+        board = board,
+        boardMeta = boardMeta,
+        boardTheme = boardTheme,
+        designTheme = designOverride.theme,
+        compileMs = ready.compileMs,
+        sourceFile = sourceFile,
+        sourceText = sourceText,
+        explorationDir = srcPath.parent,
+        outDir = outDir,
+        targets = requestedTargets,
+      )
+    }
+
+    if (writeReport) {
+      return handleReportRequest(
+        request = request,
+        srcPath = srcPath,
+        outDir = checkNotNull(outDir),
+        designPath = designOverride.path,
+        designTheme = designOverride.theme,
+        boardTheme = boardTheme,
+        board = board,
+        boardMeta = boardMeta,
+        compileMs = ready.compileMs,
+        sourceFile = sourceFile,
+        sourceText = sourceText,
+      )
+    }
+
     val renderStartNs = System.nanoTime()
-    val board: ExplorationBoard
     val outcomes =
       try {
-        board = loadBoard(sourceFile, classes)
         renderBoardTargets(
           board = board,
           sourceFile = sourceFile,
@@ -169,7 +432,7 @@ internal object RobolectricBoardRenderer {
           ok = false,
           valid = false,
           pass = false,
-          compileMs = classes.compileMs,
+          compileMs = ready.compileMs,
           error = msg,
           errors = listOf(ValidationError(sourceFile, msg)),
         )
@@ -185,13 +448,379 @@ internal object RobolectricBoardRenderer {
       ok = true,
       valid = true,
       pass = allPass,
-      compileMs = classes.compileMs,
+      compileMs = ready.compileMs,
       renderMs = renderMs,
       surface = board.surfaceSpec.key,
       boardName = board.name,
+      boardMeta = boardMeta,
+      boardTheme = boardTheme,
+      designTheme = designOverride.theme,
       trees = trees,
       endTrees = endTrees,
       writtenFiles = writtenFiles,
+    )
+  }
+
+  private fun handleTargetsRequest(
+    request: RobolectricRenderRequest,
+    board: ExplorationBoard,
+    boardMeta: DeviceBoardMeta,
+    boardTheme: ThemeOverride?,
+    designTheme: ThemeOverride?,
+    compileMs: Long,
+    sourceFile: String,
+    sourceText: String,
+    explorationDir: Path?,
+    outDir: Path?,
+    targets: List<DeviceRenderTarget>,
+  ): RobolectricRenderResponse {
+    val startNs = System.nanoTime()
+    val results = ArrayList<RobolectricTargetResult>(targets.size)
+    val trees = mutableListOf<LayoutTree>()
+    val endTrees = mutableListOf<LayoutTree>()
+    val writtenFiles = mutableListOf<String>()
+    targets.forEachIndexed { idx, target ->
+      val targetStartNs = System.nanoTime()
+      try {
+        val dir =
+          board.directions.firstOrNull { it.name == target.direction }
+            ?: error("Unknown direction '${target.direction}'")
+        val view = Views.byName(target.viewName) ?: error("Unknown view '${target.viewName}'")
+        val wantPng = target.frameFormat != FrameFormat.NONE && outDir != null
+        val wantEndPng = wantPng && target.includeEndFrame
+        val stem =
+          listOfNotNull(
+              "t${idx}",
+              sanitizeToken(dir.name),
+              sanitizeToken(target.screen),
+              view.name,
+              target.overlayId?.let(::sanitizeToken),
+            )
+            .joinToString("-")
+        val outcome =
+          renderSingleView(
+            board = board,
+            direction = dir,
+            screenId = target.screen,
+            view = view,
+            sourceFile = sourceFile,
+            sourceText = sourceText,
+            explorationDir = explorationDir,
+            designMd = designTheme,
+            overlayId = target.overlayId,
+            density = target.densityScale,
+            fontScale = target.fontScale,
+            darkOverride = target.darkOverride,
+            seedOverride = target.seedOverride,
+            variantOverride = target.variantOverride,
+            outDir = outDir,
+            encodePng = wantPng,
+            encodeEndPng = wantEndPng,
+            fileStemOverride = stem,
+          )
+        val elapsedMs = (System.nanoTime() - targetStartNs) / NANOS_PER_MS
+        val pngPath = outcome.writtenFiles.getOrNull(0)
+        val endPngPath = outcome.writtenFiles.getOrNull(1)
+        trees += outcome.tree
+        outcome.endTree?.let { endTrees += it }
+        writtenFiles += outcome.writtenFiles
+        results +=
+          RobolectricTargetResult(
+            direction = target.direction,
+            screen = target.screen,
+            viewName = target.viewName,
+            overlayId = target.overlayId,
+            densityScale = target.densityScale,
+            renderMs = elapsedMs,
+            tree = outcome.tree,
+            endTree = outcome.endTree,
+            pngPath = pngPath,
+            endPngPath = endPngPath,
+          )
+      } catch (t: Throwable) {
+        val elapsedMs = (System.nanoTime() - targetStartNs) / NANOS_PER_MS
+        results +=
+          RobolectricTargetResult(
+            direction = target.direction,
+            screen = target.screen,
+            viewName = target.viewName,
+            overlayId = target.overlayId,
+            densityScale = target.densityScale,
+            renderMs = elapsedMs,
+            error = "${t::class.java.name}: ${t.message}",
+          )
+      }
+    }
+    val totalMs = (System.nanoTime() - startNs) / NANOS_PER_MS
+    val allPass = results.all {
+      it.error == null && it.tree?.pass == true && (it.endTree?.pass ?: true)
+    }
+    return RobolectricRenderResponse(
+      id = request.id,
+      ok = true,
+      valid = true,
+      pass = allPass,
+      compileMs = compileMs,
+      renderMs = totalMs,
+      surface = board.surfaceSpec.key,
+      boardName = board.name,
+      boardMeta = boardMeta,
+      boardTheme = boardTheme,
+      designTheme = designTheme,
+      trees = trees,
+      endTrees = endTrees,
+      writtenFiles = writtenFiles,
+      results = results,
+    )
+  }
+
+  private fun handleReportRequest(
+    request: RobolectricRenderRequest,
+    srcPath: Path,
+    outDir: Path,
+    designPath: Path?,
+    designTheme: ThemeOverride?,
+    boardTheme: ThemeOverride?,
+    board: ExplorationBoard,
+    boardMeta: DeviceBoardMeta,
+    compileMs: Long,
+    sourceFile: String,
+    sourceText: String,
+  ): RobolectricRenderResponse {
+    val startNs = System.nanoTime()
+    val surface = board.surfaceSpec
+    val activeDirections =
+      if (request.direction == null) board.directions
+      else {
+        val match = board.directions.firstOrNull { it.name == request.direction }
+        if (match == null) {
+          val known = board.directions.joinToString { it.name }
+          return RobolectricRenderResponse(
+            id = request.id,
+            ok = false,
+            valid = false,
+            pass = false,
+            compileMs = compileMs,
+            error = "Unknown direction '${request.direction}' (available: $known)",
+          )
+        }
+        listOf(match)
+      }
+    val selectedViews =
+      if (request.views == null) surface.views
+      else {
+        val unknown =
+          request.views!!.filter { reqName -> surface.views.none { it.name == reqName } }
+        if (unknown.isNotEmpty()) {
+          return RobolectricRenderResponse(
+            id = request.id,
+            ok = false,
+            valid = false,
+            pass = false,
+            compileMs = compileMs,
+            error = "Unknown view(s): ${unknown.joinToString()}",
+          )
+        }
+        request.views!!.map { reqName -> surface.views.first { it.name == reqName } }
+      }
+    val screenFilter = request.screens?.toSet()
+    val singleDirection = activeDirections.size == 1 && board.directions.size == 1
+
+    val entries = mutableListOf<RenderEntry>()
+    val trees = mutableListOf<LayoutTree>()
+    val endTrees = mutableListOf<LayoutTree>()
+    val writtenFiles = mutableListOf<String>()
+    val results = mutableListOf<RobolectricTargetResult>()
+
+    for (dir in activeDirections) {
+      val screens =
+        dir.screenIds.filter { sid ->
+          val prefix = if (singleDirection) sid else "${sanitizeSegment(dir.name)}__$sid"
+          val slashName = "${dir.name}/$sid"
+          screenFilter == null ||
+            sid in screenFilter ||
+            prefix in screenFilter ||
+            slashName in screenFilter
+        }
+      for (screenId in screens) {
+        val prefix = if (singleDirection) screenId else "${sanitizeSegment(dir.name)}__$screenId"
+        val baseChecks = HashMap<String, ViewCheck>()
+        for (view in selectedViews) {
+          val filesBase = "$prefix-${view.name}"
+          val targetStartNs = System.nanoTime()
+          try {
+            val outcome =
+              renderSingleView(
+                board = board,
+                direction = dir,
+                screenId = screenId,
+                view = view,
+                sourceFile = sourceFile,
+                sourceText = sourceText,
+                explorationDir = srcPath.parent,
+                designMd = designTheme,
+                overlayId = null,
+                density = request.density,
+                outDir = outDir,
+                encodePng = true,
+                encodeEndPng = true,
+                fileStemOverride = filesBase,
+              )
+            val elapsedMs = (System.nanoTime() - targetStartNs) / NANOS_PER_MS
+            val fullCheck = ViewCheck.of(outcome.tree, surface)
+            baseChecks[view.name] = fullCheck
+            writeTreeJson(outDir, filesBase, outcome.tree)
+            val endFiles =
+              outcome.endTree?.let { et ->
+                val endBase = "$filesBase-end"
+                writeTreeJson(outDir, endBase, et)
+                endTrees += et
+                endBase
+              }
+            trees += outcome.tree
+            writtenFiles += outcome.writtenFiles
+            entries += RenderEntry.of(prefix, view.name, filesBase, fullCheck, endFiles)
+            results +=
+              RobolectricTargetResult(
+                direction = dir.name,
+                screen = screenId,
+                viewName = view.name,
+                densityScale = request.density,
+                renderMs = elapsedMs,
+                tree = outcome.tree,
+                endTree = outcome.endTree,
+                pngPath = outcome.writtenFiles.getOrNull(0),
+                endPngPath = outcome.writtenFiles.getOrNull(1),
+              )
+          } catch (t: Throwable) {
+            val elapsedMs = (System.nanoTime() - targetStartNs) / NANOS_PER_MS
+            val failedCheck = ViewCheck.renderError(t)
+            baseChecks[view.name] = failedCheck
+            entries += RenderEntry.of(prefix, view.name, null, failedCheck)
+            results +=
+              RobolectricTargetResult(
+                direction = dir.name,
+                screen = screenId,
+                viewName = view.name,
+                densityScale = request.density,
+                renderMs = elapsedMs,
+                error = "${t::class.java.name}: ${t.message}",
+              )
+          }
+        }
+        if (request.includeOverlays || request.overlay == null) {
+          val overlays =
+            if (request.overlay != null) {
+              dir.overlaysFor(screenId).filter { it.id == request.overlay }
+            } else {
+              dir.overlaysFor(screenId)
+            }
+          for (overlay in overlays) {
+            val artifactName = ViewCheck.renderOverlayName(prefix, overlay.id)
+            for (view in selectedViews) {
+              val filesBase = "$artifactName-${view.name}"
+              val targetStartNs = System.nanoTime()
+              try {
+                val outcome =
+                  renderSingleView(
+                    board = board,
+                    direction = dir,
+                    screenId = screenId,
+                    view = view,
+                    sourceFile = sourceFile,
+                    sourceText = sourceText,
+                    explorationDir = srcPath.parent,
+                    designMd = designTheme,
+                    overlayId = overlay.id,
+                    density = request.density,
+                    outDir = outDir,
+                    encodePng = true,
+                    encodeEndPng = true,
+                    fileStemOverride = filesBase,
+                  )
+                val elapsedMs = (System.nanoTime() - targetStartNs) / NANOS_PER_MS
+                val fullCheck = ViewCheck.of(outcome.tree, surface)
+                val check = baseChecks[view.name]?.let { fullCheck.overlaying(it) } ?: fullCheck
+                writeTreeJson(outDir, filesBase, outcome.tree)
+                val endFiles =
+                  outcome.endTree?.let { et ->
+                    val endBase = "$filesBase-end"
+                    writeTreeJson(outDir, endBase, et)
+                    endTrees += et
+                    endBase
+                  }
+                trees += outcome.tree
+                writtenFiles += outcome.writtenFiles
+                entries += RenderEntry.of(artifactName, view.name, filesBase, check, endFiles)
+                results +=
+                  RobolectricTargetResult(
+                    direction = dir.name,
+                    screen = screenId,
+                    viewName = view.name,
+                    overlayId = overlay.id,
+                    densityScale = request.density,
+                    renderMs = elapsedMs,
+                    tree = outcome.tree,
+                    endTree = outcome.endTree,
+                    pngPath = outcome.writtenFiles.getOrNull(0),
+                    endPngPath = outcome.writtenFiles.getOrNull(1),
+                  )
+              } catch (t: Throwable) {
+                val elapsedMs = (System.nanoTime() - targetStartNs) / NANOS_PER_MS
+                val failedCheck = ViewCheck.renderError(t)
+                entries += RenderEntry.of(artifactName, view.name, null, failedCheck)
+                results +=
+                  RobolectricTargetResult(
+                    direction = dir.name,
+                    screen = screenId,
+                    viewName = view.name,
+                    overlayId = overlay.id,
+                    densityScale = request.density,
+                    renderMs = elapsedMs,
+                    error = "${t::class.java.name}: ${t.message}",
+                  )
+              }
+            }
+          }
+        }
+      }
+    }
+
+    val report =
+      writeReportFile(
+        outDir = outDir,
+        sourcePath = srcPath,
+        designPath = designPath,
+        designTheme = designTheme,
+        boardTheme = boardTheme,
+        board = board,
+        errors = emptyList(),
+        renders = entries,
+      )
+    val totalMs = (System.nanoTime() - startNs) / NANOS_PER_MS
+    return RobolectricRenderResponse(
+      id = request.id,
+      ok = true,
+      valid = true,
+      pass = report.pass,
+      compileMs = compileMs,
+      renderMs = totalMs,
+      surface = board.surfaceSpec.key,
+      boardName = board.name,
+      boardMeta = boardMeta,
+      boardTheme = boardTheme,
+      designTheme = designTheme,
+      trees = trees,
+      endTrees = endTrees,
+      writtenFiles = writtenFiles,
+      results = results,
+    )
+  }
+
+  private fun writeTreeJson(outDir: Path, base: String, tree: LayoutTree) {
+    Files.writeString(
+      outDir.resolve("$base.tree.json"),
+      PreviewJson.pretty.encodeToString(LayoutTree.serializer(), tree) + "\n",
     )
   }
 
@@ -310,8 +939,14 @@ internal object RobolectricBoardRenderer {
     designMd: ThemeOverride? = null,
     overlayId: String? = null,
     density: Float = 2f,
+    fontScale: Float = 1f,
+    darkOverride: Boolean? = null,
+    seedOverride: String? = null,
+    variantOverride: String? = null,
     outDir: Path? = null,
     encodePng: Boolean = false,
+    encodeEndPng: Boolean = encodePng,
+    fileStemOverride: String? = null,
   ): RobolectricRenderOutcome {
     val controller = Robolectric.buildActivity(ComponentActivity::class.java)
     var recomposer: Recomposer? = null
@@ -324,23 +959,32 @@ internal object RobolectricBoardRenderer {
       controller.create().start().resume().visible()
       ProposalFonts.init(activity.assets)
 
-      val widthPx = (view.width * density).roundToInt().coerceAtLeast(1)
-      val heightPx = (view.height * density).roundToInt().coerceAtLeast(1)
+      val effectiveView =
+        if (darkOverride != null && board.surface == BoardSurface.Phone) {
+          view.copy(dark = darkOverride)
+        } else {
+          view
+        }
+      val effectiveFontScale = fontScale.coerceAtLeast(0.5f)
+      val widthPx = (effectiveView.width * density).roundToInt().coerceAtLeast(1)
+      val heightPx = (effectiveView.height * density).roundToInt().coerceAtLeast(1)
       val dpi = (BASE_DPI * density).roundToInt().coerceAtLeast(120)
       val perimeterPx = (1f * density).roundToInt().coerceAtLeast(1)
 
       val cfg =
         Configuration(activity.resources.configuration).apply {
           densityDpi = dpi
-          screenWidthDp = view.width
-          screenHeightDp = view.height
-          smallestScreenWidthDp = minOf(view.width, view.height)
+          this.fontScale = effectiveFontScale
+          screenWidthDp = effectiveView.width
+          screenHeightDp = effectiveView.height
+          smallestScreenWidthDp = minOf(effectiveView.width, effectiveView.height)
           uiMode =
             (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
-              if (view.dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
+              if (effectiveView.dark) Configuration.UI_MODE_NIGHT_YES
+              else Configuration.UI_MODE_NIGHT_NO
           screenLayout =
             (screenLayout and Configuration.SCREENLAYOUT_ROUND_MASK.inv()) or
-              if (view.round) Configuration.SCREENLAYOUT_ROUND_YES
+              if (effectiveView.round) Configuration.SCREENLAYOUT_ROUND_YES
               else Configuration.SCREENLAYOUT_ROUND_NO
         }
       val overrideCtx =
@@ -364,7 +1008,13 @@ internal object RobolectricBoardRenderer {
       val tables = Collections.synchronizedSet(LinkedHashSet<CompositionData>())
       var rootCoords: LayoutCoordinates? = null
       var emptyDetailScreen: String? = null
-      val designSystem = board.resolveDesignSystem(designMd = designMd)
+      val variant = variantOverride?.let { PaletteVariant.fromWire(it) }
+      val designSystem =
+        board.resolveDesignSystem(
+          designMd = designMd,
+          seedOverride = seedOverride,
+          variantOverride = variant,
+        )
 
       val insetContainer = InsetConsumingFrameLayout(overrideCtx)
       val cv = ComposeView(overrideCtx)
@@ -396,7 +1046,7 @@ internal object RobolectricBoardRenderer {
         CompositionLocalProvider(
           LocalContext provides overrideCtx,
           LocalConfiguration provides cfg,
-          LocalDensity provides Density(density, fontScale = 1f),
+          LocalDensity provides Density(density, fontScale = effectiveFontScale),
         ) {
           Box(Modifier.onGloballyPositioned { rootCoords = it }) {
             InspectedSubcomposition(tables) {
@@ -404,7 +1054,7 @@ internal object RobolectricBoardRenderer {
                 board = board,
                 direction = direction,
                 screenId = screenId,
-                view = view,
+                view = effectiveView,
                 designSystem = designSystem,
                 explorationDir = explorationDir,
                 overlayId = overlayId,
@@ -517,7 +1167,7 @@ internal object RobolectricBoardRenderer {
             rootCoordinates = rootCoords,
             frame = frame,
             screen = screenId,
-            view = view,
+            view = effectiveView,
             surface = board.surface,
             explorationFile = sourceFile,
             sourceText = sourceText,
@@ -549,7 +1199,7 @@ internal object RobolectricBoardRenderer {
 
         val minScrollerWidthPx = widthPx * 0.6f
         val positions = mutableListOf(finalTree)
-        val stepPx = view.height * density / 2f
+        val stepPx = effectiveView.height * density / 2f
         var steps = 0
         while (steps++ < MAX_SCROLL_STEPS) {
           val scroller =
@@ -574,20 +1224,21 @@ internal object RobolectricBoardRenderer {
       val writtenFiles = mutableListOf<String>()
       if (encodePng && outDir != null) {
         val stem =
-          listOfNotNull(
-              sanitizeToken(direction.name),
-              sanitizeToken(screenId),
-              view.name,
-              overlayId?.let(::sanitizeToken),
-            )
-            .joinToString("-")
+          fileStemOverride
+            ?: listOfNotNull(
+                sanitizeToken(direction.name),
+                sanitizeToken(screenId),
+                effectiveView.name,
+                overlayId?.let(::sanitizeToken),
+              )
+              .joinToString("-")
         val mainFile = outDir.resolve("$stem.png")
         Files.write(
           mainFile,
           FastPngEncoder.encodeFast(initialFrame.width, initialFrame.height, initialFrame.bytes),
         )
         writtenFiles += mainFile.toString()
-        if (endFrame != null) {
+        if (endFrame != null && encodeEndPng) {
           val endFile = outDir.resolve("$stem-end.png")
           Files.write(
             endFile,
@@ -614,20 +1265,35 @@ internal object RobolectricBoardRenderer {
   }
 
   private sealed interface DesignOutcome {
-    data class Ok(val theme: ThemeOverride?) : DesignOutcome
+    data class Ok(val path: Path?, val theme: ThemeOverride?) : DesignOutcome
 
-    data class Invalid(val error: ValidationError) : DesignOutcome
+    data class Invalid(val path: Path?, val error: ValidationError) : DesignOutcome
   }
 
-  private fun resolveDesignOverride(designPath: Path?): DesignOutcome {
-    if (designPath == null || !Files.isRegularFile(designPath)) return DesignOutcome.Ok(null)
+  private fun resolveDesignOverride(designPath: Path?, explicit: Boolean): DesignOutcome {
+    if (designPath == null) return DesignOutcome.Ok(null, null)
+    if (!Files.isRegularFile(designPath)) {
+      return if (explicit) {
+        DesignOutcome.Invalid(designPath, ValidationError(designPath.toString(), "no such file"))
+      } else {
+        DesignOutcome.Ok(null, null)
+      }
+    }
     return when (val parsed = DesignMdParser.parse(Files.readString(designPath))) {
-      is DesignMdParse.Parsed -> DesignOutcome.Ok(parsed.theme)
+      is DesignMdParse.Parsed -> DesignOutcome.Ok(designPath, parsed.theme)
       is DesignMdParse.Failed ->
-        DesignOutcome.Invalid(ValidationError(designPath.toString(), parsed.message))
+        DesignOutcome.Invalid(designPath, ValidationError(designPath.toString(), parsed.message))
     }
   }
 
   private fun sanitizeToken(raw: String): String =
     raw.trim().lowercase().replace(Regex("[^a-z0-9._-]+"), "_")
+
+  private fun sanitizeSegment(name: String): String =
+    name.trim().replace(Regex("""[^A-Za-z0-9._-]+"""), "_").ifBlank { "direction" }
+
+  private fun sha256Hex(text: String): String =
+    MessageDigest.getInstance("SHA-256")
+      .digest(text.toByteArray(StandardCharsets.UTF_8))
+      .joinToString("") { "%02x".format(it) }
 }

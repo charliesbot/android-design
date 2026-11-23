@@ -13,6 +13,7 @@ import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.SurfaceSpec
+import bot.charlies.androiddesign.preview.model.ThemeOverride
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import java.nio.file.Path
 import java.util.concurrent.CancellationException
@@ -84,6 +85,7 @@ data class CompileEntry(
       )
     },
   val androidData: AndroidCompiledData? = null,
+  val boardTheme: ThemeOverride? = null,
 )
 
 /** One completed 1-view render, cached by `(repoRoot, sourcePath, contentHash, RenderKey)`. */
@@ -426,6 +428,7 @@ class RenderQueue(
                   boardName = output.boardName,
                   boardMeta = output.boardMeta,
                   androidData = output.androidData,
+                  boardTheme = output.boardTheme,
                 )
               synchronized(cacheLock) {
                 val current = cachesByFile[key]
@@ -471,11 +474,14 @@ class RenderQueue(
       return CompletableFuture.failedFuture(ServerReplacedException(it))
     }
     val key = FileCacheKey(canonicalKey(entry.repoRoot), canonicalKey(entry.sourcePath))
+    val batchDensity =
+      if (scoped && effectiveBackend.name == RuntimeIdentity.BACKEND_ROBOLECTRIC) 1 else 2
     synchronized(cacheLock) {
       val current = cachesByFile[key]
       if (current != null && current.contentHash == entry.contentHash) {
         val cached = targets.mapNotNull { t ->
-          current.rendered[RenderKey(t.direction, t.screenId, t.overlayId, t.view.name, 2)]
+          current.rendered[
+              RenderKey(t.direction, t.screenId, t.overlayId, t.view.name, batchDensity)]
         }
         if (cached.size == targets.size && hasRequiredPngs(cached, scoped, entry.surface)) {
           return CompletableFuture.completedFuture(cached)
@@ -587,7 +593,7 @@ class RenderQueue(
     }
     val key = FileCacheKey(canonicalKey(entry.repoRoot), canonicalKey(entry.sourcePath))
     val renderKey = RenderKey(direction, screenId, overlayId, view.name, densityScale)
-    if (entry.loaded.compiled == null && entry.androidData == null) {
+    if (entry.loaded.compiled == null && entry.androidData == null && entry.boardMeta == null) {
       return CompletableFuture.failedFuture(IllegalStateException("Exploration is not compiled"))
     }
     val surfaceSpec: SurfaceSpec =

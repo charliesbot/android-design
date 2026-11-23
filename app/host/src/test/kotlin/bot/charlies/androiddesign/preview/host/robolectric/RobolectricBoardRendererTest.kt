@@ -9,14 +9,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalWindowInfo
+import bot.charlies.androiddesign.preview.domain.RenderReport
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
 import bot.charlies.androiddesign.preview.host.HostTestFixtures
 import bot.charlies.androiddesign.preview.kit.BoardContent
 import bot.charlies.androiddesign.preview.kit.designBoard
+import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
+import bot.charlies.androiddesign.preview.model.FrameFormat
+import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.RobolectricRenderRequest
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -321,6 +327,211 @@ class RobolectricBoardRendererTest {
       activeDir = board.directions[1]
       repeat(5) { shadowOf(Looper.getMainLooper()).idleFor(16, TimeUnit.MILLISECONDS) }
       assertTrue("Expected DirB list screen to compose after direction switch", switchedComposed)
+    } finally {
+      controller.pause().stop().destroy()
+      shadowOf(Looper.getMainLooper()).idle()
+    }
+  }
+
+  @Test
+  fun pingCompileBatchTargetsAndReportModesWorkEndToEnd() {
+    val ping =
+      RobolectricBoardRenderer.handleRequest(RobolectricRenderRequest(id = "ping-1", mode = "ping"))
+    assertTrue(ping.ok && ping.valid && ping.pass)
+
+    val workDir = tempFolder.newFolder("report-fixtures").toPath()
+    HostTestFixtures.writeSampleCoverPng(workDir)
+    val phoneFile = workDir.resolve(HostTestFixtures.PHONE_EXPLORE_FILE)
+    val wearFile = workDir.resolve(HostTestFixtures.WEAR_EXPLORE_FILE)
+    Files.writeString(phoneFile, HostTestFixtures.PHONE_EXPLORE_SOURCE)
+    Files.writeString(wearFile, HostTestFixtures.WEAR_EXPLORE_SOURCE)
+
+    // 1. compile mode returns boardMeta + boardTheme and caches unchanged source
+    val compileFirst =
+      RobolectricBoardRenderer.handleRequest(
+        RobolectricRenderRequest(id = "cmp-1", sourcePath = phoneFile.toString(), mode = "compile"),
+      )
+    assertTrue("Expected compile ok & valid: $compileFirst", compileFirst.ok && compileFirst.valid)
+    assertEquals("Editorial", compileFirst.boardMeta?.directions?.single()?.name)
+    assertEquals("expressive", compileFirst.boardTheme?.material?.scheme?.variant)
+
+    val compileSecond =
+      RobolectricBoardRenderer.handleRequest(
+        RobolectricRenderRequest(id = "cmp-2", sourcePath = phoneFile.toString(), mode = "compile"),
+      )
+    assertTrue(compileSecond.ok && compileSecond.valid)
+    assertEquals("Expected cached compile to skip kotlinc", 0L, compileSecond.compileMs)
+
+    // 2. targets batch writes PNG only when frameFormat != NONE
+    val batchOut = tempFolder.newFolder("batch-out").toPath()
+    val batchResp =
+      RobolectricBoardRenderer.handleRequest(
+        RobolectricRenderRequest(
+          id = "batch-1",
+          sourcePath = phoneFile.toString(),
+          outDir = batchOut.toString(),
+          targets =
+            listOf(
+              DeviceRenderTarget(
+                direction = "Editorial",
+                screen = "home",
+                viewName = "light",
+                densityScale = 1f,
+                frameFormat = FrameFormat.LZ4_RGBA,
+              ),
+              DeviceRenderTarget(
+                direction = "Editorial",
+                screen = "home",
+                viewName = "dark",
+                densityScale = 2f,
+                frameFormat = FrameFormat.NONE,
+              ),
+            ),
+        ),
+      )
+    assertTrue(batchResp.ok && batchResp.valid)
+    assertEquals(2, batchResp.results.size)
+    assertTrue(
+      batchResp.results[0].pngPath != null &&
+        Files.isRegularFile(Paths.get(batchResp.results[0].pngPath!!)),
+    )
+    assertEquals(null, batchResp.results[1].pngPath)
+
+    // 3. report mode writes report.json, overlays, trees, PNGs, and Wear end-of-list artifacts
+    val phoneReportOut = tempFolder.newFolder("phone-report").toPath()
+    val phoneReportResp =
+      RobolectricBoardRenderer.handleRequest(
+        RobolectricRenderRequest(
+          id = "rep-phone",
+          sourcePath = phoneFile.toString(),
+          views = listOf("light"),
+          screens = listOf("home"),
+          outDir = phoneReportOut.toString(),
+          mode = "report",
+          includeOverlays = true,
+        ),
+      )
+    assertTrue(phoneReportResp.ok && phoneReportResp.valid)
+    val phoneReport =
+      PreviewJson.compact.decodeFromString(
+        RenderReport.serializer(),
+        Files.readString(phoneReportOut.resolve("report.json")),
+      )
+    assertTrue(phoneReport.valid)
+    assertEquals("expressive", phoneReport.theme.variant)
+    assertEquals(
+      listOf("home", "home+dialog", "home+sheet", "home+popup"),
+      phoneReport.renders.map { it.screen },
+    )
+    assertTrue(Files.isRegularFile(phoneReportOut.resolve("home-light.png")))
+    assertTrue(Files.isRegularFile(phoneReportOut.resolve("home-light.tree.json")))
+    assertTrue(Files.isRegularFile(phoneReportOut.resolve("home+dialog-light.png")))
+
+    val wearReportOut = tempFolder.newFolder("wear-report").toPath()
+    val wearReportResp =
+      RobolectricBoardRenderer.handleRequest(
+        RobolectricRenderRequest(
+          id = "rep-wear",
+          sourcePath = wearFile.toString(),
+          views = listOf("watch"),
+          screens = listOf("main"),
+          outDir = wearReportOut.toString(),
+          mode = "report",
+          includeOverlays = true,
+        ),
+      )
+    assertTrue(wearReportResp.ok && wearReportResp.valid)
+    val wearReport =
+      PreviewJson.compact.decodeFromString(
+        RenderReport.serializer(),
+        Files.readString(wearReportOut.resolve("report.json")),
+      )
+    assertEquals(listOf("main", "main+confirm"), wearReport.renders.map { it.screen })
+    assertEquals("main-watch-end.png", wearReport.renders[0].endPng)
+    assertEquals("main-watch-end.tree.json", wearReport.renders[0].endTree)
+    assertTrue(Files.isRegularFile(wearReportOut.resolve("main-watch-end.png")))
+    assertTrue(Files.isRegularFile(wearReportOut.resolve("main-watch-end.tree.json")))
+
+    // 4. invalid proposal in report mode writes valid=false report.json
+    val brokenFile = workDir.resolve("Broken.explore.kt")
+    Files.writeString(brokenFile, "val preview = unresolvedSymbol()\n")
+    val brokenOut = tempFolder.newFolder("broken-report").toPath()
+    val brokenResp =
+      RobolectricBoardRenderer.handleRequest(
+        RobolectricRenderRequest(
+          id = "rep-broken",
+          sourcePath = brokenFile.toString(),
+          outDir = brokenOut.toString(),
+          mode = "report",
+        ),
+      )
+    assertTrue(brokenResp.ok)
+    assertFalse(brokenResp.valid)
+    val brokenReport =
+      PreviewJson.compact.decodeFromString(
+        RenderReport.serializer(),
+        Files.readString(brokenOut.resolve("report.json")),
+      )
+    assertFalse(brokenReport.valid)
+    assertTrue(brokenReport.errors.isNotEmpty())
+  }
+
+  @Test
+  fun localWindowInfoReflectsTargetViewDimensionsInsideListDetail() {
+    var observedDpWidth = -1
+    var observedDpHeight = -1
+    var observedPxWidth = -1
+    var observedPxHeight = -1
+    val board =
+      designBoard("WindowInfoParity") {
+        direction("Split") {
+          listDetail(
+            list = {
+              val windowInfo = LocalWindowInfo.current
+              observedDpWidth = windowInfo.containerDpSize.width.value.roundToInt()
+              observedDpHeight = windowInfo.containerDpSize.height.value.roundToInt()
+              observedPxWidth = windowInfo.containerSize.width
+              observedPxHeight = windowInfo.containerSize.height
+              Text("List ${observedDpWidth}x$observedDpHeight")
+            },
+            detail = { Text("Detail") },
+            placeholder = { Text("Placeholder") },
+          )
+        }
+      }
+    val controller = Robolectric.buildActivity(ComponentActivity::class.java)
+    val activity = controller.setup().get()
+    ProposalFonts.init(activity.assets)
+    val density = 2f
+    val widthPx = (1280 * density).roundToInt()
+    val heightPx = (800 * density).roundToInt()
+    val cv = ComposeView(activity)
+    cv.setContent {
+      androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalDensity provides
+          androidx.compose.ui.unit.Density(density, fontScale = 1f),
+      ) {
+        BoardContent(
+          board = board,
+          direction = board.directions.single(),
+          screenId = "list",
+          frameWidthDp = 1280,
+          frameHeightDp = 800,
+          fillContainer = false,
+          dark = false,
+          roundClip = false,
+          designSystem = board.resolveDesignSystem(),
+          explorationDir = null,
+        )
+      }
+    }
+    activity.setContentView(cv, android.view.ViewGroup.LayoutParams(widthPx, heightPx))
+    try {
+      repeat(5) { shadowOf(Looper.getMainLooper()).idleFor(16, TimeUnit.MILLISECONDS) }
+      assertEquals(1280, observedDpWidth)
+      assertEquals(800, observedDpHeight)
+      assertEquals(2560, observedPxWidth)
+      assertEquals(1600, observedPxHeight)
     } finally {
       controller.pause().stop().destroy()
       shadowOf(Looper.getMainLooper()).idle()

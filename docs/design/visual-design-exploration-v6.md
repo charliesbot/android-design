@@ -98,6 +98,46 @@ v6 replaces v5 only after passing both speed and eval parity gates on Apple Sili
 - **Eval parity:** Match v5's 8-case A/B bar (`evals/run.py`) with no regression in multi-turn tokens or wall time (`evals/multiturn.py`).
 - **Cutover scope:** Once both gates pass, one cutover retires Skiko, `app/wear/`, binary release packaging, and desktop-only sandbox plumbing, and trims `.github/workflows/release-previewer.yml` to lightweight tag creation. It also moves `visual-design-exploration-v5.md` and `wear-os-previewer.md` to `docs/archive/`, updates `plugin/skills/android-design-explore/` prerequisites (Android SDK, `android` CLI, emulator or connected device, plus Codex setup guidance for outbound access to GitHub and Maven hosts and a writable `~/.gradle` alongside `~/.cache/android-design-preview`), and updates `AGENTS.md` layout notes.
 
+### Rollout gate results
+
+Both rollout gates passed before authorizing v5 removal (`#162`, Apple Silicon host + Robolectric `4.18.1` `@Config(sdk = [35])`). During rollout testing, two pre-existing v6 bootstrap/parity issues were caught and fixed: rejecting macOS's `/usr/bin/java` shim in `android-design-preview` (`java-bin` cache and `JAVA_HOME` derivation), and providing `LocalWindowInfo` inside `DesignBoard.kt` (`BoardContent`) so `LocalWindowInfo.current` and `currentWindowAdaptiveInfo()` report the target view frame (`1280x800` dp tablet, etc.) rather than Robolectric or Display 0 phone bounds.
+
+**Apple Silicon Host APK speed gate (`Pixel_10_Pro_XL` headless, uncached edits on `android` backend):**
+
+| Benchmark | Target | Measured median | Min / Max | Server compile / device render median |
+| --- | --- | --- | --- | --- |
+| Warm 1-view scoped `check` (`n=7`) | `<= 500 ms` | **`434.2 ms`** | `412.2 ms` / `531.2 ms` | `248.0 ms` / `40.0 ms` |
+| Full 15-view unscoped `check` (`n=5`, 3 directions x 5 views at `2x`) | `<= 2800 ms` | **`886.6 ms`** | `829.5 ms` / `941.1 ms` | `189.0 ms` / `532.0 ms` |
+
+**Eight-case A/B suite (`evals/run.py`, `Gemini 3.8 Flash (High)` generator and judge, Robolectric backend):**
+
+| Metric | v5 (`d9df0b7`) | v6 Run 2 (`#162`) | Notes |
+| --- | --- | --- | --- |
+| Cases passed (rubric) | `5/8` (`69/71` across 7 completed) | `5/8` (`85/87` across 7 completed) | `trek` aborted at startup on transient `agy` empty conversation ID; standalone post-fix `trek` retry passed `3/3` code checks and `15/15` rubric |
+| Deterministic code checks | `20/21` (`20/22` with `C-generation`) | **`18/18` (`100%` completed)** | `21/21` (`100%`) including standalone `trek` retry (`3/3`) |
+| Median compile retries | `0` | **`0`** (`0, 0, 0, 0, 1, 1, 3`) | Standalone `trek` retry had `1` |
+| Median agent turns | `27` | `28` | `30` on standalone `trek` retry |
+| Median input tokens | `197,819` | **`145,561`** (`-26.4%`) | `163,306` on standalone `trek` retry |
+| Median output tokens | `49,108` | **`45,359`** (`-7.6%`) | `66,653` on standalone `trek` retry |
+| Median check calls | `7` | `7` | `7` on standalone `trek` retry |
+| Median wall time | `655.9 s` | `672.8 s` | `763.5 s` on standalone `trek` retry |
+| Median `skill_bytes_read` | `112,236 B` | `124,925 B` | `171,462 B` on standalone `trek` retry |
+
+Run 2 per-case results: `music` (`3/3`, `15/15`), `settings` (`3/3`, `15/15`), `workout` (`2/2`, `9/9`), `player` (`2/2`, `9/9`), and `reminder` (`2/2`, `9/9`) passed; `finance` (`3/3`, `14/15` on `R-finance-categories`) and `recipes` (`3/3`, `14/15` on `R-platform`) passed all deterministic checks; `trek` failed `C-generation` (`empty conversation id`) before writing code. Earlier full 8-case Run 1 passed `6/8` rubric (`100/102` items including `trek` `15/15`), `21/21` (`100%`) deterministic checks, `628.3 s` median wall time, `27` median turns, `153,120` input / `43,497` output tokens, `8` check calls, and `0.5` median compile retries (5 LLM Kotlin typos across `music`, `trek`, `player`, `reminder`).
+
+**Ten-turn multi-turn revision case (`evals/multiturn.py`, Robolectric backend, post-`LocalWindowInfo` fix):**
+
+| Metric | v5 (`3b1294c`, `claude-fable-5-2`) | v6 (`claude-opus-5-5`) | Notes |
+| --- | --- | --- | --- |
+| Final deterministic checks | `3/3` pass | **`3/3` pass** | Turn 1 kept `listDetail` using `LocalWindowInfo >= 840.dp` |
+| Mean wall time / turn | `33.72 s` (`337.20 s` total) | **`32.83 s`** (`328.26 s` total, `-2.6%`) | |
+| Median wall time / turn | `26.57 s` | **`25.46 s`** (`-4.2%`) | |
+| Total cost (mean / median) | `$3.6292` (`$0.3629` / `$0.2113`) | **`$2.8374`** (`$0.2837` / `$0.1919`, `-21.8%`) | Lower overall cost despite larger system context |
+| Total check calls | `10` (`1.0` / turn) | `16` (`1.6` / turn; median `1.0`) | Scoped `check` payloads remain `0.9` to `1.5 KB` |
+| Compile retries | `0` | `1` (`0.0` median across 10 turns) | Single Turn 5 LLM Kotlin math typo (`String` vs `Dp`) |
+| Total tokens / turn (mean / median) | `275,745.3` / `268,044.0` | `600,212.5` / `516,435.0` | Reflects Claude Code `2.1.322` (`claude-opus-5-5`) `35.8k` starting system context and `5.84M` cache reads (`130,390` cache-write tokens vs v4's `270,933`) |
+| `skill_bytes_read` | `42,315 B` (`3` files) | `49,652 B` (`3` files) | |
+
 ### Rejected alternatives
 
 - **Gradle incremental tasks on every edit (`:explore:dex`, Tooling API, or `--continuous`):** Pays irreducible launcher, configuration-cache, and input-snapshotting tax on every edit while pinning 2 to 3.3 GB of resident Gradle and Kotlin daemons; strictly slower and heavier than Gradle-as-bootstrap.

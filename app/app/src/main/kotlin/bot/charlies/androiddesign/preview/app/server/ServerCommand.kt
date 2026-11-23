@@ -10,6 +10,7 @@ import bot.charlies.androiddesign.preview.app.client.V5ExitCode
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import java.io.PrintStream
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -20,7 +21,7 @@ class ServerCommand : Command {
   override val name = "server"
   override val usage =
     "server --repo <dir> [--preferred-port <port>] [--view-token <token>] [--idle-timeout-ms <ms>] " +
-      "[--backend android|skiko] [--runtime-hash <hash>] [--device-serial <id>] [--avd <name>] " +
+      "[--backend android|robolectric|skiko] [--runtime-hash <hash>] [--device-serial <id>] [--avd <name>] " +
       "[--headless true|false] [--force-reinstall-apk true|false]"
 
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
@@ -57,11 +58,22 @@ class ServerCommand : Command {
       parsed.flags["--max-compiles"]?.toIntOrNull()
         ?: System.getenv(MAX_COMPILES_ENV)?.toIntOrNull()
         ?: PreviewHttpServer.MAX_COMPILES_BEFORE_RECYCLE
-    val coldBudgetMs = System.getenv(COLD_BUDGET_ENV)?.toLongOrNull() ?: Watchdog.COLD_BUDGET_MS
-    val warmBudgetMs = System.getenv(WARM_BUDGET_ENV)?.toLongOrNull() ?: Watchdog.WARM_BUDGET_MS
-
     val backendMode =
       parsed.flags["--backend"]?.takeIf { it.isNotBlank() } ?: RuntimeIdentity.resolveBackend()
+    val coldBudgetMs =
+      System.getenv(COLD_BUDGET_ENV)?.toLongOrNull()
+        ?: if (backendMode == RuntimeIdentity.BACKEND_ROBOLECTRIC) {
+          RobolectricPreviewBackend.DEFAULT_COLD_BUDGET_MS
+        } else {
+          Watchdog.COLD_BUDGET_MS
+        }
+    val warmBudgetMs =
+      System.getenv(WARM_BUDGET_ENV)?.toLongOrNull()
+        ?: if (backendMode == RuntimeIdentity.BACKEND_ROBOLECTRIC) {
+          RobolectricPreviewBackend.DEFAULT_WARM_BUDGET_MS
+        } else {
+          Watchdog.WARM_BUDGET_MS
+        }
     val env = System.getenv().toMutableMap().apply { put(RuntimeIdentity.BACKEND_ENV, backendMode) }
     parsed.flags["--runtime-hash"]
       ?.takeIf { it.isNotBlank() }
@@ -79,7 +91,61 @@ class ServerCommand : Command {
       Thread(r, "android-design-sandbox-recycle").apply { isDaemon = true }
     }
 
-    if (backendMode == RuntimeIdentity.BACKEND_ANDROID) {
+    if (backendMode == RuntimeIdentity.BACKEND_ROBOLECTRIC) {
+      val meta =
+        BootstrapMeta.locateOrNull()
+          ?: run {
+            val msg =
+              PreviewJson.compact.encodeToString(
+                ErrorEnvelope.serializer(),
+                ErrorEnvelope(
+                  error = "bootstrap_missing",
+                  message = "Cannot find bootstrap-meta.properties for Robolectric host server",
+                ),
+              )
+            out.println(msg)
+            err.println(msg)
+            recycleExecutor.shutdownNow()
+            return V5ExitCode.NOT_READY
+          }
+      val cpOverride =
+        System.getenv(RuntimeIdentity.ROBOLECTRIC_CP_ENV)?.takeIf { it.isNotBlank() }?.let(Path::of)
+      val robolectricCp = cpOverride ?: meta.bootstrapDir.resolve("robolectric.cp")
+      if (!Files.isRegularFile(robolectricCp)) {
+        val msg =
+          PreviewJson.compact.encodeToString(
+            ErrorEnvelope.serializer(),
+            ErrorEnvelope(
+              error = "bootstrap_missing",
+              message =
+                "Missing robolectric.cp at $robolectricCp; run `./gradlew :host:exportBootstrap` from app/",
+            ),
+          )
+        out.println(msg)
+        err.println(msg)
+        recycleExecutor.shutdownNow()
+        return V5ExitCode.NOT_READY
+      }
+      val roboBackend = RobolectricPreviewBackend(meta = meta, robolectricCp = robolectricCp)
+      try {
+        roboBackend.warmUp()
+      } catch (e: Exception) {
+        roboBackend.close()
+        val msg =
+          PreviewJson.compact.encodeToString(
+            ErrorEnvelope.serializer(),
+            ErrorEnvelope(
+              error = "robolectric_init_failed",
+              message = e.message ?: "Failed warming Robolectric worker",
+            ),
+          )
+        out.println(msg)
+        err.println(msg)
+        recycleExecutor.shutdownNow()
+        return V5ExitCode.NOT_READY
+      }
+      backend = roboBackend
+    } else if (backendMode == RuntimeIdentity.BACKEND_ANDROID) {
       val meta =
         BootstrapMeta.locateOrNull()
           ?: run {

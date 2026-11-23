@@ -32,18 +32,25 @@ data class RuntimeIdentity(
   val jarModified: Long?,
   val serverCpFile: Path?,
   val bootstrapDir: Path?,
+  val robolectricCpFile: Path? = null,
 ) {
   companion object {
     const val BACKEND_SKIKO = "skiko"
     const val BACKEND_ANDROID = "android"
+    const val BACKEND_ROBOLECTRIC = "robolectric"
     const val BACKEND_ENV = "ANDROID_DESIGN_PREVIEW_BACKEND"
     const val SRC_ENV = "ANDROID_DESIGN_PREVIEW_SRC"
     const val SERVER_CP_ENV = "ANDROID_DESIGN_PREVIEW_SERVER_CP"
+    const val ROBOLECTRIC_CP_ENV = "ANDROID_DESIGN_PREVIEW_ROBOLECTRIC_CP"
     const val RUNTIME_HASH_ENV = "ANDROID_DESIGN_PREVIEW_RUNTIME_HASH"
 
     fun resolveBackend(env: Map<String, String> = System.getenv()): String {
       val explicit = env[BACKEND_ENV]?.trim()?.lowercase()
-      if (explicit == BACKEND_ANDROID || explicit == BACKEND_SKIKO) return explicit
+      if (
+        explicit == BACKEND_ANDROID || explicit == BACKEND_ROBOLECTRIC || explicit == BACKEND_SKIKO
+      ) {
+        return explicit
+      }
       val hasBootstrap =
         !env[BootstrapMeta.BOOTSTRAP_DIR_ENV].isNullOrBlank() || !env[SERVER_CP_ENV].isNullOrBlank()
       val hasLegacyJar = !env["ANDROID_DESIGN_PREVIEW_JAR"].isNullOrBlank()
@@ -71,12 +78,15 @@ data class RuntimeIdentity(
     ): RuntimeIdentity {
       val backend = resolveBackend(env)
       val sourceDir = env[SRC_ENV]?.trim()?.takeIf { it.isNotBlank() }
-      val serverCpFile =
-        env[SERVER_CP_ENV]?.trim()?.takeIf { it.isNotBlank() }?.let(Path::of)
-          ?: meta?.bootstrapDir?.resolve("server.cp")?.takeIf { Files.isRegularFile(it) }
       val bootstrapDir =
         env[BootstrapMeta.BOOTSTRAP_DIR_ENV]?.trim()?.takeIf { it.isNotBlank() }?.let(Path::of)
           ?: meta?.bootstrapDir
+      val serverCpFile =
+        env[SERVER_CP_ENV]?.trim()?.takeIf { it.isNotBlank() }?.let(Path::of)
+          ?: bootstrapDir?.resolve("server.cp")?.takeIf { Files.isRegularFile(it) }
+      val robolectricCpFile =
+        env[ROBOLECTRIC_CP_ENV]?.trim()?.takeIf { it.isNotBlank() }?.let(Path::of)
+          ?: bootstrapDir?.resolve("robolectric.cp")?.takeIf { Files.isRegularFile(it) }
       val jarMod = jar?.let(ServerPaths::jarModified)
       val apkSha =
         if (backend == BACKEND_ANDROID) runCatching { meta?.apkSha256OrCompute() }.getOrNull()
@@ -91,6 +101,21 @@ data class RuntimeIdentity(
               digest.update(s.toByteArray(Charsets.UTF_8))
               digest.update(0)
             }
+            fun feedClasspath(tag: String, cpFile: Path?) {
+              if (cpFile == null || !Files.isRegularFile(cpFile)) return
+              val cpText = runCatching { Files.readString(cpFile) }.getOrDefault("")
+              feed("$tag:$cpText")
+              for (entry in cpText.lines().drop(1).joinToString("").split(File.pathSeparator)) {
+                val p = runCatching { Path.of(entry.trim()) }.getOrNull() ?: continue
+                if (p.fileName?.toString()?.endsWith(".jar") == true && Files.exists(p)) {
+                  val mtime = runCatching {
+                    Files.getLastModifiedTime(p).toMillis()
+                  }
+                    .getOrDefault(0L)
+                  feed("$tag-entry:$p:$mtime")
+                }
+              }
+            }
             feed("ver:$version")
             feed("backend:$backend")
             feed("src:${sourceDir.orEmpty()}")
@@ -100,19 +125,9 @@ data class RuntimeIdentity(
             if (apkSha != null) {
               feed("apk:$apkSha")
             }
-            if (serverCpFile != null && Files.isRegularFile(serverCpFile)) {
-              val cpText = runCatching { Files.readString(serverCpFile) }.getOrDefault("")
-              feed("cp:$cpText")
-              for (entry in cpText.lines().drop(1).joinToString("").split(File.pathSeparator)) {
-                val p = runCatching { Path.of(entry.trim()) }.getOrNull() ?: continue
-                if (p.fileName?.toString()?.endsWith(".jar") == true && Files.exists(p)) {
-                  val mtime = runCatching {
-                    Files.getLastModifiedTime(p).toMillis()
-                  }
-                    .getOrDefault(0L)
-                  feed("entry:$p:$mtime")
-                }
-              }
+            feedClasspath("cp", serverCpFile)
+            if (backend == BACKEND_ROBOLECTRIC) {
+              feedClasspath("rcp", robolectricCpFile)
             }
             append(digest.digest().joinToString("") { "%02x".format(it) }.take(24))
           }
@@ -126,6 +141,7 @@ data class RuntimeIdentity(
         jarModified = jarMod,
         serverCpFile = serverCpFile,
         bootstrapDir = bootstrapDir,
+        robolectricCpFile = robolectricCpFile,
       )
     }
   }

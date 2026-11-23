@@ -56,6 +56,10 @@ is_java_17_plus() {
   [ "$_maj" -ge 17 ]
 }
 
+is_macos_java_stub() {
+  [ "$1" = "/usr/bin/java" ] && [ ! -L "$1" ] && [ -x /usr/libexec/java_home ]
+}
+
 find_java() {
   if [ -n "${ANDROID_DESIGN_PREVIEW_JAVA:-}" ]; then
     is_java_17_plus "$ANDROID_DESIGN_PREVIEW_JAVA" || return 1
@@ -66,7 +70,7 @@ find_java() {
   _java_cache="$CACHE_ROOT/java-bin"
   if [ -f "$_java_cache" ]; then
     IFS= read -r _cached_java < "$_java_cache" || _cached_java=""
-    if [ -n "$_cached_java" ] && [ -x "$_cached_java" ]; then
+    if [ -n "$_cached_java" ] && [ -x "$_cached_java" ] && ! is_macos_java_stub "$_cached_java"; then
       printf '%s\n' "$_cached_java"
       return 0
     fi
@@ -86,7 +90,7 @@ find_java() {
 
   if [ -z "$_picked" ] && command -v java >/dev/null 2>&1; then
     _cmd_java="$(command -v java)"
-    if is_java_17_plus "$_cmd_java"; then
+    if ! is_macos_java_stub "$_cmd_java" && is_java_17_plus "$_cmd_java"; then
       _picked="$_cmd_java"
     fi
   fi
@@ -256,6 +260,9 @@ bootstrap_valid() {
   validate_paths_file "$_bdir/bootstrap-paths.txt" || return 1
   validate_cp_file "$_bdir/client.cp" || return 1
   validate_cp_file "$_bdir/server.cp" || return 1
+  if [ "${ANDROID_DESIGN_PREVIEW_BACKEND:-}" = "robolectric" ]; then
+    validate_cp_file "$_bdir/robolectric.cp" || return 1
+  fi
   return 0
 }
 
@@ -295,7 +302,7 @@ export ANDROID_SDK_ROOT="$SDK_DIR"
 if [ -z "${JAVA_HOME:-}" ]; then
   _resolved_java="$(resolve_script_path "$JAVA_BIN")"
   _java_home_cand="$(CDPATH= cd -- "$(dirname -- "$_resolved_java")/.." && pwd -P)"
-  if [ -f "$_java_home_cand/release" ] || [ -x "$_java_home_cand/bin/javac" ]; then
+  if [ -f "$_java_home_cand/release" ] || { [ "$_java_home_cand" != "/usr" ] && [ "$_java_home_cand" != "/" ] && [ -x "$_java_home_cand/bin/javac" ]; }; then
     JAVA_HOME="$_java_home_cand"
     export JAVA_HOME
   fi
@@ -315,6 +322,9 @@ export ANDROID_DESIGN_PREVIEW_SRC="$APP_DIR"
 export ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR="$BOOTSTRAP_DIR"
 export ANDROID_DESIGN_PREVIEW_SERVER_CP="$BOOTSTRAP_DIR/server.cp"
 export ANDROID_DESIGN_PREVIEW_CLIENT_CP="$BOOTSTRAP_DIR/client.cp"
+if [ -f "$BOOTSTRAP_DIR/robolectric.cp" ]; then
+  export ANDROID_DESIGN_PREVIEW_ROBOLECTRIC_CP="$BOOTSTRAP_DIR/robolectric.cp"
+fi
 
 cmd="${1:-}"
 case "$cmd" in

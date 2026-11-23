@@ -43,6 +43,7 @@ fi
   printf 'CLIENT_CP=%s\\n' "${{ANDROID_DESIGN_PREVIEW_CLIENT_CP:-}}"
   printf 'ANDROID_HOME=%s\\n' "${{ANDROID_HOME:-}}"
   printf 'CACHE_DIR=%s\\n' "${{ANDROID_DESIGN_CACHE_DIR:-}}"
+  printf 'JAVA_HOME=%s\\n' "${{JAVA_HOME:-}}"
 }} > "{capture_file}"
 exit 0
 """,
@@ -297,6 +298,86 @@ class BootstrapCliTest(unittest.TestCase):
       payload_src = json.loads(res_src.stdout)
       self.assertFalse(payload_src["ok"])
       self.assertEqual(payload_src["errors"][0]["code"], "invalid_source_dir")
+
+  def test_ignores_macos_usr_bin_java_stub_in_cache_and_never_exports_usr_java_home(self) -> None:
+    if not pathlib.Path("/usr/libexec/java_home").is_file():
+      self.skipTest("macOS /usr/libexec/java_home stub test only applies on macOS")
+    with tempfile.TemporaryDirectory() as td:
+      tmp = pathlib.Path(td)
+      capture = tmp / "java_capture.txt"
+      jdk_dir = tmp / "jdk"
+      java_bin = _make_fake_java(jdk_dir / "bin", capture)
+      _write_executable(jdk_dir / "bin" / "javac", "#!/bin/sh\nexit 0\n")
+      (jdk_dir / "release").write_text('JAVA_VERSION="17.0.20"\n', encoding="utf-8")
+
+      sdk_dir = _make_fake_sdk(tmp)
+      app_dir, _ = _make_fake_app_dir(tmp)
+      _populate_bootstrap(app_dir)
+      cache_dir = tmp / "cache"
+      cache_dir.mkdir(parents=True, exist_ok=True)
+      (cache_dir / "java-bin").write_text("/usr/bin/java\n", encoding="utf-8")
+      (tmp / "home").mkdir(parents=True, exist_ok=True)
+
+      env = {
+          "PATH": "/usr/bin:/bin",
+          "HOME": str(tmp / "home"),
+          "JAVA_HOME": str(jdk_dir),
+          "ANDROID_HOME": str(sdk_dir),
+          "ANDROID_SDK_ROOT": str(sdk_dir),
+          "ANDROID_DESIGN_CACHE_DIR": str(cache_dir),
+          "ANDROID_DESIGN_PREVIEW_SRC": str(app_dir),
+      }
+      res = subprocess.run(
+          [str(SKILL_SCRIPT), "status"],
+          env=env,
+          capture_output=True,
+          text=True,
+          timeout=15,
+      )
+      self.assertEqual(res.returncode, 0, res.stderr)
+      self.assertTrue(capture.is_file())
+      captured = capture.read_text(encoding="utf-8")
+      self.assertNotIn("JAVA_HOME=/usr\n", captured)
+      cached_java = (cache_dir / "java-bin").read_text(encoding="utf-8").strip()
+      self.assertIn(cached_java, {str(java_bin), str(java_bin.resolve())})
+
+  def test_derives_java_home_for_real_jdk_but_never_usr(self) -> None:
+    with tempfile.TemporaryDirectory() as td:
+      tmp = pathlib.Path(td)
+      capture = tmp / "java_capture.txt"
+      jdk_dir = tmp / "jdk"
+      java_bin = _make_fake_java(jdk_dir / "bin", capture)
+      _write_executable(jdk_dir / "bin" / "javac", "#!/bin/sh\nexit 0\n")
+      (jdk_dir / "release").write_text('JAVA_VERSION="17.0.20"\n', encoding="utf-8")
+
+      sdk_dir = _make_fake_sdk(tmp)
+      app_dir, _ = _make_fake_app_dir(tmp)
+      _populate_bootstrap(app_dir)
+      (tmp / "home").mkdir(parents=True, exist_ok=True)
+
+      env = {
+          "PATH": "/usr/bin:/bin",
+          "HOME": str(tmp / "home"),
+          "ANDROID_DESIGN_PREVIEW_JAVA": str(java_bin),
+          "ANDROID_HOME": str(sdk_dir),
+          "ANDROID_SDK_ROOT": str(sdk_dir),
+          "ANDROID_DESIGN_CACHE_DIR": str(tmp / "cache"),
+          "ANDROID_DESIGN_PREVIEW_SRC": str(app_dir),
+      }
+      res = subprocess.run(
+          [str(SKILL_SCRIPT), "status"],
+          env=env,
+          capture_output=True,
+          text=True,
+          timeout=15,
+      )
+      self.assertEqual(res.returncode, 0, res.stderr)
+      captured = capture.read_text(encoding="utf-8")
+      self.assertIn(f"JAVA_HOME={jdk_dir.resolve()}\n", captured)
+
+    script_text = SKILL_SCRIPT.read_text(encoding="utf-8")
+    self.assertIn('!= "/usr"', script_text)
+    self.assertIn('!= "/"', script_text)
 
 
 if __name__ == "__main__":
