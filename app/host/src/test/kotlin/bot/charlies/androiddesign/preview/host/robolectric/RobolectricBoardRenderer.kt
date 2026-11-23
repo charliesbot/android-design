@@ -72,6 +72,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
@@ -313,215 +314,221 @@ internal object RobolectricBoardRenderer {
     encodePng: Boolean = false,
   ): RobolectricRenderOutcome {
     val controller = Robolectric.buildActivity(ComponentActivity::class.java)
-    val activity = controller.get()
-    activity.setTheme(android.R.style.Theme_Material_NoActionBar)
-    WindowCompat.setDecorFitsSystemWindows(activity.window, false)
-    controller.create().start().resume().visible()
-    ProposalFonts.init(activity.assets)
+    var recomposer: Recomposer? = null
+    var job: Job? = null
+    var composeView: ComposeView? = null
+    try {
+      val activity = controller.get()
+      activity.setTheme(android.R.style.Theme_Material_NoActionBar)
+      WindowCompat.setDecorFitsSystemWindows(activity.window, false)
+      controller.create().start().resume().visible()
+      ProposalFonts.init(activity.assets)
 
-    val widthPx = (view.width * density).roundToInt().coerceAtLeast(1)
-    val heightPx = (view.height * density).roundToInt().coerceAtLeast(1)
-    val dpi = (BASE_DPI * density).roundToInt().coerceAtLeast(120)
-    val perimeterPx = (1f * density).roundToInt().coerceAtLeast(1)
+      val widthPx = (view.width * density).roundToInt().coerceAtLeast(1)
+      val heightPx = (view.height * density).roundToInt().coerceAtLeast(1)
+      val dpi = (BASE_DPI * density).roundToInt().coerceAtLeast(120)
+      val perimeterPx = (1f * density).roundToInt().coerceAtLeast(1)
 
-    val cfg =
-      Configuration(activity.resources.configuration).apply {
-        densityDpi = dpi
-        screenWidthDp = view.width
-        screenHeightDp = view.height
-        smallestScreenWidthDp = minOf(view.width, view.height)
-        uiMode =
-          (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
-            if (view.dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
-        screenLayout =
-          (screenLayout and Configuration.SCREENLAYOUT_ROUND_MASK.inv()) or
-            if (view.round) Configuration.SCREENLAYOUT_ROUND_YES
-            else Configuration.SCREENLAYOUT_ROUND_NO
-      }
-    val overrideCtx =
-      object : ContextThemeWrapper(activity, activity.theme) {
-        init {
-          applyOverrideConfiguration(cfg)
+      val cfg =
+        Configuration(activity.resources.configuration).apply {
+          densityDpi = dpi
+          screenWidthDp = view.width
+          screenHeightDp = view.height
+          smallestScreenWidthDp = minOf(view.width, view.height)
+          uiMode =
+            (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
+              if (view.dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
+          screenLayout =
+            (screenLayout and Configuration.SCREENLAYOUT_ROUND_MASK.inv()) or
+              if (view.round) Configuration.SCREENLAYOUT_ROUND_YES
+              else Configuration.SCREENLAYOUT_ROUND_NO
         }
-      }
+      val overrideCtx =
+        object : ContextThemeWrapper(activity, activity.theme) {
+          init {
+            applyOverrideConfiguration(cfg)
+          }
+        }
 
-    val clock = BroadcastFrameClock()
-    val recomposerFailure = AtomicReference<Throwable?>(null)
-    lateinit var recomposer: Recomposer
-    val handler = CoroutineExceptionHandler { _, t ->
-      if (t !is CancellationException) {
-        recomposerFailure.compareAndSet(null, t)
-        recomposer.cancel()
-      }
-    }
-    recomposer = Recomposer(AndroidUiDispatcher.Main + clock + handler)
-    val tables = Collections.synchronizedSet(LinkedHashSet<CompositionData>())
-    var rootCoords: LayoutCoordinates? = null
-    var emptyDetailScreen: String? = null
-    val designSystem = board.resolveDesignSystem(designMd = designMd)
-
-    val insetContainer = InsetConsumingFrameLayout(overrideCtx)
-    val cv = ComposeView(overrideCtx)
-    ViewCompat.setOnApplyWindowInsetsListener(activity.window.decorView) { _, _ ->
-      WindowInsetsCompat.CONSUMED
-    }
-    ViewCompat.setOnApplyWindowInsetsListener(insetContainer) { _, _ ->
-      WindowInsetsCompat.CONSUMED
-    }
-    ViewCompat.setOnApplyWindowInsetsListener(cv) { _, _ -> WindowInsetsCompat.CONSUMED }
-
-    insetContainer.addView(cv, ViewGroup.LayoutParams(widthPx, heightPx))
-    activity.window.decorView.compositionContext = recomposer
-    cv.setParentCompositionContext(recomposer)
-    activity.setContentView(insetContainer, ViewGroup.LayoutParams(widthPx, heightPx))
-
-    val job =
-      CoroutineScope(AndroidUiDispatcher.Main + clock + handler).launch {
-        try {
-          recomposer.runRecomposeAndApplyChanges()
-        } catch (t: Throwable) {
-          if (t is CancellationException) throw t
+      val clock = BroadcastFrameClock()
+      val recomposerFailure = AtomicReference<Throwable?>(null)
+      lateinit var activeRecomposer: Recomposer
+      val handler = CoroutineExceptionHandler { _, t ->
+        if (t !is CancellationException) {
           recomposerFailure.compareAndSet(null, t)
+          activeRecomposer.cancel()
         }
       }
+      activeRecomposer = Recomposer(AndroidUiDispatcher.Main + clock + handler)
+      recomposer = activeRecomposer
+      val tables = Collections.synchronizedSet(LinkedHashSet<CompositionData>())
+      var rootCoords: LayoutCoordinates? = null
+      var emptyDetailScreen: String? = null
+      val designSystem = board.resolveDesignSystem(designMd = designMd)
 
-    cv.setContent {
-      CompositionLocalProvider(
-        LocalContext provides overrideCtx,
-        LocalConfiguration provides cfg,
-        LocalDensity provides Density(density, fontScale = 1f),
-      ) {
-        Box(Modifier.onGloballyPositioned { rootCoords = it }) {
-          InspectedSubcomposition(tables) {
-            ExploreBoardFrame(
-              board = board,
-              direction = direction,
-              screenId = screenId,
-              view = view,
-              designSystem = designSystem,
-              explorationDir = explorationDir,
-              overlayId = overlayId,
-              onEmptyDetail = { emptyDetailScreen = it },
-            )
+      val insetContainer = InsetConsumingFrameLayout(overrideCtx)
+      val cv = ComposeView(overrideCtx)
+      composeView = cv
+      ViewCompat.setOnApplyWindowInsetsListener(activity.window.decorView) { _, _ ->
+        WindowInsetsCompat.CONSUMED
+      }
+      ViewCompat.setOnApplyWindowInsetsListener(insetContainer) { _, _ ->
+        WindowInsetsCompat.CONSUMED
+      }
+      ViewCompat.setOnApplyWindowInsetsListener(cv) { _, _ -> WindowInsetsCompat.CONSUMED }
+
+      insetContainer.addView(cv, ViewGroup.LayoutParams(widthPx, heightPx))
+      activity.window.decorView.compositionContext = activeRecomposer
+      cv.setParentCompositionContext(activeRecomposer)
+      activity.setContentView(insetContainer, ViewGroup.LayoutParams(widthPx, heightPx))
+
+      job =
+        CoroutineScope(AndroidUiDispatcher.Main + clock + handler).launch {
+          try {
+            activeRecomposer.runRecomposeAndApplyChanges()
+          } catch (t: Throwable) {
+            if (t is CancellationException) throw t
+            recomposerFailure.compareAndSet(null, t)
+          }
+        }
+
+      cv.setContent {
+        CompositionLocalProvider(
+          LocalContext provides overrideCtx,
+          LocalConfiguration provides cfg,
+          LocalDensity provides Density(density, fontScale = 1f),
+        ) {
+          Box(Modifier.onGloballyPositioned { rootCoords = it }) {
+            InspectedSubcomposition(tables) {
+              ExploreBoardFrame(
+                board = board,
+                direction = direction,
+                screenId = screenId,
+                view = view,
+                designSystem = designSystem,
+                explorationDir = explorationDir,
+                overlayId = overlayId,
+                onEmptyDetail = { emptyDetailScreen = it },
+              )
+            }
           }
         }
       }
-    }
 
-    shadowOf(Looper.getMainLooper()).idle()
-    recomposerFailure.get()?.let { throw it }
-    var virtualTimeNs = 0L
-    fun settleFrames(minSteps: Int) {
-      val wSpec = View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY)
-      val hSpec = View.MeasureSpec.makeMeasureSpec(heightPx, View.MeasureSpec.EXACTLY)
-      for (step in 0 until 80) {
-        Snapshot.sendApplyNotifications()
-        virtualTimeNs += FRAME_NS
-        clock.sendFrame(virtualTimeNs)
-        Snapshot.sendApplyNotifications()
-        shadowOf(Looper.getMainLooper()).idle()
-        recomposerFailure.get()?.let { throw it }
-        activity.window.decorView.measure(wSpec, hSpec)
-        activity.window.decorView.layout(0, 0, widthPx, heightPx)
-        insetContainer.measure(wSpec, hSpec)
-        insetContainer.layout(0, 0, widthPx, heightPx)
-        cv.measure(wSpec, hSpec)
-        cv.layout(0, 0, widthPx, heightPx)
-        recomposerFailure.get()?.let { throw it }
-        if (step >= minSteps && !clock.hasAwaiters && !recomposer.hasPendingWork) break
-      }
       shadowOf(Looper.getMainLooper()).idle()
       recomposerFailure.get()?.let { throw it }
-    }
+      var virtualTimeNs = 0L
+      fun settleFrames(minSteps: Int) {
+        val wSpec = View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY)
+        val hSpec = View.MeasureSpec.makeMeasureSpec(heightPx, View.MeasureSpec.EXACTLY)
+        for (step in 0 until 80) {
+          Snapshot.sendApplyNotifications()
+          virtualTimeNs += FRAME_NS
+          clock.sendFrame(virtualTimeNs)
+          Snapshot.sendApplyNotifications()
+          shadowOf(Looper.getMainLooper()).idle()
+          recomposerFailure.get()?.let { throw it }
+          activity.window.decorView.measure(wSpec, hSpec)
+          activity.window.decorView.layout(0, 0, widthPx, heightPx)
+          insetContainer.measure(wSpec, hSpec)
+          insetContainer.layout(0, 0, widthPx, heightPx)
+          cv.measure(wSpec, hSpec)
+          cv.layout(0, 0, widthPx, heightPx)
+          recomposerFailure.get()?.let { throw it }
+          if (step >= minSteps && !clock.hasAwaiters && !activeRecomposer.hasPendingWork) break
+        }
+        shadowOf(Looper.getMainLooper()).idle()
+        recomposerFailure.get()?.let { throw it }
+      }
 
-    fun captureSnapshot(): Pair<LayoutTree, RawRgbaFrame> {
-      val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
-      val rgba = ByteArray(widthPx * heightPx * 4)
-      val explicitWindowOffsets = IdentityHashMap<View, Offset>()
-      val mainDecor = activity.window.decorView
-      val mainLoc = IntArray(2)
-      mainDecor.getLocationOnScreen(mainLoc)
+      fun captureSnapshot(): Pair<LayoutTree, RawRgbaFrame> {
+        val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+        val rgba = ByteArray(widthPx * heightPx * 4)
+        val explicitWindowOffsets = IdentityHashMap<View, Offset>()
+        val mainDecor = activity.window.decorView
+        val mainLoc = IntArray(2)
+        mainDecor.getLocationOnScreen(mainLoc)
 
-      val attachedWindows = WindowInspector.getGlobalWindowViews().filter { it.isAttachedToWindow }
-      try {
-        val canvas = Canvas(bitmap)
-        canvas.drawColor(AndroidColor.BLACK)
+        val attachedWindows =
+          WindowInspector.getGlobalWindowViews().filter { it.isAttachedToWindow }
+        try {
+          val canvas = Canvas(bitmap)
+          canvas.drawColor(AndroidColor.BLACK)
 
-        for (win in attachedWindows) {
-          if (win !== mainDecor) {
-            val lp = win.layoutParams as? WindowManager.LayoutParams
-            val m =
-              OverlayWindowHelper.measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
-            explicitWindowOffsets[win] = m.offset
-            val dimAlpha =
-              if ((lp?.flags ?: 0) and WindowManager.LayoutParams.FLAG_DIM_BEHIND != 0) {
-                lp?.dimAmount ?: 0.32f
-              } else {
-                0f
+          for (win in attachedWindows) {
+            if (win !== mainDecor) {
+              val lp = win.layoutParams as? WindowManager.LayoutParams
+              val m =
+                OverlayWindowHelper.measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
+              explicitWindowOffsets[win] = m.offset
+              val dimAlpha =
+                if ((lp?.flags ?: 0) and WindowManager.LayoutParams.FLAG_DIM_BEHIND != 0) {
+                  lp?.dimAmount ?: 0.32f
+                } else {
+                  0f
+                }
+              if (dimAlpha > 0f) {
+                canvas.drawColor(AndroidColor.argb((dimAlpha * 255).toInt(), 0, 0, 0))
               }
-            if (dimAlpha > 0f) {
-              canvas.drawColor(AndroidColor.argb((dimAlpha * 255).toInt(), 0, 0, 0))
-            }
-            canvas.save()
-            canvas.translate(m.offset.x, m.offset.y)
-            if (win.width == 0 && m.width > 0 && win is ViewGroup && win.childCount > 0) {
-              win.getChildAt(0).draw(canvas)
+              canvas.save()
+              canvas.translate(m.offset.x, m.offset.y)
+              if (win.width == 0 && m.width > 0 && win is ViewGroup && win.childCount > 0) {
+                win.getChildAt(0).draw(canvas)
+              } else {
+                win.draw(canvas)
+              }
+              canvas.restore()
             } else {
               win.draw(canvas)
             }
-            canvas.restore()
-          } else {
-            win.draw(canvas)
           }
+
+          // Unpack via getPixels so RGBA byte order matches ImageReader RGBA_8888 across host Skia.
+          val ints = IntArray(widthPx * heightPx)
+          bitmap.getPixels(ints, 0, widthPx, 0, 0, widthPx, heightPx)
+          var d = 0
+          for (px in ints) {
+            rgba[d++] = ((px ushr 16) and 0xFF).toByte()
+            rgba[d++] = ((px ushr 8) and 0xFF).toByte()
+            rgba[d++] = (px and 0xFF).toByte()
+            rgba[d++] = ((px ushr 24) and 0xFF).toByte()
+          }
+        } finally {
+          bitmap.recycle()
         }
 
-        // Unpack via getPixels so RGBA byte order matches ImageReader RGBA_8888 across host Skia.
-        val ints = IntArray(widthPx * heightPx)
-        bitmap.getPixels(ints, 0, widthPx, 0, 0, widthPx, heightPx)
-        var d = 0
-        for (px in ints) {
-          rgba[d++] = ((px ushr 16) and 0xFF).toByte()
-          rgba[d++] = ((px ushr 8) and 0xFF).toByte()
-          rgba[d++] = (px and 0xFF).toByte()
-          rgba[d++] = ((px ushr 24) and 0xFF).toByte()
-        }
-      } finally {
-        bitmap.recycle()
+        val frame = RawRgbaFrame(widthPx, heightPx, rgba)
+        val composeRoots = OverlayWindowHelper.collectComposeRoots(attachedWindows)
+        val mergedRoots = composeRoots.map { it.semanticsOwner.rootSemanticsNode }
+        val unmergedRoots = composeRoots.map { it.semanticsOwner.unmergedRootSemanticsNode }
+        val layoutWindowOffsets =
+          OverlayWindowHelper.buildLayoutWindowOffsets(
+            mainDecorView = mainDecor,
+            composeRoots = composeRoots,
+            tables = tables,
+            explicitWindowOffsets = explicitWindowOffsets,
+          )
+
+        val extracted =
+          AndroidSlotTreeExtractor.extract(
+            tables = tables,
+            mergedRoots = mergedRoots,
+            unmergedRoots = unmergedRoots,
+            rootCoordinates = rootCoords,
+            frame = frame,
+            screen = screenId,
+            view = view,
+            surface = board.surface,
+            explorationFile = sourceFile,
+            sourceText = sourceText,
+            density = density,
+            perimeterPx = perimeterPx,
+            emptyDetailLists = listOfNotNull(emptyDetailScreen),
+            layoutWindowOffsets = layoutWindowOffsets,
+          )
+        return extracted.tree to frame
       }
 
-      val frame = RawRgbaFrame(widthPx, heightPx, rgba)
-      val composeRoots = OverlayWindowHelper.collectComposeRoots(attachedWindows)
-      val mergedRoots = composeRoots.map { it.semanticsOwner.rootSemanticsNode }
-      val unmergedRoots = composeRoots.map { it.semanticsOwner.unmergedRootSemanticsNode }
-      val layoutWindowOffsets =
-        OverlayWindowHelper.buildLayoutWindowOffsets(
-          mainDecorView = mainDecor,
-          composeRoots = composeRoots,
-          tables = tables,
-          explicitWindowOffsets = explicitWindowOffsets,
-        )
-
-      val extracted =
-        AndroidSlotTreeExtractor.extract(
-          tables = tables,
-          mergedRoots = mergedRoots,
-          unmergedRoots = unmergedRoots,
-          rootCoordinates = rootCoords,
-          frame = frame,
-          screen = screenId,
-          view = view,
-          surface = board.surface,
-          explorationFile = sourceFile,
-          sourceText = sourceText,
-          density = density,
-          perimeterPx = perimeterPx,
-          emptyDetailLists = listOfNotNull(emptyDetailScreen),
-          layoutWindowOffsets = layoutWindowOffsets,
-        )
-      return extracted.tree to frame
-    }
-
-    try {
       settleFrames(if (overlayId != null) 50 else 4)
       val (initialTree, initialFrame) = captureSnapshot()
       var finalTree = initialTree
@@ -598,9 +605,10 @@ internal object RobolectricBoardRenderer {
         writtenFiles = writtenFiles,
       )
     } finally {
-      recomposer.cancel()
-      job.cancel()
-      controller.pause().stop().destroy()
+      runCatching { composeView?.disposeComposition() }
+      recomposer?.cancel()
+      job?.cancel()
+      runCatching { controller.pause().stop().destroy() }
       shadowOf(Looper.getMainLooper()).idle()
     }
   }

@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.host.robolectric
 
 import android.os.Looper
+import android.view.inspector.WindowInspector
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
@@ -224,6 +225,46 @@ class RobolectricBoardRendererTest {
     assertTrue(
       "Expected effect error message in errors: ${resp.errors}",
       resp.errors.any { it.message.contains("boom in launched effect") },
+    )
+    assertTrue(
+      "Expected failed Activity windows to be detached after error",
+      WindowInspector.getGlobalWindowViews().none { it.isAttachedToWindow },
+    )
+
+    val validFile = workDir.resolve("ValidAfterFail.explore.kt")
+    Files.writeString(
+      validFile,
+      """
+      import androidx.compose.material3.Text
+      import bot.charlies.androiddesign.preview.kit.designBoard
+      val preview = designBoard("ValidAfterFail") {
+        screen("main") { Text("Recovered Cleanly") }
+      }
+      """
+        .trimIndent(),
+    )
+    val validAfter =
+      RobolectricBoardRenderer.handleRequest(
+        RobolectricRenderRequest(
+          id = "valid-after-effect-boom",
+          sourcePath = validFile.toString(),
+          views = listOf("light"),
+          screens = listOf("main"),
+          encodePng = false,
+        ),
+      )
+    assertTrue(
+      "Expected subsequent valid request to succeed: $validAfter",
+      validAfter.ok && validAfter.valid,
+    )
+    val nodes = validAfter.trees.single().nodes
+    assertTrue(
+      "Expected Recovered Cleanly text node",
+      nodes.any { it.text?.value == "Recovered Cleanly" },
+    )
+    assertTrue(
+      "Expected no leaked initial node from failed request",
+      nodes.none { it.text?.value == "initial" },
     )
   }
 
