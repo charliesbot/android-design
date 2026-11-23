@@ -39,3 +39,5 @@ include(":features:preview:desktop")
 include(":app")
 
 include(":wear:compose")
+
+include(":host")

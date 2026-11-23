@@ -1,10 +1,10 @@
-package bot.charlies.androiddesign.preview.feature.preview.sandbox
+package bot.charlies.androiddesign.preview.domain.sandbox
 
 /**
- * Shared class and member allowlist/denylist enforced both statically in [BytecodeGuard] (before
- * defining any class) and dynamically in [SandboxClassLoader].
+ * Shared class and member allowlist/denylist enforced statically in [BytecodeGuard] (before
+ * defining or DEX-loading any class) and dynamically in [SandboxClassLoader] / DEX loaders.
  */
-internal object SandboxPolicy {
+object SandboxPolicy {
   private val ALLOWED_PREFIXES =
     listOf(
       "bot.charlies.androiddesign.preview.kit.",
@@ -19,6 +19,7 @@ internal object SandboxPolicy {
       "kotlinx.coroutines.",
       "kotlin.",
       "org.jetbrains.annotations.",
+      "java.time.",
       "java.util.function.",
       "java.util.concurrent.atomic.",
     )

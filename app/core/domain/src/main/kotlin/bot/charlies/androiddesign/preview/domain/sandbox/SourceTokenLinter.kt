@@ -1,4 +1,4 @@
-package bot.charlies.androiddesign.preview.feature.preview.sandbox
+package bot.charlies.androiddesign.preview.domain.sandbox
 
 import bot.charlies.androiddesign.preview.model.ValidationError
 
@@ -24,8 +24,6 @@ object SourceTokenLinter {
     for (match in RAW_COLOR_CALL.findAll(sanitized)) {
       val index = match.range.first
       if (headerSpans.any { index in it }) continue
-      // Exempt custom parameter names or qualified calls like fooColor( if \b handles it, which
-      // \bColor does.
       val (line, col) = lineAndColumn(source, index)
       errors +=
         ValidationError(
@@ -91,7 +89,7 @@ object SourceTokenLinter {
   }
 
   /** Replaces comments, strings, and char literals with spaces, preserving `\n` and indices. */
-  internal fun blankCommentsAndStrings(source: String): String {
+  fun blankCommentsAndStrings(source: String): String {
     val out = CharArray(source.length) { source[it] }
     var i = 0
     val n = source.length

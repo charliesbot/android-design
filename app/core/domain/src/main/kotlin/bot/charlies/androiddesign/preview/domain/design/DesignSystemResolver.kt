@@ -47,7 +47,7 @@ object DesignSystemResolver {
   /** A `#RRGGBB` color. */
   val HEX = Regex("^#[0-9a-fA-F]{6}$")
   private val DIMENSION = Regex("^(-?\\d+(?:\\.\\d+)?)\\s*(?:px|dp)?$")
-  private val COLOR_REFERENCE = Regex("^\\{colors\\.([A-Za-z0-9-]+)}$")
+  private val COLOR_REFERENCE = Regex("^\\{colors\\.([A-Za-z0-9-]+)\\}$")
 
   /** `#RRGGBB` upper-cased, or null when [value] is not that form. */
   fun parseHex(value: String): String? = value.takeIf { HEX.matches(it) }?.uppercase()
