@@ -110,9 +110,11 @@ import java.util.IdentityHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -163,7 +165,7 @@ class HostRenderActivity : ComponentActivity() {
   internal var virtualClock: BroadcastFrameClock? = null
   internal var recomposer: Recomposer? = null
   internal var virtualTimeNanos: Long = 0L
-  @Volatile internal var recomposerFailure: Throwable? = null
+  internal val recomposerFailure = AtomicReference<Throwable?>(null)
   private var recomposerJob: Job? = null
   private val alwaysResumedOwners = ServiceViewTreeOwners()
   private var movedToBack = false
@@ -219,17 +221,24 @@ class HostRenderActivity : ComponentActivity() {
 
   private fun ensureRecomposerPipeline() {
     if (recomposer != null) return
-    recomposerFailure = null
+    recomposerFailure.set(null)
     val clock = BroadcastFrameClock()
-    val recomp = Recomposer(AndroidUiDispatcher.Main + clock)
+    lateinit var recomp: Recomposer
+    val handler = CoroutineExceptionHandler { _, t ->
+      if (t !is CancellationException) {
+        recomposerFailure.compareAndSet(null, t)
+        recomp.cancel()
+      }
+    }
+    recomp = Recomposer(AndroidUiDispatcher.Main + clock + handler)
     window.decorView.compositionContext = recomp
     recomposerJob =
-      CoroutineScope(AndroidUiDispatcher.Main + clock).launch {
+      CoroutineScope(AndroidUiDispatcher.Main + clock + handler).launch {
         try {
           recomp.runRecomposeAndApplyChanges()
         } catch (t: Throwable) {
           if (t is CancellationException) throw t
-          recomposerFailure = t
+          recomposerFailure.compareAndSet(null, t)
         }
       }
     virtualClock = clock
@@ -298,7 +307,7 @@ class HostRenderActivity : ComponentActivity() {
 
   internal fun resetComposeHost() {
     activeSession.value = null
-    recomposerFailure = null
+    recomposerFailure.set(null)
     runCatching { composeView?.disposeComposition() }
     composeView = null
     activeViewKey = null
@@ -655,15 +664,18 @@ internal class VirtualClockComposeRenderer(
     var endTree: LayoutTree? = null
     var endRawFrame: RawRgbaFrame? = null
 
-    if (
-      board.surface == BoardSurface.Wear &&
-        target.overlayId == null &&
-        !WearScrollHelper.hasWearPicker(inspectionTables, finalTree)
-    ) {
+    if (board.surface == BoardSurface.Wear && target.overlayId == null) {
       val minScrollerWidthPx = widthPx * 0.6f
       val scroller =
         withContext(Dispatchers.Main) {
-          WearScrollHelper.findVerticalScroller(collectUnmergedRoots(activity), minScrollerWidthPx)
+          if (WearScrollHelper.hasWearPicker(inspectionTables, finalTree)) {
+            null
+          } else {
+            WearScrollHelper.findVerticalScroller(
+              collectUnmergedRoots(activity),
+              minScrollerWidthPx,
+            )
+          }
         }
       if (scroller != null) {
         val positions = mutableListOf(finalTree)
@@ -864,12 +876,12 @@ internal class VirtualClockComposeRenderer(
         activity.virtualTimeNanos += SETTLE_FRAME_NS
         clock.sendFrame(activity.virtualTimeNanos)
         Snapshot.sendApplyNotifications()
-        activity.recomposerFailure?.let { throw it }
+        activity.recomposerFailure.get()?.let { throw it }
       }
       var needsAttachWait = false
       val hasMore =
         withContext(Dispatchers.Main) {
-          activity.recomposerFailure?.let { throw it }
+          activity.recomposerFailure.get()?.let { throw it }
           measureMainActivityTarget(activity, widthPx, heightPx)
           activity.window.decorView.getLocationOnScreen(mainLoc)
           val overlays = collectOverlayWindows(activity)
@@ -881,7 +893,7 @@ internal class VirtualClockComposeRenderer(
               needsAttachWait = true
             }
           }
-          activity.recomposerFailure?.let { throw it }
+          activity.recomposerFailure.get()?.let { throw it }
           clock.hasAwaiters || recomp.hasPendingWork
         }
       if (step >= 1 && needsAttachWait && attachYields < 6) {
@@ -897,13 +909,13 @@ internal class VirtualClockComposeRenderer(
       }
     }
     withContext(Dispatchers.Main) {
-      activity.recomposerFailure?.let { throw it }
+      activity.recomposerFailure.get()?.let { throw it }
       measureMainActivityTarget(activity, widthPx, heightPx)
       activity.window.decorView.getLocationOnScreen(mainLoc)
       for (win in collectOverlayWindows(activity)) {
         OverlayWindowHelper.measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
       }
-      activity.recomposerFailure?.let { throw it }
+      activity.recomposerFailure.get()?.let { throw it }
     }
   }
 

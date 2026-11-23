@@ -438,6 +438,55 @@ class HostEmulatorIntegrationTest {
         afterBoomPing.pid,
       )
 
+      // 5c. Uncaught exception inside LaunchedEffect coroutine also returns structured error safely
+      val effectBoomSource =
+        """
+        import androidx.compose.material3.Text
+        import androidx.compose.runtime.LaunchedEffect
+        import bot.charlies.androiddesign.preview.kit.designBoard
+        val preview = designBoard("EffectBoom") {
+          screen("main") {
+            LaunchedEffect(Unit) { error("boom in launched effect") }
+            Text("initial")
+          }
+        }
+        """
+          .trimIndent()
+      val effectClasses =
+        HostClassCompiler.compileToClasses("EffectBoom.explore.kt", effectBoomSource)
+          as HostCompileOutcome.Classes
+      val effectDex = HostClassCompiler.compileToDex(effectClasses, meta)
+      val (effectResp, _) =
+        sendBatch(
+          output = output,
+          input = input,
+          dexBytes = effectDex,
+          entryClass = effectClasses.entryClass,
+          request =
+            DeviceBatchRequest(
+              dexHash = sha256Hex(effectDex).take(16),
+              entryClass = effectClasses.entryClass,
+              sourceFile = "EffectBoom.explore.kt",
+              sourceText = effectBoomSource,
+              targets =
+                listOf(DeviceRenderTarget("EffectBoom", "main", "light", densityScale = 1f)),
+            ),
+        )
+      assertFalse(
+        "Expected ok=false when LaunchedEffect throws: ${effectResp.error}",
+        effectResp.ok,
+      )
+      assertTrue(
+        "Expected LaunchedEffect error message: ${effectResp.error}",
+        effectResp.error.orEmpty().contains("boom in launched effect"),
+      )
+      val afterEffectPing = sendPing(output, input)
+      assertEquals(
+        ":sandbox must remain alive with same PID after effect error",
+        ping.pid,
+        afterEffectPing.pid,
+      )
+
       // 6. Simulated hang triggers watchdog timeout + :sandbox process kill + clean restart
       val oldPid = ping.pid
       val hangSource =

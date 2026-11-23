@@ -70,6 +70,7 @@ import java.util.IdentityHashMap
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.robolectric.Robolectric
@@ -345,7 +346,15 @@ internal object RobolectricBoardRenderer {
       }
 
     val clock = BroadcastFrameClock()
-    val recomposer = Recomposer(AndroidUiDispatcher.Main + clock)
+    val recomposerFailure = AtomicReference<Throwable?>(null)
+    lateinit var recomposer: Recomposer
+    val handler = CoroutineExceptionHandler { _, t ->
+      if (t !is CancellationException) {
+        recomposerFailure.compareAndSet(null, t)
+        recomposer.cancel()
+      }
+    }
+    recomposer = Recomposer(AndroidUiDispatcher.Main + clock + handler)
     val tables = Collections.synchronizedSet(LinkedHashSet<CompositionData>())
     var rootCoords: LayoutCoordinates? = null
     var emptyDetailScreen: String? = null
@@ -366,14 +375,13 @@ internal object RobolectricBoardRenderer {
     cv.setParentCompositionContext(recomposer)
     activity.setContentView(insetContainer, ViewGroup.LayoutParams(widthPx, heightPx))
 
-    val recomposerFailure = AtomicReference<Throwable?>(null)
     val job =
-      CoroutineScope(AndroidUiDispatcher.Main + clock).launch {
+      CoroutineScope(AndroidUiDispatcher.Main + clock + handler).launch {
         try {
           recomposer.runRecomposeAndApplyChanges()
         } catch (t: Throwable) {
           if (t is CancellationException) throw t
-          recomposerFailure.set(t)
+          recomposerFailure.compareAndSet(null, t)
         }
       }
 

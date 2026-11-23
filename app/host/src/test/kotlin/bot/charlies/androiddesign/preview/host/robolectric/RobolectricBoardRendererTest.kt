@@ -192,6 +192,42 @@ class RobolectricBoardRendererTest {
   }
 
   @Test
+  fun launchedEffectExceptionReturnsStructuredFailureInsteadOfCrashing() {
+    val workDir = tempFolder.newFolder("effect-fail").toPath()
+    val effectFile = workDir.resolve("EffectBoom.explore.kt")
+    Files.writeString(
+      effectFile,
+      """
+      import androidx.compose.material3.Text
+      import androidx.compose.runtime.LaunchedEffect
+      import bot.charlies.androiddesign.preview.kit.designBoard
+      val preview = designBoard("EffectBoom") {
+        screen("main") {
+          LaunchedEffect(Unit) { error("boom in launched effect") }
+          Text("initial")
+        }
+      }
+      """
+        .trimIndent(),
+    )
+    val resp =
+      RobolectricBoardRenderer.handleRequest(
+        RobolectricRenderRequest(
+          id = "effect-boom",
+          sourcePath = effectFile.toString(),
+          views = listOf("light"),
+          screens = listOf("main"),
+          encodePng = false,
+        ),
+      )
+    assertFalse("Expected ok=false when LaunchedEffect throws: $resp", resp.ok)
+    assertTrue(
+      "Expected effect error message in errors: ${resp.errors}",
+      resp.errors.any { it.message.contains("boom in launched effect") },
+    )
+  }
+
+  @Test
   fun switchingDirectionsResetsNavBackStackWithoutNoSuchElementException() {
     var detailComposed = false
     var switchedComposed = false
