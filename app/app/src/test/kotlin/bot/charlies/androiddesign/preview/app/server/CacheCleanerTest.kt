@@ -13,11 +13,10 @@ import org.junit.jupiter.api.io.TempDir
 
 class CacheCleanerTest {
   @Test
-  fun `server startup cleans dead records and stale renders while preserving live and active timeout records`(
+  fun `server startup cleans dead legacy records and stale renders while preserving active and timeout records`(
     @TempDir tmp: Path,
   ) {
     val cacheRoot = tmp.resolve("cache")
-    val liveRepo = tmp.resolve("live-repo").also { Files.createDirectories(it) }
     val startingRepo = tmp.resolve("starting-repo").also { Files.createDirectories(it) }
     val deadRepo = tmp.resolve("dead-repo").also { Files.createDirectories(it) }
     val activeTimeoutRepo = tmp.resolve("timeout-active-repo")
@@ -32,15 +31,6 @@ class CacheCleanerTest {
     val staleExplore = staleTimeoutRepo.resolve("design/proposal.explore.kt")
     Files.writeString(staleExplore, "val updated = 2\n")
 
-    // Start one live server whose record must be preserved.
-    val liveServer =
-      PreviewHttpServer(
-        repoRoot = liveRepo,
-        cacheRoot = cacheRoot,
-        preferredPort = 0,
-        idleTimeoutMs = 0L,
-        enableFileWatcher = false,
-      )
     val startingServer =
       PreviewHttpServer(
         repoRoot = startingRepo,
@@ -50,12 +40,8 @@ class CacheCleanerTest {
         enableFileWatcher = false,
       )
     try {
-      val liveRec = liveServer.start()
-      val liveRecPath = ServerPaths.recordPath(liveRepo, cacheRoot)
-
-      // Dead server record with no timeouts (+ paired log file created first, matching spawn
-      // order).
-      val deadRecPath = ServerPaths.recordPath(deadRepo, cacheRoot)
+      // Dead legacy per-repo record with no timeouts (+ paired log) -> MUST BE DELETED.
+      val deadRecPath = ServerPaths.legacyRecordPath(deadRepo, cacheRoot)
       val deadLogPath =
         ServerPaths.serversDir(cacheRoot).resolve("${ServerPaths.repoHash(deadRepo)}.log")
       Files.createDirectories(deadLogPath.parent)
@@ -73,8 +59,8 @@ class CacheCleanerTest {
         ),
       )
 
-      // Dead server record holding a timeout for its repo's CURRENT content hash -> MUST BE KEPT.
-      val activeTimeoutPath = ServerPaths.recordPath(activeTimeoutRepo, cacheRoot)
+      // Dead legacy record holding a timeout for its repo's CURRENT content hash -> MUST BE KEPT.
+      val activeTimeoutPath = ServerPaths.legacyRecordPath(activeTimeoutRepo, cacheRoot)
       ServerPaths.writeRecord(
         activeTimeoutPath,
         ServerRecord(
@@ -85,13 +71,21 @@ class CacheCleanerTest {
           repoRoot = activeTimeoutRepo.toString(),
           clientSecret = "t-secret",
           viewToken = "t-view",
-          timeouts = listOf(TimeoutEntry(activeHash, "compile", System.currentTimeMillis())),
+          timeouts =
+            listOf(
+              TimeoutEntry(
+                contentHash = activeHash,
+                scope = "compile",
+                recordedAt = System.currentTimeMillis(),
+                repoRoot = activeTimeoutRepo.toString(),
+              ),
+            ),
           haltedAt = System.currentTimeMillis(),
         ),
       )
 
-      // Dead server record holding a timeout for an OLD content hash -> MUST BE DELETED.
-      val staleTimeoutPath = ServerPaths.recordPath(staleTimeoutRepo, cacheRoot)
+      // Dead legacy record holding a timeout for an OLD content hash -> MUST BE DELETED.
+      val staleTimeoutPath = ServerPaths.legacyRecordPath(staleTimeoutRepo, cacheRoot)
       ServerPaths.writeRecord(
         staleTimeoutPath,
         ServerRecord(
@@ -125,7 +119,6 @@ class CacheCleanerTest {
         }
 
       // Render hash directories older than 7 days -> deleted even when <= 20 exist.
-      // Create freshDir before backdating oldDir so agedRepoRenders is never transiently empty.
       val agedRepoRenders = cacheRoot.resolve("renders/repo-aged")
       val freshDir = agedRepoRenders.resolve("freshhash001").also { Files.createDirectories(it) }
       val freshPng = freshDir.resolve("view.png").also { Files.write(it, byteArrayOf(7, 8, 9)) }
@@ -139,10 +132,9 @@ class CacheCleanerTest {
       Files.setLastModifiedTime(oldPng, eightDaysAgo)
       Files.setLastModifiedTime(oldDir, eightDaysAgo)
 
-      // Starting another server triggers cache cleanup.
+      // Starting the shared server writes active.json and triggers cleanup.
       startingServer.start()
 
-      // Wait briefly for the async startup cleanup pass (server records + renders) to finish.
       val deadline = System.currentTimeMillis() + 5_000L
       while (
         System.currentTimeMillis() < deadline &&
@@ -158,8 +150,10 @@ class CacheCleanerTest {
       assertFalse(Files.exists(deadRecPath), "Dead server record should be deleted")
       assertFalse(Files.exists(deadLogPath), "Dead server log should be deleted")
       assertFalse(Files.exists(staleTimeoutPath), "Stale timeout record should be deleted")
-      assertTrue(Files.exists(liveRecPath), "Live server record (${liveRec.port}) must be kept")
-      assertTrue(Files.exists(startingServer.recordPath), "Starting server record must be kept")
+      assertTrue(
+        Files.exists(ServerPaths.sharedRecordPath(cacheRoot)),
+        "Shared active.json server record must be kept",
+      )
       assertTrue(
         Files.exists(activeTimeoutPath),
         "Dead record with timeout for repo's current content hash must NEVER be deleted",
@@ -174,21 +168,23 @@ class CacheCleanerTest {
       assertTrue(Files.exists(freshDir), "Render folder touched 2 days ago should be kept")
     } finally {
       startingServer.stop()
-      liveServer.stop()
     }
   }
 
   @Test
-  fun `handles missing timeout repo, concurrent replacement, child mtime, empty repo dirs, and orphan logs`(
+  fun `handles missing timeout repo, multi-repo shared record timeout, concurrent replacement, child mtime, empty repo dirs, and orphan logs`(
     @TempDir tmp: Path,
   ) {
     val cacheRoot = tmp.resolve("cache")
     val missingRepo = tmp.resolve("gone-repo")
+    val repoB = tmp.resolve("repo-b").also { Files.createDirectories(it.resolve("design")) }
+    val sourceB = repoB.resolve("design/b.explore.kt").also { Files.writeString(it, "val b = 1\n") }
+    val hashB = ContentHasher.snapshot(sourceB).contentHash
     val replacedRepo = tmp.resolve("replaced-repo").also { Files.createDirectories(it) }
     val now = Instant.now()
 
     // Record with timeouts pointing at a deleted repo -> safe to delete.
-    val missingRecPath = ServerPaths.recordPath(missingRepo, cacheRoot)
+    val missingRecPath = ServerPaths.legacyRecordPath(missingRepo, cacheRoot)
     ServerPaths.writeRecord(
       missingRecPath,
       ServerRecord(
@@ -203,8 +199,26 @@ class CacheCleanerTest {
       ),
     )
 
+    // Dead shared active.json whose primary repoRoot is missingRepo, but holding an active timeout
+    // for repoB -> MUST BE KEPT via TimeoutEntry.repoRoot!
+    val sharedRecPath = ServerPaths.sharedRecordPath(cacheRoot)
+    ServerPaths.writeRecord(
+      sharedRecPath,
+      ServerRecord(
+        pid = 112L,
+        port = 1,
+        jarVersion = "0.5.0",
+        startedAt = 1000L,
+        repoRoot = missingRepo.toString(),
+        clientSecret = "shared-secret",
+        viewToken = "shared-view",
+        timeouts =
+          listOf(TimeoutEntry(hashB, "compile", now.toEpochMilli(), repoRoot = repoB.toString())),
+      ),
+    )
+
     // Record replaced concurrently while statusProbe is running -> must NOT be deleted.
-    val replacedRecPath = ServerPaths.recordPath(replacedRepo, cacheRoot)
+    val replacedRecPath = ServerPaths.legacyRecordPath(replacedRepo, cacheRoot)
     val oldRec =
       ServerRecord(
         pid = 222L,
@@ -246,7 +260,6 @@ class CacheCleanerTest {
         nowMs = now.toEpochMilli(),
         statusProbe = { rec ->
           if (rec == oldRec) {
-            // Simulate another server replacing the record mid-probe.
             ServerPaths.writeRecord(replacedRecPath, freshRec)
           }
           false
@@ -254,9 +267,10 @@ class CacheCleanerTest {
       )
 
     assertEquals(1, summary.deletedRecords)
-    assertEquals(1, summary.keptRecords)
+    assertEquals(2, summary.keptRecords)
     assertEquals(1, summary.deletedRenderDirs)
     assertFalse(Files.exists(missingRecPath))
+    assertTrue(Files.exists(sharedRecPath))
     assertTrue(Files.exists(replacedRecPath))
     assertEquals(freshRec, ServerPaths.readRecord(replacedRecPath))
     assertFalse(Files.exists(orphanLog))
@@ -276,7 +290,7 @@ class CacheCleanerTest {
     val logicalSource = symlinkRepo.resolve("design/proposal.explore.kt")
     val activeHash = ContentHasher.snapshot(logicalSource).contentHash
 
-    val recPath = ServerPaths.recordPath(symlinkRepo, cacheRoot)
+    val recPath = ServerPaths.sharedRecordPath(cacheRoot)
     ServerPaths.writeRecord(
       recPath,
       ServerRecord(

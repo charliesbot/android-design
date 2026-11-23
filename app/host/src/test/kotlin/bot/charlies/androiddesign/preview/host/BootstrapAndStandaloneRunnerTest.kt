@@ -1,6 +1,6 @@
 package bot.charlies.androiddesign.preview.host
 
-import bot.charlies.androiddesign.preview.host.compiler.BootstrapMeta
+import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.RobolectricRenderRequest
 import bot.charlies.androiddesign.preview.model.RobolectricRenderResponse

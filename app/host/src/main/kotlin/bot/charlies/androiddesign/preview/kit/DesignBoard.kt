@@ -124,7 +124,17 @@ internal constructor(
     designMd: ThemeOverride? = null,
     seedOverride: String? = null,
     variantOverride: PaletteVariant? = null,
-  ): DesignSystem {
+  ): DesignSystem =
+    DesignSystemResolver.resolve(
+      designMd,
+      toThemeOverride(seedOverride = seedOverride, variantOverride = variantOverride),
+      surfaceSpec,
+    )
+
+  internal fun toThemeOverride(
+    seedOverride: String? = null,
+    variantOverride: PaletteVariant? = null,
+  ): ThemeOverride? {
     val effectiveSeed = seedOverride ?: seedHex
     val effectiveVariant = variantOverride ?: variant
     val typographyOverrides =
@@ -144,30 +154,25 @@ internal constructor(
         effectiveVariant != null ||
         contrast != null ||
         typographyOverrides.isNotEmpty()
-    val boardOverride =
-      if (!hasBoardTheme) {
-        null
-      } else {
-        ThemeOverride(
-          name = name,
-          colors = effectiveSeed?.let { mapOf("primary" to it) } ?: emptyMap(),
-          typography = typographyOverrides,
-          material =
-            if (effectiveSeed != null || effectiveVariant != null || contrast != null) {
-              MaterialOverride(
-                scheme =
-                  SchemeOverride(
-                    seed = effectiveSeed,
-                    variant = effectiveVariant?.wire,
-                    contrast = contrast,
-                  ),
-              )
-            } else {
-              null
-            },
-        )
-      }
-    return DesignSystemResolver.resolve(designMd, boardOverride, surfaceSpec)
+    if (!hasBoardTheme) return null
+    return ThemeOverride(
+      name = name,
+      colors = effectiveSeed?.let { mapOf("primary" to it) } ?: emptyMap(),
+      typography = typographyOverrides,
+      material =
+        if (effectiveSeed != null || effectiveVariant != null || contrast != null) {
+          MaterialOverride(
+            scheme =
+              SchemeOverride(
+                seed = effectiveSeed,
+                variant = effectiveVariant?.wire,
+                contrast = contrast,
+              ),
+          )
+        } else {
+          null
+        },
+    )
   }
 }
 

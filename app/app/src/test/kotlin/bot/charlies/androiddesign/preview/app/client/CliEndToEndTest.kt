@@ -100,7 +100,17 @@ class CliEndToEndTest {
     try {
       // --help exits 0 for top-level and subcommands.
       for (cmd in
-        listOf("check", "tree", "selection", "open", "status", "stop", "render", "install")) {
+        listOf(
+          "start",
+          "check",
+          "tree",
+          "selection",
+          "open",
+          "status",
+          "stop",
+          "render",
+          "install",
+        )) {
         val h = execCli(repo, cacheDir, cmd, "--help")
         assertEquals(0, h.exitCode, "$cmd --help failed: ${h.stderr}")
         assertTrue(h.stdout.isNotBlank(), "$cmd --help should print help")
@@ -173,7 +183,7 @@ class CliEndToEndTest {
 
       // Simulate a board click selection via HTTP (viewToken + Origin), then verify check includes
       // it ONCE.
-      val record = assertNotNull(ServerPaths.readRecord(ServerPaths.recordPath(repo, cacheDir)))
+      val record = assertNotNull(ServerPaths.readRecord(ServerPaths.sharedRecordPath(cacheDir)))
       val selReq =
         PreviewJson.compact.encodeToString(
           BoardSelectionRequest.serializer(),
@@ -248,10 +258,10 @@ class CliEndToEndTest {
         PreviewJson.compact.decodeFromString(SelectionResponse.serializer(), selCmd.stdout.trim())
       assertEquals("Button", selJson.selection?.callName)
 
-      // `open <file>` returns boardUrl with exit 0.
+      // `open <file>` returns ?repo=<id>&view=<token> boardUrl with exit 0.
       val openCmd = execCli(repo, cacheDir, "open", source.toString())
       assertEquals(0, openCmd.exitCode, openCmd.stdout)
-      assertTrue(record.boardUrl() in openCmd.stdout)
+      assertTrue(record.boardUrl(ServerPaths.repoHash(repo)) in openCmd.stdout, openCmd.stdout)
 
       // `install --bin-dir` links the script cleanly.
       val fakeBin = tmp.resolve("local-bin")
@@ -295,7 +305,7 @@ class CliEndToEndTest {
     val source = repo.resolve("hang.explore.kt").also { Files.writeString(it, sampleBoard()) }
     try {
       val snap = ContentHasher.snapshot(source)
-      val recordPath = ServerPaths.recordPath(repo, cacheDir)
+      val recordPath = ServerPaths.sharedRecordPath(cacheDir)
       // Simulate a dead server record left behind after watchdog Runtime.halt(1).
       ServerPaths.writeRecord(
         recordPath,
@@ -380,7 +390,7 @@ class CliEndToEndTest {
     stubServer.start()
     try {
       ServerPaths.writeRecord(
-        ServerPaths.recordPath(repo, cacheDir),
+        ServerPaths.sharedRecordPath(cacheDir),
         ServerRecord(
           pid = dummyProc.pid(),
           port = stubPort,
@@ -454,7 +464,7 @@ class CliEndToEndTest {
     val snap = ContentHasher.snapshot(source)
     val stubSecret = ServerPaths.randomToken()
     val stubView = ServerPaths.randomToken()
-    val recordPath = ServerPaths.recordPath(repo, cacheDir)
+    val recordPath = ServerPaths.sharedRecordPath(cacheDir)
     val stubServer = HttpServer.create(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0), 0)
     val stubPort = stubServer.address.port
     stubServer.createContext("/api/status") { ex ->

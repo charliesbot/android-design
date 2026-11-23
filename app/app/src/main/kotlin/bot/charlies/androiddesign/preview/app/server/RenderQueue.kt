@@ -3,17 +3,17 @@ package bot.charlies.androiddesign.preview.app.server
 import bot.charlies.androiddesign.preview.app.cli.ExploreRenderRunner
 import bot.charlies.androiddesign.preview.app.cli.RenderEntry
 import bot.charlies.androiddesign.preview.domain.ViewCheck
-import bot.charlies.androiddesign.preview.domain.layout.LayoutSummary
 import bot.charlies.androiddesign.preview.domain.layout.ViewLayout
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.CompileResult
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.HeadlessResult
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.SandboxHeadlessRenderer
+import bot.charlies.androiddesign.preview.kit.BoardSurface
 import bot.charlies.androiddesign.preview.kit.DirectionSpec
 import bot.charlies.androiddesign.preview.model.DesignSystem
+import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.SurfaceSpec
 import bot.charlies.androiddesign.preview.model.ViewSpec
-import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
@@ -23,11 +23,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
-/** Job priority for the single-view render queue: agent > board focus > board remainder. */
+/** Job priority for the shared queue: agent > board focus > speculative > board remainder. */
 enum class QueuePriority(val rank: Int) {
   AGENT(0),
   BOARD_FOCUS(1),
-  BOARD_REMAINDER(2),
+  SPECULATIVE(2),
+  BOARD_REMAINDER(3),
 }
 
 /** Unique key for one rendered view inside a specific content hash. */
@@ -54,7 +55,7 @@ data class RenderKey(
   }
 }
 
-/** One compiled board cached for a content hash. */
+/** One compiled board cached for a `(repoRoot, sourcePath, contentHash)`. */
 data class CompileEntry(
   val sourcePath: Path,
   val designPath: Path?,
@@ -62,9 +63,30 @@ data class CompileEntry(
   val loaded: ExploreRenderRunner.LoadedExploration,
   val fromCache: Boolean,
   val compileCountAtLoad: Int,
+  val repoRoot: Path = ServerPaths.resolveRepoRoot(sourcePath),
+  val dexHash: String? = null,
+  val surface: BoardSurface = loaded.compiled?.board?.surface ?: BoardSurface.Phone,
+  val boardName: String? = loaded.compiled?.board?.name,
+  val boardMeta: BoardMeta? =
+    loaded.compiled?.board?.let { b ->
+      BoardMeta(
+        directions =
+          b.directions.map { dir ->
+            DirectionMeta(
+              name = dir.name,
+              surface = if (dir.surface == BoardSurface.Wear) "wear" else "phone",
+              startScreen = dir.startScreen,
+              screens = dir.screenIds,
+              overlays = dir.overlays.map { ov -> OverlayMeta(ov.id, ov.screen) },
+            )
+          },
+        views = b.surfaceSpec.views,
+      )
+    },
+  val androidData: AndroidCompiledData? = null,
 )
 
-/** One completed 1-view render, cached by `(sourcePath, contentHash, RenderKey)`. */
+/** One completed 1-view render, cached by `(repoRoot, sourcePath, contentHash, RenderKey)`. */
 data class RenderArtifact(
   val direction: String,
   val screen: String,
@@ -83,7 +105,12 @@ data class RenderArtifact(
   val endPngBytes: ByteArray?,
   val pngSha256: String?,
   val entry: RenderEntry,
+  val imageMime: String = "image/png",
 )
+
+/** Signals that an in-flight queue job was displaced by a newer server version. */
+class ServerReplacedException(val replacedByVersion: String) :
+  CancellationException("replaced by v$replacedByVersion, rerun")
 
 /** Pluggable compiler so unit tests can inject deterministic or slow compiles. */
 fun interface ExplorationLoader {
@@ -104,16 +131,17 @@ fun interface DensityTargetRenderer {
 }
 
 /**
- * Shared content-hash result store and 1-view-per-job priority queue.
+ * Shared content-hash result store and multi-repo `(repoRoot, dexHash)` priority queue.
  *
- * Every compile and every 1-view render runs sequentially on one worker thread guarded by
- * [watchdog], so a higher-priority request or a newer file save preempts remaining queued views
- * within a single view's render (~0.1 to 0.35 s). Identical `(file, hash, key)` requests share the
- * same completed or in-flight result.
+ * Every compile, 1-view render, and batch device check runs sequentially on one worker thread
+ * guarded by [watchdog], so higher-priority agent jobs preempt background speculative or board
+ * remainder work, and multiple repositories cleanly isolate caches and render directories.
  */
 class RenderQueue(
   private val rendersRoot: Path,
+  private val cacheRoot: Path? = null,
   private val watchdog: Watchdog? = null,
+  private val backend: PreviewBackend? = null,
   private val loader: ExplorationLoader = ExplorationLoader { src, design ->
     ExploreRenderRunner.loadAndCompile(src, design)
   },
@@ -130,10 +158,47 @@ class RenderQueue(
         encodePng = true,
       )
     },
-  private val onViewRendered: (Path, String, RenderArtifact) -> Unit = { _, _, _ -> },
+  private val onViewRendered: (Path, Path, String, RenderArtifact) -> Unit = { _, _, _, _ -> },
 ) {
+  /** Compatibility constructor for existing unit tests calling positional/named parameters. */
+  constructor(
+    rendersRoot: Path,
+    watchdog: Watchdog? = null,
+    loader: ExplorationLoader = ExplorationLoader { src, design ->
+      ExploreRenderRunner.loadAndCompile(src, design)
+    },
+    renderer: DensityTargetRenderer =
+      DensityTargetRenderer { compiled, dir, screenId, view, system, overlayId, density ->
+        SandboxHeadlessRenderer.render(
+          compiled = compiled,
+          direction = dir,
+          screenId = screenId,
+          view = view,
+          designSystem = system,
+          overlayId = overlayId,
+          density = density,
+          encodePng = true,
+        )
+      },
+    onViewRendered: (Path, String, RenderArtifact) -> Unit = { _, _, _ -> },
+  ) : this(
+    rendersRoot = rendersRoot,
+    cacheRoot = null,
+    watchdog = watchdog,
+    backend = SkikoPreviewBackend(loader, renderer),
+    loader = loader,
+    renderer = renderer,
+    onViewRendered = { _, src, hash, art -> onViewRendered(src, hash, art) },
+  )
+
+  private val effectiveBackend: PreviewBackend = backend ?: SkikoPreviewBackend(loader, renderer)
+
+  private data class FileCacheKey(val repoKey: String, val sourceKey: String)
+
   private abstract class QueueJob(
+    val repoKey: String,
     val sourceKey: String,
+    val dexHash: String?,
     val contentHash: String,
     val priority: QueuePriority,
     val seq: Long,
@@ -147,7 +212,7 @@ class RenderQueue(
       return seq.compareTo(other.seq)
     }
 
-    abstract fun cancel(reason: String)
+    abstract fun cancel(cause: CancellationException)
 
     abstract fun execute()
   }
@@ -163,12 +228,16 @@ class RenderQueue(
   private val seqGen = AtomicLong(0L)
   private val compileCounter = AtomicInteger(0)
   private val running = AtomicBoolean(false)
-  private val cachesByFile = ConcurrentHashMap<String, FileHashCache>()
+  @Volatile private var replacedVersion: String? = null
+  private val cachesByFile = ConcurrentHashMap<FileCacheKey, FileHashCache>()
   private val cacheLock = Any()
   @Volatile private var workerThread: Thread? = null
 
   val compileCount: Int
     get() = compileCounter.get()
+
+  fun rendersRootForRepo(repoRoot: Path): Path =
+    if (cacheRoot != null) ServerPaths.rendersDir(repoRoot, cacheRoot) else rendersRoot
 
   fun start() {
     if (!running.compareAndSet(false, true)) return
@@ -183,6 +252,11 @@ class RenderQueue(
                 break
               }
             if (job.cancelled.get()) continue
+            val repVer = replacedVersion
+            if (repVer != null) {
+              job.cancel(ServerReplacedException(repVer))
+              continue
+            }
             try {
               job.execute()
             } catch (_: Throwable) {
@@ -197,24 +271,46 @@ class RenderQueue(
     t.start()
   }
 
+  fun cancelForReplacement(newVersion: String) {
+    replacedVersion = newVersion
+    val drained = ArrayList<QueueJob>()
+    queue.drainTo(drained)
+    drained.forEach { job ->
+      if (job.cancelled.compareAndSet(false, true)) {
+        job.cancel(ServerReplacedException(newVersion))
+      }
+    }
+  }
+
   fun stop() {
     running.set(false)
     workerThread?.interrupt()
     workerThread = null
     val drained = ArrayList<QueueJob>()
     queue.drainTo(drained)
-    drained.forEach { it.cancel("server stopped") }
+    val rep = replacedVersion
+    drained.forEach {
+      val ex =
+        if (rep != null) ServerReplacedException(rep) else CancellationException("server stopped")
+      it.cancel(ex)
+    }
   }
 
   /**
-   * Cancels queued background board jobs for [sourcePath] belonging to any hash older than
-   * [newContentHash]. Running 1-view renders finish cleanly; queued remainder jobs are dropped.
+   * Cancels queued background board/speculative jobs belonging to `(repoRoot, sourcePath)` for any
+   * hash older than [newContentHash]. Running jobs finish cleanly.
    */
-  fun cancelStaleJobs(sourcePath: Path, newContentHash: String) {
-    val key = canonicalKey(sourcePath)
+  fun cancelStaleJobs(repoRoot: Path, sourcePath: Path, newContentHash: String) {
+    val rKey = canonicalKey(repoRoot)
+    val sKey = canonicalKey(sourcePath)
     val toRemove = ArrayList<QueueJob>()
     for (job in queue) {
-      if (job.sourceKey == key && job.contentHash != newContentHash && job.cancellableOnNewSave) {
+      if (
+        job.repoKey == rKey &&
+          job.sourceKey == sKey &&
+          job.contentHash != newContentHash &&
+          job.cancellableOnNewSave
+      ) {
         if (job.cancelled.compareAndSet(false, true)) {
           toRemove += job
         }
@@ -222,33 +318,49 @@ class RenderQueue(
     }
     toRemove.forEach { job ->
       queue.remove(job)
-      job.cancel("superseded by newer save")
+      job.cancel(CancellationException("superseded by newer save"))
     }
   }
 
-  /** Returns the currently cached [CompileEntry] for [sourcePath], if any. */
+  fun cancelStaleJobs(sourcePath: Path, newContentHash: String) {
+    cancelStaleJobs(ServerPaths.resolveRepoRoot(sourcePath), sourcePath, newContentHash)
+  }
+
+  fun latestCompiled(repoRoot: Path, sourcePath: Path): CompileEntry? =
+    cachesByFile[cacheKey(repoRoot, sourcePath)]?.compiled
+
   fun latestCompiled(sourcePath: Path): CompileEntry? =
-    cachesByFile[canonicalKey(sourcePath)]?.compiled
+    latestCompiled(ServerPaths.resolveRepoRoot(sourcePath), sourcePath)
 
-  /** Returns true when [contentHash] is still the latest hash registered for [sourcePath]. */
+  fun isCurrentHash(repoRoot: Path, sourcePath: Path, contentHash: String): Boolean =
+    synchronized(cacheLock) {
+      cachesByFile[cacheKey(repoRoot, sourcePath)]?.contentHash == contentHash
+    }
+
   fun isCurrentHash(sourcePath: Path, contentHash: String): Boolean =
-    synchronized(cacheLock) { cachesByFile[canonicalKey(sourcePath)]?.contentHash == contentHash }
+    isCurrentHash(ServerPaths.resolveRepoRoot(sourcePath), sourcePath, contentHash)
 
-  /** Returns all completed 2x [RenderArtifact]s for [sourcePath]'s current hash. */
-  fun completedBoardArtifacts(sourcePath: Path): Map<RenderKey, RenderArtifact> {
-    val cache = cachesByFile[canonicalKey(sourcePath)] ?: return emptyMap()
+  fun completedBoardArtifacts(repoRoot: Path, sourcePath: Path): Map<RenderKey, RenderArtifact> {
+    val cache = cachesByFile[cacheKey(repoRoot, sourcePath)] ?: return emptyMap()
     return cache.rendered.filterKeys { it.densityScale == 2 }
   }
 
-  /**
-   * Compiles [sourcePath] for [snapshot.contentHash] or shares an existing completed/in-flight
-   * compilation for the exact same hash.
-   */
+  fun completedBoardArtifacts(sourcePath: Path): Map<RenderKey, RenderArtifact> =
+    completedBoardArtifacts(ServerPaths.resolveRepoRoot(sourcePath), sourcePath)
+
   fun submitCompile(
+    repoRoot: Path,
     snapshot: ContentHasher.Snapshot,
     priority: QueuePriority,
   ): CompletableFuture<CompileEntry> {
-    val key = canonicalKey(snapshot.sourcePath)
+    replacedVersion?.let {
+      return CompletableFuture.failedFuture(ServerReplacedException(it))
+    }
+    val normRepo = repoRoot.toAbsolutePath().normalize()
+    val normSource = snapshot.sourcePath.toAbsolutePath().normalize()
+    val rKey = canonicalKey(normRepo)
+    val sKey = canonicalKey(normSource)
+    val key = FileCacheKey(rKey, sKey)
     val future: CompletableFuture<CompileEntry>
     var needEnqueue = false
     synchronized(cacheLock) {
@@ -276,36 +388,44 @@ class RenderQueue(
       val job =
         object :
           QueueJob(
-            sourceKey = key,
+            repoKey = rKey,
+            sourceKey = sKey,
+            dexHash = null,
             contentHash = snapshot.contentHash,
             priority = priority,
             seq = seqGen.incrementAndGet(),
             cancellableOnNewSave = priority != QueuePriority.AGENT,
           ) {
-          override fun cancel(reason: String) {
-            future.completeExceptionally(CancellationException(reason))
+          override fun cancel(cause: CancellationException) {
+            future.completeExceptionally(cause)
           }
 
           override fun execute() {
             if (cancelled.get()) {
-              cancel("cancelled")
+              cancel(CancellationException("cancelled"))
               return
             }
             try {
               val isCold = compileCounter.get() == 0
-              val loaded =
-                runWithWatchdog(snapshot.contentHash, "compile", isCold) {
-                  loader.loadAndCompile(snapshot.sourcePath, snapshot.designPath)
+              val output =
+                runWithWatchdog(snapshot.contentHash, "compile", isCold, normRepo) {
+                  effectiveBackend.compile(snapshot)
                 }
               val count = compileCounter.incrementAndGet()
               val entry =
                 CompileEntry(
-                  sourcePath = snapshot.sourcePath,
+                  sourcePath = normSource,
                   designPath = snapshot.designPath,
                   contentHash = snapshot.contentHash,
-                  loaded = loaded,
+                  loaded = output.loaded,
                   fromCache = false,
                   compileCountAtLoad = count,
+                  repoRoot = normRepo,
+                  dexHash = output.dexHash,
+                  surface = output.surface,
+                  boardName = output.boardName,
+                  boardMeta = output.boardMeta,
+                  androidData = output.androidData,
                 )
               synchronized(cacheLock) {
                 val current = cachesByFile[key]
@@ -330,14 +450,128 @@ class RenderQueue(
     return future
   }
 
+  fun submitCompile(
+    snapshot: ContentHasher.Snapshot,
+    priority: QueuePriority,
+  ): CompletableFuture<CompileEntry> =
+    submitCompile(ServerPaths.resolveRepoRoot(snapshot.sourcePath), snapshot, priority)
+
   /**
-   * Enqueues or shares a single 1-view render job for [entry] at [priority]. If an identical
-   * `(file, contentHash, key)` render is already complete or in flight, returns that shared future
-   * (promoting queued work when a higher-priority caller waits on it).
+   * Executes one batch check across [targets] via [AndroidPreviewBackend] serialized through the
+   * shared queue tagged by `(repoRoot, dexHash)`. Uncached/unselected PNGs remain discarded on host
+   * while cached [RenderArtifact]s populate [FileHashCache] for reuse.
    */
-  fun submitRender(
+  fun submitBatchCheck(
     entry: CompileEntry,
-    direction: DirectionSpec,
+    targets: List<CheckTargetSpec>,
+    scoped: Boolean,
+    priority: QueuePriority = QueuePriority.AGENT,
+  ): CompletableFuture<List<RenderArtifact>> {
+    replacedVersion?.let {
+      return CompletableFuture.failedFuture(ServerReplacedException(it))
+    }
+    val key = FileCacheKey(canonicalKey(entry.repoRoot), canonicalKey(entry.sourcePath))
+    synchronized(cacheLock) {
+      val current = cachesByFile[key]
+      if (current != null && current.contentHash == entry.contentHash) {
+        val cached = targets.mapNotNull { t ->
+          current.rendered[RenderKey(t.direction, t.screenId, t.overlayId, t.view.name, 2)]
+        }
+        if (cached.size == targets.size && hasRequiredPngs(cached, scoped, entry.surface)) {
+          return CompletableFuture.completedFuture(cached)
+        }
+      }
+    }
+    val future = CompletableFuture<List<RenderArtifact>>()
+    val repoRenders = rendersRootForRepo(entry.repoRoot)
+    val job =
+      object :
+        QueueJob(
+          repoKey = key.repoKey,
+          sourceKey = key.sourceKey,
+          dexHash = entry.dexHash,
+          contentHash = entry.contentHash,
+          priority = priority,
+          seq = seqGen.incrementAndGet(),
+          cancellableOnNewSave = false,
+        ) {
+        override fun cancel(cause: CancellationException) {
+          future.completeExceptionally(cause)
+        }
+
+        override fun execute() {
+          if (cancelled.get()) {
+            cancel(CancellationException("cancelled"))
+            return
+          }
+          try {
+            val scope = if (scoped) "batch-scoped" else "batch-full"
+            val artifacts =
+              runWithWatchdog(
+                contentHash = entry.contentHash,
+                scope = scope,
+                isCold = false,
+                repoRoot = entry.repoRoot,
+                minBudgetMs = if (scoped) null else Watchdog.BATCH_BUDGET_MS,
+              ) {
+                effectiveBackend.renderBatchCheck(entry, targets, scoped, repoRenders)
+              }
+            synchronized(cacheLock) {
+              val current = cachesByFile[key]
+              if (current != null && current.contentHash == entry.contentHash) {
+                for (art in artifacts) {
+                  val rk =
+                    RenderKey(
+                      art.direction,
+                      art.screen,
+                      art.overlay,
+                      art.view.name,
+                      art.densityScale,
+                    )
+                  current.rendered[rk] = art
+                }
+              }
+            }
+            for (art in artifacts) {
+              onViewRendered(entry.repoRoot, entry.sourcePath, entry.contentHash, art)
+            }
+            future.complete(artifacts)
+          } catch (t: Throwable) {
+            future.completeExceptionally(t)
+          }
+        }
+      }
+    queue.put(job)
+    return future
+  }
+
+  private fun hasRequiredPngs(
+    artifacts: List<RenderArtifact>,
+    scoped: Boolean,
+    surface: BoardSurface,
+  ): Boolean {
+    fun fileExists(art: RenderArtifact): Boolean =
+      art.pngPath != null && java.nio.file.Files.isRegularFile(art.pngPath)
+    if (scoped) {
+      return artifacts.all(::fileExists)
+    }
+    val allPass = artifacts.all { it.pass }
+    if (!allPass) {
+      return artifacts.any { !it.pass && fileExists(it) }
+    }
+    val primaryViews =
+      if (surface == BoardSurface.Wear) setOf("watch", "watch-large") else setOf("light", "desktop")
+    val primaries = artifacts.filter { it.overlay == null && it.view.name in primaryViews }
+    return primaries.isEmpty() || primaries.all(::fileExists)
+  }
+
+  /**
+   * Enqueues or shares a single 1-view render job for [entry] at [priority]. Identical `(repo,
+   * file, hash, key)` requests share the completed or in-flight result.
+   */
+  fun submitSingleRender(
+    entry: CompileEntry,
+    direction: String,
     screenId: String,
     prefix: String,
     overlayId: String?,
@@ -345,20 +579,29 @@ class RenderQueue(
     densityScale: Int,
     baseCheck: ViewCheck?,
     priority: QueuePriority,
+    writeFiles: Boolean = true,
+    frameFormat: FrameFormat = FrameFormat.LZ4_RGBA,
   ): CompletableFuture<RenderArtifact> {
-    val sourceKey = canonicalKey(entry.sourcePath)
-    val renderKey = RenderKey(direction.name, screenId, overlayId, view.name, densityScale)
-    val compiled =
-      entry.loaded.compiled
-        ?: return CompletableFuture.failedFuture(
-          IllegalStateException("Exploration is not compiled"),
-        )
-    val surface = compiled.board.surfaceSpec
+    replacedVersion?.let {
+      return CompletableFuture.failedFuture(ServerReplacedException(it))
+    }
+    val key = FileCacheKey(canonicalKey(entry.repoRoot), canonicalKey(entry.sourcePath))
+    val renderKey = RenderKey(direction, screenId, overlayId, view.name, densityScale)
+    if (entry.loaded.compiled == null && entry.androidData == null) {
+      return CompletableFuture.failedFuture(IllegalStateException("Exploration is not compiled"))
+    }
+    val surfaceSpec: SurfaceSpec =
+      entry.loaded.compiled?.board?.surfaceSpec
+        ?: if (entry.surface == BoardSurface.Wear) {
+          bot.charlies.androiddesign.preview.model.WearSurface
+        } else {
+          bot.charlies.androiddesign.preview.model.PhoneSurface
+        }
 
     val future: CompletableFuture<RenderArtifact>
     var needEnqueue = false
     synchronized(cacheLock) {
-      val currentCache = cachesByFile[sourceKey]
+      val currentCache = cachesByFile[key]
       if (currentCache != null && currentCache.contentHash != entry.contentHash) {
         return CompletableFuture.failedFuture(CancellationException("superseded by newer save"))
       }
@@ -366,16 +609,19 @@ class RenderQueue(
         currentCache
           ?: FileHashCache(entry.contentHash).also {
             it.compiled = entry
-            cachesByFile[sourceKey] = it
+            cachesByFile[key] = it
           }
       hashCache.rendered[renderKey]?.let { done ->
-        return CompletableFuture.completedFuture(done)
+        val hasImageIfNeeded =
+          frameFormat == FrameFormat.NONE || (done.pngBytes != null && done.pngBytes.isNotEmpty())
+        if (hasImageIfNeeded && (!writeFiles || done.pngPath != null)) {
+          return CompletableFuture.completedFuture(done)
+        }
       }
       val existing = hashCache.renderFutures[renderKey]
       if (existing != null && !existing.isCancelled && !existing.isCompletedExceptionally) {
         future = existing
-        // If an AGENT or BOARD_FOCUS request awaits a queued BOARD_REMAINDER job, promote it.
-        promoteQueuedJob(sourceKey, entry.contentHash, renderKey, priority)
+        promoteQueuedJob(key, entry.contentHash, renderKey, priority)
       } else {
         future = CompletableFuture()
         hashCache.renderFutures[renderKey] = future
@@ -386,22 +632,24 @@ class RenderQueue(
     if (needEnqueue) {
       val job =
         RenderViewJob(
-          sourceKey = sourceKey,
+          key = key,
+          dexHash = entry.dexHash,
           contentHash = entry.contentHash,
           renderKey = renderKey,
           priority = priority,
           seq = seqGen.incrementAndGet(),
           cancellableOnNewSave = priority != QueuePriority.AGENT,
           entry = entry,
-          compiled = compiled,
           direction = direction,
           screenId = screenId,
           prefix = prefix,
           overlayId = overlayId,
           view = view,
-          surface = surface,
+          surfaceSpec = surfaceSpec,
           densityScale = densityScale,
           baseCheck = baseCheck,
+          writeFiles = writeFiles,
+          frameFormat = frameFormat,
           future = future,
         )
       queue.put(job)
@@ -409,7 +657,70 @@ class RenderQueue(
     return future
   }
 
-  /** Renders directly using cached compiled classes with ad-hoc theme/view overrides (no cache). */
+  /** Overload matching Skiko callers that hold a [DirectionSpec]. */
+  fun submitRender(
+    entry: CompileEntry,
+    direction: DirectionSpec,
+    screenId: String,
+    prefix: String,
+    overlayId: String?,
+    view: ViewSpec,
+    densityScale: Int,
+    baseCheck: ViewCheck?,
+    priority: QueuePriority,
+  ): CompletableFuture<RenderArtifact> =
+    submitSingleRender(
+      entry = entry,
+      direction = direction.name,
+      screenId = screenId,
+      prefix = prefix,
+      overlayId = overlayId,
+      view = view,
+      densityScale = densityScale,
+      baseCheck = baseCheck,
+      priority = priority,
+      writeFiles = true,
+      frameFormat = FrameFormat.LZ4_RGBA,
+    )
+
+  /**
+   * Renders directly using cached compiled classes/DEX with ad-hoc theme/font overrides (no cache).
+   */
+  fun renderOverride(
+    entry: CompileEntry,
+    direction: String,
+    screenId: String,
+    prefix: String,
+    overlayId: String?,
+    view: ViewSpec,
+    designSystem: DesignSystem,
+    densityScale: Int = 2,
+    frameFormat: FrameFormat = FrameFormat.LZ4_RGBA,
+    fontScale: Float = 1f,
+    seedOverride: String? = null,
+    variantOverride: String? = null,
+    darkOverride: Boolean? = null,
+  ): RenderArtifact {
+    return effectiveBackend.renderSingle(
+      entry = entry,
+      direction = direction,
+      screenId = screenId,
+      prefix = prefix,
+      overlayId = overlayId,
+      view = view,
+      densityScale = densityScale,
+      designSystem = designSystem,
+      baseCheck = null,
+      writeFiles = false,
+      rendersRoot = rendersRootForRepo(entry.repoRoot),
+      frameFormat = frameFormat,
+      fontScale = fontScale,
+      seedOverride = seedOverride,
+      variantOverride = variantOverride,
+      darkOverride = darkOverride,
+    )
+  }
+
   fun renderOverride(
     entry: CompileEntry,
     direction: DirectionSpec,
@@ -419,28 +730,21 @@ class RenderQueue(
     view: ViewSpec,
     designSystem: DesignSystem,
     densityScale: Int = 2,
-  ): RenderArtifact {
-    val compiled =
-      checkNotNull(entry.loaded.compiled) { "Cannot render override without compiled board" }
-    val surface = compiled.board.surfaceSpec
-    return executeSingleRender(
-      contentHash = entry.contentHash,
-      compiled = compiled,
-      direction = direction,
+  ): RenderArtifact =
+    renderOverride(
+      entry = entry,
+      direction = direction.name,
       screenId = screenId,
       prefix = prefix,
       overlayId = overlayId,
       view = view,
       designSystem = designSystem,
-      surface = surface,
       densityScale = densityScale,
-      baseCheck = null,
-      writeFiles = false,
+      frameFormat = FrameFormat.LZ4_RGBA,
     )
-  }
 
   private fun promoteQueuedJob(
-    sourceKey: String,
+    key: FileCacheKey,
     contentHash: String,
     renderKey: RenderKey,
     desiredPriority: QueuePriority,
@@ -448,7 +752,8 @@ class RenderQueue(
     val queued =
       queue.firstOrNull {
         it is RenderViewJob &&
-          it.sourceKey == sourceKey &&
+          it.repoKey == key.repoKey &&
+          it.sourceKey == key.sourceKey &&
           it.contentHash == contentHash &&
           it.renderKey == renderKey &&
           it.priority.rank > desiredPriority.rank
@@ -456,22 +761,24 @@ class RenderQueue(
     if (queue.remove(queued)) {
       val promoted =
         RenderViewJob(
-          sourceKey = queued.sourceKey,
+          key = key,
+          dexHash = queued.dexHash,
           contentHash = queued.contentHash,
           renderKey = queued.renderKey,
           priority = desiredPriority,
           seq = seqGen.incrementAndGet(),
           cancellableOnNewSave = desiredPriority != QueuePriority.AGENT,
           entry = queued.entry,
-          compiled = queued.compiled,
           direction = queued.direction,
           screenId = queued.screenId,
           prefix = queued.prefix,
           overlayId = queued.overlayId,
           view = queued.view,
-          surface = queued.surface,
+          surfaceSpec = queued.surfaceSpec,
           densityScale = queued.densityScale,
           baseCheck = queued.baseCheck,
+          writeFiles = queued.writeFiles,
+          frameFormat = queued.frameFormat,
           future = queued.future,
         )
       queue.put(promoted)
@@ -479,69 +786,85 @@ class RenderQueue(
   }
 
   private inner class RenderViewJob(
-    sourceKey: String,
+    val key: FileCacheKey,
+    dexHash: String?,
     contentHash: String,
     val renderKey: RenderKey,
     priority: QueuePriority,
     seq: Long,
     cancellableOnNewSave: Boolean,
     val entry: CompileEntry,
-    val compiled: CompileResult.Compiled,
-    val direction: DirectionSpec,
+    val direction: String,
     val screenId: String,
     val prefix: String,
     val overlayId: String?,
     val view: ViewSpec,
-    val surface: SurfaceSpec,
+    val surfaceSpec: SurfaceSpec,
     val densityScale: Int,
     val baseCheck: ViewCheck?,
+    val writeFiles: Boolean,
+    val frameFormat: FrameFormat,
     val future: CompletableFuture<RenderArtifact>,
-  ) : QueueJob(sourceKey, contentHash, priority, seq, cancellableOnNewSave) {
-    override fun cancel(reason: String) {
+  ) :
+    QueueJob(
+      key.repoKey,
+      key.sourceKey,
+      dexHash,
+      contentHash,
+      priority,
+      seq,
+      cancellableOnNewSave,
+    ) {
+    override fun cancel(cause: CancellationException) {
       synchronized(cacheLock) {
-        val current = cachesByFile[sourceKey]
+        val current = cachesByFile[key]
         if (current != null && current.contentHash == contentHash) {
           current.renderFutures.remove(renderKey, future)
         }
       }
-      future.completeExceptionally(CancellationException(reason))
+      future.completeExceptionally(cause)
     }
 
     override fun execute() {
       if (cancelled.get()) {
-        cancel("cancelled")
+        cancel(CancellationException("cancelled"))
         return
       }
       try {
+        val scope = renderKey.scopeLabel()
         val artifact =
-          executeSingleRender(
-            contentHash = contentHash,
-            compiled = compiled,
-            direction = direction,
-            screenId = screenId,
-            prefix = prefix,
-            overlayId = overlayId,
-            view = view,
-            designSystem = entry.loaded.designSystem,
-            surface = surface,
-            densityScale = densityScale,
-            baseCheck = baseCheck,
-            writeFiles = true,
-          )
+          runWithWatchdog(contentHash, scope, isCold = false, repoRoot = entry.repoRoot) {
+            effectiveBackend.renderSingle(
+              entry = entry,
+              direction = direction,
+              screenId = screenId,
+              prefix = prefix,
+              overlayId = overlayId,
+              view = view,
+              densityScale = densityScale,
+              designSystem = entry.loaded.designSystem,
+              baseCheck = baseCheck,
+              writeFiles = writeFiles,
+              rendersRoot = rendersRootForRepo(entry.repoRoot),
+              frameFormat = frameFormat,
+            )
+          }
         synchronized(cacheLock) {
-          val current = cachesByFile[sourceKey]
+          val current = cachesByFile[key]
           if (current != null && current.contentHash == contentHash) {
-            current.rendered[renderKey] = artifact
+            if (frameFormat != FrameFormat.NONE || current.rendered[renderKey] == null) {
+              current.rendered[renderKey] = artifact
+            }
           }
         }
         try {
-          onViewRendered(entry.sourcePath, contentHash, artifact)
+          onViewRendered(entry.repoRoot, entry.sourcePath, contentHash, artifact)
         } finally {
           future.complete(artifact)
         }
       } catch (t: Throwable) {
         synchronized(cacheLock) {
-          val current = cachesByFile[sourceKey]
+          val current = cachesByFile[key]
           if (current != null && current.contentHash == contentHash) {
             current.renderFutures.remove(renderKey, future)
           }
@@ -551,116 +874,20 @@ class RenderQueue(
     }
   }
 
-  private fun executeSingleRender(
-    contentHash: String,
-    compiled: CompileResult.Compiled,
-    direction: DirectionSpec,
-    screenId: String,
-    prefix: String,
-    overlayId: String?,
-    view: ViewSpec,
-    designSystem: DesignSystem,
-    surface: SurfaceSpec,
-    densityScale: Int,
-    baseCheck: ViewCheck?,
-    writeFiles: Boolean,
-  ): RenderArtifact {
-    val artifactName = overlayId?.let { ViewCheck.renderOverlayName(prefix, it) } ?: prefix
-    val scope = RenderKey(direction.name, screenId, overlayId, view.name, densityScale).scopeLabel()
-    val startNs = System.nanoTime()
-    val headless =
-      try {
-        runWithWatchdog(contentHash, scope, isCold = false) {
-          renderer.render(
-            compiled = compiled,
-            direction = direction,
-            screenId = screenId,
-            view = view,
-            designSystem = designSystem,
-            overlayId = overlayId,
-            density = densityScale.toFloat(),
-          )
-        }
-      } catch (e: Exception) {
-        val elapsedMs = (System.nanoTime() - startNs) / 1_000_000L
-        val failed = ViewCheck.renderError(e)
-        return RenderArtifact(
-          direction = direction.name,
-          screen = screenId,
-          overlay = overlayId,
-          view = view,
-          densityScale = densityScale,
-          artifactName = artifactName,
-          pass = false,
-          renderMs = elapsedMs,
-          check = failed,
-          layout = null,
-          tree = null,
-          pngPath = null,
-          endPngPath = null,
-          pngBytes = null,
-          endPngBytes = null,
-          pngSha256 = null,
-          entry = RenderEntry.of(artifactName, view.name, null, failed),
-        )
-      }
-    val elapsedMs = (System.nanoTime() - startNs) / 1_000_000L
-    val full = ViewCheck.of(headless.tree, surface)
-    val check = if (baseCheck == null) full else full.overlaying(baseCheck)
-    val layout = if (overlayId == null) LayoutSummary.of(headless.tree, surface) else null
-
-    var pngPath: Path? = null
-    var endPngPath: Path? = null
-    if (writeFiles && headless.png.isNotEmpty()) {
-      val hashDir = rendersRoot.resolve(contentHash.take(12))
-      Files.createDirectories(hashDir)
-      val baseFile = "${sanitizeFileName(artifactName)}-${view.name}-${densityScale}x"
-      pngPath = hashDir.resolve("$baseFile.png").toAbsolutePath().normalize()
-      Files.write(pngPath, headless.png)
-      headless.end?.let { end ->
-        if (end.png.isNotEmpty()) {
-          endPngPath = hashDir.resolve("$baseFile-end.png").toAbsolutePath().normalize()
-          Files.write(endPngPath, end.png)
-        }
-      }
-    }
-    val sha = if (headless.png.isNotEmpty()) ContentHasher.sha256Hex(headless.png) else null
-    val baseName = if (pngPath != null) "${artifactName}-${view.name}" else null
-    val endName = if (endPngPath != null) "${artifactName}-${view.name}-end" else null
-
-    return RenderArtifact(
-      direction = direction.name,
-      screen = screenId,
-      overlay = overlayId,
-      view = view,
-      densityScale = densityScale,
-      artifactName = artifactName,
-      pass = check.pass,
-      renderMs = elapsedMs,
-      check = check,
-      layout = layout,
-      tree = headless.tree,
-      pngPath = pngPath,
-      endPngPath = endPngPath,
-      pngBytes = headless.png,
-      endPngBytes = headless.end?.png,
-      pngSha256 = sha,
-      entry = RenderEntry.of(artifactName, view.name, baseName, check, endName),
-    )
-  }
-
   private inline fun <T> runWithWatchdog(
     contentHash: String,
     scope: String,
     isCold: Boolean,
+    repoRoot: Path,
+    minBudgetMs: Long? = null,
     block: () -> T,
   ): T {
     val w = watchdog ?: return block()
-    return w.guard(contentHash, scope, isCold, block)
+    return w.guard(contentHash, scope, isCold, repoRoot.toString(), minBudgetMs, block)
   }
 
-  private fun canonicalKey(path: Path): String = path.toAbsolutePath().normalize().toString()
+  private fun cacheKey(repoRoot: Path, sourcePath: Path): FileCacheKey =
+    FileCacheKey(canonicalKey(repoRoot), canonicalKey(sourcePath))
 
-  private fun sanitizeFileName(raw: String): String =
-    raw.replace(Regex("""[^A-Za-z0-9._+-]+"""), "_").ifBlank { "render" }
+  private fun canonicalKey(path: Path): String = path.toAbsolutePath().normalize().toString()
 }

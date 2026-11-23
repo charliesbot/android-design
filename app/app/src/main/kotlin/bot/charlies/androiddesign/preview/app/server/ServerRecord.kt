@@ -1,6 +1,9 @@
 package bot.charlies.androiddesign.preview.app.server
 
+import bot.charlies.androiddesign.preview.app.AppInfo
+import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.PreviewJson
+import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -9,18 +12,128 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import kotlinx.serialization.Serializable
 
-/** One recorded watchdog timeout for a specific content hash and scope. */
+/** One recorded watchdog timeout for a specific content hash, scope, and optional repository. */
 @Serializable
 data class TimeoutEntry(
   val contentHash: String,
   val scope: String,
   val recordedAt: Long,
   val reason: String? = null,
+  val repoRoot: String? = null,
 )
 
+/** Runtime identity of the client or running host server so upgrades/rebuilds replace cleanly. */
+data class RuntimeIdentity(
+  val backend: String,
+  val runtimeHash: String,
+  val sourceDir: String?,
+  val apkSha256: String?,
+  val jarPath: Path?,
+  val jarModified: Long?,
+  val serverCpFile: Path?,
+  val bootstrapDir: Path?,
+) {
+  companion object {
+    const val BACKEND_SKIKO = "skiko"
+    const val BACKEND_ANDROID = "android"
+    const val BACKEND_ENV = "ANDROID_DESIGN_PREVIEW_BACKEND"
+    const val SRC_ENV = "ANDROID_DESIGN_PREVIEW_SRC"
+    const val SERVER_CP_ENV = "ANDROID_DESIGN_PREVIEW_SERVER_CP"
+    const val RUNTIME_HASH_ENV = "ANDROID_DESIGN_PREVIEW_RUNTIME_HASH"
+
+    fun resolveBackend(env: Map<String, String> = System.getenv()): String {
+      val explicit = env[BACKEND_ENV]?.trim()?.lowercase()
+      if (explicit == BACKEND_ANDROID || explicit == BACKEND_SKIKO) return explicit
+      val hasBootstrap =
+        !env[BootstrapMeta.BOOTSTRAP_DIR_ENV].isNullOrBlank() || !env[SERVER_CP_ENV].isNullOrBlank()
+      val hasLegacyJar = !env["ANDROID_DESIGN_PREVIEW_JAR"].isNullOrBlank()
+      return when {
+        hasLegacyJar && !hasBootstrap -> BACKEND_SKIKO
+        hasBootstrap -> BACKEND_ANDROID
+        ServerPaths.runningJar() != null -> BACKEND_SKIKO
+        else -> BACKEND_SKIKO
+      }
+    }
+
+    fun compute(
+      env: Map<String, String> = System.getenv(),
+      jar: Path? = ServerPaths.runningJar(),
+      meta: BootstrapMeta? =
+        env[BootstrapMeta.BOOTSTRAP_DIR_ENV]
+          ?.takeIf { it.isNotBlank() }
+          ?.let { dir ->
+            runCatching {
+              BootstrapMeta.fromFile(Path.of(dir).resolve("bootstrap-meta.properties"))
+            }
+              .getOrNull()
+          } ?: BootstrapMeta.locateOrNull(env),
+      version: String = AppInfo.VERSION,
+    ): RuntimeIdentity {
+      val backend = resolveBackend(env)
+      val sourceDir = env[SRC_ENV]?.trim()?.takeIf { it.isNotBlank() }
+      val serverCpFile =
+        env[SERVER_CP_ENV]?.trim()?.takeIf { it.isNotBlank() }?.let(Path::of)
+          ?: meta?.bootstrapDir?.resolve("server.cp")?.takeIf { Files.isRegularFile(it) }
+      val bootstrapDir =
+        env[BootstrapMeta.BOOTSTRAP_DIR_ENV]?.trim()?.takeIf { it.isNotBlank() }?.let(Path::of)
+          ?: meta?.bootstrapDir
+      val jarMod = jar?.let(ServerPaths::jarModified)
+      val apkSha =
+        if (backend == BACKEND_ANDROID) runCatching { meta?.apkSha256OrCompute() }.getOrNull()
+        else null
+
+      val overrideHash = env[RUNTIME_HASH_ENV]?.trim()?.takeIf { it.isNotBlank() }
+      val runtimeHash =
+        overrideHash
+          ?: buildString {
+            val digest = MessageDigest.getInstance("SHA-256")
+            fun feed(s: String) {
+              digest.update(s.toByteArray(Charsets.UTF_8))
+              digest.update(0)
+            }
+            feed("ver:$version")
+            feed("backend:$backend")
+            feed("src:${sourceDir.orEmpty()}")
+            if (jar != null) {
+              feed("jar:$jar:${jarMod ?: -1L}")
+            }
+            if (apkSha != null) {
+              feed("apk:$apkSha")
+            }
+            if (serverCpFile != null && Files.isRegularFile(serverCpFile)) {
+              val cpText = runCatching { Files.readString(serverCpFile) }.getOrDefault("")
+              feed("cp:$cpText")
+              for (entry in cpText.lines().drop(1).joinToString("").split(File.pathSeparator)) {
+                val p = runCatching { Path.of(entry.trim()) }.getOrNull() ?: continue
+                if (p.fileName?.toString()?.endsWith(".jar") == true && Files.exists(p)) {
+                  val mtime = runCatching {
+                    Files.getLastModifiedTime(p).toMillis()
+                  }
+                    .getOrDefault(0L)
+                  feed("entry:$p:$mtime")
+                }
+              }
+            }
+            append(digest.digest().joinToString("") { "%02x".format(it) }.take(24))
+          }
+
+      return RuntimeIdentity(
+        backend = backend,
+        runtimeHash = runtimeHash,
+        sourceDir = sourceDir,
+        apkSha256 = apkSha,
+        jarPath = jar,
+        jarModified = jarMod,
+        serverCpFile = serverCpFile,
+        bootstrapDir = bootstrapDir,
+      )
+    }
+  }
+}
+
 /**
- * On-disk discovery record for one repository's preview server, stored with `0600` permissions
- * under `~/.cache/android-design-preview/servers/<repo-hash>.json`.
+ * On-disk discovery record for the single shared preview host server, stored with `0600`
+ * permissions under `~/.cache/android-design-preview/servers/active.json`.
  */
 @Serializable
 data class ServerRecord(
@@ -33,11 +146,24 @@ data class ServerRecord(
   val viewToken: String,
   val timeouts: List<TimeoutEntry> = emptyList(),
   val haltedAt: Long? = null,
-  /** The JAR this server runs and its modification time, so a rebuild replaces the server. */
+  /** The JAR this server runs and its modification time (v5 JAR mode). */
   val jarPath: String? = null,
   val jarModified: Long? = null,
+  /** Shared runtime version/checkout hash, backend mode, and active Android device metadata. */
+  val runtimeHash: String? = null,
+  val sourceDir: String? = null,
+  val backend: String = RuntimeIdentity.BACKEND_SKIKO,
+  val deviceSerial: String? = null,
+  val adbForwardPort: Int? = null,
+  val apkSha256: String? = null,
+  val replacedByVersion: String? = null,
 ) {
-  fun boardUrl(): String = "http://127.0.0.1:$port/?view=$viewToken"
+  fun boardUrl(repoId: String? = null): String =
+    if (repoId.isNullOrBlank()) {
+      "http://127.0.0.1:$port/?view=$viewToken"
+    } else {
+      "http://127.0.0.1:$port/?repo=$repoId&view=$viewToken"
+    }
 
   fun hasTimeout(
     contentHash: String,
@@ -71,6 +197,7 @@ data class ServerRecord(
 /** Deterministic cache paths, repo hashing, port selection, and atomic 0600 record persistence. */
 object ServerPaths {
   const val CACHE_DIR_ENV = "ANDROID_DESIGN_CACHE_DIR"
+  const val SHARED_PREFERRED_PORT = 49210
   private const val PORT_RANGE_START = 49200
   private const val PORT_RANGE_SIZE = 10000
   private val rng = SecureRandom()
@@ -118,8 +245,21 @@ object ServerPaths {
 
   fun serversDir(cacheRoot: Path = cacheRoot()): Path = cacheRoot.resolve("servers")
 
-  fun recordPath(repoRoot: Path, cacheRoot: Path = cacheRoot()): Path =
+  /** Single shared active server discovery record across all repositories. */
+  fun sharedRecordPath(cacheRoot: Path = cacheRoot()): Path =
+    serversDir(cacheRoot).resolve("active.json")
+
+  fun sharedLockPath(cacheRoot: Path = cacheRoot()): Path =
+    serversDir(cacheRoot).resolve("active.lock")
+
+  fun sharedLogPath(cacheRoot: Path = cacheRoot()): Path =
+    serversDir(cacheRoot).resolve("active.log")
+
+  /** Legacy per-repo record path (retained for startup cleanup of stale v5 records). */
+  fun legacyRecordPath(repoRoot: Path, cacheRoot: Path = cacheRoot()): Path =
     serversDir(cacheRoot).resolve("${repoHash(repoRoot)}.json")
+
+  fun recordPath(repoRoot: Path, cacheRoot: Path = cacheRoot()): Path = sharedRecordPath(cacheRoot)
 
   fun rendersDir(repoRoot: Path, cacheRoot: Path = cacheRoot()): Path =
     cacheRoot.resolve("renders").resolve(repoHash(repoRoot))
@@ -216,7 +356,6 @@ object ServerPaths {
     try {
       Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rw-------"))
     } catch (_: UnsupportedOperationException) {
-      // Non-POSIX filesystem, such as a FAT or network volume.
       path.toFile().setReadable(false, false)
       path.toFile().setReadable(true, true)
       path.toFile().setWritable(false, false)

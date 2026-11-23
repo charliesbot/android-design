@@ -1,14 +1,18 @@
 package bot.charlies.androiddesign.preview.app.client
 
+import bot.charlies.androiddesign.preview.app.android.DeviceManager
+import bot.charlies.androiddesign.preview.app.android.DeviceSetupResult
 import bot.charlies.androiddesign.preview.app.cli.Command
 import bot.charlies.androiddesign.preview.app.server.CheckRequest
 import bot.charlies.androiddesign.preview.app.server.CheckResponse
 import bot.charlies.androiddesign.preview.app.server.ContentHasher
 import bot.charlies.androiddesign.preview.app.server.ErrorEnvelope
+import bot.charlies.androiddesign.preview.app.server.RuntimeIdentity
 import bot.charlies.androiddesign.preview.app.server.SelectionResponse
 import bot.charlies.androiddesign.preview.app.server.ServerPaths
 import bot.charlies.androiddesign.preview.app.server.TreeRequest
 import bot.charlies.androiddesign.preview.app.server.TreeResponse
+import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import java.io.PrintStream
 import java.net.SocketTimeoutException
@@ -17,7 +21,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.serialization.Serializable
 
-/** Fixed exit codes for v5 CLI commands. */
+/** Fixed exit codes for v5/v6 CLI commands. */
 object V5ExitCode {
   const val OK = 0
   const val FAILED = 1
@@ -55,6 +59,7 @@ private data class SimpleArgs(
 private fun parseV5Args(
   args: List<String>,
   valueFlags: Set<String>,
+  booleanFlags: Set<String> = emptySet(),
 ): Pair<SimpleArgs?, String?> {
   val positionals = mutableListOf<String>()
   val flags = LinkedHashMap<String, String>()
@@ -62,6 +67,7 @@ private fun parseV5Args(
   while (i < args.size) {
     val arg = args[i]
     when {
+      arg in booleanFlags -> flags[arg] = "true"
       arg in valueFlags -> {
         val value = args.getOrNull(++i) ?: return null to "$arg requires a value"
         flags[arg] = value
@@ -72,6 +78,148 @@ private fun parseV5Args(
     i++
   }
   return SimpleArgs(positionals, flags) to null
+}
+
+/** `start [--serial <id>] [--avd <name>] [--headless] [--help]` */
+class StartCommand(
+  private val cacheRoot: Path = ServerPaths.cacheRoot(),
+  private val env: Map<String, String> = System.getenv(),
+  private val deviceManager: DeviceManager = DeviceManager(cacheRoot = cacheRoot, env = env),
+  private val clientFactory: (BootstrapMeta) -> PreviewClient = { meta ->
+    val startEnv =
+      env.toMutableMap().apply {
+        put(RuntimeIdentity.BACKEND_ENV, RuntimeIdentity.BACKEND_ANDROID)
+        put(BootstrapMeta.BOOTSTRAP_DIR_ENV, meta.bootstrapDir.toString())
+        val serverCp = meta.bootstrapDir.resolve("server.cp")
+        if (Files.isRegularFile(serverCp)) {
+          put(RuntimeIdentity.SERVER_CP_ENV, serverCp.toString())
+        }
+      }
+    PreviewClient(cacheRoot = cacheRoot, env = startEnv)
+  },
+  private val bootstrapLocator: () -> BootstrapMeta? = { BootstrapMeta.locateOrNull(env) },
+) : Command {
+  override val name = "start"
+  override val usage = "start [--serial <id>] [--avd <name>] [--headless] [--help]"
+
+  @Serializable
+  data class StartResponse(
+    val ok: Boolean = true,
+    val serial: String,
+    val avd: String? = null,
+    val apkInstalled: Boolean,
+    val aotCompiled: Boolean,
+    val forwardPort: Int,
+    val serverPid: Long,
+    val serverPort: Int,
+    val boardUrl: String,
+  )
+
+  override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
+    if (wantsHelp(args)) {
+      out.println(HELP)
+      return V5ExitCode.OK
+    }
+    val (parsed, parseErr) =
+      parseV5Args(args, setOf("--serial", "--avd"), booleanFlags = setOf("--headless"))
+    if (parseErr != null || parsed == null) {
+      return emitError(
+        out,
+        V5ExitCode.USAGE,
+        "usage",
+        parseErr ?: "Invalid arguments",
+        next = "android-design-preview start --help",
+      )
+    }
+    if (parsed.positionals.size > 1) {
+      return emitError(
+        out,
+        V5ExitCode.USAGE,
+        "usage",
+        "Unexpected arguments: ${parsed.positionals.joinToString(" ")}",
+      )
+    }
+
+    val meta =
+      bootstrapLocator()
+        ?: return emitError(
+          out,
+          V5ExitCode.NOT_READY,
+          "bootstrap_missing",
+          "Bootstrap artifacts missing (bootstrap-meta.properties). Run `./gradlew :host:exportBootstrap` from app/ or invoke the bundled CLI script.",
+        )
+
+    val requestedSerial = parsed.flags["--serial"]
+    val requestedAvd = parsed.flags["--avd"]
+    val headless = parsed.flags["--headless"] == "true"
+
+    val setup =
+      deviceManager.ensureDeviceReady(
+        meta = meta,
+        requestedSerial = requestedSerial,
+        requestedAvd = requestedAvd,
+        headless = headless,
+      )
+    val readyDevice =
+      when (setup) {
+        is DeviceSetupResult.Failed ->
+          return emitError(out, setup.exitCode, setup.error, setup.message)
+        is DeviceSetupResult.Ready -> setup
+      }
+
+    val targetDir =
+      parsed.positionals.firstOrNull()?.let { Path.of(it).toAbsolutePath().normalize() }
+        ?: Path.of(".").toAbsolutePath().normalize()
+    val repoRoot = ServerPaths.resolveRepoRoot(targetDir)
+    val client = clientFactory(meta)
+    val lookup =
+      client.ensureServer(
+        repoRoot = repoRoot,
+        requestedSerial = readyDevice.serial,
+        requestedAvd = readyDevice.avdName,
+        headless = headless,
+        forceReinstallApk = false,
+      )
+    val readyServer =
+      when (lookup) {
+        is PreviewClient.ServerLookup.NotReady ->
+          return emitError(out, V5ExitCode.NOT_READY, "server_not_ready", lookup.message)
+        is PreviewClient.ServerLookup.Ready -> lookup
+      }
+
+    val resp =
+      StartResponse(
+        ok = true,
+        serial = readyDevice.serial,
+        avd = readyDevice.avdName,
+        apkInstalled = readyDevice.apkInstalled,
+        aotCompiled = readyDevice.aotCompiled,
+        forwardPort = readyDevice.forwardPort,
+        serverPid = readyServer.status.pid,
+        serverPort = readyServer.status.port,
+        boardUrl = readyServer.record.boardUrl(ServerPaths.repoHash(repoRoot)),
+      )
+    emitJson(out, PreviewJson.compact.encodeToString(StartResponse.serializer(), resp))
+    return V5ExitCode.OK
+  }
+
+  companion object {
+    val HELP =
+      """
+      Usage: android-design-preview start [--serial <id>] [--avd <name>] [--headless]
+
+      Ensure a compatible Android emulator or device is running (reusing a `resizable` AVD if
+      present, else creating `medium_phone`), install + AOT-compile host-preview.apk, establish
+      adb forward, start the :sandbox host service, and ensure the shared host server is ready.
+
+      Exit codes:
+        0  Device, Host APK, and shared server are ready
+        1  Device boot, APK install, AOT compile, or sandbox start failed
+        2  Usage error (unknown flag, unknown serial, or unknown AVD)
+        3  Prerequisites missing (Java, Android SDK, adb, android CLI, or bootstrap artifacts)
+      """
+        .trimIndent()
+  }
 }
 
 /** `check <file> [--direction d] [--screen s] [--view v] [--design path]` */
@@ -165,6 +313,7 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
         direction = direction,
         screen = screen,
         view = view,
+        repoRoot = repoRoot.toString(),
       )
     val body = PreviewJson.compact.encodeToString(CheckRequest.serializer(), req)
     val timeoutMs = client.deadlineMs(isCold = ready.status.compileCount == 0, scoped = scoped)
@@ -173,6 +322,26 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
       try {
         client.postJson(ready.record, "/api/check", body, readTimeoutMs = timeoutMs)
       } catch (_: SocketTimeoutException) {
+        val repVer = client.checkReplacedByVersion(ready.record)
+        if (repVer != null) {
+          val msg = "replaced by v$repVer, rerun"
+          emitJson(
+            out,
+            PreviewJson.compact.encodeToString(
+              CheckResponse.serializer(),
+              CheckResponse(
+                ok = false,
+                valid = false,
+                pass = false,
+                scoped = scoped,
+                sourcePath = sourcePath.toString(),
+                error = "server_replaced",
+                tell = msg,
+              ),
+            ),
+          )
+          return V5ExitCode.FAILED
+        }
         client.killAndRespawn(repoRoot, ready.record)
         return emitError(
           out,
@@ -183,6 +352,26 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
             "Check timed out (possible infinite loop or slow composition). Simplify the view and retry.",
         )
       } catch (e: Exception) {
+        val repVer = client.checkReplacedByVersion(ready.record)
+        if (repVer != null) {
+          val msg = "replaced by v$repVer, rerun"
+          emitJson(
+            out,
+            PreviewJson.compact.encodeToString(
+              CheckResponse.serializer(),
+              CheckResponse(
+                ok = false,
+                valid = false,
+                pass = false,
+                scoped = scoped,
+                sourcePath = sourcePath.toString(),
+                error = "server_replaced",
+                tell = msg,
+              ),
+            ),
+          )
+          return V5ExitCode.FAILED
+        }
         if (client.checkRecordedTimeout(repoRoot, snapshot, scopeKey, direction, screen, view)) {
           val resp =
             CheckResponse(
@@ -212,6 +401,10 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
       emitJson(out, http.body.ifBlank { """{"ok":false,"error":"bad_request"}""" })
       return V5ExitCode.USAGE
     }
+    if (http.status == 409) {
+      emitJson(out, http.body.ifBlank { """{"ok":false,"error":"server_replaced"}""" })
+      return V5ExitCode.FAILED
+    }
     if (http.status >= 500) {
       emitJson(out, http.body.ifBlank { """{"ok":false,"error":"server_error"}""" })
       return V5ExitCode.FAILED
@@ -233,7 +426,7 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
       Usage: android-design-preview check <file> [--direction d] [--screen s] [--view v] [--design path]
 
       Compile and check a Compose exploration file.
-      - Scoped (any of --direction, --screen, --view): checks only the target and writes 1x PNG path(s), whether findings pass or fail.
+      - Scoped (any of --direction, --screen, --view): checks only the target and writes PNG path(s), whether findings pass or fail.
       - Unscoped (no scope flags): full gate across every direction, screen, overlay, and view at 2x density.
         Failing full checks return at most 2 deduplicated failing PNG paths; passing full checks return light + desktop (or watch + watch-large on Wear).
 
@@ -244,7 +437,7 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
 
       Exit codes:
         0  All requested checks passed
-        1  Compile error, finding failure, or timeout
+        1  Compile error, finding failure, server replacement, or timeout
         2  Usage error (missing file, unknown direction/screen/view)
         3  Server or prerequisites not ready
       """
@@ -316,6 +509,7 @@ class TreeCommand(private val client: PreviewClient = PreviewClient()) : Command
         overlay = parsed.flags["--overlay"],
         view = view,
         maxDepth = maxDepth,
+        repoRoot = repoRoot.toString(),
       )
     val timeoutMs = client.deadlineMs(isCold = ready.status.compileCount == 0, scoped = true)
     val snapshot = ContentHasher.snapshot(sourcePath)
@@ -339,6 +533,10 @@ class TreeCommand(private val client: PreviewClient = PreviewClient()) : Command
         client.killAndRespawn(repoRoot, ready.record)
         return emitError(out, V5ExitCode.FAILED, "timeout", "tree request timed out")
       } catch (e: Exception) {
+        val repVer = client.checkReplacedByVersion(ready.record)
+        if (repVer != null) {
+          return emitError(out, V5ExitCode.FAILED, "server_replaced", "replaced by v$repVer, rerun")
+        }
         if (client.checkRecordedTimeout(repoRoot, snapshot, treeScope, direction, screen, view)) {
           return emitError(
             out,
@@ -491,6 +689,7 @@ class OpenCommand(private val client: PreviewClient = PreviewClient()) : Command
       rawFile?.let { Path.of(it).toAbsolutePath().normalize() }
         ?: Path.of(".").toAbsolutePath().normalize()
     val repoRoot = ServerPaths.resolveRepoRoot(targetPath)
+    val repoId = ServerPaths.repoHash(repoRoot)
     val ready =
       when (val lookup = client.ensureServer(repoRoot)) {
         is PreviewClient.ServerLookup.Ready -> lookup
@@ -498,16 +697,13 @@ class OpenCommand(private val client: PreviewClient = PreviewClient()) : Command
           return emitError(out, V5ExitCode.NOT_READY, "server_not_ready", lookup.message)
       }
 
-    // If a file was provided and nothing is compiled yet, trigger a quick scoped check so the board
-    // has content.
-    if (
+    val isExploreFile =
       rawFile != null &&
         Files.isRegularFile(targetPath) &&
-        targetPath.fileName.toString().endsWith(".explore.kt") &&
-        ready.status.activeFile == null
-    ) {
+        targetPath.fileName.toString().endsWith(".explore.kt")
+    if (isExploreFile && ready.status.activeFile == null) {
       try {
-        val req = CheckRequest(path = targetPath.toString())
+        val req = CheckRequest(path = targetPath.toString(), repoRoot = repoRoot.toString())
         client.postJson(
           ready.record,
           "/api/check",
@@ -517,11 +713,16 @@ class OpenCommand(private val client: PreviewClient = PreviewClient()) : Command
       } catch (_: Exception) {
         // Still return boardUrl even if initial compile failed or timed out.
       }
+    } else {
+      client.notifyLive(ready.record, if (isExploreFile) targetPath else null, repoRoot)
     }
 
-    val url = ready.record.boardUrl()
+    val url = ready.record.boardUrl(repoId)
     val noOpen = System.getenv(PreviewClient.NO_OPEN_ENV) == "1"
     val opened = if (noOpen) false else openBrowser(url)
+    if (!noOpen && ready.status.backend == RuntimeIdentity.BACKEND_ANDROID) {
+      DeviceManager().launchLiveActivity(ready.status.deviceSerial)
+    }
     val resp =
       OpenResponse(
         ok = true,
@@ -553,8 +754,8 @@ class OpenCommand(private val client: PreviewClient = PreviewClient()) : Command
       """
       Usage: android-design-preview open [<file>]
 
-      Ensure the preview server is running, print its boardUrl JSON line, and open it in the
-      default browser (suppressed when ANDROID_DESIGN_NO_OPEN=1).
+      Ensure the preview server is running, transfer live device ownership, print its boardUrl JSON
+      line, and open it in the default browser (suppressed when ANDROID_DESIGN_NO_OPEN=1).
 
       Exit codes:
         0  Board URL printed
@@ -600,7 +801,7 @@ class StatusCommand(private val client: PreviewClient = PreviewClient()) : Comma
           V5ExitCode.NOT_READY,
           "server_not_running",
           lookup.message,
-          next = "android-design-preview check <file>",
+          next = "android-design-preview start",
         )
     }
   }
@@ -610,7 +811,7 @@ class StatusCommand(private val client: PreviewClient = PreviewClient()) : Comma
       """
       Usage: android-design-preview status [<file-or-dir>]
 
-      Report server state (pid, port, jarVersion, compileCount, boardUrl) for the repository.
+      Report shared server state (pid, port, jarVersion, backend, deviceSerial, compileCount, boardUrl).
 
       Exit codes:
         0  Server is running and answering
@@ -664,7 +865,7 @@ class StopCommand(private val client: PreviewClient = PreviewClient()) : Command
       """
       Usage: android-design-preview stop [<file-or-dir>]
 
-      Shut down the running preview server for the repository (no-op if already stopped).
+      Shut down the running shared preview server (no-op if already stopped).
 
       Exit codes:
         0  Server stopped (or already stopped)

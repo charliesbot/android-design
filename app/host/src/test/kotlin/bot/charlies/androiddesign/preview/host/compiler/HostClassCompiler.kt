@@ -1,5 +1,6 @@
 package bot.charlies.androiddesign.preview.host.compiler
 
+import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.domain.sandbox.BytecodeGuard
 import bot.charlies.androiddesign.preview.domain.sandbox.SourceTokenLinter
 import bot.charlies.androiddesign.preview.model.ValidationError
@@ -10,7 +11,6 @@ import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
 import org.jetbrains.kotlin.cli.common.ExitCode as KotlinExitCode
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
@@ -18,75 +18,6 @@ import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
 import org.jetbrains.kotlin.config.Services
-
-data class BootstrapMeta(
-  val bootstrapDir: Path,
-  val androidJar: Path,
-  val bundleJar: Path,
-  val d8Jar: Path,
-  val composeCompilerPluginJar: Path,
-  val apkPath: Path,
-) {
-  companion object {
-    fun locate(): BootstrapMeta {
-      val explicitDir = System.getProperty("adp.bootstrap.dir")?.trim()?.takeIf { it.isNotEmpty() }
-      val cpBootstrapDir =
-        System.getProperty("java.class.path")
-          .orEmpty()
-          .split(File.pathSeparator)
-          .firstNotNullOfOrNull { entry ->
-            val p = runCatching { Paths.get(entry).toAbsolutePath().normalize() }.getOrNull()
-            when {
-              p == null -> null
-              p.fileName?.toString() == "robolectric-config" ->
-                p.parent?.resolve("bootstrap-meta.properties")?.takeIf { Files.isRegularFile(it) }
-              Files.isDirectory(p) ->
-                p.resolve("bootstrap-meta.properties").takeIf { Files.isRegularFile(it) }
-              else -> null
-            }
-          }
-      val candidates = buildList {
-        if (explicitDir != null) {
-          add(Paths.get(explicitDir).resolve("bootstrap-meta.properties"))
-        }
-        if (cpBootstrapDir != null) {
-          add(cpBootstrapDir)
-        }
-        add(Paths.get("build/bootstrap/bootstrap-meta.properties"))
-        add(Paths.get("host/build/bootstrap/bootstrap-meta.properties"))
-        add(Paths.get("app/host/build/bootstrap/bootstrap-meta.properties"))
-      }
-      val metaFile =
-        candidates.firstOrNull { Files.isRegularFile(it) }
-          ?: error(
-            "Cannot find bootstrap-meta.properties; searched: ${candidates.joinToString()}",
-          )
-      return fromFile(metaFile)
-    }
-
-    fun fromFile(metaFile: Path): BootstrapMeta {
-      val props = Properties()
-      Files.newBufferedReader(metaFile).use { props.load(it) }
-      fun reqPath(key: String): Path {
-        val raw =
-          requireNotNull(props.getProperty(key)?.trim()?.takeIf { it.isNotEmpty() }) {
-            "Missing '$key' in $metaFile"
-          }
-        val path = Paths.get(raw).toAbsolutePath().normalize()
-        require(Files.exists(path)) { "Bootstrap entry '$key' missing on disk: $path" }
-        return path
-      }
-      return BootstrapMeta(
-        bootstrapDir = metaFile.toAbsolutePath().normalize().parent,
-        androidJar = reqPath("androidJar"),
-        bundleJar = reqPath("bundleJar"),
-        d8Jar = reqPath("d8Jar"),
-        composeCompilerPluginJar = reqPath("composeCompilerPluginJar"),
-        apkPath = reqPath("apkPath"),
-      )
-    }
-  }
-}
 
 sealed interface HostCompileOutcome {
   data class Classes(

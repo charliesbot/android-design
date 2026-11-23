@@ -13,13 +13,14 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.time.Duration
 
 /**
- * Cleans stale discovery records and old render directories under
- * `~/.cache/android-design-preview/`.
+ * Cleans stale discovery records (`active.json` and any legacy `<repo-hash>.json` files) and old
+ * render directories under `~/.cache/android-design-preview/`.
  *
  * On server startup:
  * - Deletes server records under `servers/` whose server does not answer `/api/status`, EXCEPT
  *   records holding `timeouts` that match any `.explore.kt` file's current content hash in that
- *   record's repository (so watchdog fast-fail state is never lost).
+ *   timeout entry's repository (falling back to [ServerRecord.repoRoot]) so watchdog fast-fail
+ *   state is never lost.
  * - Deletes content-hash directories under `renders/<repo-hash>/` older than the newest
  *   [DEFAULT_MAX_HASHES_PER_REPO] (20) per repo, or untouched for [DEFAULT_MAX_RENDER_AGE_DAYS] (7)
  *   days.
@@ -92,7 +93,6 @@ object CacheCleaner {
       }
       val record = ServerPaths.readRecord(norm)
       if (record == null) {
-        // Corrupt record file: remove it and its paired log.
         if (deleteFileQuietly(norm)) {
           deleted++
           deletePairedLog(norm)
@@ -188,7 +188,6 @@ object CacheCleaner {
           }
         }
       }
-      // Remove empty repo render directories after pruning.
       try {
         val isEmpty = Files.list(repoDir).use { stream -> !stream.findFirst().isPresent }
         if (isEmpty) {
@@ -203,27 +202,39 @@ object CacheCleaner {
 
   internal fun hasActiveTimeout(record: ServerRecord): Boolean {
     if (record.timeouts.isEmpty()) return false
-    val repoRoot =
-      try {
-        Path.of(record.repoRoot)
-      } catch (_: Exception) {
-        return false
-      }
-    if (!Files.isDirectory(repoRoot)) return false
+    val versionsToCheck =
+      if (record.jarVersion == AppInfo.VERSION) listOf(record.jarVersion)
+      else listOf(record.jarVersion, AppInfo.VERSION)
 
+    val byRepo = record.timeouts.groupBy { it.repoRoot ?: record.repoRoot }
+    for ((rawRepo, entries) in byRepo) {
+      val repoRoot =
+        try {
+          Path.of(rawRepo)
+        } catch (_: Exception) {
+          continue
+        }
+      if (!Files.isDirectory(repoRoot)) continue
+      val recordedHashes = entries.mapTo(HashSet()) { it.contentHash }
+      if (repoMatchesAnyHash(repoRoot, recordedHashes, versionsToCheck)) {
+        return true
+      }
+    }
+    return false
+  }
+
+  private fun repoMatchesAnyHash(
+    repoRoot: Path,
+    recordedHashes: Set<String>,
+    versionsToCheck: List<String>,
+  ): Boolean {
     val walkRoot =
       try {
         if (Files.isSymbolicLink(repoRoot)) repoRoot.toRealPath() else repoRoot
       } catch (_: Exception) {
         return true
       }
-
-    val recordedHashes = record.timeouts.mapTo(HashSet()) { it.contentHash }
-    val versionsToCheck =
-      if (record.jarVersion == AppInfo.VERSION) listOf(record.jarVersion)
-      else listOf(record.jarVersion, AppInfo.VERSION)
     var matched = false
-
     try {
       Files.walkFileTree(
         walkRoot,
@@ -268,8 +279,6 @@ object CacheCleaner {
         },
       )
     } catch (_: Exception) {
-      // Conservative fallback: if scanning fails unexpectedly while timeouts exist, preserve
-      // record.
       return true
     }
     return matched

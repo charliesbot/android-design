@@ -32,6 +32,8 @@ dependencies {
   implementation(compose.desktop.currentOs)
   implementation(libs.compose.material3)
   implementation(libs.kotlinx.coroutines.swing)
+  implementation(libs.kotlin.compiler.embeddable)
+  implementation(libs.lz4.java)
   composeCompilerPlugin(libs.kotlin.compose.compiler.embeddable)
   workerRuntime(libs.skiko.awt.runtime.all)
   testImplementation(kotlin("test"))
@@ -129,7 +131,8 @@ val workerJar =
 tasks.named("assemble") { dependsOn(workerJar) }
 
 tasks.test {
-  dependsOn(workerJar)
+  dependsOn(workerJar, ":host:exportBootstrap")
+  maxHeapSize = "3072m"
   systemProperty("sun.net.http.allowRestrictedHeaders", "true")
   systemProperty("preview.jar", workerJar.flatMap { it.archiveFile }.get().asFile.absolutePath)
   systemProperty(
@@ -137,5 +140,13 @@ tasks.test {
     rootProject.projectDir.parentFile
       .resolve("plugin/skills/android-design-explore/scripts/android-design-preview")
       .absolutePath,
+  )
+  systemProperty(
+    "adp.bootstrap.dir",
+    project(":host").layout.buildDirectory.dir("bootstrap").get().asFile.absolutePath,
+  )
+  systemProperty(
+    "adp.runEmulatorTests",
+    System.getProperty("adp.runEmulatorTests", "false"),
   )
 }

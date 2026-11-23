@@ -5,6 +5,7 @@ import bot.charlies.androiddesign.preview.app.client.CheckCommand
 import bot.charlies.androiddesign.preview.app.client.InstallCommand
 import bot.charlies.androiddesign.preview.app.client.OpenCommand
 import bot.charlies.androiddesign.preview.app.client.SelectionCommand
+import bot.charlies.androiddesign.preview.app.client.StartCommand
 import bot.charlies.androiddesign.preview.app.client.StatusCommand
 import bot.charlies.androiddesign.preview.app.client.StopCommand
 import bot.charlies.androiddesign.preview.app.client.TreeCommand
@@ -67,19 +68,21 @@ fun parseArgs(args: List<String>, flags: Set<String>, err: PrintStream): ParsedA
   return ParsedArgs(positional, values)
 }
 
-/** Dispatches the first argument to its headless [Command]. */
+/**
+ * Dispatches the first argument lazily so lightweight commands (`status`) avoid loading compilers.
+ */
 object Cli {
-  private val commands: List<Command> =
+  private val commandUsages =
     listOf(
-      CheckCommand(),
-      TreeCommand(),
-      SelectionCommand(),
-      OpenCommand(),
-      StatusCommand(),
-      StopCommand(),
-      RenderCommand(),
-      InstallCommand(),
-      ServerCommand(),
+      "start [--serial <id>] [--avd <name>] [--headless] [--help]",
+      "check <file> [--direction d] [--screen s] [--view v] [--design path] [--help]",
+      "tree <file> --direction d --view v [--screen s] [--overlay o] [--max-depth n] [--help]",
+      "selection <file> [--help]",
+      "open <file> [--help]",
+      "status [<file-or-dir>] [--help]",
+      "stop [<file-or-dir>] [--help]",
+      "render <exploration.explore.kt> --out <dir> [--design <DESIGN.md>] [--views light,dark,...] [--screens a,b]",
+      "install [--bin-dir <dir>] [--help]",
     )
 
   fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
@@ -96,18 +99,30 @@ object Cli {
       out.println(AppInfo.VERSION)
       return ExitCode.OK
     }
-    val command = commands.firstOrNull { it.name == first }
-    if (command == null) {
-      err.println("unknown command '$first'")
-      printUsage(err)
-      return ExitCode.USAGE
-    }
+    val command: Command =
+      when (first) {
+        "start" -> StartCommand()
+        "check" -> CheckCommand()
+        "tree" -> TreeCommand()
+        "selection" -> SelectionCommand()
+        "open" -> OpenCommand()
+        "status" -> StatusCommand()
+        "stop" -> StopCommand()
+        "render" -> RenderCommand()
+        "install" -> InstallCommand()
+        "server" -> ServerCommand()
+        else -> {
+          err.println("unknown command '$first'")
+          printUsage(err)
+          return ExitCode.USAGE
+        }
+      }
     return command.run(args.drop(1), out, err)
   }
 
   fun printUsage(out: PrintStream) {
     out.println("usage: android-design-preview <command> [options]")
-    commands.filter { it.name != "server" }.forEach { out.println("  ${it.usage}") }
+    commandUsages.forEach { out.println("  $it") }
     out.println("  --version")
     out.println("  --help")
     out.println("Run `android-design-preview <command> --help` for details and exit codes.")

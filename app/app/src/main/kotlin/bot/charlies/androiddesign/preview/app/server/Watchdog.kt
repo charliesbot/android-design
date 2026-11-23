@@ -4,10 +4,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Daemon watchdog that bounds every server compile and 1-view render against its deadline (30 s
- * cold first compile, 5 s warm compile and 1-view render). When a job passes its budget, the
- * watchdog invokes [onTimeout] (to record `(contentHash, scope)` in the server record and notify
- * browsers) and then invokes [onHalt] (`Runtime.getRuntime().halt(1)` in production).
+ * Daemon watchdog that bounds every server compile, 1-view render, and batch check against its
+ * deadline (30 s cold first compile, 5 s warm compile and 1-view render, 15 s full batch check).
  */
 class Watchdog(
   private val coldBudgetMs: Long = COLD_BUDGET_MS,
@@ -21,6 +19,7 @@ class Watchdog(
     val scope: String,
     val budgetMs: Long,
     val startedAtMs: Long,
+    val repoRoot: String? = null,
   )
 
   private val active = AtomicReference<ActiveJob?>(null)
@@ -66,9 +65,16 @@ class Watchdog(
     thread = null
   }
 
-  fun begin(contentHash: String, scope: String, isCold: Boolean): ActiveJob {
-    val budget = if (isCold) coldBudgetMs else warmBudgetMs
-    val job = ActiveJob(contentHash, scope, budget, System.currentTimeMillis())
+  fun begin(
+    contentHash: String,
+    scope: String,
+    isCold: Boolean,
+    repoRoot: String? = null,
+    minBudgetMs: Long? = null,
+  ): ActiveJob {
+    val base = if (isCold) coldBudgetMs else warmBudgetMs
+    val budget = if (minBudgetMs != null && base == warmBudgetMs) maxOf(base, minBudgetMs) else base
+    val job = ActiveJob(contentHash, scope, budget, System.currentTimeMillis(), repoRoot)
     active.set(job)
     return job
   }
@@ -77,8 +83,15 @@ class Watchdog(
     active.compareAndSet(job, null)
   }
 
-  inline fun <T> guard(contentHash: String, scope: String, isCold: Boolean, block: () -> T): T {
-    val token = begin(contentHash, scope, isCold)
+  inline fun <T> guard(
+    contentHash: String,
+    scope: String,
+    isCold: Boolean,
+    repoRoot: String? = null,
+    minBudgetMs: Long? = null,
+    block: () -> T,
+  ): T {
+    val token = begin(contentHash, scope, isCold, repoRoot, minBudgetMs)
     return try {
       block()
     } finally {
@@ -89,5 +102,6 @@ class Watchdog(
   companion object {
     const val COLD_BUDGET_MS = 30_000L
     const val WARM_BUDGET_MS = 5_000L
+    const val BATCH_BUDGET_MS = 15_000L
   }
 }
