@@ -17,10 +17,9 @@ internal object TypeScale {
     if (surface === WearSurface) wear[wire] else TypeRole.fromWire(wire)?.let(::of)
 
   /**
-   * The Wear Material 3 type scale, read from `TypeScaleTokens` of the Wear Compose sources
-   * (`app/wear/compose/upstream/material3/.../tokens/TypeScaleTokens.kt`); a test compares it with
-   * the library's `Typography()`. The weights are variable font weights, so none reaches the bold
-   * weight (700) that makes a smaller text count as large.
+   * The Wear Material 3 type scale from `androidx.wear.compose.material3.tokens.TypeScaleTokens`.
+   * The weights are variable font weights, so none reaches the bold weight (700) that makes a
+   * smaller text count as large.
    */
   private val wear: Map<String, TypeSpec> =
     mapOf(

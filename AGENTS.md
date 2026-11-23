@@ -2,18 +2,17 @@
 
 This is the home of the `android-design` and `android-design-explore` agent skills: Material 3 Expressive design judgment for Jetpack Compose, and exploration built on it in a native previewer app. The repository holds the skills, the previewer app, the research the skills are distilled from, and the evals that check them.
 
-**Scope status:** phone, tablet, desktop, and Wear OS app screens are the validated target, with Wear eval cases. Wear tiles, watch faces, and widgets are out of scope: the guidance exists (`docs/research/`, `docs/archive/widgets-reference.md`) but its results do not yet meet the quality bar, so the skills mark it out of scope, with no eval cases and no widget catalog. The previewer compiles and renders `wearBoard` `.explore.kt` boards (`docs/design/wear-os-previewer.md`). Widen the skills' descriptions to tiles and widgets only once they have eval cases and a widget catalog whose renders pass.
+**Scope status:** phone, tablet, desktop, and Wear OS app screens are the validated target, with Wear eval cases. Wear tiles, watch faces, and widgets are out of scope: the guidance exists (`docs/research/`, `docs/archive/widgets-reference.md`) but its results do not yet meet the quality bar, so the skills mark it out of scope, with no eval cases and no widget catalog. The previewer compiles and renders `wearBoard` `.explore.kt` boards on Android and Robolectric (`docs/design/visual-design-exploration-v6.md`). Widen the skills' descriptions to tiles and widgets only once they have eval cases and a widget catalog whose renders pass.
 
 It is charliesbot's personal repository. Optimize for the owner's workflow, not broad applicability.
 
 ## Layout
 
-- `plugin/` holds the distributable bundle: `plugin/skills/`, `plugin/skills/android-design-explore/scripts/android-design-preview` (the POSIX `sh` bootstrap script, bundled in the skill so every install route ships it; macOS and Linux only, Windows is unsupported), `plugin/bin/` (Claude Code's wrapper that puts it on `PATH`), Antigravity `plugin/plugin.json`, Claude Code `.claude-plugin/`, and Codex `.codex-plugin/`. Root marketplace manifests (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) point to `plugin/`. Changing the version in `plugin/plugin.json` on `main` publishes (the bootstrap script's `VERSION` and the other manifests must match, which `scripts/test_plugin_manifests.py` checks): `.github/workflows/release-previewer.yml` builds the JAR, packages one artifact per OS and CPU (`scripts/package_release.py`), and creates the `v<version>` tag and GitHub release, so bump the version only when the owner asks for a release.
+- `plugin/` holds the distributable bundle: `plugin/skills/`, `plugin/skills/android-design-explore/scripts/android-design-preview` (the POSIX `sh` bootstrap script, bundled in the skill so every install route ships it; macOS and Linux only, Windows is unsupported), `plugin/bin/` (Claude Code's wrapper that puts it on `PATH`), Antigravity `plugin/plugin.json`, Claude Code `.claude-plugin/`, and Codex `.codex-plugin/`. Root marketplace manifests (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) point to `plugin/`. Changing the version in `plugin/plugin.json` on `main` publishes (the bootstrap script's `VERSION` and the other manifests must match, which `scripts/test_plugin_manifests.py` checks): `.github/workflows/release-previewer.yml` verifies the version and creates the `v<version>` git tag on `main`, so bump the version only when the owner asks for a release.
 - `plugin/skills/android-design/` is the installable design judgment skill (`SKILL.md` and `references/`): building, refining, and reviewing real Compose.
 - `plugin/skills/android-design-explore/` is the installable exploration skill (`SKILL.md` and `references/`): live `.explore.kt` Compose boards checked through the `android-design-preview` CLI and long-running Kotlin HTTP/SSE server, viewed in the browser board, and wired into an app. It builds on `android-design`.
 - Chai and `npx skills` install both from `plugin/skills/`, so keep anything that is not skill content out of these folders.
-- `app/` is the previewer backend, a standalone Gradle build (Compose Multiplatform): it compiles `.explore.kt` files inside a sandboxed classloader, runs headless Skiko checks, serves the localhost HTTP/SSE browser board, and ships the `HttpURLConnection` CLI client inside `android-design-preview.jar`. `SurfaceSpec.kt`, `CallNameMapper.kt`, `FindingRules.kt`, and `docs/design/visual-design-exploration-v5.md` define the design-system checks and runtime.
-- `app/wear/compose/` is the Wear Compose port: Google's `androidx.wear.compose` sources compiled for desktop. `upstream/` stays byte-identical to Google's release, so fixes go in shims or exclusions. Read `app/wear/README.md` before changing or upgrading the port.
+- `app/` is the previewer backend, a standalone Gradle build (`:app`, `:host`, `:core:*`): `:app` compiles `.explore.kt` files, orchestrates live Android device/emulator and headless Robolectric renders, and serves the localhost HTTP/SSE browser board plus CLI; `:host` builds the Android Host APK running real AndroidX Material 3 Expressive and Wear Compose and exports the bootstrap bundle via `:host:exportBootstrap`. `SurfaceSpec.kt`, `CallNameMapper.kt`, `FindingRules.kt`, and `docs/design/visual-design-exploration-v6.md` define the design-system checks and runtime.
 - `docs/research/` holds the distilled research the skill is built from. `docs/research/source-coverage.md` is the page-by-page ledger of every official source and whether its guidance reached the research docs.
 - `evals/` checks that agents following the skill still produce screens that meet its rules. See `evals/README.md`.
 - `sources/` holds every official source page as fetched Markdown, one file per page at `sources/<domain>/<route>.md`. It is generated by `scripts/fetch.py`; never edit it by hand.
@@ -53,12 +52,11 @@ Run the check for every kind of change you made:
 - **A skill's `description`:** the trigger evals (`evals/README.md`, Trigger evals).
 - **The rubric:** `evals/calibrate.py` first.
 - **`evals/`:** `python3 -m unittest discover evals`.
-- **The bootstrap script, `plugin/bin/`, or manifests:** `python3 -m unittest discover scripts` and `cd app && ./gradlew build spotlessCheck`.
+- **The bootstrap script, `plugin/bin/`, or manifests:** `python3 -m unittest discover scripts` and `cd app && ./gradlew :host:exportBootstrap build spotlessCheck`.
 - **`scripts/`:** `python3 -m unittest discover scripts`.
-- **The app:** `cd app && ./gradlew build spotlessCheck`.
+- **The app:** `cd app && ./gradlew :host:exportBootstrap build spotlessCheck`.
 - **The pinned `material3` version in `app/gradle/libs.versions.toml`:** run `python3 scripts/material3_inventory.py`, regenerate `compose-signatures.md` with `python3 scripts/generate_signatures.py`, update `scripts/test_m3_page_coverage.py` / `CallNameMapper.kt` for any new components, and run `python3 -m unittest discover scripts`.
 - **`compose-signatures.md` or kit DSL:** `python3 scripts/generate_signatures.py` and verify `python3 -m unittest discover scripts` passes.
-- **Wear Compose upgrade:** follow `app/wear/README.md` (Upgrading).
 
 ## Prose
 

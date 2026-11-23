@@ -5,15 +5,12 @@ import bot.charlies.androiddesign.preview.app.android.AndroidExplorationCompiler
 import bot.charlies.androiddesign.preview.app.android.DeviceBatchExecution
 import bot.charlies.androiddesign.preview.app.android.DeviceTransport
 import bot.charlies.androiddesign.preview.app.android.FrameKey
-import bot.charlies.androiddesign.preview.app.cli.ExploreRenderRunner
 import bot.charlies.androiddesign.preview.app.cli.RenderEntry
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.domain.layout.LayoutSummary
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.HeadlessResult
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.SandboxHeadlessRenderer
-import bot.charlies.androiddesign.preview.kit.BoardSurface
+import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
 import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
@@ -29,6 +26,16 @@ import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.WearSurface
 import java.nio.file.Files
 import java.nio.file.Path
+
+/** Exploration compile inputs, resolved design system, and any validation/compiler errors. */
+data class LoadedExploration(
+  val sourcePath: Path,
+  val designPath: Path?,
+  val designTheme: ThemeOverride?,
+  val designSystem: DesignSystem,
+  val compileMs: Long,
+  val errors: List<ValidationError>,
+)
 
 /**
  * Android-compiled artifacts cached per `(repoRoot, sourcePath, contentHash)` on the host server.
@@ -54,7 +61,7 @@ data class CheckTargetSpec(
 )
 
 data class BackendCompileOutput(
-  val loaded: ExploreRenderRunner.LoadedExploration,
+  val loaded: LoadedExploration,
   val dexHash: String?,
   val surface: BoardSurface,
   val boardName: String?,
@@ -112,176 +119,6 @@ interface PreviewBackend : AutoCloseable {
   override fun close() {}
 }
 
-class SkikoPreviewBackend(
-  private val loader: ExplorationLoader = ExplorationLoader { src, design ->
-    ExploreRenderRunner.loadAndCompile(src, design)
-  },
-  private val renderer: DensityTargetRenderer =
-    DensityTargetRenderer { compiled, dir, screenId, view, system, overlayId, density ->
-      SandboxHeadlessRenderer.render(
-        compiled = compiled,
-        direction = dir,
-        screenId = screenId,
-        view = view,
-        designSystem = system,
-        overlayId = overlayId,
-        density = density,
-        encodePng = true,
-      )
-    },
-) : PreviewBackend {
-  override val name: String = RuntimeIdentity.BACKEND_SKIKO
-  override val supportsBatchCheck: Boolean = false
-  override val supportsHeadlessSpeculativePrecompile: Boolean = false
-
-  override fun compile(snapshot: ContentHasher.Snapshot): BackendCompileOutput {
-    val loaded = loader.loadAndCompile(snapshot.sourcePath, snapshot.designPath)
-    val compiled = loaded.compiled
-    val boardMeta =
-      compiled?.board?.let { b ->
-        BoardMeta(
-          directions =
-            b.directions.map { dir ->
-              DirectionMeta(
-                name = dir.name,
-                surface = if (dir.surface == BoardSurface.Wear) "wear" else "phone",
-                startScreen = dir.startScreen,
-                screens = dir.screenIds,
-                overlays = dir.overlays.map { ov -> OverlayMeta(ov.id, ov.screen) },
-              )
-            },
-          views = b.surfaceSpec.views,
-        )
-      }
-    return BackendCompileOutput(
-      loaded = loaded,
-      dexHash = null,
-      surface = compiled?.board?.surface ?: BoardSurface.Phone,
-      boardName = compiled?.board?.name,
-      boardMeta = boardMeta,
-      androidData = null,
-    )
-  }
-
-  override fun renderBatchCheck(
-    entry: CompileEntry,
-    targets: List<CheckTargetSpec>,
-    scoped: Boolean,
-    rendersRoot: Path,
-  ): List<RenderArtifact> {
-    error("Skiko backend executes 1-view jobs directly through RenderQueue.submitRender")
-  }
-
-  override fun renderSingle(
-    entry: CompileEntry,
-    direction: String,
-    screenId: String,
-    prefix: String,
-    overlayId: String?,
-    view: ViewSpec,
-    densityScale: Int,
-    designSystem: DesignSystem,
-    baseCheck: ViewCheck?,
-    writeFiles: Boolean,
-    rendersRoot: Path,
-    frameFormat: FrameFormat,
-    fontScale: Float,
-    seedOverride: String?,
-    variantOverride: String?,
-    darkOverride: Boolean?,
-  ): RenderArtifact {
-    val compiled =
-      checkNotNull(entry.loaded.compiled) { "Cannot render without compiled Skiko board" }
-    val dirSpec = compiled.board.directions.first { it.name == direction }
-    val surface = compiled.board.surfaceSpec
-    val artifactName = overlayId?.let { ViewCheck.renderOverlayName(prefix, it) } ?: prefix
-    val startNs = System.nanoTime()
-    val headless: HeadlessResult =
-      try {
-        renderer.render(
-          compiled = compiled,
-          direction = dirSpec,
-          screenId = screenId,
-          view = view,
-          designSystem = designSystem,
-          overlayId = overlayId,
-          density = densityScale.toFloat(),
-        )
-      } catch (e: Exception) {
-        val elapsedMs = (System.nanoTime() - startNs) / 1_000_000L
-        val failed = ViewCheck.renderError(e)
-        return RenderArtifact(
-          direction = direction,
-          screen = screenId,
-          overlay = overlayId,
-          view = view,
-          densityScale = densityScale,
-          artifactName = artifactName,
-          pass = false,
-          renderMs = elapsedMs,
-          check = failed,
-          layout = null,
-          tree = null,
-          pngPath = null,
-          endPngPath = null,
-          pngBytes = null,
-          endPngBytes = null,
-          pngSha256 = null,
-          entry = RenderEntry.of(artifactName, view.name, null, failed),
-          imageMime = "image/png",
-        )
-      }
-
-    val elapsedMs = (System.nanoTime() - startNs) / 1_000_000L
-    val full = ViewCheck.of(headless.tree, surface)
-    val check = if (baseCheck == null) full else full.overlaying(baseCheck)
-    val layout = if (overlayId == null) LayoutSummary.of(headless.tree, surface) else null
-
-    var pngPath: Path? = null
-    var endPngPath: Path? = null
-    if (writeFiles && headless.png.isNotEmpty()) {
-      val hashDir = rendersRoot.resolve(entry.contentHash.take(12))
-      Files.createDirectories(hashDir)
-      val baseFile = "${sanitizeFileName(artifactName)}-${view.name}-${densityScale}x"
-      pngPath = hashDir.resolve("$baseFile.png").toAbsolutePath().normalize()
-      Files.write(pngPath, headless.png)
-      headless.end?.let { end ->
-        if (end.png.isNotEmpty()) {
-          endPngPath = hashDir.resolve("$baseFile-end.png").toAbsolutePath().normalize()
-          Files.write(endPngPath, end.png)
-        }
-      }
-    }
-    val sha = if (headless.png.isNotEmpty()) ContentHasher.sha256Hex(headless.png) else null
-    val baseName = if (pngPath != null) "${artifactName}-${view.name}" else null
-    val endName = if (endPngPath != null) "${artifactName}-${view.name}-end" else null
-
-    return RenderArtifact(
-      direction = direction,
-      screen = screenId,
-      overlay = overlayId,
-      view = view,
-      densityScale = densityScale,
-      artifactName = artifactName,
-      pass = check.pass,
-      renderMs = elapsedMs,
-      check = check,
-      layout = layout,
-      tree = headless.tree,
-      pngPath = pngPath,
-      endPngPath = endPngPath,
-      pngBytes = headless.png,
-      endPngBytes = headless.end?.png,
-      pngSha256 = sha,
-      entry = RenderEntry.of(artifactName, view.name, baseName, check, endName),
-      imageMime = "image/png",
-    )
-  }
-
-  private fun sanitizeFileName(raw: String): String =
-    raw.replace(Regex("""[^A-Za-z0-9._+-]+"""), "_").ifBlank { "render" }
-}
-
 /**
  * Android Host APK backend (`kotlinc + D8` in RAM, persistent `adb forward` `:sandbox` bridge,
  * host-side `Deflater.BEST_SPEED` PNG encoding for selected frames, and `WEBP_LOSSLESS` browser
@@ -306,12 +143,11 @@ class AndroidPreviewBackend(
         val fallbackSystem = DesignSystemResolver.resolve(outcome.designTheme, null)
         BackendCompileOutput(
           loaded =
-            ExploreRenderRunner.LoadedExploration(
+            LoadedExploration(
               sourcePath = snapshot.sourcePath,
               designPath = outcome.designPath,
               designTheme = outcome.designTheme,
               designSystem = fallbackSystem,
-              compiled = null,
               compileMs = outcome.compileMs,
               errors = outcome.errors,
             ),
@@ -330,12 +166,11 @@ class AndroidPreviewBackend(
           val fallbackSystem = DesignSystemResolver.resolve(compiled.designTheme, null)
           return BackendCompileOutput(
             loaded =
-              ExploreRenderRunner.LoadedExploration(
+              LoadedExploration(
                 sourcePath = compiled.sourcePath,
                 designPath = compiled.designPath,
                 designTheme = compiled.designTheme,
                 designSystem = fallbackSystem,
-                compiled = null,
                 compileMs = compiled.compileMs,
                 errors = listOf(ValidationError(compiled.sourceFile, errMsg)),
               ),
@@ -380,12 +215,11 @@ class AndroidPreviewBackend(
           )
         BackendCompileOutput(
           loaded =
-            ExploreRenderRunner.LoadedExploration(
+            LoadedExploration(
               sourcePath = compiled.sourcePath,
               designPath = compiled.designPath,
               designTheme = compiled.designTheme,
               designSystem = designSystem,
-              compiled = null,
               compileMs = compiled.compileMs,
               errors = emptyList(),
             ),
@@ -877,14 +711,6 @@ internal fun DesignSystemResolver.resolveWithOverrides(
   seedOverride: String? = null,
   variantOverride: PaletteVariant? = null,
 ): DesignSystem {
-  val compiled = entry.loaded.compiled
-  if (compiled != null) {
-    return compiled.board.resolveDesignSystem(
-      designMd = entry.loaded.designTheme,
-      seedOverride = seedOverride,
-      variantOverride = variantOverride,
-    )
-  }
   val android = entry.androidData
   val baseTheme = entry.boardTheme ?: android?.boardTheme
   val surfaceSpec = if (entry.surface == BoardSurface.Wear) WearSurface else PhoneSurface

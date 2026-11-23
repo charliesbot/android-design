@@ -1,9 +1,9 @@
-"""Checks that the previewer worker bundles the full set of required fonts and licenses. Run: python3 -m unittest discover scripts"""
+"""Checks that :host bundles the full set of required fonts and licenses. Run: python3 -m unittest discover scripts"""
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-APP_FONTS = ROOT / "app/features/preview/desktop/src/main/resources/fonts"
+APP_FONTS = ROOT / "app/host/src/main/assets/fonts"
 
 EXPECTED_FONTS = {
     "big_shoulders_display.ttf",
@@ -13,6 +13,7 @@ EXPECTED_FONTS = {
     "google_sans_code.ttf",
     "google_sans_flex.ttf",
     "material_symbols_rounded.ttf",
+    "roboto_flex.ttf",
 }
 
 EXPECTED_LICENSES = {
@@ -23,6 +24,7 @@ EXPECTED_LICENSES = {
     "google-sans-code-OFL.txt",
     "google-sans-flex-OFL.txt",
     "material-symbols-rounded-Apache-2.0.txt",
+    "roboto-flex-OFL.txt",
 }
 
 

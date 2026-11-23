@@ -60,10 +60,7 @@ import kotlin.math.roundToInt
 
 internal val ExplorePaneKey = SemanticsPropertyKey<String>("ExplorePane")
 
-enum class BoardSurface {
-  Phone,
-  Wear,
-}
+typealias BoardSurface = bot.charlies.androiddesign.preview.model.BoardSurface
 
 internal enum class PaneStrategyKind {
   Single,

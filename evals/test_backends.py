@@ -42,15 +42,14 @@ class BackendTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'denied'):
                 backends.execute('claude', 'brief', Path('/tmp'), role='generator', mcp_binary=BINARY)
 
-    def test_claude_generator_uses_cli_allowlist_and_v6_env_and_strips_stale_jar(self):
+    def test_claude_generator_uses_cli_allowlist_and_v6_env(self):
         with tempfile.TemporaryDirectory() as tmp:
             bdir = Path(tmp) / 'bootstrap'
             bdir.mkdir()
             (bdir / 'server.cp').write_text('-cp\na.jar\n')
             (bdir / 'robolectric.cp').write_text('-cp\nb.jar\n')
             custom_cache = Path(tmp) / 'eval-cache'
-            with patch.dict('backends.os.environ', {'ANDROID_DESIGN_PREVIEW_JAR': '/stale/legacy.jar'}), \
-                    patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, '{"result": "ok"}', '')) as call:
+            with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, '{"result": "ok"}', '')) as call:
                 backends.execute(
                     'claude',
                     'brief',
@@ -81,7 +80,6 @@ class BackendTests(unittest.TestCase):
         self.assertIn(str(custom_cache.resolve()), cmd)
         self.assertEqual(env['PATH'].split(os.pathsep)[0], str(Path(BINARY).resolve().parent))
         self.assertEqual(env['ANDROID_DESIGN_NO_OPEN'], '1')
-        self.assertNotIn('ANDROID_DESIGN_PREVIEW_JAR', env)
         self.assertEqual(env['ANDROID_DESIGN_PREVIEW_SRC'], '/tmp/repo/app')
         self.assertEqual(env['ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR'], str(bdir))
         self.assertEqual(env['ANDROID_DESIGN_PREVIEW_SERVER_CP'], str(bdir / 'server.cp'))
@@ -267,13 +265,13 @@ class BackendTests(unittest.TestCase):
             with patch('backends.Path.home', return_value=Path(home_tmp)), \
                     patch('backends.subprocess.run', side_effect=fake_run):
                 result = backends.execute('agy', 'Use android-design-preview.', case_dir,
-                                          role='generator', mcp_binary=BINARY, mcp_jar='/tmp/w.jar')
+                                          role='generator', mcp_binary=BINARY, preview_src='/tmp/app')
 
         self.assertFalse(seen['had_agents'])
         self.assertEqual(seen['stdin'], subprocess.DEVNULL)
         self.assertEqual(seen['env']['PATH'].split(os.pathsep)[0], str(Path(BINARY).resolve().parent))
         self.assertEqual(seen['env']['ANDROID_DESIGN_NO_OPEN'], '1')
-        self.assertEqual(seen['env']['ANDROID_DESIGN_PREVIEW_JAR'], '/tmp/w.jar')
+        self.assertEqual(seen['env']['ANDROID_DESIGN_PREVIEW_SRC'], '/tmp/app')
         cmd = seen['cmd']
         settings = json.loads(cmd[cmd.index('--settings') + 1])
         self.assertIn(f'write_file({case_dir})', settings['permissions']['allow'])

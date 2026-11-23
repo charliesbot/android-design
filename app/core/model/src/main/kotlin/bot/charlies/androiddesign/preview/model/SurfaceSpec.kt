@@ -1,5 +1,10 @@
 package bot.charlies.androiddesign.preview.model
 
+enum class BoardSurface {
+  Phone,
+  Wear,
+}
+
 /**
  * Surface-level configuration for a target platform ([PhoneSurface] or [WearSurface]): views,
  * color/type role names, navigation chrome, and component sets read by theme resolution and

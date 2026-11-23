@@ -1,6 +1,6 @@
 # Visual design exploration v4
 
-> **Archived:** Superseded by [Visual design exploration v5](../design/visual-design-exploration-v5.md).
+> **Archived:** Superseded by [Visual design exploration v5](visual-design-exploration-v5.md).
 
 **Date:** 2026-11-15
 
@@ -153,6 +153,6 @@ After fixing synthetic `$WhenMappings` `NoSuchFieldError` allowlisting in `Sandb
 ## Links
 
 - [Visual design exploration v3](visual-design-exploration-v3.md): archived JSON-interpreted macOS previewer design superseded by v4
-- [Wear OS in the previewer](../design/wear-os-previewer.md): the upstream `androidx.wear.compose` desktop port reused on the worker classpath
+- [Wear OS in the previewer](wear-os-previewer.md): the upstream `androidx.wear.compose` desktop port reused on the worker classpath
 - [Script ban eval baseline](../design/script-ban-eval.md): the 8-case v3 baseline (17 to 36 turns, 6/8 rubric) and why `claude -p` generators use MCP rather than `Bash`
 - [`kakao/prevue`](https://github.com/kakao/prevue): browser-based `@Preview` hot-swap tool used on macOS when wiring approved screens into an Android app

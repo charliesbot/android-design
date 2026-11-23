@@ -1,9 +1,13 @@
 package bot.charlies.androiddesign.preview.app.client
 
+import bot.charlies.androiddesign.preview.app.server.RuntimeIdentity
 import bot.charlies.androiddesign.preview.app.server.ServerPaths
+import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
+import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.FileTime
+import java.util.zip.ZipOutputStream
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,23 +19,54 @@ import kotlin.test.assertTrue
 
 /** A repository never ends up with an outdated server, or two servers, after a replacement. */
 class ServerReplacementTest {
-  private val builtJar: Path =
-    Path.of(System.getProperty("preview.jar") ?: error("preview.jar system property missing"))
+  private val sourceBootstrapDir: Path =
+    Path.of(
+      System.getProperty("adp.bootstrap.dir") ?: error("adp.bootstrap.dir system property missing"),
+    )
 
-  private class Fixture(val repo: Path, val cache: Path, val jar: Path, val client: PreviewClient)
+  private class Fixture(
+    val repo: Path,
+    val cache: Path,
+    val dummyJar: Path,
+    val serverCp: Path,
+    val client: PreviewClient,
+  )
 
-  /** A repository, a cache, and a private copy of the JAR whose timestamp the test may change. */
+  /**
+   * A repository, a cache, and a private copy of bootstrap argfiles whose classpath JAR mtime may
+   * change.
+   */
   private fun withFixture(block: (Fixture) -> Unit) {
     val tmp = createTempDirectory("server-replacement-")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
     val cache = tmp.resolve("cache")
-    val jar = tmp.resolve("jar/android-design-preview.jar")
-    Files.createDirectories(jar.parent)
-    Files.copy(builtJar, jar)
+    val bdir = tmp.resolve("bootstrap").also { Files.createDirectories(it) }
+    val dummyJar = bdir.resolve("dummy-marker.jar")
+    ZipOutputStream(Files.newOutputStream(dummyJar)).use {}
+
+    Files.copy(
+      sourceBootstrapDir.resolve("bootstrap-meta.properties"),
+      bdir.resolve("bootstrap-meta.properties"),
+    )
+    Files.copy(sourceBootstrapDir.resolve("robolectric.cp"), bdir.resolve("robolectric.cp"))
+
+    val origServerCp = Files.readString(sourceBootstrapDir.resolve("server.cp")).trimEnd()
+    val serverCp = bdir.resolve("server.cp")
+    Files.writeString(serverCp, "$origServerCp${File.pathSeparator}$dummyJar\n")
+
     val client =
-      PreviewClient(cacheRoot = cache, env = mapOf(PreviewClient.JAR_ENV to jar.toString()))
+      PreviewClient(
+        cacheRoot = cache,
+        env =
+          mapOf(
+            RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_ROBOLECTRIC,
+            BootstrapMeta.BOOTSTRAP_DIR_ENV to bdir.toString(),
+            RuntimeIdentity.SERVER_CP_ENV to serverCp.toString(),
+            RuntimeIdentity.ROBOLECTRIC_CP_ENV to bdir.resolve("robolectric.cp").toString(),
+          ),
+      )
     try {
-      block(Fixture(repo, cache, jar, client))
+      block(Fixture(repo, cache, dummyJar, serverCp, client))
     } finally {
       client.stop(repo)
       tmp.toFile().deleteRecursively()
@@ -53,31 +88,32 @@ class ServerReplacementTest {
   }
 
   @Test
-  fun `record names the JAR the server runs`() = withFixture { f ->
+  fun `record captures the server runtime hash`() = withFixture { f ->
     f.client.start(f.repo)
     val record = assertNotNull(ServerPaths.readRecord(ServerPaths.sharedRecordPath(f.cache)))
-    assertEquals(f.jar.toRealPath().toString(), record.jarPath)
-    assertEquals(Files.getLastModifiedTime(f.jar).toMillis(), record.jarModified)
+    assertNotNull(record.runtimeHash)
+    assertEquals(RuntimeIdentity.BACKEND_ROBOLECTRIC, record.backend)
   }
 
   @Test
-  fun `unchanged JAR reuses the running server`() = withFixture { f ->
+  fun `unchanged runtime reuses the running server`() = withFixture { f ->
     val first = f.client.start(f.repo)
 
     assertEquals(first, f.client.start(f.repo), "an up-to-date server must be reused")
   }
 
   @Test
-  fun `rebuilt JAR at the same version replaces the running server`() = withFixture { f ->
-    val first = f.client.start(f.repo)
-    val rebuilt = Files.getLastModifiedTime(f.jar).toMillis() + 10_000
-    Files.setLastModifiedTime(f.jar, FileTime.fromMillis(rebuilt))
+  fun `rebuilt classpath entry at the same version replaces the running server`() =
+    withFixture { f ->
+      val first = f.client.start(f.repo)
+      val rebuilt = Files.getLastModifiedTime(f.dummyJar).toMillis() + 10_000
+      Files.setLastModifiedTime(f.dummyJar, FileTime.fromMillis(rebuilt))
 
-    val second = f.client.start(f.repo)
+      val second = f.client.start(f.repo)
 
-    assertNotEquals(first, second, "a rebuilt JAR must start a fresh server")
-    assertFalse(isAlive(first), "the outdated server must exit before its replacement runs")
-  }
+      assertNotEquals(first, second, "a rebuilt runtime must start a fresh server")
+      assertFalse(isAlive(first), "the outdated server must exit before its replacement runs")
+    }
 
   @Test
   fun `server that stops answering is stopped before a replacement starts`() = withFixture { f ->
@@ -124,8 +160,8 @@ class ServerReplacementTest {
     withFixture { f ->
       val first = f.client.start(f.repo)
       skewStartTime(f)
-      val rebuilt = Files.getLastModifiedTime(f.jar).toMillis() + 10_000
-      Files.setLastModifiedTime(f.jar, FileTime.fromMillis(rebuilt))
+      val rebuilt = Files.getLastModifiedTime(f.dummyJar).toMillis() + 10_000
+      Files.setLastModifiedTime(f.dummyJar, FileTime.fromMillis(rebuilt))
 
       val second = f.client.start(f.repo)
 

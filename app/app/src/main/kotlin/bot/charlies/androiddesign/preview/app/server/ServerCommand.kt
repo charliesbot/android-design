@@ -21,7 +21,7 @@ class ServerCommand : Command {
   override val name = "server"
   override val usage =
     "server --repo <dir> [--preferred-port <port>] [--view-token <token>] [--idle-timeout-ms <ms>] " +
-      "[--backend android|robolectric|skiko] [--runtime-hash <hash>] [--device-serial <id>] [--avd <name>] " +
+      "[--backend android|robolectric] [--runtime-hash <hash>] [--device-serial <id>] [--avd <name>] " +
       "[--headless true|false] [--force-reinstall-apk true|false]"
 
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
@@ -59,7 +59,24 @@ class ServerCommand : Command {
         ?: System.getenv(MAX_COMPILES_ENV)?.toIntOrNull()
         ?: PreviewHttpServer.MAX_COMPILES_BEFORE_RECYCLE
     val backendMode =
-      parsed.flags["--backend"]?.takeIf { it.isNotBlank() } ?: RuntimeIdentity.resolveBackend()
+      parsed.flags["--backend"]?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+        ?: RuntimeIdentity.resolveBackend()
+    if (
+      backendMode != RuntimeIdentity.BACKEND_ANDROID &&
+        backendMode != RuntimeIdentity.BACKEND_ROBOLECTRIC
+    ) {
+      val msg =
+        PreviewJson.compact.encodeToString(
+          ErrorEnvelope.serializer(),
+          ErrorEnvelope(
+            error = "invalid_backend",
+            message = "Unsupported backend '$backendMode'; expected 'android' or 'robolectric'",
+          ),
+        )
+      out.println(msg)
+      err.println(msg)
+      return ExitCode.USAGE
+    }
     val coldBudgetMs =
       System.getenv(COLD_BUDGET_ENV)?.toLongOrNull()
         ?: if (backendMode == RuntimeIdentity.BACKEND_ROBOLECTRIC) {
@@ -83,7 +100,7 @@ class ServerCommand : Command {
     val runtimeIdentity = RuntimeIdentity.compute(env)
     val cacheRoot = ServerPaths.cacheRoot()
 
-    var backend: PreviewBackend? = null
+    val backend: PreviewBackend
     var deviceSerial: String? = null
     var forwardPort: Int? = null
     var apkSha256: String? = null
@@ -145,7 +162,7 @@ class ServerCommand : Command {
         return V5ExitCode.NOT_READY
       }
       backend = roboBackend
-    } else if (backendMode == RuntimeIdentity.BACKEND_ANDROID) {
+    } else {
       val meta =
         BootstrapMeta.locateOrNull()
           ?: run {

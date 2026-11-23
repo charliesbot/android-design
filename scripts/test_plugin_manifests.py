@@ -45,15 +45,26 @@ class PluginManifestsTest(unittest.TestCase):
         self.assertIn("skills/android-design-explore/scripts/android-design-preview", posix_bin.read_text())
         self.assertFalse((PLUGIN_DIR / "bin/android-design-preview.cmd").exists())
 
-        # v4 Node MCP supervisor and MCP configs are retired.
+        # v4 Node MCP supervisor and v5 desktop Skiko / Wear port are retired.
         for removed in (
             PLUGIN_DIR / "scripts",
             ROOT / "supervisor",
             PLUGIN_DIR / "mcp_config.json",
             PLUGIN_DIR / ".mcp.json",
             PLUGIN_DIR / ".codex-plugin/mcp.json",
+            ROOT / "app/wear",
+            ROOT / "app/features/preview/desktop",
+            ROOT / "scripts/package_release.py",
+            ROOT / "scripts/test_package_release.py",
+            ROOT / "scripts/sync_wear_compose.py",
+            ROOT / "scripts/test_sync_wear_compose.py",
         ):
-            self.assertFalse(removed.exists(), f"retired v4 path should not exist: {removed.relative_to(ROOT)}")
+            self.assertFalse(removed.exists(), f"retired path should not exist: {removed.relative_to(ROOT)}")
+
+        release_wf = (ROOT / ".github/workflows/release-previewer.yml").read_text(encoding="utf-8")
+        for forbidden in ("workerJar", "package_release.py", "gh release create"):
+            self.assertNotIn(forbidden, release_wf)
+        self.assertIn('git tag "$TAG"', release_wf)
 
         # AppInfo.VERSION in Main.kt matches plugin version.
         main_kt = APP_MAIN_KT.read_text(encoding="utf-8")
@@ -106,9 +117,10 @@ class BinWrapperTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             link = Path(tmp) / "android-design-preview"
             link.symlink_to(PLUGIN_DIR / "bin/android-design-preview")
-            env = dict(os.environ, ANDROID_DESIGN_PREVIEW_JAR=str(Path(tmp) / "missing.jar"))
+            env = dict(os.environ, ANDROID_DESIGN_PREVIEW_JAVA=str(Path(tmp) / "missing-java"))
             result = subprocess.run([str(link), "status"], capture_output=True, text=True, env=env)
-        # Reaching the script ends in its JSON error (missing JAR, or missing Java), never exec's 127.
+        # Reaching the script ends in its JSON error (missing Java), never exec's 127.
         self.assertEqual(result.returncode, 3, result.stderr)
         self.assertIn('"ok":false', result.stdout)
+        self.assertIn('"missing_java"', result.stdout)
 

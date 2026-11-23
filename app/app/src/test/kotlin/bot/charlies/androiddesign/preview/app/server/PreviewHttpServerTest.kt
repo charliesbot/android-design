@@ -1,12 +1,17 @@
 package bot.charlies.androiddesign.preview.app.server
 
-import bot.charlies.androiddesign.preview.app.cli.ExploreRenderRunner
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.HeadlessResult
-import bot.charlies.androiddesign.preview.kit.BoardSurface
+import bot.charlies.androiddesign.preview.app.cli.RenderEntry
+import bot.charlies.androiddesign.preview.domain.ViewCheck
+import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
+import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.Bounds
+import bot.charlies.androiddesign.preview.model.DesignSystem
+import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
+import bot.charlies.androiddesign.preview.model.ViewSpec
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.InetAddress
@@ -68,6 +73,145 @@ class PreviewHttpServerTest {
     """
       .trimIndent()
 
+  private fun fakeMeta(): BoardMeta =
+    BoardMeta(
+      directions =
+        listOf(
+          DirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
+          DirectionMeta("Compact", "phone", "home", listOf("home"), emptyList()),
+        ),
+      views = PhoneSurface.views,
+    )
+
+  private fun fakeCompileOutput(snapshot: ContentHasher.Snapshot): BackendCompileOutput =
+    BackendCompileOutput(
+      loaded =
+        LoadedExploration(
+          sourcePath = snapshot.sourcePath,
+          designPath = snapshot.designPath,
+          designTheme = null,
+          designSystem = DesignSystemResolver.resolve(null, null, PhoneSurface),
+          compileMs = 2L,
+          errors = emptyList(),
+        ),
+      dexHash = null,
+      surface = BoardSurface.Phone,
+      boardName = "Plates",
+      boardMeta = fakeMeta(),
+      androidData = null,
+    )
+
+  private fun fakeBackend(
+    compileCalls: AtomicInteger = AtomicInteger(0),
+    onCompile: ((ContentHasher.Snapshot) -> Unit)? = null,
+    onRenderSingle: ((String, ViewSpec, Int) -> Unit)? = null,
+  ): PreviewBackend =
+    object : PreviewBackend {
+      override val name = RuntimeIdentity.BACKEND_ROBOLECTRIC
+      override val supportsBatchCheck = true
+      override val supportsHeadlessSpeculativePrecompile = false
+
+      override fun compile(snapshot: ContentHasher.Snapshot): BackendCompileOutput {
+        compileCalls.incrementAndGet()
+        onCompile?.invoke(snapshot)
+        return fakeCompileOutput(snapshot)
+      }
+
+      override fun renderBatchCheck(
+        entry: CompileEntry,
+        targets: List<CheckTargetSpec>,
+        scoped: Boolean,
+        rendersRoot: Path,
+      ): List<RenderArtifact> {
+        val density = if (scoped) 1 else 2
+        val primary = setOf("light", "desktop")
+        return targets.map { t ->
+          val check = ViewCheck(pass = true)
+          val bytes = byteArrayOf(1, 2, 3, t.direction.length.toByte(), t.view.name.length.toByte())
+          var pngPath: Path? = null
+          if (scoped || t.view.name in primary) {
+            val dir = rendersRoot.resolve(entry.contentHash.take(12))
+            Files.createDirectories(dir)
+            pngPath = dir.resolve("${t.prefix}-${t.view.name}-${density}x.png")
+            Files.write(pngPath, bytes)
+          }
+          RenderArtifact(
+            direction = t.direction,
+            screen = t.screenId,
+            overlay = t.overlayId,
+            view = t.view,
+            densityScale = density,
+            artifactName = t.prefix,
+            pass = true,
+            renderMs = 3L,
+            check = check,
+            layout = null,
+            tree =
+              LayoutTree(
+                t.screenId,
+                t.view,
+                listOf(LayoutNode("root", "Box", bounds = Bounds(0f, 0f, 100f, 100f))),
+                emptyList(),
+              ),
+            pngPath = pngPath,
+            endPngPath = null,
+            pngBytes = bytes,
+            endPngBytes = null,
+            pngSha256 = ContentHasher.sha256Hex(bytes),
+            entry = RenderEntry.of(t.prefix, t.view.name, "${t.prefix}-${t.view.name}", check),
+          )
+        }
+      }
+
+      override fun renderSingle(
+        entry: CompileEntry,
+        direction: String,
+        screenId: String,
+        prefix: String,
+        overlayId: String?,
+        view: ViewSpec,
+        densityScale: Int,
+        designSystem: DesignSystem,
+        baseCheck: ViewCheck?,
+        writeFiles: Boolean,
+        rendersRoot: Path,
+        frameFormat: FrameFormat,
+        fontScale: Float,
+        seedOverride: String?,
+        variantOverride: String?,
+        darkOverride: Boolean?,
+      ): RenderArtifact {
+        onRenderSingle?.invoke(direction, view, densityScale)
+        val check = ViewCheck(pass = true)
+        val bytes = byteArrayOf(1, 2, 3)
+        return RenderArtifact(
+          direction = direction,
+          screen = screenId,
+          overlay = overlayId,
+          view = view,
+          densityScale = densityScale,
+          artifactName = prefix,
+          pass = true,
+          renderMs = 2L,
+          check = check,
+          layout = null,
+          tree =
+            LayoutTree(
+              screenId,
+              view,
+              listOf(LayoutNode("root", "Box", bounds = Bounds(0f, 0f, 100f, 100f))),
+              emptyList(),
+            ),
+          pngPath = null,
+          endPngPath = null,
+          pngBytes = bytes,
+          endPngBytes = null,
+          pngSha256 = ContentHasher.sha256Hex(bytes),
+          entry = RenderEntry.of(prefix, view.name, null, check),
+        )
+      }
+    }
+
   private fun httpRequest(
     port: Int,
     method: String,
@@ -108,7 +252,7 @@ class PreviewHttpServerTest {
 
   @Test
   fun `content-hash cache hits reuse compile and scoped vs full image policy works`() {
-    val tmp = createTempDirectory("v5-server-cache-")
+    val tmp = createTempDirectory("v6-server-cache-")
     val cache = tmp.resolve("cache")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it) }
     val source = repo.resolve("board.explore.kt").also { Files.writeString(it, simpleBoard()) }
@@ -119,11 +263,7 @@ class PreviewHttpServerTest {
         repoRoot = repo,
         cacheRoot = cache,
         preferredPort = 0,
-        loader =
-          ExplorationLoader { src, design ->
-            compileCalls.incrementAndGet()
-            ExploreRenderRunner.loadAndCompile(src, design)
-          },
+        backend = fakeBackend(compileCalls = compileCalls),
         enableFileWatcher = false,
       )
     try {
@@ -224,13 +364,7 @@ class PreviewHttpServerTest {
         pngBytes = png,
         endPngBytes = null,
         pngSha256 = ContentHasher.sha256Hex(png),
-        entry =
-          bot.charlies.androiddesign.preview.app.cli.RenderEntry.of(
-            "home",
-            viewName,
-            null,
-            dummyCheck,
-          ),
+        entry = RenderEntry.of("home", viewName, null, dummyCheck),
       )
     }
 
@@ -252,12 +386,13 @@ class PreviewHttpServerTest {
 
   @Test
   fun `Host, Origin, clientSecret, and viewToken are enforced with 403`() {
-    val tmp = createTempDirectory("v5-server-sec-")
+    val tmp = createTempDirectory("v6-server-sec-")
     val server =
       PreviewHttpServer(
         repoRoot = tmp,
         cacheRoot = tmp.resolve("cache"),
         preferredPort = 0,
+        backend = fakeBackend(),
         enableFileWatcher = false,
       )
     try {
@@ -329,7 +464,7 @@ class PreviewHttpServerTest {
 
   @Test
   fun `OS-assigned port fallback binds a free port when preferred port is busy`() {
-    val tmp = createTempDirectory("v5-server-port-")
+    val tmp = createTempDirectory("v6-server-port-")
     ServerSocket(0, 0, InetAddress.getByName("127.0.0.1")).use { occupied ->
       val busyPort = occupied.localPort
       val server =
@@ -337,6 +472,7 @@ class PreviewHttpServerTest {
           repoRoot = tmp,
           cacheRoot = tmp.resolve("cache"),
           preferredPort = busyPort,
+          backend = fakeBackend(),
           enableFileWatcher = false,
         )
       try {
@@ -360,50 +496,36 @@ class PreviewHttpServerTest {
 
   @Test
   fun `1-view queue preempts board remainder for agent requests and cancels stale jobs on new save`() {
-    val tmp = createTempDirectory("v5-queue-")
+    val tmp = createTempDirectory("v6-queue-")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it) }
     val source = repo.resolve("board.explore.kt").also { Files.writeString(it, simpleBoard("V1")) }
     val snap1 = ContentHasher.snapshot(source)
-    val loaded1 = ExploreRenderRunner.loadAndCompile(source, null)
-    val compiled1 = assertNotNull(loaded1.compiled)
 
     val firstRenderStarted = CountDownLatch(1)
     val releaseFirstRender = CountDownLatch(1)
     val order = CopyOnWriteArrayList<String>()
 
-    val queue =
-      RenderQueue(
-        rendersRoot = tmp.resolve("renders"),
-        loader = ExplorationLoader { _, _ -> loaded1 },
-        renderer =
-          DensityTargetRenderer { compiled, dir, screenId, view, system, overlayId, density ->
-            val label = "${dir.name}/${view.name}@${density.toInt()}x"
-            order += label
-            if (order.size == 1) {
-              firstRenderStarted.countDown()
-              releaseFirstRender.await(5, TimeUnit.SECONDS)
-            }
-            HeadlessResult(
-              tree =
-                LayoutTree(
-                  screenId,
-                  view,
-                  listOf(LayoutNode("root", "Box", bounds = Bounds(0f, 0f, 100f, 100f))),
-                  emptyList(),
-                ),
-              png = byteArrayOf(1, 2, 3),
-            )
-          },
+    val backend =
+      fakeBackend(
+        onRenderSingle = { direction, view, density ->
+          order += "$direction/${view.name}@${density}x"
+          if (order.size == 1) {
+            firstRenderStarted.countDown()
+            releaseFirstRender.await(5, TimeUnit.SECONDS)
+          }
+        },
       )
+
+    val queue = RenderQueue(rendersRoot = tmp.resolve("renders"), backend = backend)
     queue.start()
     try {
       val entry1 = queue.submitCompile(snap1, QueuePriority.AGENT).get(5, TimeUnit.SECONDS)
-      val dir = compiled1.board.directions.first()
-      val views = compiled1.board.surfaceSpec.views
+      val dir = assertNotNull(entry1.boardMeta).directions.first().name
+      val views = assertNotNull(entry1.boardMeta).views
 
       // Enqueue 4 low-priority board remainder jobs; first starts and blocks on releaseFirstRender.
       val rem0 =
-        queue.submitRender(
+        queue.submitSingleRender(
           entry1,
           dir,
           "home",
@@ -416,7 +538,7 @@ class PreviewHttpServerTest {
         )
       assertTrue(firstRenderStarted.await(5, TimeUnit.SECONDS))
       val rem1 =
-        queue.submitRender(
+        queue.submitSingleRender(
           entry1,
           dir,
           "home",
@@ -428,7 +550,7 @@ class PreviewHttpServerTest {
           QueuePriority.BOARD_REMAINDER,
         )
       val rem2 =
-        queue.submitRender(
+        queue.submitSingleRender(
           entry1,
           dir,
           "home",
@@ -443,7 +565,7 @@ class PreviewHttpServerTest {
       // Agent request arrives while rem0 is running and rem1/rem2 are queued -> must run BEFORE
       // rem1/rem2!
       val agentJob =
-        queue.submitRender(
+        queue.submitSingleRender(
           entry1,
           dir,
           "home",
@@ -478,7 +600,7 @@ class PreviewHttpServerTest {
 
   @Test
   fun `watchdog records timeout to server record and subsequent check fast-fails until file changes`() {
-    val tmp = createTempDirectory("v5-watchdog-")
+    val tmp = createTempDirectory("v6-watchdog-")
     val cache = tmp.resolve("cache")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it) }
     val source = repo.resolve("slow.explore.kt").also { Files.writeString(it, simpleBoard("Slow")) }
@@ -492,11 +614,10 @@ class PreviewHttpServerTest {
         preferredPort = 0,
         coldBudgetMs = 200L,
         warmBudgetMs = 200L,
-        loader =
-          ExplorationLoader { src, design ->
-            releaseSlow.await(3, TimeUnit.SECONDS)
-            ExploreRenderRunner.loadAndCompile(src, design)
-          },
+        backend =
+          fakeBackend(
+            onCompile = { releaseSlow.await(3, TimeUnit.SECONDS) },
+          ),
         onWatchdogHalt = {
           haltedLatch.countDown()
           releaseSlow.countDown()
@@ -543,18 +664,12 @@ class PreviewHttpServerTest {
   }
 
   @Test
-  fun `superseded submitRender is rejected and does not overwrite newer FileHashCache`() {
-    val tmp = createTempDirectory("v5-queue-race-")
+  fun `superseded submitSingleRender is rejected and does not overwrite newer FileHashCache`() {
+    val tmp = createTempDirectory("v6-queue-race-")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it) }
     val source = repo.resolve("board.explore.kt").also { Files.writeString(it, simpleBoard("V1")) }
     val snap1 = ContentHasher.snapshot(source)
-    val loaded1 = ExploreRenderRunner.loadAndCompile(source, null)
-    val compiled1 = assertNotNull(loaded1.compiled)
-    val queue =
-      RenderQueue(
-        rendersRoot = tmp.resolve("renders"),
-        loader = ExplorationLoader { _, _ -> loaded1 },
-      )
+    val queue = RenderQueue(rendersRoot = tmp.resolve("renders"), backend = fakeBackend())
     queue.start()
     try {
       val entry1 = queue.submitCompile(snap1, QueuePriority.AGENT).get(5, TimeUnit.SECONDS)
@@ -565,14 +680,15 @@ class PreviewHttpServerTest {
       assertTrue(queue.isCurrentHash(source, snap2.contentHash))
       assertFalse(queue.isCurrentHash(source, snap1.contentHash))
 
+      val meta = assertNotNull(entry1.boardMeta)
       val staleRender =
-        queue.submitRender(
+        queue.submitSingleRender(
           entry = entry1,
-          direction = compiled1.board.directions.first(),
+          direction = meta.directions.first().name,
           screenId = "home",
           prefix = "home",
           overlayId = null,
-          view = compiled1.board.surfaceSpec.views.first(),
+          view = meta.views.first(),
           densityScale = 2,
           baseCheck = null,
           priority = QueuePriority.BOARD_REMAINDER,

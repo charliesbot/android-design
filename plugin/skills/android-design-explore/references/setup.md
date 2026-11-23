@@ -6,8 +6,10 @@ Read this when `android-design-preview` cannot be found (neither on `PATH` nor b
 
 - **macOS or Linux** (Windows is unsupported)
 - **Java 17+** (system `java` on `PATH`, `JAVA_HOME`, or Android Studio's bundled JBR)
+- **Android SDK** (`ANDROID_HOME` or `ANDROID_SDK_ROOT`) and **`git`**
+- **`android` CLI and an emulator or connected device** for interactive live preview (`start`, `check`, `open`; Wear boards require a Wear OS AVD or connected watch; headless `render` uses Robolectric locally without booting a device)
 
-On first run, if `~/.cache/android-design-preview/<version>/android-design-preview.jar` is missing, the bootstrap script downloads the previewer for your OS and Java CPU from GitHub Releases and verifies its SHA-256 checksum automatically.
+On first run, if the cached runtime under `~/.cache/android-design-preview/<version>/` is missing, the bootstrap script sparse-checkouts `app/` from GitHub at tag `v<version>` and runs `./gradlew :host:exportBootstrap` once to build the previewer server/CLI, Android Host APK, and AndroidX compile and Robolectric bundles locally.
 
 ## Where `android-design-preview` comes from
 
@@ -21,14 +23,14 @@ If the skill folder is missing `scripts/android-design-preview`, the skill was c
 
 ## Codex sandbox settings (only if the command fails in Codex)
 
-Codex runs shell commands inside its workspace-write sandbox, which blocks loopback HTTP and cache writes by default. If `android-design-preview` fails in Codex with a connection or permission error, tell the user to add these settings to `~/.codex/config.toml` (noting that `network_access = true` opens outbound network access to all Codex shell commands, not only this tool):
+Codex runs shell commands inside its workspace-write sandbox, which blocks loopback HTTP, cache writes, and Gradle writes by default. If `android-design-preview` fails in Codex with a connection, download, or permission error, tell the user to add these settings to `~/.codex/config.toml` (noting that `network_access = true` opens outbound network access to GitHub and Maven hosts as well as all other Codex shell commands):
 
 ```toml
 [sandbox_workspace_write]
 network_access = true
-writable_roots = ["~/.cache/android-design-preview"]
+writable_roots = ["~/.cache/android-design-preview", "~/.gradle"]
 ```
 
-## Local development JAR override
+## Local development override
 
-To test a locally built JAR (`cd app && ./gradlew :app:workerJar`), set `ANDROID_DESIGN_PREVIEW_JAR` to `<path-to-repo>/app/app/build/libs/android-design-preview.jar`.
+To run against a local checkout (`./gradlew :host:exportBootstrap`), set `ANDROID_DESIGN_PREVIEW_SRC` to the repository root path (`<path-to-repo>`), or run `./scripts/install_local_plugin.sh` from your clone to run `:host:exportBootstrap` and link `app/` into `~/.cache/android-design-preview/<version>/src/app`.

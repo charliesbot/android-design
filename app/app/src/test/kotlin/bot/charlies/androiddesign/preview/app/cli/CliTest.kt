@@ -1,6 +1,9 @@
 package bot.charlies.androiddesign.preview.app.cli
 
 import bot.charlies.androiddesign.preview.app.AppInfo
+import bot.charlies.androiddesign.preview.app.server.PreviewBackend
+import bot.charlies.androiddesign.preview.app.server.RobolectricPreviewBackend
+import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.Views
 import java.io.ByteArrayOutputStream
@@ -14,11 +17,56 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
 
 class CliTest {
   private class Run(val code: Int, val out: String, val err: String)
 
-  private fun run(vararg args: String): Run {
+  companion object {
+    private lateinit var sharedBackend: RobolectricPreviewBackend
+
+    @JvmStatic
+    @BeforeAll
+    fun setUpBackend() {
+      val bdir =
+        Path.of(
+          System.getProperty("adp.bootstrap.dir")
+            ?: error("adp.bootstrap.dir system property missing"),
+        )
+      val meta = BootstrapMeta.fromFile(bdir.resolve("bootstrap-meta.properties"))
+      sharedBackend =
+        RobolectricPreviewBackend(
+          meta = meta,
+          robolectricCp = bdir.resolve("robolectric.cp"),
+          bootstrapDir = bdir,
+        )
+    }
+
+    @JvmStatic
+    @AfterAll
+    fun tearDownBackend() {
+      if (::sharedBackend.isInitialized) {
+        sharedBackend.close()
+      }
+    }
+  }
+
+  private fun nonClosingBackend(): PreviewBackend =
+    object : PreviewBackend by sharedBackend {
+      override fun close() {}
+    }
+
+  private fun runRender(vararg args: String): Run {
+    val out = ByteArrayOutputStream()
+    val err = ByteArrayOutputStream()
+    val code =
+      RenderCommand(::nonClosingBackend)
+        .run(args.toList(), PrintStream(out, true), PrintStream(err, true))
+    return Run(code, out.toString(), err.toString())
+  }
+
+  private fun runCli(vararg args: String): Run {
     val out = ByteArrayOutputStream()
     val err = ByteArrayOutputStream()
     val code = Cli.run(args.toList(), PrintStream(out, true), PrintStream(err, true))
@@ -149,7 +197,7 @@ class CliTest {
         "---\ncolors:\n  primary: \"#B5523B\"\nmaterial:\n  scheme: { variant: content }\n---\n",
       )
       val out = dir.resolve("out")
-      val result = run("render", source.toString(), "--out", out.toString())
+      val result = runRender(source.toString(), "--out", out.toString())
       val report = readReport(out)
 
       assertTrue(report.valid, report.errors.toString())
@@ -185,8 +233,7 @@ class CliTest {
       val source =
         dir.resolve("plates.explore.kt").also { Files.writeString(it, phoneBoardSource()) }
       val out = dir.resolve("out")
-      run(
-        "render",
+      runRender(
         source.toString(),
         "--out",
         out.toString(),
@@ -206,6 +253,45 @@ class CliTest {
   }
 
   @Test
+  fun `overlay without explicit screen attaches only to startScreen in multi-screen direction`() {
+    val dir = createTempDirectory("cli-default-overlay-")
+    try {
+      val source =
+        dir.resolve("plates.explore.kt").also {
+          Files.writeString(
+            it,
+            phoneBoardSource()
+              .replace("overlay(\"new_sheet\", screen = \"plates\")", "overlay(\"new_sheet\")"),
+          )
+        }
+      val outAll = dir.resolve("out-all")
+      runRender(source.toString(), "--out", outAll.toString(), "--views", "light")
+      val reportAll = readReport(outAll)
+      assertTrue(reportAll.valid, reportAll.errors.toString())
+      assertEquals(
+        listOf("plates", "plates+new_sheet", "plate_detail"),
+        reportAll.renders.map { it.screen },
+      )
+
+      val outDetail = dir.resolve("out-detail")
+      runRender(
+        source.toString(),
+        "--out",
+        outDetail.toString(),
+        "--views",
+        "light",
+        "--screens",
+        "plate_detail",
+      )
+      val reportDetail = readReport(outDetail)
+      assertTrue(reportDetail.valid, reportDetail.errors.toString())
+      assertEquals(listOf("plate_detail"), reportDetail.renders.map { it.screen })
+    } finally {
+      dir.toFile().deleteRecursively()
+    }
+  }
+
+  @Test
   fun `an invalid exploration exits 2 and the report says why`() {
     val dir = createTempDirectory("cli-invalid-")
     try {
@@ -217,7 +303,7 @@ class CliTest {
           )
         }
       val out = dir.resolve("out")
-      val result = run("render", broken.toString(), "--out", out.toString())
+      val result = runRender(broken.toString(), "--out", out.toString())
 
       assertEquals(ExitCode.INVALID, result.code)
       val report = readReport(out)
@@ -237,7 +323,7 @@ class CliTest {
     try {
       val other = dir.resolve("other.txt").also { Files.writeString(it, "{ not explore kt }") }
       val out = dir.resolve("out")
-      val result = run("render", other.toString(), "--out", out.toString())
+      val result = runRender(other.toString(), "--out", out.toString())
       assertEquals(ExitCode.INVALID, result.code)
       assertFalse(readReport(out).valid)
     } finally {
@@ -253,7 +339,7 @@ class CliTest {
       Files.write(broken, byteArrayOf('/'.code.toByte(), '*'.code.toByte(), 0xC3.toByte(), 0x28))
       val out = dir.resolve("out")
 
-      val result = run("render", broken.toString(), "--out", out.toString())
+      val result = runRender(broken.toString(), "--out", out.toString())
 
       assertEquals(ExitCode.INVALID, result.code)
       val report = readReport(out)
@@ -274,8 +360,7 @@ class CliTest {
       val out = dir.resolve("out")
 
       val result =
-        run(
-          "render",
+        runRender(
           source.toString(),
           "--out",
           out.toString(),
@@ -300,8 +385,7 @@ class CliTest {
     try {
       val source = dir.resolve("watch.explore.kt").also { Files.writeString(it, wearBoardSource()) }
       val out = dir.resolve("out")
-      run(
-        "render",
+      runRender(
         source.toString(),
         "--out",
         out.toString(),
@@ -352,8 +436,7 @@ class CliTest {
           )
         }
       val out = dir.resolve("out")
-      run(
-        "render",
+      runRender(
         source.toString(),
         "--out",
         out.toString(),
@@ -368,7 +451,7 @@ class CliTest {
 
       Files.delete(design)
       val plain = dir.resolve("plain")
-      run("render", source.toString(), "--out", plain.toString(), "--views", "light")
+      runRender(source.toString(), "--out", plain.toString(), "--views", "light")
       assertEquals("#6750A4", readReport(plain).theme.seed)
     } finally {
       dir.toFile().deleteRecursively()
@@ -380,23 +463,22 @@ class CliTest {
     val dir = createTempDirectory("cli-usage-")
     try {
       val source = dir.resolve("ok.explore.kt").also { Files.writeString(it, phoneBoardSource()) }
-      assertEquals(ExitCode.USAGE, run().code)
-      assertTrue("usage" in run().err)
-      assertEquals(ExitCode.USAGE, run("nope").code)
-      assertEquals(ExitCode.USAGE, run("render").code)
-      assertEquals(ExitCode.USAGE, run("render", source.toString()).code)
+      assertEquals(ExitCode.USAGE, runCli().code)
+      assertTrue("usage" in runCli().err)
+      assertEquals(ExitCode.USAGE, runCli("nope").code)
+      assertEquals(ExitCode.USAGE, runCli("render").code)
+      assertEquals(ExitCode.USAGE, runCli("render", source.toString()).code)
       assertEquals(
         ExitCode.USAGE,
-        run("render", source.toString(), "--out", dir.resolve("x").toString(), "--views", "huge")
-          .code,
+        runRender(source.toString(), "--out", dir.resolve("x").toString(), "--views", "huge").code,
       )
       assertEquals(
         ExitCode.USAGE,
-        run("render", "/no/such/file.explore.kt", "--out", "x").code,
+        runCli("render", "/no/such/file.explore.kt", "--out", "x").code,
       )
       assertEquals(
         ExitCode.USAGE,
-        run("render", source.toString(), "--out", dir.resolve("y").toString(), "--screens", "nope")
+        runRender(source.toString(), "--out", dir.resolve("y").toString(), "--screens", "nope")
           .code,
       )
     } finally {
@@ -406,7 +488,7 @@ class CliTest {
 
   @Test
   fun `version prints to stdout`() {
-    val version = run("--version")
+    val version = runCli("--version")
     assertEquals(ExitCode.OK, version.code)
     assertEquals(AppInfo.VERSION, version.out.trim())
   }

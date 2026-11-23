@@ -2,7 +2,7 @@
 
 2026-10-03
 
-**Status:** v3 chose a Compose Multiplatform desktop (JVM) app for proposals (archived in the [v3 design](../archive/visual-design-exploration-v3.md)), and the [v4 design](../archive/visual-design-exploration-v4.md) moved to Code-First Kotlin explorations inside a cross-OS headless Skiko JVM worker on that same Compose Multiplatform baseline, which [v5](../design/visual-design-exploration-v5.md) keeps.
+**Status:** Historical context. v3 chose a Compose Multiplatform desktop (JVM) app for proposals (archived in the [v3 design](../archive/visual-design-exploration-v3.md)), and the [v4 design](../archive/visual-design-exploration-v4.md) and [v5](../archive/visual-design-exploration-v5.md) rendered Code-First Kotlin explorations inside a headless Skiko JVM worker on that same Compose Multiplatform baseline. [v6](../design/visual-design-exploration-v6.md) retired Compose Multiplatform and Skiko in favor of real AndroidX Compose rendered on an Android device/AVD or Robolectric.
 
 ## Conclusion
 

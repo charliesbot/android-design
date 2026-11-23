@@ -4,7 +4,6 @@ plugins {
   alias(libs.plugins.kotlin.jvm) apply false
   alias(libs.plugins.kotlin.compose) apply false
   alias(libs.plugins.kotlin.serialization) apply false
-  alias(libs.plugins.compose.multiplatform) apply false
   alias(libs.plugins.android.application) apply false
   alias(libs.plugins.spotless)
 }
@@ -12,12 +11,7 @@ plugins {
 spotless {
   kotlin {
     target("**/*.kt")
-    targetExclude(
-      "**/build/**",
-      ".gradle/**",
-      "wear/compose/upstream/**",
-      "wear/compose/src/generated/**",
-    )
+    targetExclude("**/build/**", ".gradle/**")
     ktfmt().googleStyle()
   }
   kotlinGradle {

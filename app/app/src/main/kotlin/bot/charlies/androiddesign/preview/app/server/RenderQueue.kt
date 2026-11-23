@@ -1,14 +1,9 @@
 package bot.charlies.androiddesign.preview.app.server
 
-import bot.charlies.androiddesign.preview.app.cli.ExploreRenderRunner
 import bot.charlies.androiddesign.preview.app.cli.RenderEntry
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.layout.ViewLayout
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.CompileResult
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.HeadlessResult
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.SandboxHeadlessRenderer
-import bot.charlies.androiddesign.preview.kit.BoardSurface
-import bot.charlies.androiddesign.preview.kit.DirectionSpec
+import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutTree
@@ -61,29 +56,14 @@ data class CompileEntry(
   val sourcePath: Path,
   val designPath: Path?,
   val contentHash: String,
-  val loaded: ExploreRenderRunner.LoadedExploration,
+  val loaded: LoadedExploration,
   val fromCache: Boolean,
   val compileCountAtLoad: Int,
   val repoRoot: Path = ServerPaths.resolveRepoRoot(sourcePath),
   val dexHash: String? = null,
-  val surface: BoardSurface = loaded.compiled?.board?.surface ?: BoardSurface.Phone,
-  val boardName: String? = loaded.compiled?.board?.name,
-  val boardMeta: BoardMeta? =
-    loaded.compiled?.board?.let { b ->
-      BoardMeta(
-        directions =
-          b.directions.map { dir ->
-            DirectionMeta(
-              name = dir.name,
-              surface = if (dir.surface == BoardSurface.Wear) "wear" else "phone",
-              startScreen = dir.startScreen,
-              screens = dir.screenIds,
-              overlays = dir.overlays.map { ov -> OverlayMeta(ov.id, ov.screen) },
-            )
-          },
-        views = b.surfaceSpec.views,
-      )
-    },
+  val surface: BoardSurface = BoardSurface.Phone,
+  val boardName: String? = null,
+  val boardMeta: BoardMeta? = null,
   val androidData: AndroidCompiledData? = null,
   val boardTheme: ThemeOverride? = null,
 )
@@ -108,29 +88,12 @@ data class RenderArtifact(
   val pngSha256: String?,
   val entry: RenderEntry,
   val imageMime: String = "image/png",
+  val endTree: LayoutTree? = null,
 )
 
 /** Signals that an in-flight queue job was displaced by a newer server version. */
 class ServerReplacedException(val replacedByVersion: String) :
   CancellationException("replaced by v$replacedByVersion, rerun")
-
-/** Pluggable compiler so unit tests can inject deterministic or slow compiles. */
-fun interface ExplorationLoader {
-  fun loadAndCompile(sourcePath: Path, explicitDesign: Path?): ExploreRenderRunner.LoadedExploration
-}
-
-/** Pluggable single-view renderer so unit tests can inject deterministic or slow renders. */
-fun interface DensityTargetRenderer {
-  fun render(
-    compiled: CompileResult.Compiled,
-    direction: DirectionSpec,
-    screenId: String,
-    view: ViewSpec,
-    designSystem: DesignSystem,
-    overlayId: String?,
-    density: Float,
-  ): HeadlessResult
-}
 
 /**
  * Shared content-hash result store and multi-repo `(repoRoot, dexHash)` priority queue.
@@ -141,59 +104,12 @@ fun interface DensityTargetRenderer {
  */
 class RenderQueue(
   private val rendersRoot: Path,
+  private val backend: PreviewBackend,
   private val cacheRoot: Path? = null,
   private val watchdog: Watchdog? = null,
-  private val backend: PreviewBackend? = null,
-  private val loader: ExplorationLoader = ExplorationLoader { src, design ->
-    ExploreRenderRunner.loadAndCompile(src, design)
-  },
-  private val renderer: DensityTargetRenderer =
-    DensityTargetRenderer { compiled, dir, screenId, view, system, overlayId, density ->
-      SandboxHeadlessRenderer.render(
-        compiled = compiled,
-        direction = dir,
-        screenId = screenId,
-        view = view,
-        designSystem = system,
-        overlayId = overlayId,
-        density = density,
-        encodePng = true,
-      )
-    },
   private val onViewRendered: (Path, Path, String, RenderArtifact) -> Unit = { _, _, _, _ -> },
 ) {
-  /** Compatibility constructor for existing unit tests calling positional/named parameters. */
-  constructor(
-    rendersRoot: Path,
-    watchdog: Watchdog? = null,
-    loader: ExplorationLoader = ExplorationLoader { src, design ->
-      ExploreRenderRunner.loadAndCompile(src, design)
-    },
-    renderer: DensityTargetRenderer =
-      DensityTargetRenderer { compiled, dir, screenId, view, system, overlayId, density ->
-        SandboxHeadlessRenderer.render(
-          compiled = compiled,
-          direction = dir,
-          screenId = screenId,
-          view = view,
-          designSystem = system,
-          overlayId = overlayId,
-          density = density,
-          encodePng = true,
-        )
-      },
-    onViewRendered: (Path, String, RenderArtifact) -> Unit = { _, _, _ -> },
-  ) : this(
-    rendersRoot = rendersRoot,
-    cacheRoot = null,
-    watchdog = watchdog,
-    backend = SkikoPreviewBackend(loader, renderer),
-    loader = loader,
-    renderer = renderer,
-    onViewRendered = { _, src, hash, art -> onViewRendered(src, hash, art) },
-  )
-
-  private val effectiveBackend: PreviewBackend = backend ?: SkikoPreviewBackend(loader, renderer)
+  private val effectiveBackend: PreviewBackend = backend
 
   private data class FileCacheKey(val repoKey: String, val sourceKey: String)
 
@@ -593,16 +509,15 @@ class RenderQueue(
     }
     val key = FileCacheKey(canonicalKey(entry.repoRoot), canonicalKey(entry.sourcePath))
     val renderKey = RenderKey(direction, screenId, overlayId, view.name, densityScale)
-    if (entry.loaded.compiled == null && entry.androidData == null && entry.boardMeta == null) {
+    if (entry.androidData == null && entry.boardMeta == null) {
       return CompletableFuture.failedFuture(IllegalStateException("Exploration is not compiled"))
     }
     val surfaceSpec: SurfaceSpec =
-      entry.loaded.compiled?.board?.surfaceSpec
-        ?: if (entry.surface == BoardSurface.Wear) {
-          bot.charlies.androiddesign.preview.model.WearSurface
-        } else {
-          bot.charlies.androiddesign.preview.model.PhoneSurface
-        }
+      if (entry.surface == BoardSurface.Wear) {
+        bot.charlies.androiddesign.preview.model.WearSurface
+      } else {
+        bot.charlies.androiddesign.preview.model.PhoneSurface
+      }
 
     val future: CompletableFuture<RenderArtifact>
     var needEnqueue = false
@@ -663,32 +578,6 @@ class RenderQueue(
     return future
   }
 
-  /** Overload matching Skiko callers that hold a [DirectionSpec]. */
-  fun submitRender(
-    entry: CompileEntry,
-    direction: DirectionSpec,
-    screenId: String,
-    prefix: String,
-    overlayId: String?,
-    view: ViewSpec,
-    densityScale: Int,
-    baseCheck: ViewCheck?,
-    priority: QueuePriority,
-  ): CompletableFuture<RenderArtifact> =
-    submitSingleRender(
-      entry = entry,
-      direction = direction.name,
-      screenId = screenId,
-      prefix = prefix,
-      overlayId = overlayId,
-      view = view,
-      densityScale = densityScale,
-      baseCheck = baseCheck,
-      priority = priority,
-      writeFiles = true,
-      frameFormat = FrameFormat.LZ4_RGBA,
-    )
-
   /**
    * Renders directly using cached compiled classes/DEX with ad-hoc theme/font overrides (no cache).
    */
@@ -726,28 +615,6 @@ class RenderQueue(
       darkOverride = darkOverride,
     )
   }
-
-  fun renderOverride(
-    entry: CompileEntry,
-    direction: DirectionSpec,
-    screenId: String,
-    prefix: String,
-    overlayId: String?,
-    view: ViewSpec,
-    designSystem: DesignSystem,
-    densityScale: Int = 2,
-  ): RenderArtifact =
-    renderOverride(
-      entry = entry,
-      direction = direction.name,
-      screenId = screenId,
-      prefix = prefix,
-      overlayId = overlayId,
-      view = view,
-      designSystem = designSystem,
-      densityScale = densityScale,
-      frameFormat = FrameFormat.LZ4_RGBA,
-    )
 
   private fun promoteQueuedJob(
     key: FileCacheKey,

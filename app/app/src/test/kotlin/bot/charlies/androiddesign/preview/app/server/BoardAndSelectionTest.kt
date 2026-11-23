@@ -1,16 +1,24 @@
 package bot.charlies.androiddesign.preview.app.server
 
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.HeadlessResult
+import bot.charlies.androiddesign.preview.app.cli.RenderEntry
+import bot.charlies.androiddesign.preview.domain.ViewCheck
+import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
+import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.Bounds
+import bot.charlies.androiddesign.preview.model.DesignSystem
+import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
+import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -22,6 +30,110 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class BoardAndSelectionTest {
+  private fun fakeBoardBackend(): PreviewBackend =
+    object : PreviewBackend {
+      override val name = RuntimeIdentity.BACKEND_ROBOLECTRIC
+      override val supportsBatchCheck = false
+      override val supportsHeadlessSpeculativePrecompile = false
+
+      override fun compile(snapshot: ContentHasher.Snapshot): BackendCompileOutput {
+        val meta =
+          BoardMeta(
+            directions =
+              listOf(
+                DirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
+                DirectionMeta("Cards", "phone", "home", listOf("home"), emptyList()),
+              ),
+            views = PhoneSurface.views,
+          )
+        return BackendCompileOutput(
+          loaded =
+            LoadedExploration(
+              sourcePath = snapshot.sourcePath,
+              designPath = snapshot.designPath,
+              designTheme = null,
+              designSystem = DesignSystemResolver.resolve(null, null, PhoneSurface),
+              compileMs = 2L,
+              errors = emptyList(),
+            ),
+          dexHash = null,
+          surface = BoardSurface.Phone,
+          boardName = "Plates",
+          boardMeta = meta,
+          androidData = null,
+        )
+      }
+
+      override fun renderBatchCheck(
+        entry: CompileEntry,
+        targets: List<CheckTargetSpec>,
+        scoped: Boolean,
+        rendersRoot: Path,
+      ): List<RenderArtifact> = targets.map { t ->
+        renderSingle(
+          entry = entry,
+          direction = t.direction,
+          screenId = t.screenId,
+          prefix = t.prefix,
+          overlayId = t.overlayId,
+          view = t.view,
+          densityScale = 2,
+          designSystem = entry.loaded.designSystem,
+          baseCheck = null,
+          writeFiles = true,
+          rendersRoot = rendersRoot,
+          frameFormat = FrameFormat.LZ4_RGBA,
+        )
+      }
+
+      override fun renderSingle(
+        entry: CompileEntry,
+        direction: String,
+        screenId: String,
+        prefix: String,
+        overlayId: String?,
+        view: ViewSpec,
+        densityScale: Int,
+        designSystem: DesignSystem,
+        baseCheck: ViewCheck?,
+        writeFiles: Boolean,
+        rendersRoot: Path,
+        frameFormat: FrameFormat,
+        fontScale: Float,
+        seedOverride: String?,
+        variantOverride: String?,
+        darkOverride: Boolean?,
+      ): RenderArtifact {
+        val check = ViewCheck(pass = true)
+        val bytes = byteArrayOf(7, 8, 9)
+        return RenderArtifact(
+          direction = direction,
+          screen = screenId,
+          overlay = overlayId,
+          view = view,
+          densityScale = densityScale,
+          artifactName = prefix,
+          pass = true,
+          renderMs = 2L,
+          check = check,
+          layout = null,
+          tree =
+            LayoutTree(
+              screenId,
+              view,
+              listOf(LayoutNode("root", "Box", bounds = Bounds(0f, 0f, 100f, 100f))),
+              emptyList(),
+            ),
+          pngPath = null,
+          endPngPath = null,
+          pngBytes = bytes,
+          endPngBytes = null,
+          pngSha256 = ContentHasher.sha256Hex(bytes),
+          entry = RenderEntry.of(prefix, view.name, null, check),
+        )
+      }
+    }
+
   private fun boardSource(extraTopLines: Int = 0, duplicateButton: Boolean = false): String {
     val paddingComments = (1..extraTopLines).joinToString("") { "// shift line $it\n" }
     val secondBtn =
@@ -108,7 +220,7 @@ class BoardAndSelectionTest {
 
   @Test
   fun `SSE streams stale then focused view first before remaining views on file save`() {
-    val tmp = createTempDirectory("v5-sse-")
+    val tmp = createTempDirectory("v6-sse-")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it) }
     val source = repo.resolve("board.explore.kt").also { Files.writeString(it, boardSource()) }
 
@@ -117,19 +229,7 @@ class BoardAndSelectionTest {
         repoRoot = repo,
         cacheRoot = tmp.resolve("cache"),
         preferredPort = 0,
-        renderer =
-          DensityTargetRenderer { _, _, screenId, view, _, _, _ ->
-            HeadlessResult(
-              tree =
-                LayoutTree(
-                  screenId,
-                  view,
-                  listOf(LayoutNode("root", "Box", bounds = Bounds(0f, 0f, 100f, 100f))),
-                  emptyList(),
-                ),
-              png = byteArrayOf(7, 8, 9),
-            )
-          },
+        backend = fakeBoardBackend(),
         enableFileWatcher = false,
       )
     try {
@@ -221,7 +321,7 @@ class BoardAndSelectionTest {
 
   @Test
   fun `selection storage enforces Origin and viewToken and re-resolves or marks stale on edits`() {
-    val tmp = createTempDirectory("v5-sel-")
+    val tmp = createTempDirectory("v6-sel-")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it) }
     val source = repo.resolve("sel.explore.kt").also { Files.writeString(it, boardSource()) }
 
@@ -230,6 +330,7 @@ class BoardAndSelectionTest {
         repoRoot = repo,
         cacheRoot = tmp.resolve("cache"),
         preferredPort = 0,
+        backend = fakeBoardBackend(),
         enableFileWatcher = false,
       )
     try {

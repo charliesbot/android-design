@@ -1,10 +1,19 @@
 package bot.charlies.androiddesign.preview.app.cli
 
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.SandboxHeadlessRenderer
+import bot.charlies.androiddesign.preview.app.server.CompileEntry
+import bot.charlies.androiddesign.preview.app.server.PreviewBackend
+import bot.charlies.androiddesign.preview.app.server.RenderArtifact
+import bot.charlies.androiddesign.preview.app.server.RobolectricPreviewBackend
+import bot.charlies.androiddesign.preview.domain.ViewCheck
+import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
+import bot.charlies.androiddesign.preview.model.DesignSystem
+import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.PreviewJson
+import bot.charlies.androiddesign.preview.model.ViewSpec
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,19 +23,62 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RenderCrashTest {
-  private val flaky =
-    ExploreTargetRenderer { compiled, direction, screenId, view, designSystem, overlayId ->
-      if (screenId == "detail" && view.name == "dark") error("boom\nsecond line")
-      SandboxHeadlessRenderer.render(
-        compiled = compiled,
-        direction = direction,
-        screenId = screenId,
-        view = view,
-        designSystem = designSystem,
-        overlayId = overlayId,
-        encodePng = true,
+  private fun flakyBackend(): PreviewBackend {
+    val bdir =
+      Path.of(
+        System.getProperty("adp.bootstrap.dir")
+          ?: error("adp.bootstrap.dir system property missing"),
       )
+    val meta = BootstrapMeta.fromFile(bdir.resolve("bootstrap-meta.properties"))
+    val real =
+      RobolectricPreviewBackend(
+        meta = meta,
+        robolectricCp = bdir.resolve("robolectric.cp"),
+        bootstrapDir = bdir,
+      )
+    return object : PreviewBackend by real {
+      override fun renderSingle(
+        entry: CompileEntry,
+        direction: String,
+        screenId: String,
+        prefix: String,
+        overlayId: String?,
+        view: ViewSpec,
+        densityScale: Int,
+        designSystem: DesignSystem,
+        baseCheck: ViewCheck?,
+        writeFiles: Boolean,
+        rendersRoot: Path,
+        frameFormat: FrameFormat,
+        fontScale: Float,
+        seedOverride: String?,
+        variantOverride: String?,
+        darkOverride: Boolean?,
+      ): RenderArtifact {
+        if (screenId == "detail" && view.name == "dark") error("boom\nsecond line")
+        return real.renderSingle(
+          entry = entry,
+          direction = direction,
+          screenId = screenId,
+          prefix = prefix,
+          overlayId = overlayId,
+          view = view,
+          densityScale = densityScale,
+          designSystem = designSystem,
+          baseCheck = baseCheck,
+          writeFiles = writeFiles,
+          rendersRoot = rendersRoot,
+          frameFormat = frameFormat,
+          fontScale = fontScale,
+          seedOverride = seedOverride,
+          variantOverride = variantOverride,
+          darkOverride = darkOverride,
+        )
+      }
+
+      override fun close() = real.close()
     }
+  }
 
   @Test
   fun `a render that throws is recorded, the others are kept and the exit code is 1`() {
@@ -79,7 +131,7 @@ class RenderCrashTest {
       val out = dir.resolve("out")
       val err = ByteArrayOutputStream()
       val code =
-        RenderCommand(flaky)
+        RenderCommand(::flakyBackend)
           .run(
             listOf(
               source.toString(),

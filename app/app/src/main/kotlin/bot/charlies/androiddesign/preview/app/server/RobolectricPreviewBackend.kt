@@ -1,14 +1,13 @@
 package bot.charlies.androiddesign.preview.app.server
 
 import bot.charlies.androiddesign.preview.app.cli.DesignMdLoader
-import bot.charlies.androiddesign.preview.app.cli.ExploreRenderRunner
 import bot.charlies.androiddesign.preview.app.cli.RenderEntry
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.domain.layout.LayoutSummary
 import bot.charlies.androiddesign.preview.domain.layout.ViewLayout
-import bot.charlies.androiddesign.preview.kit.BoardSurface
+import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.PhoneSurface
@@ -145,12 +144,11 @@ private constructor(
       )
     return BackendCompileOutput(
       loaded =
-        ExploreRenderRunner.LoadedExploration(
+        LoadedExploration(
           sourcePath = normSource,
           designPath = designRes.path,
           designTheme = designRes.theme,
           designSystem = designSystem,
-          compiled = null,
           compileMs = resp.compileMs,
           errors = emptyList(),
         ),
@@ -401,6 +399,7 @@ private constructor(
         pngSha256 = sha,
         entry = RenderEntry.of(artName, t.view.name, baseName, ev.check, endName),
         imageMime = "image/png",
+        endTree = ev.res?.endTree,
       )
     }
   }
@@ -545,6 +544,7 @@ private constructor(
       pngSha256 = sha,
       entry = RenderEntry.of(artName, view.name, baseName, check, endName),
       imageMime = "image/png",
+      endTree = res.endTree,
     )
   }
 
@@ -567,12 +567,11 @@ private constructor(
   ): BackendCompileOutput =
     BackendCompileOutput(
       loaded =
-        ExploreRenderRunner.LoadedExploration(
+        LoadedExploration(
           sourcePath = sourcePath,
           designPath = designPath,
           designTheme = designTheme,
           designSystem = DesignSystemResolver.resolve(designTheme, boardTheme),
-          compiled = null,
           compileMs = compileMs,
           errors = errors,
         ),
