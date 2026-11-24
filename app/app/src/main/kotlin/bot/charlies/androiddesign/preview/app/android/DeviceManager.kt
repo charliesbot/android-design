@@ -5,7 +5,9 @@ import bot.charlies.androiddesign.preview.app.server.ContentHasher
 import bot.charlies.androiddesign.preview.app.server.ServerPaths
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
+import bot.charlies.androiddesign.preview.model.DeviceTransportSpec
 import bot.charlies.androiddesign.preview.model.PreviewJson
+import bot.charlies.androiddesign.preview.model.isWorkerStuck
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
@@ -310,11 +312,14 @@ class DeviceManager(
         ?: return DeviceSetupResult.Failed(
           exitCode = V5ExitCode.FAILED,
           error = "adb_forward_failed",
-          message = "Failed forwarding host TCP port to device $chosenSerial:$DEVICE_PORT.",
+          message = "Failed forwarding host TCP port to device $chosenSerial:$DEVICE_REMOTE.",
         )
 
     var ping = pingFn(forwardPort)
-    if (ping == null || !ping.ok || installedNow) {
+    if (ping != null && ping.isWorkerStuck()) {
+      killWedgedSandbox(adbBin, chosenSerial, cmdEnv, ping)
+    }
+    if (ping == null || !ping.ok || installedNow || ping.isWorkerStuck()) {
       if (!launchSandboxActivity(adbBin, chosenSerial, cmdEnv)) {
         return DeviceSetupResult.Failed(
           exitCode = V5ExitCode.FAILED,
@@ -373,9 +378,34 @@ class DeviceManager(
         put("ANDROID_SDK_ROOT", it.toString())
       }
     }
-    if (!launchSandboxActivity(adbBin, serial, cmdEnv)) return false
     val port = ensureAdbForward(adbBin, serial, cmdEnv) ?: return false
+    pingFn(port)
+      ?.takeIf { it.isWorkerStuck() }
+      ?.let { killWedgedSandbox(adbBin, serial, cmdEnv, it) }
+    if (!launchSandboxActivity(adbBin, serial, cmdEnv)) return false
     return awaitPing(port)?.ok == true
+  }
+
+  /**
+   * A ping is answered on a client thread, so it stays healthy while the single worker is stuck in
+   * user code. When the in-flight op outlived its budget the in-process watchdog failed, so the
+   * host kills the whole package process before relaunching.
+   */
+  private fun killWedgedSandbox(
+    adbBin: String,
+    serial: String,
+    cmdEnv: Map<String, String>,
+    ping: DevicePingResponse,
+  ) {
+    System.err.println(
+      "adp: sandbox worker stuck in ${ping.inFlightOp} for ${ping.inFlightAgeMs}ms " +
+        "(budget ${ping.inFlightBudgetMs}ms); force-stopping $HOST_PACKAGE",
+    )
+    runner.run(
+      listOf(adbBin, "-s", serial, "shell", "am", "force-stop", HOST_PACKAGE),
+      ADB_SHORT_TIMEOUT_MS,
+      cmdEnv,
+    )
   }
 
   internal fun listOnlineDevices(adbBin: String, cmdEnv: Map<String, String>): List<DeviceSlot> {
@@ -590,7 +620,7 @@ class DeviceManager(
     val localPort = portAllocator()
     val fwdOut =
       runner.run(
-        listOf(adbBin, "-s", serial, "forward", "tcp:$localPort", "tcp:$DEVICE_PORT"),
+        listOf(adbBin, "-s", serial, "forward", "tcp:$localPort", DEVICE_REMOTE),
         ADB_SHORT_TIMEOUT_MS,
         cmdEnv,
       )
@@ -598,7 +628,7 @@ class DeviceManager(
   }
 
   internal fun parseForwardPort(stdout: String, serial: String): Int? {
-    val targetRemote = "tcp:$DEVICE_PORT"
+    val targetRemote = DEVICE_REMOTE
     for (raw in stdout.lineSequence()) {
       val parts = raw.trim().split(Regex("""\s+"""))
       if (parts.size >= 3 && parts[0] == serial && parts[2] == targetRemote) {
@@ -711,7 +741,7 @@ class DeviceManager(
     const val HOST_PACKAGE = "bot.charlies.androiddesign.preview.host"
     const val HOST_RENDER_ACTIVITY = "$HOST_PACKAGE/.sandbox.HostRenderActivity"
     const val LIVE_ACTIVITY = "$HOST_PACKAGE/.LivePreviewActivity"
-    const val DEVICE_PORT = 18765
+    const val DEVICE_REMOTE = DeviceTransportSpec.ADB_REMOTE
     const val DEFAULT_DEVICE_PORT = 18765
     const val DEFAULT_AVD_PROFILE = "medium_phone"
     const val ADB_ENV = "ANDROID_DESIGN_ADB_BIN"

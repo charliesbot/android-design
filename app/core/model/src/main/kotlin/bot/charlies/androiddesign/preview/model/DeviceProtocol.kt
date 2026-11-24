@@ -38,7 +38,28 @@ data class DevicePingResponse(
   val reloadCount: Int = 0,
   val loadedDexHashes: List<String> = emptyList(),
   val memory: DeviceMemoryStats? = null,
+  /** Name of the op the single worker thread is running, or null when the worker is idle. */
+  val inFlightOp: String? = null,
+  val inFlightAgeMs: Long = 0L,
+  /** Watchdog budget of [inFlightOp]; the service kills itself when the op outlives it. */
+  val inFlightBudgetMs: Long = 0L,
 )
+
+/**
+ * True when the worker has been running one op longer than its watchdog budget, which means the
+ * in-process watchdog failed and the host must kill the process itself.
+ */
+fun DevicePingResponse.isWorkerStuck(): Boolean =
+  inFlightOp != null && inFlightBudgetMs > 0L && inFlightAgeMs > inFlightBudgetMs
+
+/**
+ * The device service listens on an Android abstract-namespace socket, reached from the host with
+ * `adb forward tcp:<port> localabstract:<name>`. Only the adb shell (uid 2000) or root may connect.
+ */
+object DeviceTransportSpec {
+  const val SOCKET_NAME: String = "adp-render-sandbox"
+  const val ADB_REMOTE: String = "localabstract:$SOCKET_NAME"
+}
 
 @Serializable
 data class DeviceHasAssetsRequest(

@@ -128,7 +128,7 @@ class DeviceManagerTest {
         "cmd appops set ${DeviceManager.HOST_PACKAGE} RUN_ANY_IN_BACKGROUND allow" in it
       },
     )
-    assertTrue(joinedAll.any { "forward tcp:18999 tcp:18765" in it })
+    assertTrue(joinedAll.any { "forward tcp:18999 localabstract:adp-render-sandbox" in it })
     assertTrue(
       joinedAll.any {
         "am start -W -n ${DeviceManager.HOST_RENDER_ACTIVITY} --ez move_to_back true" in it
@@ -189,7 +189,8 @@ class DeviceManagerTest {
           }
           "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
           "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
-          "forward --list" in j -> CommandOutput(0, "emulator-5560 tcp:18990 tcp:18765\n")
+          "forward --list" in j ->
+            CommandOutput(0, "emulator-5560 tcp:18990 localabstract:adp-render-sandbox\n")
           else -> CommandOutput(0, "OK\n")
         }
       }
@@ -279,7 +280,8 @@ class DeviceManagerTest {
         "emu avd name" in j -> CommandOutput(0, "Pixel_10\nOK\n")
         "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
         "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
-        "forward --list" in j -> CommandOutput(0, "emulator-5554 tcp:18991 tcp:18765\n")
+        "forward --list" in j ->
+          CommandOutput(0, "emulator-5554 tcp:18991 localabstract:adp-render-sandbox\n")
         else -> CommandOutput(0, "OK\n")
       }
     }
@@ -389,7 +391,8 @@ class DeviceManagerTest {
         }
         "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
         "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
-        "forward --list" in j -> CommandOutput(0, "emulator-5562 tcp:18995 tcp:18765\n")
+        "forward --list" in j ->
+          CommandOutput(0, "emulator-5562 tcp:18995 localabstract:adp-render-sandbox\n")
         else -> CommandOutput(0, "OK\n")
       }
     }
@@ -428,7 +431,8 @@ class DeviceManagerTest {
         "-s emulator-5562 emu avd name" in j -> CommandOutput(0, "Target_AVD\nOK\n")
         "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
         "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
-        "forward --list" in j -> CommandOutput(0, "emulator-5562 tcp:18996 tcp:18765\n")
+        "forward --list" in j ->
+          CommandOutput(0, "emulator-5562 tcp:18996 localabstract:adp-render-sandbox\n")
         else -> CommandOutput(0, "OK\n")
       }
     }
@@ -446,5 +450,118 @@ class DeviceManagerTest {
       )
     assertEquals("emulator-5562", reuseRes.serial)
     assertFalse(cmdsReuse.any { "emulator start" in it.joinToString(" ") })
+  }
+
+  private fun stuckPing() =
+    DevicePingResponse(
+      pid = 1,
+      inFlightOp = "PRELOAD_DEX",
+      inFlightAgeMs = 60_000,
+      inFlightBudgetMs = 30_000,
+    )
+
+  @Test
+  fun `a sandbox whose worker outlived its watchdog is force-stopped before relaunch`(
+    @TempDir tmp: Path,
+  ) {
+    val meta = fakeBootstrap(tmp.resolve("b"), "apk-stuck")
+    val env = fakeToolsEnv(tmp)
+    val commands = mutableListOf<String>()
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      commands += j
+      when {
+        cmd.getOrNull(1) == "devices" ->
+          CommandOutput(0, "List of devices attached\nemulator-5554\tdevice\n")
+        "emu avd name" in j -> CommandOutput(0, "Pixel_Phone\nOK\n")
+        "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
+        "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
+        "forward --list" in j ->
+          CommandOutput(0, "emulator-5554 tcp:18997 localabstract:adp-render-sandbox\n")
+        else -> CommandOutput(0, "OK\n")
+      }
+    }
+    var pings = 0
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env,
+        runner = runner,
+        pingFn = {
+          pings++
+          if (pings == 1) stuckPing() else DevicePingResponse(pid = 2)
+        },
+        sleepFn = {},
+      )
+    assertIs<DeviceSetupResult.Ready>(dm.ensureDeviceReady(meta))
+    val stopIdx = commands.indexOfFirst { "am force-stop ${DeviceManager.HOST_PACKAGE}" in it }
+    val startIdx = commands.indexOfFirst {
+      "am start -W -n ${DeviceManager.HOST_RENDER_ACTIVITY}" in it
+    }
+    assertTrue(stopIdx >= 0, "expected force-stop in $commands")
+    assertTrue(startIdx > stopIdx, "expected relaunch after force-stop in $commands")
+  }
+
+  @Test
+  fun `restartSandboxOnSerial force-stops a wedged worker instead of trusting its ping`(
+    @TempDir tmp: Path,
+  ) {
+    val env = fakeToolsEnv(tmp)
+    val commands = mutableListOf<String>()
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      commands += j
+      if ("forward --list" in j) {
+        CommandOutput(0, "emulator-5554 tcp:18998 localabstract:adp-render-sandbox\n")
+      } else {
+        CommandOutput(0, "OK\n")
+      }
+    }
+    var pings = 0
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env,
+        runner = runner,
+        pingFn = {
+          pings++
+          if (pings == 1) stuckPing() else DevicePingResponse(pid = 7)
+        },
+        sleepFn = {},
+      )
+    assertTrue(dm.restartSandboxOnSerial("emulator-5554"))
+    assertTrue(commands.any { "am force-stop ${DeviceManager.HOST_PACKAGE}" in it }, "$commands")
+  }
+
+  @Test
+  fun `a busy but within budget sandbox is not force-stopped on restart`(@TempDir tmp: Path) {
+    val env = fakeToolsEnv(tmp)
+    val commands = mutableListOf<String>()
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      commands += j
+      if ("forward --list" in j) {
+        CommandOutput(0, "emulator-5554 tcp:18998 localabstract:adp-render-sandbox\n")
+      } else {
+        CommandOutput(0, "OK\n")
+      }
+    }
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env,
+        runner = runner,
+        pingFn = {
+          DevicePingResponse(
+            pid = 7,
+            inFlightOp = "RENDER_BATCH",
+            inFlightAgeMs = 10,
+            inFlightBudgetMs = 15_000,
+          )
+        },
+        sleepFn = {},
+      )
+    assertTrue(dm.restartSandboxOnSerial("emulator-5554"))
+    assertFalse(commands.any { "force-stop" in it })
   }
 }

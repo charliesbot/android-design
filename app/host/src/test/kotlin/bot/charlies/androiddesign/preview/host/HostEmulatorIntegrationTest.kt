@@ -5,7 +5,6 @@ import bot.charlies.androiddesign.preview.host.compiler.HostClassCompiler
 import bot.charlies.androiddesign.preview.host.compiler.HostCompileOutcome
 import bot.charlies.androiddesign.preview.host.robolectric.RobolectricBoardRenderer
 import bot.charlies.androiddesign.preview.host.robolectric.SandboxExcludingRobolectricTestRunner
-import bot.charlies.androiddesign.preview.host.sandbox.RenderForegroundService
 import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
 import bot.charlies.androiddesign.preview.model.DeviceBatchResponse
 import bot.charlies.androiddesign.preview.model.DeviceHasAssetsRequest
@@ -14,6 +13,7 @@ import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
 import bot.charlies.androiddesign.preview.model.DeviceOp
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
 import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
+import bot.charlies.androiddesign.preview.model.DeviceTransportSpec
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PreviewJson
@@ -48,6 +48,9 @@ class HostEmulatorIntegrationTest {
 
   private val pkg = "bot.charlies.androiddesign.preview.host"
 
+  /** Host side of `adb forward`; the device side is an abstract socket. */
+  private val HOST_PORT = 18765
+
   @Test
   fun fullEmulatorEndToEndSecurityWatchdogAndRobolectricParity() {
     assumeTrue(
@@ -59,7 +62,7 @@ class HostEmulatorIntegrationTest {
     runAdb("install", "-r", meta.apkPath.toString())
     runAdb("shell", "cmd", "package", "compile", "-m", "speed", "-f", pkg)
     runAdb("shell", "dumpsys", "deviceidle", "whitelist", "+$pkg")
-    runAdb("forward", "tcp:${RenderForegroundService.PORT}", "tcp:${RenderForegroundService.PORT}")
+    runAdb("forward", "tcp:$HOST_PORT", DeviceTransportSpec.ADB_REMOTE)
     startServiceAndAwaitPing()
 
     val workDir = tempFolder.newFolder("emu-fixtures").toPath()
@@ -87,7 +90,7 @@ class HostEmulatorIntegrationTest {
 
     // 1. Asset protocol (HAS_ASSETS + PUT_ASSETS) & PRELOAD_DEX + PHONE batch (1x, 2x, overlays,
     // LZ4, WEBP, NONE)
-    Socket("127.0.0.1", RenderForegroundService.PORT).use { sock ->
+    Socket("127.0.0.1", HOST_PORT).use { sock ->
       sock.tcpNoDelay = true
       sock.soTimeout = 30_000
       val output = DataOutputStream(BufferedOutputStream(sock.getOutputStream(), 65536))
@@ -580,7 +583,7 @@ class HostEmulatorIntegrationTest {
     val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15)
     while (System.nanoTime() < deadline) {
       val ping = runCatching {
-        Socket("127.0.0.1", RenderForegroundService.PORT).use { s ->
+        Socket("127.0.0.1", HOST_PORT).use { s ->
           s.soTimeout = 3000
           val out = DataOutputStream(BufferedOutputStream(s.getOutputStream()))
           val inp = DataInputStream(BufferedInputStream(s.getInputStream()))
