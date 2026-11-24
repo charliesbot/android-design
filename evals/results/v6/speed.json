@@ -1,0 +1,45 @@
+{
+  "device": "Pixel_10_Pro_XL",
+  "host": "Darwin arm64",
+  "git_head": "68a5ce1",
+  "scoped_check": {
+    "n": 7,
+    "median_ms": 360.3,
+    "min_ms": 327.5,
+    "max_ms": 372.3,
+    "samples_ms": [
+      327.5,
+      360.3,
+      372.3,
+      358.2,
+      369.5,
+      365.9,
+      338.7
+    ],
+    "gate_ms": 500.0,
+    "pass": true
+  },
+  "full_check_3x5": {
+    "n": 7,
+    "median_ms": 768.7,
+    "min_ms": 684.0,
+    "max_ms": 773.1,
+    "samples_ms": [
+      769.7,
+      773.1,
+      727.6,
+      772.5,
+      733.7,
+      768.7,
+      684.0
+    ],
+    "gate_ms": 2800.0,
+    "pass": true
+  },
+  "scoped_render_count": 1,
+  "full_render_count": 15,
+  "full_image_count": 2,
+  "full_compile_ms": 134,
+  "full_render_ms": 436,
+  "full_valid": true
+}
