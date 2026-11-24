@@ -3,6 +3,7 @@
 import json
 import os
 import pathlib
+import re
 import stat
 import subprocess
 import tempfile
@@ -19,6 +20,9 @@ SKILL_SCRIPT = (
     / "scripts"
     / "android-design-preview"
 )
+SCRIPT_VERSION = re.search(
+  r'^VERSION="([^"]+)"', SKILL_SCRIPT.read_text(encoding="utf-8"), re.MULTILINE
+).group(1)
 
 
 def _write_executable(path: pathlib.Path, content: str) -> None:
@@ -234,7 +238,7 @@ class BootstrapCliTest(unittest.TestCase):
       git("config", "user.name", "Tester")
       git("add", ".")
       git("commit", "-m", "initial")
-      git("tag", "v0.5.0")
+      git("tag", f"v{SCRIPT_VERSION}")
 
       bare = tmp / "origin.git"
       subprocess.run(
@@ -245,7 +249,7 @@ class BootstrapCliTest(unittest.TestCase):
 
       env["ANDROID_DESIGN_PREVIEW_FORCE_SPARSE"] = "1"
       env["ANDROID_DESIGN_PREVIEW_GIT_URL"] = bare.as_uri()
-      env["ANDROID_DESIGN_PREVIEW_GIT_REF"] = "v0.5.0"
+      env["ANDROID_DESIGN_PREVIEW_GIT_REF"] = f"v{SCRIPT_VERSION}"
 
       res = subprocess.run(
           [str(SKILL_SCRIPT), "status"],
@@ -254,7 +258,7 @@ class BootstrapCliTest(unittest.TestCase):
           text=True,
       )
       self.assertEqual(res.returncode, 0, res.stderr)
-      sparse_src = pathlib.Path(env["ANDROID_DESIGN_CACHE_DIR"]) / "0.5.0" / "src"
+      sparse_src = pathlib.Path(env["ANDROID_DESIGN_CACHE_DIR"]) / SCRIPT_VERSION / "src"
       self.assertTrue((sparse_src / "app" / "settings.gradle.kts").is_file())
       self.assertFalse((sparse_src / "docs").exists(), "Non-app docs/ must not be checked out")
       self.assertFalse((sparse_src / "sources").exists(), "Non-app sources/ must not be checked out")
