@@ -2,7 +2,7 @@ package bot.charlies.androiddesign.preview.host
 
 import bot.charlies.androiddesign.preview.app.android.AndroidExplorationCompiler
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
-import bot.charlies.androiddesign.preview.host.robolectric.RobolectricBoardRenderer
+import bot.charlies.androiddesign.preview.host.robolectric.RobolectricTestStaging
 import bot.charlies.androiddesign.preview.host.robolectric.SandboxExcludingRobolectricTestRunner
 import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
 import bot.charlies.androiddesign.preview.model.DeviceBatchResponse
@@ -257,7 +257,7 @@ class HostEmulatorIntegrationTest {
 
       // 3. Parity check: Emulator (Display 0 insets consumed) vs Robolectric (same fixtures)
       val roboPhone1x =
-        RobolectricBoardRenderer.handleRequest(
+        RobolectricTestStaging.handle(
             RobolectricRenderRequest(
               id = "parity-p1",
               sourcePath = phoneFile.toString(),
@@ -270,7 +270,7 @@ class HostEmulatorIntegrationTest {
           .trees
           .single()
       val roboPhone2x =
-        RobolectricBoardRenderer.handleRequest(
+        RobolectricTestStaging.handle(
             RobolectricRenderRequest(
               id = "parity-p2",
               sourcePath = phoneFile.toString(),
@@ -283,7 +283,7 @@ class HostEmulatorIntegrationTest {
           .trees
           .single()
       val roboWearMain =
-        RobolectricBoardRenderer.handleRequest(
+        RobolectricTestStaging.handle(
             RobolectricRenderRequest(
               id = "parity-w1",
               sourcePath = wearFile.toString(),
