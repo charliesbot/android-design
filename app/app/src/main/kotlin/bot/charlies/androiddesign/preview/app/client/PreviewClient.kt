@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.app.client
 
 import bot.charlies.androiddesign.preview.app.AppInfo
+import bot.charlies.androiddesign.preview.app.server.CheckScope
 import bot.charlies.androiddesign.preview.app.server.ContentHasher
 import bot.charlies.androiddesign.preview.app.server.LiveFocusRequest
 import bot.charlies.androiddesign.preview.app.server.RuntimeIdentity
@@ -34,10 +35,31 @@ class PreviewClient(
 ) {
   data class HttpResult(val status: Int, val body: String)
 
+  /** True when automatic browser / device live-activity launching is suppressed via env. */
+  val noOpen: Boolean
+    get() = env[NO_OPEN_ENV] == "1"
+
   sealed class ServerLookup {
     data class Ready(val record: ServerRecord, val status: StatusResponse) : ServerLookup()
 
     data class NotReady(val message: String) : ServerLookup()
+  }
+
+  /** Outcome of a scoped CLI POST to `/api/check` or `/api/tree` with timeout/409 recovery. */
+  sealed interface PostOutcome {
+    data class Ok(val body: String) : PostOutcome
+
+    data class ClientError(val status: Int, val body: String) : PostOutcome
+
+    data class ServerError(val status: Int, val body: String) : PostOutcome
+
+    data class Replaced(val replacedByVersion: String?, val body: String? = null) : PostOutcome
+
+    data class DeadlineExceeded(val timeoutMs: Int, val restarted: Boolean) : PostOutcome
+
+    data class WatchdogHalted(val scope: CheckScope) : PostOutcome
+
+    data class Unreachable(val message: String) : PostOutcome
   }
 
   /** Probes liveness of the shared host server via `/api/status` without starting one. */
@@ -67,19 +89,15 @@ class PreviewClient(
   }
 
   /**
-   * Checks whether `active.json` holds a recorded watchdog timeout for [snapshot] and scope BEFORE
-   * overwriting a dead server record on respawn.
+   * Checks whether `active.json` holds a recorded watchdog timeout for [snapshot] and [scope]
+   * BEFORE overwriting a dead server record on respawn.
    */
   fun checkRecordedTimeout(
-    repoRoot: Path,
     snapshot: ContentHasher.Snapshot,
-    scope: String,
-    direction: String?,
-    screen: String?,
-    view: String?,
+    scope: CheckScope,
   ): Boolean {
     val record = ServerPaths.readRecord(ServerPaths.sharedRecordPath(cacheRoot)) ?: return false
-    return record.hasTimeout(snapshot.contentHash, scope, direction, screen, view)
+    return record.hasTimeout(snapshot.contentHash, scope)
   }
 
   /**
@@ -209,7 +227,62 @@ class PreviewClient(
     return DeadlineRecovery.RESTARTED
   }
 
-  fun notifyLive(record: ServerRecord, sourcePath: Path?, repoRoot: Path): Boolean =
+  /**
+   * Sends a JSON POST request (`check` or `tree`) to the active server under [scope]'s client
+   * deadline and classifies HTTP errors, server replacement (409 or record supersession), watchdog
+   * halts, and deadline recovery into [PostOutcome].
+   */
+  fun postScoped(
+    ready: ServerLookup.Ready,
+    repoRoot: Path,
+    path: String,
+    jsonBody: String,
+    snapshot: ContentHasher.Snapshot,
+    scope: CheckScope,
+  ): PostOutcome {
+    val timeoutMs = deadlineMs(isCold = ready.status.compileCount == 0, scoped = scope.isScoped)
+    val http =
+      try {
+        postJson(ready.record, path, jsonBody, readTimeoutMs = timeoutMs)
+      } catch (e: Exception) {
+        val repVer = checkReplacedByVersion(ready.record)
+        if (repVer != null) {
+          return PostOutcome.Replaced(replacedByVersion = repVer)
+        }
+        return when {
+          e is SocketTimeoutException -> {
+            val restarted =
+              recoverFromDeadline(repoRoot, ready.record) == DeadlineRecovery.RESTARTED
+            PostOutcome.DeadlineExceeded(timeoutMs = timeoutMs, restarted = restarted)
+          }
+          checkRecordedTimeout(snapshot, scope) -> PostOutcome.WatchdogHalted(scope)
+          else -> PostOutcome.Unreachable(e.message ?: "Failed contacting preview server")
+        }
+      }
+
+    return when (http.status) {
+      400,
+      404 -> PostOutcome.ClientError(http.status, http.body)
+      409 ->
+        PostOutcome.Replaced(
+          replacedByVersion = checkReplacedByVersion(ready.record),
+          body = http.body,
+        )
+      in 200..299 -> PostOutcome.Ok(http.body)
+      else -> PostOutcome.ServerError(http.status, http.body)
+    }
+  }
+
+  /**
+   * Updates live focus on the active server and, when [launchActivity] is true, asks the server to
+   * bring `LivePreviewActivity` to the foreground (allowing enough read timeout for `am start -W`).
+   */
+  fun notifyLive(
+    record: ServerRecord,
+    sourcePath: Path?,
+    repoRoot: Path,
+    launchActivity: Boolean = false,
+  ): Boolean =
     try {
       val body =
         PreviewJson.compact.encodeToString(
@@ -217,9 +290,11 @@ class PreviewClient(
           LiveFocusRequest(
             path = sourcePath?.toAbsolutePath()?.normalize()?.toString(),
             repoRoot = repoRoot.toAbsolutePath().normalize().toString(),
+            launchActivity = launchActivity,
           ),
         )
-      postJson(record, "/api/live", body, readTimeoutMs = 3_000).status == 200
+      val timeoutMs = if (launchActivity) LIVE_LAUNCH_TIMEOUT_MS else LIVE_TIMEOUT_MS
+      postJson(record, "/api/live", body, readTimeoutMs = timeoutMs).status == 200
     } catch (_: Exception) {
       false
     }
@@ -568,6 +643,9 @@ class PreviewClient(
     internal const val ANDROID_STARTUP_WAIT_MS = 420_000L
     private const val PROGRESS_INTERVAL_MS = 10_000L
     private const val DEADLINE_PROBE_TIMEOUT_MS = 2_000
+    private const val LIVE_TIMEOUT_MS = 3_000
+    /** Exceeds `DeviceManager`'s 15 s `adb shell am start -W` timeout plus live focus update. */
+    private const val LIVE_LAUNCH_TIMEOUT_MS = 20_000
     private const val COLD_CLIENT_DEADLINE_MS = 35_000
     private const val WARM_SCOPED_CLIENT_DEADLINE_MS = 10_000
     private const val WARM_FULL_CLIENT_DEADLINE_MS = 35_000

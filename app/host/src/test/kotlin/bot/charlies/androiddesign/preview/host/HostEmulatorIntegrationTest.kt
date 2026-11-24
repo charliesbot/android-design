@@ -4,18 +4,19 @@ import bot.charlies.androiddesign.preview.app.android.AndroidExplorationCompiler
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.host.robolectric.RobolectricStaging
 import bot.charlies.androiddesign.preview.host.robolectric.SandboxExcludingRobolectricTestRunner
+import bot.charlies.androiddesign.preview.model.DeviceAckResponse
 import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
-import bot.charlies.androiddesign.preview.model.DeviceBatchResponse
+import bot.charlies.androiddesign.preview.model.DeviceBatchWireResult
 import bot.charlies.androiddesign.preview.model.DeviceHasAssetsRequest
 import bot.charlies.androiddesign.preview.model.DeviceHasAssetsResponse
 import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
-import bot.charlies.androiddesign.preview.model.DeviceOp
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
+import bot.charlies.androiddesign.preview.model.DevicePreloadResponse
 import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
 import bot.charlies.androiddesign.preview.model.DeviceTransportSpec
+import bot.charlies.androiddesign.preview.model.DeviceWireCodec
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutTree
-import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.RobolectricRenderRequest
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -101,12 +102,13 @@ class HostEmulatorIntegrationTest {
       assertTrue(ping.ok && ping.pid > 0)
 
       val preload = sendPreloadDex(output, input, phoneHash, phoneClasses.entryClass, phoneDex)
-      assertTrue("Expected PRELOAD_DEX ok: $preload", preload.contains("\"ok\":true"))
+      assertTrue("Expected PRELOAD_DEX ok: ${preload.error}", preload.ok)
 
       val hasResp1 = sendHasAssets(output, input, listOf(coverSha))
       assertEquals(listOf(coverSha), hasResp1.missing)
 
-      sendPutAssets(output, input, mapOf(coverSha to coverBytes))
+      val putAck = sendPutAssets(output, input, mapOf(coverSha to coverBytes))
+      assertTrue("Expected PUT_ASSETS ok: ${putAck.error}", putAck.ok)
       val hasResp2 = sendHasAssets(output, input, listOf(coverSha))
       assertTrue("Asset should now be cached", hasResp2.missing.isEmpty())
 
@@ -301,7 +303,7 @@ class HostEmulatorIntegrationTest {
       assertTreeParity("wear-main", roboWearMain, emuWearMain.tree)
 
       // 4. OP_SET_LIVE updates LivePreviewActivity cleanly
-      val liveJson =
+      val liveAck =
         sendSetLive(
           output,
           input,
@@ -315,7 +317,7 @@ class HostEmulatorIntegrationTest {
             screen = "home",
           ),
         )
-      assertTrue("Expected SET_LIVE ok: $liveJson", liveJson.contains("\"ok\":true"))
+      assertTrue("Expected SET_LIVE ok: ${liveAck.error}", liveAck.ok)
       runAdb("shell", "am", "start", "-W", "-n", "$pkg/.LivePreviewActivity")
       val topActivity = runAdb("shell", "dumpsys", "activity", "activities")
       assertTrue("LivePreviewActivity should launch", topActivity.contains("LivePreviewActivity"))
@@ -610,10 +612,8 @@ class HostEmulatorIntegrationTest {
   }
 
   private fun sendPing(output: DataOutputStream, input: DataInputStream): DevicePingResponse {
-    output.writeByte(DeviceOp.PING)
-    output.flush()
-    val json = readUtf(input)
-    return PreviewJson.compact.decodeFromString(DevicePingResponse.serializer(), json)
+    DeviceWireCodec.writePingRequest(output)
+    return DeviceWireCodec.readPingResponse(input)
   }
 
   private fun sendPreloadDex(
@@ -622,14 +622,9 @@ class HostEmulatorIntegrationTest {
     dexHash: String,
     entryClass: String,
     dexBytes: ByteArray,
-  ): String {
-    output.writeByte(DeviceOp.PRELOAD_DEX)
-    writeUtf(output, dexHash)
-    writeUtf(output, entryClass)
-    output.writeInt(dexBytes.size)
-    output.write(dexBytes)
-    output.flush()
-    return readUtf(input)
+  ): DevicePreloadResponse {
+    DeviceWireCodec.writePreloadDexRequest(output, dexHash, entryClass, dexBytes)
+    return DeviceWireCodec.readPreloadDexResponse(input)
   }
 
   private fun sendHasAssets(
@@ -637,35 +632,17 @@ class HostEmulatorIntegrationTest {
     input: DataInputStream,
     hashes: List<String>,
   ): DeviceHasAssetsResponse {
-    output.writeByte(DeviceOp.HAS_ASSETS)
-    writeUtf(
-      output,
-      PreviewJson.compact.encodeToString(
-        DeviceHasAssetsRequest.serializer(),
-        DeviceHasAssetsRequest(hashes),
-      ),
-    )
-    output.flush()
-    return PreviewJson.compact.decodeFromString(
-      DeviceHasAssetsResponse.serializer(),
-      readUtf(input),
-    )
+    DeviceWireCodec.writeHasAssetsRequest(output, DeviceHasAssetsRequest(hashes))
+    return DeviceWireCodec.readHasAssetsResponse(input)
   }
 
   private fun sendPutAssets(
     output: DataOutputStream,
     input: DataInputStream,
     assets: Map<String, ByteArray>,
-  ): String {
-    output.writeByte(DeviceOp.PUT_ASSETS)
-    output.writeInt(assets.size)
-    for ((hash, bytes) in assets) {
-      writeUtf(output, hash)
-      output.writeInt(bytes.size)
-      output.write(bytes)
-    }
-    output.flush()
-    return readUtf(input)
+  ): DeviceAckResponse {
+    DeviceWireCodec.writePutAssetsRequest(output, assets.entries.map { it.key to it.value })
+    return DeviceWireCodec.readAck(input)
   }
 
   private fun sendSetLive(
@@ -673,34 +650,10 @@ class HostEmulatorIntegrationTest {
     input: DataInputStream,
     dexBytes: ByteArray?,
     request: DeviceLiveStateRequest,
-  ): String {
-    output.writeByte(DeviceOp.SET_LIVE)
-    if (dexBytes == null) {
-      output.writeInt(0)
-    } else {
-      output.writeInt(dexBytes.size)
-      output.write(dexBytes)
-    }
-    writeUtf(
-      output,
-      PreviewJson.compact.encodeToString(DeviceLiveStateRequest.serializer(), request),
-    )
-    output.flush()
-    return readUtf(input)
+  ): DeviceAckResponse {
+    DeviceWireCodec.writeSetLiveRequest(output, dexBytes, request)
+    return DeviceWireCodec.readAck(input)
   }
-
-  private data class WireFrame(
-    val direction: String,
-    val screen: String,
-    val viewName: String,
-    val overlayId: String?,
-    val isEndFrame: Boolean,
-    val format: FrameFormat,
-    val widthPx: Int,
-    val heightPx: Int,
-    val rawLength: Int,
-    val payload: ByteArray,
-  )
 
   private fun sendBatch(
     output: DataOutputStream,
@@ -708,51 +661,9 @@ class HostEmulatorIntegrationTest {
     dexBytes: ByteArray?,
     entryClass: String,
     request: DeviceBatchRequest,
-  ): Pair<DeviceBatchResponse, List<WireFrame>> {
-    output.writeByte(DeviceOp.RENDER_BATCH)
-    if (dexBytes == null) {
-      output.writeInt(0)
-    } else {
-      output.writeInt(dexBytes.size)
-      output.write(dexBytes)
-    }
-    writeUtf(output, entryClass)
-    writeUtf(output, PreviewJson.compact.encodeToString(DeviceBatchRequest.serializer(), request))
-    output.flush()
-
-    val respJson = readUtf(input)
-    val resp = PreviewJson.compact.decodeFromString(DeviceBatchResponse.serializer(), respJson)
-    val frameCount = input.readInt()
-    val frames =
-      List(frameCount) {
-        val dir = readUtf(input)
-        val screen = readUtf(input)
-        val viewName = readUtf(input)
-        val ovId = readUtf(input).ifEmpty { null }
-        val isEnd = input.readBoolean()
-        val format = FrameFormat.valueOf(readUtf(input))
-        val w = input.readInt()
-        val h = input.readInt()
-        val rawLen = input.readInt()
-        val len = input.readInt()
-        val payload = ByteArray(len)
-        input.readFully(payload)
-        WireFrame(dir, screen, viewName, ovId, isEnd, format, w, h, rawLen, payload)
-      }
-    return resp to frames
-  }
-
-  private fun writeUtf(out: DataOutputStream, text: String) {
-    val bytes = text.toByteArray(StandardCharsets.UTF_8)
-    out.writeInt(bytes.size)
-    out.write(bytes)
-  }
-
-  private fun readUtf(inp: DataInputStream): String {
-    val len = inp.readInt()
-    val bytes = ByteArray(len)
-    inp.readFully(bytes)
-    return String(bytes, StandardCharsets.UTF_8)
+  ): DeviceBatchWireResult {
+    DeviceWireCodec.writeRenderBatchRequest(output, dexBytes, entryClass, request)
+    return DeviceWireCodec.readRenderBatchResponse(input)
   }
 
   private fun sha256Hex(bytes: ByteArray): String =

@@ -155,16 +155,14 @@ data class ServerRecord(
       "http://127.0.0.1:$port/?repo=$repoId&view=$viewToken"
     }
 
-  fun hasTimeout(
-    contentHash: String,
-    scope: String,
-    direction: String? = null,
-    screen: String? = null,
-    view: String? = null,
-  ): Boolean = timeouts.any { entry ->
+  fun hasTimeout(contentHash: String, scope: CheckScope): Boolean = timeouts.any { entry ->
     if (entry.contentHash != contentHash) return@any false
+    val scopeKey = scope.key
     if (
-      entry.scope == scope || entry.scope == "compile" || entry.scope == "full" || scope == "full"
+      entry.scope == scopeKey ||
+        entry.scope == "compile" ||
+        entry.scope == "full" ||
+        scopeKey == "full"
     ) {
       return@any true
     }
@@ -174,9 +172,9 @@ data class ServerRecord(
     if (parts.size == 3) {
       val (eDir, eScrRaw, eView) = parts
       val eScr = eScrRaw.substringBefore('+')
-      val dirOk = direction.isNullOrBlank() || eDir == direction
-      val scrOk = screen.isNullOrBlank() || eScr == screen
-      val viewOk = view.isNullOrBlank() || eView == view
+      val dirOk = scope.direction.isNullOrBlank() || eDir == scope.direction
+      val scrOk = scope.screen.isNullOrBlank() || eScr == scope.screen
+      val viewOk = scope.view.isNullOrBlank() || eView == scope.view
       dirOk && scrOk && viewOk
     } else {
       false

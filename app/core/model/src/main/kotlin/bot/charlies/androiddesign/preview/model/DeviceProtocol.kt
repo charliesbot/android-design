@@ -167,6 +167,127 @@ data class DeviceBatchResponse(
   val memoryAfter: DeviceMemoryStats? = null,
 )
 
+/** Binary acknowledgment returned by `:sandbox` ops without a specialized payload. */
+@Serializable
+data class DeviceAckResponse(
+  val ok: Boolean,
+  val error: String? = null,
+  val stored: Int? = null,
+)
+
+/** Rendered frame metadata and compressed/encoded bytes streamed in a `RENDER_BATCH` response. */
+data class DeviceWireFrame(
+  val direction: String,
+  val screen: String,
+  val viewName: String,
+  val overlayId: String?,
+  val isEndFrame: Boolean,
+  val format: FrameFormat,
+  val widthPx: Int,
+  val heightPx: Int,
+  val rawLength: Int,
+  val payload: ByteArray,
+) {
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is DeviceWireFrame) return false
+    return direction == other.direction &&
+      screen == other.screen &&
+      viewName == other.viewName &&
+      overlayId == other.overlayId &&
+      isEndFrame == other.isEndFrame &&
+      format == other.format &&
+      widthPx == other.widthPx &&
+      heightPx == other.heightPx &&
+      rawLength == other.rawLength &&
+      payload.contentEquals(other.payload)
+  }
+
+  override fun hashCode(): Int {
+    var result = direction.hashCode()
+    result = 31 * result + screen.hashCode()
+    result = 31 * result + viewName.hashCode()
+    result = 31 * result + (overlayId?.hashCode() ?: 0)
+    result = 31 * result + isEndFrame.hashCode()
+    result = 31 * result + format.hashCode()
+    result = 31 * result + widthPx
+    result = 31 * result + heightPx
+    result = 31 * result + rawLength
+    result = 31 * result + payload.contentHashCode()
+    return result
+  }
+}
+
+/** Decoded `PRELOAD_DEX` wire request carrying identity metadata and compiled DEX bytes. */
+data class PreloadDexWireRequest(
+  val dexHash: String,
+  val entryClass: String,
+  val dexBytes: ByteArray,
+) {
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is PreloadDexWireRequest) return false
+    return dexHash == other.dexHash &&
+      entryClass == other.entryClass &&
+      dexBytes.contentEquals(other.dexBytes)
+  }
+
+  override fun hashCode(): Int {
+    var result = dexHash.hashCode()
+    result = 31 * result + entryClass.hashCode()
+    result = 31 * result + dexBytes.contentHashCode()
+    return result
+  }
+}
+
+/** Decoded `RENDER_BATCH` wire request pairing optional inline DEX bytes with batch parameters. */
+data class RenderBatchWireRequest(
+  val dexBytes: ByteArray?,
+  val entryClass: String,
+  val request: DeviceBatchRequest,
+) {
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is RenderBatchWireRequest) return false
+    return dexBytes.contentEquals(other.dexBytes) &&
+      entryClass == other.entryClass &&
+      request == other.request
+  }
+
+  override fun hashCode(): Int {
+    var result = dexBytes?.contentHashCode() ?: 0
+    result = 31 * result + entryClass.hashCode()
+    result = 31 * result + request.hashCode()
+    return result
+  }
+}
+
+/**
+ * Decoded `SET_LIVE` wire request pairing optional inline DEX bytes with live-viewer focus state.
+ */
+data class SetLiveWireRequest(
+  val dexBytes: ByteArray?,
+  val request: DeviceLiveStateRequest,
+) {
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is SetLiveWireRequest) return false
+    return dexBytes.contentEquals(other.dexBytes) && request == other.request
+  }
+
+  override fun hashCode(): Int {
+    var result = dexBytes?.contentHashCode() ?: 0
+    result = 31 * result + request.hashCode()
+    return result
+  }
+}
+
+/** Decoded `RENDER_BATCH` response paired with its streamed [DeviceWireFrame] payloads. */
+data class DeviceBatchWireResult(
+  val response: DeviceBatchResponse,
+  val frames: List<DeviceWireFrame>,
+)
+
 @Serializable
 data class DeviceLiveStateRequest(
   val dexHash: String,

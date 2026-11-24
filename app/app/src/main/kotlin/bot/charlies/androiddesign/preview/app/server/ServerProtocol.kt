@@ -9,6 +9,26 @@ import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import kotlinx.serialization.Serializable
 
+/** Target filter shared by `check`, `tree`, and recorded watchdog timeout matching. */
+data class CheckScope(
+  val direction: String? = null,
+  val screen: String? = null,
+  val view: String? = null,
+) {
+  val isScoped: Boolean
+    get() = !direction.isNullOrBlank() || !screen.isNullOrBlank() || !view.isNullOrBlank()
+
+  val key: String
+    get() =
+      listOfNotNull(
+          direction?.takeIf { it.isNotBlank() }?.let { "dir=$it" },
+          screen?.takeIf { it.isNotBlank() }?.let { "screen=$it" },
+          view?.takeIf { it.isNotBlank() }?.let { "view=$it" },
+        )
+        .ifEmpty { listOf("full") }
+        .joinToString(",")
+}
+
 @Serializable
 data class StatusResponse(
   val ok: Boolean = true,
@@ -41,6 +61,7 @@ data class LiveFocusRequest(
   val direction: String? = null,
   val screen: String? = null,
   val overlay: String? = null,
+  val launchActivity: Boolean = false,
 )
 
 @Serializable
@@ -51,7 +72,9 @@ data class CheckRequest(
   val screen: String? = null,
   val view: String? = null,
   val repoRoot: String? = null,
-)
+) {
+  fun scope(): CheckScope = CheckScope(direction = direction, screen = screen, view = view)
+}
 
 @Serializable
 data class ImageOutput(
