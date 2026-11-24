@@ -38,7 +38,7 @@ class SandboxExcludingRobolectricTestRunner(testClass: Class<*>) :
       .doNotAcquirePackage("bot.charlies.androiddesign.preview.model.")
       .doNotAcquirePackage("bot.charlies.androiddesign.preview.domain.")
       .doNotAcquirePackage("bot.charlies.androiddesign.preview.data.")
-      .doNotAcquirePackage("bot.charlies.androiddesign.preview.host.compiler.")
+      .doNotAcquirePackage("bot.charlies.androiddesign.preview.app.")
       .doNotAcquireClass("bot.charlies.androiddesign.preview.host.robolectric.RunnerStdioBridge")
       .build()
   }
@@ -81,7 +81,7 @@ class RobolectricRunnerEntry {
         try {
           val req =
             PreviewJson.compact.decodeFromString(RobolectricRenderRequest.serializer(), trimmed)
-          RobolectricBoardRenderer.handleRequest(req)
+          RobolectricStaging.handle(req)
         } catch (t: Throwable) {
           RunnerStdioBridge.lastFailure = t
           RobolectricRenderResponse(

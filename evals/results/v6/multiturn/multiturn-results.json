@@ -1,0 +1,314 @@
+{
+  "pipeline": "v6",
+  "backend": "claude",
+  "model": "claude-fable-5-2",
+  "commit_sha": "2e679a870de5c0de68e5fbe549aae3b9d566b1de",
+  "captured_at": "2026-11-24T01:31:28Z",
+  "turns_count": 10,
+  "final_checks_pass": true,
+  "final_checks": {
+    "C-valid": {
+      "pass": true,
+      "detail": ""
+    },
+    "C-review": {
+      "pass": true,
+      "detail": ""
+    },
+    "C-palette": {
+      "pass": true,
+      "detail": ""
+    }
+  },
+  "totals": {
+    "wall_seconds": 350.32,
+    "agent_turns": 70,
+    "input_tokens": 86,
+    "cache_read_tokens": 3562013,
+    "cache_creation_tokens": 121475,
+    "total_input_tokens": 3683574,
+    "output_tokens": 26456,
+    "total_tokens": 3710030,
+    "cost": 3.7149,
+    "check_calls": 12,
+    "compile_retries": 0,
+    "skill_bytes_read": 49806,
+    "skill_read_calls": 3,
+    "skill_unique_files": 3,
+    "skill_files_read": {
+      "android-design-explore/SKILL.md": {
+        "reads": 1,
+        "bytes": 7680
+      },
+      "android-design-explore/references/compose-signatures.md": {
+        "reads": 1,
+        "bytes": 15628
+      },
+      "android-design/SKILL.md": {
+        "reads": 1,
+        "bytes": 26498
+      }
+    }
+  },
+  "per_turn": {
+    "wall_seconds": {
+      "mean": 35.03,
+      "median": 31.36
+    },
+    "input_tokens": {
+      "mean": 8.6,
+      "median": 8.0
+    },
+    "total_input_tokens": {
+      "mean": 368357.4,
+      "median": 359662.5
+    },
+    "output_tokens": {
+      "mean": 2645.6,
+      "median": 2493.0
+    },
+    "total_tokens": {
+      "mean": 371003.0,
+      "median": 361345.5
+    },
+    "check_calls": {
+      "mean": 1.2,
+      "median": 1.0
+    },
+    "compile_retries": {
+      "mean": 0.0,
+      "median": 0.0
+    },
+    "cost": {
+      "mean": 0.3715,
+      "median": 0.2529
+    }
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "title": "Layout shift (Editorial split)",
+      "wall_seconds": 72.5,
+      "agent_turns": 14,
+      "input_tokens": 12,
+      "cache_read_tokens": 405599,
+      "cache_creation_tokens": 64227,
+      "total_input_tokens": 469838,
+      "output_tokens": 6050,
+      "total_tokens": 475888,
+      "cost": 1.3508478,
+      "cumulative_cost": 1.3508478,
+      "check_calls": 2,
+      "compile_retries": 0,
+      "skill_bytes_read": 49806,
+      "skill_read_calls": 3,
+      "skill_unique_files": 3,
+      "skill_files_read": {
+        "android-design-explore/SKILL.md": {
+          "reads": 1,
+          "bytes": 7680
+        },
+        "android-design-explore/references/compose-signatures.md": {
+          "reads": 1,
+          "bytes": 15628
+        },
+        "android-design/SKILL.md": {
+          "reads": 1,
+          "bytes": 26498
+        }
+      },
+      "model": "claude-fable-5-2"
+    },
+    {
+      "turn": 2,
+      "title": "Typography emphasis (Editorial split)",
+      "wall_seconds": 39.08,
+      "agent_turns": 9,
+      "input_tokens": 12,
+      "cache_read_tokens": 453474,
+      "cache_creation_tokens": 7892,
+      "total_input_tokens": 461378,
+      "output_tokens": 2774,
+      "total_tokens": 464152,
+      "cost": 0.328023,
+      "cumulative_cost": 1.6788705999999998,
+      "check_calls": 2,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "claude-fable-5-2"
+    },
+    {
+      "turn": 3,
+      "title": "Targeted element tweak (Editorial split)",
+      "wall_seconds": 26.32,
+      "agent_turns": 5,
+      "input_tokens": 8,
+      "cache_read_tokens": 290674,
+      "cache_creation_tokens": 4524,
+      "total_input_tokens": 295206,
+      "output_tokens": 1821,
+      "total_tokens": 297027,
+      "cost": 0.203423,
+      "cumulative_cost": 1.8822933999999998,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "claude-fable-5-2"
+    },
+    {
+      "turn": 4,
+      "title": "Theme and contrast adjustment (shared)",
+      "wall_seconds": 16.73,
+      "agent_turns": 4,
+      "input_tokens": 8,
+      "cache_read_tokens": 303154,
+      "cache_creation_tokens": 2614,
+      "total_input_tokens": 305776,
+      "output_tokens": 955,
+      "total_tokens": 306731,
+      "cost": 0.140719,
+      "cumulative_cost": 2.0230121999999997,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "claude-fable-5-2"
+    },
+    {
+      "turn": 5,
+      "title": "Layout shift (Quick pantry)",
+      "wall_seconds": 37.83,
+      "agent_turns": 6,
+      "input_tokens": 6,
+      "cache_read_tokens": 313972,
+      "cache_creation_tokens": 5716,
+      "total_input_tokens": 319694,
+      "output_tokens": 3146,
+      "total_tokens": 322840,
+      "cost": 0.280138,
+      "cumulative_cost": 2.3031505999999995,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "claude-fable-5-2"
+    },
+    {
+      "turn": 6,
+      "title": "Targeted element tweak (Quick pantry)",
+      "wall_seconds": 30.04,
+      "agent_turns": 5,
+      "input_tokens": 8,
+      "cache_read_tokens": 329510,
+      "cache_creation_tokens": 4360,
+      "total_input_tokens": 333878,
+      "output_tokens": 2249,
+      "total_tokens": 336127,
+      "cost": 0.225686,
+      "cumulative_cost": 2.528836599999999,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "claude-fable-5-2"
+    },
+    {
+      "turn": 7,
+      "title": "Adaptive fix (Editorial split detail pane)",
+      "wall_seconds": 32.68,
+      "agent_turns": 5,
+      "input_tokens": 6,
+      "cache_read_tokens": 346344,
+      "cache_creation_tokens": 7453,
+      "total_input_tokens": 353803,
+      "output_tokens": 2737,
+      "total_tokens": 356540,
+      "cost": 0.298045,
+      "cumulative_cost": 2.826881399999999,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "claude-fable-5-2"
+    },
+    {
+      "turn": 8,
+      "title": "Typography emphasis (Quick pantry)",
+      "wall_seconds": 14.81,
+      "agent_turns": 3,
+      "input_tokens": 8,
+      "cache_read_tokens": 363265,
+      "cache_creation_tokens": 2249,
+      "total_input_tokens": 365522,
+      "output_tokens": 629,
+      "total_tokens": 366151,
+      "cost": 0.133861,
+      "cumulative_cost": 2.960742399999999,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "claude-fable-5-2"
+    },
+    {
+      "turn": 9,
+      "title": "Theme and contrast adjustment (Editorial split)",
+      "wall_seconds": 20.83,
+      "agent_turns": 4,
+      "input_tokens": 8,
+      "cache_read_tokens": 370414,
+      "cache_creation_tokens": 2731,
+      "total_input_tokens": 373153,
+      "output_tokens": 1116,
+      "total_tokens": 374269,
+      "cost": 0.162483,
+      "cumulative_cost": 3.123225199999999,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "claude-fable-5-2"
+    },
+    {
+      "turn": 10,
+      "title": "Final polish and full verification",
+      "wall_seconds": 59.5,
+      "agent_turns": 15,
+      "input_tokens": 10,
+      "cache_read_tokens": 385607,
+      "cache_creation_tokens": 19709,
+      "total_input_tokens": 405326,
+      "output_tokens": 4979,
+      "total_tokens": 410305,
+      "cost": 0.591705,
+      "cumulative_cost": 3.714930599999999,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "claude-fable-5-2"
+    }
+  ],
+  "session_id": "d0843d76-7ee3-4601-83b4-44df31d557e9",
+  "rendered_images": 15
+}

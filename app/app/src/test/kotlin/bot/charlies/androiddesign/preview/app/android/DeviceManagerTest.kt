@@ -1,7 +1,7 @@
 package bot.charlies.androiddesign.preview.app.android
 
+import bot.charlies.androiddesign.preview.app.client.ClientExitCode
 import bot.charlies.androiddesign.preview.app.client.StartCommand
-import bot.charlies.androiddesign.preview.app.client.V5ExitCode
 import bot.charlies.androiddesign.preview.app.server.RuntimeIdentity
 import bot.charlies.androiddesign.preview.app.server.ServerPaths
 import bot.charlies.androiddesign.preview.app.server.ServerRecord
@@ -128,7 +128,7 @@ class DeviceManagerTest {
         "cmd appops set ${DeviceManager.HOST_PACKAGE} RUN_ANY_IN_BACKGROUND allow" in it
       },
     )
-    assertTrue(joinedAll.any { "forward tcp:18999 tcp:18765" in it })
+    assertTrue(joinedAll.any { "forward tcp:18999 localabstract:adp-render-sandbox" in it })
     assertTrue(
       joinedAll.any {
         "am start -W -n ${DeviceManager.HOST_RENDER_ACTIVITY} --ez move_to_back true" in it
@@ -168,6 +168,7 @@ class DeviceManagerTest {
     fun runWithAvds(initialAvds: MutableList<String>): List<List<String>> {
       val cmds = mutableListOf<List<String>>()
       var online = false
+      var startedAvd = ""
       val runner = ExternalCommandRunner { cmd, _, _ ->
         cmds += cmd
         val j = cmd.joinToString(" ")
@@ -178,6 +179,7 @@ class DeviceManagerTest {
               if (online) "List of devices attached\nemulator-5560\tdevice\n"
               else "List of devices attached\n",
             )
+          "emu avd name" in j -> CommandOutput(0, "$startedAvd\nOK\n")
           "emulator list" in j -> CommandOutput(0, initialAvds.joinToString("\n") + "\n")
           "emulator create" in j -> {
             initialAvds += "medium_phone"
@@ -185,11 +187,13 @@ class DeviceManagerTest {
           }
           "emulator start" in j -> {
             online = true
+            startedAvd = cmd.last()
             CommandOutput(0, "Started\n")
           }
           "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
           "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
-          "forward --list" in j -> CommandOutput(0, "emulator-5560 tcp:18990 tcp:18765\n")
+          "forward --list" in j ->
+            CommandOutput(0, "emulator-5560 tcp:18990 localabstract:adp-render-sandbox\n")
           else -> CommandOutput(0, "OK\n")
         }
       }
@@ -244,14 +248,14 @@ class DeviceManagerTest {
     val usageCode =
       StartCommand(tmp.resolve("c0"), envWithBootstrap)
         .run(listOf("--bogus"), PrintStream(usageOut), PrintStream(ByteArrayOutputStream()))
-    assertEquals(V5ExitCode.USAGE, usageCode)
+    assertEquals(ClientExitCode.USAGE, usageCode)
 
     // Exit 3 when bootstrap missing.
     val notReadyOut = ByteArrayOutputStream()
     val notReadyCode =
       StartCommand(tmp.resolve("c1"), emptyMap(), bootstrapLocator = { null })
         .run(emptyList(), PrintStream(notReadyOut), PrintStream(ByteArrayOutputStream()))
-    assertEquals(V5ExitCode.NOT_READY, notReadyCode)
+    assertEquals(ClientExitCode.NOT_READY, notReadyCode)
     assertTrue("bootstrap_missing" in notReadyOut.toString(StandardCharsets.UTF_8))
 
     // Exit 2 when --serial is not online.
@@ -262,13 +266,19 @@ class DeviceManagerTest {
     val dmUnknownSerial =
       DeviceManager(tmp.resolve("c2"), envWithBootstrap, noAdbsRunner, sleepFn = {})
     val serialCode =
-      StartCommand(tmp.resolve("c2"), envWithBootstrap, dmUnknownSerial)
+      StartCommand(
+          tmp.resolve("c2"),
+          envWithBootstrap,
+          deviceManager = dmUnknownSerial,
+          bootstrapLocator = { meta },
+          startServer = { error("an unknown serial must fail before the server starts") },
+        )
         .run(
           listOf("--serial", "emulator-9999"),
           PrintStream(ByteArrayOutputStream()),
           PrintStream(ByteArrayOutputStream()),
         )
-    assertEquals(V5ExitCode.USAGE, serialCode)
+    assertEquals(ClientExitCode.USAGE, serialCode)
 
     // Exit 0 when device + server are ready.
     val readyRunner = ExternalCommandRunner { cmd, _, _ ->
@@ -279,7 +289,8 @@ class DeviceManagerTest {
         "emu avd name" in j -> CommandOutput(0, "Pixel_10\nOK\n")
         "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
         "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
-        "forward --list" in j -> CommandOutput(0, "emulator-5554 tcp:18991 tcp:18765\n")
+        "forward --list" in j ->
+          CommandOutput(0, "emulator-5554 tcp:18991 localabstract:adp-render-sandbox\n")
         else -> CommandOutput(0, "OK\n")
       }
     }
@@ -314,6 +325,7 @@ class DeviceManagerTest {
             backend = id.backend,
             runtimeHash = id.runtimeHash,
             deviceSerial = "emulator-5554",
+            adbForwardPort = 18991,
           ),
         )
       val bytes = body.toByteArray(StandardCharsets.UTF_8)
@@ -340,9 +352,14 @@ class DeviceManagerTest {
       )
       val okOut = ByteArrayOutputStream()
       val okCode =
-        StartCommand(readyCache, envWithBootstrap, readyDm, bootstrapLocator = { meta })
+        StartCommand(
+            readyCache,
+            envWithBootstrap,
+            deviceManager = readyDm,
+            bootstrapLocator = { meta },
+          )
           .run(listOf(repo.toString()), PrintStream(okOut), PrintStream(ByteArrayOutputStream()))
-      assertEquals(V5ExitCode.OK, okCode, okOut.toString(StandardCharsets.UTF_8))
+      assertEquals(ClientExitCode.OK, okCode, okOut.toString(StandardCharsets.UTF_8))
       val jsonStr = okOut.toString(StandardCharsets.UTF_8).trim()
       val parsedResp =
         bot.charlies.androiddesign.preview.model.PreviewJson.compact.decodeFromString(
@@ -351,9 +368,37 @@ class DeviceManagerTest {
         )
       assertTrue(parsedResp.ok, jsonStr)
       assertEquals("emulator-5554", parsedResp.serial)
+      assertEquals(18991, parsedResp.forwardPort)
     } finally {
       stubHttp.stop(0)
     }
+  }
+
+  @Test
+  fun `validateRequest rejects unknown serials and AVDs without booting anything`(
+    @TempDir tmp: Path,
+  ) {
+    val env = fakeToolsEnv(tmp)
+    val cmds = mutableListOf<String>()
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      cmds += j
+      when {
+        cmd.getOrNull(1) == "devices" ->
+          CommandOutput(0, "List of devices attached\nemulator-5554\tdevice\n")
+        "emu avd name" in j -> CommandOutput(0, "Pixel_10\nOK\n")
+        "emulator list" in j -> CommandOutput(0, "Pixel_10\nWear_Round\n")
+        else -> CommandOutput(0, "")
+      }
+    }
+    val dm = DeviceManager(tmp.resolve("c"), env, runner, sleepFn = {})
+
+    assertEquals("unknown_serial", dm.validateRequest("emulator-9999", null)?.error)
+    assertEquals("unknown_avd", dm.validateRequest(null, "Missing_AVD")?.error)
+    assertEquals(null, dm.validateRequest("emulator-5554", null))
+    assertEquals(null, dm.validateRequest(null, "Wear_Round"))
+    assertEquals(null, dm.validateRequest(null, null))
+    assertFalse(cmds.any { "emulator start" in it || "emulator/emulator" in it || "install" in it })
   }
 
   @Test
@@ -389,7 +434,8 @@ class DeviceManagerTest {
         }
         "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
         "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
-        "forward --list" in j -> CommandOutput(0, "emulator-5562 tcp:18995 tcp:18765\n")
+        "forward --list" in j ->
+          CommandOutput(0, "emulator-5562 tcp:18995 localabstract:adp-render-sandbox\n")
         else -> CommandOutput(0, "OK\n")
       }
     }
@@ -428,7 +474,8 @@ class DeviceManagerTest {
         "-s emulator-5562 emu avd name" in j -> CommandOutput(0, "Target_AVD\nOK\n")
         "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
         "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
-        "forward --list" in j -> CommandOutput(0, "emulator-5562 tcp:18996 tcp:18765\n")
+        "forward --list" in j ->
+          CommandOutput(0, "emulator-5562 tcp:18996 localabstract:adp-render-sandbox\n")
         else -> CommandOutput(0, "OK\n")
       }
     }
@@ -446,5 +493,432 @@ class DeviceManagerTest {
       )
     assertEquals("emulator-5562", reuseRes.serial)
     assertFalse(cmdsReuse.any { "emulator start" in it.joinToString(" ") })
+  }
+
+  private fun stuckPing() =
+    DevicePingResponse(
+      pid = 1,
+      inFlightOp = "PRELOAD_DEX",
+      inFlightAgeMs = 60_000,
+      inFlightBudgetMs = 30_000,
+    )
+
+  @Test
+  fun `boots through the SDK emulator with the host GPU when the binary exists`(
+    @TempDir tmp: Path,
+  ) {
+    val env = fakeToolsEnv(tmp)
+    val emulatorBin = Path.of(env.getValue("ANDROID_HOME")).resolve("emulator/emulator")
+    Files.createDirectories(emulatorBin.parent)
+    Files.writeString(emulatorBin, "#!/bin/sh\nexit 0\n")
+    emulatorBin.toFile().setExecutable(true)
+    val meta = fakeBootstrap(tmp.resolve("b"), "apk-gpu")
+    val cmds = mutableListOf<List<String>>()
+    var online = false
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      cmds += cmd
+      val j = cmd.joinToString(" ")
+      when {
+        cmd.getOrNull(1) == "devices" ->
+          CommandOutput(
+            0,
+            if (online) "List of devices attached\nemulator-5560\tdevice\n"
+            else "List of devices attached\n",
+          )
+        "emu avd name" in j -> CommandOutput(0, "Medium_Resizable_API_35\nOK\n")
+        "emulator list" in j -> CommandOutput(0, "Medium_Resizable_API_35\n")
+        "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
+        "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
+        "forward --list" in j ->
+          CommandOutput(0, "emulator-5560 tcp:18990 localabstract:adp-render-sandbox\n")
+        else -> CommandOutput(0, "OK\n")
+      }
+    }
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env,
+        runner = runner,
+        pingFn = { DevicePingResponse(ok = true, pid = 11) },
+        sleepFn = {},
+        launchEmulator = { cmd, _ ->
+          cmds += cmd
+          online = true
+          FakeProcess()
+        },
+      )
+    assertIs<DeviceSetupResult.Ready>(dm.ensureDeviceReady(meta, headless = true))
+    assertEquals(
+      listOf(
+        emulatorBin.toString(),
+        "-avd",
+        "Medium_Resizable_API_35",
+        "-gpu",
+        "host",
+        "-no-snapshot-save",
+        "-no-window",
+      ),
+      cmds.first { it.first() == emulatorBin.toString() },
+    )
+    assertFalse(cmds.any { "emulator start" in it.joinToString(" ") })
+  }
+
+  @Test
+  fun `reports whether it booted the emulator and shuts down only that serial`(
+    @TempDir tmp: Path,
+  ) {
+    val env = fakeToolsEnv(tmp)
+    val meta = fakeBootstrap(tmp.resolve("b"), "apk-own")
+    val cmds = mutableListOf<String>()
+    var online = false
+    var preexisting = false
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      cmds += j
+      when {
+        cmd.getOrNull(1) == "devices" ->
+          CommandOutput(
+            0,
+            if (online || preexisting) "List of devices attached\nemulator-5560\tdevice\n"
+            else "List of devices attached\n",
+          )
+        "emu avd name" in j -> CommandOutput(0, "Medium_Resizable_API_35\nOK\n")
+        "emulator list" in j -> CommandOutput(0, "Medium_Resizable_API_35\n")
+        "emulator start" in j -> {
+          online = true
+          CommandOutput(0, "Started\n")
+        }
+        "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
+        "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
+        "forward --list" in j ->
+          CommandOutput(0, "emulator-5560 tcp:18990 localabstract:adp-render-sandbox\n")
+        else -> CommandOutput(0, "OK\n")
+      }
+    }
+    fun manager(name: String) =
+      DeviceManager(
+        cacheRoot = tmp.resolve(name),
+        env = env,
+        runner = runner,
+        pingFn = { DevicePingResponse(ok = true, pid = 11) },
+        sleepFn = {},
+      )
+
+    val owner = manager("c1")
+    val booted = assertIs<DeviceSetupResult.Ready>(owner.ensureDeviceReady(meta))
+    assertTrue(booted.bootedEmulator, "an AVD this server started is owned by it")
+    assertTrue(owner.releaseLaunchedEmulator())
+    assertTrue(cmds.any { it.endsWith("-s emulator-5560 emu kill") }, "expected emu kill in $cmds")
+
+    online = false
+    preexisting = true
+    cmds.clear()
+    val reused = assertIs<DeviceSetupResult.Ready>(manager("c2").ensureDeviceReady(meta))
+    assertFalse(reused.bootedEmulator, "an already running device belongs to the user")
+    assertFalse(cmds.any { "emulator start" in it })
+  }
+
+  @Test
+  fun `a setup that fails after booting shuts down the emulator it launched`(@TempDir tmp: Path) {
+    val env = fakeToolsEnv(tmp)
+    val meta = fakeBootstrap(tmp.resolve("b"), "apk-leak")
+    val cmds = mutableListOf<String>()
+    var online = false
+    var now = 0L
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      cmds += j
+      when {
+        cmd.getOrNull(1) == "devices" ->
+          CommandOutput(
+            0,
+            if (online) "List of devices attached\nemulator-5560\tdevice\n"
+            else "List of devices attached\n",
+          )
+        "emu avd name" in j -> CommandOutput(0, "Medium_Resizable_API_35\nOK\n")
+        "emulator list" in j -> CommandOutput(0, "Medium_Resizable_API_35\n")
+        "emulator start" in j -> {
+          online = true
+          CommandOutput(0, "Started\n")
+        }
+        "getprop sys.boot_completed" in j -> CommandOutput(0, "\n")
+        else -> CommandOutput(0, "OK\n")
+      }
+    }
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env,
+        runner = runner,
+        sleepFn = { now += it },
+        nowMs = { now },
+      )
+
+    val failed = assertIs<DeviceSetupResult.Failed>(dm.ensureDeviceReady(meta))
+    assertEquals("boot_timeout", failed.error)
+    assertTrue(
+      cmds.any { it.endsWith("-s emulator-5560 emu kill") },
+      "the emulator this call booted must not outlive the failed setup: $cmds",
+    )
+  }
+
+  @Test
+  fun `never claims a device that is not the AVD it launched`(@TempDir tmp: Path) {
+    val env = fakeToolsEnv(tmp)
+    val meta = fakeBootstrap(tmp.resolve("b"), "apk-claim")
+    val cmds = mutableListOf<String>()
+    var launched = false
+    var now = 0L
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      cmds += j
+      when {
+        // The user's own emulator comes online while ours is still booting.
+        cmd.getOrNull(1) == "devices" ->
+          CommandOutput(
+            0,
+            if (launched) "List of devices attached\nemulator-5556\tdevice\n"
+            else "List of devices attached\n",
+          )
+        "emu avd name" in j -> CommandOutput(0, "Users_Own_AVD\nOK\n")
+        "emulator list" in j -> CommandOutput(0, "Medium_Resizable_API_35\nUsers_Own_AVD\n")
+        else -> CommandOutput(0, "OK\n")
+      }
+    }
+    val ours = FakeProcess()
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env + mapOf("ANDROID_HOME" to sdkWithEmulator(tmp).toString()),
+        runner = runner,
+        sleepFn = { now += it },
+        nowMs = { now },
+        launchEmulator = { _, _ ->
+          launched = true
+          ours
+        },
+      )
+
+    val result = dm.ensureDeviceReady(meta, requestedAvd = "Medium_Resizable_API_35")
+    assertEquals("emulator_start_failed", assertIs<DeviceSetupResult.Failed>(result).error)
+    assertFalse(
+      cmds.any { "emulator-5556 emu kill" in it },
+      "the user's emulator was killed: $cmds",
+    )
+    assertFalse(ours.isAlive, "our own launch must be stopped when setup fails")
+  }
+
+  @Test
+  fun `a launch that exited does not own the device that came up instead`(@TempDir tmp: Path) {
+    val env = fakeToolsEnv(tmp)
+    val meta = fakeBootstrap(tmp.resolve("b"), "apk-race")
+    val cmds = mutableListOf<String>()
+    var launched = false
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      cmds += j
+      when {
+        cmd.getOrNull(1) == "devices" ->
+          CommandOutput(
+            0,
+            if (launched) "List of devices attached\nemulator-5556\tdevice\n"
+            else "List of devices attached\n",
+          )
+        // Same AVD: the user started it first, so our launch hit the AVD lock and exited.
+        "emu avd name" in j -> CommandOutput(0, "Medium_Resizable_API_35\nOK\n")
+        "emulator list" in j -> CommandOutput(0, "Medium_Resizable_API_35\n")
+        "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
+        "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
+        "forward --list" in j ->
+          CommandOutput(0, "emulator-5556 tcp:18990 localabstract:adp-render-sandbox\n")
+        else -> CommandOutput(0, "OK\n")
+      }
+    }
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env + mapOf("ANDROID_HOME" to sdkWithEmulator(tmp).toString()),
+        runner = runner,
+        pingFn = { DevicePingResponse(ok = true, pid = 11) },
+        sleepFn = {},
+        launchEmulator = { _, _ ->
+          launched = true
+          FakeProcess(alive = false)
+        },
+      )
+
+    val ready = assertIs<DeviceSetupResult.Ready>(dm.ensureDeviceReady(meta))
+    assertFalse(ready.bootedEmulator)
+    dm.releaseLaunchedEmulator()
+    assertFalse(cmds.any { "emu kill" in it }, "the user's emulator was killed: $cmds")
+  }
+
+  private fun sdkWithEmulator(tmp: Path): Path {
+    val sdk = tmp.resolve("sdk")
+    val emulatorBin = sdk.resolve("emulator/emulator")
+    Files.createDirectories(emulatorBin.parent)
+    Files.writeString(emulatorBin, "#!/bin/sh\nexit 0\n")
+    emulatorBin.toFile().setExecutable(true)
+    return sdk
+  }
+
+  /** Stands in for the qemu process the SDK launcher execs into. */
+  private class FakeProcess(alive: Boolean = true) : Process() {
+    @Volatile private var running = alive
+
+    override fun getOutputStream() = java.io.OutputStream.nullOutputStream()
+
+    override fun getInputStream() = java.io.InputStream.nullInputStream()
+
+    override fun getErrorStream() = java.io.InputStream.nullInputStream()
+
+    override fun waitFor(): Int = 0
+
+    override fun exitValue(): Int = if (running) throw IllegalThreadStateException() else 0
+
+    override fun destroy() {
+      running = false
+    }
+
+    override fun isAlive(): Boolean = running
+  }
+
+  @Test
+  fun `a device that never finishes booting fails with boot_timeout instead of installing`(
+    @TempDir tmp: Path,
+  ) {
+    val meta = fakeBootstrap(tmp.resolve("b"), "apk-boot")
+    val env = fakeToolsEnv(tmp)
+    val commands = mutableListOf<String>()
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      commands += j
+      when {
+        cmd.getOrNull(1) == "devices" ->
+          CommandOutput(0, "List of devices attached\nemulator-5554\tdevice\n")
+        "emu avd name" in j -> CommandOutput(0, "Pixel_Phone\nOK\n")
+        "getprop sys.boot_completed" in j -> CommandOutput(0, "\n")
+        else -> CommandOutput(0, "OK\n")
+      }
+    }
+    var now = 0L
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env,
+        runner = runner,
+        sleepFn = { now += it },
+        nowMs = { now },
+      )
+    val result = dm.ensureDeviceReady(meta)
+    val failed = assertIs<DeviceSetupResult.Failed>(result)
+    assertEquals("boot_timeout", failed.error)
+    assertEquals(ClientExitCode.FAILED, failed.exitCode)
+    assertFalse(commands.any { " install" in it }, "must not install before boot: $commands")
+  }
+
+  @Test
+  fun `a sandbox whose worker outlived its watchdog is force-stopped before relaunch`(
+    @TempDir tmp: Path,
+  ) {
+    val meta = fakeBootstrap(tmp.resolve("b"), "apk-stuck")
+    val env = fakeToolsEnv(tmp)
+    val commands = mutableListOf<String>()
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      commands += j
+      when {
+        cmd.getOrNull(1) == "devices" ->
+          CommandOutput(0, "List of devices attached\nemulator-5554\tdevice\n")
+        "emu avd name" in j -> CommandOutput(0, "Pixel_Phone\nOK\n")
+        "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
+        "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
+        "forward --list" in j ->
+          CommandOutput(0, "emulator-5554 tcp:18997 localabstract:adp-render-sandbox\n")
+        else -> CommandOutput(0, "OK\n")
+      }
+    }
+    var pings = 0
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env,
+        runner = runner,
+        pingFn = {
+          pings++
+          if (pings == 1) stuckPing() else DevicePingResponse(pid = 2)
+        },
+        sleepFn = {},
+      )
+    assertIs<DeviceSetupResult.Ready>(dm.ensureDeviceReady(meta))
+    val stopIdx = commands.indexOfFirst { "am force-stop ${DeviceManager.HOST_PACKAGE}" in it }
+    val startIdx = commands.indexOfFirst {
+      "am start -W -n ${DeviceManager.HOST_RENDER_ACTIVITY}" in it
+    }
+    assertTrue(stopIdx >= 0, "expected force-stop in $commands")
+    assertTrue(startIdx > stopIdx, "expected relaunch after force-stop in $commands")
+  }
+
+  @Test
+  fun `restartSandboxOnSerial force-stops a wedged worker instead of trusting its ping`(
+    @TempDir tmp: Path,
+  ) {
+    val env = fakeToolsEnv(tmp)
+    val commands = mutableListOf<String>()
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      commands += j
+      if ("forward --list" in j) {
+        CommandOutput(0, "emulator-5554 tcp:18998 localabstract:adp-render-sandbox\n")
+      } else {
+        CommandOutput(0, "OK\n")
+      }
+    }
+    var pings = 0
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env,
+        runner = runner,
+        pingFn = {
+          pings++
+          if (pings == 1) stuckPing() else DevicePingResponse(pid = 7)
+        },
+        sleepFn = {},
+      )
+    assertTrue(dm.restartSandboxOnSerial("emulator-5554"))
+    assertTrue(commands.any { "am force-stop ${DeviceManager.HOST_PACKAGE}" in it }, "$commands")
+  }
+
+  @Test
+  fun `a busy but within budget sandbox is not force-stopped on restart`(@TempDir tmp: Path) {
+    val env = fakeToolsEnv(tmp)
+    val commands = mutableListOf<String>()
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      commands += j
+      if ("forward --list" in j) {
+        CommandOutput(0, "emulator-5554 tcp:18998 localabstract:adp-render-sandbox\n")
+      } else {
+        CommandOutput(0, "OK\n")
+      }
+    }
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env,
+        runner = runner,
+        pingFn = {
+          DevicePingResponse(
+            pid = 7,
+            inFlightOp = "RENDER_BATCH",
+            inFlightAgeMs = 10,
+            inFlightBudgetMs = 15_000,
+          )
+        },
+        sleepFn = {},
+      )
+    assertTrue(dm.restartSandboxOnSerial("emulator-5554"))
+    assertFalse(commands.any { "force-stop" in it })
   }
 }

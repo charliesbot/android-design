@@ -38,7 +38,28 @@ data class DevicePingResponse(
   val reloadCount: Int = 0,
   val loadedDexHashes: List<String> = emptyList(),
   val memory: DeviceMemoryStats? = null,
+  /** Name of the op the single worker thread is running, or null when the worker is idle. */
+  val inFlightOp: String? = null,
+  val inFlightAgeMs: Long = 0L,
+  /** Watchdog budget of [inFlightOp]; the service kills itself when the op outlives it. */
+  val inFlightBudgetMs: Long = 0L,
 )
+
+/**
+ * True when the worker has been running one op longer than its watchdog budget, which means the
+ * in-process watchdog failed and the host must kill the process itself.
+ */
+fun DevicePingResponse.isWorkerStuck(): Boolean =
+  inFlightOp != null && inFlightBudgetMs > 0L && inFlightAgeMs > inFlightBudgetMs
+
+/**
+ * The device service listens on an Android abstract-namespace socket, reached from the host with
+ * `adb forward tcp:<port> localabstract:<name>`. Only the adb shell (uid 2000) or root may connect.
+ */
+object DeviceTransportSpec {
+  const val SOCKET_NAME: String = "adp-render-sandbox"
+  const val ADB_REMOTE: String = "localabstract:$SOCKET_NAME"
+}
 
 @Serializable
 data class DeviceHasAssetsRequest(
@@ -193,6 +214,16 @@ data class RobolectricRenderRequest(
   val includeOverlays: Boolean = false,
   val targets: List<DeviceRenderTarget>? = null,
   val writeReport: Boolean = false,
+  /**
+   * Directory of compiled `.class` files staged by the host backend. The runner never compiles: it
+   * only loads these, exactly as the device loads the DEX the host sends. Required by every mode
+   * except `ping`.
+   */
+  val classesDir: String? = null,
+  /** Exploration-relative asset path to SHA-256, as on the device batch request. */
+  val assetMap: Map<String, String> = emptyMap(),
+  /** Directory holding the asset blobs, one file per SHA-256 named by that hash. */
+  val assetBlobsDir: String? = null,
 )
 
 @Serializable
@@ -214,4 +245,6 @@ data class RobolectricRenderResponse(
   val boardTheme: ThemeOverride? = null,
   val designTheme: ThemeOverride? = null,
   val results: List<RobolectricTargetResult> = emptyList(),
+  /** `watchdog_timeout` when the host killed the worker for outliving its budget. */
+  val recycleReason: String? = null,
 )

@@ -1,0 +1,47 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "On the list, the large orange \"3 left\" count leads the reminder rows and the orange edge button is the single clear main action; on the add screen, Save is the only primary action under the input."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Each reminder is its own full-width pill row with a checkbox, the input is its own tonal pill, and the add and Save edge buttons are distinct filled controls."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No text overlaps or is cut by its own container; the only partly visible rows are at the scrolling edges, which is expected."
+  },
+  "R-wear-round": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The time, title, count, rows, and edge buttons all sit inside the circle on both watches, and only scrolling rows are cut at the edge."
+  },
+  "R-wear-glance": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Each screen has one task: a count over a scrolling list of one-item rows, one input with a Save button, or a single confirmation check."
+  },
+  "R-wear-hero": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "The list's \"3\" is a strong hero, but on the saved confirmation the hero check mark is black on a dark brown circle, so the key status is hard to see on both watches."
+  },
+  "R-wear-sizes": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The small render is complete and uncramped, and the large render adds times under each row and \"1 of 4 done\" without breaking anything."
+  },
+  "R-wear-color": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The background is black, and accent color appears only on the hero count, the edge buttons, the mic icon, and the confirmation status, while rows use neutral containers."
+  },
+  "R-reminder-list": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Each reminder is one tappable pill row, \"Pick up laundry\" shows a filled checkmark, dimmed text, and its own \"Done\" section, and the add screen is a separate screen."
+  }
+}

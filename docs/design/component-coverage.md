@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-04
 
-> **Status:** [Visual design exploration v4](../archive/visual-design-exploration-v4.md) retired the v3 JSON catalog (`Catalog.kt`, `app/schemas/`), `export/`, and `compose-mapping.md`. Authors now write real Material 3 Compose code directly in `.explore.kt`. M3 page coverage against `sources/m3.material.io/pages/components/` is enforced directly against `scripts/material3-inventory.txt` (generated from pinned `material3-desktop`) and `CallNameMapper.kt` by `scripts/test_m3_page_coverage.py`.
+> **Status:** [Visual design exploration v4](../archive/visual-design-exploration-v4.md) retired the v3 JSON catalog (`Catalog.kt`, `app/schemas/`), `export/`, and `compose-mapping.md`. Authors now write real Material 3 Compose code directly in `.explore.kt`. M3 page coverage against `sources/m3.material.io/pages/components/` is enforced directly against `scripts/material3-inventory.txt` (generated from pinned `androidx.compose.material3:material3-android:1.5.0`) and `CallNameMapper.kt` by `scripts/test_m3_page_coverage.py`.
 
 ## TL;DR
 

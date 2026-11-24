@@ -1,0 +1,35 @@
+{
+  "backend": "claude",
+  "model": "claude-opus-5-5",
+  "wall_seconds": 289.23,
+  "turns": 38,
+  "input_tokens": 38,
+  "output_tokens": 28573,
+  "thinking_tokens": null,
+  "cache_read_tokens": 1765827,
+  "cache_creation_tokens": 109988,
+  "cost": 1.8046814000000002,
+  "check_calls": 9,
+  "compile_retries": 1,
+  "skill_bytes_read": 63625,
+  "skill_read_calls": 4,
+  "skill_unique_files": 4,
+  "skill_files_read": {
+    "android-design-explore/SKILL.md": {
+      "reads": 1,
+      "bytes": 7680
+    },
+    "android-design-explore/references/compose-signatures.md": {
+      "reads": 1,
+      "bytes": 15628
+    },
+    "android-design/SKILL.md": {
+      "reads": 1,
+      "bytes": 26498
+    },
+    "android-design/references/layout.md": {
+      "reads": 1,
+      "bytes": 13819
+    }
+  }
+}

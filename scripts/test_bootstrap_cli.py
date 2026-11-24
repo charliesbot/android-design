@@ -3,6 +3,7 @@
 import json
 import os
 import pathlib
+import re
 import stat
 import subprocess
 import tempfile
@@ -19,6 +20,9 @@ SKILL_SCRIPT = (
     / "scripts"
     / "android-design-preview"
 )
+SCRIPT_VERSION = re.search(
+  r'^VERSION="([^"]+)"', SKILL_SCRIPT.read_text(encoding="utf-8"), re.MULTILINE
+).group(1)
 
 
 def _write_executable(path: pathlib.Path, content: str) -> None:
@@ -48,6 +52,17 @@ fi
 exit 0
 """,
   )
+  return java_bin
+
+
+def _make_fake_jdk(
+    jdk_dir: pathlib.Path, version: str, capture_file: pathlib.Path
+) -> pathlib.Path:
+  java_bin = _make_fake_java(jdk_dir / "bin", capture_file)
+  text = java_bin.read_text(encoding="utf-8").replace("21.0.2", version)
+  java_bin.write_text(text, encoding="utf-8")
+  _write_executable(jdk_dir / "bin" / "javac", "#!/bin/sh\nexit 0\n")
+  (jdk_dir / "release").write_text(f'JAVA_VERSION="{version}"\n', encoding="utf-8")
   return java_bin
 
 
@@ -92,6 +107,9 @@ def _make_fake_app_dir(root: pathlib.Path, name: str = "fake-app") -> tuple[path
       f"""#!/bin/sh
 set -eu
 printf '%s\\n' "$*" > "{marker}"
+printf '%s\\n' "${{JAVA_HOME:-}}" > "{marker}.javahome"
+printf 'run\\n' >> "{marker}.runs"
+sleep "${{FAKE_GRADLE_SLEEP:-0}}"
 bdir="$(pwd)/host/build/bootstrap"
 mkdir -p "$bdir"
 printf 'jar1' > "$bdir/dep1.jar"
@@ -234,7 +252,7 @@ class BootstrapCliTest(unittest.TestCase):
       git("config", "user.name", "Tester")
       git("add", ".")
       git("commit", "-m", "initial")
-      git("tag", "v0.5.0")
+      git("tag", f"v{SCRIPT_VERSION}")
 
       bare = tmp / "origin.git"
       subprocess.run(
@@ -245,7 +263,7 @@ class BootstrapCliTest(unittest.TestCase):
 
       env["ANDROID_DESIGN_PREVIEW_FORCE_SPARSE"] = "1"
       env["ANDROID_DESIGN_PREVIEW_GIT_URL"] = bare.as_uri()
-      env["ANDROID_DESIGN_PREVIEW_GIT_REF"] = "v0.5.0"
+      env["ANDROID_DESIGN_PREVIEW_GIT_REF"] = f"v{SCRIPT_VERSION}"
 
       res = subprocess.run(
           [str(SKILL_SCRIPT), "status"],
@@ -254,7 +272,7 @@ class BootstrapCliTest(unittest.TestCase):
           text=True,
       )
       self.assertEqual(res.returncode, 0, res.stderr)
-      sparse_src = pathlib.Path(env["ANDROID_DESIGN_CACHE_DIR"]) / "0.5.0" / "src"
+      sparse_src = pathlib.Path(env["ANDROID_DESIGN_CACHE_DIR"]) / SCRIPT_VERSION / "src"
       self.assertTrue((sparse_src / "app" / "settings.gradle.kts").is_file())
       self.assertFalse((sparse_src / "docs").exists(), "Non-app docs/ must not be checked out")
       self.assertFalse((sparse_src / "sources").exists(), "Non-app sources/ must not be checked out")
@@ -385,6 +403,111 @@ class BootstrapCliTest(unittest.TestCase):
     script_text = SKILL_SCRIPT.read_text(encoding="utf-8")
     self.assertIn('!= "/usr"', script_text)
     self.assertIn('!= "/"', script_text)
+
+  def _old_java_home_env(self, tmp: pathlib.Path) -> tuple[dict[str, str], pathlib.Path, pathlib.Path]:
+    capture = tmp / "java_capture.txt"
+    old_jdk = tmp / "jdk11"
+    new_jdk = tmp / "jdk21"
+    _make_fake_jdk(old_jdk, "11.0.2", capture)
+    new_java = _make_fake_jdk(new_jdk, "21.0.2", capture)
+    env = self._base_env(tmp, capture)
+    env["PATH"] = "/usr/bin:/bin"
+    env["JAVA_HOME"] = str(old_jdk)
+    env["ANDROID_DESIGN_PREVIEW_JAVA"] = str(new_java)
+    app_dir, marker = _make_fake_app_dir(tmp)
+    env["ANDROID_DESIGN_PREVIEW_SRC"] = str(app_dir)
+    return env, new_jdk, marker
+
+  def test_old_java_home_is_replaced_for_gradle(self) -> None:
+    with tempfile.TemporaryDirectory() as td:
+      tmp = pathlib.Path(td)
+      env, new_jdk, marker = self._old_java_home_env(tmp)
+      res = subprocess.run([str(SKILL_SCRIPT), "status"], env=env, capture_output=True, text=True, timeout=30)
+      self.assertEqual(res.returncode, 0, res.stderr)
+      gradle_home = pathlib.Path(str(marker) + ".javahome").read_text(encoding="utf-8").strip()
+      self.assertEqual(gradle_home, str(new_jdk.resolve()))
+
+  def test_old_java_home_is_replaced_when_java_bin_is_cached(self) -> None:
+    with tempfile.TemporaryDirectory() as td:
+      tmp = pathlib.Path(td)
+      env, new_jdk, marker = self._old_java_home_env(tmp)
+      del env["ANDROID_DESIGN_PREVIEW_JAVA"]
+      cache = pathlib.Path(env["ANDROID_DESIGN_CACHE_DIR"])
+      cache.mkdir(parents=True)
+      (cache / "java-bin").write_text(f"{new_jdk / 'bin' / 'java'}\n", encoding="utf-8")
+      res = subprocess.run([str(SKILL_SCRIPT), "status"], env=env, capture_output=True, text=True, timeout=30)
+      self.assertEqual(res.returncode, 0, res.stderr)
+      gradle_home = pathlib.Path(str(marker) + ".javahome").read_text(encoding="utf-8").strip()
+      self.assertEqual(gradle_home, str(new_jdk.resolve()))
+
+  def test_valid_java_home_is_kept(self) -> None:
+    with tempfile.TemporaryDirectory() as td:
+      tmp = pathlib.Path(td)
+      env, new_jdk, marker = self._old_java_home_env(tmp)
+      keep = tmp / "jdk17"
+      _make_fake_jdk(keep, "17.0.9", tmp / "other_capture.txt")
+      env["JAVA_HOME"] = str(keep)
+      res = subprocess.run([str(SKILL_SCRIPT), "status"], env=env, capture_output=True, text=True, timeout=30)
+      self.assertEqual(res.returncode, 0, res.stderr)
+      gradle_home = pathlib.Path(str(marker) + ".javahome").read_text(encoding="utf-8").strip()
+      self.assertEqual(gradle_home, str(keep))
+
+  def test_concurrent_first_runs_build_once(self) -> None:
+    with tempfile.TemporaryDirectory() as td:
+      tmp = pathlib.Path(td)
+      capture = tmp / "java_capture.txt"
+      env = self._base_env(tmp, capture)
+      app_dir, marker = _make_fake_app_dir(tmp)
+      env["ANDROID_DESIGN_PREVIEW_SRC"] = str(app_dir)
+      env["FAKE_GRADLE_SLEEP"] = "2"
+      procs = [
+          subprocess.Popen([str(SKILL_SCRIPT), "status"], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+          for _ in range(2)
+      ]
+      results = [p.communicate(timeout=60) + (p.returncode,) for p in procs]
+      for out, err, rc in results:
+        self.assertEqual(rc, 0, err)
+      runs = pathlib.Path(str(marker) + ".runs").read_text(encoding="utf-8").splitlines()
+      self.assertEqual(len(runs), 1, "Exactly one process should run Gradle")
+      lock = pathlib.Path(env["ANDROID_DESIGN_CACHE_DIR"]) / SCRIPT_VERSION / ".lock"
+      self.assertFalse(lock.is_symlink() or lock.exists(), "Lock must be released")
+
+  def test_stale_lock_from_dead_process_is_cleaned(self) -> None:
+    with tempfile.TemporaryDirectory() as td:
+      tmp = pathlib.Path(td)
+      capture = tmp / "java_capture.txt"
+      env = self._base_env(tmp, capture)
+      app_dir, marker = _make_fake_app_dir(tmp)
+      env["ANDROID_DESIGN_PREVIEW_SRC"] = str(app_dir)
+      dead = subprocess.Popen(["true"])
+      dead.wait()
+      lock = pathlib.Path(env["ANDROID_DESIGN_CACHE_DIR"]) / SCRIPT_VERSION / ".lock"
+      lock.parent.mkdir(parents=True)
+      os.symlink(str(dead.pid), lock)
+      res = subprocess.run([str(SKILL_SCRIPT), "status"], env=env, capture_output=True, text=True, timeout=30)
+      self.assertEqual(res.returncode, 0, res.stderr)
+      self.assertTrue(pathlib.Path(str(marker) + ".runs").exists())
+      self.assertFalse(lock.is_symlink())
+
+  def test_live_lock_times_out_with_json_error(self) -> None:
+    with tempfile.TemporaryDirectory() as td:
+      tmp = pathlib.Path(td)
+      capture = tmp / "java_capture.txt"
+      env = self._base_env(tmp, capture)
+      app_dir, _ = _make_fake_app_dir(tmp)
+      env["ANDROID_DESIGN_PREVIEW_SRC"] = str(app_dir)
+      env["ANDROID_DESIGN_PREVIEW_LOCK_TIMEOUT"] = "1"
+      holder = subprocess.Popen(["sleep", "30"])
+      try:
+        lock = pathlib.Path(env["ANDROID_DESIGN_CACHE_DIR"]) / SCRIPT_VERSION / ".lock"
+        lock.parent.mkdir(parents=True)
+        os.symlink(str(holder.pid), lock)
+        res = subprocess.run([str(SKILL_SCRIPT), "status"], env=env, capture_output=True, text=True, timeout=30)
+      finally:
+        holder.kill()
+        holder.wait()
+      self.assertEqual(res.returncode, 3)
+      self.assertIn("bootstrap_lock_timeout", res.stdout)
 
 
 if __name__ == "__main__":

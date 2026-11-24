@@ -1,11 +1,9 @@
 package bot.charlies.androiddesign.preview.host
 
+import bot.charlies.androiddesign.preview.app.android.AndroidExplorationCompiler
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
-import bot.charlies.androiddesign.preview.host.compiler.HostClassCompiler
-import bot.charlies.androiddesign.preview.host.compiler.HostCompileOutcome
-import bot.charlies.androiddesign.preview.host.robolectric.RobolectricBoardRenderer
+import bot.charlies.androiddesign.preview.host.robolectric.RobolectricStaging
 import bot.charlies.androiddesign.preview.host.robolectric.SandboxExcludingRobolectricTestRunner
-import bot.charlies.androiddesign.preview.host.sandbox.RenderForegroundService
 import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
 import bot.charlies.androiddesign.preview.model.DeviceBatchResponse
 import bot.charlies.androiddesign.preview.model.DeviceHasAssetsRequest
@@ -14,6 +12,7 @@ import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
 import bot.charlies.androiddesign.preview.model.DeviceOp
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
 import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
+import bot.charlies.androiddesign.preview.model.DeviceTransportSpec
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PreviewJson
@@ -48,6 +47,9 @@ class HostEmulatorIntegrationTest {
 
   private val pkg = "bot.charlies.androiddesign.preview.host"
 
+  /** Host side of `adb forward`; the device side is an abstract socket. */
+  private val HOST_PORT = 18765
+
   @Test
   fun fullEmulatorEndToEndSecurityWatchdogAndRobolectricParity() {
     assumeTrue(
@@ -59,7 +61,7 @@ class HostEmulatorIntegrationTest {
     runAdb("install", "-r", meta.apkPath.toString())
     runAdb("shell", "cmd", "package", "compile", "-m", "speed", "-f", pkg)
     runAdb("shell", "dumpsys", "deviceidle", "whitelist", "+$pkg")
-    runAdb("forward", "tcp:${RenderForegroundService.PORT}", "tcp:${RenderForegroundService.PORT}")
+    runAdb("forward", "tcp:$HOST_PORT", DeviceTransportSpec.ADB_REMOTE)
     startServiceAndAwaitPing()
 
     val workDir = tempFolder.newFolder("emu-fixtures").toPath()
@@ -70,24 +72,26 @@ class HostEmulatorIntegrationTest {
     Files.writeString(wearFile, HostTestFixtures.WEAR_EXPLORE_SOURCE)
 
     val phoneClasses =
-      HostClassCompiler.compileToClasses(
+      AndroidExplorationCompiler.compileSourceToDex(
         HostTestFixtures.PHONE_EXPLORE_FILE,
         HostTestFixtures.PHONE_EXPLORE_SOURCE,
-      ) as HostCompileOutcome.Classes
-    val phoneDex = HostClassCompiler.compileToDex(phoneClasses, meta)
+        meta = meta,
+      ) as AndroidExplorationCompiler.DexCompileOutcome.Ready
+    val phoneDex = phoneClasses.dexBytes
     val phoneHash = sha256Hex(phoneDex).take(16)
 
     val wearClasses =
-      HostClassCompiler.compileToClasses(
+      AndroidExplorationCompiler.compileSourceToDex(
         HostTestFixtures.WEAR_EXPLORE_FILE,
         HostTestFixtures.WEAR_EXPLORE_SOURCE,
-      ) as HostCompileOutcome.Classes
-    val wearDex = HostClassCompiler.compileToDex(wearClasses, meta)
+        meta = meta,
+      ) as AndroidExplorationCompiler.DexCompileOutcome.Ready
+    val wearDex = wearClasses.dexBytes
     val wearHash = sha256Hex(wearDex).take(16)
 
     // 1. Asset protocol (HAS_ASSETS + PUT_ASSETS) & PRELOAD_DEX + PHONE batch (1x, 2x, overlays,
     // LZ4, WEBP, NONE)
-    Socket("127.0.0.1", RenderForegroundService.PORT).use { sock ->
+    Socket("127.0.0.1", HOST_PORT).use { sock ->
       sock.tcpNoDelay = true
       sock.soTimeout = 30_000
       val output = DataOutputStream(BufferedOutputStream(sock.getOutputStream(), 65536))
@@ -253,7 +257,7 @@ class HostEmulatorIntegrationTest {
 
       // 3. Parity check: Emulator (Display 0 insets consumed) vs Robolectric (same fixtures)
       val roboPhone1x =
-        RobolectricBoardRenderer.handleRequest(
+        RobolectricStaging.handle(
             RobolectricRenderRequest(
               id = "parity-p1",
               sourcePath = phoneFile.toString(),
@@ -266,7 +270,7 @@ class HostEmulatorIntegrationTest {
           .trees
           .single()
       val roboPhone2x =
-        RobolectricBoardRenderer.handleRequest(
+        RobolectricStaging.handle(
             RobolectricRenderRequest(
               id = "parity-p2",
               sourcePath = phoneFile.toString(),
@@ -279,7 +283,7 @@ class HostEmulatorIntegrationTest {
           .trees
           .single()
       val roboWearMain =
-        RobolectricBoardRenderer.handleRequest(
+        RobolectricStaging.handle(
             RobolectricRenderRequest(
               id = "parity-w1",
               sourcePath = wearFile.toString(),
@@ -359,12 +363,13 @@ class HostEmulatorIntegrationTest {
         """
           .trimIndent()
       val maliciousClasses =
-        HostClassCompiler.compileToClasses(
+        AndroidExplorationCompiler.compileSourceToDex(
           "Malicious.explore.kt",
           maliciousSource,
           skipGuards = true,
-        ) as HostCompileOutcome.Classes
-      val maliciousDex = HostClassCompiler.compileToDex(maliciousClasses, meta)
+          meta = meta,
+        ) as AndroidExplorationCompiler.DexCompileOutcome.Ready
+      val maliciousDex = maliciousClasses.dexBytes
       val (malResp, _) =
         sendBatch(
           output = output,
@@ -407,9 +412,12 @@ class HostEmulatorIntegrationTest {
         """
           .trimIndent()
       val boomClasses =
-        HostClassCompiler.compileToClasses("Boom.explore.kt", recompBoomSource)
-          as HostCompileOutcome.Classes
-      val boomDex = HostClassCompiler.compileToDex(boomClasses, meta)
+        AndroidExplorationCompiler.compileSourceToDex(
+          "Boom.explore.kt",
+          recompBoomSource,
+          meta = meta,
+        ) as AndroidExplorationCompiler.DexCompileOutcome.Ready
+      val boomDex = boomClasses.dexBytes
       val (boomResp, _) =
         sendBatch(
           output = output,
@@ -453,9 +461,12 @@ class HostEmulatorIntegrationTest {
         """
           .trimIndent()
       val effectClasses =
-        HostClassCompiler.compileToClasses("EffectBoom.explore.kt", effectBoomSource)
-          as HostCompileOutcome.Classes
-      val effectDex = HostClassCompiler.compileToDex(effectClasses, meta)
+        AndroidExplorationCompiler.compileSourceToDex(
+          "EffectBoom.explore.kt",
+          effectBoomSource,
+          meta = meta,
+        ) as AndroidExplorationCompiler.DexCompileOutcome.Ready
+      val effectDex = effectClasses.dexBytes
       val (effectResp, _) =
         sendBatch(
           output = output,
@@ -505,9 +516,13 @@ class HostEmulatorIntegrationTest {
         """
           .trimIndent()
       val hangClasses =
-        HostClassCompiler.compileToClasses("Hang.explore.kt", hangSource, skipGuards = true)
-          as HostCompileOutcome.Classes
-      val hangDex = HostClassCompiler.compileToDex(hangClasses, meta)
+        AndroidExplorationCompiler.compileSourceToDex(
+          "Hang.explore.kt",
+          hangSource,
+          skipGuards = true,
+          meta = meta,
+        ) as AndroidExplorationCompiler.DexCompileOutcome.Ready
+      val hangDex = hangClasses.dexBytes
       val (hangResp, _) =
         sendBatch(
           output = output,
@@ -580,7 +595,7 @@ class HostEmulatorIntegrationTest {
     val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15)
     while (System.nanoTime() < deadline) {
       val ping = runCatching {
-        Socket("127.0.0.1", RenderForegroundService.PORT).use { s ->
+        Socket("127.0.0.1", HOST_PORT).use { s ->
           s.soTimeout = 3000
           val out = DataOutputStream(BufferedOutputStream(s.getOutputStream()))
           val inp = DataInputStream(BufferedInputStream(s.getInputStream()))

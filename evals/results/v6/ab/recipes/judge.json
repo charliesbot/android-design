@@ -1,0 +1,77 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The week's lead Shakshuka photo dominates the discover screen, and the detail leads with the photo, the title, and one Save recipe button as the clear primary action."
+  },
+  "R-fill": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The only strong saturated fill is the Save recipe button; the search bar, selected chip, and ingredients card are soft tonal containers."
+  },
+  "R-surfaces": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Calm warm-neutral backgrounds with light tonal containers (search bar, ingredients card) group the content without competing with the photos."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Chips, the search bar, the filled Save button, and the photo tiles and list rows all read as separate tappable controls; no lone text buttons."
+  },
+  "R-font": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "Fraunces is used for 'Simmer' and the recipe titles at a regular weight with no axis settings, so the brand face shows no deliberate weight or width choice."
+  },
+  "R-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No chevrons on rows, no Cancel/Done text in a top bar, and content runs edge to edge in Android style."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No text is clipped or overlapping in any layout; tile titles wrap cleanly and rows cut at the bottom edge are only scrolling content."
+  },
+  "R-dark": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "In dark, text, icons, the stars, the chip outlines, and the light-pink Save button all stay legible on dark surfaces."
+  },
+  "R-adaptive": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Foldable widens to a roomier single pane, while tablet and desktop show discover beside a two-column recipe detail (ingredients and steps beside the photo), revealing far more at once."
+  },
+  "R-idea": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "A cookbook-spread design: an editorial lead photo with three tiles under it, a serif brand voice, and a detail laid out like a magazine page with photo and title beside ingredients and steps."
+  },
+  "R-semantics": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Every section title (Simmer, This week, the category count, Ingredients, Steps, recipe name) has heading(); there are no toggling rows, and the category FilterChips are already single controls."
+  },
+  "R-fields": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The search InputField uses textFieldState from rememberTextFieldState with a searchBarState; there are no password fields."
+  },
+  "R-visibility": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Nothing is hidden by alpha; category filtering removes items from the list, and the detail swaps through listDetail."
+  },
+  "R-blur": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No blur is used, and no text is drawn over photos."
+  },
+  "R-recipes-browse": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Search is a SearchBar at the top, categories are FilterChips, and the featured set leads with a large photo plus photo tiles (a hero-style layout); titles sit below the photos, so they stay readable."
+  }
+}

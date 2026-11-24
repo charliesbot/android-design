@@ -755,6 +755,8 @@ class RenderQueue(
     minBudgetMs: Long? = null,
     block: () -> T,
   ): T {
+    // Warm a fresh worker first, outside the budget, so a cold start is not charged to this job.
+    effectiveBackend.prepare()
     val w = watchdog ?: return block()
     return w.guard(contentHash, scope, isCold, repoRoot.toString(), minBudgetMs, block)
   }

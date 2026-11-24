@@ -369,7 +369,7 @@ class PreviewHttpServerTest {
     }
 
     val selected =
-      PreviewHttpServer.selectImagesForResponse(
+      CheckService.selectImagesForResponse(
         artifacts =
           listOf(
             fakeArt("foldable", identicalPng),

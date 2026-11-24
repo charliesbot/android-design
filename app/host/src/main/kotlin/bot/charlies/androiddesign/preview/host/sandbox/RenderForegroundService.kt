@@ -6,6 +6,8 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.LocalServerSocket
+import android.net.LocalSocket
 import android.os.IBinder
 import android.os.Process
 import android.util.Log
@@ -18,29 +20,26 @@ import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
 import bot.charlies.androiddesign.preview.model.DeviceOp
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
 import bot.charlies.androiddesign.preview.model.DevicePreloadResponse
+import bot.charlies.androiddesign.preview.model.DeviceTransportSpec
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.IOException
-import java.net.InetAddress
-import java.net.ServerSocket
-import java.net.Socket
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 
 class RenderForegroundService : Service() {
   private val workerExecutor = Executors.newSingleThreadExecutor()
   private val clientExecutor = Executors.newCachedThreadPool { runnable ->
-    Thread(runnable, "adp-tcp-client").apply { isDaemon = true }
+    Thread(runnable, "adp-client").apply { isDaemon = true }
   }
   private val watchdogExecutor = Executors.newSingleThreadScheduledExecutor()
-  private val activeSockets = ConcurrentHashMap.newKeySet<Socket>()
-  private var serverSocket: ServerSocket? = null
+  private val guardedWorker = GuardedWorker(workerExecutor, watchdogExecutor)
+  private val activeSockets = ConcurrentHashMap.newKeySet<LocalSocket>()
+  private var serverSocket: LocalServerSocket? = null
   @Volatile private var running = true
   private lateinit var renderer: VirtualClockComposeRenderer
 
@@ -49,7 +48,7 @@ class RenderForegroundService : Service() {
     ProposalFonts.init(assets)
     renderer = VirtualClockComposeRenderer(this)
     startAsForeground()
-    startTcpServer()
+    startSocketServer()
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
@@ -89,39 +88,47 @@ class RenderForegroundService : Service() {
     startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
   }
 
-  private fun startTcpServer() {
+  private fun startSocketServer() {
     Thread(
         {
           try {
-            val server =
-              ServerSocket(PORT, 8, InetAddress.getByName("127.0.0.1")).apply {
-                reuseAddress = true
-              }
+            val server = LocalServerSocket(DeviceTransportSpec.SOCKET_NAME)
             serverSocket = server
-            Log.i(TAG, "Listening on 127.0.0.1:$PORT pid=${Process.myPid()}")
+            Log.i(TAG, "Listening on @${DeviceTransportSpec.SOCKET_NAME} pid=${Process.myPid()}")
             while (running) {
               val client = server.accept()
-              client.tcpNoDelay = true
+              if (!isTrustedPeer(client)) {
+                runCatching { client.close() }
+                continue
+              }
               activeSockets.add(client)
               clientExecutor.submit { handleClient(client) }
             }
           } catch (t: Throwable) {
             if (running) {
-              Log.e(TAG, "TCP server error", t)
+              Log.e(TAG, "Socket server error", t)
             }
           }
         },
-        "adp-tcp-accept",
+        "adp-accept",
       )
       .start()
   }
 
-  private fun handleClient(socket: Socket) {
+  private fun isTrustedPeer(client: LocalSocket): Boolean {
+    val uid = runCatching { client.peerCredentials.uid }.getOrDefault(-1)
+    if (PeerCredentialPolicy.isTrusted(uid)) return true
+    Log.w(TAG, "Rejected connection from uid=$uid")
+    return false
+  }
+
+  private fun handleClient(socket: LocalSocket) {
     val writeLock = Any()
     try {
       socket.use { s ->
-        val input = DataInputStream(BufferedInputStream(s.getInputStream(), 65536))
-        val output = DataOutputStream(BufferedOutputStream(s.getOutputStream(), 65536))
+        val input = DataInputStream(BufferedInputStream(s.inputStream, 65536))
+        val output = DataOutputStream(BufferedOutputStream(s.outputStream, 65536))
+        val sink = ClientSink(s, output, writeLock)
         while (running) {
           val op =
             try {
@@ -135,7 +142,9 @@ class RenderForegroundService : Service() {
               val dexHash = readUtfBytes(input)
               val entryClass = readUtfBytes(input)
               val dexBytes = readSizedBytes(input)
-              runOnWorker { executePreloadDex(dexHash, entryClass, dexBytes, output, writeLock) }
+              runGuarded("PRELOAD_DEX", OP_BUDGET_MS, sink) {
+                executePreloadDex(dexHash, entryClass, dexBytes)
+              }
             }
             DeviceOp.PUT_ASSETS -> {
               val count = input.readInt()
@@ -145,24 +154,34 @@ class RenderForegroundService : Service() {
                     add(readUtfBytes(input) to readSizedBytes(input))
                   }
                 }
-              runOnWorker { executePutAssets(items, output, writeLock) }
+              runGuarded("PUT_ASSETS", OP_BUDGET_MS, sink) { executePutAssets(items) }
             }
             DeviceOp.HAS_ASSETS -> {
               val reqJson = readUtfBytes(input)
-              runOnWorker { executeHasAssets(reqJson, output, writeLock) }
+              runGuarded("HAS_ASSETS", OP_BUDGET_MS, sink) { executeHasAssets(reqJson) }
             }
             DeviceOp.RENDER_BATCH -> {
               val dexBytes = readOptionalSizedBytes(input)
               val entryClass = readUtfBytes(input)
-              val reqJson = readUtfBytes(input)
-              runOnWorker {
-                executeRenderBatch(s, dexBytes, entryClass, reqJson, output, writeLock)
+              val request =
+                PreviewJson.compact.decodeFromString(
+                  DeviceBatchRequest.serializer(),
+                  readUtfBytes(input),
+                )
+              val timeoutMs = request.timeoutMs.coerceAtLeast(MIN_BATCH_BUDGET_MS)
+              runGuarded(
+                "RENDER_BATCH",
+                timeoutMs,
+                sink,
+                timeoutReply = batchTimeoutReply(timeoutMs),
+              ) {
+                executeRenderBatch(dexBytes, entryClass, request)
               }
             }
             DeviceOp.SET_LIVE -> {
               val dexBytes = readOptionalSizedBytes(input)
               val reqJson = readUtfBytes(input)
-              runOnWorker { executeSetLive(dexBytes, reqJson, output, writeLock) }
+              runGuarded("SET_LIVE", OP_BUDGET_MS, sink) { executeSetLive(dexBytes, reqJson) }
             }
             DeviceOp.RECYCLE -> {
               handleRecycle(output, writeLock)
@@ -179,15 +198,51 @@ class RenderForegroundService : Service() {
     }
   }
 
-  private fun runOnWorker(block: () -> Unit) {
-    try {
-      workerExecutor.submit(block).get()
-    } catch (e: java.util.concurrent.ExecutionException) {
-      throw e.cause ?: e
+  /**
+   * Writes a client's replies; on watchdog expiry answers, closes the client, and kills `:sandbox`.
+   */
+  private inner class ClientSink(
+    private val socket: LocalSocket,
+    private val output: DataOutputStream,
+    private val writeLock: Any,
+  ) : ReplySink {
+    override fun send(reply: OpReply) {
+      synchronized(writeLock) {
+        reply.write(output)
+        output.flush()
+      }
+    }
+
+    override fun expired(reply: OpReply) {
+      Log.e(TAG, "Watchdog timeout; killing :sandbox process")
+      synchronized(writeLock) {
+        runCatching {
+          reply.write(output)
+          output.flush()
+          socket.close()
+        }
+      }
+      runCatching { Thread.sleep(50) }
+      Process.killProcess(Process.myPid())
     }
   }
 
+  /**
+   * Every op that touches user DEX or renderer state goes through here, so none can wedge
+   * `:sandbox`.
+   */
+  private fun runGuarded(
+    name: String,
+    budgetMs: Long,
+    sink: ReplySink,
+    timeoutReply: OpReply = opTimeoutReply(name, budgetMs),
+    block: () -> OpReply,
+  ) {
+    guardedWorker.run(name, budgetMs, timeoutReply, sink, block)
+  }
+
   private fun handlePing(output: DataOutputStream, writeLock: Any) {
+    val inFlight = guardedWorker.inFlight()
     val resp =
       DevicePingResponse(
         ok = true,
@@ -196,18 +251,15 @@ class RenderForegroundService : Service() {
         reloadCount = renderer.currentReloadCount(),
         loadedDexHashes = renderer.cachedDexHashes(),
         memory = renderer.collectMemoryStats(),
+        inFlightOp = inFlight?.name,
+        inFlightAgeMs = inFlight?.let { guardedWorker.ageMs(it) } ?: 0L,
+        inFlightBudgetMs = inFlight?.budgetMs ?: 0L,
       )
     val json = PreviewJson.compact.encodeToString(DevicePingResponse.serializer(), resp)
     writeJsonPacket(output, writeLock, json)
   }
 
-  private fun executePreloadDex(
-    dexHash: String,
-    entryClass: String,
-    dexBytes: ByteArray,
-    output: DataOutputStream,
-    writeLock: Any,
-  ) {
+  private fun executePreloadDex(dexHash: String, entryClass: String, dexBytes: ByteArray): OpReply {
     val resp =
       try {
         val board = renderer.preloadDex(dexHash, entryClass, dexBytes)
@@ -225,75 +277,28 @@ class RenderForegroundService : Service() {
         Log.e(TAG, "PRELOAD_DEX failed", t)
         DevicePreloadResponse(ok = false, error = "${t::class.java.name}: ${t.message}")
       }
-    writeJsonPacket(
-      output,
-      writeLock,
-      PreviewJson.compact.encodeToString(DevicePreloadResponse.serializer(), resp),
-    )
+    return jsonReply(PreviewJson.compact.encodeToString(DevicePreloadResponse.serializer(), resp))
   }
 
-  private fun executePutAssets(
-    items: List<Pair<String, ByteArray>>,
-    output: DataOutputStream,
-    writeLock: Any,
-  ) {
+  private fun executePutAssets(items: List<Pair<String, ByteArray>>): OpReply {
     for ((hash, bytes) in items) {
       renderer.assetCache.put(hash, bytes)
     }
-    writeJsonPacket(output, writeLock, """{"ok":true,"stored":${items.size}}""")
+    return jsonReply("""{"ok":true,"stored":${items.size}}""")
   }
 
-  private fun executeHasAssets(
-    reqJson: String,
-    output: DataOutputStream,
-    writeLock: Any,
-  ) {
+  private fun executeHasAssets(reqJson: String): OpReply {
     val req = PreviewJson.compact.decodeFromString(DeviceHasAssetsRequest.serializer(), reqJson)
     val missing = renderer.assetCache.missing(req.hashes)
     val resp = DeviceHasAssetsResponse(missing = missing)
-    val json = PreviewJson.compact.encodeToString(DeviceHasAssetsResponse.serializer(), resp)
-    writeJsonPacket(output, writeLock, json)
+    return jsonReply(PreviewJson.compact.encodeToString(DeviceHasAssetsResponse.serializer(), resp))
   }
 
   private fun executeRenderBatch(
-    socket: Socket,
     dexBytes: ByteArray?,
     entryClass: String,
-    reqJson: String,
-    output: DataOutputStream,
-    writeLock: Any,
-  ) {
-    val request = PreviewJson.compact.decodeFromString(DeviceBatchRequest.serializer(), reqJson)
-
-    val responded = AtomicBoolean(false)
-    val timeoutMs = request.timeoutMs.coerceAtLeast(250L)
-    val timeoutFuture =
-      watchdogExecutor.schedule(
-        {
-          if (responded.compareAndSet(false, true)) {
-            Log.e(TAG, "Watchdog timeout after ${timeoutMs}ms; killing :sandbox process")
-            synchronized(writeLock) {
-              runCatching {
-                val timeoutResp =
-                  DeviceBatchResponse(
-                    ok = false,
-                    error = "Batch render timed out after $timeoutMs ms",
-                    reloadCount = renderer.currentReloadCount(),
-                    recycleRecommended = true,
-                    recycleReason = "watchdog_timeout",
-                  )
-                writeBatchResult(output, timeoutResp, emptyList())
-                socket.close()
-              }
-            }
-            runCatching { Thread.sleep(50) }
-            Process.killProcess(Process.myPid())
-          }
-        },
-        timeoutMs,
-        TimeUnit.MILLISECONDS,
-      )
-
+    request: DeviceBatchRequest,
+  ): OpReply {
     val (response, frames) =
       try {
         renderer.executeBatch(dexBytes, entryClass, request)
@@ -305,23 +310,11 @@ class RenderForegroundService : Service() {
           reloadCount = renderer.currentReloadCount(),
           memoryAfter = renderer.collectMemoryStats(),
         ) to emptyList()
-      } finally {
-        timeoutFuture.cancel(false)
       }
-
-    if (responded.compareAndSet(false, true)) {
-      synchronized(writeLock) {
-        writeBatchResult(output, response, frames)
-      }
-    }
+    return OpReply { output -> writeBatchResult(output, response, frames) }
   }
 
-  private fun executeSetLive(
-    dexBytes: ByteArray?,
-    reqJson: String,
-    output: DataOutputStream,
-    writeLock: Any,
-  ) {
+  private fun executeSetLive(dexBytes: ByteArray?, reqJson: String): OpReply {
     val req = PreviewJson.compact.decodeFromString(DeviceLiveStateRequest.serializer(), reqJson)
     val json =
       try {
@@ -331,7 +324,30 @@ class RenderForegroundService : Service() {
         Log.e(TAG, "SET_LIVE failed", t)
         """{"ok":false,"error":"${escapeJson("${t::class.java.name}: ${t.message}")}"}"""
       }
-    writeJsonPacket(output, writeLock, json)
+    return jsonReply(json)
+  }
+
+  private fun batchTimeoutReply(timeoutMs: Long): OpReply = OpReply { output ->
+    val resp =
+      DeviceBatchResponse(
+        ok = false,
+        error = "Batch render timed out after $timeoutMs ms",
+        reloadCount = renderer.currentReloadCount(),
+        recycleRecommended = true,
+        recycleReason = "watchdog_timeout",
+      )
+    writeBatchResult(output, resp, emptyList())
+  }
+
+  private fun opTimeoutReply(name: String, budgetMs: Long): OpReply =
+    jsonReply(
+      """{"ok":false,"error":"$name timed out after $budgetMs ms; sandbox restarted"}""",
+    )
+
+  private fun jsonReply(json: String): OpReply = OpReply { output ->
+    val bytes = json.toByteArray(StandardCharsets.UTF_8)
+    output.writeInt(bytes.size)
+    output.write(bytes)
   }
 
   private fun handleRecycle(output: DataOutputStream, writeLock: Any) {
@@ -413,6 +429,7 @@ class RenderForegroundService : Service() {
 
   companion object {
     private const val TAG = "AdpRenderService"
-    const val PORT = 18765
+    private const val OP_BUDGET_MS = 30_000L
+    private const val MIN_BATCH_BUDGET_MS = 250L
   }
 }

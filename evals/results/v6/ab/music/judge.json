@@ -1,0 +1,77 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Album art, the Fraunces title, and the large filled play/pause button lead clearly; secondary toggles and the sheet actions are quieter."
+  },
+  "R-fill": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The play/pause button is the only strong saturated fill; previous/next and the toolbar use light tonal containers."
+  },
+  "R-surfaces": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "A calm blush/near-black surface backs the content, and tonal containers group the transport and sheet actions without competing."
+  },
+  "R-controls": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "Lyrics, Queue, and Credits are borderless text buttons inside one tonal pill, so the toolbar reads as a single wide pill rather than three separate controls."
+  },
+  "R-font": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "'Golden Hour' uses Fraunces at its default regular weight with no visible axis treatment, which reads as a brand face swapped in without intent."
+  },
+  "R-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No disclosure chevrons or Cancel/Done text; the sheets use a drag handle and close icon, and content runs edge to edge."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No text is clipped or overlapping in the plain renders or in the sheet contents across sizes."
+  },
+  "R-dark": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "In dark, the pink accents, white text, and tonal buttons are all legible against the near-black surface."
+  },
+  "R-adaptive": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The tablet and desktop renders use a two-column layout that adds an 'Up next' section, and the sheets become a side sheet; nothing overflows or overlaps."
+  },
+  "R-idea": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "Apart from the wavy progress bar and the highlighted lyric line, this is a standard catalog now-playing layout with no specific design idea."
+  },
+  "R-semantics": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "'Up next' and the sheet titles carry heading(), and the toggles are single IconToggleButtons with no rows that toggle."
+  },
+  "R-fields": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The proposal contains no text fields."
+  },
+  "R-visibility": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The sheet is shown through AnimatedVisibility plus a null check, so it leaves the composition when hidden."
+  },
+  "R-blur": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No blur is used; the sheets sit on solid surfaces over a scrim."
+  },
+  "R-music-actions": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "The three actions are icon+label TextButtons with no individual containers inside one tonal pill, so they read as one wide pill rather than distinct icon buttons."
+  }
+}

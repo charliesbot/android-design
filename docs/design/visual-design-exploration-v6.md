@@ -64,7 +64,7 @@ The host control plane carries over from v5 with minimal surface change: `Previe
 - **Version mismatch replacement and displaced checks:** When a client connects with a different version or local dev checkout (`ANDROID_DESIGN_PREVIEW_SRC`), it stops the running server, starts its own version, and reinstalls the matching `host-preview.apk`. Any in-flight `check` interrupted by that replacement fails immediately with `replaced by v<x>, rerun` instead of hanging or timing out.
 - **Auth and board tokens:** Keep one shared `clientSecret` (`0600`) in the server record for local CLI calls and one shared `viewToken` for the browser board, matching v5. `?repo=<id>` on `/?repo=<id>&view=<token>` selects which repository is active on the board rather than acting as a per-repo security boundary.
 - **Cross-repo queue ordering and device ownership:** Offscreen `RenderQueue` jobs from different repositories serialize cleanly through the shared server tagged by `(repoRoot, dexHash)`, so background checks never overwrite another repository's results. Live visible Activity ownership belongs to whichever repository last ran `check` or `open`, or whichever repository is selected on the browser board.
-- **Device lifecycle via `android` CLI:** `android-design-preview start` (and auto-setup on `check` when no active forward exists) calls the `android` CLI (`android emulator`, `android install`) to boot an emulator if needed, install `host-preview.apk`, run one-time AOT compilation (`adb shell cmd package compile -m speed -f <pkg>`), apply background idle exemptions, and establish `adb forward`. Because `android emulator create --list-profiles` offers no `resizable` profile (only phone, foldable, tablet, and desktop profiles), `android-design-preview start` reuses an existing compatible AVD (preferring a `resizable` AVD created in Android Studio or with `avdmanager` if present) and otherwise creates `medium_phone` with `android emulator create`. The resizable emulator toolbar (API 34+) is optional for sizing the live interactive view and is never resized or required for offscreen checks.
+- **Device lifecycle, owned by the server:** the preview server does the only device setup, whether `android-design-preview start` or `check` started it (the CLI just validates `--serial` and `--avd` first). It boots an emulator if needed through the SDK `emulator` binary with `-gpu host -no-snapshot-save` (`android emulator start --headless` forces software rendering, which recent system images never finish booting on, so the `android` CLI is only the fallback when the binary is missing). It owns an emulator only when the serial that comes online runs the AVD it launched while its launched process is still alive. It shuts that emulator down when setup fails, when it stops or idles out, and when the CLI times out waiting for it (the CLI sends SIGTERM before forcing a kill). Devices that were already running, or that won a boot race, are left alone. Ownership does not pass to a replacement server: after a version replacement or a deadline respawn, an emulator the old server booted keeps running until the user stops it. It also installs `host-preview.apk`, runs one-time AOT compilation (`adb shell cmd package compile -m speed -f <pkg>`), applies background idle exemptions, and establishes `adb forward`. Because `android emulator create --list-profiles` offers no `resizable` profile (only phone, foldable, tablet, and desktop profiles), `android-design-preview start` reuses an existing compatible AVD (preferring a `resizable` AVD created in Android Studio or with `avdmanager` if present) and otherwise creates `medium_phone` with `android emulator create`. The resizable emulator toolbar (API 34+) is optional for sizing the live interactive view and is never resized or required for offscreen checks.
 - **Why the server stays on the host computer:**
   1. Speculative pre-compile needs a host process watching `.explore.kt` and `DESIGN.md` directly.
   2. `check` returns local host PNG file paths so the agent's file-reading tool opens them without cross-device pull logic in the CLI.
@@ -100,43 +100,43 @@ v6 replaces v5 only after passing both speed and eval parity gates on Apple Sili
 
 ### Rollout gate results
 
-Both rollout gates passed before authorizing v5 removal (`#162`, Apple Silicon host + Robolectric `4.18.1` `@Config(sdk = [35])`). During rollout testing, two pre-existing v6 bootstrap/parity issues were caught and fixed: rejecting macOS's `/usr/bin/java` shim in `android-design-preview` (`java-bin` cache and `JAVA_HOME` derivation), and providing `LocalWindowInfo` inside `DesignBoard.kt` (`BoardContent`) so `LocalWindowInfo.current` and `currentWindowAdaptiveInfo()` report the target view frame (`1280x800` dp tablet, etc.) rather than Robolectric or Display 0 phone bounds.
+Rerun on the v0.6.0 fixes (watchdogs and liveness on the device worker, server supervision, Robolectric parity through the shared compiler and `SettlePolicy`, server-owned device lifecycle). Raw outputs are committed under `evals/results/v6/` (`speed.json`, `ab/`, `multiturn/`). Every eval ran in Claude Code; the earlier v5 and v6 A/B numbers came from `agy` (Gemini) and are not comparable, so this section judges the A/B run against the bar itself.
 
-**Apple Silicon Host APK speed gate (`Pixel_10_Pro_XL` headless, uncached edits on `android` backend):**
+**Speed gate: passes.** Apple Silicon host, `Pixel_10_Pro_XL` headless emulator, `android` backend, uncached edits, every sample checked for the expected render count and a valid result (`evals/bench_speed.py`, commit `5de0b7e`):
 
-| Benchmark | Target | Measured median | Min / Max | Server compile / device render median |
-| --- | --- | --- | --- | --- |
-| Warm 1-view scoped `check` (`n=7`) | `<= 500 ms` | **`434.2 ms`** | `412.2 ms` / `531.2 ms` | `248.0 ms` / `40.0 ms` |
-| Full 15-view unscoped `check` (`n=5`, 3 directions x 5 views at `2x`) | `<= 2800 ms` | **`886.6 ms`** | `829.5 ms` / `941.1 ms` | `189.0 ms` / `532.0 ms` |
-
-**Eight-case A/B suite (`evals/run.py`, `Gemini 3.8 Flash (High)` generator and judge, Robolectric backend):**
-
-| Metric | v5 (`d9df0b7`) | v6 Run 2 (`#162`) | Notes |
+| Benchmark | Target | Median | Min / Max |
 | --- | --- | --- | --- |
-| Cases passed (rubric) | `5/8` (`69/71` across 7 completed) | `5/8` (`85/87` across 7 completed) | `trek` aborted at startup on transient `agy` empty conversation ID; standalone post-fix `trek` retry passed `3/3` code checks and `15/15` rubric |
-| Deterministic code checks | `20/21` (`20/22` with `C-generation`) | **`18/18` (`100%` completed)** | `21/21` (`100%`) including standalone `trek` retry (`3/3`) |
-| Median compile retries | `0` | **`0`** (`0, 0, 0, 0, 1, 1, 3`) | Standalone `trek` retry had `1` |
-| Median agent turns | `27` | `28` | `30` on standalone `trek` retry |
-| Median input tokens | `197,819` | **`145,561`** (`-26.4%`) | `163,306` on standalone `trek` retry |
-| Median output tokens | `49,108` | **`45,359`** (`-7.6%`) | `66,653` on standalone `trek` retry |
-| Median check calls | `7` | `7` | `7` on standalone `trek` retry |
-| Median wall time | `655.9 s` | `672.8 s` | `763.5 s` on standalone `trek` retry |
-| Median `skill_bytes_read` | `112,236 B` | `124,925 B` | `171,462 B` on standalone `trek` retry |
+| Warm 1-view scoped `check` (`n=7`) | `<= 500 ms` | **`423.9 ms`** | `411.3 ms` / `471.5 ms` |
+| Full 15-view unscoped `check` (`n=7`, 3 directions x 5 views) | `<= 2800 ms` | **`765.9 ms`** | `712.9 ms` / `790.4 ms` |
 
-Run 2 per-case results: `music` (`3/3`, `15/15`), `settings` (`3/3`, `15/15`), `workout` (`2/2`, `9/9`), `player` (`2/2`, `9/9`), and `reminder` (`2/2`, `9/9`) passed; `finance` (`3/3`, `14/15` on `R-finance-categories`) and `recipes` (`3/3`, `14/15` on `R-platform`) passed all deterministic checks; `trek` failed `C-generation` (`empty conversation id`) before writing code. Earlier full 8-case Run 1 passed `6/8` rubric (`100/102` items including `trek` `15/15`), `21/21` (`100%`) deterministic checks, `628.3 s` median wall time, `27` median turns, `153,120` input / `43,497` output tokens, `8` check calls, and `0.5` median compile retries (5 LLM Kotlin typos across `music`, `trek`, `player`, `reminder`).
+**Eight-case A/B suite: fails the bar.** `evals/run.py`, `claude-opus-5-5` generator and judge (one judge run), Robolectric backend, one run of all 8 cases:
 
-**Ten-turn multi-turn revision case (`evals/multiturn.py`, Robolectric backend, post-`LocalWindowInfo` fix):**
+| Metric | Bar | Result |
+| --- | --- | --- |
+| Cases passing every rubric item | `6/8` | **`3/8`** (`trek`, `player`, `workout`); `93/102` items |
+| Deterministic code checks | `100%` | **`18/21`** (`86%`): `music`, `workout`, `reminder` each fail `C-review` |
+| Median compile retries | `0` | **`0.5`** |
+| Median wall time / turns | | `174.6 s` / `25.5` |
+| Median output tokens / check calls | | `16,748` / `6.5` |
+| Median `skill_bytes_read` | | `63,625 B` |
 
-| Metric | v5 (`3b1294c`, `claude-fable-5-2`) | v6 (`claude-opus-5-5`) | Notes |
+Failures, by cause:
+
+- **Previewer bug (`music` `C-review`).** The lyrics and queue sheets render inside the view, but the layout tree reports a padded `Column` (`fillMaxWidth().padding(start = 24.dp, ...)`) at its padded x (`24 dp`) with its unpadded width (`411 dp`), so it appears to end at `435 dp` in a `411 dp` view and trips `offscreen` and `overflow`. The child `Row` bounds are consistent. This is a tree-bounds bug, not an agent layout error.
+- **Not yet triaged (`workout`, `reminder` `C-review`).** `workout` flags `contrast` on the watch end-confirm overlay; `reminder` flags `primary-largest` on its list on both watch sizes. The judge independently saw the `reminder` confirmation check mark as dark on dark, so at least that one looks like a real agent miss.
+- **Rubric misses (agent output).** `R-font` on `music`, `settings`, and `recipes` (Fraunces at its default weight with no axis choice), `R-controls` and `R-music-actions` on `music` (three actions inside one tonal pill), `R-idea` on `music`, `R-finance-categories` on `finance` (one hue for every category), `R-semantics` on `settings`, and `R-wear-hero` on `reminder`.
+
+**Ten-turn multi-turn revision case:** `evals/multiturn.py`, `claude-fable-5-2`, Robolectric backend, commit `2e679a8`, compared with v5 (`3b1294c`, `claude-fable-5-2`) from [Visual design exploration v5](../archive/visual-design-exploration-v5.md):
+
+| Metric | v5 (`3b1294c`) | v6 | Change |
 | --- | --- | --- | --- |
-| Final deterministic checks | `3/3` pass | **`3/3` pass** | Turn 1 kept `listDetail` using `LocalWindowInfo >= 840.dp` |
-| Mean wall time / turn | `33.72 s` (`337.20 s` total) | **`32.83 s`** (`328.26 s` total, `-2.6%`) | |
-| Median wall time / turn | `26.57 s` | **`25.46 s`** (`-4.2%`) | |
-| Total cost (mean / median) | `$3.6292` (`$0.3629` / `$0.2113`) | **`$2.8374`** (`$0.2837` / `$0.1919`, `-21.8%`) | Lower overall cost despite larger system context |
-| Total check calls | `10` (`1.0` / turn) | `16` (`1.6` / turn; median `1.0`) | Scoped `check` payloads remain `0.9` to `1.5 KB` |
-| Compile retries | `0` | `1` (`0.0` median across 10 turns) | Single Turn 5 LLM Kotlin math typo (`String` vs `Dp`) |
-| Total tokens / turn (mean / median) | `275,745.3` / `268,044.0` | `600,212.5` / `516,435.0` | Reflects Claude Code `2.1.322` (`claude-opus-5-5`) `35.8k` starting system context and `5.84M` cache reads (`130,390` cache-write tokens vs v4's `270,933`) |
-| `skill_bytes_read` | `42,315 B` (`3` files) | `49,652 B` (`3` files) | |
+| Final deterministic checks | `3/3` | **`3/3`** | |
+| Total wall time | `337.20 s` | `350.32 s` | `+3.9%` |
+| Mean tokens / turn | `275,745.3` | `371,003.0` | `+34.5%` |
+| Check calls / compile retries | `10` / `0` | `12` / `0` | |
+| `skill_bytes_read` | `42,315 B` (`3` files) | `49,806 B` (`3` files) | `+17.7%` |
+
+Both tokens and wall time regressed against v5, so the multi-turn case fails "no regression in tokens or wall time". Tokens regressed most, by about a third per turn.
 
 ### Rejected alternatives
 

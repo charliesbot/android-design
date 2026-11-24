@@ -6,7 +6,7 @@ import bot.charlies.androiddesign.preview.app.android.DeviceSetupResult
 import bot.charlies.androiddesign.preview.app.cli.Command
 import bot.charlies.androiddesign.preview.app.cli.ExitCode
 import bot.charlies.androiddesign.preview.app.cli.parseArgs
-import bot.charlies.androiddesign.preview.app.client.V5ExitCode
+import bot.charlies.androiddesign.preview.app.client.ClientExitCode
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import java.io.PrintStream
@@ -14,6 +14,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /** Internal subcommand launched by the CLI client to run the single shared HTTP/SSE host server. */
@@ -107,6 +108,24 @@ class ServerCommand : Command {
     val recycleExecutor = Executors.newSingleThreadExecutor { r ->
       Thread(r, "android-design-sandbox-recycle").apply { isDaemon = true }
     }
+    // An emulator this server launched goes down with it, unless a newer version replaced this
+    // server and reuses the running device. The hook is registered before device setup so a SIGTERM
+    // mid-boot (the CLI's startup timeout) still stops it. Devices the user started are never
+    // touched.
+    var emulatorLauncher: DeviceManager? = null
+    var runningServer: PreviewHttpServer? = null
+    val emulatorReleased = AtomicBoolean(false)
+    val releaseLaunchedEmulator = {
+      val manager = emulatorLauncher
+      if (
+        manager != null &&
+          runningServer?.wasReplaced != true &&
+          emulatorReleased.compareAndSet(false, true)
+      ) {
+        runCatching { manager.releaseLaunchedEmulator() }
+      }
+    }
+    Runtime.getRuntime().addShutdownHook(Thread { releaseLaunchedEmulator() })
 
     if (backendMode == RuntimeIdentity.BACKEND_ROBOLECTRIC) {
       val meta =
@@ -123,7 +142,7 @@ class ServerCommand : Command {
             out.println(msg)
             err.println(msg)
             recycleExecutor.shutdownNow()
-            return V5ExitCode.NOT_READY
+            return ClientExitCode.NOT_READY
           }
       val cpOverride =
         System.getenv(RuntimeIdentity.ROBOLECTRIC_CP_ENV)?.takeIf { it.isNotBlank() }?.let(Path::of)
@@ -141,7 +160,7 @@ class ServerCommand : Command {
         out.println(msg)
         err.println(msg)
         recycleExecutor.shutdownNow()
-        return V5ExitCode.NOT_READY
+        return ClientExitCode.NOT_READY
       }
       val roboBackend = RobolectricPreviewBackend(meta = meta, robolectricCp = robolectricCp)
       try {
@@ -159,7 +178,7 @@ class ServerCommand : Command {
         out.println(msg)
         err.println(msg)
         recycleExecutor.shutdownNow()
-        return V5ExitCode.NOT_READY
+        return ClientExitCode.NOT_READY
       }
       backend = roboBackend
     } else {
@@ -177,11 +196,14 @@ class ServerCommand : Command {
             out.println(msg)
             err.println(msg)
             recycleExecutor.shutdownNow()
-            return V5ExitCode.NOT_READY
+            return ClientExitCode.NOT_READY
           }
       val devMgr = DeviceManager(cacheRoot = cacheRoot)
+      emulatorLauncher = devMgr
       val headless = parsed.flags["--headless"].equals("true", ignoreCase = true)
       val forceReinstall = parsed.flags["--force-reinstall-apk"].equals("true", ignoreCase = true)
+      out.println("startup: preparing Android device (boot, install, warm-up)")
+      out.flush()
       val setup =
         devMgr.ensureDeviceReady(
           meta = meta,
@@ -257,12 +279,14 @@ class ServerCommand : Command {
         apkSha256 = apkSha256,
         onProcessExit = { latch.countDown() },
       )
+    runningServer = server
     val record = server.start()
     Runtime.getRuntime()
       .addShutdownHook(
         Thread {
           server.stop(triggerExit = false)
           recycleExecutor.shutdownNow()
+          releaseLaunchedEmulator()
           latch.countDown()
         },
       )
@@ -276,6 +300,7 @@ class ServerCommand : Command {
       server.stop(triggerExit = false)
     } finally {
       recycleExecutor.shutdownNow()
+      releaseLaunchedEmulator()
     }
     return ExitCode.OK
   }

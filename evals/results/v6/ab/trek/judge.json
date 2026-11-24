@@ -1,0 +1,77 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The cover, trip title, and large '20 days to go' lead the screen, followed by the packing card with its clear 'Packing list' button and the Day 1 plan, so no unrelated elements compete equally."
+  },
+  "R-fill": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The packing card in primaryContainer, together with its filled button, is the only saturated fill; Day 1 sits on a neutral tonal container and the itinerary rows on the surface."
+  },
+  "R-surfaces": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Calm warm-neutral surfaces form the backdrop, with one accent card for packing and a tonal card for Day 1, which keeps the groups clear."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Back, the tonal share icon button, and the filled 'Packing list' button each read as their own tappable control, and there are no floating text-only buttons."
+  },
+  "R-font": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Big Shoulders Display is used at display and headline size for the title, the '20' countdown, and the '18' count, and its extreme condensed width gives a deliberate trail-signage voice; body text stays Google Sans Flex and the data uses Google Sans Code."
+  },
+  "R-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The screen follows Android conventions: a back arrow, a share action icon, no disclosure chevrons, and no Cancel/Done text."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No text is clipped or overlapping in any render; the foldable's partly visible itinerary row sits at a scrolling edge, which is expected."
+  },
+  "R-dark": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "In dark, all text, icons, the wavy progress, and the light-on-dark button are clearly legible against their surfaces."
+  },
+  "R-adaptive": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The foldable places packing and Day 1 side by side, and the tablet and desktop add a dedicated itinerary pane beside the cover and Day 1 plan, revealing content the phone only reaches by scrolling."
+  },
+  "R-idea": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The 'altitude ledger' idea, with a bar per itinerary day scaled to the 5,364 m peak and monospaced altitudes, is specific to a high-altitude trek."
+  },
+  "R-semantics": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The 'Itinerary', 'Packing', and 'Day 1' titles all carry semantics { heading() }, and there are no toggling rows."
+  },
+  "R-fields": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The proposal has no text fields."
+  },
+  "R-visibility": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Nothing is shown and hidden, and no alpha is used to hide content."
+  },
+  "R-blur": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No blur is used, and no text is drawn over the photo."
+  },
+  "R-trek-forms": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Packing is a progress card with a wavy indicator, Day 1 is a timeline with time stamps and stats, and the itinerary is a segmented list with altitude bars, so each kind of information has its own form; no text sits on the photo."
+  }
+}

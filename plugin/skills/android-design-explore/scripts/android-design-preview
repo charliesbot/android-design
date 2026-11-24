@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-VERSION="0.5.0"
+VERSION="0.6.0"
 DEFAULT_GIT_URL="https://github.com/charliesbot/android-design.git"
 CACHE_ROOT="${ANDROID_DESIGN_CACHE_DIR:-${ANDROID_DESIGN_PREVIEW_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/android-design-preview}}"
 
@@ -146,6 +146,50 @@ find_android_sdk() {
   return 1
 }
 
+LOCK_PATH=""
+LOCK_HELD=0
+
+release_lock() {
+  if [ "$LOCK_HELD" -eq 1 ]; then
+    LOCK_HELD=0
+    rm -f "$LOCK_PATH"
+  fi
+}
+
+# Cross-process lock for the clone and Gradle export steps. A symlink whose target
+# is the holder's pid is created atomically by ln -s, so the owner is never unknown.
+acquire_lock() {
+  mkdir -p "$CACHE_ROOT/$VERSION" || fail_json "cache_unwritable" "Cannot create $CACHE_ROOT/$VERSION"
+  LOCK_PATH="$CACHE_ROOT/$VERSION/.lock"
+  _lock_timeout="${ANDROID_DESIGN_PREVIEW_LOCK_TIMEOUT:-900}"
+  _waited=0
+  while ! ln -s "$$" "$LOCK_PATH" 2>/dev/null; do
+    _holder="$(readlink "$LOCK_PATH" 2>/dev/null || true)"
+    if [ -z "$_holder" ]; then
+      continue
+    fi
+    _stale=0
+    case "$_holder" in
+      *[!0-9]*) _stale=1 ;;
+      *) kill -0 "$_holder" 2>/dev/null || _stale=1 ;;
+    esac
+    if [ "$_stale" -eq 1 ]; then
+      # Re-read before removing so a freshly taken lock is not discarded.
+      if [ "$(readlink "$LOCK_PATH" 2>/dev/null || true)" = "$_holder" ] &&
+        mv "$LOCK_PATH" "$LOCK_PATH.stale.$$" 2>/dev/null; then
+        rm -f "$LOCK_PATH.stale.$$"
+      fi
+      continue
+    fi
+    if [ "$_waited" -ge "$_lock_timeout" ]; then
+      fail_json "bootstrap_lock_timeout" "Another android-design-preview bootstrap (pid $_holder) held $LOCK_PATH for ${_lock_timeout}s. Wait for it, or remove the lock if that process is gone."
+    fi
+    sleep 1
+    _waited=$((_waited + 1))
+  done
+  LOCK_HELD=1
+}
+
 resolve_app_dir() {
   _script_dir="$1"
 
@@ -207,8 +251,12 @@ resolve_app_dir() {
     fail_json "sparse_checkout_incomplete" "Sparse checkout succeeded but app/settings.gradle.kts is missing"
   fi
 
-  rm -rf "$_src_root"
-  mv "$_tmp_src" "$_src_root"
+  if [ -f "$_src_app/settings.gradle.kts" ] && [ -f "$_src_app/gradlew" ]; then
+    rm -rf "$_tmp_src"
+  else
+    rm -rf "$_src_root"
+    mv "$_tmp_src" "$_src_root"
+  fi
   APP_DIR="$_src_app"
 }
 
@@ -285,14 +333,30 @@ SDK_DIR="$(find_android_sdk)" || fail_json "missing_android_sdk" "Android SDK no
 export ANDROID_HOME="$SDK_DIR"
 export ANDROID_SDK_ROOT="$SDK_DIR"
 
-if [ -z "${JAVA_HOME:-}" ]; then
+# Gradle's ./gradlew reads JAVA_HOME, not JAVA_BIN. Keep an existing JAVA_HOME only
+# when it points at a working Java 17+; otherwise derive it from the resolved JAVA_BIN.
+if [ -z "${JAVA_HOME:-}" ] || ! is_java_17_plus "$JAVA_HOME/bin/java"; then
   _resolved_java="$(resolve_script_path "$JAVA_BIN")"
   _java_home_cand="$(CDPATH= cd -- "$(dirname -- "$_resolved_java")/.." && pwd -P)"
+  _java_home_new=""
   if [ -f "$_java_home_cand/release" ] || { [ "$_java_home_cand" != "/usr" ] && [ "$_java_home_cand" != "/" ] && [ -x "$_java_home_cand/bin/javac" ]; }; then
-    JAVA_HOME="$_java_home_cand"
+    _java_home_new="$_java_home_cand"
+  elif [ -x /usr/libexec/java_home ]; then
+    _java_home_new="$(/usr/libexec/java_home -v 17+ 2>/dev/null || true)"
+  fi
+  if [ -n "$_java_home_new" ]; then
+    JAVA_HOME="$_java_home_new"
     export JAVA_HOME
+  elif [ -n "${JAVA_HOME:-}" ]; then
+    # A stale JAVA_HOME must not reach Gradle; let it fall back to java on PATH.
+    unset JAVA_HOME
   fi
 fi
+
+trap release_lock EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+acquire_lock
 
 APP_DIR=""
 resolve_app_dir "$SCRIPT_DIR"
@@ -303,6 +367,8 @@ if ! bootstrap_valid "$BOOTSTRAP_DIR" "$cmd"; then
   run_gradle_bootstrap "$APP_DIR"
   bootstrap_valid "$BOOTSTRAP_DIR" "$cmd" || fail_json "bootstrap_invalid" "Gradle bootstrap completed but outputs in $BOOTSTRAP_DIR are incomplete"
 fi
+
+release_lock
 
 export ANDROID_DESIGN_CACHE_DIR="$CACHE_ROOT"
 export ANDROID_DESIGN_PREVIEW_SRC="$APP_DIR"

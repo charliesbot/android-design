@@ -1,0 +1,77 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The large 'Settings' title and the sync summary with the filled 'Back up now' button lead, and the grouped setting rows stay clearly readable below without competing elements."
+  },
+  "R-fill": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The only strong saturated fill is the 'Back up now' button; the switches use standard tonal track colors and the selected toggles are soft secondary-container tints."
+  },
+  "R-surfaces": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "A calm warm-neutral surface with surfaceContainer blocks groups the settings, and the preview pane is a quiet tonal panel, so accents are left for actions and state."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The back button, filled button, connected toggle-button groups and switch rows each read as distinct tappable controls, and no text-only button floats alone."
+  },
+  "R-font": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "The hero 'Settings' title and '2 min ago' use Fraunces at what looks like a regular weight with no visible axis treatment, which the rubric treats as a brand face swapped in without intent."
+  },
+  "R-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "There is a back arrow in the top app bar, no disclosure chevrons, no Cancel/Done text, and content runs edge to edge."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No text is clipped or overlapping in any render; lists cut at the bottom edge are scrolling content, and the text-size sample reflows."
+  },
+  "R-dark": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "In dark, text, icons, switches and the light-gold filled button are all clearly legible against the dark surfaces."
+  },
+  "R-adaptive": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Tablet and desktop add a second pane with a live note and notification preview beside a width-capped settings list (desktop shows all sections at once), and the foldable keeps the list at a max width instead of stretching it."
+  },
+  "R-idea": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The sync status leads as a headline summary, and a live preview of note text size and notification states reflects the settings, which goes beyond a catalog list."
+  },
+  "R-semantics": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "The section titles and 'Preview' carry heading() and the switch rows are single Role.Switch targets with null callbacks, but the 'Notifications' label that groups the notification previews in PreviewPane has no heading()."
+  },
+  "R-fields": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The proposal contains no text fields."
+  },
+  "R-visibility": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The inline sample and the notification preview body/off label are toggled with if blocks, not alpha."
+  },
+  "R-blur": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No blur is used."
+  },
+  "R-settings-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "There are no version, license or account rows; on/off settings use switches, theme is a connected button group, and rows are grouped under section headings."
+  }
+}

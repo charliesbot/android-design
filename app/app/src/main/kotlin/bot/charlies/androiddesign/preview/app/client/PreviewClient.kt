@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit
 class PreviewClient(
   internal val cacheRoot: Path = ServerPaths.cacheRoot(),
   private val env: Map<String, String> = System.getenv(),
+  private val progress: (String) -> Unit = { System.err.println(it) },
 ) {
   data class HttpResult(val status: Int, val body: String)
 
@@ -94,6 +95,23 @@ class PreviewClient(
     headless: Boolean = false,
     forceReinstallApk: Boolean = false,
   ): ServerLookup = withServerLock {
+    ensureServerLocked(
+      repoRoot,
+      requestedSerial,
+      requestedAvd,
+      headless,
+      forceReinstallApk,
+    )
+  }
+
+  /** [ensureServer] body; the caller must hold the server lock. */
+  private fun ensureServerLocked(
+    repoRoot: Path,
+    requestedSerial: String? = null,
+    requestedAvd: String? = null,
+    headless: Boolean = false,
+    forceReinstallApk: Boolean = false,
+  ): ServerLookup {
     val normRepo = repoRoot.toAbsolutePath().normalize()
     val repoId = ServerPaths.repoHash(normRepo)
     val recordPath = ServerPaths.sharedRecordPath(cacheRoot)
@@ -109,7 +127,7 @@ class PreviewClient(
           serialMatches &&
           runsCurrentRuntime(existing, live, identity)
       ) {
-        return@withServerLock ServerLookup.Ready(existing, live)
+        return ServerLookup.Ready(existing, live)
       }
       if (
         identity.backend == RuntimeIdentity.BACKEND_ANDROID &&
@@ -121,7 +139,7 @@ class PreviewClient(
       }
       stopServer(existing, graceful = live != null, replacedByVersion = AppInfo.VERSION)
     }
-    spawnServer(
+    return spawnServer(
       repoRoot = normRepo,
       reusePort = existing?.port ?: ServerPaths.SHARED_PREFERRED_PORT,
       reuseViewToken = existing?.viewToken,
@@ -142,7 +160,19 @@ class PreviewClient(
     if (stopped) record else null
   }
 
+  /**
+   * Replaces [deadRecord]'s server. Re-reads `active.json` under the lock: if another CLI already
+   * replaced the server (different pid or start time), that server is used through the normal
+   * readiness path instead of spawning a second one and orphaning it.
+   */
   fun killAndRespawn(repoRoot: Path, deadRecord: ServerRecord): ServerLookup = withServerLock {
+    val current = ServerPaths.readRecord(ServerPaths.sharedRecordPath(cacheRoot))
+    if (
+      current != null &&
+        (current.pid != deadRecord.pid || current.startedAt != deadRecord.startedAt)
+    ) {
+      return@withServerLock ensureServerLocked(repoRoot)
+    }
     val normRepo = repoRoot.toAbsolutePath().normalize()
     val identity = RuntimeIdentity.compute(env)
     stopServer(deadRecord, graceful = false, replacedByVersion = null)
@@ -156,6 +186,27 @@ class PreviewClient(
       avdName = null,
       headless = false,
     )
+  }
+
+  /** Outcome of [recoverFromDeadline]. */
+  enum class DeadlineRecovery {
+    /** The server still answered `/api/status`; it was left running (the watchdog owns hangs). */
+    SERVER_RESPONSIVE,
+    /** The server did not answer and was replaced. */
+    RESTARTED,
+  }
+
+  /**
+   * Handles a client-side deadline. The deadline includes queue wait in the shared single worker,
+   * so a timeout alone does not prove the server is hung: probe `/api/status` first and only
+   * replace an unresponsive server.
+   */
+  fun recoverFromDeadline(repoRoot: Path, record: ServerRecord): DeadlineRecovery {
+    if (probeRecord(record, timeoutMs = DEADLINE_PROBE_TIMEOUT_MS) != null) {
+      return DeadlineRecovery.SERVER_RESPONSIVE
+    }
+    killAndRespawn(repoRoot, record)
+    return DeadlineRecovery.RESTARTED
   }
 
   fun notifyLive(record: ServerRecord, sourcePath: Path?, repoRoot: Path): Boolean =
@@ -274,10 +325,14 @@ class PreviewClient(
       !handle.isAlive
     }
 
-  private fun probeRecord(record: ServerRecord, repoId: String? = null): StatusResponse? {
+  private fun probeRecord(
+    record: ServerRecord,
+    repoId: String? = null,
+    timeoutMs: Int = 700,
+  ): StatusResponse? {
     return try {
       val path = if (repoId.isNullOrBlank()) "/api/status" else "/api/status?repo=$repoId"
-      val res = request(record, "GET", path, body = null, readTimeoutMs = 700)
+      val res = request(record, "GET", path, body = null, readTimeoutMs = timeoutMs)
       if (res.status != 200) return null
       PreviewJson.compact.decodeFromString(StatusResponse.serializer(), res.body)
     } catch (_: Exception) {
@@ -367,6 +422,7 @@ class PreviewClient(
     env[ServerCommand.COLD_BUDGET_ENV]?.let { childEnv[ServerCommand.COLD_BUDGET_ENV] = it }
     env[ServerCommand.WARM_BUDGET_ENV]?.let { childEnv[ServerCommand.WARM_BUDGET_ENV] = it }
 
+    val logStart = logFile.takeIf { it.exists() }?.length() ?: 0L
     val proc =
       try {
         pb.start()
@@ -374,20 +430,30 @@ class PreviewClient(
         return ServerLookup.NotReady("Failed to launch preview server: ${e.message}")
       }
 
+    return awaitServerStart(proc, logFile, logStart, ANDROID_STARTUP_WAIT_MS)
+  }
+
+  /**
+   * Waits for the spawned [proc] to publish a live record. Device setup (AVD boot, install, AOT)
+   * runs before the record exists, so the wait lasts as long as the child is alive, up to [waitMs].
+   * Fails fast when the child exits; reports progress from the child's log to [progress].
+   */
+  internal fun awaitServerStart(
+    proc: Process,
+    logFile: java.io.File,
+    logStart: Long,
+    waitMs: Long,
+    progressIntervalMs: Long = PROGRESS_INTERVAL_MS,
+  ): ServerLookup {
     val recordPath = ServerPaths.sharedRecordPath(cacheRoot)
-    val waitMs = ANDROID_STARTUP_WAIT_MS
-    val deadline = System.currentTimeMillis() + waitMs
+    val started = System.currentTimeMillis()
+    val deadline = started + waitMs
     val targetPid = proc.pid()
+    var nextProgressAt = started + progressIntervalMs
     while (System.currentTimeMillis() < deadline) {
       if (!proc.isAlive) {
-        val tail =
-          try {
-            logFile.readText().takeLast(600).trim()
-          } catch (_: Exception) {
-            ""
-          }
         return ServerLookup.NotReady(
-          "Preview server exited immediately (code ${proc.exitValue()}): $tail",
+          "Preview server exited immediately (code ${proc.exitValue()}): ${logTail(logFile, logStart)}",
         )
       }
       val rec = ServerPaths.readRecord(recordPath)
@@ -395,15 +461,38 @@ class PreviewClient(
         val live = probeRecord(rec)
         if (live != null) return ServerLookup.Ready(rec, live)
       }
+      val now = System.currentTimeMillis()
+      if (now >= nextProgressAt) {
+        nextProgressAt = now + progressIntervalMs
+        val last = logTail(logFile, logStart).lineSequence().lastOrNull { it.isNotBlank() }
+        progress(
+          "Starting preview server (${(now - started) / 1000}s)" +
+            (last?.let { ": ${it.take(160)}" } ?: "..."),
+        )
+      }
       try {
         Thread.sleep(50)
       } catch (_: InterruptedException) {
         break
       }
     }
-    proc.destroyForcibly()
+    // SIGTERM first: the server's shutdown hook stops an emulator it launched mid-boot.
+    proc.destroy()
+    try {
+      if (!proc.waitFor(SERVER_TERM_GRACE_MS, TimeUnit.MILLISECONDS)) proc.destroyForcibly()
+    } catch (_: InterruptedException) {
+      proc.destroyForcibly()
+    }
     return ServerLookup.NotReady("Timed out waiting for preview server to start")
   }
+
+  private fun logTail(logFile: java.io.File, logStart: Long): String =
+    try {
+      val text = logFile.readText()
+      text.substring(minOf(logStart, text.length.toLong()).toInt()).takeLast(600).trim()
+    } catch (_: Exception) {
+      ""
+    }
 
   private fun request(
     record: ServerRecord,
@@ -472,11 +561,18 @@ class PreviewClient(
     const val NO_OPEN_ENV = "ANDROID_DESIGN_NO_OPEN"
     const val SCRIPT_ENV = "ANDROID_DESIGN_PREVIEW_SCRIPT"
     const val CLIENT_TIMEOUT_ENV = "ANDROID_DESIGN_CLIENT_TIMEOUT_MS"
-    private const val ANDROID_STARTUP_WAIT_MS = 90_000L
+    /**
+     * Overall startup cap: the device setup budget in `DeviceManager` (AVD online 120 s + boot 60 s
+     * + install 120 s + AOT 120 s), which runs before the server writes its record.
+     */
+    internal const val ANDROID_STARTUP_WAIT_MS = 420_000L
+    private const val PROGRESS_INTERVAL_MS = 10_000L
+    private const val DEADLINE_PROBE_TIMEOUT_MS = 2_000
     private const val COLD_CLIENT_DEADLINE_MS = 35_000
     private const val WARM_SCOPED_CLIENT_DEADLINE_MS = 10_000
     private const val WARM_FULL_CLIENT_DEADLINE_MS = 35_000
     private const val STOP_WAIT_MS = 3_000L
+    private const val SERVER_TERM_GRACE_MS = 15_000L
     private const val START_CLOCK_SLACK_MS = 2_000L
     private const val MAX_SERVER_BOOT_MS = 120_000L
     private val inProcessLock = Any()
