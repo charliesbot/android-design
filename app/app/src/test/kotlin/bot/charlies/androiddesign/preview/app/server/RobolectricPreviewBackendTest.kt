@@ -532,6 +532,100 @@ class RobolectricPreviewBackendTest {
     }
   }
 
+  private fun compileEntry(out: BackendCompileOutput, snap: ContentHasher.Snapshot) =
+    CompileEntry(
+      sourcePath = out.loaded.sourcePath,
+      designPath = out.loaded.designPath,
+      contentHash = snap.contentHash,
+      loaded = out.loaded,
+      fromCache = false,
+      compileCountAtLoad = 0,
+    )
+
+  @Test
+  fun stagesOutliveManyOtherFilesAndAreDeletedWhenTheirFileRecompiles(@TempDir tmp: Path) {
+    val classesDirs = mutableListOf<Path>()
+    val backend =
+      RobolectricPreviewBackend(
+        classStager = ::fakeClassStage,
+        requestExecutor = { req ->
+          req.classesDir?.let { classesDirs.add(Path.of(it)) }
+          RobolectricRenderResponse(
+            id = req.id,
+            ok = true,
+            valid = true,
+            pass = true,
+            boardMeta = sampleBoardMeta(),
+          )
+        },
+      )
+    backend.use { rb ->
+      val dir = tmp.resolve("repo/design")
+      val files = (0 until 20).map { writeSampleFile(dir, "F$it.explore.kt", "Board$it") }
+      val snaps = files.map { ContentHasher.snapshot(it, null) }
+      val firstOut = rb.compile(snaps[0])
+      files.indices.drop(1).forEach { rb.compile(snaps[it]) }
+      val firstDir = classesDirs.first()
+
+      // The first file is unchanged and cached upstream, so nothing recompiles it.
+      rb.renderBatchCheck(
+        compileEntry(firstOut, snaps[0]),
+        listOf(CheckTargetSpec("Editorial", "home", "home", null, Views.byName("light")!!)),
+        scoped = true,
+        rendersRoot = tmp.resolve("renders"),
+      )
+
+      Files.writeString(files[0], sampleExploreSource("Changed"))
+      rb.compile(ContentHasher.snapshot(files[0], null))
+      assertFalse(Files.exists(firstDir), "Replaced stage must be deleted")
+    }
+  }
+
+  @Test
+  fun freshWorkerColdStartDoesNotConsumeTheRenderBudget(@TempDir tmp: Path) {
+    val script = tmp.resolve("slow-start-worker.sh")
+    Files.writeString(
+      script,
+      """
+      #!/bin/sh
+      sleep 1
+      n=0
+      while IFS= read -r _line; do
+        echo '{"id":"x","ok":true,"valid":true,"pass":true}'
+        n=${'$'}((n + 1))
+        if [ ${'$'}n -ge 2 ] && [ -e "${tmp.resolve("exit-after-first").toAbsolutePath()}" ]; then exit 0; fi
+      done
+      """
+        .trimIndent() + "\n",
+    )
+    script.toFile().setExecutable(true)
+    val exitMarker = tmp.resolve("exit-after-first")
+    Files.writeString(exitMarker, "")
+
+    val backend =
+      RobolectricPreviewBackend(
+        workerCommand = listOf("/bin/sh", script.toString()),
+        classStager = ::fakeClassStage,
+        renderTimeoutMs = 400L,
+        controlTimeoutMs = 10_000L,
+      )
+    backend.use { rb ->
+      val file = writeSampleFile(tmp.resolve("repo/design"))
+      val snap = ContentHasher.snapshot(file, null)
+      val out = rb.compile(snap)
+      // The worker exited after answering warmup and compile; the next render spawns a fresh, slow
+      // one.
+      Files.delete(exitMarker)
+      Thread.sleep(300)
+      rb.renderBatchCheck(
+        compileEntry(out, snap),
+        listOf(CheckTargetSpec("Editorial", "home", "home", null, Views.byName("light")!!)),
+        scoped = true,
+        rendersRoot = tmp.resolve("renders"),
+      )
+    }
+  }
+
   @Test
   fun hungWorkerIsKilledAtTheBudgetAndRestartedOnTheNextRequest(@TempDir tmp: Path) {
     val pidFile = tmp.resolve("worker.pid")

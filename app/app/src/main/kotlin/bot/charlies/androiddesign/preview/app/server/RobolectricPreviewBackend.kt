@@ -29,6 +29,7 @@ import java.nio.file.Path
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -98,7 +99,11 @@ private constructor(
   override val supportsHeadlessSpeculativePrecompile: Boolean = false
 
   private val requestIds = AtomicLong(0L)
-  private val stages = LinkedHashMap<String, RobolectricStage>()
+  /** One stage per source file, like `RenderQueue`'s compile cache: a recompile replaces it. */
+  private val stages = HashMap<Path, HashedStage>()
+
+  private class HashedStage(val contentHash: String, val stage: RobolectricStage)
+
   private var stageRoot: Path? = null
   private var stageSequence = 0
   private val processClient =
@@ -140,7 +145,7 @@ private constructor(
         is AndroidExplorationCompiler.ClassStageOutcome.Ready -> outcome.stage
       }
     val designRes = StagedDesign(stagedClasses.designPath, stagedClasses.designTheme)
-    val staged = registerStage(snapshot.contentHash, stagedClasses)
+    val staged = registerStage(normSource, snapshot.contentHash, stagedClasses)
     val resp =
       execRequest(
         staged.applyTo(
@@ -606,7 +611,7 @@ private constructor(
   override fun close() {
     processClient?.close()
     synchronized(stages) {
-      stages.values.forEach { it.delete() }
+      stages.values.forEach { it.stage.delete() }
       stages.clear()
       stageRoot?.toFile()?.deleteRecursively()
       stageRoot = null
@@ -618,9 +623,12 @@ private constructor(
     request: RobolectricRenderRequest,
   ): RobolectricRenderResponse {
     val staged =
-      synchronized(stages) { stages[entry.contentHash] }
-        ?: error("No staged classes for ${entry.sourcePath}; compile it again")
-    return execRequest(staged.applyTo(request), renderTimeoutMs)
+      synchronized(stages) {
+        stages[entry.sourcePath.toAbsolutePath().normalize()]?.takeIf {
+          it.contentHash == entry.contentHash
+        }
+      } ?: error("No staged classes for ${entry.sourcePath}; compile it again")
+    return execRequest(staged.stage.applyTo(request), renderTimeoutMs)
   }
 
   /** Runs [req] on the worker; a worker that outlives [timeoutMs] is killed and reported. */
@@ -628,7 +636,8 @@ private constructor(
     req: RobolectricRenderRequest,
     timeoutMs: Long = controlTimeoutMs,
   ): RobolectricRenderResponse {
-    val resp = requestExecutor?.invoke(req) ?: processClient!!.request(req, timeoutMs)
+    val resp =
+      requestExecutor?.invoke(req) ?: processClient!!.request(req, timeoutMs, controlTimeoutMs)
     if (resp.recycleReason == WATCHDOG_TIMEOUT) {
       throw SandboxWatchdogException(resp.error ?: "Robolectric request timed out")
     }
@@ -636,6 +645,7 @@ private constructor(
   }
 
   private fun registerStage(
+    sourcePath: Path,
     contentHash: String,
     stage: AndroidExplorationCompiler.ClassStage,
   ): RobolectricStage {
@@ -644,12 +654,7 @@ private constructor(
         val root = stageRoot ?: Files.createTempDirectory("adp-robo-stage-").also { stageRoot = it }
         val dir = root.resolve("stage-${stageSequence++}")
         RobolectricStage.write(dir, stage).also { fresh ->
-          stages.put(contentHash, fresh)?.delete()
-          while (stages.size > MAX_STAGES) {
-            val eldest = stages.entries.first()
-            stages.remove(eldest.key)
-            eldest.value.delete()
-          }
+          stages.put(sourcePath, HashedStage(contentHash, fresh))?.stage?.delete()
         }
       }
     return staged
@@ -750,11 +755,14 @@ private constructor(
     /** `ping` and `compile` may include a cold JVM and Robolectric SDK start. */
     const val DEFAULT_CONTROL_TIMEOUT_MS = DEFAULT_COLD_BUDGET_MS
     private const val WATCHDOG_TIMEOUT = "watchdog_timeout"
-    private const val MAX_STAGES = 16
     private const val ROBOLECTRIC_MAIN =
       "bot.charlies.androiddesign.preview.host.robolectric.RobolectricRunnerMain"
   }
 }
+
+private const val PENDING = 0
+private const val ANSWERED = 1
+private const val TIMED_OUT = 2
 
 private class RobolectricProcessClient(
   private val robolectricCp: Path? = null,
@@ -784,14 +792,42 @@ private class RobolectricProcessClient(
    * killed and the reply reports `watchdog_timeout`, like the device `:sandbox`; the next request
    * starts a fresh worker.
    */
-  fun request(req: RobolectricRenderRequest, timeoutMs: Long): RobolectricRenderResponse {
+  fun request(
+    req: RobolectricRenderRequest,
+    timeoutMs: Long,
+    coldTimeoutMs: Long = RobolectricPreviewBackend.DEFAULT_COLD_BUDGET_MS,
+  ): RobolectricRenderResponse {
     synchronized(requestLock) {
-      val (proc, w, r) = ensureStarted()
+      val started = ensureStarted()
+      if (started.fresh && req.mode != "ping") {
+        // A fresh worker pays JVM and Robolectric SDK warmup; keep that out of the request budget.
+        val ping =
+          exchange(
+            started,
+            RobolectricRenderRequest(id = "${req.id}-warmup", mode = "ping"),
+            coldTimeoutMs,
+          )
+        if (!ping.ok) return ping
+      }
+      return exchange(started, req, timeoutMs)
+    }
+  }
+
+  private fun exchange(
+    started: StartedWorker,
+    req: RobolectricRenderRequest,
+    timeoutMs: Long,
+  ): RobolectricRenderResponse {
+    val (proc, w, r) = started
+    run {
       val payload = PreviewJson.compact.encodeToString(RobolectricRenderRequest.serializer(), req)
+      // The reply and the timer race for this flag, so a worker that answered is never killed.
+      val outcome = AtomicInteger(PENDING)
       val timedOut = AtomicBoolean(false)
       val timer =
         watchdog.schedule(
           {
+            if (!outcome.compareAndSet(PENDING, TIMED_OUT)) return@schedule
             timedOut.set(true)
             // Killing the process ends the blocked readLine(); never close the reader from here.
             runCatching { proc.descendants().forEach { it.destroyForcibly() } }
@@ -823,10 +859,13 @@ private class RobolectricProcessClient(
           }
           val trimmed = line.trim()
           if (trimmed.isEmpty()) continue
-          return PreviewJson.compact.decodeFromString(
-            RobolectricRenderResponse.serializer(),
-            trimmed,
-          )
+          val parsed =
+            PreviewJson.compact.decodeFromString(RobolectricRenderResponse.serializer(), trimmed)
+          if (!outcome.compareAndSet(PENDING, ANSWERED)) {
+            // The timer won the flag and is killing this worker, so report the timeout.
+            throw IllegalStateException("Robolectric worker killed at the request budget")
+          }
+          return parsed
         }
       } catch (e: Exception) {
         val wasClosed = synchronized(stateLock) { closed }
@@ -870,14 +909,21 @@ private class RobolectricProcessClient(
     watchdog.shutdownNow()
   }
 
-  private fun ensureStarted(): Triple<Process, BufferedWriter, BufferedReader> {
+  private data class StartedWorker(
+    val process: Process,
+    val writer: BufferedWriter,
+    val reader: BufferedReader,
+    val fresh: Boolean,
+  )
+
+  private fun ensureStarted(): StartedWorker {
     synchronized(stateLock) {
       check(!closed) { "RobolectricProcessClient is closed" }
       val p = process
       val w = writer
       val r = reader
       if (p != null && p.isAlive && w != null && r != null) {
-        return Triple(p, w, r)
+        return StartedWorker(p, w, r, fresh = false)
       }
     }
     val stale = synchronized(stateLock) { detachAllLocked() }
@@ -945,7 +991,7 @@ private class RobolectricProcessClient(
         isDaemon = true
         start()
       }
-    return Triple(proc, w, r)
+    return StartedWorker(proc, w, r, fresh = true)
   }
 
   private fun recentStderr(): String = synchronized(stderrLock) { stderrTail.joinToString("\n") }
