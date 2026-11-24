@@ -105,6 +105,7 @@ class DeviceManager(
   private val portAllocator: () -> Int = { findPreferredOrFreePort(DEFAULT_DEVICE_PORT) },
   private val pingFn: (Int) -> DevicePingResponse? = ::pingLocalForward,
   private val sleepFn: (Long) -> Unit = Thread::sleep,
+  private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
   data class DeviceSlot(
     val serial: String,
@@ -219,7 +220,15 @@ class DeviceManager(
       chosenSerial = started
     }
 
-    waitUntilBootCompleted(adbBin, chosenSerial, cmdEnv)
+    if (!waitUntilBootCompleted(adbBin, chosenSerial, cmdEnv)) {
+      return DeviceSetupResult.Failed(
+        exitCode = V5ExitCode.FAILED,
+        error = "boot_timeout",
+        message =
+          "Device $chosenSerial did not report sys.boot_completed=1 within " +
+            "${BOOT_COMPLETED_TIMEOUT_MS / 1000}s.",
+      )
+    }
 
     val apkSha256 = meta.apkSha256OrCompute()
     val pmPath = queryInstalledPackagePath(adbBin, chosenSerial, cmdEnv)
@@ -547,19 +556,25 @@ class DeviceManager(
     return null
   }
 
-  private fun waitUntilBootCompleted(adbBin: String, serial: String, cmdEnv: Map<String, String>) {
+  /** Returns false when the device never reports `sys.boot_completed=1` within the budget. */
+  private fun waitUntilBootCompleted(
+    adbBin: String,
+    serial: String,
+    cmdEnv: Map<String, String>,
+  ): Boolean {
     runner.run(listOf(adbBin, "-s", serial, "wait-for-device"), ADB_SHORT_TIMEOUT_MS, cmdEnv)
-    val deadline = System.currentTimeMillis() + 60_000L
-    while (System.currentTimeMillis() < deadline) {
+    val deadline = nowMs() + BOOT_COMPLETED_TIMEOUT_MS
+    while (nowMs() < deadline) {
       val prop =
         runner.run(
           listOf(adbBin, "-s", serial, "shell", "getprop", "sys.boot_completed"),
           ADB_SHORT_TIMEOUT_MS,
           cmdEnv,
         )
-      if (prop.exitCode == 0 && prop.stdout.trim() == "1") return
+      if (prop.exitCode == 0 && prop.stdout.trim() == "1") return true
       sleepFn(250L)
     }
+    return false
   }
 
   private fun queryInstalledPackagePath(
@@ -748,6 +763,7 @@ class DeviceManager(
     const val ANDROID_CLI_ENV = "ANDROID_DESIGN_ANDROID_CLI"
 
     private const val ADB_SHORT_TIMEOUT_MS = 15_000L
+    private const val BOOT_COMPLETED_TIMEOUT_MS = 60_000L
     private const val INSTALL_TIMEOUT_MS = 120_000L
     private const val AOT_TIMEOUT_MS = 120_000L
     private const val BOOT_TIMEOUT_MS = 180_000L

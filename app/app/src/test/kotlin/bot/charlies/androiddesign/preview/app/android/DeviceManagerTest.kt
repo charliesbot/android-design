@@ -461,6 +461,40 @@ class DeviceManagerTest {
     )
 
   @Test
+  fun `a device that never finishes booting fails with boot_timeout instead of installing`(
+    @TempDir tmp: Path,
+  ) {
+    val meta = fakeBootstrap(tmp.resolve("b"), "apk-boot")
+    val env = fakeToolsEnv(tmp)
+    val commands = mutableListOf<String>()
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      commands += j
+      when {
+        cmd.getOrNull(1) == "devices" ->
+          CommandOutput(0, "List of devices attached\nemulator-5554\tdevice\n")
+        "emu avd name" in j -> CommandOutput(0, "Pixel_Phone\nOK\n")
+        "getprop sys.boot_completed" in j -> CommandOutput(0, "\n")
+        else -> CommandOutput(0, "OK\n")
+      }
+    }
+    var now = 0L
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env,
+        runner = runner,
+        sleepFn = { now += it },
+        nowMs = { now },
+      )
+    val result = dm.ensureDeviceReady(meta)
+    val failed = assertIs<DeviceSetupResult.Failed>(result)
+    assertEquals("boot_timeout", failed.error)
+    assertEquals(V5ExitCode.FAILED, failed.exitCode)
+    assertFalse(commands.any { " install" in it }, "must not install before boot: $commands")
+  }
+
+  @Test
   fun `a sandbox whose worker outlived its watchdog is force-stopped before relaunch`(
     @TempDir tmp: Path,
   ) {
