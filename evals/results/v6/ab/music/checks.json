@@ -1,0 +1,14 @@
+{
+  "C-valid": {
+    "pass": true,
+    "detail": ""
+  },
+  "C-review": {
+    "pass": false,
+    "detail": "player+lyrics/light: offscreen; player+lyrics/light: overflow; player+lyrics/dark: offscreen; player+lyrics/dark: overflow; player+lyrics/foldable: overflow; player+lyrics/foldable: overflow; player+queue/light: offscreen; player+queue/light: overflow; player+queue/dark: offscreen; player+queue/dark: overflow; player+queue/foldable: overflow; player+queue/foldable: overflow; player+credits/light: offscreen; player+credits/light: overflow; player+credits/dark: offscreen; player+credits/dark: overflow; player+credits/foldable: overflow; player+credits/foldable: overflow"
+  },
+  "C-palette": {
+    "pass": true,
+    "detail": ""
+  }
+}

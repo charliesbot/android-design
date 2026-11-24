@@ -1,0 +1,10 @@
+{
+  "C-valid": {
+    "pass": true,
+    "detail": ""
+  },
+  "C-review": {
+    "pass": false,
+    "detail": "run+end-confirm/watch: contrast; run+end-confirm/watch: contrast"
+  }
+}

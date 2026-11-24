@@ -1,0 +1,47 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The 24:18 elapsed time dominates the center, the progress ring frames it, and the filled pause button reads as the main action with the outlined end button secondary."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Pause and end are distinct round/pill buttons in a pair, and the dialog's cancel and confirm are each clear standalone buttons."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No text is clipped or overlapping in any render; the dialog body wraps cleanly onto two lines."
+  },
+  "R-wear-round": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All text, metrics, and buttons sit within the circle on both sizes, with the time and distance tucked inside the narrow top and the buttons clear of the bottom curve."
+  },
+  "R-wear-glance": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "One idea (run in progress) with a hero time, three supporting values, and just two actions reads at a glance."
+  },
+  "R-wear-hero": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "24:18 is set in a large display-style numeral, far bigger than every other element, and the secondary text stays readable."
+  },
+  "R-wear-sizes": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The small render is complete and uncramped, and the large render keeps everything and adds a '1.9 km to go' line with pill-shaped buttons without breaking."
+  },
+  "R-wear-color": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Black background, with primary color limited to the progress arc and the pause/confirm buttons; the coral stop icon and heart are status accents, and the secondary buttons use neutral/outlined containers."
+  },
+  "R-workout-hero": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "On the run renders 24:18 is clearly the largest element, and distance, heart rate, and pace are all shown in smaller, uncrowded rows."
+  }
+}

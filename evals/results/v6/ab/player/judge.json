@@ -1,0 +1,47 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The large peach pause button dominates the center, with the title and show name above and smaller skip and volume controls around it, so the main action is obvious."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Skip back, pause, skip forward, and the two volume buttons are each separate circular controls. The skip icons are dim against their dark containers but still read as buttons."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The time, title, show name, and the large render's '24 min left' are all fully drawn with no clipping or overlap."
+  },
+  "R-wear-round": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All text and controls sit inside the circle in both renders. The skip buttons and volume pair keep clear of the curve, and only the decorative progress arc follows the edge."
+  },
+  "R-wear-glance": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "It is a single now-playing task with one transport cluster and a small volume pair, and it reads at a glance without dense data."
+  },
+  "R-wear-hero": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No number leads this screen, and the play/pause status button is clearly the largest element, with the title in readable secondary text."
+  },
+  "R-wear-sizes": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The small render is complete and uncramped, and the large render keeps the same layout and adds a '24 min left' line without breaking."
+  },
+  "R-wear-color": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The background is black and the peach accent is reserved for the primary pause button, the progress arc, and the show name, while skip and volume use dark container or outlined treatments."
+  },
+  "R-player-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Pause is much larger and filled compared with the separate skip back/forward icon buttons, volume down/up buttons sit below, and the title and show name are fully readable without truncation."
+  }
+}

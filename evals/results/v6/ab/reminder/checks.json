@@ -1,0 +1,10 @@
+{
+  "C-valid": {
+    "pass": true,
+    "detail": ""
+  },
+  "C-review": {
+    "pass": false,
+    "detail": "list/watch: primary-largest; list/watch-large: primary-largest"
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The heavy condensed $1,284.50 numeral with its wavy budget bar leads clearly on every render, and the FAB or the rail's Add button stays easy to find as the main action."
+  },
+  "R-fill": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The salmon FAB is the only strong fill; the four pale yellow category badges read as one coherent group, not competing fills."
+  },
+  "R-surfaces": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Near-neutral warm surfaces, one tonal container for categories and a surfaceContainerLow recent pane give clear grouping without competing colored containers."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The FAB or extended FAB, the nav bar and rail items, and the list rows each read as distinct tappable controls, with no floating text-only buttons."
+  },
+  "R-font": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The hero amount uses Google Sans Flex at weight 800 and a very narrow width (wdth 40), a clearly deliberate display voice."
+  },
+  "R-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Rows have no chevrons, the top bar has no Cancel or Done text, content is edge to edge, and navigation uses a bottom bar and a rail."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No text overlaps or is clipped by its container; the phone's last visible row sits under the nav bar at a scrolling edge, which is expected."
+  },
+  "R-dark": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "In the dark render all text, icons, progress bars and the FAB icon are clearly visible against the dark surfaces."
+  },
+  "R-adaptive": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The foldable moves to a rail with a two-column category grid and shows more transactions; the tablet and desktop add a separate Recent pane with all 8 rows beside the summary, and the desktop expands the rail."
+  },
+  "R-idea": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "An oversized condensed spending numeral over a wavy budget progress line with a days-left caption gives a budget-specific ledger idea beyond a stock catalog layout."
+  },
+  "R-semantics": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Section titles carry semantics { heading() }, and there are no toggling or selecting rows; the dialog's FilterChips already count as single controls."
+  },
+  "R-fields": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Both TextFields use state = rememberTextFieldState(), and there is no password field."
+  },
+  "R-visibility": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The only shown and hidden content, the add dialog, is wrapped in an if (adding) so it leaves the composition when closed."
+  },
+  "R-blur": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The proposal uses no blur."
+  },
+  "R-finance-categories": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "All four categories share the same tertiary yellow badge and olive bar, and the recent list icons are neutral, so the categories cannot be told apart by hue."
+  }
+}
