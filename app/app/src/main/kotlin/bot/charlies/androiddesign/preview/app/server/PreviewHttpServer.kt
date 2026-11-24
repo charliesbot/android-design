@@ -55,6 +55,7 @@ class PreviewHttpServer(
   private val onWatchdogHalt: () -> Unit = { Runtime.getRuntime().halt(1) },
   private val onProcessExit: (() -> Unit)? = null,
   private val enableFileWatcher: Boolean = true,
+  private val onLaunchLiveActivity: () -> Unit = {},
 ) {
   data class FocusTarget(
     val direction: String,
@@ -709,6 +710,9 @@ class PreviewHttpServer(
           overlayId = ov,
         ),
       )
+    }
+    if (req.launchActivity) {
+      runCatching { onLaunchLiveActivity() }
     }
     sendRawJson(
       exchange,

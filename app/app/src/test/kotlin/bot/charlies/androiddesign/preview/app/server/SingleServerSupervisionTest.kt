@@ -654,4 +654,62 @@ exit 1
       stubHttp.stop(0)
     }
   }
+
+  @Test
+  fun `POST api live invokes onLaunchLiveActivity only when launchActivity is true`(
+    @TempDir tmp: Path,
+  ) {
+    val cache = tmp.resolve("cache")
+    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
+    val launchCount = AtomicInteger(0)
+    val worker =
+      InMemoryRenderWorker(
+        name = "fake-live",
+        directions = fakeDirections,
+        views = PhoneSurface.views,
+        dexHashFor = { "dex" },
+      )
+    val server =
+      PreviewHttpServer(
+        repoRoot = repo,
+        cacheRoot = cache,
+        preferredPort = 0,
+        worker = worker,
+        enableFileWatcher = false,
+        onLaunchLiveActivity = { launchCount.incrementAndGet() },
+      )
+    val record = server.start()
+    try {
+      val base = "http://127.0.0.1:${record.port}"
+      val (cFalse, _) =
+        httpCall(
+          "$base/api/live",
+          method = "POST",
+          secret = record.clientSecret,
+          body =
+            PreviewJson.compact.encodeToString(
+              LiveFocusRequest.serializer(),
+              LiveFocusRequest(repoRoot = repo.toString(), launchActivity = false),
+            ),
+        )
+      assertEquals(200, cFalse)
+      assertEquals(0, launchCount.get())
+
+      val (cTrue, _) =
+        httpCall(
+          "$base/api/live",
+          method = "POST",
+          secret = record.clientSecret,
+          body =
+            PreviewJson.compact.encodeToString(
+              LiveFocusRequest.serializer(),
+              LiveFocusRequest(repoRoot = repo.toString(), launchActivity = true),
+            ),
+        )
+      assertEquals(200, cTrue)
+      assertEquals(1, launchCount.get())
+    } finally {
+      server.stop()
+    }
+  }
 }

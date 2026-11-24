@@ -105,6 +105,7 @@ class ServerCommand : Command {
     var deviceSerial: String? = null
     var forwardPort: Int? = null
     var apkSha256: String? = null
+    var onLaunchLiveActivity: () -> Unit = {}
     val recycleExecutor = Executors.newSingleThreadExecutor { r ->
       Thread(r, "android-design-sandbox-recycle").apply { isDaemon = true }
     }
@@ -228,6 +229,7 @@ class ServerCommand : Command {
           deviceSerial = setup.serial
           forwardPort = setup.forwardPort
           apkSha256 = setup.apkSha256
+          onLaunchLiveActivity = { devMgr.launchLiveActivity(setup.serial) }
           val currentPort = AtomicInteger(setup.forwardPort)
           lateinit var transport: AdbTcpDeviceTransport
           transport =
@@ -278,6 +280,7 @@ class ServerCommand : Command {
         adbForwardPort = forwardPort,
         apkSha256 = apkSha256,
         onProcessExit = { latch.countDown() },
+        onLaunchLiveActivity = onLaunchLiveActivity,
       )
     runningServer = server
     val record = server.start()

@@ -16,6 +16,7 @@ import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
 import bot.charlies.androiddesign.preview.model.DeviceMemoryStats
 import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
 import bot.charlies.androiddesign.preview.model.DeviceTargetResult
+import bot.charlies.androiddesign.preview.model.DeviceWireFrame
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.Views
@@ -101,7 +102,7 @@ internal class VirtualClockComposeRenderer(
     dexBytes: ByteArray?,
     entryClass: String,
     request: DeviceBatchRequest,
-  ): Pair<DeviceBatchResponse, List<EncodedFramePayload>> {
+  ): Pair<DeviceBatchResponse, List<DeviceWireFrame>> {
     val totalStartNs = System.nanoTime()
     val dexStartNs = System.nanoTime()
     val loaded =
@@ -115,7 +116,7 @@ internal class VirtualClockComposeRenderer(
     val board = loaded.board
 
     val results = mutableListOf<DeviceTargetResult>()
-    val encodedFrames = mutableListOf<EncodedFramePayload>()
+    val encodedFrames = mutableListOf<DeviceWireFrame>()
     val assetResolver = assetCache.resolverFor(request.assetMap)
 
     runBlocking {
@@ -147,7 +148,7 @@ internal class VirtualClockComposeRenderer(
     request: DeviceBatchRequest,
     target: DeviceRenderTarget,
     assetResolver: ((String) -> ImageBitmap?)?,
-  ): Pair<DeviceTargetResult, List<EncodedFramePayload>> {
+  ): Pair<DeviceTargetResult, List<DeviceWireFrame>> {
     val direction =
       board.directions.firstOrNull { it.name == target.direction }
         ?: error("No direction '${target.direction}'")
@@ -173,7 +174,7 @@ internal class VirtualClockComposeRenderer(
       )
 
     val viewName = rendered.target.effectiveView.name
-    val payloads = mutableListOf<EncodedFramePayload>()
+    val payloads = mutableListOf<DeviceWireFrame>()
     val endFrame = rendered.endFrame
     if (target.frameFormat != FrameFormat.NONE) {
       payloads +=

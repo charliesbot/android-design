@@ -4,6 +4,7 @@ import bot.charlies.androiddesign.preview.app.android.DeviceManager
 import bot.charlies.androiddesign.preview.app.cli.Command
 import bot.charlies.androiddesign.preview.app.server.CheckRequest
 import bot.charlies.androiddesign.preview.app.server.CheckResponse
+import bot.charlies.androiddesign.preview.app.server.CheckScope
 import bot.charlies.androiddesign.preview.app.server.ContentHasher
 import bot.charlies.androiddesign.preview.app.server.ErrorEnvelope
 import bot.charlies.androiddesign.preview.app.server.RuntimeIdentity
@@ -14,7 +15,6 @@ import bot.charlies.androiddesign.preview.app.server.TreeResponse
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import java.io.PrintStream
-import java.net.SocketTimeoutException
 import java.net.URLEncoder
 import java.nio.file.Files
 import java.nio.file.Path
@@ -50,6 +50,31 @@ private fun emitError(
   emitJson(out, PreviewJson.compact.encodeToString(ErrorEnvelope.serializer(), envelope))
   return code
 }
+
+private fun emitHttpBodyFailure(
+  out: PrintStream,
+  exitCode: Int,
+  body: String,
+  fallbackError: String,
+): Int {
+  emitJson(out, body.ifBlank { """{"ok":false,"error":"$fallbackError"}""" })
+  return exitCode
+}
+
+private fun emitDeadlineExceeded(
+  out: PrintStream,
+  outcome: PreviewClient.PostOutcome.DeadlineExceeded,
+  restartedMessage: String,
+  busyMessage: String,
+  tell: String? = null,
+): Int =
+  emitError(
+    out,
+    ClientExitCode.FAILED,
+    "timeout",
+    if (outcome.restarted) restartedMessage else busyMessage,
+    tell = tell,
+  )
 
 private fun wantsHelp(args: List<String>): Boolean = args.any { it == "--help" || it == "-h" }
 
@@ -291,39 +316,25 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
     val direction = parsed.flags["--direction"]
     val screen = parsed.flags["--screen"]
     val view = parsed.flags["--view"]
-    val scoped = !direction.isNullOrBlank() || !screen.isNullOrBlank() || !view.isNullOrBlank()
-    val scopeKey =
-      listOfNotNull(
-          direction?.takeIf { it.isNotBlank() }?.let { "dir=$it" },
-          screen?.takeIf { it.isNotBlank() }?.let { "screen=$it" },
-          view?.takeIf { it.isNotBlank() }?.let { "view=$it" },
-        )
-        .ifEmpty { listOf("full") }
-        .joinToString(",")
+    val scope = CheckScope(direction = direction, screen = screen, view = view)
+    val scoped = scope.isScoped
 
     // Check recorded watchdog timeouts BEFORE overwriting a dead server record on respawn.
     val snapshot = ContentHasher.snapshot(sourcePath, explicitDesign)
-    if (client.checkRecordedTimeout(repoRoot, snapshot, scopeKey, direction, screen, view)) {
-      val resp =
-        CheckResponse(
-          ok = false,
-          valid = false,
-          pass = false,
-          scoped = scoped,
-          contentHash = snapshot.contentHash,
-          sourcePath = sourcePath.toString(),
-          designPath = snapshot.designPath?.toString(),
-          error = "timeout",
-          tell =
-            "Previous attempt for this exact file timed out ($scopeKey). Edit and save the file to clear the timeout.",
-        )
-      emitJson(out, PreviewJson.compact.encodeToString(CheckResponse.serializer(), resp))
+    if (client.checkRecordedTimeout(snapshot, scope)) {
+      emitTimeoutCheckResponse(
+        out = out,
+        scoped = scoped,
+        snapshot = snapshot,
+        sourcePath = sourcePath,
+        tell =
+          "Previous attempt for this exact file timed out (${scope.key}). Edit and save the file to clear the timeout.",
+      )
       return ClientExitCode.FAILED
     }
 
-    val lookup = client.ensureServer(repoRoot)
     val ready =
-      when (lookup) {
+      when (val lookup = client.ensureServer(repoRoot)) {
         is PreviewClient.ServerLookup.Ready -> lookup
         is PreviewClient.ServerLookup.NotReady ->
           return emitError(out, ClientExitCode.NOT_READY, "server_not_ready", lookup.message)
@@ -338,116 +349,113 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
         view = view,
         repoRoot = repoRoot.toString(),
       )
-    val body = PreviewJson.compact.encodeToString(CheckRequest.serializer(), req)
-    val timeoutMs = client.deadlineMs(isCold = ready.status.compileCount == 0, scoped = scoped)
+    val outcome =
+      client.postScoped(
+        ready = ready,
+        repoRoot = repoRoot,
+        path = "/api/check",
+        jsonBody = PreviewJson.compact.encodeToString(CheckRequest.serializer(), req),
+        snapshot = snapshot,
+        scope = scope,
+      )
+    return emitCheckOutcome(out, outcome, scoped, snapshot, sourcePath)
+  }
 
-    val http =
-      try {
-        client.postJson(ready.record, "/api/check", body, readTimeoutMs = timeoutMs)
-      } catch (_: SocketTimeoutException) {
-        val repVer = client.checkReplacedByVersion(ready.record)
-        if (repVer != null) {
-          val msg = "replaced by v$repVer, rerun"
-          emitJson(
-            out,
-            PreviewJson.compact.encodeToString(
-              CheckResponse.serializer(),
-              CheckResponse(
-                ok = false,
-                valid = false,
-                pass = false,
-                scoped = scoped,
-                sourcePath = sourcePath.toString(),
-                error = "server_replaced",
-                tell = msg,
-              ),
-            ),
-          )
-          return ClientExitCode.FAILED
-        }
-        val restarted =
-          client.recoverFromDeadline(repoRoot, ready.record) ==
-            PreviewClient.DeadlineRecovery.RESTARTED
-        return emitError(
+  private fun emitCheckOutcome(
+    out: PrintStream,
+    outcome: PreviewClient.PostOutcome,
+    scoped: Boolean,
+    snapshot: ContentHasher.Snapshot,
+    sourcePath: Path,
+  ): Int =
+    when (outcome) {
+      is PreviewClient.PostOutcome.Ok -> {
+        emitJson(out, outcome.body)
+        val parsedResp =
+          try {
+            PreviewJson.compact.decodeFromString(CheckResponse.serializer(), outcome.body)
+          } catch (_: Exception) {
+            return ClientExitCode.FAILED
+          }
+        if (parsedResp.ok && parsedResp.valid && parsedResp.pass) ClientExitCode.OK
+        else ClientExitCode.FAILED
+      }
+      is PreviewClient.PostOutcome.ClientError ->
+        emitHttpBodyFailure(out, ClientExitCode.USAGE, outcome.body, "bad_request")
+      is PreviewClient.PostOutcome.ServerError ->
+        emitHttpBodyFailure(out, ClientExitCode.FAILED, outcome.body, "server_error")
+      is PreviewClient.PostOutcome.Replaced -> {
+        val payload =
+          outcome.body?.ifBlank { """{"ok":false,"error":"server_replaced"}""" }
+            ?: replacedCheckJson(scoped, sourcePath, outcome.replacedByVersion)
+        emitJson(out, payload)
+        ClientExitCode.FAILED
+      }
+      is PreviewClient.PostOutcome.DeadlineExceeded ->
+        emitDeadlineExceeded(
           out,
-          ClientExitCode.FAILED,
-          "timeout",
-          if (restarted) {
-            "Request exceeded ${timeoutMs} ms deadline; restarted unresponsive preview server."
-          } else {
-            "Request exceeded ${timeoutMs} ms deadline; preview server is still responsive (it may be busy with another repository's render). Retry."
-          },
+          outcome,
+          restartedMessage =
+            "Request exceeded ${outcome.timeoutMs} ms deadline; restarted unresponsive preview server.",
+          busyMessage =
+            "Request exceeded ${outcome.timeoutMs} ms deadline; preview server is still responsive (it may be busy with another repository's render). Retry.",
           tell =
             "Check timed out (slow composition or a busy shared server). Simplify the view or retry.",
         )
-      } catch (e: Exception) {
-        val repVer = client.checkReplacedByVersion(ready.record)
-        if (repVer != null) {
-          val msg = "replaced by v$repVer, rerun"
-          emitJson(
-            out,
-            PreviewJson.compact.encodeToString(
-              CheckResponse.serializer(),
-              CheckResponse(
-                ok = false,
-                valid = false,
-                pass = false,
-                scoped = scoped,
-                sourcePath = sourcePath.toString(),
-                error = "server_replaced",
-                tell = msg,
-              ),
-            ),
-          )
-          return ClientExitCode.FAILED
-        }
-        if (client.checkRecordedTimeout(repoRoot, snapshot, scopeKey, direction, screen, view)) {
-          val resp =
-            CheckResponse(
-              ok = false,
-              valid = false,
-              pass = false,
-              scoped = scoped,
-              contentHash = snapshot.contentHash,
-              sourcePath = sourcePath.toString(),
-              designPath = snapshot.designPath?.toString(),
-              error = "timeout",
-              tell =
-                "Preview server halted after timing out ($scopeKey). Simplify the view and save the file to retry.",
-            )
-          emitJson(out, PreviewJson.compact.encodeToString(CheckResponse.serializer(), resp))
-          return ClientExitCode.FAILED
-        }
-        return emitError(
-          out,
-          ClientExitCode.NOT_READY,
-          "server_unreachable",
-          e.message ?: "Failed contacting preview server",
+      is PreviewClient.PostOutcome.WatchdogHalted -> {
+        emitTimeoutCheckResponse(
+          out = out,
+          scoped = scoped,
+          snapshot = snapshot,
+          sourcePath = sourcePath,
+          tell =
+            "Preview server halted after timing out (${outcome.scope.key}). Simplify the view and save the file to retry.",
         )
+        ClientExitCode.FAILED
       }
+      is PreviewClient.PostOutcome.Unreachable ->
+        emitError(out, ClientExitCode.NOT_READY, "server_unreachable", outcome.message)
+    }
 
-    if (http.status == 400 || http.status == 404) {
-      emitJson(out, http.body.ifBlank { """{"ok":false,"error":"bad_request"}""" })
-      return ClientExitCode.USAGE
-    }
-    if (http.status == 409) {
-      emitJson(out, http.body.ifBlank { """{"ok":false,"error":"server_replaced"}""" })
-      return ClientExitCode.FAILED
-    }
-    if (http.status >= 500) {
-      emitJson(out, http.body.ifBlank { """{"ok":false,"error":"server_error"}""" })
-      return ClientExitCode.FAILED
-    }
-    emitJson(out, http.body)
-    val parsedResp =
-      try {
-        PreviewJson.compact.decodeFromString(CheckResponse.serializer(), http.body)
-      } catch (_: Exception) {
-        return ClientExitCode.FAILED
-      }
-    return if (parsedResp.ok && parsedResp.valid && parsedResp.pass) ClientExitCode.OK
-    else ClientExitCode.FAILED
+  private fun emitTimeoutCheckResponse(
+    out: PrintStream,
+    scoped: Boolean,
+    snapshot: ContentHasher.Snapshot,
+    sourcePath: Path,
+    tell: String,
+  ) {
+    val resp =
+      CheckResponse(
+        ok = false,
+        valid = false,
+        pass = false,
+        scoped = scoped,
+        contentHash = snapshot.contentHash,
+        sourcePath = sourcePath.toString(),
+        designPath = snapshot.designPath?.toString(),
+        error = "timeout",
+        tell = tell,
+      )
+    emitJson(out, PreviewJson.compact.encodeToString(CheckResponse.serializer(), resp))
   }
+
+  private fun replacedCheckJson(
+    scoped: Boolean,
+    sourcePath: Path,
+    replacedByVersion: String?,
+  ): String =
+    PreviewJson.compact.encodeToString(
+      CheckResponse.serializer(),
+      CheckResponse(
+        ok = false,
+        valid = false,
+        pass = false,
+        scoped = scoped,
+        sourcePath = sourcePath.toString(),
+        error = "server_replaced",
+        tell = "replaced by v$replacedByVersion, rerun",
+      ),
+    )
 
   companion object {
     val HELP =
@@ -530,89 +538,74 @@ class TreeCommand(private val client: PreviewClient = PreviewClient()) : Command
           return emitError(out, ClientExitCode.NOT_READY, "server_not_ready", lookup.message)
       }
 
+    val screen = parsed.flags["--screen"]
     val req =
       TreeRequest(
         path = sourcePath.toString(),
         direction = direction,
-        screen = parsed.flags["--screen"],
+        screen = screen,
         overlay = parsed.flags["--overlay"],
         view = view,
         maxDepth = maxDepth,
         repoRoot = repoRoot.toString(),
       )
-    val timeoutMs = client.deadlineMs(isCold = ready.status.compileCount == 0, scoped = true)
-    val snapshot = ContentHasher.snapshot(sourcePath)
-    val screen = parsed.flags["--screen"]
-    val treeScope =
-      listOfNotNull(
-          direction.takeIf { it.isNotBlank() }?.let { "dir=$it" },
-          screen?.takeIf { it.isNotBlank() }?.let { "screen=$it" },
-          view.takeIf { it.isNotBlank() }?.let { "view=$it" },
-        )
-        .joinToString(",")
-    val http =
-      try {
-        client.postJson(
-          ready.record,
-          "/api/tree",
-          PreviewJson.compact.encodeToString(TreeRequest.serializer(), req),
-          readTimeoutMs = timeoutMs,
-        )
-      } catch (_: SocketTimeoutException) {
-        val restarted =
-          client.recoverFromDeadline(repoRoot, ready.record) ==
-            PreviewClient.DeadlineRecovery.RESTARTED
-        return emitError(
-          out,
-          ClientExitCode.FAILED,
-          "timeout",
-          if (restarted) {
-            "tree request timed out; restarted unresponsive preview server."
-          } else {
-            "tree request timed out; preview server is still responsive (possibly busy). Retry."
-          },
-        )
-      } catch (e: Exception) {
-        val repVer = client.checkReplacedByVersion(ready.record)
-        if (repVer != null) {
-          return emitError(
-            out,
-            ClientExitCode.FAILED,
-            "server_replaced",
-            "replaced by v$repVer, rerun",
-          )
-        }
-        if (client.checkRecordedTimeout(repoRoot, snapshot, treeScope, direction, screen, view)) {
-          return emitError(
-            out,
-            ClientExitCode.FAILED,
-            "timeout",
-            "Preview server halted after timing out ($treeScope).",
-          )
-        }
-        return emitError(
-          out,
-          ClientExitCode.NOT_READY,
-          "server_unreachable",
-          e.message ?: "Failed contacting preview server",
-        )
-      }
-    emitJson(out, http.body)
-    return when (http.status) {
-      200 -> {
+    val outcome =
+      client.postScoped(
+        ready = ready,
+        repoRoot = repoRoot,
+        path = "/api/tree",
+        jsonBody = PreviewJson.compact.encodeToString(TreeRequest.serializer(), req),
+        snapshot = ContentHasher.snapshot(sourcePath),
+        scope = CheckScope(direction = direction, screen = screen, view = view),
+      )
+    return emitTreeOutcome(out, outcome)
+  }
+
+  private fun emitTreeOutcome(out: PrintStream, outcome: PreviewClient.PostOutcome): Int =
+    when (outcome) {
+      is PreviewClient.PostOutcome.Ok -> {
+        emitJson(out, outcome.body)
         val resp =
           try {
-            PreviewJson.compact.decodeFromString(TreeResponse.serializer(), http.body)
+            PreviewJson.compact.decodeFromString(TreeResponse.serializer(), outcome.body)
           } catch (_: Exception) {
             null
           }
         if (resp?.ok == true) ClientExitCode.OK else ClientExitCode.FAILED
       }
-      400,
-      404 -> ClientExitCode.USAGE
-      else -> ClientExitCode.FAILED
+      is PreviewClient.PostOutcome.ClientError ->
+        emitHttpBodyFailure(out, ClientExitCode.USAGE, outcome.body, "bad_request")
+      is PreviewClient.PostOutcome.ServerError ->
+        emitHttpBodyFailure(out, ClientExitCode.FAILED, outcome.body, "server_error")
+      is PreviewClient.PostOutcome.Replaced ->
+        if (outcome.body != null) {
+          emitHttpBodyFailure(out, ClientExitCode.FAILED, outcome.body, "server_replaced")
+        } else {
+          emitError(
+            out,
+            ClientExitCode.FAILED,
+            "server_replaced",
+            "replaced by v${outcome.replacedByVersion}, rerun",
+          )
+        }
+      is PreviewClient.PostOutcome.DeadlineExceeded ->
+        emitDeadlineExceeded(
+          out,
+          outcome,
+          restartedMessage = "tree request timed out; restarted unresponsive preview server.",
+          busyMessage =
+            "tree request timed out; preview server is still responsive (possibly busy). Retry.",
+        )
+      is PreviewClient.PostOutcome.WatchdogHalted ->
+        emitError(
+          out,
+          ClientExitCode.FAILED,
+          "timeout",
+          "Preview server halted after timing out (${outcome.scope.key}).",
+        )
+      is PreviewClient.PostOutcome.Unreachable ->
+        emitError(out, ClientExitCode.NOT_READY, "server_unreachable", outcome.message)
     }
-  }
 
   companion object {
     val HELP =
@@ -706,8 +699,26 @@ class SelectionCommand(private val client: PreviewClient = PreviewClient()) : Co
   }
 }
 
+private fun openSystemBrowser(url: String): Boolean {
+  val os = System.getProperty("os.name").orEmpty().lowercase()
+  val cmd =
+    when {
+      "mac" in os -> listOf("open", url)
+      else -> listOf("xdg-open", url)
+    }
+  return try {
+    ProcessBuilder(cmd).start()
+    true
+  } catch (_: Exception) {
+    false
+  }
+}
+
 /** `open <file>` */
-class OpenCommand(private val client: PreviewClient = PreviewClient()) : Command {
+class OpenCommand(
+  private val client: PreviewClient = PreviewClient(),
+  private val openBrowser: (String) -> Boolean = ::openSystemBrowser,
+) : Command {
   override val name = "open"
   override val usage = "open <file> [--help]"
 
@@ -742,6 +753,7 @@ class OpenCommand(private val client: PreviewClient = PreviewClient()) : Command
           return emitError(out, ClientExitCode.NOT_READY, "server_not_ready", lookup.message)
       }
 
+    val noOpen = client.noOpen
     val isExploreFile =
       rawFile != null &&
         Files.isRegularFile(targetPath) &&
@@ -758,16 +770,20 @@ class OpenCommand(private val client: PreviewClient = PreviewClient()) : Command
       } catch (_: Exception) {
         // Still return boardUrl even if initial compile failed or timed out.
       }
+      if (!noOpen) {
+        client.notifyLive(ready.record, targetPath, repoRoot, launchActivity = true)
+      }
     } else {
-      client.notifyLive(ready.record, if (isExploreFile) targetPath else null, repoRoot)
+      client.notifyLive(
+        ready.record,
+        if (isExploreFile) targetPath else null,
+        repoRoot,
+        launchActivity = !noOpen,
+      )
     }
 
     val url = ready.record.boardUrl(repoId)
-    val noOpen = System.getenv(PreviewClient.NO_OPEN_ENV) == "1"
     val opened = if (noOpen) false else openBrowser(url)
-    if (!noOpen && ready.status.backend == RuntimeIdentity.BACKEND_ANDROID) {
-      DeviceManager().launchLiveActivity(ready.status.deviceSerial)
-    }
     val resp =
       OpenResponse(
         ok = true,
@@ -777,21 +793,6 @@ class OpenCommand(private val client: PreviewClient = PreviewClient()) : Command
       )
     emitJson(out, PreviewJson.compact.encodeToString(OpenResponse.serializer(), resp))
     return ClientExitCode.OK
-  }
-
-  private fun openBrowser(url: String): Boolean {
-    val os = System.getProperty("os.name").orEmpty().lowercase()
-    val cmd =
-      when {
-        "mac" in os -> listOf("open", url)
-        else -> listOf("xdg-open", url)
-      }
-    return try {
-      ProcessBuilder(cmd).start()
-      true
-    } catch (_: Exception) {
-      false
-    }
   }
 
   companion object {

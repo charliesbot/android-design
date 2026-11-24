@@ -8,36 +8,39 @@ import bot.charlies.androiddesign.preview.app.server.ContentHasher
 import bot.charlies.androiddesign.preview.app.server.SingleRenderRequest
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.Bounds
+import bot.charlies.androiddesign.preview.model.DeviceAckResponse
 import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
 import bot.charlies.androiddesign.preview.model.DeviceBatchResponse
 import bot.charlies.androiddesign.preview.model.DeviceBoardMeta
 import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
-import bot.charlies.androiddesign.preview.model.DeviceHasAssetsRequest
 import bot.charlies.androiddesign.preview.model.DeviceHasAssetsResponse
 import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
 import bot.charlies.androiddesign.preview.model.DeviceOp
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
 import bot.charlies.androiddesign.preview.model.DevicePreloadResponse
+import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
 import bot.charlies.androiddesign.preview.model.DeviceTargetResult
+import bot.charlies.androiddesign.preview.model.DeviceWireCodec
+import bot.charlies.androiddesign.preview.model.DeviceWireFrame
 import bot.charlies.androiddesign.preview.model.Finding
 import bot.charlies.androiddesign.preview.model.FindingRule
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PhoneSurface
-import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.Severity
+import bot.charlies.androiddesign.preview.model.Views
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.InetAddress
 import java.net.ServerSocket
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import net.jpountz.lz4.LZ4Factory
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -372,61 +375,28 @@ class AndroidPreviewBackendTest {
           val inp = DataInputStream(BufferedInputStream(sock.getInputStream()))
           val out = DataOutputStream(BufferedOutputStream(sock.getOutputStream()))
           while (true) {
-            val op = inp.read()
-            if (op < 0) break
-            when (op) {
-              DeviceOp.PING -> {
-                val json =
-                  PreviewJson.compact.encodeToString(
-                    DevicePingResponse.serializer(),
-                    DevicePingResponse(ok = true, pid = 4242),
-                  )
-                val bytes = json.toByteArray(StandardCharsets.UTF_8)
-                out.writeInt(bytes.size)
-                out.write(bytes)
-                out.flush()
-              }
+            when (DeviceWireCodec.readOpOrNull(inp) ?: break) {
+              DeviceOp.PING ->
+                DeviceWireCodec.writePingResponse(out, DevicePingResponse(ok = true, pid = 4242))
               DeviceOp.HAS_ASSETS -> {
-                val len = inp.readInt()
-                val buf = ByteArray(len)
-                inp.readFully(buf)
-                val req =
-                  PreviewJson.compact.decodeFromString(
-                    DeviceHasAssetsRequest.serializer(),
-                    String(buf, StandardCharsets.UTF_8),
-                  )
-                val respJson =
-                  PreviewJson.compact.encodeToString(
-                    DeviceHasAssetsResponse.serializer(),
-                    DeviceHasAssetsResponse(missing = req.hashes),
-                  )
-                val respBytes = respJson.toByteArray(StandardCharsets.UTF_8)
-                out.writeInt(respBytes.size)
-                out.write(respBytes)
-                out.flush()
+                val req = DeviceWireCodec.readHasAssetsRequest(inp)
+                DeviceWireCodec.writeHasAssetsResponse(
+                  out,
+                  DeviceHasAssetsResponse(missing = req.hashes),
+                )
               }
               DeviceOp.PUT_ASSETS -> {
-                val count = inp.readInt()
-                repeat(count) {
-                  val hLen = inp.readInt()
-                  val hBytes = ByteArray(hLen)
-                  inp.readFully(hBytes)
-                  val hash = String(hBytes, StandardCharsets.UTF_8)
-                  val bLen = inp.readInt()
-                  val blob = ByteArray(bLen)
-                  inp.readFully(blob)
+                val items = DeviceWireCodec.readPutAssetsRequest(inp)
+                for ((hash, blob) in items) {
                   receivedAssets[hash] = blob
                 }
-                val okBytes = """{"ok":true}""".toByteArray(StandardCharsets.UTF_8)
-                out.writeInt(okBytes.size)
-                out.write(okBytes)
-                out.flush()
+                DeviceWireCodec.writeAck(out, DeviceAckResponse(ok = true, stored = items.size))
               }
             }
           }
         }
       }
-      val connectAttempts = java.util.concurrent.atomic.AtomicInteger(0)
+      val connectAttempts = AtomicInteger(0)
       try {
         AdbTcpDeviceTransport(
             connectAndEnsurePort = {
@@ -451,6 +421,177 @@ class AndroidPreviewBackendTest {
           }
         worker.get()
         assertEquals(assetBytes.toList(), receivedAssets[assetHash]?.toList())
+      } finally {
+        executor.shutdownNow()
+      }
+    }
+  }
+
+  @Test
+  fun `tcp bridge performs preloadDex, renderBatch, setLive retry, and recycle wire roundtrip`() {
+    val dexBytes = byteArrayOf(0x64, 0x65, 0x78)
+    val lz4Payload = compressedLz4Frame(4, 4)
+    val webpPayload =
+      byteArrayOf('R'.code.toByte(), 'I'.code.toByte(), 'F'.code.toByte(), 'F'.code.toByte())
+    val preloadedDex = mutableListOf<String>()
+    val batchDexSizes = mutableListOf<Int>()
+    val liveDexSizes = mutableListOf<Int>()
+    val restarted = AtomicInteger(0)
+
+    ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { server ->
+      val executor = Executors.newSingleThreadExecutor()
+      val worker = executor.submit {
+        server.accept().use { sock ->
+          val inp = DataInputStream(BufferedInputStream(sock.getInputStream()))
+          val out = DataOutputStream(BufferedOutputStream(sock.getOutputStream()))
+          while (true) {
+            when (DeviceWireCodec.readOpOrNull(inp) ?: break) {
+              DeviceOp.PRELOAD_DEX -> {
+                val req = DeviceWireCodec.readPreloadDexRequest(inp)
+                preloadedDex += req.dexHash
+                DeviceWireCodec.writePreloadDexResponse(
+                  out,
+                  DevicePreloadResponse(ok = true, dexHash = req.dexHash),
+                )
+              }
+              DeviceOp.RENDER_BATCH -> {
+                val req = DeviceWireCodec.readRenderBatchRequest(inp)
+                batchDexSizes += req.dexBytes?.size ?: 0
+                val tree = LayoutTree("home", Views.Light, emptyList(), emptyList())
+                DeviceWireCodec.writeRenderBatchResponse(
+                  out,
+                  DeviceBatchResponse(
+                    ok = true,
+                    results =
+                      listOf(
+                        DeviceTargetResult(
+                          direction = "Dir",
+                          screen = "home",
+                          viewName = "light",
+                          tree = tree,
+                          hasFrame = true,
+                          frameFormat = FrameFormat.LZ4_RGBA,
+                        ),
+                        DeviceTargetResult(
+                          direction = "Dir",
+                          screen = "home",
+                          viewName = "dark",
+                          tree = tree,
+                          hasFrame = true,
+                          frameFormat = FrameFormat.WEBP_LOSSLESS,
+                        ),
+                      ),
+                  ),
+                  listOf(
+                    DeviceWireFrame(
+                      direction = "Dir",
+                      screen = "home",
+                      viewName = "light",
+                      overlayId = null,
+                      isEndFrame = false,
+                      format = FrameFormat.LZ4_RGBA,
+                      widthPx = 4,
+                      heightPx = 4,
+                      rawLength = 4 * 4 * 4,
+                      payload = lz4Payload,
+                    ),
+                    DeviceWireFrame(
+                      direction = "Dir",
+                      screen = "home",
+                      viewName = "dark",
+                      overlayId = null,
+                      isEndFrame = false,
+                      format = FrameFormat.WEBP_LOSSLESS,
+                      widthPx = 4,
+                      heightPx = 4,
+                      rawLength = 4 * 4 * 4,
+                      payload = webpPayload,
+                    ),
+                  ),
+                )
+              }
+              DeviceOp.SET_LIVE -> {
+                val req = DeviceWireCodec.readSetLiveRequest(inp)
+                liveDexSizes += req.dexBytes?.size ?: 0
+                if (req.dexBytes == null) {
+                  DeviceWireCodec.writeAck(
+                    out,
+                    DeviceAckResponse(ok = false, error = "DEX 'h1' is not preloaded"),
+                  )
+                } else {
+                  DeviceWireCodec.writeAck(out, DeviceAckResponse(ok = true))
+                }
+              }
+              DeviceOp.RECYCLE -> {
+                DeviceWireCodec.writeAck(out, DeviceAckResponse(ok = true))
+                break
+              }
+            }
+          }
+        }
+      }
+
+      try {
+        AdbTcpDeviceTransport(
+            connectAndEnsurePort = { server.localPort },
+            restartSandboxActivity = { restarted.incrementAndGet() },
+          )
+          .use { transport ->
+            val preload = transport.preloadDex("h1", "SampleKt", dexBytes)
+            assertTrue(preload.ok)
+            assertEquals(listOf("h1"), preloadedDex)
+
+            val exec =
+              transport.renderBatch(
+                dexHash = "h1",
+                entryClass = "SampleKt",
+                dexBytes = dexBytes,
+                request =
+                  DeviceBatchRequest(
+                    dexHash = "h1",
+                    entryClass = "SampleKt",
+                    sourceFile = "Sample.explore.kt",
+                    sourceText = "val preview = ...",
+                    targets =
+                      listOf(
+                        DeviceRenderTarget(
+                          "Dir",
+                          "home",
+                          "light",
+                          frameFormat = FrameFormat.LZ4_RGBA,
+                        ),
+                        DeviceRenderTarget(
+                          "Dir",
+                          "home",
+                          "dark",
+                          frameFormat = FrameFormat.WEBP_LOSSLESS,
+                        ),
+                      ),
+                  ),
+              )
+            assertTrue(exec.response.ok)
+            assertEquals(listOf(0), batchDexSizes, "Already preloaded DEX should not resend bytes")
+            val lightPng = exec.frames[FrameKey("Dir", "home", null, "light", false)]
+            assertNotNull(lightPng?.pngBytes)
+            val darkWebp = exec.frames[FrameKey("Dir", "home", null, "dark", false)]
+            assertEquals("image/webp", darkWebp?.imageMime)
+            assertEquals(webpPayload.toList(), darkWebp?.imageBytes?.toList())
+
+            // setLive omits dexBytes first (since h1 is in preloadedDexHashes), gets `not
+            // preloaded`
+            // ack, and retries with dexBytes cleanly.
+            val liveOk =
+              transport.setLive(
+                dexBytes = dexBytes,
+                request = DeviceLiveStateRequest(dexHash = "h1", entryClass = "SampleKt"),
+              )
+            assertTrue(liveOk)
+            assertEquals(listOf(0, dexBytes.size), liveDexSizes)
+
+            assertTrue(transport.recycle())
+            assertEquals(1, restarted.get())
+          }
+        worker.get()
       } finally {
         executor.shutdownNow()
       }

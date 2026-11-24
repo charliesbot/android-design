@@ -90,13 +90,15 @@ internal class CheckService(
       )
       return
     }
+    val scope = req.scope()
+    val scoped = scope.isScoped
     if (!sourcePath.fileName.toString().endsWith(".explore.kt")) {
       val resp =
         CheckResponse(
           ok = false,
           valid = false,
           pass = false,
-          scoped = isScoped(req),
+          scoped = scoped,
           sourcePath = sourcePath.toString(),
           boardUrl = repoBoardUrl,
           errors =
@@ -113,25 +115,16 @@ internal class CheckService(
 
     val explicitDesign = req.design?.takeIf { it.isNotBlank() }?.let(Path::of)
     val snapshot = ContentHasher.snapshot(sourcePath, explicitDesign)
-    val scopeKey = buildScopeKey(req)
+    val scopeKey = scope.key
 
     val rec = ServerPaths.readRecord(host.recordPath)
-    if (
-      rec != null &&
-        rec.hasTimeout(
-          contentHash = snapshot.contentHash,
-          scope = scopeKey,
-          direction = req.direction,
-          screen = req.screen,
-          view = req.view,
-        )
-    ) {
+    if (rec != null && rec.hasTimeout(snapshot.contentHash, scope)) {
       val resp =
         CheckResponse(
           ok = false,
           valid = false,
           pass = false,
-          scoped = isScoped(req),
+          scoped = scoped,
           contentHash = snapshot.contentHash,
           sourcePath = sourcePath.toString(),
           designPath = snapshot.designPath?.toString(),
@@ -163,7 +156,7 @@ internal class CheckService(
           renderQueue.submitCompile(state.repoRoot, snapshot, QueuePriority.AGENT),
         )
       } catch (e: ServerReplacedException) {
-        sendReplacedCheckResponse(reply, isScoped(req), sourcePath, e.replacedByVersion)
+        sendReplacedCheckResponse(reply, scoped, sourcePath, e.replacedByVersion)
         return
       } catch (e: Exception) {
         val cause = e.cause ?: e
@@ -191,7 +184,7 @@ internal class CheckService(
           ok = false,
           valid = false,
           pass = false,
-          scoped = isScoped(req),
+          scoped = scoped,
           contentHash = snapshot.contentHash,
           compileMs = loaded.compileMs,
           compileCount = renderQueue.compileCount,
@@ -256,7 +249,6 @@ internal class CheckService(
         boardMeta.views
       }
 
-    val scoped = isScoped(req)
     if (state.currentFocus == null) {
       state.currentFocus =
         PreviewHttpServer.FocusTarget(
@@ -447,19 +439,6 @@ internal class CheckService(
         tell = msg,
       )
     reply(409, PreviewJson.compact.encodeToString(CheckResponse.serializer(), resp))
-  }
-
-  private fun isScoped(req: CheckRequest): Boolean =
-    !req.direction.isNullOrBlank() || !req.screen.isNullOrBlank() || !req.view.isNullOrBlank()
-
-  private fun buildScopeKey(req: CheckRequest): String {
-    val parts =
-      listOfNotNull(
-        req.direction?.takeIf { it.isNotBlank() }?.let { "dir=$it" },
-        req.screen?.takeIf { it.isNotBlank() }?.let { "screen=$it" },
-        req.view?.takeIf { it.isNotBlank() }?.let { "view=$it" },
-      )
-    return if (parts.isEmpty()) "full" else parts.joinToString(",")
   }
 
   companion object {

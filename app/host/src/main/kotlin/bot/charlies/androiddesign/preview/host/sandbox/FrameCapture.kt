@@ -21,6 +21,7 @@ import bot.charlies.androiddesign.preview.feature.preview.sandbox.OverlayWindowH
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.RawRgbaFrame
 import bot.charlies.androiddesign.preview.host.LivePreviewActivity
 import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
+import bot.charlies.androiddesign.preview.model.DeviceWireFrame
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -30,19 +31,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import net.jpountz.lz4.LZ4Factory
-
-internal data class EncodedFramePayload(
-  val direction: String,
-  val screen: String,
-  val viewName: String,
-  val overlayId: String?,
-  val isEndFrame: Boolean,
-  val format: FrameFormat,
-  val widthPx: Int,
-  val heightPx: Int,
-  val rawLength: Int,
-  val payload: ByteArray,
-)
 
 /** Frame readback and encoding for the offscreen host: HardwareRenderer into an ImageReader. */
 internal class FrameCapture {
@@ -210,14 +198,14 @@ internal class FrameCapture {
     viewName: String,
     isEndFrame: Boolean,
     frame: RawRgbaFrame,
-  ): EncodedFramePayload {
+  ): DeviceWireFrame {
     val encodedBytes =
       when (target.frameFormat) {
         FrameFormat.LZ4_RGBA -> compressLz4(frame.bytes)
         FrameFormat.WEBP_LOSSLESS -> compressWebpLossless(frame)
         FrameFormat.NONE -> ByteArray(0)
       }
-    return EncodedFramePayload(
+    return DeviceWireFrame(
       direction = target.direction,
       screen = target.screen,
       viewName = viewName,

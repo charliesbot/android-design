@@ -1,25 +1,23 @@
 package bot.charlies.androiddesign.preview.app.android
 
 import bot.charlies.androiddesign.preview.domain.image.FastPngEncoder
+import bot.charlies.androiddesign.preview.model.DeviceAckResponse
 import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
 import bot.charlies.androiddesign.preview.model.DeviceBatchResponse
 import bot.charlies.androiddesign.preview.model.DeviceHasAssetsRequest
-import bot.charlies.androiddesign.preview.model.DeviceHasAssetsResponse
 import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
-import bot.charlies.androiddesign.preview.model.DeviceOp
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
 import bot.charlies.androiddesign.preview.model.DevicePreloadResponse
+import bot.charlies.androiddesign.preview.model.DeviceWireCodec
+import bot.charlies.androiddesign.preview.model.DeviceWireFrame
 import bot.charlies.androiddesign.preview.model.FrameFormat
-import bot.charlies.androiddesign.preview.model.PreviewJson
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
-import java.io.EOFException
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.SerializationException
 import net.jpountz.lz4.LZ4Factory
@@ -94,8 +92,8 @@ object FrameCodec {
 }
 
 /**
- * Persistent keep-alive TCP bridge speaking [DeviceOp] to `RenderForegroundService` over `adb
- * forward` on `127.0.0.1:<port>`.
+ * Persistent keep-alive TCP bridge speaking `DeviceOp` via [DeviceWireCodec] to
+ * `RenderForegroundService` over `adb forward` on `127.0.0.1:<port>`.
  */
 class AdbTcpDeviceTransport(
   private val host: String = "127.0.0.1",
@@ -113,10 +111,8 @@ class AdbTcpDeviceTransport(
   override fun ping(): DevicePingResponse =
     synchronized(lock) {
       withReconnect(allowRetry = true) { out, inp ->
-        out.writeByte(DeviceOp.PING)
-        out.flush()
-        val resp =
-          PreviewJson.compact.decodeFromString(DevicePingResponse.serializer(), readUtf(inp))
+        DeviceWireCodec.writePingRequest(out)
+        val resp = DeviceWireCodec.readPingResponse(inp)
         noteSandboxPid(resp.pid)
         preloadedDexHashes.clear()
         preloadedDexHashes.addAll(resp.loadedDexHashes)
@@ -131,21 +127,15 @@ class AdbTcpDeviceTransport(
   ): DevicePreloadResponse =
     synchronized(lock) {
       withReconnect(allowRetry = true) { out, inp ->
-        out.writeByte(DeviceOp.PRELOAD_DEX)
-        writeUtf(out, dexHash)
-        writeUtf(out, entryClass)
-        out.writeInt(dexBytes.size)
-        out.write(dexBytes)
-        out.flush()
-        val raw = readUtf(inp)
+        DeviceWireCodec.writePreloadDexRequest(out, dexHash, entryClass, dexBytes)
         val resp =
           try {
-            PreviewJson.compact.decodeFromString(DevicePreloadResponse.serializer(), raw)
-          } catch (_: SerializationException) {
+            DeviceWireCodec.readPreloadDexResponse(inp)
+          } catch (e: SerializationException) {
             DevicePreloadResponse(
               ok = false,
               dexHash = dexHash,
-              error = "Invalid preload response: $raw",
+              error = "Invalid preload response: ${e.message}",
             )
           }
         if (resp.ok) {
@@ -160,32 +150,18 @@ class AdbTcpDeviceTransport(
     return synchronized(lock) {
       val missingHashes =
         withReconnect(allowRetry = true) { out, inp ->
-          out.writeByte(DeviceOp.HAS_ASSETS)
-          writeUtf(
+          DeviceWireCodec.writeHasAssetsRequest(
             out,
-            PreviewJson.compact.encodeToString(
-              DeviceHasAssetsRequest.serializer(),
-              DeviceHasAssetsRequest(assetBlobs.keys.toList()),
-            ),
+            DeviceHasAssetsRequest(assetBlobs.keys.toList()),
           )
-          out.flush()
-          PreviewJson.compact
-            .decodeFromString(DeviceHasAssetsResponse.serializer(), readUtf(inp))
-            .missing
+          DeviceWireCodec.readHasAssetsResponse(inp).missing
         }
       if (missingHashes.isEmpty()) return@synchronized 0
       val toSend = missingHashes.mapNotNull { h -> assetBlobs[h]?.let { b -> h to b } }
       if (toSend.isEmpty()) return@synchronized 0
       withReconnect(allowRetry = true) { out, inp ->
-        out.writeByte(DeviceOp.PUT_ASSETS)
-        out.writeInt(toSend.size)
-        for ((hash, bytes) in toSend) {
-          writeUtf(out, hash)
-          out.writeInt(bytes.size)
-          out.write(bytes)
-        }
-        out.flush()
-        readUtf(inp)
+        DeviceWireCodec.writePutAssetsRequest(out, toSend)
+        DeviceWireCodec.readAck(inp)
         toSend.size
       }
     }
@@ -219,10 +195,8 @@ class AdbTcpDeviceTransport(
             sendRenderBatchOnce(out, inp, sendDex, entryClass, request)
           }
       }
-      if (result.response.ok || sendDex != null && "not preloaded" !in errText) {
-        if (result.response.ok) {
-          preloadedDexHashes.add(dexHash)
-        }
+      if (result.response.ok) {
+        preloadedDexHashes.add(dexHash)
       }
       if (result.response.recycleReason == "watchdog_timeout") {
         closeSocketQuietly()
@@ -234,22 +208,19 @@ class AdbTcpDeviceTransport(
   override fun setLive(dexBytes: ByteArray?, request: DeviceLiveStateRequest): Boolean =
     synchronized(lock) {
       val sendDex = if (request.dexHash in preloadedDexHashes) null else dexBytes
-      var raw =
+      var ack =
         withReconnect(allowRetry = true) { out, inp ->
           sendSetLiveOnce(out, inp, sendDex, request)
         }
       if (
-        !raw.contains("\"ok\":true") &&
-          "not preloaded" in raw &&
-          dexBytes != null &&
-          sendDex == null
+        !ack.ok && "not preloaded" in ack.error.orEmpty() && dexBytes != null && sendDex == null
       ) {
-        raw =
+        ack =
           withReconnect(allowRetry = true) { out, inp ->
             sendSetLiveOnce(out, inp, dexBytes, request)
           }
       }
-      raw.contains("\"ok\":true")
+      ack.ok
     }
 
   override fun recycle(): Boolean =
@@ -257,9 +228,8 @@ class AdbTcpDeviceTransport(
       val ack =
         try {
           withReconnect(allowRetry = false) { out, inp ->
-            out.writeByte(DeviceOp.RECYCLE)
-            out.flush()
-            readUtf(inp).contains("\"ok\":true")
+            DeviceWireCodec.writeRecycleRequest(out)
+            DeviceWireCodec.readAck(inp).ok
           }
         } catch (_: IOException) {
           false
@@ -282,73 +252,65 @@ class AdbTcpDeviceTransport(
     entryClass: String,
     request: DeviceBatchRequest,
   ): DeviceBatchExecution {
-    out.writeByte(DeviceOp.RENDER_BATCH)
-    if (dexBytes == null || dexBytes.isEmpty()) {
-      out.writeInt(0)
-    } else {
-      out.writeInt(dexBytes.size)
-      out.write(dexBytes)
+    DeviceWireCodec.writeRenderBatchRequest(out, dexBytes, entryClass, request)
+    val wireResult = DeviceWireCodec.readRenderBatchResponse(inp)
+    val frames = LinkedHashMap<FrameKey, DecodedDeviceFrame>(wireResult.frames.size)
+    for (frame in wireResult.frames) {
+      val decoded = decodeWireFrame(frame)
+      frames[decoded.key] = decoded
     }
-    writeUtf(out, entryClass)
-    writeUtf(out, PreviewJson.compact.encodeToString(DeviceBatchRequest.serializer(), request))
-    out.flush()
+    return DeviceBatchExecution(wireResult.response, frames)
+  }
 
-    val respJson = readUtf(inp)
-    val resp = PreviewJson.compact.decodeFromString(DeviceBatchResponse.serializer(), respJson)
-    val frameCount = inp.readInt()
-    val frames = LinkedHashMap<FrameKey, DecodedDeviceFrame>(frameCount.coerceAtLeast(0))
-    repeat(frameCount) {
-      val dir = readUtf(inp)
-      val screen = readUtf(inp)
-      val viewName = readUtf(inp)
-      val ovId = readUtf(inp).ifEmpty { null }
-      val isEnd = inp.readBoolean()
-      val format = FrameFormat.valueOf(readUtf(inp))
-      val widthPx = inp.readInt()
-      val heightPx = inp.readInt()
-      val rawLen = inp.readInt()
-      val payloadLen = inp.readInt()
-      val payload = ByteArray(payloadLen)
-      inp.readFully(payload)
-      val key = FrameKey(dir, screen, ovId, viewName, isEnd)
-      val decoded =
-        when (format) {
-          FrameFormat.LZ4_RGBA -> {
-            val png = FrameCodec.decodeLz4ToPng(widthPx, heightPx, rawLen, payload)
-            DecodedDeviceFrame(
-              key = key,
-              format = format,
-              widthPx = widthPx,
-              heightPx = heightPx,
-              pngBytes = png,
-              imageBytes = png,
-              imageMime = "image/png",
-            )
-          }
-          FrameFormat.WEBP_LOSSLESS ->
-            DecodedDeviceFrame(
-              key = key,
-              format = format,
-              widthPx = widthPx,
-              heightPx = heightPx,
-              pngBytes = null,
-              imageBytes = payload,
-              imageMime = "image/webp",
-            )
-          FrameFormat.NONE ->
-            DecodedDeviceFrame(
-              key = key,
-              format = format,
-              widthPx = widthPx,
-              heightPx = heightPx,
-              pngBytes = null,
-              imageBytes = ByteArray(0),
-              imageMime = "application/octet-stream",
-            )
-        }
-      frames[key] = decoded
+  private fun decodeWireFrame(frame: DeviceWireFrame): DecodedDeviceFrame {
+    val key =
+      FrameKey(
+        direction = frame.direction,
+        screen = frame.screen,
+        overlayId = frame.overlayId,
+        viewName = frame.viewName,
+        isEndFrame = frame.isEndFrame,
+      )
+    return when (frame.format) {
+      FrameFormat.LZ4_RGBA -> {
+        val png =
+          FrameCodec.decodeLz4ToPng(
+            widthPx = frame.widthPx,
+            heightPx = frame.heightPx,
+            rawLength = frame.rawLength,
+            lz4Payload = frame.payload,
+          )
+        DecodedDeviceFrame(
+          key = key,
+          format = frame.format,
+          widthPx = frame.widthPx,
+          heightPx = frame.heightPx,
+          pngBytes = png,
+          imageBytes = png,
+          imageMime = "image/png",
+        )
+      }
+      FrameFormat.WEBP_LOSSLESS ->
+        DecodedDeviceFrame(
+          key = key,
+          format = frame.format,
+          widthPx = frame.widthPx,
+          heightPx = frame.heightPx,
+          pngBytes = null,
+          imageBytes = frame.payload,
+          imageMime = "image/webp",
+        )
+      FrameFormat.NONE ->
+        DecodedDeviceFrame(
+          key = key,
+          format = frame.format,
+          widthPx = frame.widthPx,
+          heightPx = frame.heightPx,
+          pngBytes = null,
+          imageBytes = ByteArray(0),
+          imageMime = "application/octet-stream",
+        )
     }
-    return DeviceBatchExecution(resp, frames)
   }
 
   private fun sendSetLiveOnce(
@@ -356,17 +318,9 @@ class AdbTcpDeviceTransport(
     inp: DataInputStream,
     dexBytes: ByteArray?,
     request: DeviceLiveStateRequest,
-  ): String {
-    out.writeByte(DeviceOp.SET_LIVE)
-    if (dexBytes == null || dexBytes.isEmpty()) {
-      out.writeInt(0)
-    } else {
-      out.writeInt(dexBytes.size)
-      out.write(dexBytes)
-    }
-    writeUtf(out, PreviewJson.compact.encodeToString(DeviceLiveStateRequest.serializer(), request))
-    out.flush()
-    return readUtf(inp)
+  ): DeviceAckResponse {
+    DeviceWireCodec.writeSetLiveRequest(out, dexBytes, request)
+    return DeviceWireCodec.readAck(inp)
   }
 
   private inline fun <T> withReconnect(
@@ -428,20 +382,6 @@ class AdbTcpDeviceTransport(
     input = null
     socket = null
     activePort = -1
-  }
-
-  private fun writeUtf(out: DataOutputStream, text: String) {
-    val bytes = text.toByteArray(StandardCharsets.UTF_8)
-    out.writeInt(bytes.size)
-    out.write(bytes)
-  }
-
-  private fun readUtf(inp: DataInputStream): String {
-    val len = inp.readInt()
-    if (len < 0) throw EOFException("Invalid packet length: $len")
-    val bytes = ByteArray(len)
-    inp.readFully(bytes)
-    return String(bytes, StandardCharsets.UTF_8)
   }
 
   companion object {
