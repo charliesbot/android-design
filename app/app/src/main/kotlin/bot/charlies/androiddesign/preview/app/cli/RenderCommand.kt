@@ -2,12 +2,14 @@ package bot.charlies.androiddesign.preview.app.cli
 
 import bot.charlies.androiddesign.preview.app.client.ClientExitCode
 import bot.charlies.androiddesign.preview.app.server.BoardMeta
+import bot.charlies.androiddesign.preview.app.server.CheckExecutor
 import bot.charlies.androiddesign.preview.app.server.CompileEntry
 import bot.charlies.androiddesign.preview.app.server.ContentHasher
 import bot.charlies.androiddesign.preview.app.server.DirectionMeta
-import bot.charlies.androiddesign.preview.app.server.PreviewBackend
-import bot.charlies.androiddesign.preview.app.server.RobolectricPreviewBackend
+import bot.charlies.androiddesign.preview.app.server.RenderWorker
+import bot.charlies.androiddesign.preview.app.server.RobolectricRenderWorker
 import bot.charlies.androiddesign.preview.app.server.RuntimeIdentity
+import bot.charlies.androiddesign.preview.app.server.SingleRenderRequest
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
@@ -31,13 +33,13 @@ import java.nio.file.Path
  * [--screens a,b]`
  *
  * Compiles and draws each exploration screen and overlay at each view headlessly via
- * [RobolectricPreviewBackend], writing `<screen>-<view>.png`, `<screen>-<view>.tree.json`, and
+ * [RobolectricRenderWorker], writing `<screen>-<view>.png`, `<screen>-<view>.tree.json`, and
  * `report.json` into `<dir>`. Exit 0 when valid and every render passes, 1 when a render has error
  * findings or threw, 2 when the exploration fails validation/compilation, and 3 when the bootstrap
  * classpath is missing.
  */
 class RenderCommand(
-  private val backendFactory: (() -> PreviewBackend)? = null,
+  private val workerFactory: (() -> RenderWorker)? = null,
 ) : Command {
   override val name = "render"
   override val usage =
@@ -132,28 +134,29 @@ class RenderCommand(
       return ExitCode.INVALID
     }
 
-    val backend =
-      backendFactory?.invoke() ?: createRobolectricBackend(err) ?: return ClientExitCode.NOT_READY
+    val worker =
+      workerFactory?.invoke() ?: createRobolectricWorker(err) ?: return ClientExitCode.NOT_READY
+    val executor = CheckExecutor(worker)
     return try {
-      renderWithBackend(
-        backend = backend,
+      renderWithExecutor(
+        executor = executor,
         sourcePath = sourcePath,
         options = options,
         err = err,
       )
     } finally {
-      backend.close()
+      executor.close()
     }
   }
 
-  private fun renderWithBackend(
-    backend: PreviewBackend,
+  private fun renderWithExecutor(
+    executor: CheckExecutor,
     sourcePath: Path,
     options: Options,
     err: PrintStream,
   ): Int {
     val snapshot = ContentHasher.snapshot(sourcePath, options.design)
-    val compiled = backend.compile(snapshot)
+    val compiled = executor.compile(snapshot)
     val meta: BoardMeta? = compiled.boardMeta
     if (compiled.loaded.errors.isNotEmpty() || meta == null) {
       val errors =
@@ -223,7 +226,7 @@ class RenderCommand(
       for (view in views) {
         val rendered =
           renderSingleTarget(
-            backend = backend,
+            executor = executor,
             entry = entry,
             direction = target.direction.name,
             screenId = target.screenId,
@@ -241,7 +244,7 @@ class RenderCommand(
         views.forEachIndexed { index, view ->
           val (_, renderEntry) =
             renderSingleTarget(
-              backend = backend,
+              executor = executor,
               entry = entry,
               direction = target.direction.name,
               screenId = target.screenId,
@@ -274,7 +277,7 @@ class RenderCommand(
   }
 
   private fun renderSingleTarget(
-    backend: PreviewBackend,
+    executor: CheckExecutor,
     entry: CompileEntry,
     direction: String,
     screenId: String,
@@ -287,19 +290,20 @@ class RenderCommand(
     val artifactName = overlayId?.let { ViewCheck.renderOverlayName(prefix, it) } ?: prefix
     val artifact =
       try {
-        backend.renderSingle(
+        executor.renderSingle(
           entry = entry,
-          direction = direction,
-          screenId = screenId,
-          prefix = prefix,
-          overlayId = overlayId,
-          view = view,
-          densityScale = 2,
-          designSystem = entry.loaded.designSystem,
-          baseCheck = baseCheck,
-          writeFiles = false,
-          rendersRoot = outDir,
-          frameFormat = FrameFormat.LZ4_RGBA,
+          SingleRenderRequest(
+            direction = direction,
+            screenId = screenId,
+            prefix = prefix,
+            overlayId = overlayId,
+            view = view,
+            densityScale = 2,
+            baseCheck = baseCheck,
+            writeFiles = false,
+            rendersRoot = outDir,
+            frameFormat = FrameFormat.LZ4_RGBA,
+          ),
         )
       } catch (e: Exception) {
         val failed = ViewCheck.renderError(e)
@@ -328,7 +332,7 @@ class RenderCommand(
       RenderEntry.of(artifactName, view.name, filesBase, artifact.check, endFiles)
   }
 
-  private fun createRobolectricBackend(err: PrintStream): PreviewBackend? {
+  private fun createRobolectricWorker(err: PrintStream): RenderWorker? {
     val meta = BootstrapMeta.locateOrNull()
     val cpOverride =
       System.getenv(RuntimeIdentity.ROBOLECTRIC_CP_ENV)?.takeIf { it.isNotBlank() }?.let(Path::of)
@@ -339,7 +343,7 @@ class RenderCommand(
       )
       return null
     }
-    return RobolectricPreviewBackend(
+    return RobolectricRenderWorker(
       meta = meta,
       robolectricCp = robolectricCp,
       bootstrapDir = meta?.bootstrapDir ?: robolectricCp.toAbsolutePath().normalize().parent,

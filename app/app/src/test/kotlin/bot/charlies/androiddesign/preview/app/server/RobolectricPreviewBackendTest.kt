@@ -169,8 +169,8 @@ class RobolectricPreviewBackendTest {
     val requests = mutableListOf<RobolectricRenderRequest>()
     var failFoldable = false
 
-    val backend =
-      RobolectricPreviewBackend(
+    val worker =
+      RobolectricRenderWorker(
         classStager = ::fakeClassStage,
         requestExecutor = { req ->
           requests += req
@@ -273,7 +273,7 @@ class RobolectricPreviewBackendTest {
         },
       )
 
-    backend.warmUp()
+    worker.warmUp()
     assertEquals("ping", requests.first().mode)
 
     val identity =
@@ -291,7 +291,7 @@ class RobolectricPreviewBackendTest {
         cacheRoot = cacheRoot,
         preferredPort = 0,
         idleTimeoutMs = 0L,
-        backend = backend,
+        worker = worker,
         runtimeIdentity = identity,
         enableFileWatcher = false,
       )
@@ -409,11 +409,11 @@ class RobolectricPreviewBackendTest {
     val repo = tmp.resolve("live-repo").also { Files.createDirectories(it.resolve(".git")) }
     val file = writeSampleFile(repo.resolve("design"), title = "LiveRobo")
     val rendersRoot = tmp.resolve("renders")
-    val backend = RobolectricPreviewBackend(meta = meta, robolectricCp = rcp)
-    backend.use { rb ->
-      rb.warmUp()
+    val worker = RobolectricRenderWorker(meta = meta, robolectricCp = rcp)
+    CheckExecutor(worker).use { exec ->
+      worker.warmUp()
       val snap = ContentHasher.snapshot(file, null)
-      val out = rb.compile(snap)
+      val out = exec.compile(snap)
       assertTrue(out.loaded.errors.isEmpty(), "Expected compile errors empty: ${out.loaded.errors}")
       assertEquals("phone", out.boardMeta?.directions?.single()?.surface)
 
@@ -440,7 +440,7 @@ class RobolectricPreviewBackendTest {
           view = PhoneSurface.views.first { it.name == "light" },
         )
       val arts =
-        rb.renderBatchCheck(entry, listOf(target), scoped = true, rendersRoot = rendersRoot)
+        exec.renderBatchCheck(entry, listOf(target), scoped = true, rendersRoot = rendersRoot)
       assertEquals(1, arts.size)
       val art = arts.single()
       assertTrue(art.pass, "Expected render pass: ${art.check}")
@@ -457,8 +457,8 @@ class RobolectricPreviewBackendTest {
     val file = writeSampleFile(tmp.resolve("repo/design"))
     val requests = mutableListOf<RobolectricRenderRequest>()
     val stagedClasses = mutableListOf<Boolean>()
-    val backend =
-      RobolectricPreviewBackend(
+    val worker =
+      RobolectricRenderWorker(
         classStager = ::fakeClassStage,
         requestExecutor = { req ->
           requests += req
@@ -480,9 +480,9 @@ class RobolectricPreviewBackendTest {
           }
         },
       )
-    backend.use { rb ->
+    CheckExecutor(worker).use { exec ->
       val snap = ContentHasher.snapshot(file, null)
-      val out = rb.compile(snap)
+      val out = exec.compile(snap)
       assertTrue(out.loaded.errors.isEmpty(), "compile errors: ${out.loaded.errors}")
       val compileReq = requests.single { it.mode == "compile" }
       assertEquals(mapOf("assets/cover.png" to "abc123"), compileReq.assetMap)
@@ -514,16 +514,16 @@ class RobolectricPreviewBackendTest {
       """
         .trimIndent(),
     )
-    val backend =
-      RobolectricPreviewBackend(
+    val worker =
+      RobolectricRenderWorker(
         meta = meta,
         robolectricCp = tmp.resolve("unused.cp"),
         requestExecutor = {
           error("The runner must not see a board whose assets escape the case dir")
         },
       )
-    backend.use { rb ->
-      val out = rb.compile(ContentHasher.snapshot(file, null))
+    CheckExecutor(worker).use { exec ->
+      val out = exec.compile(ContentHasher.snapshot(file, null))
       assertTrue(
         out.loaded.errors.any { "escape" in it.message.lowercase() },
         "Expected asset escape error, got ${out.loaded.errors}",
@@ -545,8 +545,8 @@ class RobolectricPreviewBackendTest {
   @Test
   fun stagesOutliveManyOtherFilesAndAreDeletedWhenTheirFileRecompiles(@TempDir tmp: Path) {
     val classesDirs = mutableListOf<Path>()
-    val backend =
-      RobolectricPreviewBackend(
+    val worker =
+      RobolectricRenderWorker(
         classStager = ::fakeClassStage,
         requestExecutor = { req ->
           req.classesDir?.let { classesDirs.add(Path.of(it)) }
@@ -559,16 +559,16 @@ class RobolectricPreviewBackendTest {
           )
         },
       )
-    backend.use { rb ->
+    CheckExecutor(worker).use { exec ->
       val dir = tmp.resolve("repo/design")
       val files = (0 until 20).map { writeSampleFile(dir, "F$it.explore.kt", "Board$it") }
       val snaps = files.map { ContentHasher.snapshot(it, null) }
-      val firstOut = rb.compile(snaps[0])
-      files.indices.drop(1).forEach { rb.compile(snaps[it]) }
+      val firstOut = exec.compile(snaps[0])
+      files.indices.drop(1).forEach { exec.compile(snaps[it]) }
       val firstDir = classesDirs.first()
 
       // The first file is unchanged and cached upstream, so nothing recompiles it.
-      rb.renderBatchCheck(
+      exec.renderBatchCheck(
         compileEntry(firstOut, snaps[0]),
         listOf(CheckTargetSpec("Editorial", "home", "home", null, Views.byName("light")!!)),
         scoped = true,
@@ -576,7 +576,7 @@ class RobolectricPreviewBackendTest {
       )
 
       Files.writeString(files[0], sampleExploreSource("Changed"))
-      rb.compile(ContentHasher.snapshot(files[0], null))
+      exec.compile(ContentHasher.snapshot(files[0], null))
       assertFalse(Files.exists(firstDir), "Replaced stage must be deleted")
     }
   }
@@ -602,22 +602,22 @@ class RobolectricPreviewBackendTest {
     val exitMarker = tmp.resolve("exit-after-first")
     Files.writeString(exitMarker, "")
 
-    val backend =
-      RobolectricPreviewBackend(
+    val worker =
+      RobolectricRenderWorker(
         workerCommand = listOf("/bin/sh", script.toString()),
         classStager = ::fakeClassStage,
         renderTimeoutMs = 400L,
         controlTimeoutMs = 10_000L,
       )
-    backend.use { rb ->
+    CheckExecutor(worker).use { exec ->
       val file = writeSampleFile(tmp.resolve("repo/design"))
       val snap = ContentHasher.snapshot(file, null)
-      val out = rb.compile(snap)
+      val out = exec.compile(snap)
       // The worker exited after answering warmup and compile; the next render spawns a fresh, slow
       // one.
       Files.delete(exitMarker)
       Thread.sleep(300)
-      rb.renderBatchCheck(
+      exec.renderBatchCheck(
         compileEntry(out, snap),
         listOf(CheckTargetSpec("Editorial", "home", "home", null, Views.byName("light")!!)),
         scoped = true,
@@ -649,14 +649,14 @@ class RobolectricPreviewBackendTest {
     )
     script.toFile().setExecutable(true)
 
-    val backend =
-      RobolectricPreviewBackend(
+    val worker =
+      RobolectricRenderWorker(
         workerCommand = listOf("/bin/sh", script.toString()),
         controlTimeoutMs = 400L,
       )
-    backend.use { rb ->
+    worker.use { rw ->
       val started = System.nanoTime()
-      val timeout = assertThrows(SandboxWatchdogException::class.java) { rb.warmUp() }
+      val timeout = assertThrows(SandboxWatchdogException::class.java) { rw.warmUp() }
       val elapsedMs = (System.nanoTime() - started) / 1_000_000L
       assertTrue(elapsedMs < 5_000L, "Watchdog must fire at the budget, took $elapsedMs ms")
       assertTrue(
@@ -676,7 +676,7 @@ class RobolectricPreviewBackendTest {
         "Hung worker $firstPid must be killed",
       )
 
-      rb.warmUp()
+      rw.warmUp()
       val pids = Files.readAllLines(pidFile).map { it.trim().toLong() }
       assertEquals(2, pids.size, "Worker must restart lazily on the next request")
       assertTrue(pids[0] != pids[1])
@@ -701,10 +701,10 @@ class RobolectricPreviewBackendTest {
     )
     script.toFile().setExecutable(true)
 
-    val backend = RobolectricPreviewBackend(workerCommand = listOf("/bin/sh", script.toString()))
+    val worker = RobolectricRenderWorker(workerCommand = listOf("/bin/sh", script.toString()))
     val requestDone = java.util.concurrent.CompletableFuture<Throwable?>()
     val caller = Thread {
-      val err = runCatching { backend.warmUp() }.exceptionOrNull()
+      val err = runCatching { worker.warmUp() }.exceptionOrNull()
       requestDone.complete(err)
     }
     caller.isDaemon = true
@@ -719,7 +719,7 @@ class RobolectricPreviewBackendTest {
 
     val closeDone = java.util.concurrent.CompletableFuture<Unit>()
     val closer = Thread {
-      backend.close()
+      worker.close()
       closeDone.complete(Unit)
     }
     closer.isDaemon = true
@@ -768,8 +768,8 @@ class RobolectricPreviewBackendTest {
     )
     script.toFile().setExecutable(true)
 
-    val backend =
-      RobolectricPreviewBackend(
+    val worker =
+      RobolectricRenderWorker(
         workerCommand = listOf("/bin/sh", script.toString()),
         classStager = ::fakeClassStage,
       )
@@ -792,7 +792,7 @@ class RobolectricPreviewBackendTest {
         idleTimeoutMs = 0L,
         coldBudgetMs = 250L,
         warmBudgetMs = 250L,
-        backend = backend,
+        worker = worker,
         runtimeIdentity = identity,
         onWatchdogHalt = {
           val pid =

@@ -1,11 +1,12 @@
 package bot.charlies.androiddesign.preview.app.android
 
-import bot.charlies.androiddesign.preview.app.server.AndroidPreviewBackend
+import bot.charlies.androiddesign.preview.app.server.AndroidRenderWorker
+import bot.charlies.androiddesign.preview.app.server.CheckExecutor
 import bot.charlies.androiddesign.preview.app.server.CheckTargetSpec
 import bot.charlies.androiddesign.preview.app.server.CompileEntry
 import bot.charlies.androiddesign.preview.app.server.ContentHasher
+import bot.charlies.androiddesign.preview.app.server.SingleRenderRequest
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
-import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
 import bot.charlies.androiddesign.preview.model.DeviceBatchResponse
@@ -218,6 +219,7 @@ class AndroidPreviewBackendTest {
             renderMs = 12.0,
             pass = findings.isEmpty(),
             tree = tree,
+            endTree = if (target.includeEndFrame) tree else null,
             hasFrame = hasFrame,
             frameFormat = target.frameFormat,
           )
@@ -265,16 +267,21 @@ class AndroidPreviewBackendTest {
     val snapshot = ContentHasher.snapshot(sourceFile, null)
     val rendersRoot = tmp.resolve("renders")
 
+    val recycleAtBatchCount = mutableListOf<Int>()
     val recycleReasons = mutableListOf<String?>()
     val transport = FakeTransport(failDarkView = true, recommendRecycle = true)
-    val backend =
-      AndroidPreviewBackend(
+    val worker =
+      AndroidRenderWorker(
         meta = meta,
         transport = transport,
-        onRecycleRecommended = { recycleReasons += it },
+        onRecycleRecommended = { reason ->
+          recycleReasons += reason
+          recycleAtBatchCount += transport.batchRequests.size
+        },
       )
+    val executor = CheckExecutor(worker)
 
-    val compiledOut = backend.compile(snapshot)
+    val compiledOut = executor.compile(snapshot)
     assertTrue(compiledOut.loaded.errors.isEmpty(), "Compile errors: ${compiledOut.loaded.errors}")
     assertEquals(1, transport.preloaded.size)
 
@@ -304,7 +311,7 @@ class AndroidPreviewBackendTest {
       )
 
     val artifacts =
-      backend.renderBatchCheck(entry, targets, scoped = false, rendersRoot = rendersRoot)
+      executor.renderBatchCheck(entry, targets, scoped = false, rendersRoot = rendersRoot)
     assertEquals(3, artifacts.size)
     // First batch + follow-up batch for failing non-primary `dark` view.
     assertEquals(2, transport.batchRequests.size)
@@ -318,31 +325,38 @@ class AndroidPreviewBackendTest {
     assertEquals(listOf("dark"), followUpTargets.map { it.viewName })
     assertEquals(FrameFormat.LZ4_RGBA, followUpTargets.single().frameFormat)
 
+    val lightArtifact = artifacts.first { it.view.name == "light" }
+    assertNotNull(lightArtifact.endTree, "CheckExecutor must preserve endTree for Android")
+
     val darkArtifact = artifacts.first { it.view.name == "dark" }
     assertFalse(darkArtifact.pass)
     assertNotNull(darkArtifact.pngBytes, "Follow-up LZ4 fetch must populate failing dark PNG bytes")
 
     val expectedAssetSha = ContentHasher.sha256Hex(assetBytes)
     assertTrue(expectedAssetSha in transport.syncedAssetHashes)
-    assertTrue("memory_pressure" in recycleReasons)
+    assertEquals(listOf("memory_pressure"), recycleReasons)
+    assertEquals(listOf(2), recycleAtBatchCount)
 
     val cardArtifact =
-      backend.renderSingle(
+      executor.renderSingle(
         entry = entry,
-        direction = "Main",
-        screenId = "home",
-        prefix = "Main-home",
-        overlayId = null,
-        view = darkView,
-        densityScale = 2,
-        designSystem = DesignSystemResolver.resolve(null, null, PhoneSurface),
-        baseCheck = null,
-        writeFiles = false,
-        rendersRoot = rendersRoot,
-        frameFormat = FrameFormat.WEBP_LOSSLESS,
+        SingleRenderRequest(
+          direction = "Main",
+          screenId = "home",
+          prefix = "Main-home",
+          overlayId = null,
+          view = darkView,
+          densityScale = 2,
+          baseCheck = null,
+          writeFiles = false,
+          rendersRoot = rendersRoot,
+          frameFormat = FrameFormat.WEBP_LOSSLESS,
+        ),
       )
     assertEquals("image/webp", cardArtifact.imageMime)
     assertEquals(FrameFormat.WEBP_LOSSLESS, transport.singleFormats.last())
+    assertNotNull(cardArtifact.endTree)
+    assertEquals(listOf(2, 3), recycleAtBatchCount)
   }
 
   @Test

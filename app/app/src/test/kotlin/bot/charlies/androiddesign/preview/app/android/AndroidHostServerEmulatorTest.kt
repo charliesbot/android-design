@@ -1,6 +1,6 @@
 package bot.charlies.androiddesign.preview.app.android
 
-import bot.charlies.androiddesign.preview.app.server.AndroidPreviewBackend
+import bot.charlies.androiddesign.preview.app.server.AndroidRenderWorker
 import bot.charlies.androiddesign.preview.app.server.BoardRenderRequest
 import bot.charlies.androiddesign.preview.app.server.BoardRenderResponse
 import bot.charlies.androiddesign.preview.app.server.BoardSelectionRequest
@@ -168,14 +168,14 @@ class AndroidHostServerEmulatorTest {
         },
         restartSandboxActivity = { deviceManager.restartSandboxOnSerial(ready.serial) },
       )
-    val backend = AndroidPreviewBackend(meta = meta, transport = transport)
+    val worker = AndroidRenderWorker(meta = meta, transport = transport)
     val identity = RuntimeIdentity.compute(meta = meta)
     val server =
       PreviewHttpServer(
         repoRoot = repo,
         cacheRoot = cache,
         preferredPort = 0,
-        backend = backend,
+        worker = worker,
         runtimeIdentity = identity,
         deviceSerial = ready.serial,
         adbForwardPort = ready.forwardPort,

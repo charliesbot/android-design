@@ -1,8 +1,8 @@
 package bot.charlies.androiddesign.preview.app.cli
 
 import bot.charlies.androiddesign.preview.app.AppInfo
-import bot.charlies.androiddesign.preview.app.server.PreviewBackend
-import bot.charlies.androiddesign.preview.app.server.RobolectricPreviewBackend
+import bot.charlies.androiddesign.preview.app.server.RenderWorker
+import bot.charlies.androiddesign.preview.app.server.RobolectricRenderWorker
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.Views
@@ -24,19 +24,19 @@ class CliTest {
   private class Run(val code: Int, val out: String, val err: String)
 
   companion object {
-    private lateinit var sharedBackend: RobolectricPreviewBackend
+    private lateinit var sharedWorker: RobolectricRenderWorker
 
     @JvmStatic
     @BeforeAll
-    fun setUpBackend() {
+    fun setUpWorker() {
       val bdir =
         Path.of(
           System.getProperty("adp.bootstrap.dir")
             ?: error("adp.bootstrap.dir system property missing"),
         )
       val meta = BootstrapMeta.fromFile(bdir.resolve("bootstrap-meta.properties"))
-      sharedBackend =
-        RobolectricPreviewBackend(
+      sharedWorker =
+        RobolectricRenderWorker(
           meta = meta,
           robolectricCp = bdir.resolve("robolectric.cp"),
           bootstrapDir = bdir,
@@ -45,15 +45,15 @@ class CliTest {
 
     @JvmStatic
     @AfterAll
-    fun tearDownBackend() {
-      if (::sharedBackend.isInitialized) {
-        sharedBackend.close()
+    fun tearDownWorker() {
+      if (::sharedWorker.isInitialized) {
+        sharedWorker.close()
       }
     }
   }
 
-  private fun nonClosingBackend(): PreviewBackend =
-    object : PreviewBackend by sharedBackend {
+  private fun nonClosingWorker(): RenderWorker =
+    object : RenderWorker by sharedWorker {
       override fun close() {}
     }
 
@@ -61,7 +61,7 @@ class CliTest {
     val out = ByteArrayOutputStream()
     val err = ByteArrayOutputStream()
     val code =
-      RenderCommand(::nonClosingBackend)
+      RenderCommand(::nonClosingWorker)
         .run(args.toList(), PrintStream(out, true), PrintStream(err, true))
     return Run(code, out.toString(), err.toString())
   }

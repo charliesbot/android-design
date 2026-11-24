@@ -2,7 +2,6 @@ package bot.charlies.androiddesign.preview.app.server
 
 import bot.charlies.androiddesign.preview.app.AppInfo
 import bot.charlies.androiddesign.preview.app.cli.ReportTheme
-import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutNode
@@ -48,7 +47,7 @@ class PreviewHttpServer(
   private val idleTimeoutMs: Long = DEFAULT_IDLE_TIMEOUT_MS,
   private val coldBudgetMs: Long = Watchdog.COLD_BUDGET_MS,
   private val warmBudgetMs: Long = Watchdog.WARM_BUDGET_MS,
-  private val backend: PreviewBackend,
+  private val worker: RenderWorker,
   private val runtimeIdentity: RuntimeIdentity? = null,
   private val deviceSerial: String? = null,
   private val adbForwardPort: Int? = null,
@@ -103,14 +102,7 @@ class PreviewHttpServer(
     repos[defaultRepoId] = RepoState(defaultRepoId, defaultRepoRoot)
   }
 
-  private val effectiveBackend: PreviewBackend = backend
-
-  private val effectiveMaxCompiles: Int =
-    if (backend.supportsBatchCheck && maxCompilesBeforeRecycle == MAX_COMPILES_BEFORE_RECYCLE) {
-      Int.MAX_VALUE
-    } else {
-      maxCompilesBeforeRecycle
-    }
+  private val executor = CheckExecutor(worker)
 
   private val watchdog =
     Watchdog(
@@ -118,7 +110,7 @@ class PreviewHttpServer(
       warmBudgetMs = warmBudgetMs,
       onTimeout = { job -> handleWatchdogTimeout(job) },
       onHalt = {
-        runCatching { effectiveBackend.close() }
+        runCatching { executor.close() }
         onWatchdogHalt()
       },
     )
@@ -126,7 +118,7 @@ class PreviewHttpServer(
   val renderQueue: RenderQueue =
     RenderQueue(
       rendersRoot = rendersRoot,
-      backend = effectiveBackend,
+      executor = executor,
       cacheRoot = cacheRoot,
       watchdog = watchdog,
       onViewRendered = { rRoot, sourcePath, contentHash, artifact ->
@@ -139,7 +131,7 @@ class PreviewHttpServer(
     val hasBoardListeners = sseClients.any { it.repoId == null || it.repoId == repoState.repoId }
     if (hasBoardListeners) {
       handleFileChanged(repoState, src, design)
-    } else if (effectiveBackend.supportsHeadlessSpeculativePrecompile) {
+    } else if (executor.supportsHeadlessSpeculativePrecompile) {
       handleSpeculativePrecompile(repoState, src, design)
     }
   }
@@ -156,7 +148,7 @@ class PreviewHttpServer(
     CheckService(
       host = PreviewCheckHost(),
       renderQueue = renderQueue,
-      backend = effectiveBackend,
+      executor = executor,
       selectionStore = selectionStore,
       warmBudgetMs = warmBudgetMs,
     )
@@ -318,7 +310,7 @@ class PreviewHttpServer(
       haltedAt = null,
       runtimeHash = runtimeIdentity?.runtimeHash,
       sourceDir = runtimeIdentity?.sourceDir,
-      backend = effectiveBackend.name,
+      backend = executor.name,
       deviceSerial = deviceSerial,
       adbForwardPort = adbForwardPort,
       apkSha256 = apkSha256 ?: runtimeIdentity?.apkSha256,
@@ -343,7 +335,7 @@ class PreviewHttpServer(
       // Ignore stop errors.
     }
     httpServer = null
-    runCatching { effectiveBackend.close() }
+    runCatching { executor.close() }
     httpExecutor.shutdownNow()
     housekeepExecutor.shutdownNow()
     if (triggerExit) {
@@ -491,8 +483,6 @@ class PreviewHttpServer(
       PreviewJson.compact.encodeToString(BoardPayload.serializer(), metaPayload),
     )
 
-    val cardFrameFormat =
-      if (effectiveBackend.supportsBatchCheck) FrameFormat.WEBP_LOSSLESS else FrameFormat.LZ4_RGBA
     ordered.forEachIndexed { idx, (target, prio) ->
       val fut =
         renderQueue.submitSingleRender(
@@ -505,8 +495,8 @@ class PreviewHttpServer(
           densityScale = 2,
           baseCheck = null,
           priority = prio,
-          writeFiles = !effectiveBackend.supportsBatchCheck,
-          frameFormat = cardFrameFormat,
+          writeFiles = false,
+          frameFormat = FrameFormat.WEBP_LOSSLESS,
         )
       if (idx == 0) {
         fut.whenComplete { _, _ -> maybeScheduleRecycle() }
@@ -623,7 +613,7 @@ class PreviewHttpServer(
         repoRoot = reportedRepoRoot,
         boardUrl = url,
         activeFile = reqRepo?.activeSourcePath?.toString(),
-        backend = effectiveBackend.name,
+        backend = executor.name,
         runtimeHash = runtimeIdentity?.runtimeHash,
         deviceSerial = deviceSerial,
         adbForwardPort = adbForwardPort,
@@ -711,11 +701,13 @@ class PreviewHttpServer(
           ?: state.currentFocus?.screen
           ?: entry.boardMeta.directions.firstOrNull { it.name == dir }?.startScreen
       val ov = req.overlay ?: state.currentFocus?.overlay
-      effectiveBackend.updateLive(
+      executor.updateLive(
         entry = entry,
-        direction = dir,
-        screenId = screen,
-        overlayId = ov,
+        LivePreviewUpdate(
+          direction = dir,
+          screenId = screen,
+          overlayId = ov,
+        ),
       )
     }
     sendRawJson(
@@ -865,12 +857,11 @@ class PreviewHttpServer(
             prefix = prefix,
             overlayId = overlayId,
             view = view,
-            densityScale = if (effectiveBackend.supportsBatchCheck) 2 else 1,
+            densityScale = 2,
             baseCheck = null,
             priority = QueuePriority.AGENT,
             writeFiles = false,
-            frameFormat =
-              if (effectiveBackend.supportsBatchCheck) FrameFormat.NONE else FrameFormat.LZ4_RGBA,
+            frameFormat = FrameFormat.NONE,
           ),
         )
       } catch (e: ServerReplacedException) {
@@ -1130,8 +1121,6 @@ class PreviewHttpServer(
     val hasThemeOverride =
       req.seed != null || req.variant != null || req.dark != null || fontScale != 1f
     val prefix = if (meta.directions.size == 1) screenId else "${dir.name}__$screenId"
-    val cardFormat =
-      if (effectiveBackend.supportsBatchCheck) FrameFormat.WEBP_LOSSLESS else FrameFormat.LZ4_RGBA
     val artifact =
       if (!hasThemeOverride) {
         renderQueue
@@ -1145,8 +1134,8 @@ class PreviewHttpServer(
             densityScale = 2,
             baseCheck = null,
             priority = QueuePriority.BOARD_FOCUS,
-            writeFiles = !effectiveBackend.supportsBatchCheck,
-            frameFormat = cardFormat,
+            writeFiles = false,
+            frameFormat = FrameFormat.WEBP_LOSSLESS,
           )
           .get()
       } else {
@@ -1156,12 +1145,6 @@ class PreviewHttpServer(
           } else {
             baseView
           }
-        val system =
-          DesignSystemResolver.resolveWithOverrides(
-            entry = entry,
-            seedOverride = req.seed,
-            variantOverride = variantOverride,
-          )
         renderQueue.renderOverride(
           entry = entry,
           direction = dir.name,
@@ -1169,9 +1152,8 @@ class PreviewHttpServer(
           prefix = prefix,
           overlayId = overlayId,
           view = effectiveView,
-          designSystem = system,
           densityScale = 2,
-          frameFormat = cardFormat,
+          frameFormat = FrameFormat.WEBP_LOSSLESS,
           fontScale = fontScale,
           seedOverride = req.seed,
           variantOverride = variantOverride?.wire,
@@ -1180,15 +1162,17 @@ class PreviewHttpServer(
       }
 
     liveOwnerRepoId = state.repoId
-    effectiveBackend.updateLive(
+    executor.updateLive(
       entry = entry,
-      direction = dir.name,
-      screenId = screenId,
-      overlayId = overlayId,
-      darkOverride = if (entry.surface == BoardSurface.Phone) req.dark else null,
-      seedOverride = req.seed,
-      variantOverride = variantOverride?.wire,
-      fontScale = fontScale,
+      LivePreviewUpdate(
+        direction = dir.name,
+        screenId = screenId,
+        overlayId = overlayId,
+        darkOverride = if (entry.surface == BoardSurface.Phone) req.dark else null,
+        seedOverride = req.seed,
+        variantOverride = variantOverride?.wire,
+        fontScale = fontScale,
+      ),
     )
 
     val response = toBoardRenderResponse(artifact, entry.contentHash)
@@ -1231,11 +1215,13 @@ class PreviewHttpServer(
     liveOwnerRepoId = state.repoId
     state.activeSourcePath?.let { src ->
       renderQueue.latestCompiled(state.repoRoot, src)?.let { entry ->
-        effectiveBackend.updateLive(
+        executor.updateLive(
           entry = entry,
-          direction = req.direction,
-          screenId = req.screen?.takeIf { it.isNotBlank() },
-          overlayId = req.overlay?.takeIf { it.isNotBlank() },
+          LivePreviewUpdate(
+            direction = req.direction,
+            screenId = req.screen?.takeIf { it.isNotBlank() },
+            overlayId = req.overlay?.takeIf { it.isNotBlank() },
+          ),
         )
       }
     }
@@ -1389,7 +1375,7 @@ class PreviewHttpServer(
 
   private fun maybeScheduleRecycle() {
     if (
-      renderQueue.compileCount >= effectiveMaxCompiles &&
+      renderQueue.compileCount >= maxCompilesBeforeRecycle &&
         recycleScheduled.compareAndSet(false, true)
     ) {
       broadcastSse(null, "recycling", """{"reason":"compile_limit"}""")
@@ -1606,7 +1592,7 @@ class PreviewHttpServer(
   }
 
   companion object {
-    const val MAX_COMPILES_BEFORE_RECYCLE = 25
+    const val MAX_COMPILES_BEFORE_RECYCLE = Int.MAX_VALUE
     const val DEFAULT_IDLE_TIMEOUT_MS = 15 * 60 * 1000L
     private const val MAX_BODY_BYTES = 64 * 1024
     private const val REPLACEMENT_DRAIN_WAIT_MS = 450L

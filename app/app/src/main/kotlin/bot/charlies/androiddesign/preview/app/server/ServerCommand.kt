@@ -81,14 +81,14 @@ class ServerCommand : Command {
     val coldBudgetMs =
       System.getenv(COLD_BUDGET_ENV)?.toLongOrNull()
         ?: if (backendMode == RuntimeIdentity.BACKEND_ROBOLECTRIC) {
-          RobolectricPreviewBackend.DEFAULT_COLD_BUDGET_MS
+          RobolectricRenderWorker.DEFAULT_COLD_BUDGET_MS
         } else {
           Watchdog.COLD_BUDGET_MS
         }
     val warmBudgetMs =
       System.getenv(WARM_BUDGET_ENV)?.toLongOrNull()
         ?: if (backendMode == RuntimeIdentity.BACKEND_ROBOLECTRIC) {
-          RobolectricPreviewBackend.DEFAULT_WARM_BUDGET_MS
+          RobolectricRenderWorker.DEFAULT_WARM_BUDGET_MS
         } else {
           Watchdog.WARM_BUDGET_MS
         }
@@ -101,7 +101,7 @@ class ServerCommand : Command {
     val runtimeIdentity = RuntimeIdentity.compute(env)
     val cacheRoot = ServerPaths.cacheRoot()
 
-    val backend: PreviewBackend
+    val worker: RenderWorker
     var deviceSerial: String? = null
     var forwardPort: Int? = null
     var apkSha256: String? = null
@@ -162,11 +162,11 @@ class ServerCommand : Command {
         recycleExecutor.shutdownNow()
         return ClientExitCode.NOT_READY
       }
-      val roboBackend = RobolectricPreviewBackend(meta = meta, robolectricCp = robolectricCp)
+      val roboWorker = RobolectricRenderWorker(meta = meta, robolectricCp = robolectricCp)
       try {
-        roboBackend.warmUp()
+        roboWorker.warmUp()
       } catch (e: Exception) {
-        roboBackend.close()
+        roboWorker.close()
         val msg =
           PreviewJson.compact.encodeToString(
             ErrorEnvelope.serializer(),
@@ -180,7 +180,7 @@ class ServerCommand : Command {
         recycleExecutor.shutdownNow()
         return ClientExitCode.NOT_READY
       }
-      backend = roboBackend
+      worker = roboWorker
     } else {
       val meta =
         BootstrapMeta.locateOrNull()
@@ -249,8 +249,8 @@ class ServerCommand : Command {
               },
               restartSandboxActivity = { devMgr.restartSandboxOnSerial(setup.serial) },
             )
-          backend =
-            AndroidPreviewBackend(
+          worker =
+            AndroidRenderWorker(
               meta = meta,
               transport = transport,
               onRecycleRecommended = {
@@ -272,7 +272,7 @@ class ServerCommand : Command {
         idleTimeoutMs = idleTimeoutMs,
         coldBudgetMs = coldBudgetMs,
         warmBudgetMs = warmBudgetMs,
-        backend = backend,
+        worker = worker,
         runtimeIdentity = runtimeIdentity,
         deviceSerial = deviceSerial,
         adbForwardPort = forwardPort,
