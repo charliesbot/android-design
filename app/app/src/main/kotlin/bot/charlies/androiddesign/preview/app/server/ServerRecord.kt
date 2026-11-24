@@ -188,8 +188,6 @@ data class ServerRecord(
 object ServerPaths {
   const val CACHE_DIR_ENV = "ANDROID_DESIGN_CACHE_DIR"
   const val SHARED_PREFERRED_PORT = 49210
-  private const val PORT_RANGE_START = 49200
-  private const val PORT_RANGE_SIZE = 10000
   private val rng = SecureRandom()
   private val recordLock = Any()
 
@@ -227,12 +225,6 @@ object ServerPaths {
     return digest.take(8).joinToString("") { "%02x".format(it) }
   }
 
-  fun preferredPort(repoRoot: Path): Int {
-    val hash = repoHash(repoRoot)
-    val unsigned = hash.substring(0, 8).toLong(16)
-    return PORT_RANGE_START + (unsigned % PORT_RANGE_SIZE).toInt()
-  }
-
   fun serversDir(cacheRoot: Path = cacheRoot()): Path = cacheRoot.resolve("servers")
 
   /** Single shared active server discovery record across all repositories. */
@@ -244,12 +236,6 @@ object ServerPaths {
 
   fun sharedLogPath(cacheRoot: Path = cacheRoot()): Path =
     serversDir(cacheRoot).resolve("active.log")
-
-  /** Legacy per-repo record path (retained for startup cleanup of stale v5 records). */
-  fun legacyRecordPath(repoRoot: Path, cacheRoot: Path = cacheRoot()): Path =
-    serversDir(cacheRoot).resolve("${repoHash(repoRoot)}.json")
-
-  fun recordPath(repoRoot: Path, cacheRoot: Path = cacheRoot()): Path = sharedRecordPath(cacheRoot)
 
   fun rendersDir(repoRoot: Path, cacheRoot: Path = cacheRoot()): Path =
     cacheRoot.resolve("renders").resolve(repoHash(repoRoot))

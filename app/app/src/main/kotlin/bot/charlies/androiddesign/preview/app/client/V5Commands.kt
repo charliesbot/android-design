@@ -342,14 +342,20 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
           )
           return V5ExitCode.FAILED
         }
-        client.killAndRespawn(repoRoot, ready.record)
+        val restarted =
+          client.recoverFromDeadline(repoRoot, ready.record) ==
+            PreviewClient.DeadlineRecovery.RESTARTED
         return emitError(
           out,
           V5ExitCode.FAILED,
           "timeout",
-          "Request exceeded ${timeoutMs} ms deadline; restarted preview server.",
+          if (restarted) {
+            "Request exceeded ${timeoutMs} ms deadline; restarted unresponsive preview server."
+          } else {
+            "Request exceeded ${timeoutMs} ms deadline; preview server is still responsive (it may be busy with another repository's render). Retry."
+          },
           tell =
-            "Check timed out (possible infinite loop or slow composition). Simplify the view and retry.",
+            "Check timed out (slow composition or a busy shared server). Simplify the view or retry.",
         )
       } catch (e: Exception) {
         val repVer = client.checkReplacedByVersion(ready.record)
@@ -530,8 +536,19 @@ class TreeCommand(private val client: PreviewClient = PreviewClient()) : Command
           readTimeoutMs = timeoutMs,
         )
       } catch (_: SocketTimeoutException) {
-        client.killAndRespawn(repoRoot, ready.record)
-        return emitError(out, V5ExitCode.FAILED, "timeout", "tree request timed out")
+        val restarted =
+          client.recoverFromDeadline(repoRoot, ready.record) ==
+            PreviewClient.DeadlineRecovery.RESTARTED
+        return emitError(
+          out,
+          V5ExitCode.FAILED,
+          "timeout",
+          if (restarted) {
+            "tree request timed out; restarted unresponsive preview server."
+          } else {
+            "tree request timed out; preview server is still responsive (possibly busy). Retry."
+          },
+        )
       } catch (e: Exception) {
         val repVer = client.checkReplacedByVersion(ready.record)
         if (repVer != null) {

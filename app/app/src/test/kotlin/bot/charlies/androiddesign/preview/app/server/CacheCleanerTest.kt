@@ -102,7 +102,7 @@ class CacheCleanerTest {
       )
     try {
       // Dead legacy per-repo record with no timeouts (+ paired log) -> MUST BE DELETED.
-      val deadRecPath = ServerPaths.legacyRecordPath(deadRepo, cacheRoot)
+      val deadRecPath = legacyRecordPath(deadRepo, cacheRoot)
       val deadLogPath =
         ServerPaths.serversDir(cacheRoot).resolve("${ServerPaths.repoHash(deadRepo)}.log")
       Files.createDirectories(deadLogPath.parent)
@@ -121,7 +121,7 @@ class CacheCleanerTest {
       )
 
       // Dead legacy record holding a timeout for its repo's CURRENT content hash -> MUST BE KEPT.
-      val activeTimeoutPath = ServerPaths.legacyRecordPath(activeTimeoutRepo, cacheRoot)
+      val activeTimeoutPath = legacyRecordPath(activeTimeoutRepo, cacheRoot)
       ServerPaths.writeRecord(
         activeTimeoutPath,
         ServerRecord(
@@ -146,7 +146,7 @@ class CacheCleanerTest {
       )
 
       // Dead legacy record holding a timeout for an OLD content hash -> MUST BE DELETED.
-      val staleTimeoutPath = ServerPaths.legacyRecordPath(staleTimeoutRepo, cacheRoot)
+      val staleTimeoutPath = legacyRecordPath(staleTimeoutRepo, cacheRoot)
       ServerPaths.writeRecord(
         staleTimeoutPath,
         ServerRecord(
@@ -245,7 +245,7 @@ class CacheCleanerTest {
     val now = Instant.now()
 
     // Record with timeouts pointing at a deleted repo -> safe to delete.
-    val missingRecPath = ServerPaths.legacyRecordPath(missingRepo, cacheRoot)
+    val missingRecPath = legacyRecordPath(missingRepo, cacheRoot)
     ServerPaths.writeRecord(
       missingRecPath,
       ServerRecord(
@@ -279,7 +279,7 @@ class CacheCleanerTest {
     )
 
     // Record replaced concurrently while statusProbe is running -> must NOT be deleted.
-    val replacedRecPath = ServerPaths.legacyRecordPath(replacedRepo, cacheRoot)
+    val replacedRecPath = legacyRecordPath(replacedRepo, cacheRoot)
     val oldRec =
       ServerRecord(
         pid = 222L,
@@ -375,4 +375,8 @@ class CacheCleanerTest {
       "Dead record with active timeout under a symlinked repoRoot must be preserved",
     )
   }
+
+  /** Pre-v6 per-repo record path, used to prove startup cleanup still removes stale v5 records. */
+  private fun legacyRecordPath(repoRoot: Path, cacheRoot: Path): Path =
+    ServerPaths.serversDir(cacheRoot).resolve("${ServerPaths.repoHash(repoRoot)}.json")
 }

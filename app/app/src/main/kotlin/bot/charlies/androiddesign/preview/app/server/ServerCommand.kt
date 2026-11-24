@@ -182,6 +182,8 @@ class ServerCommand : Command {
       val devMgr = DeviceManager(cacheRoot = cacheRoot)
       val headless = parsed.flags["--headless"].equals("true", ignoreCase = true)
       val forceReinstall = parsed.flags["--force-reinstall-apk"].equals("true", ignoreCase = true)
+      out.println("startup: preparing Android device (boot, install, warm-up)")
+      out.flush()
       val setup =
         devMgr.ensureDeviceReady(
           meta = meta,
