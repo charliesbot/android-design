@@ -476,7 +476,13 @@ class PreviewClient(
         break
       }
     }
-    proc.destroyForcibly()
+    // SIGTERM first: the server's shutdown hook stops an emulator it launched mid-boot.
+    proc.destroy()
+    try {
+      if (!proc.waitFor(SERVER_TERM_GRACE_MS, TimeUnit.MILLISECONDS)) proc.destroyForcibly()
+    } catch (_: InterruptedException) {
+      proc.destroyForcibly()
+    }
     return ServerLookup.NotReady("Timed out waiting for preview server to start")
   }
 
@@ -566,6 +572,7 @@ class PreviewClient(
     private const val WARM_SCOPED_CLIENT_DEADLINE_MS = 10_000
     private const val WARM_FULL_CLIENT_DEADLINE_MS = 35_000
     private const val STOP_WAIT_MS = 3_000L
+    private const val SERVER_TERM_GRACE_MS = 15_000L
     private const val START_CLOCK_SLACK_MS = 2_000L
     private const val MAX_SERVER_BOOT_MS = 120_000L
     private val inProcessLock = Any()

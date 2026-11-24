@@ -64,7 +64,7 @@ The host control plane carries over from v5 with minimal surface change: `Previe
 - **Version mismatch replacement and displaced checks:** When a client connects with a different version or local dev checkout (`ANDROID_DESIGN_PREVIEW_SRC`), it stops the running server, starts its own version, and reinstalls the matching `host-preview.apk`. Any in-flight `check` interrupted by that replacement fails immediately with `replaced by v<x>, rerun` instead of hanging or timing out.
 - **Auth and board tokens:** Keep one shared `clientSecret` (`0600`) in the server record for local CLI calls and one shared `viewToken` for the browser board, matching v5. `?repo=<id>` on `/?repo=<id>&view=<token>` selects which repository is active on the board rather than acting as a per-repo security boundary.
 - **Cross-repo queue ordering and device ownership:** Offscreen `RenderQueue` jobs from different repositories serialize cleanly through the shared server tagged by `(repoRoot, dexHash)`, so background checks never overwrite another repository's results. Live visible Activity ownership belongs to whichever repository last ran `check` or `open`, or whichever repository is selected on the browser board.
-- **Device lifecycle, owned by the server:** the preview server does the only device setup, whether `android-design-preview start` or `check` started it (the CLI just validates `--serial` and `--avd` first). It boots an emulator if needed through the SDK `emulator` binary with `-gpu host -no-snapshot-save` (`android emulator start --headless` forces software rendering, which recent system images never finish booting on, so the `android` CLI is only the fallback when the binary is missing). It shuts down an emulator it booted when it stops or idles out, and leaves devices that were already running alone. It also installs `host-preview.apk`, runs one-time AOT compilation (`adb shell cmd package compile -m speed -f <pkg>`), applies background idle exemptions, and establishes `adb forward`. Because `android emulator create --list-profiles` offers no `resizable` profile (only phone, foldable, tablet, and desktop profiles), `android-design-preview start` reuses an existing compatible AVD (preferring a `resizable` AVD created in Android Studio or with `avdmanager` if present) and otherwise creates `medium_phone` with `android emulator create`. The resizable emulator toolbar (API 34+) is optional for sizing the live interactive view and is never resized or required for offscreen checks.
+- **Device lifecycle, owned by the server:** the preview server does the only device setup, whether `android-design-preview start` or `check` started it (the CLI just validates `--serial` and `--avd` first). It boots an emulator if needed through the SDK `emulator` binary with `-gpu host -no-snapshot-save` (`android emulator start --headless` forces software rendering, which recent system images never finish booting on, so the `android` CLI is only the fallback when the binary is missing). It owns an emulator only when the serial that comes online runs the AVD it launched while its launched process is still alive. It shuts that emulator down when setup fails, when it stops or idles out, and when the CLI times out waiting for it (the CLI sends SIGTERM before forcing a kill). Devices that were already running, or that won a boot race, are left alone. It also installs `host-preview.apk`, runs one-time AOT compilation (`adb shell cmd package compile -m speed -f <pkg>`), applies background idle exemptions, and establishes `adb forward`. Because `android emulator create --list-profiles` offers no `resizable` profile (only phone, foldable, tablet, and desktop profiles), `android-design-preview start` reuses an existing compatible AVD (preferring a `resizable` AVD created in Android Studio or with `avdmanager` if present) and otherwise creates `medium_phone` with `android emulator create`. The resizable emulator toolbar (API 34+) is optional for sizing the live interactive view and is never resized or required for offscreen checks.
 - **Why the server stays on the host computer:**
   1. Speculative pre-compile needs a host process watching `.explore.kt` and `DESIGN.md` directly.
   2. `check` returns local host PNG file paths so the agent's file-reading tool opens them without cross-device pull logic in the CLI.
@@ -113,7 +113,7 @@ Rerun on the v0.6.0 fixes (watchdogs and liveness on the device worker, server s
 
 | Metric | Bar | Result |
 | --- | --- | --- |
-| Cases passing every rubric item | `6/8` | **`3/8`** (`trek`, `player`, `workout`); `93/96` items |
+| Cases passing every rubric item | `6/8` | **`3/8`** (`trek`, `player`, `workout`); `93/102` items |
 | Deterministic code checks | `100%` | **`18/21`** (`86%`): `music`, `workout`, `reminder` each fail `C-review` |
 | Median compile retries | `0` | **`0.5`** |
 | Median wall time / turns | | `174.6 s` / `25.5` |
@@ -126,17 +126,17 @@ Failures, by cause:
 - **Not yet triaged (`workout`, `reminder` `C-review`).** `workout` flags `contrast` on the watch end-confirm overlay; `reminder` flags `primary-largest` on its list on both watch sizes. The judge independently saw the `reminder` confirmation check mark as dark on dark, so at least that one looks like a real agent miss.
 - **Rubric misses (agent output).** `R-font` on `music`, `settings`, and `recipes` (Fraunces at its default weight with no axis choice), `R-controls` and `R-music-actions` on `music` (three actions inside one tonal pill), `R-idea` on `music`, `R-finance-categories` on `finance` (one hue for every category), `R-semantics` on `settings`, and `R-wear-hero` on `reminder`.
 
-**Ten-turn multi-turn revision case:** `evals/multiturn.py`, `claude-fable-5-2`, Robolectric backend, commit `2e679a8`, compared with the committed v5 `claude-fable-5-2` baseline:
+**Ten-turn multi-turn revision case:** `evals/multiturn.py`, `claude-fable-5-2`, Robolectric backend, commit `2e679a8`, compared with v5 (`3b1294c`, `claude-fable-5-2`) from [Visual design exploration v5](../archive/visual-design-exploration-v5.md):
 
-| Metric | v5 baseline | v6 | Change |
+| Metric | v5 (`3b1294c`) | v6 | Change |
 | --- | --- | --- | --- |
 | Final deterministic checks | `3/3` | **`3/3`** | |
-| Total wall time | `337.46 s` | `350.32 s` | `+3.8%` |
-| Mean tokens / turn | `385.9k` | `371.0k` | `-3.9%` |
-| Check calls / compile retries | | `12` / `0` | |
-| `skill_bytes_read` | | `49,806 B` (`3` files) | |
+| Total wall time | `337.20 s` | `350.32 s` | `+3.9%` |
+| Mean tokens / turn | `275,745.3` | `371,003.0` | `+34.5%` |
+| Check calls / compile retries | `10` / `0` | `12` / `0` | |
+| `skill_bytes_read` | `42,315 B` (`3` files) | `49,806 B` (`3` files) | `+17.7%` |
 
-Tokens improved and wall time regressed slightly, so the multi-turn case does not strictly meet "no regression in tokens or wall time".
+Both tokens and wall time regressed against v5, so the multi-turn case fails "no regression in tokens or wall time". Tokens regressed most, by about a third per turn.
 
 ### Rejected alternatives
 

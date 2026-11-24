@@ -224,4 +224,22 @@ class DeadlineRecoveryTest {
       proc.waitFor()
       assertFalse(proc.isAlive)
     }
+
+  @Test
+  fun `startup timeout asks the server to exit before killing it, so its cleanup runs`(
+    @TempDir tmp: Path,
+  ) =
+    withEnv(tmp) { e ->
+      val client = PreviewClient(cacheRoot = e.cache, env = emptyMap(), progress = {})
+      val log = tmp.resolve("log.txt").also { Files.writeString(it, "startup\n") }
+      val marker = tmp.resolve("cleaned-up")
+      // Stands in for the server's shutdown hook releasing an emulator it launched.
+      val proc = fakeChild("trap 'touch $marker; exit 0' TERM; while true; do sleep 0.1; done")
+
+      val result = client.awaitServerStart(proc, log.toFile(), 0L, waitMs = 300L)
+
+      assertTrue(result is PreviewClient.ServerLookup.NotReady)
+      proc.waitFor()
+      assertTrue(Files.exists(marker), "a SIGKILL skips the server's emulator cleanup")
+    }
 }

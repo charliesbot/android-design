@@ -168,6 +168,7 @@ class DeviceManagerTest {
     fun runWithAvds(initialAvds: MutableList<String>): List<List<String>> {
       val cmds = mutableListOf<List<String>>()
       var online = false
+      var startedAvd = ""
       val runner = ExternalCommandRunner { cmd, _, _ ->
         cmds += cmd
         val j = cmd.joinToString(" ")
@@ -178,6 +179,7 @@ class DeviceManagerTest {
               if (online) "List of devices attached\nemulator-5560\tdevice\n"
               else "List of devices attached\n",
             )
+          "emu avd name" in j -> CommandOutput(0, "$startedAvd\nOK\n")
           "emulator list" in j -> CommandOutput(0, initialAvds.joinToString("\n") + "\n")
           "emulator create" in j -> {
             initialAvds += "medium_phone"
@@ -185,6 +187,7 @@ class DeviceManagerTest {
           }
           "emulator start" in j -> {
             online = true
+            startedAvd = cmd.last()
             CommandOutput(0, "Started\n")
           }
           "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
@@ -522,11 +525,8 @@ class DeviceManagerTest {
             if (online) "List of devices attached\nemulator-5560\tdevice\n"
             else "List of devices attached\n",
           )
+        "emu avd name" in j -> CommandOutput(0, "Medium_Resizable_API_35\nOK\n")
         "emulator list" in j -> CommandOutput(0, "Medium_Resizable_API_35\n")
-        cmd.first() == emulatorBin.toString() -> {
-          online = true
-          CommandOutput(0, "")
-        }
         "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
         "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
         "forward --list" in j ->
@@ -541,6 +541,11 @@ class DeviceManagerTest {
         runner = runner,
         pingFn = { DevicePingResponse(ok = true, pid = 11) },
         sleepFn = {},
+        launchEmulator = { cmd, _ ->
+          cmds += cmd
+          online = true
+          FakeProcess()
+        },
       )
     assertIs<DeviceSetupResult.Ready>(dm.ensureDeviceReady(meta, headless = true))
     assertEquals(
@@ -599,9 +604,10 @@ class DeviceManagerTest {
         sleepFn = {},
       )
 
-    val booted = assertIs<DeviceSetupResult.Ready>(manager("c1").ensureDeviceReady(meta))
+    val owner = manager("c1")
+    val booted = assertIs<DeviceSetupResult.Ready>(owner.ensureDeviceReady(meta))
     assertTrue(booted.bootedEmulator, "an AVD this server started is owned by it")
-    assertTrue(manager("c1").shutdownEmulator(booted.serial))
+    assertTrue(owner.releaseLaunchedEmulator())
     assertTrue(cmds.any { it.endsWith("-s emulator-5560 emu kill") }, "expected emu kill in $cmds")
 
     online = false
@@ -610,6 +616,171 @@ class DeviceManagerTest {
     val reused = assertIs<DeviceSetupResult.Ready>(manager("c2").ensureDeviceReady(meta))
     assertFalse(reused.bootedEmulator, "an already running device belongs to the user")
     assertFalse(cmds.any { "emulator start" in it })
+  }
+
+  @Test
+  fun `a setup that fails after booting shuts down the emulator it launched`(@TempDir tmp: Path) {
+    val env = fakeToolsEnv(tmp)
+    val meta = fakeBootstrap(tmp.resolve("b"), "apk-leak")
+    val cmds = mutableListOf<String>()
+    var online = false
+    var now = 0L
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      cmds += j
+      when {
+        cmd.getOrNull(1) == "devices" ->
+          CommandOutput(
+            0,
+            if (online) "List of devices attached\nemulator-5560\tdevice\n"
+            else "List of devices attached\n",
+          )
+        "emu avd name" in j -> CommandOutput(0, "Medium_Resizable_API_35\nOK\n")
+        "emulator list" in j -> CommandOutput(0, "Medium_Resizable_API_35\n")
+        "emulator start" in j -> {
+          online = true
+          CommandOutput(0, "Started\n")
+        }
+        "getprop sys.boot_completed" in j -> CommandOutput(0, "\n")
+        else -> CommandOutput(0, "OK\n")
+      }
+    }
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env,
+        runner = runner,
+        sleepFn = { now += it },
+        nowMs = { now },
+      )
+
+    val failed = assertIs<DeviceSetupResult.Failed>(dm.ensureDeviceReady(meta))
+    assertEquals("boot_timeout", failed.error)
+    assertTrue(
+      cmds.any { it.endsWith("-s emulator-5560 emu kill") },
+      "the emulator this call booted must not outlive the failed setup: $cmds",
+    )
+  }
+
+  @Test
+  fun `never claims a device that is not the AVD it launched`(@TempDir tmp: Path) {
+    val env = fakeToolsEnv(tmp)
+    val meta = fakeBootstrap(tmp.resolve("b"), "apk-claim")
+    val cmds = mutableListOf<String>()
+    var launched = false
+    var now = 0L
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      cmds += j
+      when {
+        // The user's own emulator comes online while ours is still booting.
+        cmd.getOrNull(1) == "devices" ->
+          CommandOutput(
+            0,
+            if (launched) "List of devices attached\nemulator-5556\tdevice\n"
+            else "List of devices attached\n",
+          )
+        "emu avd name" in j -> CommandOutput(0, "Users_Own_AVD\nOK\n")
+        "emulator list" in j -> CommandOutput(0, "Medium_Resizable_API_35\nUsers_Own_AVD\n")
+        else -> CommandOutput(0, "OK\n")
+      }
+    }
+    val ours = FakeProcess()
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env + mapOf("ANDROID_HOME" to sdkWithEmulator(tmp).toString()),
+        runner = runner,
+        sleepFn = { now += it },
+        nowMs = { now },
+        launchEmulator = { _, _ ->
+          launched = true
+          ours
+        },
+      )
+
+    val result = dm.ensureDeviceReady(meta, requestedAvd = "Medium_Resizable_API_35")
+    assertEquals("emulator_start_failed", assertIs<DeviceSetupResult.Failed>(result).error)
+    assertFalse(
+      cmds.any { "emulator-5556 emu kill" in it },
+      "the user's emulator was killed: $cmds",
+    )
+    assertFalse(ours.isAlive, "our own launch must be stopped when setup fails")
+  }
+
+  @Test
+  fun `a launch that exited does not own the device that came up instead`(@TempDir tmp: Path) {
+    val env = fakeToolsEnv(tmp)
+    val meta = fakeBootstrap(tmp.resolve("b"), "apk-race")
+    val cmds = mutableListOf<String>()
+    var launched = false
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      cmds += j
+      when {
+        cmd.getOrNull(1) == "devices" ->
+          CommandOutput(
+            0,
+            if (launched) "List of devices attached\nemulator-5556\tdevice\n"
+            else "List of devices attached\n",
+          )
+        // Same AVD: the user started it first, so our launch hit the AVD lock and exited.
+        "emu avd name" in j -> CommandOutput(0, "Medium_Resizable_API_35\nOK\n")
+        "emulator list" in j -> CommandOutput(0, "Medium_Resizable_API_35\n")
+        "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
+        "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
+        "forward --list" in j ->
+          CommandOutput(0, "emulator-5556 tcp:18990 localabstract:adp-render-sandbox\n")
+        else -> CommandOutput(0, "OK\n")
+      }
+    }
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env + mapOf("ANDROID_HOME" to sdkWithEmulator(tmp).toString()),
+        runner = runner,
+        pingFn = { DevicePingResponse(ok = true, pid = 11) },
+        sleepFn = {},
+        launchEmulator = { _, _ ->
+          launched = true
+          FakeProcess(alive = false)
+        },
+      )
+
+    val ready = assertIs<DeviceSetupResult.Ready>(dm.ensureDeviceReady(meta))
+    assertFalse(ready.bootedEmulator)
+    dm.releaseLaunchedEmulator()
+    assertFalse(cmds.any { "emu kill" in it }, "the user's emulator was killed: $cmds")
+  }
+
+  private fun sdkWithEmulator(tmp: Path): Path {
+    val sdk = tmp.resolve("sdk")
+    val emulatorBin = sdk.resolve("emulator/emulator")
+    Files.createDirectories(emulatorBin.parent)
+    Files.writeString(emulatorBin, "#!/bin/sh\nexit 0\n")
+    emulatorBin.toFile().setExecutable(true)
+    return sdk
+  }
+
+  /** Stands in for the qemu process the SDK launcher execs into. */
+  private class FakeProcess(alive: Boolean = true) : Process() {
+    @Volatile private var running = alive
+
+    override fun getOutputStream() = java.io.OutputStream.nullOutputStream()
+
+    override fun getInputStream() = java.io.InputStream.nullInputStream()
+
+    override fun getErrorStream() = java.io.InputStream.nullInputStream()
+
+    override fun waitFor(): Int = 0
+
+    override fun exitValue(): Int = if (running) throw IllegalThreadStateException() else 0
+
+    override fun destroy() {
+      running = false
+    }
+
+    override fun isAlive(): Boolean = running
   }
 
   @Test

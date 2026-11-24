@@ -103,12 +103,29 @@ class ServerCommand : Command {
 
     val backend: PreviewBackend
     var deviceSerial: String? = null
-    var ownedEmulatorShutdown: (() -> Unit)? = null
     var forwardPort: Int? = null
     var apkSha256: String? = null
     val recycleExecutor = Executors.newSingleThreadExecutor { r ->
       Thread(r, "android-design-sandbox-recycle").apply { isDaemon = true }
     }
+    // An emulator this server launched goes down with it, unless a newer version replaced this
+    // server and reuses the running device. The hook is registered before device setup so a SIGTERM
+    // mid-boot (the CLI's startup timeout) still stops it. Devices the user started are never
+    // touched.
+    var emulatorLauncher: DeviceManager? = null
+    var runningServer: PreviewHttpServer? = null
+    val emulatorReleased = AtomicBoolean(false)
+    val releaseLaunchedEmulator = {
+      val manager = emulatorLauncher
+      if (
+        manager != null &&
+          runningServer?.wasReplaced != true &&
+          emulatorReleased.compareAndSet(false, true)
+      ) {
+        runCatching { manager.releaseLaunchedEmulator() }
+      }
+    }
+    Runtime.getRuntime().addShutdownHook(Thread { releaseLaunchedEmulator() })
 
     if (backendMode == RuntimeIdentity.BACKEND_ROBOLECTRIC) {
       val meta =
@@ -182,6 +199,7 @@ class ServerCommand : Command {
             return ClientExitCode.NOT_READY
           }
       val devMgr = DeviceManager(cacheRoot = cacheRoot)
+      emulatorLauncher = devMgr
       val headless = parsed.flags["--headless"].equals("true", ignoreCase = true)
       val forceReinstall = parsed.flags["--force-reinstall-apk"].equals("true", ignoreCase = true)
       out.println("startup: preparing Android device (boot, install, warm-up)")
@@ -209,9 +227,6 @@ class ServerCommand : Command {
         is DeviceSetupResult.Ready -> {
           deviceSerial = setup.serial
           forwardPort = setup.forwardPort
-          if (setup.bootedEmulator) {
-            ownedEmulatorShutdown = { devMgr.shutdownEmulator(setup.serial) }
-          }
           apkSha256 = setup.apkSha256
           val currentPort = AtomicInteger(setup.forwardPort)
           lateinit var transport: AdbTcpDeviceTransport
@@ -264,22 +279,14 @@ class ServerCommand : Command {
         apkSha256 = apkSha256,
         onProcessExit = { latch.countDown() },
       )
+    runningServer = server
     val record = server.start()
-    // An emulator this server booted goes down with it, unless a newer version replaced this server
-    // and will reuse the running device. Devices the user started are never touched.
-    val emulatorReleased = AtomicBoolean(false)
-    val releaseOwnedEmulator = {
-      val shutdown = ownedEmulatorShutdown
-      if (shutdown != null && !server.wasReplaced && emulatorReleased.compareAndSet(false, true)) {
-        runCatching { shutdown() }
-      }
-    }
     Runtime.getRuntime()
       .addShutdownHook(
         Thread {
           server.stop(triggerExit = false)
           recycleExecutor.shutdownNow()
-          releaseOwnedEmulator()
+          releaseLaunchedEmulator()
           latch.countDown()
         },
       )
@@ -293,7 +300,7 @@ class ServerCommand : Command {
       server.stop(triggerExit = false)
     } finally {
       recycleExecutor.shutdownNow()
-      releaseOwnedEmulator()
+      releaseLaunchedEmulator()
     }
     return ExitCode.OK
   }
