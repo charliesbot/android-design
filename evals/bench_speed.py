@@ -42,6 +42,15 @@ def run_cli(args: list[str], env: dict[str, str], cwd: pathlib.Path) -> tuple[fl
     return elapsed_ms, payload
 
 
+def timed_check(args: list[str], env: dict[str, str], cwd: pathlib.Path, renders: int) -> tuple[float, dict]:
+    """Times one check and rejects any sample that did not render [renders] valid targets."""
+    ms, payload = run_cli(args, env, cwd)
+    count = len(payload.get("renders", []))
+    if payload.get("error") or payload.get("valid") is not True or count != renders:
+        raise RuntimeError(f"Invalid sample for {' '.join(args)}: renders={count} payload={json.dumps(payload)[:2000]}")
+    return ms, payload
+
+
 def bump(source: pathlib.Path, value: int) -> None:
     text = source.read_text(encoding="utf-8")
     source.write_text(re.sub(r"const val EDIT_MARKER = \d+", f"const val EDIT_MARKER = {value}", text), encoding="utf-8")
@@ -82,23 +91,28 @@ def main() -> int:
         source = repo / "design" / "bench.explore.kt"
 
         run_cli(["start", "--headless"], env, repo)
-        marker = 1
-        for _ in range(3):  # Warm the compiler, D8, and device JIT before timing.
-            bump(source, marker)
-            marker += 1
-            run_cli(["check", str(source)], env, repo)
+        try:
+            marker = 1
+            for _ in range(3):  # Warm the compiler, D8, and device JIT before timing.
+                bump(source, marker)
+                marker += 1
+                timed_check(["check", str(source)], env, repo, renders=15)
 
-        scoped, full, last = [], [], {}
-        for _ in range(args.runs):
-            bump(source, marker)
-            marker += 1
-            ms, last_scoped = run_cli(["check", str(source), "--direction", "List", "--view", "light"], env, repo)
-            scoped.append(ms)
-        for _ in range(args.runs):
-            bump(source, marker)
-            marker += 1
-            ms, last = run_cli(["check", str(source)], env, repo)
-            full.append(ms)
+            scoped, full = [], []
+            for _ in range(args.runs):
+                bump(source, marker)
+                marker += 1
+                ms, last_scoped = timed_check(
+                    ["check", str(source), "--direction", "List", "--view", "light"], env, repo, renders=1
+                )
+                scoped.append(ms)
+            for _ in range(args.runs):
+                bump(source, marker)
+                marker += 1
+                ms, last = timed_check(["check", str(source)], env, repo, renders=15)
+                full.append(ms)
+        finally:
+            subprocess.run([str(SCRIPT), "stop"], env=env, cwd=repo, capture_output=True, text=True)
 
     result = {
         "device": device_name(env),
@@ -108,15 +122,11 @@ def main() -> int:
         ).stdout.strip(),
         "scoped_check": summarize(scoped, SCOPED_GATE_MS),
         "full_check_3x5": summarize(full, FULL_GATE_MS),
-        "scoped_render_count": len(last_scoped.get("renders", [])),
-        "full_render_count": len(last.get("renders", [])),
-        "full_image_count": len(last.get("images", [])),
-        "full_compile_ms": last.get("compileMs"),
-        "full_render_ms": last.get("renderMs"),
-        "full_valid": last.get("valid"),
+        "every_sample_validated": {"scoped_renders": 1, "full_renders": 15, "valid": True, "error": None},
+        "last_full_image_count": len(last.get("images", [])),
+        "last_full_compile_ms": last.get("compileMs"),
+        "last_full_render_ms": last.get("renderMs"),
     }
-    if result["full_render_count"] != 15 or result["scoped_render_count"] != 1:
-        raise RuntimeError(f"Unexpected render counts: {result}")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({k: v for k, v in result.items() if k not in ("scoped_check", "full_check_3x5")}, indent=2))
