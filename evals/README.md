@@ -6,6 +6,8 @@ An eval case is the skill's current output: one Compose exploration (`design/pro
 
 ## Use the current chat or another agent
 
+Default to the current AI harness and its own model. Active agent sessions should run `prepare`, `evaluate`, and `score` with fresh subagents in the current harness, and must not shell out to external AI CLIs (`agy`, `claude`, `codex`) or run other harnesses unless the user explicitly asks.
+
 From this directory:
 
 ```bash
@@ -70,7 +72,7 @@ Imported judgments are bound to the image, `.explore.kt`, and `DESIGN.md` hashes
 
 ## Optional unattended automation
 
-Select generation and judging independently; neither has an implicit provider:
+Use unattended `run.py run` or `evaluate --judge` from a standalone terminal outside an active agent session (or when explicitly asked for CLI or cross-harness release checks). Select generation and judging independently; neither has an implicit provider:
 
 ```bash
 python3 run.py run --out /tmp/design-eval-auto --generator agy --judge agy --no-open
@@ -86,7 +88,7 @@ CLI invocation sends the prompt and any accessed files/images to that CLI's conf
 
 ## Calibration and baselines
 
-Calibrate a judge after rubric changes or when changing the judging backend/model. The rubric must reproduce the known labels before trusting that configuration:
+Calibrate a judge after rubric changes or when changing the judging backend/model. Inside an active agent session, use `calibrate.py prepare` and `calibrate.py score` with blind subagents in the current harness instead of launching an external `--judge` CLI. The rubric must reproduce the known labels before trusting that configuration:
 
 ```bash
 python3 calibrate.py run --judge agy --runs 3

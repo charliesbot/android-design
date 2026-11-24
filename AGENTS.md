@@ -48,9 +48,9 @@ These are settled. Don't flag them in reviews unless the reasoning no longer hol
 
 Run the check for every kind of change you made:
 
-- **Either skill:** the evals (`evals/README.md`).
-- **A skill's `description`:** the trigger evals (`evals/README.md`, Trigger evals).
-- **The rubric:** `evals/calibrate.py` first.
+- **Either skill:** run the evals (`evals/README.md`) in the current AI harness only via `evals/run.py prepare`, fresh current-harness subagents (using its default model), `evaluate`, and `score`. Never invoke external AI CLIs (`agy`, `claude`, `codex`) or test other harnesses unless explicitly requested.
+- **A skill's `description`:** the trigger evals (`evals/README.md`, Trigger evals); `evals/trigger_eval.py` calls `claude -p`, so run it only when explicitly evaluating Claude Code triggering.
+- **The rubric:** `evals/calibrate.py prepare` and `score` with blind subagents in the current harness first; invoke `--judge` CLI automation only when explicitly requested.
 - **`evals/`:** `python3 -m unittest discover evals`.
 - **The bootstrap script, `plugin/bin/`, or manifests:** `python3 -m unittest discover scripts` and `cd app && ./gradlew :host:exportBootstrap build spotlessCheck`.
 - **`scripts/`:** `python3 -m unittest discover scripts`.
