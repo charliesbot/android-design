@@ -75,76 +75,143 @@ object AndroidExplorationCompiler {
     val started = System.nanoTime()
     fun elapsedMs(): Long = (System.nanoTime() - started) / NANOS_PER_MS
 
+    val stage =
+      when (val outcome = compileClassStage(sourcePath, explicitDesign, meta)) {
+        is ClassStageOutcome.Failed ->
+          return AndroidCompileOutcome.Failed(
+            errors = outcome.errors,
+            compileMs = elapsedMs(),
+            designPath = outcome.designPath,
+            designTheme = outcome.designTheme,
+          )
+        is ClassStageOutcome.Ready -> outcome.stage
+      }
+    val dexBytes =
+      when (val lowered = lowerToDex(stage.sourceFile, stage.classBytes, meta)) {
+        is DexLowering.Failed ->
+          return AndroidCompileOutcome.Failed(
+            errors = lowered.errors,
+            compileMs = elapsedMs(),
+            designPath = stage.designPath,
+            designTheme = stage.designTheme,
+          )
+        is DexLowering.Ready -> lowered.dexBytes
+      }
+    return AndroidCompileOutcome.Success(
+      CompiledAndroidExploration(
+        sourcePath = stage.sourcePath,
+        sourceFile = stage.sourceFile,
+        sourceText = stage.sourceText,
+        designPath = stage.designPath,
+        designTheme = stage.designTheme,
+        entryClass = stage.entryClass,
+        classBytes = stage.classBytes,
+        dexBytes = dexBytes,
+        dexHash = ContentHasher.sha256Hex(dexBytes),
+        assetMap = stage.assetMap,
+        assetBlobs = stage.assetBlobs,
+        compileMs = elapsedMs(),
+      ),
+    )
+  }
+
+  /** A compiled exploration before DEX lowering: what Robolectric (JVM bytecode) consumes. */
+  data class ClassStage(
+    val sourcePath: Path,
+    val sourceFile: String,
+    val sourceText: String,
+    val designPath: Path?,
+    val designTheme: ThemeOverride?,
+    val entryClass: String,
+    val classBytes: Map<String, ByteArray>,
+    val assetMap: Map<String, String>,
+    val assetBlobs: Map<String, ByteArray>,
+    val compileMs: Long,
+  )
+
+  /**
+   * Everything [compile] does except D8: design load, asset collection with its confinement errors,
+   * then lint, kotlinc with the Compose plugin, and [BytecodeGuard]. The Robolectric backend
+   * renders from this, so it applies the same rules as the device path.
+   */
+  fun compileClassStage(
+    sourcePath: Path,
+    explicitDesign: Path?,
+    meta: BootstrapMeta,
+  ): ClassStageOutcome {
+    val started = System.nanoTime()
+    fun elapsedMs(): Long = (System.nanoTime() - started) / NANOS_PER_MS
+
     val normalized = sourcePath.toAbsolutePath().normalize()
     if (!Files.isRegularFile(normalized)) {
-      return AndroidCompileOutcome.Failed(
+      return ClassStageOutcome.Failed(
         errors = listOf(ValidationError(normalized.toString(), "No such file: $normalized")),
         compileMs = elapsedMs(),
       )
     }
-
     val design = DesignMdLoader.load(normalized, explicitDesign)
     if (design.errors.isNotEmpty()) {
-      return AndroidCompileOutcome.Failed(
-        errors = design.errors,
-        compileMs = elapsedMs(),
-        designPath = design.path,
-        designTheme = design.theme,
-      )
+      return ClassStageOutcome.Failed(design.errors, elapsedMs(), design.path, design.theme)
     }
-
     val sourceText =
       try {
         Files.readString(normalized)
       } catch (e: CharacterCodingException) {
-        return AndroidCompileOutcome.Failed(
-          errors =
-            listOf(
-              ValidationError(normalized.toString(), "File is not valid UTF-8: ${e.message}"),
-            ),
-          compileMs = elapsedMs(),
-          designPath = design.path,
-          designTheme = design.theme,
+        return ClassStageOutcome.Failed(
+          listOf(ValidationError(normalized.toString(), "File is not valid UTF-8: ${e.message}")),
+          elapsedMs(),
+          design.path,
+          design.theme,
         )
       }
-
     val fileName = normalized.fileName.toString()
     val (assetMap, assetBlobs, assetErrors) = collectAssets(normalized.parent, fileName, sourceText)
     if (assetErrors.isNotEmpty()) {
-      return AndroidCompileOutcome.Failed(
-        errors = assetErrors,
-        compileMs = elapsedMs(),
-        designPath = design.path,
-        designTheme = design.theme,
-      )
+      return ClassStageOutcome.Failed(assetErrors, elapsedMs(), design.path, design.theme)
     }
-
-    return when (val dexOutcome = compileSourceToDex(fileName, sourceText, meta)) {
-      is DexCompileOutcome.Failed ->
-        AndroidCompileOutcome.Failed(
-          errors = dexOutcome.errors,
-          compileMs = elapsedMs(),
-          designPath = design.path,
-          designTheme = design.theme,
-        )
-      is DexCompileOutcome.Ready ->
-        AndroidCompileOutcome.Success(
-          CompiledAndroidExploration(
+    return when (val classes = compileSourceToClasses(fileName, sourceText, meta)) {
+      is ClassesOutcome.Failed ->
+        ClassStageOutcome.Failed(classes.errors, elapsedMs(), design.path, design.theme)
+      is ClassesOutcome.Ready ->
+        ClassStageOutcome.Ready(
+          ClassStage(
             sourcePath = normalized,
             sourceFile = fileName,
             sourceText = sourceText,
             designPath = design.path,
             designTheme = design.theme,
-            entryClass = dexOutcome.entryClass,
-            classBytes = dexOutcome.classBytes,
-            dexBytes = dexOutcome.dexBytes,
-            dexHash = dexOutcome.dexHash,
+            entryClass = classes.entryClass,
+            classBytes = classes.classBytes,
             assetMap = assetMap,
             assetBlobs = assetBlobs,
             compileMs = elapsedMs(),
           ),
         )
     }
+  }
+
+  sealed interface ClassStageOutcome {
+    data class Ready(val stage: ClassStage) : ClassStageOutcome
+
+    data class Failed(
+      val errors: List<ValidationError>,
+      val compileMs: Long,
+      val designPath: Path? = null,
+      val designTheme: ThemeOverride? = null,
+    ) : ClassStageOutcome
+  }
+
+  sealed interface ClassesOutcome {
+    data class Ready(
+      val entryClass: String,
+      val classBytes: Map<String, ByteArray>,
+      val compileMs: Long,
+    ) : ClassesOutcome
+
+    data class Failed(
+      val errors: List<ValidationError>,
+      val compileMs: Long,
+    ) : ClassesOutcome
   }
 
   sealed interface DexCompileOutcome {
@@ -162,19 +229,20 @@ object AndroidExplorationCompiler {
     ) : DexCompileOutcome
   }
 
-  fun compileSourceToDex(
+  /** Lint, kotlinc with the Compose plugin, and [BytecodeGuard]; stops before D8. */
+  fun compileSourceToClasses(
     fileName: String,
     sourceText: String,
     meta: BootstrapMeta,
     skipGuards: Boolean = false,
-  ): DexCompileOutcome {
+  ): ClassesOutcome {
     val started = System.nanoTime()
     fun elapsedMs(): Long = (System.nanoTime() - started) / NANOS_PER_MS
 
     if (!skipGuards) {
       val lintErrors = SourceTokenLinter.lint(fileName, sourceText)
       if (lintErrors.isNotEmpty()) {
-        return DexCompileOutcome.Failed(lintErrors, elapsedMs())
+        return ClassesOutcome.Failed(lintErrors, elapsedMs())
       }
     }
 
@@ -197,12 +265,12 @@ object AndroidExplorationCompiler {
           collector.errors.ifEmpty {
             listOf(ValidationError(fileName, "Kotlin compilation failed ($exit)"))
           }
-        return DexCompileOutcome.Failed(errors, elapsedMs())
+        return ClassesOutcome.Failed(errors, elapsedMs())
       }
 
       val classBytes = readClassFiles(classesDir)
       if (classBytes.isEmpty()) {
-        return DexCompileOutcome.Failed(
+        return ClassesOutcome.Failed(
           listOf(ValidationError(fileName, "Exploration produced no compiled classes")),
           elapsedMs(),
         )
@@ -217,37 +285,66 @@ object AndroidExplorationCompiler {
             }
           }
         if (secErrors.isNotEmpty()) {
-          return DexCompileOutcome.Failed(secErrors, elapsedMs())
+          return ClassesOutcome.Failed(secErrors, elapsedMs())
         }
       }
 
       val entryClass =
         classBytes.keys.firstOrNull { it.endsWith("Kt") && !it.contains('$') }
           ?: classBytes.keys.first()
-
-      val d8Session =
-        d8Sessions.computeIfAbsent(D8Key(meta.androidJar, meta.bundleJar, meta.d8Jar)) {
-          D8Session(it.androidJar, it.bundleJar, it.d8Jar)
-        }
-      val dexBytes =
-        try {
-          d8Session.compileToDex(classBytes)
-        } catch (t: Throwable) {
-          return DexCompileOutcome.Failed(
-            listOf(ValidationError(fileName, t.message ?: "D8 DEX lowering failed")),
-            elapsedMs(),
-          )
-        }
-      val dexHash = ContentHasher.sha256Hex(dexBytes)
-      DexCompileOutcome.Ready(
-        entryClass = entryClass,
-        classBytes = classBytes,
-        dexBytes = dexBytes,
-        dexHash = dexHash,
-        compileMs = elapsedMs(),
-      )
+      ClassesOutcome.Ready(entryClass, classBytes, elapsedMs())
     } finally {
       workDir.toFile().deleteRecursively()
+    }
+  }
+
+  fun compileSourceToDex(
+    fileName: String,
+    sourceText: String,
+    meta: BootstrapMeta,
+    skipGuards: Boolean = false,
+  ): DexCompileOutcome {
+    val started = System.nanoTime()
+    fun elapsedMs(): Long = (System.nanoTime() - started) / NANOS_PER_MS
+
+    val classes =
+      when (val outcome = compileSourceToClasses(fileName, sourceText, meta, skipGuards)) {
+        is ClassesOutcome.Failed -> return DexCompileOutcome.Failed(outcome.errors, elapsedMs())
+        is ClassesOutcome.Ready -> outcome
+      }
+    val dexBytes =
+      when (val lowered = lowerToDex(fileName, classes.classBytes, meta)) {
+        is DexLowering.Failed -> return DexCompileOutcome.Failed(lowered.errors, elapsedMs())
+        is DexLowering.Ready -> lowered.dexBytes
+      }
+    return DexCompileOutcome.Ready(
+      entryClass = classes.entryClass,
+      classBytes = classes.classBytes,
+      dexBytes = dexBytes,
+      dexHash = ContentHasher.sha256Hex(dexBytes),
+      compileMs = elapsedMs(),
+    )
+  }
+
+  private sealed interface DexLowering {
+    data class Ready(val dexBytes: ByteArray) : DexLowering
+
+    data class Failed(val errors: List<ValidationError>) : DexLowering
+  }
+
+  private fun lowerToDex(
+    fileName: String,
+    classBytes: Map<String, ByteArray>,
+    meta: BootstrapMeta,
+  ): DexLowering {
+    val d8Session =
+      d8Sessions.computeIfAbsent(D8Key(meta.androidJar, meta.bundleJar, meta.d8Jar)) {
+        D8Session(it.androidJar, it.bundleJar, it.d8Jar)
+      }
+    return try {
+      DexLowering.Ready(d8Session.compileToDex(classBytes))
+    } catch (t: Throwable) {
+      DexLowering.Failed(listOf(ValidationError(fileName, t.message ?: "D8 DEX lowering failed")))
     }
   }
 

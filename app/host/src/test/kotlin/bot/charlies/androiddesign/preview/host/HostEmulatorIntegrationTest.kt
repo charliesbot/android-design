@@ -1,8 +1,7 @@
 package bot.charlies.androiddesign.preview.host
 
+import bot.charlies.androiddesign.preview.app.android.AndroidExplorationCompiler
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
-import bot.charlies.androiddesign.preview.host.compiler.HostClassCompiler
-import bot.charlies.androiddesign.preview.host.compiler.HostCompileOutcome
 import bot.charlies.androiddesign.preview.host.robolectric.RobolectricBoardRenderer
 import bot.charlies.androiddesign.preview.host.robolectric.SandboxExcludingRobolectricTestRunner
 import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
@@ -73,19 +72,21 @@ class HostEmulatorIntegrationTest {
     Files.writeString(wearFile, HostTestFixtures.WEAR_EXPLORE_SOURCE)
 
     val phoneClasses =
-      HostClassCompiler.compileToClasses(
+      AndroidExplorationCompiler.compileSourceToDex(
         HostTestFixtures.PHONE_EXPLORE_FILE,
         HostTestFixtures.PHONE_EXPLORE_SOURCE,
-      ) as HostCompileOutcome.Classes
-    val phoneDex = HostClassCompiler.compileToDex(phoneClasses, meta)
+        meta = meta,
+      ) as AndroidExplorationCompiler.DexCompileOutcome.Ready
+    val phoneDex = phoneClasses.dexBytes
     val phoneHash = sha256Hex(phoneDex).take(16)
 
     val wearClasses =
-      HostClassCompiler.compileToClasses(
+      AndroidExplorationCompiler.compileSourceToDex(
         HostTestFixtures.WEAR_EXPLORE_FILE,
         HostTestFixtures.WEAR_EXPLORE_SOURCE,
-      ) as HostCompileOutcome.Classes
-    val wearDex = HostClassCompiler.compileToDex(wearClasses, meta)
+        meta = meta,
+      ) as AndroidExplorationCompiler.DexCompileOutcome.Ready
+    val wearDex = wearClasses.dexBytes
     val wearHash = sha256Hex(wearDex).take(16)
 
     // 1. Asset protocol (HAS_ASSETS + PUT_ASSETS) & PRELOAD_DEX + PHONE batch (1x, 2x, overlays,
@@ -362,12 +363,13 @@ class HostEmulatorIntegrationTest {
         """
           .trimIndent()
       val maliciousClasses =
-        HostClassCompiler.compileToClasses(
+        AndroidExplorationCompiler.compileSourceToDex(
           "Malicious.explore.kt",
           maliciousSource,
           skipGuards = true,
-        ) as HostCompileOutcome.Classes
-      val maliciousDex = HostClassCompiler.compileToDex(maliciousClasses, meta)
+          meta = meta,
+        ) as AndroidExplorationCompiler.DexCompileOutcome.Ready
+      val maliciousDex = maliciousClasses.dexBytes
       val (malResp, _) =
         sendBatch(
           output = output,
@@ -410,9 +412,12 @@ class HostEmulatorIntegrationTest {
         """
           .trimIndent()
       val boomClasses =
-        HostClassCompiler.compileToClasses("Boom.explore.kt", recompBoomSource)
-          as HostCompileOutcome.Classes
-      val boomDex = HostClassCompiler.compileToDex(boomClasses, meta)
+        AndroidExplorationCompiler.compileSourceToDex(
+          "Boom.explore.kt",
+          recompBoomSource,
+          meta = meta,
+        ) as AndroidExplorationCompiler.DexCompileOutcome.Ready
+      val boomDex = boomClasses.dexBytes
       val (boomResp, _) =
         sendBatch(
           output = output,
@@ -456,9 +461,12 @@ class HostEmulatorIntegrationTest {
         """
           .trimIndent()
       val effectClasses =
-        HostClassCompiler.compileToClasses("EffectBoom.explore.kt", effectBoomSource)
-          as HostCompileOutcome.Classes
-      val effectDex = HostClassCompiler.compileToDex(effectClasses, meta)
+        AndroidExplorationCompiler.compileSourceToDex(
+          "EffectBoom.explore.kt",
+          effectBoomSource,
+          meta = meta,
+        ) as AndroidExplorationCompiler.DexCompileOutcome.Ready
+      val effectDex = effectClasses.dexBytes
       val (effectResp, _) =
         sendBatch(
           output = output,
@@ -508,9 +516,13 @@ class HostEmulatorIntegrationTest {
         """
           .trimIndent()
       val hangClasses =
-        HostClassCompiler.compileToClasses("Hang.explore.kt", hangSource, skipGuards = true)
-          as HostCompileOutcome.Classes
-      val hangDex = HostClassCompiler.compileToDex(hangClasses, meta)
+        AndroidExplorationCompiler.compileSourceToDex(
+          "Hang.explore.kt",
+          hangSource,
+          skipGuards = true,
+          meta = meta,
+        ) as AndroidExplorationCompiler.DexCompileOutcome.Ready
+      val hangDex = hangClasses.dexBytes
       val (hangResp, _) =
         sendBatch(
           output = output,

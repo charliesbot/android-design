@@ -166,4 +166,53 @@ class AndroidExplorationCompilerTest {
       )
     assertTrue(failed.errors.any { "escape" in it.message.lowercase() })
   }
+
+  @Test
+  fun `class stage collects assets and applies the device guards without D8`(@TempDir tmp: Path) {
+    val meta = BootstrapMeta.locate()
+    val assetsDir = tmp.resolve("assets")
+    Files.createDirectories(assetsDir)
+    Files.write(assetsDir.resolve("cover.png"), byteArrayOf(1, 2, 3))
+    val ok = tmp.resolve("Ok.explore.kt")
+    Files.writeString(
+      ok,
+      validExploreSource(
+        """Image(painter = designPainter("assets/cover.png"), contentDescription = "Cover")""",
+      ),
+    )
+    val ready =
+      assertIs<AndroidExplorationCompiler.ClassStageOutcome.Ready>(
+        AndroidExplorationCompiler.compileClassStage(ok, explicitDesign = null, meta = meta),
+      )
+    assertTrue(ready.stage.classBytes.isNotEmpty())
+    assertEquals(setOf("assets/cover.png"), ready.stage.assetMap.keys)
+
+    val escape = tmp.resolve("Escape.explore.kt")
+    Files.writeString(
+      escape,
+      validExploreSource(
+        """Image(painter = designPainter("../secret.png"), contentDescription = "Bad")""",
+      ),
+    )
+    val escaped =
+      assertIs<AndroidExplorationCompiler.ClassStageOutcome.Failed>(
+        AndroidExplorationCompiler.compileClassStage(escape, explicitDesign = null, meta = meta),
+      )
+    assertTrue(escaped.errors.any { "escape" in it.message.lowercase() })
+
+    val hostile = tmp.resolve("Hostile.explore.kt")
+    Files.writeString(
+      hostile,
+      validExploreSource(
+        """
+        val exists = java.io.File("/etc/passwd").exists()
+        Text(exists.toString())
+        """
+          .trimIndent(),
+      ),
+    )
+    assertIs<AndroidExplorationCompiler.ClassStageOutcome.Failed>(
+      AndroidExplorationCompiler.compileClassStage(hostile, explicitDesign = null, meta = meta),
+    )
+  }
 }

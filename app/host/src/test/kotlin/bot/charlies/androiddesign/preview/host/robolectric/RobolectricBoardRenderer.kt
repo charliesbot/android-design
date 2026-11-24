@@ -20,6 +20,7 @@ import androidx.compose.runtime.tooling.ComposeToolingApi
 import androidx.compose.runtime.tooling.CompositionData
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.AndroidUiDispatcher
@@ -29,9 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.compositionContext
 import androidx.compose.ui.platform.isDebugInspectorInfoEnabled
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Density
 import androidx.core.view.ViewCompat
@@ -49,13 +48,15 @@ import bot.charlies.androiddesign.preview.domain.findings.ScrolledTree
 import bot.charlies.androiddesign.preview.domain.image.FastPngEncoder
 import bot.charlies.androiddesign.preview.domain.sandbox.SandboxClassLoader
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.AndroidSlotTreeExtractor
+import bot.charlies.androiddesign.preview.feature.preview.sandbox.FrameStatus
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.InsetConsumingFrameLayout
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.OverlayWindowHelper
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.RawRgbaFrame
+import bot.charlies.androiddesign.preview.feature.preview.sandbox.SettlePolicy
+import bot.charlies.androiddesign.preview.feature.preview.sandbox.WearScrollDriver
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.WearScrollHelper
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
-import bot.charlies.androiddesign.preview.host.compiler.HostClassCompiler
-import bot.charlies.androiddesign.preview.host.compiler.HostCompileOutcome
+import bot.charlies.androiddesign.preview.host.sandbox.DeviceAssetCache
 import bot.charlies.androiddesign.preview.host.sandbox.InspectedSubcomposition
 import bot.charlies.androiddesign.preview.kit.BoardSurface
 import bot.charlies.androiddesign.preview.kit.DirectionSpec
@@ -91,6 +92,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
 
@@ -114,22 +116,15 @@ internal object RobolectricBoardRenderer {
 
   private const val NANOS_PER_MS = 1_000_000L
   private const val BASE_DPI = 160f
-  private const val FRAME_NS = 16_000_000L
-  private const val MAX_SCROLL_STEPS = 30
-  private const val MAX_COMPILED_CACHE = 8
 
-  private data class CompiledCacheKey(val sourcePath: String, val sourceSha256: String)
+  private const val MAX_BOARD_CACHE = 8
 
-  private data class CompiledBoardEntry(
-    val classes: HostCompileOutcome.Classes,
-    val board: ExplorationBoard,
-  )
-
-  private val compiledCache =
-    object : LinkedHashMap<CompiledCacheKey, CompiledBoardEntry>(16, 0.75f, true) {
+  /** Boards loaded from a staged classes directory; each stage directory is immutable. */
+  private val boardCache =
+    object : LinkedHashMap<String, ExplorationBoard>(16, 0.75f, true) {
       override fun removeEldestEntry(
-        eldest: MutableMap.MutableEntry<CompiledCacheKey, CompiledBoardEntry>?,
-      ): Boolean = size > MAX_COMPILED_CACHE
+        eldest: MutableMap.MutableEntry<String, ExplorationBoard>?,
+      ): Boolean = size > MAX_BOARD_CACHE
     }
 
   private fun writeReportFile(
@@ -200,53 +195,73 @@ internal object RobolectricBoardRenderer {
     )
   }
 
-  private fun compileCached(
-    srcPath: Path,
+  /** Loads the board from the classes the host backend staged; the runner never compiles. */
+  private fun loadStagedBoard(
+    request: RobolectricRenderRequest,
     sourceFile: String,
-    sourceText: String,
     loadImmediately: Boolean,
-  ): CompileOrLoadOutcome {
-    val key = CompiledCacheKey(srcPath.toString(), sha256Hex(sourceText))
-    val cached = synchronized(compiledCache) { compiledCache[key] }
-    if (cached != null) {
-      return CompileOrLoadOutcome.Ready(cached.classes, cached.board, compileMs = 0L)
-    }
-    val compiled = HostClassCompiler.compileToClasses(sourceFile, sourceText)
-    if (compiled is HostCompileOutcome.Failed) {
-      return CompileOrLoadOutcome.Failed(compiled.errors, compiled.compileMs, ok = true)
-    }
-    val classes = compiled as HostCompileOutcome.Classes
+  ): StagedBoardOutcome {
+    val classesDir =
+      request.classesDir
+        ?: return StagedBoardOutcome.Failed(
+          errors = listOf(ValidationError(sourceFile, "Request has no staged classesDir")),
+          ok = false,
+          errorMessage = "Request has no staged classesDir",
+        )
+    synchronized(boardCache) { boardCache[classesDir] }
+      ?.let {
+        return StagedBoardOutcome.Ready(it)
+      }
     val board =
       try {
-        loadBoard(sourceFile, classes)
+        loadBoard(sourceFile, readStagedClasses(Paths.get(classesDir)))
       } catch (t: Throwable) {
         val msg = "${t::class.java.name}: ${t.message}"
-        return CompileOrLoadOutcome.Failed(
+        return StagedBoardOutcome.Failed(
           errors = listOf(ValidationError(sourceFile, msg)),
-          compileMs = classes.compileMs,
           ok = !loadImmediately,
           errorMessage = msg,
         )
       }
-    synchronized(compiledCache) {
-      compiledCache[key] = CompiledBoardEntry(classes, board)
-    }
-    return CompileOrLoadOutcome.Ready(classes, board, compileMs = classes.compileMs)
+    synchronized(boardCache) { boardCache[classesDir] = board }
+    return StagedBoardOutcome.Ready(board)
   }
 
-  private sealed interface CompileOrLoadOutcome {
-    data class Ready(
-      val classes: HostCompileOutcome.Classes,
-      val board: ExplorationBoard,
-      val compileMs: Long,
-    ) : CompileOrLoadOutcome
+  private fun readStagedClasses(classesDir: Path): Map<String, ByteArray> {
+    val result = linkedMapOf<String, ByteArray>()
+    Files.walk(classesDir).use { paths ->
+      paths
+        .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".class") }
+        .sorted()
+        .forEach { file ->
+          val name = classesDir.relativize(file).toString().removeSuffix(".class")
+          result[name.replace(java.io.File.separatorChar, '.')] = Files.readAllBytes(file)
+        }
+    }
+    return result
+  }
+
+  /** Serves the asset blobs the backend staged, matching what the device receives. */
+  private fun stagedAssetResolver(request: RobolectricRenderRequest): ((String) -> ImageBitmap?)? {
+    if (request.assetMap.isEmpty()) return null
+    val blobsDir = Paths.get(checkNotNull(request.assetBlobsDir) { "Request has no assetBlobsDir" })
+    val cache = DeviceAssetCache()
+    for (sha in request.assetMap.values.distinct()) {
+      val blob = blobsDir.resolve(sha)
+      check(Files.isRegularFile(blob)) { "Staged asset blob $sha is missing" }
+      cache.put(sha, Files.readAllBytes(blob))
+    }
+    return cache.resolverFor(request.assetMap)
+  }
+
+  private sealed interface StagedBoardOutcome {
+    data class Ready(val board: ExplorationBoard) : StagedBoardOutcome
 
     data class Failed(
       val errors: List<ValidationError>,
-      val compileMs: Long,
       val ok: Boolean,
       val errorMessage: String? = null,
-    ) : CompileOrLoadOutcome
+    ) : StagedBoardOutcome
   }
 
   private fun buildDeviceBoardMeta(board: ExplorationBoard): DeviceBoardMeta =
@@ -330,18 +345,16 @@ internal object RobolectricBoardRenderer {
 
     val sourceText = Files.readString(srcPath)
     val loadInSandboxError = request.mode == "render" && !writeReport && request.targets == null
-    val compiled =
-      compileCached(srcPath, sourceFile, sourceText, loadImmediately = loadInSandboxError)
-    if (compiled is CompileOrLoadOutcome.Failed) {
-      if (!compiled.ok) {
+    val staged = loadStagedBoard(request, sourceFile, loadImmediately = loadInSandboxError)
+    if (staged is StagedBoardOutcome.Failed) {
+      if (!staged.ok) {
         return RobolectricRenderResponse(
           id = request.id,
           ok = false,
           valid = false,
           pass = false,
-          compileMs = compiled.compileMs,
-          error = compiled.errorMessage,
-          errors = compiled.errors,
+          error = staged.errorMessage,
+          errors = staged.errors,
         )
       }
       return invalidResponse(
@@ -351,13 +364,25 @@ internal object RobolectricBoardRenderer {
         writeReport = writeReport,
         designPath = designOverride.path,
         designTheme = designOverride.theme,
-        errors = compiled.errors,
-        compileMs = compiled.compileMs,
+        errors = staged.errors,
       )
     }
 
-    val ready = compiled as CompileOrLoadOutcome.Ready
-    val board = ready.board
+    val board = (staged as StagedBoardOutcome.Ready).board
+    val assetResolver =
+      try {
+        stagedAssetResolver(request)
+      } catch (t: Throwable) {
+        val msg = "${t::class.java.name}: ${t.message}"
+        return RobolectricRenderResponse(
+          id = request.id,
+          ok = false,
+          valid = false,
+          pass = false,
+          error = msg,
+          errors = listOf(ValidationError(sourceFile, msg)),
+        )
+      }
     val boardMeta = buildDeviceBoardMeta(board)
     val boardTheme = board.toThemeOverride()
 
@@ -367,7 +392,7 @@ internal object RobolectricBoardRenderer {
         ok = true,
         valid = true,
         pass = true,
-        compileMs = ready.compileMs,
+        compileMs = 0L,
         surface = board.surfaceSpec.key,
         boardName = board.name,
         boardMeta = boardMeta,
@@ -388,10 +413,10 @@ internal object RobolectricBoardRenderer {
         boardMeta = boardMeta,
         boardTheme = boardTheme,
         designTheme = designOverride.theme,
-        compileMs = ready.compileMs,
+        compileMs = 0L,
         sourceFile = sourceFile,
         sourceText = sourceText,
-        explorationDir = srcPath.parent,
+        assetResolver = assetResolver,
         outDir = outDir,
         targets = requestedTargets,
       )
@@ -407,9 +432,10 @@ internal object RobolectricBoardRenderer {
         boardTheme = boardTheme,
         board = board,
         boardMeta = boardMeta,
-        compileMs = ready.compileMs,
+        compileMs = 0L,
         sourceFile = sourceFile,
         sourceText = sourceText,
+        assetResolver = assetResolver,
       )
     }
 
@@ -420,7 +446,7 @@ internal object RobolectricBoardRenderer {
           board = board,
           sourceFile = sourceFile,
           sourceText = sourceText,
-          explorationDir = srcPath.parent,
+          assetResolver = assetResolver,
           designMd = designOverride.theme,
           directionFilter = request.direction,
           screenFilter = request.screens?.toSet(),
@@ -437,7 +463,7 @@ internal object RobolectricBoardRenderer {
           ok = false,
           valid = false,
           pass = false,
-          compileMs = ready.compileMs,
+          compileMs = 0L,
           error = msg,
           errors = listOf(ValidationError(sourceFile, msg)),
         )
@@ -453,7 +479,7 @@ internal object RobolectricBoardRenderer {
       ok = true,
       valid = true,
       pass = allPass,
-      compileMs = ready.compileMs,
+      compileMs = 0L,
       renderMs = renderMs,
       surface = board.surfaceSpec.key,
       boardName = board.name,
@@ -475,7 +501,7 @@ internal object RobolectricBoardRenderer {
     compileMs: Long,
     sourceFile: String,
     sourceText: String,
-    explorationDir: Path?,
+    assetResolver: ((String) -> ImageBitmap?)?,
     outDir: Path?,
     targets: List<DeviceRenderTarget>,
   ): RobolectricRenderResponse {
@@ -510,7 +536,7 @@ internal object RobolectricBoardRenderer {
             view = view,
             sourceFile = sourceFile,
             sourceText = sourceText,
-            explorationDir = explorationDir,
+            assetResolver = assetResolver,
             designMd = designTheme,
             overlayId = target.overlayId,
             density = target.densityScale,
@@ -591,6 +617,7 @@ internal object RobolectricBoardRenderer {
     compileMs: Long,
     sourceFile: String,
     sourceText: String,
+    assetResolver: ((String) -> ImageBitmap?)?,
   ): RobolectricRenderResponse {
     val startNs = System.nanoTime()
     val surface = board.surfaceSpec
@@ -662,7 +689,7 @@ internal object RobolectricBoardRenderer {
                 view = view,
                 sourceFile = sourceFile,
                 sourceText = sourceText,
-                explorationDir = srcPath.parent,
+                assetResolver = assetResolver,
                 designMd = designTheme,
                 overlayId = null,
                 density = request.density,
@@ -734,7 +761,7 @@ internal object RobolectricBoardRenderer {
                     view = view,
                     sourceFile = sourceFile,
                     sourceText = sourceText,
-                    explorationDir = srcPath.parent,
+                    assetResolver = assetResolver,
                     designMd = designTheme,
                     overlayId = overlay.id,
                     density = request.density,
@@ -829,11 +856,10 @@ internal object RobolectricBoardRenderer {
     )
   }
 
-  fun loadBoard(sourceFile: String, compiled: HostCompileOutcome.Classes): ExplorationBoard {
-    val loader =
-      SandboxClassLoader(compiled.classes, RobolectricBoardRenderer::class.java.classLoader!!)
+  fun loadBoard(sourceFile: String, classes: Map<String, ByteArray>): ExplorationBoard {
+    val loader = SandboxClassLoader(classes, RobolectricBoardRenderer::class.java.classLoader!!)
     val candidates = mutableListOf<java.lang.reflect.Method>()
-    for (clsName in compiled.classes.keys) {
+    for (clsName in classes.keys) {
       val cls = loader.loadClass(clsName)
       for (m in cls.declaredMethods) {
         if (
@@ -856,7 +882,7 @@ internal object RobolectricBoardRenderer {
     board: ExplorationBoard,
     sourceFile: String,
     sourceText: String,
-    explorationDir: Path? = null,
+    assetResolver: ((String) -> ImageBitmap?)? = null,
     designMd: ThemeOverride? = null,
     directionFilter: String? = null,
     screenFilter: Set<String>? = null,
@@ -900,7 +926,7 @@ internal object RobolectricBoardRenderer {
                 view = view,
                 sourceFile = sourceFile,
                 sourceText = sourceText,
-                explorationDir = explorationDir,
+                assetResolver = assetResolver,
                 designMd = designMd,
                 overlayId = matching.id,
                 density = density,
@@ -918,7 +944,7 @@ internal object RobolectricBoardRenderer {
                 view = view,
                 sourceFile = sourceFile,
                 sourceText = sourceText,
-                explorationDir = explorationDir,
+                assetResolver = assetResolver,
                 designMd = designMd,
                 overlayId = null,
                 density = density,
@@ -940,7 +966,7 @@ internal object RobolectricBoardRenderer {
     view: ViewSpec,
     sourceFile: String,
     sourceText: String,
-    explorationDir: Path? = null,
+    assetResolver: ((String) -> ImageBitmap?)? = null,
     designMd: ThemeOverride? = null,
     overlayId: String? = null,
     density: Float = 2f,
@@ -1061,7 +1087,8 @@ internal object RobolectricBoardRenderer {
                 screenId = screenId,
                 view = effectiveView,
                 designSystem = designSystem,
-                explorationDir = explorationDir,
+                explorationDir = null,
+                assetResolver = assetResolver,
                 overlayId = overlayId,
                 onEmptyDetail = { emptyDetailScreen = it },
               )
@@ -1073,28 +1100,68 @@ internal object RobolectricBoardRenderer {
       shadowOf(Looper.getMainLooper()).idle()
       recomposerFailure.get()?.let { throw it }
       var virtualTimeNs = 0L
-      fun settleFrames(minSteps: Int) {
-        val wSpec = View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY)
-        val hSpec = View.MeasureSpec.makeMeasureSpec(heightPx, View.MeasureSpec.EXACTLY)
-        for (step in 0 until 80) {
-          Snapshot.sendApplyNotifications()
-          virtualTimeNs += FRAME_NS
-          clock.sendFrame(virtualTimeNs)
-          Snapshot.sendApplyNotifications()
-          shadowOf(Looper.getMainLooper()).idle()
-          recomposerFailure.get()?.let { throw it }
-          activity.window.decorView.measure(wSpec, hSpec)
-          activity.window.decorView.layout(0, 0, widthPx, heightPx)
-          insetContainer.measure(wSpec, hSpec)
-          insetContainer.layout(0, 0, widthPx, heightPx)
-          cv.measure(wSpec, hSpec)
-          cv.layout(0, 0, widthPx, heightPx)
-          recomposerFailure.get()?.let { throw it }
-          if (step >= minSteps && !clock.hasAwaiters && !activeRecomposer.hasPendingWork) break
+      val wSpec = View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY)
+      val hSpec = View.MeasureSpec.makeMeasureSpec(heightPx, View.MeasureSpec.EXACTLY)
+      val mainLoc = IntArray(2)
+
+      fun layoutWindows(): FrameStatus {
+        activity.window.decorView.measure(wSpec, hSpec)
+        activity.window.decorView.layout(0, 0, widthPx, heightPx)
+        insetContainer.measure(wSpec, hSpec)
+        insetContainer.layout(0, 0, widthPx, heightPx)
+        cv.measure(wSpec, hSpec)
+        cv.layout(0, 0, widthPx, heightPx)
+        activity.window.decorView.getLocationOnScreen(mainLoc)
+        val mainDecor = activity.window.decorView
+        val overlays =
+          WindowInspector.getGlobalWindowViews().filter {
+            it !== mainDecor && it.visibility == View.VISIBLE
+          }
+        var awaitingAttach = false
+        for (win in overlays) {
+          val m = OverlayWindowHelper.measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
+          if (!win.isAttachedToWindow || m.width == 0) awaitingAttach = true
         }
-        shadowOf(Looper.getMainLooper()).idle()
         recomposerFailure.get()?.let { throw it }
+        return FrameStatus(
+          workPending = clock.hasAwaiters || activeRecomposer.hasPendingWork,
+          overlayPresent = overlays.isNotEmpty(),
+          awaitingOverlayAttach = awaitingAttach,
+        )
       }
+
+      val minScrollerWidthPx = widthPx * 0.6f
+      val scrollStepPx = effectiveView.height * density / 2f
+
+      fun collectUnmergedRoots(): List<SemanticsNode> {
+        val windows = WindowInspector.getGlobalWindowViews().filter { it.isAttachedToWindow }
+        return OverlayWindowHelper.collectComposeRoots(windows).map {
+          it.semanticsOwner.unmergedRootSemanticsNode
+        }
+      }
+
+      val driver =
+        object : WearScrollDriver {
+          override suspend fun advanceFrame(): FrameStatus {
+            Snapshot.sendApplyNotifications()
+            virtualTimeNs += SettlePolicy.FRAME_NS
+            clock.sendFrame(virtualTimeNs)
+            Snapshot.sendApplyNotifications()
+            shadowOf(Looper.getMainLooper()).idle()
+            recomposerFailure.get()?.let { throw it }
+            return layoutWindows()
+          }
+
+          override suspend fun finishSettle() {
+            shadowOf(Looper.getMainLooper()).idle()
+            recomposerFailure.get()?.let { throw it }
+          }
+
+          override suspend fun scrollOnce(): Boolean =
+            WearScrollHelper.scrollDown(collectUnmergedRoots(), minScrollerWidthPx, scrollStepPx)
+        }
+
+      fun settleFrames() = runBlocking { SettlePolicy.settle(driver) }
 
       fun captureSnapshot(): Pair<LayoutTree, RawRgbaFrame> {
         val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
@@ -1184,7 +1251,7 @@ internal object RobolectricBoardRenderer {
         return extracted.tree to frame
       }
 
-      settleFrames(if (overlayId != null) 50 else 4)
+      settleFrames()
       val (initialTree, initialFrame) = captureSnapshot()
       var finalTree = initialTree
       var endTree: LayoutTree? = null
@@ -1195,28 +1262,9 @@ internal object RobolectricBoardRenderer {
           overlayId == null &&
           !WearScrollHelper.hasWearPicker(tables, finalTree)
       ) {
-        fun collectUnmergedRoots(): List<SemanticsNode> {
-          val windows = WindowInspector.getGlobalWindowViews().filter { it.isAttachedToWindow }
-          return OverlayWindowHelper.collectComposeRoots(windows).map {
-            it.semanticsOwner.unmergedRootSemanticsNode
-          }
-        }
-
-        val minScrollerWidthPx = widthPx * 0.6f
         val positions = mutableListOf(finalTree)
-        val stepPx = effectiveView.height * density / 2f
-        var steps = 0
-        while (steps++ < MAX_SCROLL_STEPS) {
-          val scroller =
-            WearScrollHelper.findVerticalScroller(collectUnmergedRoots(), minScrollerWidthPx)
-              ?: break
-          val range =
-            scroller.config.getOrNull(SemanticsProperties.VerticalScrollAxisRange) ?: break
-          if (range.value() >= range.maxValue() - 0.5f) break
-          val action = scroller.config.getOrNull(SemanticsActions.ScrollBy)?.action ?: break
-          if (!action(0f, stepPx)) break
-          settleFrames(4)
-          val (stepTree, stepFrame) = captureSnapshot()
+        val scrolled = runBlocking { SettlePolicy.scrollThrough(driver) { captureSnapshot() } }
+        for ((stepTree, stepFrame) in scrolled) {
           positions += stepTree
           endFrame = stepFrame
         }

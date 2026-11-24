@@ -1,13 +1,15 @@
 package bot.charlies.androiddesign.preview.host
 
+import bot.charlies.androiddesign.preview.app.android.AndroidExplorationCompiler
+import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.domain.sandbox.BytecodeGuard
 import bot.charlies.androiddesign.preview.domain.sandbox.SandboxClassLoader
-import bot.charlies.androiddesign.preview.host.compiler.HostClassCompiler
-import bot.charlies.androiddesign.preview.host.compiler.HostCompileOutcome
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HostSandboxSecurityTest {
+  private val meta by lazy { BootstrapMeta.locate() }
+
   @Test
   fun sourceTokenLinterRejectsRawColorAndAlphaCopy() {
     val rawColorSrc =
@@ -17,8 +19,16 @@ class HostSandboxSecurityTest {
       val preview = designBoard("Bad") { screen("main") { val c = Color(0xFF123456) } }
       """
         .trimIndent()
-    val res1 = HostClassCompiler.compileToClasses("BadColor.explore.kt", rawColorSrc)
-    assertTrue("Expected lint failure for raw Color", res1 is HostCompileOutcome.Failed)
+    val res1 =
+      AndroidExplorationCompiler.compileSourceToClasses(
+        "BadColor.explore.kt",
+        rawColorSrc,
+        meta = meta,
+      )
+    assertTrue(
+      "Expected lint failure for raw Color",
+      res1 is AndroidExplorationCompiler.ClassesOutcome.Failed,
+    )
 
     val alphaSrc =
       """
@@ -30,8 +40,16 @@ class HostSandboxSecurityTest {
       }
       """
         .trimIndent()
-    val res2 = HostClassCompiler.compileToClasses("BadAlpha.explore.kt", alphaSrc)
-    assertTrue("Expected lint failure for .copy(alpha=...)", res2 is HostCompileOutcome.Failed)
+    val res2 =
+      AndroidExplorationCompiler.compileSourceToClasses(
+        "BadAlpha.explore.kt",
+        alphaSrc,
+        meta = meta,
+      )
+    assertTrue(
+      "Expected lint failure for .copy(alpha=...)",
+      res2 is AndroidExplorationCompiler.ClassesOutcome.Failed,
+    )
   }
 
   @Test
@@ -47,26 +65,38 @@ class HostSandboxSecurityTest {
 
     // Compile with skipGuards=true to test BytecodeGuard & SandboxClassLoader independently.
     val unguarded =
-      HostClassCompiler.compileToClasses("Hostile.explore.kt", hostileSource, skipGuards = true)
-    check(unguarded is HostCompileOutcome.Classes) { "Expected compilation with skipGuards=true" }
+      AndroidExplorationCompiler.compileSourceToClasses(
+        "Hostile.explore.kt",
+        hostileSource,
+        skipGuards = true,
+        meta = meta,
+      )
+    check(unguarded is AndroidExplorationCompiler.ClassesOutcome.Ready) {
+      "Expected compilation with skipGuards=true"
+    }
 
     val violations =
-      unguarded.classes.entries.flatMap { (name, bytes) ->
-        BytecodeGuard.verify(name, bytes, unguarded.classes.keys)
+      unguarded.classBytes.entries.flatMap { (name, bytes) ->
+        BytecodeGuard.verify(name, bytes, unguarded.classBytes.keys)
       }
     assertTrue(
       "Expected BytecodeGuard violation for java.io.File, got $violations",
       violations.any { it.contains("java.io.File") },
     )
 
-    val normalGuard = HostClassCompiler.compileToClasses("Hostile.explore.kt", hostileSource)
+    val normalGuard =
+      AndroidExplorationCompiler.compileSourceToClasses(
+        "Hostile.explore.kt",
+        hostileSource,
+        meta = meta,
+      )
     assertTrue(
-      "Expected HostClassCompiler guard rejection",
-      normalGuard is HostCompileOutcome.Failed,
+      "Expected guard rejection",
+      normalGuard is AndroidExplorationCompiler.ClassesOutcome.Failed,
     )
 
     val loader =
-      SandboxClassLoader(unguarded.classes, HostSandboxSecurityTest::class.java.classLoader!!)
+      SandboxClassLoader(unguarded.classBytes, HostSandboxSecurityTest::class.java.classLoader!!)
     val loadFailure = runCatching {
       val cls = loader.loadClass("HostileExplore")
       cls.getDeclaredMethod("touchFile").invoke(cls.getDeclaredField("INSTANCE").get(null))
@@ -77,23 +107,25 @@ class HostSandboxSecurityTest {
   @Test
   fun validPhoneAndWearBoardsCompileCleanlyWithSourceInfo() {
     val phoneRes =
-      HostClassCompiler.compileToClasses(
+      AndroidExplorationCompiler.compileSourceToClasses(
         HostTestFixtures.PHONE_EXPLORE_FILE,
         HostTestFixtures.PHONE_EXPLORE_SOURCE,
+        meta = meta,
       )
     assertTrue(
       "Phone fixture should compile cleanly: $phoneRes",
-      phoneRes is HostCompileOutcome.Classes,
+      phoneRes is AndroidExplorationCompiler.ClassesOutcome.Ready,
     )
 
     val wearRes =
-      HostClassCompiler.compileToClasses(
+      AndroidExplorationCompiler.compileSourceToClasses(
         HostTestFixtures.WEAR_EXPLORE_FILE,
         HostTestFixtures.WEAR_EXPLORE_SOURCE,
+        meta = meta,
       )
     assertTrue(
       "Wear fixture should compile cleanly: $wearRes",
-      wearRes is HostCompileOutcome.Classes,
+      wearRes is AndroidExplorationCompiler.ClassesOutcome.Ready,
     )
   }
 }

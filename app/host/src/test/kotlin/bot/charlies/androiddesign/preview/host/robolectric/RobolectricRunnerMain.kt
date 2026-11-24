@@ -38,7 +38,7 @@ class SandboxExcludingRobolectricTestRunner(testClass: Class<*>) :
       .doNotAcquirePackage("bot.charlies.androiddesign.preview.model.")
       .doNotAcquirePackage("bot.charlies.androiddesign.preview.domain.")
       .doNotAcquirePackage("bot.charlies.androiddesign.preview.data.")
-      .doNotAcquirePackage("bot.charlies.androiddesign.preview.host.compiler.")
+      .doNotAcquirePackage("bot.charlies.androiddesign.preview.app.")
       .doNotAcquireClass("bot.charlies.androiddesign.preview.host.robolectric.RunnerStdioBridge")
       .build()
   }

@@ -17,14 +17,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.semantics.getOrNull
 import bot.charlies.androiddesign.preview.domain.findings.ScrolledTree
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.AndroidSlotTreeExtractor
+import bot.charlies.androiddesign.preview.feature.preview.sandbox.FrameStatus
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.OverlayWindowHelper
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.RawRgbaFrame
+import bot.charlies.androiddesign.preview.feature.preview.sandbox.SettlePolicy
+import bot.charlies.androiddesign.preview.feature.preview.sandbox.WearScrollDriver
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.WearScrollHelper
 import bot.charlies.androiddesign.preview.kit.BoardSurface
 import bot.charlies.androiddesign.preview.kit.ExplorationBoard
@@ -46,7 +46,6 @@ import java.util.Collections
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
@@ -322,7 +321,7 @@ internal class VirtualClockComposeRenderer(
       activity.activeSession.value = session
     }
 
-    settleVirtualClock(activity, MAX_SETTLE_FRAMES, widthPx, heightPx)
+    settleVirtualClock(activity, SettlePolicy.MAX_SETTLE_FRAMES, widthPx, heightPx)
     val (rawFrame, overlayOffsets) = frameCapture.capture(activity, widthPx, heightPx)
 
     val initialOutput =
@@ -363,48 +362,33 @@ internal class VirtualClockComposeRenderer(
       if (scroller != null) {
         val positions = mutableListOf(finalTree)
         val stepPx = effectiveView.height * density / 2f
-        var steps = 0
-        var moved = false
-        while (steps++ < MAX_SCROLL_STEPS) {
-          val didScroll =
-            withContext(Dispatchers.Main) {
-              val curScroller =
-                WearScrollHelper.findVerticalScroller(
-                  collectUnmergedRoots(activity),
-                  minScrollerWidthPx,
-                ) ?: return@withContext false
-              val range =
-                curScroller.config.getOrNull(SemanticsProperties.VerticalScrollAxisRange)
-                  ?: return@withContext false
-              if (range.value() >= range.maxValue() - 0.5f) return@withContext false
-              val action =
-                curScroller.config.getOrNull(SemanticsActions.ScrollBy)?.action
-                  ?: return@withContext false
-              action(0f, stepPx)
-            }
-          if (!didScroll) break
-          moved = true
-          settleVirtualClock(activity, SCROLL_SETTLE_FRAMES, widthPx, heightPx)
-          val (stepFrame, stepOffsets) = frameCapture.capture(activity, widthPx, heightPx)
-          val stepTree =
-            withContext(Dispatchers.Main) {
-              extractTreeSnapshot(
-                  activity = activity,
-                  inspectionTables = inspectionTables,
-                  rootCoords = rootCoords,
-                  rawFrame = stepFrame,
-                  screenId = target.screen,
-                  view = effectiveView,
-                  surface = board.surface,
-                  sourceFile = request.sourceFile,
-                  sourceText = request.sourceText,
-                  density = density,
-                  perimeterPx = perimeterPx,
-                  emptyDetailScreen = emptyDetailScreen,
-                  explicitWindowOffsets = stepOffsets,
-                )
-                .tree
-            }
+        val driver = DeviceFrameDriver(activity, widthPx, heightPx, minScrollerWidthPx, stepPx)
+        val scrolled =
+          SettlePolicy.scrollThrough(driver) {
+            val (stepFrame, stepOffsets) = frameCapture.capture(activity, widthPx, heightPx)
+            val stepTree =
+              withContext(Dispatchers.Main) {
+                extractTreeSnapshot(
+                    activity = activity,
+                    inspectionTables = inspectionTables,
+                    rootCoords = rootCoords,
+                    rawFrame = stepFrame,
+                    screenId = target.screen,
+                    view = effectiveView,
+                    surface = board.surface,
+                    sourceFile = request.sourceFile,
+                    sourceText = request.sourceText,
+                    density = density,
+                    perimeterPx = perimeterPx,
+                    emptyDetailScreen = emptyDetailScreen,
+                    explicitWindowOffsets = stepOffsets,
+                  )
+                  .tree
+              }
+            stepFrame to stepTree
+          }
+        val moved = scrolled.isNotEmpty()
+        for ((stepFrame, stepTree) in scrolled) {
           positions += stepTree
           endRawFrame = stepFrame
         }
@@ -469,59 +453,69 @@ internal class VirtualClockComposeRenderer(
     widthPx: Int,
     heightPx: Int,
   ) {
-    val clock = activity.virtualClock ?: return
-    val recomp = activity.recomposer ?: return
-    val mainLoc = IntArray(2)
-    var attachYields = 0
-    var hadOverlay = false
-    var idleStreak = 0
-    for (step in 0 until maxFrames) {
+    if (activity.virtualClock == null || activity.recomposer == null) return
+    SettlePolicy.settle(DeviceFrameDriver(activity, widthPx, heightPx), maxFrames)
+  }
+
+  /** Produces virtual frames on the `:sandbox` activity for [SettlePolicy]. */
+  private inner class DeviceFrameDriver(
+    private val activity: HostRenderActivity,
+    private val widthPx: Int,
+    private val heightPx: Int,
+    private val minScrollerWidthPx: Float = 0f,
+    private val scrollStepPx: Float = 0f,
+  ) : WearScrollDriver {
+    private val mainLoc = IntArray(2)
+
+    override suspend fun advanceFrame(): FrameStatus {
+      val clock = checkNotNull(activity.virtualClock)
+      val recomp = checkNotNull(activity.recomposer)
       withContext(Dispatchers.Main) {
         Snapshot.sendApplyNotifications()
-        activity.virtualTimeNanos += SETTLE_FRAME_NS
+        activity.virtualTimeNanos += SettlePolicy.FRAME_NS
         clock.sendFrame(activity.virtualTimeNanos)
         Snapshot.sendApplyNotifications()
         activity.recomposerFailure.get()?.let { throw it }
       }
-      var needsAttachWait = false
-      val hasMore =
-        withContext(Dispatchers.Main) {
-          activity.recomposerFailure.get()?.let { throw it }
-          measureMainActivityTarget(activity, widthPx, heightPx)
-          activity.window.decorView.getLocationOnScreen(mainLoc)
-          val overlays = collectOverlayWindows(activity)
-          if (overlays.isNotEmpty()) hadOverlay = true
-          for (win in overlays) {
-            val m =
-              OverlayWindowHelper.measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
-            if (!win.isAttachedToWindow || m.width == 0) {
-              needsAttachWait = true
-            }
-          }
-          activity.recomposerFailure.get()?.let { throw it }
-          clock.hasAwaiters || recomp.hasPendingWork
+      return withContext(Dispatchers.Main) {
+        activity.recomposerFailure.get()?.let { throw it }
+        measureMainActivityTarget(activity, widthPx, heightPx)
+        activity.window.decorView.getLocationOnScreen(mainLoc)
+        val overlays = collectOverlayWindows(activity)
+        var awaitingAttach = false
+        for (win in overlays) {
+          val m = OverlayWindowHelper.measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
+          if (!win.isAttachedToWindow || m.width == 0) awaitingAttach = true
         }
-      if (step >= 1 && needsAttachWait && attachYields < 6) {
-        attachYields++
-        delay(16)
-      }
-      val minSteps = if (hadOverlay) 45 else 4
-      if (!hasMore && !needsAttachWait && step >= minSteps) {
-        idleStreak++
-        if (idleStreak >= 3) break
-      } else {
-        idleStreak = 0
+        activity.recomposerFailure.get()?.let { throw it }
+        FrameStatus(
+          workPending = clock.hasAwaiters || recomp.hasPendingWork,
+          overlayPresent = overlays.isNotEmpty(),
+          awaitingOverlayAttach = awaitingAttach,
+        )
       }
     }
-    withContext(Dispatchers.Main) {
-      activity.recomposerFailure.get()?.let { throw it }
-      measureMainActivityTarget(activity, widthPx, heightPx)
-      activity.window.decorView.getLocationOnScreen(mainLoc)
-      for (win in collectOverlayWindows(activity)) {
-        OverlayWindowHelper.measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
+
+    override suspend fun finishSettle() {
+      withContext(Dispatchers.Main) {
+        activity.recomposerFailure.get()?.let { throw it }
+        measureMainActivityTarget(activity, widthPx, heightPx)
+        activity.window.decorView.getLocationOnScreen(mainLoc)
+        for (win in collectOverlayWindows(activity)) {
+          OverlayWindowHelper.measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
+        }
+        activity.recomposerFailure.get()?.let { throw it }
       }
-      activity.recomposerFailure.get()?.let { throw it }
     }
+
+    override suspend fun scrollOnce(): Boolean =
+      withContext(Dispatchers.Main) {
+        WearScrollHelper.scrollDown(
+          collectUnmergedRoots(activity),
+          minScrollerWidthPx,
+          scrollStepPx,
+        )
+      }
   }
 
   private fun extractTreeSnapshot(
@@ -610,10 +604,6 @@ internal class VirtualClockComposeRenderer(
   companion object {
     private const val NANOS_PER_MS = 1_000_000.0
     private const val BASE_DPI = 160f
-    private const val SETTLE_FRAME_NS = 16_666_667L
-    private const val MAX_SETTLE_FRAMES = 120
-    private const val SCROLL_SETTLE_FRAMES = 32
-    private const val MAX_SCROLL_STEPS = 60
     private const val MAX_CACHED_DEX = 4
     private const val RECYCLE_RELOAD_LIMIT = 200
     private const val RECYCLE_NATIVE_HEAP_BYTES = 256L * 1024L * 1024L

@@ -1,5 +1,6 @@
 package bot.charlies.androiddesign.preview.app.server
 
+import bot.charlies.androiddesign.preview.app.android.AndroidExplorationCompiler
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.Bounds
@@ -29,6 +30,7 @@ import java.nio.file.Path
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
@@ -76,6 +78,25 @@ class RobolectricPreviewBackendTest {
           ),
         ),
       views = PhoneSurface.views,
+    )
+
+  private fun fakeClassStage(
+    source: Path,
+    design: Path?,
+  ): AndroidExplorationCompiler.ClassStageOutcome =
+    AndroidExplorationCompiler.ClassStageOutcome.Ready(
+      AndroidExplorationCompiler.ClassStage(
+        sourcePath = source,
+        sourceFile = source.fileName.toString(),
+        sourceText = Files.readString(source),
+        designPath = design,
+        designTheme = null,
+        entryClass = "DemoKt",
+        classBytes = mapOf("DemoKt" to byteArrayOf(1, 2, 3), "pkg.Inner" to byteArrayOf(4)),
+        assetMap = mapOf("assets/cover.png" to "abc123"),
+        assetBlobs = mapOf("abc123" to byteArrayOf(9, 9)),
+        compileMs = 5L,
+      ),
     )
 
   private fun stubPngBytes(tag: String): ByteArray {
@@ -150,6 +171,7 @@ class RobolectricPreviewBackendTest {
 
     val backend =
       RobolectricPreviewBackend(
+        classStager = ::fakeClassStage,
         requestExecutor = { req ->
           requests += req
           when (req.mode) {
@@ -431,6 +453,143 @@ class RobolectricPreviewBackendTest {
   }
 
   @Test
+  fun compileStagesClassesAndAssetsForTheRunnerAndRendersReferenceThem(@TempDir tmp: Path) {
+    val file = writeSampleFile(tmp.resolve("repo/design"))
+    val requests = mutableListOf<RobolectricRenderRequest>()
+    val stagedClasses = mutableListOf<Boolean>()
+    val backend =
+      RobolectricPreviewBackend(
+        classStager = ::fakeClassStage,
+        requestExecutor = { req ->
+          requests += req
+          if (req.mode == "compile") {
+            val dir = Path.of(checkNotNull(req.classesDir))
+            stagedClasses += Files.isRegularFile(dir.resolve("DemoKt.class"))
+            stagedClasses += Files.isRegularFile(dir.resolve("pkg/Inner.class"))
+            stagedClasses +=
+              Files.isRegularFile(Path.of(checkNotNull(req.assetBlobsDir)).resolve("abc123"))
+            RobolectricRenderResponse(
+              id = req.id,
+              ok = true,
+              valid = true,
+              pass = true,
+              boardMeta = sampleBoardMeta(),
+            )
+          } else {
+            RobolectricRenderResponse(id = req.id, ok = true, valid = true, pass = true)
+          }
+        },
+      )
+    backend.use { rb ->
+      val snap = ContentHasher.snapshot(file, null)
+      val out = rb.compile(snap)
+      assertTrue(out.loaded.errors.isEmpty(), "compile errors: ${out.loaded.errors}")
+      val compileReq = requests.single { it.mode == "compile" }
+      assertEquals(mapOf("assets/cover.png" to "abc123"), compileReq.assetMap)
+      assertEquals(listOf(true, true, true), stagedClasses)
+    }
+  }
+
+  @Test
+  fun assetEscapingTheCaseDirFailsCompileOnTheRobolectricBackend(@TempDir tmp: Path) {
+    val meta = BootstrapMeta.locateOrNull()
+    assumeTrue(meta != null)
+    val file = tmp.resolve("repo/design/Escape.explore.kt")
+    Files.createDirectories(file.parent)
+    Files.writeString(
+      file,
+      """
+      import androidx.compose.foundation.Image
+      import androidx.compose.material3.Text
+      import bot.charlies.androiddesign.preview.kit.designBoard
+      import bot.charlies.androiddesign.preview.kit.designPainter
+
+      val preview = designBoard(name = "Escape") {
+        direction("Main") {
+          screen("home") {
+            Image(painter = designPainter("../secret.png"), contentDescription = "Bad")
+          }
+        }
+      }
+      """
+        .trimIndent(),
+    )
+    val backend =
+      RobolectricPreviewBackend(
+        meta = meta,
+        robolectricCp = tmp.resolve("unused.cp"),
+        requestExecutor = {
+          error("The runner must not see a board whose assets escape the case dir")
+        },
+      )
+    backend.use { rb ->
+      val out = rb.compile(ContentHasher.snapshot(file, null))
+      assertTrue(
+        out.loaded.errors.any { "escape" in it.message.lowercase() },
+        "Expected asset escape error, got ${out.loaded.errors}",
+      )
+      assertNull(out.boardMeta)
+    }
+  }
+
+  @Test
+  fun hungWorkerIsKilledAtTheBudgetAndRestartedOnTheNextRequest(@TempDir tmp: Path) {
+    val pidFile = tmp.resolve("worker.pid")
+    val markerFile = tmp.resolve("worker.hung-once")
+    val script = tmp.resolve("hang-once-worker.sh")
+    Files.writeString(
+      script,
+      """
+      #!/bin/sh
+      echo $$ >> "${pidFile.toAbsolutePath()}"
+      IFS= read -r _line
+      if [ -e "${markerFile.toAbsolutePath()}" ]; then
+        echo '{"id":"rb-2","ok":true,"valid":true,"pass":true}'
+        IFS= read -r _next
+      else
+        touch "${markerFile.toAbsolutePath()}"
+        sleep 60
+      fi
+      """
+        .trimIndent() + "\n",
+    )
+    script.toFile().setExecutable(true)
+
+    val backend =
+      RobolectricPreviewBackend(
+        workerCommand = listOf("/bin/sh", script.toString()),
+        controlTimeoutMs = 400L,
+      )
+    backend.use { rb ->
+      val started = System.nanoTime()
+      val timeout = assertThrows(SandboxWatchdogException::class.java) { rb.warmUp() }
+      val elapsedMs = (System.nanoTime() - started) / 1_000_000L
+      assertTrue(elapsedMs < 5_000L, "Watchdog must fire at the budget, took $elapsedMs ms")
+      assertTrue(
+        timeout.message.orEmpty().contains("timed out"),
+        "Unexpected timeout message: ${timeout.message}",
+      )
+      val firstPid = Files.readAllLines(pidFile).first().trim().toLong()
+      val deadline = System.currentTimeMillis() + 3_000L
+      while (
+        ProcessHandle.of(firstPid).map { it.isAlive }.orElse(false) &&
+          System.currentTimeMillis() < deadline
+      ) {
+        Thread.sleep(20)
+      }
+      assertFalse(
+        ProcessHandle.of(firstPid).map { it.isAlive }.orElse(false),
+        "Hung worker $firstPid must be killed",
+      )
+
+      rb.warmUp()
+      val pids = Files.readAllLines(pidFile).map { it.trim().toLong() }
+      assertEquals(2, pids.size, "Worker must restart lazily on the next request")
+      assertTrue(pids[0] != pids[1])
+    }
+  }
+
+  @Test
   fun closeDuringActiveRequestUnblocksImmediatelyAndKillsHungWorkerProcess(@TempDir tmp: Path) {
     val pidFile = tmp.resolve("worker.pid")
     val startedFile = tmp.resolve("worker.started")
@@ -513,7 +672,11 @@ class RobolectricPreviewBackendTest {
     )
     script.toFile().setExecutable(true)
 
-    val backend = RobolectricPreviewBackend(workerCommand = listOf("/bin/sh", script.toString()))
+    val backend =
+      RobolectricPreviewBackend(
+        workerCommand = listOf("/bin/sh", script.toString()),
+        classStager = ::fakeClassStage,
+      )
     val halted = java.util.concurrent.CountDownLatch(1)
     var aliveAtHalt: Boolean? = null
     val identity =

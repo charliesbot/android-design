@@ -106,6 +106,7 @@ dependencies {
   composeCompilerPlugin(libs.kotlin.compose.compiler.embeddable)
 
   testImplementation(project(":core:data"))
+  testImplementation(project(":app"))
   testImplementation(libs.junit4)
   testImplementation(libs.robolectric)
   testImplementation(libs.kotlin.compiler.embeddable)

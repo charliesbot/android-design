@@ -214,6 +214,16 @@ data class RobolectricRenderRequest(
   val includeOverlays: Boolean = false,
   val targets: List<DeviceRenderTarget>? = null,
   val writeReport: Boolean = false,
+  /**
+   * Directory of compiled `.class` files staged by the host backend. The runner never compiles: it
+   * only loads these, exactly as the device loads the DEX the host sends. Required by every mode
+   * except `ping`.
+   */
+  val classesDir: String? = null,
+  /** Exploration-relative asset path to SHA-256, as on the device batch request. */
+  val assetMap: Map<String, String> = emptyMap(),
+  /** Directory holding the asset blobs, one file per SHA-256 named by that hash. */
+  val assetBlobsDir: String? = null,
 )
 
 @Serializable
@@ -235,4 +245,6 @@ data class RobolectricRenderResponse(
   val boardTheme: ThemeOverride? = null,
   val designTheme: ThemeOverride? = null,
   val results: List<RobolectricTargetResult> = emptyList(),
+  /** `watchdog_timeout` when the host killed the worker for outliving its budget. */
+  val recycleReason: String? = null,
 )
