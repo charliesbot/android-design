@@ -81,7 +81,7 @@ class RobolectricRunnerEntry {
         try {
           val req =
             PreviewJson.compact.decodeFromString(RobolectricRenderRequest.serializer(), trimmed)
-          RobolectricBoardRenderer.handleRequest(req)
+          RobolectricStaging.handle(req)
         } catch (t: Throwable) {
           RunnerStdioBridge.lastFailure = t
           RobolectricRenderResponse(

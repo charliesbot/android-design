@@ -53,7 +53,7 @@ class RobolectricBoardRendererTest {
 
     // 1. Phone main view at 2x with Fraunces brand font + designPainter asset
     val phoneMain =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(
           id = "p-main",
           sourcePath = phoneFile.toString(),
@@ -85,7 +85,7 @@ class RobolectricBoardRendererTest {
     // 2. Phone overlays: dialog, sheet, popup
     for (overlayId in listOf("dialog", "sheet", "popup")) {
       val ov =
-        RobolectricTestStaging.handle(
+        RobolectricStaging.handle(
           RobolectricRenderRequest(
             id = "p-$overlayId",
             sourcePath = phoneFile.toString(),
@@ -103,7 +103,7 @@ class RobolectricBoardRendererTest {
 
     // 3. Wear main scroll + endTree + EdgeButton + TimeText
     val wearMain =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(
           id = "w-main",
           sourcePath = wearFile.toString(),
@@ -125,7 +125,7 @@ class RobolectricBoardRendererTest {
     // 4. Wear DatePicker must skip infinite circular picker scrolling (< 2s)
     val t0 = System.nanoTime()
     val wearDate =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(
           id = "w-date",
           sourcePath = wearFile.toString(),
@@ -145,7 +145,7 @@ class RobolectricBoardRendererTest {
 
     // 5. Malformed request/file returns structured validation failure without throwing
     val missing =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(
           id = "missing",
           sourcePath = workDir.resolve("Nope.explore.kt").toString(),
@@ -182,7 +182,7 @@ class RobolectricBoardRendererTest {
         .trimIndent(),
     )
     val resp =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(
           id = "recomp-boom",
           sourcePath = boomFile.toString(),
@@ -218,7 +218,7 @@ class RobolectricBoardRendererTest {
         .trimIndent(),
     )
     val resp =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(
           id = "effect-boom",
           sourcePath = effectFile.toString(),
@@ -250,7 +250,7 @@ class RobolectricBoardRendererTest {
         .trimIndent(),
     )
     val validAfter =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(
           id = "valid-after-effect-boom",
           sourcePath = validFile.toString(),
@@ -335,7 +335,7 @@ class RobolectricBoardRendererTest {
 
   @Test
   fun pingCompileBatchTargetsAndReportModesWorkEndToEnd() {
-    val ping = RobolectricTestStaging.handle(RobolectricRenderRequest(id = "ping-1", mode = "ping"))
+    val ping = RobolectricStaging.handle(RobolectricRenderRequest(id = "ping-1", mode = "ping"))
     assertTrue(ping.ok && ping.valid && ping.pass)
 
     val workDir = tempFolder.newFolder("report-fixtures").toPath()
@@ -347,7 +347,7 @@ class RobolectricBoardRendererTest {
 
     // 1. compile mode returns boardMeta + boardTheme and caches unchanged source
     val compileFirst =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(id = "cmp-1", sourcePath = phoneFile.toString(), mode = "compile"),
       )
     assertTrue("Expected compile ok & valid: $compileFirst", compileFirst.ok && compileFirst.valid)
@@ -355,7 +355,7 @@ class RobolectricBoardRendererTest {
     assertEquals("expressive", compileFirst.boardTheme?.material?.scheme?.variant)
 
     val compileSecond =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(id = "cmp-2", sourcePath = phoneFile.toString(), mode = "compile"),
       )
     assertTrue(compileSecond.ok && compileSecond.valid)
@@ -364,7 +364,7 @@ class RobolectricBoardRendererTest {
     // 2. targets batch writes PNG only when frameFormat != NONE
     val batchOut = tempFolder.newFolder("batch-out").toPath()
     val batchResp =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(
           id = "batch-1",
           sourcePath = phoneFile.toString(),
@@ -399,7 +399,7 @@ class RobolectricBoardRendererTest {
     // 3. report mode writes report.json, overlays, trees, PNGs, and Wear end-of-list artifacts
     val phoneReportOut = tempFolder.newFolder("phone-report").toPath()
     val phoneReportResp =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(
           id = "rep-phone",
           sourcePath = phoneFile.toString(),
@@ -428,7 +428,7 @@ class RobolectricBoardRendererTest {
 
     val wearReportOut = tempFolder.newFolder("wear-report").toPath()
     val wearReportResp =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(
           id = "rep-wear",
           sourcePath = wearFile.toString(),
@@ -456,7 +456,7 @@ class RobolectricBoardRendererTest {
     val brokenFile = workDir.resolve("Missing.explore.kt")
     val brokenOut = tempFolder.newFolder("broken-report").toPath()
     val brokenResp =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(
           id = "rep-broken",
           sourcePath = brokenFile.toString(),
@@ -572,7 +572,7 @@ class RobolectricBoardRendererTest {
     )
 
     val firstCol =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(
           id = "seq-col-1",
           sourcePath = columnFile.toString(),
@@ -596,7 +596,7 @@ class RobolectricBoardRendererTest {
     )
 
     val secondCol =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(
           id = "seq-col-2",
           sourcePath = columnFile.toString(),
@@ -623,7 +623,7 @@ class RobolectricBoardRendererTest {
     Files.writeString(scaffoldFile, HostTestFixtures.PHONE_EXPLORE_SOURCE)
     for (viewName in listOf("light", "dark")) {
       val resp =
-        RobolectricTestStaging.handle(
+        RobolectricStaging.handle(
           RobolectricRenderRequest(
             id = "seq-scaf-$viewName",
             sourcePath = scaffoldFile.toString(),
@@ -675,7 +675,7 @@ class RobolectricBoardRendererTest {
         .trimIndent(),
     )
     val resp =
-      RobolectricTestStaging.handle(
+      RobolectricStaging.handle(
         RobolectricRenderRequest(
           id = "settle-1500",
           sourcePath = file.toString(),

@@ -1,7 +1,7 @@
 package bot.charlies.androiddesign.preview.host
 
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
-import bot.charlies.androiddesign.preview.host.robolectric.RobolectricTestStaging
+import bot.charlies.androiddesign.preview.host.robolectric.RobolectricStaging
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.RobolectricRenderRequest
 import bot.charlies.androiddesign.preview.model.RobolectricRenderResponse
@@ -99,7 +99,7 @@ class BootstrapAndStandaloneRunnerTest {
     val req1 =
       PreviewJson.compact.encodeToString(
         RobolectricRenderRequest.serializer(),
-        RobolectricTestStaging.stage(
+        RobolectricStaging.stage(
           RobolectricRenderRequest(
             id = "seq-1",
             sourcePath = phoneFile.toString(),
@@ -111,19 +111,18 @@ class BootstrapAndStandaloneRunnerTest {
           ),
         ),
       )
+    // Source-only, as the eval harness sends report renders: the runner must stage it itself.
     val req2 =
       PreviewJson.compact.encodeToString(
         RobolectricRenderRequest.serializer(),
-        RobolectricTestStaging.stage(
-          RobolectricRenderRequest(
-            id = "seq-2",
-            sourcePath = wearFile.toString(),
-            views = listOf("watch"),
-            screens = listOf("main"),
-            outDir = outDir.toString(),
-            density = 2f,
-            encodePng = true,
-          ),
+        RobolectricRenderRequest(
+          id = "seq-2",
+          sourcePath = wearFile.toString(),
+          views = listOf("watch"),
+          screens = listOf("main"),
+          outDir = outDir.toString(),
+          density = 2f,
+          encodePng = true,
         ),
       )
 

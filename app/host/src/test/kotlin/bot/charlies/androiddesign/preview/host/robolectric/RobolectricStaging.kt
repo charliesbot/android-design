@@ -9,13 +9,19 @@ import java.nio.file.Files
 import java.nio.file.Paths
 
 /**
- * Stages a request's source the way `RobolectricPreviewBackend` does, through the device path's own
- * compiler, so tests drive the runner with the same inputs it gets in production.
+ * Stages a source-only request the way `RobolectricPreviewBackend` does, through the device path's
+ * own compiler. The runner uses it for callers that send only `sourcePath` (the eval harness's
+ * report renders and tests), so every Robolectric render goes through the same compile,
+ * BytecodeGuard, and asset collection as the device.
  */
-internal object RobolectricTestStaging {
+internal object RobolectricStaging {
   private val meta by lazy { BootstrapMeta.locate() }
 
-  fun stage(request: RobolectricRenderRequest): RobolectricRenderRequest {
+  fun stage(request: RobolectricRenderRequest): RobolectricRenderRequest = stageIn(request).second
+
+  private fun stageIn(
+    request: RobolectricRenderRequest,
+  ): Pair<RobolectricStage, RobolectricRenderRequest> {
     val outcome =
       AndroidExplorationCompiler.compileClassStage(
         Paths.get(request.sourcePath),
@@ -24,8 +30,9 @@ internal object RobolectricTestStaging {
       )
     return when (outcome) {
       is AndroidExplorationCompiler.ClassStageOutcome.Ready ->
-        RobolectricStage.write(Files.createTempDirectory("robo-test-stage-"), outcome.stage)
-          .applyTo(request)
+        RobolectricStage.write(Files.createTempDirectory("robo-stage-"), outcome.stage).let {
+          it to it.applyTo(request)
+        }
       is AndroidExplorationCompiler.ClassStageOutcome.Failed ->
         throw StageFailure(outcome.errors.joinToString { "${it.path}: ${it.message}" })
     }
@@ -39,9 +46,9 @@ internal object RobolectricTestStaging {
     if (!Files.isRegularFile(Paths.get(request.sourcePath))) {
       return RobolectricBoardRenderer.handleRequest(request)
     }
-    val staged =
+    val (stage, staged) =
       try {
-        stage(request)
+        stageIn(request)
       } catch (e: StageFailure) {
         return RobolectricRenderResponse(
           id = request.id,
@@ -57,7 +64,11 @@ internal object RobolectricTestStaging {
             ),
         )
       }
-    return RobolectricBoardRenderer.handleRequest(staged)
+    return try {
+      RobolectricBoardRenderer.handleRequest(staged)
+    } finally {
+      stage.dir.toFile().deleteRecursively()
+    }
   }
 
   private class StageFailure(message: String) : RuntimeException(message)

@@ -130,6 +130,12 @@ private constructor(
     check(resp.ok) { resp.error ?: "Robolectric warmup ping failed" }
   }
 
+  /** Re-warms the worker after a crash or watchdog kill; a live worker returns immediately. */
+  override fun prepare() {
+    val client = processClient ?: return
+    if (!client.isRunning()) warmUp()
+  }
+
   override fun compile(snapshot: ContentHasher.Snapshot): BackendCompileOutput {
     val normSource = snapshot.sourcePath.toAbsolutePath().normalize()
     val stagedClasses =
@@ -915,6 +921,15 @@ private class RobolectricProcessClient(
     val reader: BufferedReader,
     val fresh: Boolean,
   )
+
+  /**
+   * True when a worker process is alive and attached; false before the first start or after a kill.
+   */
+  fun isRunning(): Boolean =
+    synchronized(stateLock) {
+      val p = process
+      !closed && p != null && p.isAlive && writer != null && reader != null
+    }
 
   private fun ensureStarted(): StartedWorker {
     synchronized(stateLock) {

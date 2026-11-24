@@ -758,6 +758,8 @@ class RobolectricPreviewBackendTest {
       """
       #!/bin/sh
       echo $$ > "${pidFile.toAbsolutePath()}"
+      IFS= read -r _warmup
+      echo '{"id":"warmup","ok":true,"valid":true,"pass":true}'
       IFS= read -r _line
       touch "${startedFile.toAbsolutePath()}"
       sleep 60

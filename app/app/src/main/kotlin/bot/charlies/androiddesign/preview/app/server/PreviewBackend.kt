@@ -77,6 +77,13 @@ interface PreviewBackend : AutoCloseable {
   val supportsBatchCheck: Boolean
   val supportsHeadlessSpeculativePrecompile: Boolean
 
+  /**
+   * Brings the backend's worker to a warm state before a job starts. [RenderQueue] calls it outside
+   * the job watchdog, so a cold worker start (after a crash or watchdog kill) is never charged to a
+   * warm job's budget. It must bound its own wait.
+   */
+  fun prepare() {}
+
   fun compile(snapshot: ContentHasher.Snapshot): BackendCompileOutput
 
   fun renderBatchCheck(
