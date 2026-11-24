@@ -3,9 +3,7 @@ package bot.charlies.androiddesign.preview.host.sandbox
 import android.content.Context
 import android.content.ContextWrapper
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.graphics.HardwareRenderer
-import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.RenderNode
 import android.hardware.HardwareBuffer
@@ -18,6 +16,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inspector.WindowInspector
 import androidx.compose.ui.geometry.Offset
+import bot.charlies.androiddesign.preview.feature.preview.sandbox.CapturedFrame
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.OverlayWindowHelper
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.RawRgbaFrame
 import bot.charlies.androiddesign.preview.host.LivePreviewActivity
@@ -25,10 +24,8 @@ import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
-import java.util.IdentityHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -61,7 +58,7 @@ internal class FrameCapture {
     activity: HostRenderActivity,
     widthPx: Int,
     heightPx: Int,
-  ): Pair<RawRgbaFrame, Map<View, Offset>> {
+  ): CapturedFrame {
     if (hardwareRenderer == null) {
       hardwareRenderer = HardwareRenderer()
       renderNode = RenderNode("adp-frame")
@@ -91,42 +88,24 @@ internal class FrameCapture {
       stale.close()
     }
 
-    val overlayOffsets = IdentityHashMap<View, Offset>()
+    lateinit var overlayOffsets: Map<View, Offset>
     withContext(Dispatchers.Main) {
       measureMainActivityTarget(activity, widthPx, heightPx)
       val view = checkNotNull(activity.composeView)
       val overlays = collectOverlayWindows(activity)
-      val mainLoc = IntArray(2)
-      activity.window.decorView.getLocationOnScreen(mainLoc)
 
-      val dimPaint = Paint()
       rn.setPosition(0, 0, widthPx, heightPx)
       val canvas = rn.beginRecording(widthPx, heightPx)
       try {
-        view.draw(canvas)
-        for (win in overlays) {
-          val lp = win.layoutParams as? WindowManager.LayoutParams
-          if (
-            lp != null &&
-              (lp.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0 &&
-              lp.dimAmount > 0f
-          ) {
-            val alpha = (lp.dimAmount * 255f).roundToInt().coerceIn(0, 255)
-            dimPaint.color = Color.argb(alpha, 0, 0, 0)
-            canvas.drawRect(0f, 0f, widthPx.toFloat(), heightPx.toFloat(), dimPaint)
-          }
-          val m = OverlayWindowHelper.measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
-          val offset = m.offset
-          overlayOffsets[win] = offset
-          canvas.save()
-          canvas.translate(offset.x, offset.y)
-          if (win.width == 0 && m.width > 0 && win is ViewGroup && win.childCount > 0) {
-            win.getChildAt(0).draw(canvas)
-          } else {
-            win.draw(canvas)
-          }
-          canvas.restore()
-        }
+        overlayOffsets =
+          OverlayWindowHelper.drawWindowComposite(
+            canvas = canvas,
+            mainView = view,
+            mainDecorView = activity.window.decorView,
+            overlays = overlays,
+            widthPx = widthPx,
+            heightPx = heightPx,
+          )
       } finally {
         rn.endRecording()
       }
@@ -140,7 +119,7 @@ internal class FrameCapture {
       "HardwareRenderer syncAndDraw status=$syncStatus"
     }
     val image = acquireLatestOrWaitImage(reader)
-    return copyImageToRgba(image, widthPx, heightPx) to overlayOffsets
+    return CapturedFrame(copyImageToRgba(image, widthPx, heightPx), overlayOffsets)
   }
 
   suspend fun acquireLatestOrWaitImage(

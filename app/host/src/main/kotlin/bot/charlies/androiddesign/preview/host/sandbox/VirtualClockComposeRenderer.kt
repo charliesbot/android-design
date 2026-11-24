@@ -1,66 +1,38 @@
 package bot.charlies.androiddesign.preview.host.sandbox
 
 import android.content.Context
-import android.content.Intent
-import android.content.res.Configuration
 import android.os.Debug
 import android.os.Handler
 import android.os.Looper
 import android.util.LruCache
-import android.view.ContextThemeWrapper
-import android.view.View
-import android.view.inspector.WindowInspector
-import androidx.compose.runtime.key
-import androidx.compose.runtime.snapshots.Snapshot
-import androidx.compose.runtime.tooling.CompositionData
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.semantics.SemanticsNode
-import bot.charlies.androiddesign.preview.domain.findings.ScrolledTree
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.AndroidSlotTreeExtractor
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.FrameStatus
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.OverlayWindowHelper
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.RawRgbaFrame
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.SettlePolicy
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.WearScrollDriver
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.WearScrollHelper
-import bot.charlies.androiddesign.preview.kit.BoardSurface
+import bot.charlies.androiddesign.preview.feature.preview.sandbox.ComposeBoardRenderer
+import bot.charlies.androiddesign.preview.feature.preview.sandbox.RenderTargetRequest
 import bot.charlies.androiddesign.preview.kit.ExplorationBoard
 import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
 import bot.charlies.androiddesign.preview.model.DeviceBatchResponse
 import bot.charlies.androiddesign.preview.model.DeviceBoardMeta
-import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
 import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
 import bot.charlies.androiddesign.preview.model.DeviceMemoryStats
-import bot.charlies.androiddesign.preview.model.DeviceOverlayMeta
 import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
 import bot.charlies.androiddesign.preview.model.DeviceTargetResult
 import bot.charlies.androiddesign.preview.model.FrameFormat
-import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PaletteVariant
-import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
-import java.util.Collections
-import java.util.concurrent.TimeUnit
-import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 
 internal class VirtualClockComposeRenderer(
-  private val serviceContext: Context,
+  serviceContext: Context,
   internal val assetCache: DeviceAssetCache = DeviceAssetCache(),
 ) {
   private val frameCapture = FrameCapture()
+  private val boardRenderer = ComposeBoardRenderer(Display0RenderHost(serviceContext, frameCapture))
   private val mainHandler = Handler(Looper.getMainLooper())
 
   private data class LoadedDex(val loader: PolicyDexClassLoader, val board: ExplorationBoard)
 
   private val dexCache = LruCache<String, LoadedDex>(MAX_CACHED_DEX)
   @Volatile private var reloadCount: Int = 0
-  private var sessionSequence: Long = 0L
 
   @Synchronized
   fun preloadDex(dexHash: String, entryClass: String, dexBytes: ByteArray): ExplorationBoard {
@@ -147,16 +119,10 @@ internal class VirtualClockComposeRenderer(
     val assetResolver = assetCache.resolverFor(request.assetMap)
 
     runBlocking {
-      try {
-        for (target in request.targets) {
-          val (targetResult, targetFrames) =
-            renderSingleTarget(board, request, target, assetResolver)
-          results += targetResult
-          encodedFrames += targetFrames
-        }
-      } catch (t: Throwable) {
-        withContext(Dispatchers.Main) { HostRenderActivity.current()?.resetComposeHost() }
-        throw t
+      for (target in request.targets) {
+        val (targetResult, targetFrames) = renderSingleTarget(board, request, target, assetResolver)
+        results += targetResult
+        encodedFrames += targetFrames
       }
     }
 
@@ -174,6 +140,77 @@ internal class VirtualClockComposeRenderer(
       results = results,
       memoryAfter = memStats,
     ) to encodedFrames
+  }
+
+  private suspend fun renderSingleTarget(
+    board: ExplorationBoard,
+    request: DeviceBatchRequest,
+    target: DeviceRenderTarget,
+    assetResolver: ((String) -> ImageBitmap?)?,
+  ): Pair<DeviceTargetResult, List<EncodedFramePayload>> {
+    val direction =
+      board.directions.firstOrNull { it.name == target.direction }
+        ?: error("No direction '${target.direction}'")
+    val baseView = Views.byName(target.viewName) ?: error("Unknown view '${target.viewName}'")
+    val rendered =
+      boardRenderer.render(
+        RenderTargetRequest(
+          board = board,
+          direction = direction,
+          screenId = target.screen,
+          view = baseView,
+          sourceFile = request.sourceFile,
+          sourceText = request.sourceText,
+          designMd = request.designTheme,
+          overlayId = target.overlayId,
+          density = target.densityScale,
+          fontScale = target.fontScale,
+          darkOverride = target.darkOverride,
+          seedOverride = target.seedOverride,
+          variantOverride = target.variantOverride,
+          assetResolver = assetResolver,
+        ),
+      )
+
+    val viewName = rendered.target.effectiveView.name
+    val payloads = mutableListOf<EncodedFramePayload>()
+    val endFrame = rendered.endFrame
+    if (target.frameFormat != FrameFormat.NONE) {
+      payloads +=
+        frameCapture.encodeFrame(
+          target = target,
+          viewName = viewName,
+          isEndFrame = false,
+          frame = rendered.frame,
+        )
+      if (target.includeEndFrame && endFrame != null) {
+        payloads +=
+          frameCapture.encodeFrame(
+            target = target,
+            viewName = viewName,
+            isEndFrame = true,
+            frame = endFrame,
+          )
+      }
+    }
+
+    return DeviceTargetResult(
+      direction = target.direction,
+      screen = target.screen,
+      viewName = target.viewName,
+      overlayId = target.overlayId,
+      densityScale = target.densityScale,
+      widthPx = rendered.target.widthPx,
+      heightPx = rendered.target.heightPx,
+      renderMs = rendered.renderMs,
+      pass = rendered.tree.pass,
+      tree = rendered.tree,
+      endTree = rendered.endTree,
+      hasFrame = target.frameFormat != FrameFormat.NONE,
+      hasEndFrame =
+        target.frameFormat != FrameFormat.NONE && target.includeEndFrame && endFrame != null,
+      frameFormat = target.frameFormat,
+    ) to payloads
   }
 
   private fun resolveBoard(
@@ -229,21 +266,7 @@ internal class VirtualClockComposeRenderer(
   }
 
   internal fun buildBoardMeta(board: ExplorationBoard): DeviceBoardMeta =
-    DeviceBoardMeta(
-      surface = board.surfaceSpec.key,
-      boardName = board.name,
-      directions =
-        board.directions.map { d ->
-          DeviceDirectionMeta(
-            name = d.name,
-            surface = board.surfaceSpec.key,
-            startScreen = d.startScreen,
-            screens = d.screenIds,
-            overlays = d.overlays.map { o -> DeviceOverlayMeta(o.id, o.screen) },
-          )
-        },
-      views = board.surfaceSpec.views,
-    )
+    ComposeBoardRenderer.buildBoardMeta(board)
 
   private fun evaluateRecycleReason(reloads: Int, mem: DeviceMemoryStats): String? =
     when {
@@ -254,356 +277,8 @@ internal class VirtualClockComposeRenderer(
       else -> null
     }
 
-  private suspend fun renderSingleTarget(
-    board: ExplorationBoard,
-    request: DeviceBatchRequest,
-    target: DeviceRenderTarget,
-    assetResolver: ((String) -> ImageBitmap?)?,
-  ): Pair<DeviceTargetResult, List<EncodedFramePayload>> {
-    val viewStartNs = System.nanoTime()
-    val direction =
-      board.directions.firstOrNull { it.name == target.direction }
-        ?: error("No direction '${target.direction}'")
-    val baseView = Views.byName(target.viewName) ?: error("Unknown view '${target.viewName}'")
-    val effectiveView =
-      if (target.darkOverride != null) baseView.copy(dark = target.darkOverride!!) else baseView
-    val variantOverride = target.variantOverride?.let { PaletteVariant.fromWire(it) }
-    val designSystem =
-      board.resolveDesignSystem(
-        designMd = request.designTheme,
-        seedOverride = target.seedOverride,
-        variantOverride = variantOverride,
-      )
-    val density = target.densityScale
-    val fontScale = target.fontScale.coerceAtLeast(0.5f)
-    val widthPx = (effectiveView.width * density).roundToInt().coerceAtLeast(1)
-    val heightPx = (effectiveView.height * density).roundToInt().coerceAtLeast(1)
-    val dpi = (BASE_DPI * density).roundToInt().coerceAtLeast(120)
-    val perimeterPx = (1f * density).roundToInt().coerceAtLeast(1)
-
-    ensureDisplay0ActivityHost()
-    val activity = checkNotNull(HostRenderActivity.current()) { "HostRenderActivity did not start" }
-    val inspectionTables = Collections.synchronizedSet(LinkedHashSet<CompositionData>())
-    var rootCoords: LayoutCoordinates? = null
-    var emptyDetailScreen: String? = null
-
-    val (overrideCtx, overrideCfg) =
-      buildOverrideContext(activity, effectiveView, density, dpi, fontScale)
-    val session =
-      ActiveRenderSession(
-        sessionKey =
-          "${request.dexHash}:${target.direction}:${target.screen}:${effectiveView.name}:${target.overlayId}:$density:$fontScale:${effectiveView.dark}:${target.seedOverride}:${target.variantOverride}:${sessionSequence++}",
-        sourceFile = request.sourceFile,
-        sourceText = request.sourceText,
-        board = board,
-        direction = direction,
-        screenId = target.screen,
-        view = effectiveView,
-        designSystem = designSystem,
-        overlayId = target.overlayId,
-        renderDensity = density,
-        fontScale = fontScale,
-        overrideContext = overrideCtx,
-        overrideConfig = overrideCfg,
-        inspectionTables = inspectionTables,
-        assetResolver = assetResolver,
-        onRootCoordinates = { rootCoords = it },
-        onEmptyDetail = { emptyDetailScreen = it },
-      )
-
-    withContext(Dispatchers.Main) {
-      activity.ensureComposeViewForTarget(
-        overrideCtx,
-        "${effectiveView.name}@$density@$fontScale",
-        widthPx,
-        heightPx,
-      )
-      activity.activeSession.value = session
-    }
-
-    settleVirtualClock(activity, SettlePolicy.MAX_SETTLE_FRAMES, widthPx, heightPx)
-    val (rawFrame, overlayOffsets) = frameCapture.capture(activity, widthPx, heightPx)
-
-    val initialOutput =
-      withContext(Dispatchers.Main) {
-        extractTreeSnapshot(
-          activity = activity,
-          inspectionTables = inspectionTables,
-          rootCoords = rootCoords,
-          rawFrame = rawFrame,
-          screenId = target.screen,
-          view = effectiveView,
-          surface = board.surface,
-          sourceFile = request.sourceFile,
-          sourceText = request.sourceText,
-          density = density,
-          perimeterPx = perimeterPx,
-          emptyDetailScreen = emptyDetailScreen,
-          explicitWindowOffsets = overlayOffsets,
-        )
-      }
-    var finalTree = initialOutput.tree
-    var endTree: LayoutTree? = null
-    var endRawFrame: RawRgbaFrame? = null
-
-    if (board.surface == BoardSurface.Wear && target.overlayId == null) {
-      val minScrollerWidthPx = widthPx * 0.6f
-      val scroller =
-        withContext(Dispatchers.Main) {
-          if (WearScrollHelper.hasWearPicker(inspectionTables, finalTree)) {
-            null
-          } else {
-            WearScrollHelper.findVerticalScroller(
-              collectUnmergedRoots(activity),
-              minScrollerWidthPx,
-            )
-          }
-        }
-      if (scroller != null) {
-        val positions = mutableListOf(finalTree)
-        val stepPx = effectiveView.height * density / 2f
-        val driver = DeviceFrameDriver(activity, widthPx, heightPx, minScrollerWidthPx, stepPx)
-        val scrolled =
-          SettlePolicy.scrollThrough(driver) {
-            val (stepFrame, stepOffsets) = frameCapture.capture(activity, widthPx, heightPx)
-            val stepTree =
-              withContext(Dispatchers.Main) {
-                extractTreeSnapshot(
-                    activity = activity,
-                    inspectionTables = inspectionTables,
-                    rootCoords = rootCoords,
-                    rawFrame = stepFrame,
-                    screenId = target.screen,
-                    view = effectiveView,
-                    surface = board.surface,
-                    sourceFile = request.sourceFile,
-                    sourceText = request.sourceText,
-                    density = density,
-                    perimeterPx = perimeterPx,
-                    emptyDetailScreen = emptyDetailScreen,
-                    explicitWindowOffsets = stepOffsets,
-                  )
-                  .tree
-              }
-            stepFrame to stepTree
-          }
-        val moved = scrolled.isNotEmpty()
-        for ((stepFrame, stepTree) in scrolled) {
-          positions += stepTree
-          endRawFrame = stepFrame
-        }
-        if (moved && positions.size > 1) {
-          finalTree = ScrolledTree.merge(positions)
-          endTree = positions.last()
-        }
-      }
-    }
-
-    val payloads = mutableListOf<EncodedFramePayload>()
-    if (target.frameFormat != FrameFormat.NONE) {
-      payloads +=
-        frameCapture.encodeFrame(target, effectiveView.name, isEndFrame = false, frame = rawFrame)
-      if (target.includeEndFrame && endRawFrame != null) {
-        payloads +=
-          frameCapture.encodeFrame(
-            target,
-            effectiveView.name,
-            isEndFrame = true,
-            frame = endRawFrame,
-          )
-      }
-    }
-    val renderMs = (System.nanoTime() - viewStartNs) / NANOS_PER_MS
-    return DeviceTargetResult(
-      direction = target.direction,
-      screen = target.screen,
-      viewName = target.viewName,
-      overlayId = target.overlayId,
-      densityScale = density,
-      widthPx = widthPx,
-      heightPx = heightPx,
-      renderMs = renderMs,
-      pass = finalTree.pass,
-      tree = finalTree,
-      endTree = endTree,
-      hasFrame = target.frameFormat != FrameFormat.NONE,
-      hasEndFrame =
-        target.frameFormat != FrameFormat.NONE && target.includeEndFrame && endRawFrame != null,
-      frameFormat = target.frameFormat,
-    ) to payloads
-  }
-
-  private fun ensureDisplay0ActivityHost() {
-    if (HostRenderActivity.current() != null) return
-    HostRenderActivity.resetLatch()
-    val intent =
-      Intent(serviceContext, HostRenderActivity::class.java).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
-        putExtra("move_to_back", true)
-      }
-    serviceContext.startActivity(intent)
-    check(HostRenderActivity.readyLatch.await(3, TimeUnit.SECONDS)) {
-      "Timed out waiting for HostRenderActivity on Display 0"
-    }
-  }
-
-  private suspend fun settleVirtualClock(
-    activity: HostRenderActivity,
-    maxFrames: Int,
-    widthPx: Int,
-    heightPx: Int,
-  ) {
-    if (activity.virtualClock == null || activity.recomposer == null) return
-    SettlePolicy.settle(DeviceFrameDriver(activity, widthPx, heightPx), maxFrames)
-  }
-
-  /** Produces virtual frames on the `:sandbox` activity for [SettlePolicy]. */
-  private inner class DeviceFrameDriver(
-    private val activity: HostRenderActivity,
-    private val widthPx: Int,
-    private val heightPx: Int,
-    private val minScrollerWidthPx: Float = 0f,
-    private val scrollStepPx: Float = 0f,
-  ) : WearScrollDriver {
-    private val mainLoc = IntArray(2)
-
-    override suspend fun advanceFrame(): FrameStatus {
-      val clock = checkNotNull(activity.virtualClock)
-      val recomp = checkNotNull(activity.recomposer)
-      withContext(Dispatchers.Main) {
-        Snapshot.sendApplyNotifications()
-        activity.virtualTimeNanos += SettlePolicy.FRAME_NS
-        clock.sendFrame(activity.virtualTimeNanos)
-        Snapshot.sendApplyNotifications()
-        activity.recomposerFailure.get()?.let { throw it }
-      }
-      return withContext(Dispatchers.Main) {
-        activity.recomposerFailure.get()?.let { throw it }
-        measureMainActivityTarget(activity, widthPx, heightPx)
-        activity.window.decorView.getLocationOnScreen(mainLoc)
-        val overlays = collectOverlayWindows(activity)
-        var awaitingAttach = false
-        for (win in overlays) {
-          val m = OverlayWindowHelper.measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
-          if (!win.isAttachedToWindow || m.width == 0) awaitingAttach = true
-        }
-        activity.recomposerFailure.get()?.let { throw it }
-        FrameStatus(
-          workPending = clock.hasAwaiters || recomp.hasPendingWork,
-          overlayPresent = overlays.isNotEmpty(),
-          awaitingOverlayAttach = awaitingAttach,
-        )
-      }
-    }
-
-    override suspend fun finishSettle() {
-      withContext(Dispatchers.Main) {
-        activity.recomposerFailure.get()?.let { throw it }
-        measureMainActivityTarget(activity, widthPx, heightPx)
-        activity.window.decorView.getLocationOnScreen(mainLoc)
-        for (win in collectOverlayWindows(activity)) {
-          OverlayWindowHelper.measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
-        }
-        activity.recomposerFailure.get()?.let { throw it }
-      }
-    }
-
-    override suspend fun scrollOnce(): Boolean =
-      withContext(Dispatchers.Main) {
-        WearScrollHelper.scrollDown(
-          collectUnmergedRoots(activity),
-          minScrollerWidthPx,
-          scrollStepPx,
-        )
-      }
-  }
-
-  private fun extractTreeSnapshot(
-    activity: HostRenderActivity,
-    inspectionTables: Set<CompositionData>,
-    rootCoords: LayoutCoordinates?,
-    rawFrame: RawRgbaFrame,
-    screenId: String,
-    view: ViewSpec,
-    surface: BoardSurface,
-    sourceFile: String,
-    sourceText: String,
-    density: Float,
-    perimeterPx: Int,
-    emptyDetailScreen: String?,
-    explicitWindowOffsets: Map<View, Offset>,
-  ): AndroidSlotTreeExtractor.ExtractionOutput {
-    val globalViews =
-      WindowInspector.getGlobalWindowViews().filter { belongsToOffscreenTree(activity, it) }
-    val composeRoots = OverlayWindowHelper.collectComposeRoots(globalViews)
-    val mergedRoots = composeRoots.map { it.semanticsOwner.rootSemanticsNode }
-    val unmergedRoots = composeRoots.map { it.semanticsOwner.unmergedRootSemanticsNode }
-    val layoutWindowOffsets =
-      OverlayWindowHelper.buildLayoutWindowOffsets(
-        mainDecorView = activity.window.decorView,
-        composeRoots = composeRoots,
-        tables = inspectionTables,
-        explicitWindowOffsets = explicitWindowOffsets,
-      )
-
-    return AndroidSlotTreeExtractor.extract(
-      tables = inspectionTables,
-      mergedRoots = mergedRoots,
-      unmergedRoots = unmergedRoots,
-      rootCoordinates = rootCoords,
-      frame = rawFrame,
-      screen = screenId,
-      view = view,
-      surface = surface,
-      explorationFile = sourceFile,
-      sourceText = sourceText,
-      density = density,
-      perimeterPx = perimeterPx,
-      emptyDetailLists = listOfNotNull(emptyDetailScreen),
-      layoutWindowOffsets = layoutWindowOffsets,
-    )
-  }
-
-  private fun collectUnmergedRoots(activity: HostRenderActivity): List<SemanticsNode> {
-    val globalViews =
-      WindowInspector.getGlobalWindowViews().filter { belongsToOffscreenTree(activity, it) }
-    return OverlayWindowHelper.collectComposeRoots(globalViews).map {
-      it.semanticsOwner.unmergedRootSemanticsNode
-    }
-  }
-
-  private fun buildOverrideContext(
-    base: Context,
-    view: ViewSpec,
-    density: Float,
-    dpi: Int,
-    fontScale: Float,
-  ): Pair<Context, Configuration> {
-    val cfg = Configuration(base.resources.configuration)
-    cfg.densityDpi = dpi
-    cfg.fontScale = fontScale
-    cfg.screenWidthDp = view.width
-    cfg.screenHeightDp = view.height
-    cfg.smallestScreenWidthDp = minOf(view.width, view.height)
-    cfg.uiMode =
-      (cfg.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
-        if (view.dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
-    cfg.screenLayout =
-      (cfg.screenLayout and Configuration.SCREENLAYOUT_ROUND_MASK.inv()) or
-        if (view.round) Configuration.SCREENLAYOUT_ROUND_YES
-        else Configuration.SCREENLAYOUT_ROUND_NO
-    val wrapped =
-      object : ContextThemeWrapper(base, base.theme) {
-        init {
-          applyOverrideConfiguration(cfg)
-        }
-      }
-    return wrapped to cfg
-  }
-
   companion object {
     private const val NANOS_PER_MS = 1_000_000.0
-    private const val BASE_DPI = 160f
     private const val MAX_CACHED_DEX = 4
     private const val RECYCLE_RELOAD_LIMIT = 200
     private const val RECYCLE_NATIVE_HEAP_BYTES = 256L * 1024L * 1024L

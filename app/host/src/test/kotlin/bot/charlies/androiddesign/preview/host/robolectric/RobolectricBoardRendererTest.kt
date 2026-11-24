@@ -10,6 +10,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.navigationevent.NavigationEventDispatcherOwner
+import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import bot.charlies.androiddesign.preview.domain.RenderReport
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
 import bot.charlies.androiddesign.preview.host.HostTestFixtures
@@ -19,12 +21,14 @@ import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.RobolectricRenderRequest
+import bot.charlies.androiddesign.preview.model.Views
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -687,5 +691,57 @@ class RobolectricBoardRendererTest {
     assertTrue("Render ok & valid: $resp", resp.ok && resp.valid)
     val texts = resp.trees.single().nodes.mapNotNull { it.text?.value }
     assertTrue("Expected 1.5 s animation to reach its final state, got $texts", "settled" in texts)
+  }
+
+  @Test
+  fun navigationEventDispatcherOwnerIsProvidedInsideRenderedBoard() {
+    var observedOwner: NavigationEventDispatcherOwner? = null
+    val board =
+      designBoard("NavOwner") {
+        screen("main") {
+          observedOwner = LocalNavigationEventDispatcherOwner.current
+          Text(if (observedOwner != null) "nav-owner-present" else "nav-owner-missing")
+        }
+      }
+    RobolectricBoardRenderer.renderSingleView(
+      board = board,
+      direction = board.directions.single(),
+      screenId = "main",
+      view = Views.Light,
+      sourceFile = "RobolectricBoardRendererTest.kt",
+      sourceText = "",
+    )
+    assertNotNull("Expected LocalNavigationEventDispatcherOwner to be provided", observedOwner)
+  }
+
+  @Test
+  fun wearBoardIgnoresLightDarkOverride() {
+    val workDir = tempFolder.newFolder("wear-dark").toPath()
+    val wearFile = workDir.resolve(HostTestFixtures.WEAR_EXPLORE_FILE)
+    Files.writeString(wearFile, HostTestFixtures.WEAR_EXPLORE_SOURCE)
+
+    val resp =
+      RobolectricStaging.handle(
+        RobolectricRenderRequest(
+          id = "wear-dark-1",
+          sourcePath = wearFile.toString(),
+          targets =
+            listOf(
+              DeviceRenderTarget(
+                direction = "Wear Fitness",
+                screen = "main",
+                viewName = "watch",
+                densityScale = 2f,
+                darkOverride = false,
+                frameFormat = FrameFormat.NONE,
+              ),
+            ),
+        ),
+      )
+    assertTrue("Render ok & valid: $resp", resp.ok && resp.valid)
+    assertTrue(
+      "Wear views must stay dark even when darkOverride=false",
+      resp.results.single().tree!!.view.dark,
+    )
   }
 }
