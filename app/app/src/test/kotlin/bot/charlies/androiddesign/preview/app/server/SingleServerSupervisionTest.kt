@@ -1,18 +1,11 @@
 package bot.charlies.androiddesign.preview.app.server
 
 import bot.charlies.androiddesign.preview.app.AppInfo
-import bot.charlies.androiddesign.preview.app.cli.RenderEntry
 import bot.charlies.androiddesign.preview.app.client.PreviewClient
-import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
-import bot.charlies.androiddesign.preview.model.BoardSurface
-import bot.charlies.androiddesign.preview.model.Bounds
-import bot.charlies.androiddesign.preview.model.FrameFormat
-import bot.charlies.androiddesign.preview.model.LayoutNode
-import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
 import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
-import bot.charlies.androiddesign.preview.model.ViewSpec
 import com.sun.net.httpserver.HttpServer
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -62,67 +55,8 @@ class SingleServerSupervisionTest {
     return file
   }
 
-  private fun fakeBoardMeta(): BoardMeta =
-    BoardMeta(
-      directions = listOf(DirectionMeta("Dir", "phone", "home", listOf("home"), emptyList())),
-      views = PhoneSurface.views,
-    )
-
-  private fun fakeLoaded(sourcePath: Path): LoadedExploration {
-    return LoadedExploration(
-      sourcePath = sourcePath,
-      designPath = null,
-      designTheme = null,
-      designSystem =
-        bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver.resolve(
-          null,
-          null,
-          PhoneSurface,
-        ),
-      compileMs = 1L,
-      errors = emptyList(),
-    )
-  }
-
-  private fun fakeArtifact(
-    dir: String,
-    screen: String,
-    view: ViewSpec,
-    rendersRoot: Path,
-  ): RenderArtifact {
-    val artName = "$dir-$screen"
-    val pngPath = rendersRoot.resolve("$artName-${view.name}.png")
-    Files.createDirectories(pngPath.parent)
-    val bytes = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
-    Files.write(pngPath, bytes)
-    val check = ViewCheck(pass = true)
-    val tree =
-      LayoutTree(
-        screen = screen,
-        view = view,
-        nodes = listOf(LayoutNode("n1", "Text", bounds = Bounds(0f, 0f, 50f, 20f))),
-        findings = emptyList(),
-      )
-    return RenderArtifact(
-      direction = dir,
-      screen = screen,
-      overlay = null,
-      view = view,
-      densityScale = 2,
-      artifactName = artName,
-      pass = true,
-      renderMs = 5L,
-      check = check,
-      layout = null,
-      tree = tree,
-      pngPath = pngPath,
-      endPngPath = null,
-      pngBytes = bytes,
-      endPngBytes = null,
-      pngSha256 = ContentHasher.sha256Hex(bytes),
-      entry = RenderEntry.of(artName, view.name, "$artName-${view.name}", check),
-    )
-  }
+  private val fakeDirections =
+    listOf(DeviceDirectionMeta("Dir", "phone", "home", listOf("home"), emptyList()))
 
   private fun httpCall(
     url: String,
@@ -161,79 +95,34 @@ class SingleServerSupervisionTest {
     val concurrentRenders = AtomicInteger(0)
     val maxConcurrent = AtomicInteger(0)
 
-    val backend =
-      object : PreviewBackend {
-        override val name = "fake"
-        override val supportsBatchCheck = true
-        override val supportsHeadlessSpeculativePrecompile = true
-
-        override fun compile(snapshot: ContentHasher.Snapshot): BackendCompileOutput {
-          val loaded = fakeLoaded(snapshot.sourcePath)
-          return BackendCompileOutput(
-            loaded,
-            ContentHasher.sha256Hex(snapshot.sourcePath.toString().toByteArray()),
-            BoardSurface.Phone,
-            "Board",
-            fakeBoardMeta(),
-            null,
-          )
-        }
-
-        override fun renderBatchCheck(
-          entry: CompileEntry,
-          targets: List<CheckTargetSpec>,
-          scoped: Boolean,
-          rendersRoot: Path,
-        ): List<RenderArtifact> {
+    val worker =
+      InMemoryRenderWorker(
+        name = "fake",
+        supportsHeadlessSpeculativePrecompile = true,
+        directions = fakeDirections,
+        views = PhoneSurface.views,
+        dexHashFor = { ContentHasher.sha256Hex(it.sourcePath.toString().toByteArray()) },
+        aroundRenderBatch = { _, proceed ->
           val cur = concurrentRenders.incrementAndGet()
           maxConcurrent.updateAndGet { maxOf(it, cur) }
           try {
             Thread.sleep(25)
-            return targets.map { fakeArtifact(it.direction, it.screenId, it.view, rendersRoot) }
+            proceed()
           } finally {
             concurrentRenders.decrementAndGet()
           }
-        }
-
-        override fun renderSingle(
-          entry: CompileEntry,
-          direction: String,
-          screenId: String,
-          prefix: String,
-          overlayId: String?,
-          view: ViewSpec,
-          densityScale: Int,
-          designSystem: bot.charlies.androiddesign.preview.model.DesignSystem,
-          baseCheck: ViewCheck?,
-          writeFiles: Boolean,
-          rendersRoot: Path,
-          frameFormat: FrameFormat,
-          fontScale: Float,
-          seedOverride: String?,
-          variantOverride: String?,
-          darkOverride: Boolean?,
-        ): RenderArtifact = fakeArtifact(direction, screenId, view, rendersRoot)
-
-        override fun updateLive(
-          entry: CompileEntry,
-          direction: String?,
-          screenId: String?,
-          overlayId: String?,
-          darkOverride: Boolean?,
-          seedOverride: String?,
-          variantOverride: String?,
-          fontScale: Float,
-        ) {
+        },
+        onUpdateLive = { entry, _ ->
           liveOwners += entry.sourcePath.toAbsolutePath().normalize().toString()
-        }
-      }
+        },
+      )
 
     val server =
       PreviewHttpServer(
         repoRoot = repoA,
         cacheRoot = cache,
         preferredPort = 0,
-        backend = backend,
+        worker = worker,
         enableFileWatcher = false,
       )
     val record = server.start()
@@ -391,61 +280,25 @@ class SingleServerSupervisionTest {
 
     val compileCount = AtomicInteger(0)
     val compiledLatches = AtomicReference(CountDownLatch(1))
-    val backend =
-      object : PreviewBackend {
-        override val name = "fake-watch"
-        override val supportsBatchCheck = true
-        override val supportsHeadlessSpeculativePrecompile = true
-
-        override fun compile(snapshot: ContentHasher.Snapshot): BackendCompileOutput {
+    val worker =
+      InMemoryRenderWorker(
+        name = "fake-watch",
+        supportsHeadlessSpeculativePrecompile = true,
+        directions = fakeDirections,
+        views = PhoneSurface.views,
+        dexHashFor = { "dex-${it.contentHash}" },
+        onCompile = {
           compileCount.incrementAndGet()
-          val loaded = fakeLoaded(snapshot.sourcePath)
           compiledLatches.get().countDown()
-          return BackendCompileOutput(
-            loaded,
-            "dex-${snapshot.contentHash}",
-            BoardSurface.Phone,
-            "Board",
-            fakeBoardMeta(),
-            null,
-          )
-        }
-
-        override fun renderBatchCheck(
-          entry: CompileEntry,
-          targets: List<CheckTargetSpec>,
-          scoped: Boolean,
-          rendersRoot: Path,
-        ): List<RenderArtifact> = targets.map {
-          fakeArtifact(it.direction, it.screenId, it.view, rendersRoot)
-        }
-
-        override fun renderSingle(
-          entry: CompileEntry,
-          direction: String,
-          screenId: String,
-          prefix: String,
-          overlayId: String?,
-          view: ViewSpec,
-          densityScale: Int,
-          designSystem: bot.charlies.androiddesign.preview.model.DesignSystem,
-          baseCheck: ViewCheck?,
-          writeFiles: Boolean,
-          rendersRoot: Path,
-          frameFormat: FrameFormat,
-          fontScale: Float,
-          seedOverride: String?,
-          variantOverride: String?,
-          darkOverride: Boolean?,
-        ): RenderArtifact = fakeArtifact(direction, screenId, view, rendersRoot)
-      }
+        },
+      )
 
     val server =
       PreviewHttpServer(
         repoRoot = repo,
         cacheRoot = cache,
         preferredPort = 0,
-        backend = backend,
+        worker = worker,
         enableFileWatcher = true,
       )
     val record = server.start()
@@ -508,61 +361,24 @@ class SingleServerSupervisionTest {
     val source = writeSampleExplore(repo, "Slow.explore.kt", "Slow")
 
     val renderStarted = CountDownLatch(1)
-    val backend =
-      object : PreviewBackend {
-        override val name = "slow"
-        override val supportsBatchCheck = true
-        override val supportsHeadlessSpeculativePrecompile = false
-
-        override fun compile(snapshot: ContentHasher.Snapshot): BackendCompileOutput {
-          val loaded = fakeLoaded(snapshot.sourcePath)
-          return BackendCompileOutput(
-            loaded,
-            "dex",
-            BoardSurface.Phone,
-            "Board",
-            fakeBoardMeta(),
-            null,
-          )
-        }
-
-        override fun renderBatchCheck(
-          entry: CompileEntry,
-          targets: List<CheckTargetSpec>,
-          scoped: Boolean,
-          rendersRoot: Path,
-        ): List<RenderArtifact> {
+    val worker =
+      InMemoryRenderWorker(
+        name = "slow",
+        directions = fakeDirections,
+        views = PhoneSurface.views,
+        dexHashFor = { "dex" },
+        onRenderBatch = {
           renderStarted.countDown()
           Thread.sleep(10_000)
-          return targets.map { fakeArtifact(it.direction, it.screenId, it.view, rendersRoot) }
-        }
-
-        override fun renderSingle(
-          entry: CompileEntry,
-          direction: String,
-          screenId: String,
-          prefix: String,
-          overlayId: String?,
-          view: ViewSpec,
-          densityScale: Int,
-          designSystem: bot.charlies.androiddesign.preview.model.DesignSystem,
-          baseCheck: ViewCheck?,
-          writeFiles: Boolean,
-          rendersRoot: Path,
-          frameFormat: FrameFormat,
-          fontScale: Float,
-          seedOverride: String?,
-          variantOverride: String?,
-          darkOverride: Boolean?,
-        ): RenderArtifact = fakeArtifact(direction, screenId, view, rendersRoot)
-      }
+        },
+      )
 
     val server =
       PreviewHttpServer(
         repoRoot = repo,
         cacheRoot = cache,
         preferredPort = 0,
-        backend = backend,
+        worker = worker,
         enableFileWatcher = false,
       )
     val record = server.start()

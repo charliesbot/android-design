@@ -1,10 +1,5 @@
 package bot.charlies.androiddesign.preview.app.server
 
-import bot.charlies.androiddesign.preview.app.cli.RenderEntry
-import bot.charlies.androiddesign.preview.domain.ViewCheck
-import bot.charlies.androiddesign.preview.model.DesignSystem
-import bot.charlies.androiddesign.preview.model.FrameFormat
-import bot.charlies.androiddesign.preview.model.ViewSpec
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.FileTime
@@ -36,60 +31,11 @@ class CacheCleanerTest {
     val staleExplore = staleTimeoutRepo.resolve("design/proposal.explore.kt")
     Files.writeString(staleExplore, "val updated = 2\n")
 
-    val noopBackend =
-      object : PreviewBackend {
-        override val name = RuntimeIdentity.BACKEND_ROBOLECTRIC
-        override val supportsBatchCheck = true
-        override val supportsHeadlessSpeculativePrecompile = false
-
-        override fun compile(snapshot: ContentHasher.Snapshot): BackendCompileOutput =
-          error("unused in CacheCleanerTest")
-
-        override fun renderBatchCheck(
-          entry: CompileEntry,
-          targets: List<CheckTargetSpec>,
-          scoped: Boolean,
-          rendersRoot: Path,
-        ): List<RenderArtifact> = emptyList()
-
-        override fun renderSingle(
-          entry: CompileEntry,
-          direction: String,
-          screenId: String,
-          prefix: String,
-          overlayId: String?,
-          view: ViewSpec,
-          densityScale: Int,
-          designSystem: DesignSystem,
-          baseCheck: ViewCheck?,
-          writeFiles: Boolean,
-          rendersRoot: Path,
-          frameFormat: FrameFormat,
-          fontScale: Float,
-          seedOverride: String?,
-          variantOverride: String?,
-          darkOverride: Boolean?,
-        ): RenderArtifact =
-          RenderArtifact(
-            direction = direction,
-            screen = screenId,
-            overlay = overlayId,
-            view = view,
-            densityScale = densityScale,
-            artifactName = prefix,
-            pass = true,
-            renderMs = 0L,
-            check = ViewCheck(pass = true),
-            layout = null,
-            tree = null,
-            pngPath = null,
-            endPngPath = null,
-            pngBytes = null,
-            endPngBytes = null,
-            pngSha256 = null,
-            entry = RenderEntry.of(prefix, view.name, null, ViewCheck(pass = true)),
-          )
-      }
+    val noopWorker =
+      InMemoryRenderWorker(
+        name = RuntimeIdentity.BACKEND_ROBOLECTRIC,
+        compileOverride = { error("unused in CacheCleanerTest") },
+      )
 
     val startingServer =
       PreviewHttpServer(
@@ -97,7 +43,7 @@ class CacheCleanerTest {
         cacheRoot = cacheRoot,
         preferredPort = 0,
         idleTimeoutMs = 0L,
-        backend = noopBackend,
+        worker = noopWorker,
         enableFileWatcher = false,
       )
     try {

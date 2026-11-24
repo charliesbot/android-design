@@ -1,17 +1,12 @@
 package bot.charlies.androiddesign.preview.app.server
 
 import bot.charlies.androiddesign.preview.app.cli.RenderEntry
-import bot.charlies.androiddesign.preview.domain.ViewCheck
-import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.model.BoardSurface
-import bot.charlies.androiddesign.preview.model.Bounds
-import bot.charlies.androiddesign.preview.model.DesignSystem
-import bot.charlies.androiddesign.preview.model.FrameFormat
-import bot.charlies.androiddesign.preview.model.LayoutNode
-import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
 import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.ViewSpec
+import bot.charlies.androiddesign.preview.model.Views
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.InetAddress
@@ -73,144 +68,32 @@ class PreviewHttpServerTest {
     """
       .trimIndent()
 
-  private fun fakeMeta(): BoardMeta =
-    BoardMeta(
-      directions =
-        listOf(
-          DirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
-          DirectionMeta("Compact", "phone", "home", listOf("home"), emptyList()),
-        ),
-      views = PhoneSurface.views,
-    )
-
-  private fun fakeCompileOutput(snapshot: ContentHasher.Snapshot): BackendCompileOutput =
-    BackendCompileOutput(
-      loaded =
-        LoadedExploration(
-          sourcePath = snapshot.sourcePath,
-          designPath = snapshot.designPath,
-          designTheme = null,
-          designSystem = DesignSystemResolver.resolve(null, null, PhoneSurface),
-          compileMs = 2L,
-          errors = emptyList(),
-        ),
-      dexHash = null,
-      surface = BoardSurface.Phone,
-      boardName = "Plates",
-      boardMeta = fakeMeta(),
-      androidData = null,
-    )
-
-  private fun fakeBackend(
+  private fun fakeWorker(
     compileCalls: AtomicInteger = AtomicInteger(0),
     onCompile: ((ContentHasher.Snapshot) -> Unit)? = null,
     onRenderSingle: ((String, ViewSpec, Int) -> Unit)? = null,
-  ): PreviewBackend =
-    object : PreviewBackend {
-      override val name = RuntimeIdentity.BACKEND_ROBOLECTRIC
-      override val supportsBatchCheck = true
-      override val supportsHeadlessSpeculativePrecompile = false
-
-      override fun compile(snapshot: ContentHasher.Snapshot): BackendCompileOutput {
+  ): RenderWorker =
+    InMemoryRenderWorker(
+      name = RuntimeIdentity.BACKEND_ROBOLECTRIC,
+      scopedCheckDensity = 1,
+      boardName = "Plates",
+      directions =
+        listOf(
+          DeviceDirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
+          DeviceDirectionMeta("Compact", "phone", "home", listOf("home"), emptyList()),
+        ),
+      views = PhoneSurface.views,
+      onCompile = { snapshot ->
         compileCalls.incrementAndGet()
         onCompile?.invoke(snapshot)
-        return fakeCompileOutput(snapshot)
-      }
-
-      override fun renderBatchCheck(
-        entry: CompileEntry,
-        targets: List<CheckTargetSpec>,
-        scoped: Boolean,
-        rendersRoot: Path,
-      ): List<RenderArtifact> {
-        val density = if (scoped) 1 else 2
-        val primary = setOf("light", "desktop")
-        return targets.map { t ->
-          val check = ViewCheck(pass = true)
-          val bytes = byteArrayOf(1, 2, 3, t.direction.length.toByte(), t.view.name.length.toByte())
-          var pngPath: Path? = null
-          if (scoped || t.view.name in primary) {
-            val dir = rendersRoot.resolve(entry.contentHash.take(12))
-            Files.createDirectories(dir)
-            pngPath = dir.resolve("${t.prefix}-${t.view.name}-${density}x.png")
-            Files.write(pngPath, bytes)
-          }
-          RenderArtifact(
-            direction = t.direction,
-            screen = t.screenId,
-            overlay = t.overlayId,
-            view = t.view,
-            densityScale = density,
-            artifactName = t.prefix,
-            pass = true,
-            renderMs = 3L,
-            check = check,
-            layout = null,
-            tree =
-              LayoutTree(
-                t.screenId,
-                t.view,
-                listOf(LayoutNode("root", "Box", bounds = Bounds(0f, 0f, 100f, 100f))),
-                emptyList(),
-              ),
-            pngPath = pngPath,
-            endPngPath = null,
-            pngBytes = bytes,
-            endPngBytes = null,
-            pngSha256 = ContentHasher.sha256Hex(bytes),
-            entry = RenderEntry.of(t.prefix, t.view.name, "${t.prefix}-${t.view.name}", check),
-          )
+      },
+      onRenderTarget = { target ->
+        if (onRenderSingle != null) {
+          val view = Views.byName(target.viewName) ?: Views.Light
+          onRenderSingle.invoke(target.direction, view, target.densityScale.toInt())
         }
-      }
-
-      override fun renderSingle(
-        entry: CompileEntry,
-        direction: String,
-        screenId: String,
-        prefix: String,
-        overlayId: String?,
-        view: ViewSpec,
-        densityScale: Int,
-        designSystem: DesignSystem,
-        baseCheck: ViewCheck?,
-        writeFiles: Boolean,
-        rendersRoot: Path,
-        frameFormat: FrameFormat,
-        fontScale: Float,
-        seedOverride: String?,
-        variantOverride: String?,
-        darkOverride: Boolean?,
-      ): RenderArtifact {
-        onRenderSingle?.invoke(direction, view, densityScale)
-        val check = ViewCheck(pass = true)
-        val bytes = byteArrayOf(1, 2, 3)
-        return RenderArtifact(
-          direction = direction,
-          screen = screenId,
-          overlay = overlayId,
-          view = view,
-          densityScale = densityScale,
-          artifactName = prefix,
-          pass = true,
-          renderMs = 2L,
-          check = check,
-          layout = null,
-          tree =
-            LayoutTree(
-              screenId,
-              view,
-              listOf(LayoutNode("root", "Box", bounds = Bounds(0f, 0f, 100f, 100f))),
-              emptyList(),
-            ),
-          pngPath = null,
-          endPngPath = null,
-          pngBytes = bytes,
-          endPngBytes = null,
-          pngSha256 = ContentHasher.sha256Hex(bytes),
-          entry = RenderEntry.of(prefix, view.name, null, check),
-        )
-      }
-    }
+      },
+    )
 
   private fun httpRequest(
     port: Int,
@@ -263,7 +146,7 @@ class PreviewHttpServerTest {
         repoRoot = repo,
         cacheRoot = cache,
         preferredPort = 0,
-        backend = fakeBackend(compileCalls = compileCalls),
+        worker = fakeWorker(compileCalls = compileCalls),
         enableFileWatcher = false,
       )
     try {
@@ -392,7 +275,7 @@ class PreviewHttpServerTest {
         repoRoot = tmp,
         cacheRoot = tmp.resolve("cache"),
         preferredPort = 0,
-        backend = fakeBackend(),
+        worker = fakeWorker(),
         enableFileWatcher = false,
       )
     try {
@@ -472,7 +355,7 @@ class PreviewHttpServerTest {
           repoRoot = tmp,
           cacheRoot = tmp.resolve("cache"),
           preferredPort = busyPort,
-          backend = fakeBackend(),
+          worker = fakeWorker(),
           enableFileWatcher = false,
         )
       try {
@@ -505,8 +388,8 @@ class PreviewHttpServerTest {
     val releaseFirstRender = CountDownLatch(1)
     val order = CopyOnWriteArrayList<String>()
 
-    val backend =
-      fakeBackend(
+    val worker =
+      fakeWorker(
         onRenderSingle = { direction, view, density ->
           order += "$direction/${view.name}@${density}x"
           if (order.size == 1) {
@@ -516,7 +399,7 @@ class PreviewHttpServerTest {
         },
       )
 
-    val queue = RenderQueue(rendersRoot = tmp.resolve("renders"), backend = backend)
+    val queue = RenderQueue(rendersRoot = tmp.resolve("renders"), executor = CheckExecutor(worker))
     queue.start()
     try {
       val entry1 = queue.submitCompile(snap1, QueuePriority.AGENT).get(5, TimeUnit.SECONDS)
@@ -614,8 +497,8 @@ class PreviewHttpServerTest {
         preferredPort = 0,
         coldBudgetMs = 200L,
         warmBudgetMs = 200L,
-        backend =
-          fakeBackend(
+        worker =
+          fakeWorker(
             onCompile = { releaseSlow.await(3, TimeUnit.SECONDS) },
           ),
         onWatchdogHalt = {
@@ -669,7 +552,8 @@ class PreviewHttpServerTest {
     val repo = tmp.resolve("repo").also { Files.createDirectories(it) }
     val source = repo.resolve("board.explore.kt").also { Files.writeString(it, simpleBoard("V1")) }
     val snap1 = ContentHasher.snapshot(source)
-    val queue = RenderQueue(rendersRoot = tmp.resolve("renders"), backend = fakeBackend())
+    val queue =
+      RenderQueue(rendersRoot = tmp.resolve("renders"), executor = CheckExecutor(fakeWorker()))
     queue.start()
     try {
       val entry1 = queue.submitCompile(snap1, QueuePriority.AGENT).get(5, TimeUnit.SECONDS)

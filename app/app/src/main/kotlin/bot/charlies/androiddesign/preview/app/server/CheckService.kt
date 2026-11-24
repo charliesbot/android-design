@@ -1,6 +1,5 @@
 package bot.charlies.androiddesign.preview.app.server
 
-import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.ValidationError
@@ -68,7 +67,7 @@ internal interface CheckHost {
 internal class CheckService(
   private val host: CheckHost,
   private val renderQueue: RenderQueue,
-  private val backend: PreviewBackend,
+  private val executor: CheckExecutor,
   private val selectionStore: SelectionStore,
   private val warmBudgetMs: Long,
 ) {
@@ -269,89 +268,41 @@ internal class CheckService(
     }
 
     val renderStartNs = System.nanoTime()
+    val planned = buildList {
+      for (target in targets) {
+        for (view in views) {
+          add(
+            CheckTargetSpec(
+              target.direction.name,
+              target.screenId,
+              target.prefix,
+              null,
+              view,
+            ),
+          )
+        }
+        if (!scoped) {
+          for (overlay in target.direction.overlaysFor(target.screenId)) {
+            for (view in views) {
+              add(
+                CheckTargetSpec(
+                  target.direction.name,
+                  target.screenId,
+                  target.prefix,
+                  overlay.id,
+                  view,
+                ),
+              )
+            }
+          }
+        }
+      }
+    }
     val artifacts =
       try {
-        if (backend.supportsBatchCheck) {
-          val planned = buildList {
-            for (target in targets) {
-              for (view in views) {
-                add(
-                  CheckTargetSpec(
-                    target.direction.name,
-                    target.screenId,
-                    target.prefix,
-                    null,
-                    view,
-                  ),
-                )
-              }
-              if (!scoped) {
-                for (overlay in target.direction.overlaysFor(target.screenId)) {
-                  for (view in views) {
-                    add(
-                      CheckTargetSpec(
-                        target.direction.name,
-                        target.screenId,
-                        target.prefix,
-                        overlay.id,
-                        view,
-                      ),
-                    )
-                  }
-                }
-              }
-            }
-          }
-          host.awaitOrReplaced(
-            renderQueue.submitBatchCheck(compileEntry, planned, scoped, QueuePriority.AGENT),
-          )
-        } else {
-          val densityScale = if (scoped) 1 else 2
-          val out = mutableListOf<RenderArtifact>()
-          for (target in targets) {
-            val baseChecks = HashMap<String, ViewCheck>()
-            for (view in views) {
-              val art =
-                host.awaitOrReplaced(
-                  renderQueue.submitSingleRender(
-                    entry = compileEntry,
-                    direction = target.direction.name,
-                    screenId = target.screenId,
-                    prefix = target.prefix,
-                    overlayId = null,
-                    view = view,
-                    densityScale = densityScale,
-                    baseCheck = null,
-                    priority = QueuePriority.AGENT,
-                  ),
-                )
-              baseChecks[view.name] = art.check
-              out += art
-            }
-            if (!scoped) {
-              for (overlay in target.direction.overlaysFor(target.screenId)) {
-                for (view in views) {
-                  val art =
-                    host.awaitOrReplaced(
-                      renderQueue.submitSingleRender(
-                        entry = compileEntry,
-                        direction = target.direction.name,
-                        screenId = target.screenId,
-                        prefix = target.prefix,
-                        overlayId = overlay.id,
-                        view = view,
-                        densityScale = densityScale,
-                        baseCheck = baseChecks[view.name],
-                        priority = QueuePriority.AGENT,
-                      ),
-                    )
-                  out += art
-                }
-              }
-            }
-          }
-          out
-        }
+        host.awaitOrReplaced(
+          renderQueue.submitBatchCheck(compileEntry, planned, scoped, QueuePriority.AGENT),
+        )
       } catch (e: ServerReplacedException) {
         sendReplacedCheckResponse(reply, scoped, sourcePath, e.replacedByVersion)
         return
@@ -408,14 +359,11 @@ internal class CheckService(
     if (!scoped) {
       state.lastBoardQueuedHash[fileKey] = snapshot.contentHash
     }
-    val boardRenders =
-      if (!scoped || backend.supportsBatchCheck) artifacts
-      else renderQueue.completedBoardArtifacts(state.repoRoot, sourcePath).values.toList()
     val boardPayload =
       host.buildBoardPayload(
         state.repoId,
         compileEntry,
-        boardRenders,
+        artifacts,
         emptyList(),
         overallPass = allPass,
       )
@@ -429,11 +377,13 @@ internal class CheckService(
     }
 
     host.markLiveOwner(state.repoId)
-    backend.updateLive(
+    executor.updateLive(
       entry = compileEntry,
-      direction = targets.first().direction.name,
-      screenId = targets.first().screenId,
-      overlayId = null,
+      LivePreviewUpdate(
+        direction = targets.first().direction.name,
+        screenId = targets.first().screenId,
+        overlayId = null,
+      ),
     )
 
     val pendingSelection = selectionStore.consumePending(sourcePath)
@@ -554,9 +504,7 @@ internal class CheckService(
         }
         return selected
       }
-      val primaryViews =
-        if (surface == BoardSurface.Wear) setOf("watch", "watch-large")
-        else setOf("light", "desktop")
+      val primaryViews = CheckExecutor.primaryCheckViews(surface)
       val seenHashes = LinkedHashSet<String>()
       return buildList {
         for (art in artifacts) {

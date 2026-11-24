@@ -4,10 +4,8 @@ import bot.charlies.androiddesign.preview.app.cli.RenderEntry
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.layout.ViewLayout
 import bot.charlies.androiddesign.preview.model.BoardSurface
-import bot.charlies.androiddesign.preview.model.DesignSystem
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutTree
-import bot.charlies.androiddesign.preview.model.SurfaceSpec
 import bot.charlies.androiddesign.preview.model.ThemeOverride
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import java.nio.file.Path
@@ -104,12 +102,11 @@ class ServerReplacedException(val replacedByVersion: String) :
  */
 class RenderQueue(
   private val rendersRoot: Path,
-  private val backend: PreviewBackend,
+  private val executor: CheckExecutor,
   private val cacheRoot: Path? = null,
   private val watchdog: Watchdog? = null,
   private val onViewRendered: (Path, Path, String, RenderArtifact) -> Unit = { _, _, _, _ -> },
 ) {
-  private val effectiveBackend: PreviewBackend = backend
 
   private data class FileCacheKey(val repoKey: String, val sourceKey: String)
 
@@ -327,7 +324,7 @@ class RenderQueue(
               val isCold = compileCounter.get() == 0
               val output =
                 runWithWatchdog(snapshot.contentHash, "compile", isCold, normRepo) {
-                  effectiveBackend.compile(snapshot)
+                  executor.compile(snapshot)
                 }
               val count = compileCounter.incrementAndGet()
               val entry =
@@ -376,9 +373,9 @@ class RenderQueue(
     submitCompile(ServerPaths.resolveRepoRoot(snapshot.sourcePath), snapshot, priority)
 
   /**
-   * Executes one batch check across [targets] via [AndroidPreviewBackend] serialized through the
-   * shared queue tagged by `(repoRoot, dexHash)`. Uncached/unselected PNGs remain discarded on host
-   * while cached [RenderArtifact]s populate [FileHashCache] for reuse.
+   * Executes one batch check across [targets] via [CheckExecutor] serialized through the shared
+   * queue tagged by `(repoRoot, dexHash)`. Uncached/unselected PNGs remain discarded on host while
+   * cached [RenderArtifact]s populate [FileHashCache] for reuse.
    */
   fun submitBatchCheck(
     entry: CompileEntry,
@@ -390,8 +387,7 @@ class RenderQueue(
       return CompletableFuture.failedFuture(ServerReplacedException(it))
     }
     val key = FileCacheKey(canonicalKey(entry.repoRoot), canonicalKey(entry.sourcePath))
-    val batchDensity =
-      if (scoped && effectiveBackend.name == RuntimeIdentity.BACKEND_ROBOLECTRIC) 1 else 2
+    val batchDensity = if (scoped) executor.scopedCheckDensity else 2
     synchronized(cacheLock) {
       val current = cachesByFile[key]
       if (current != null && current.contentHash == entry.contentHash) {
@@ -436,7 +432,7 @@ class RenderQueue(
                 repoRoot = entry.repoRoot,
                 minBudgetMs = if (scoped) null else Watchdog.BATCH_BUDGET_MS,
               ) {
-                effectiveBackend.renderBatchCheck(entry, targets, scoped, repoRenders)
+                executor.renderBatchCheck(entry, targets, scoped, repoRenders)
               }
             synchronized(cacheLock) {
               val current = cachesByFile[key]
@@ -481,8 +477,7 @@ class RenderQueue(
     if (!allPass) {
       return artifacts.any { !it.pass && fileExists(it) }
     }
-    val primaryViews =
-      if (surface == BoardSurface.Wear) setOf("watch", "watch-large") else setOf("light", "desktop")
+    val primaryViews = CheckExecutor.primaryCheckViews(surface)
     val primaries = artifacts.filter { it.overlay == null && it.view.name in primaryViews }
     return primaries.isEmpty() || primaries.all(::fileExists)
   }
@@ -512,12 +507,6 @@ class RenderQueue(
     if (entry.androidData == null && entry.boardMeta == null) {
       return CompletableFuture.failedFuture(IllegalStateException("Exploration is not compiled"))
     }
-    val surfaceSpec: SurfaceSpec =
-      if (entry.surface == BoardSurface.Wear) {
-        bot.charlies.androiddesign.preview.model.WearSurface
-      } else {
-        bot.charlies.androiddesign.preview.model.PhoneSurface
-      }
 
     val future: CompletableFuture<RenderArtifact>
     var needEnqueue = false
@@ -566,7 +555,6 @@ class RenderQueue(
           prefix = prefix,
           overlayId = overlayId,
           view = view,
-          surfaceSpec = surfaceSpec,
           densityScale = densityScale,
           baseCheck = baseCheck,
           writeFiles = writeFiles,
@@ -588,7 +576,6 @@ class RenderQueue(
     prefix: String,
     overlayId: String?,
     view: ViewSpec,
-    designSystem: DesignSystem,
     densityScale: Int = 2,
     frameFormat: FrameFormat = FrameFormat.LZ4_RGBA,
     fontScale: Float = 1f,
@@ -596,23 +583,25 @@ class RenderQueue(
     variantOverride: String? = null,
     darkOverride: Boolean? = null,
   ): RenderArtifact {
-    return effectiveBackend.renderSingle(
+    return executor.renderSingle(
       entry = entry,
-      direction = direction,
-      screenId = screenId,
-      prefix = prefix,
-      overlayId = overlayId,
-      view = view,
-      densityScale = densityScale,
-      designSystem = designSystem,
-      baseCheck = null,
-      writeFiles = false,
-      rendersRoot = rendersRootForRepo(entry.repoRoot),
-      frameFormat = frameFormat,
-      fontScale = fontScale,
-      seedOverride = seedOverride,
-      variantOverride = variantOverride,
-      darkOverride = darkOverride,
+      request =
+        SingleRenderRequest(
+          direction = direction,
+          screenId = screenId,
+          prefix = prefix,
+          overlayId = overlayId,
+          view = view,
+          densityScale = densityScale,
+          baseCheck = null,
+          writeFiles = false,
+          rendersRoot = rendersRootForRepo(entry.repoRoot),
+          frameFormat = frameFormat,
+          fontScale = fontScale,
+          seedOverride = seedOverride,
+          variantOverride = variantOverride,
+          darkOverride = darkOverride,
+        ),
     )
   }
 
@@ -647,7 +636,6 @@ class RenderQueue(
           prefix = queued.prefix,
           overlayId = queued.overlayId,
           view = queued.view,
-          surfaceSpec = queued.surfaceSpec,
           densityScale = queued.densityScale,
           baseCheck = queued.baseCheck,
           writeFiles = queued.writeFiles,
@@ -672,7 +660,6 @@ class RenderQueue(
     val prefix: String,
     val overlayId: String?,
     val view: ViewSpec,
-    val surfaceSpec: SurfaceSpec,
     val densityScale: Int,
     val baseCheck: ViewCheck?,
     val writeFiles: Boolean,
@@ -707,19 +694,21 @@ class RenderQueue(
         val scope = renderKey.scopeLabel()
         val artifact =
           runWithWatchdog(contentHash, scope, isCold = false, repoRoot = entry.repoRoot) {
-            effectiveBackend.renderSingle(
+            executor.renderSingle(
               entry = entry,
-              direction = direction,
-              screenId = screenId,
-              prefix = prefix,
-              overlayId = overlayId,
-              view = view,
-              densityScale = densityScale,
-              designSystem = entry.loaded.designSystem,
-              baseCheck = baseCheck,
-              writeFiles = writeFiles,
-              rendersRoot = rendersRootForRepo(entry.repoRoot),
-              frameFormat = frameFormat,
+              request =
+                SingleRenderRequest(
+                  direction = direction,
+                  screenId = screenId,
+                  prefix = prefix,
+                  overlayId = overlayId,
+                  view = view,
+                  densityScale = densityScale,
+                  baseCheck = baseCheck,
+                  writeFiles = writeFiles,
+                  rendersRoot = rendersRootForRepo(entry.repoRoot),
+                  frameFormat = frameFormat,
+                ),
             )
           }
         synchronized(cacheLock) {
@@ -756,7 +745,7 @@ class RenderQueue(
     block: () -> T,
   ): T {
     // Warm a fresh worker first, outside the budget, so a cold start is not charged to this job.
-    effectiveBackend.prepare()
+    executor.prepare()
     val w = watchdog ?: return block()
     return w.guard(contentHash, scope, isCold, repoRoot.toString(), minBudgetMs, block)
   }
