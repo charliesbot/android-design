@@ -1,7 +1,7 @@
 package bot.charlies.androiddesign.preview.app.android
 
+import bot.charlies.androiddesign.preview.app.client.ClientExitCode
 import bot.charlies.androiddesign.preview.app.client.StartCommand
-import bot.charlies.androiddesign.preview.app.client.V5ExitCode
 import bot.charlies.androiddesign.preview.app.server.RuntimeIdentity
 import bot.charlies.androiddesign.preview.app.server.ServerPaths
 import bot.charlies.androiddesign.preview.app.server.ServerRecord
@@ -245,14 +245,14 @@ class DeviceManagerTest {
     val usageCode =
       StartCommand(tmp.resolve("c0"), envWithBootstrap)
         .run(listOf("--bogus"), PrintStream(usageOut), PrintStream(ByteArrayOutputStream()))
-    assertEquals(V5ExitCode.USAGE, usageCode)
+    assertEquals(ClientExitCode.USAGE, usageCode)
 
     // Exit 3 when bootstrap missing.
     val notReadyOut = ByteArrayOutputStream()
     val notReadyCode =
       StartCommand(tmp.resolve("c1"), emptyMap(), bootstrapLocator = { null })
         .run(emptyList(), PrintStream(notReadyOut), PrintStream(ByteArrayOutputStream()))
-    assertEquals(V5ExitCode.NOT_READY, notReadyCode)
+    assertEquals(ClientExitCode.NOT_READY, notReadyCode)
     assertTrue("bootstrap_missing" in notReadyOut.toString(StandardCharsets.UTF_8))
 
     // Exit 2 when --serial is not online.
@@ -269,7 +269,7 @@ class DeviceManagerTest {
           PrintStream(ByteArrayOutputStream()),
           PrintStream(ByteArrayOutputStream()),
         )
-    assertEquals(V5ExitCode.USAGE, serialCode)
+    assertEquals(ClientExitCode.USAGE, serialCode)
 
     // Exit 0 when device + server are ready.
     val readyRunner = ExternalCommandRunner { cmd, _, _ ->
@@ -344,7 +344,7 @@ class DeviceManagerTest {
       val okCode =
         StartCommand(readyCache, envWithBootstrap, readyDm, bootstrapLocator = { meta })
           .run(listOf(repo.toString()), PrintStream(okOut), PrintStream(ByteArrayOutputStream()))
-      assertEquals(V5ExitCode.OK, okCode, okOut.toString(StandardCharsets.UTF_8))
+      assertEquals(ClientExitCode.OK, okCode, okOut.toString(StandardCharsets.UTF_8))
       val jsonStr = okOut.toString(StandardCharsets.UTF_8).trim()
       val parsedResp =
         bot.charlies.androiddesign.preview.model.PreviewJson.compact.decodeFromString(
@@ -490,7 +490,7 @@ class DeviceManagerTest {
     val result = dm.ensureDeviceReady(meta)
     val failed = assertIs<DeviceSetupResult.Failed>(result)
     assertEquals("boot_timeout", failed.error)
-    assertEquals(V5ExitCode.FAILED, failed.exitCode)
+    assertEquals(ClientExitCode.FAILED, failed.exitCode)
     assertFalse(commands.any { " install" in it }, "must not install before boot: $commands")
   }
 

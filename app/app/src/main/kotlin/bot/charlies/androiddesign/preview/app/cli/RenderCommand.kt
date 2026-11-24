@@ -1,6 +1,6 @@
 package bot.charlies.androiddesign.preview.app.cli
 
-import bot.charlies.androiddesign.preview.app.client.V5ExitCode
+import bot.charlies.androiddesign.preview.app.client.ClientExitCode
 import bot.charlies.androiddesign.preview.app.server.BoardMeta
 import bot.charlies.androiddesign.preview.app.server.CompileEntry
 import bot.charlies.androiddesign.preview.app.server.ContentHasher
@@ -133,7 +133,7 @@ class RenderCommand(
     }
 
     val backend =
-      backendFactory?.invoke() ?: createRobolectricBackend(err) ?: return V5ExitCode.NOT_READY
+      backendFactory?.invoke() ?: createRobolectricBackend(err) ?: return ClientExitCode.NOT_READY
     return try {
       renderWithBackend(
         backend = backend,

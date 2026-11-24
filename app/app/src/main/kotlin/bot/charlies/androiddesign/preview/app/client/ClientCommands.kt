@@ -21,8 +21,11 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.serialization.Serializable
 
-/** Fixed exit codes for v5/v6 CLI commands. */
-object V5ExitCode {
+/**
+ * Fixed exit codes shared by the client CLI commands (`start`, `check`, `tree`, `stop`, and the
+ * rest).
+ */
+object ClientExitCode {
   const val OK = 0
   const val FAILED = 1
   const val USAGE = 2
@@ -56,7 +59,7 @@ private data class SimpleArgs(
   val flags: Map<String, String>,
 )
 
-private fun parseV5Args(
+private fun parseClientArgs(
   args: List<String>,
   valueFlags: Set<String>,
   booleanFlags: Set<String> = emptySet(),
@@ -118,14 +121,14 @@ class StartCommand(
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
     if (wantsHelp(args)) {
       out.println(HELP)
-      return V5ExitCode.OK
+      return ClientExitCode.OK
     }
     val (parsed, parseErr) =
-      parseV5Args(args, setOf("--serial", "--avd"), booleanFlags = setOf("--headless"))
+      parseClientArgs(args, setOf("--serial", "--avd"), booleanFlags = setOf("--headless"))
     if (parseErr != null || parsed == null) {
       return emitError(
         out,
-        V5ExitCode.USAGE,
+        ClientExitCode.USAGE,
         "usage",
         parseErr ?: "Invalid arguments",
         next = "android-design-preview start --help",
@@ -134,7 +137,7 @@ class StartCommand(
     if (parsed.positionals.size > 1) {
       return emitError(
         out,
-        V5ExitCode.USAGE,
+        ClientExitCode.USAGE,
         "usage",
         "Unexpected arguments: ${parsed.positionals.joinToString(" ")}",
       )
@@ -144,7 +147,7 @@ class StartCommand(
       bootstrapLocator()
         ?: return emitError(
           out,
-          V5ExitCode.NOT_READY,
+          ClientExitCode.NOT_READY,
           "bootstrap_missing",
           "Bootstrap artifacts missing (bootstrap-meta.properties). Run `./gradlew :host:exportBootstrap` from app/ or invoke the bundled CLI script.",
         )
@@ -183,7 +186,7 @@ class StartCommand(
     val readyServer =
       when (lookup) {
         is PreviewClient.ServerLookup.NotReady ->
-          return emitError(out, V5ExitCode.NOT_READY, "server_not_ready", lookup.message)
+          return emitError(out, ClientExitCode.NOT_READY, "server_not_ready", lookup.message)
         is PreviewClient.ServerLookup.Ready -> lookup
       }
 
@@ -200,7 +203,7 @@ class StartCommand(
         boardUrl = readyServer.record.boardUrl(ServerPaths.repoHash(repoRoot)),
       )
     emitJson(out, PreviewJson.compact.encodeToString(StartResponse.serializer(), resp))
-    return V5ExitCode.OK
+    return ClientExitCode.OK
   }
 
   companion object {
@@ -231,14 +234,14 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
     if (wantsHelp(args)) {
       out.println(HELP)
-      return V5ExitCode.OK
+      return ClientExitCode.OK
     }
     val (parsed, parseErr) =
-      parseV5Args(args, setOf("--direction", "--screen", "--view", "--design"))
+      parseClientArgs(args, setOf("--direction", "--screen", "--view", "--design"))
     if (parseErr != null || parsed == null) {
       return emitError(
         out,
-        V5ExitCode.USAGE,
+        ClientExitCode.USAGE,
         "usage",
         parseErr ?: "Invalid arguments",
         next = "android-design-preview check --help",
@@ -248,7 +251,7 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
     if (rawFile.isNullOrBlank() || parsed.positionals.size > 1) {
       return emitError(
         out,
-        V5ExitCode.USAGE,
+        ClientExitCode.USAGE,
         "usage",
         "Provide exactly one .explore.kt file path",
         next = "android-design-preview check <file>",
@@ -258,7 +261,7 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
     if (!Files.isRegularFile(sourcePath)) {
       return emitError(
         out,
-        V5ExitCode.USAGE,
+        ClientExitCode.USAGE,
         "no_such_file",
         "No such file: $sourcePath",
       )
@@ -295,7 +298,7 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
             "Previous attempt for this exact file timed out ($scopeKey). Edit and save the file to clear the timeout.",
         )
       emitJson(out, PreviewJson.compact.encodeToString(CheckResponse.serializer(), resp))
-      return V5ExitCode.FAILED
+      return ClientExitCode.FAILED
     }
 
     val lookup = client.ensureServer(repoRoot)
@@ -303,7 +306,7 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
       when (lookup) {
         is PreviewClient.ServerLookup.Ready -> lookup
         is PreviewClient.ServerLookup.NotReady ->
-          return emitError(out, V5ExitCode.NOT_READY, "server_not_ready", lookup.message)
+          return emitError(out, ClientExitCode.NOT_READY, "server_not_ready", lookup.message)
       }
 
     val req =
@@ -340,14 +343,14 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
               ),
             ),
           )
-          return V5ExitCode.FAILED
+          return ClientExitCode.FAILED
         }
         val restarted =
           client.recoverFromDeadline(repoRoot, ready.record) ==
             PreviewClient.DeadlineRecovery.RESTARTED
         return emitError(
           out,
-          V5ExitCode.FAILED,
+          ClientExitCode.FAILED,
           "timeout",
           if (restarted) {
             "Request exceeded ${timeoutMs} ms deadline; restarted unresponsive preview server."
@@ -376,7 +379,7 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
               ),
             ),
           )
-          return V5ExitCode.FAILED
+          return ClientExitCode.FAILED
         }
         if (client.checkRecordedTimeout(repoRoot, snapshot, scopeKey, direction, screen, view)) {
           val resp =
@@ -393,11 +396,11 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
                 "Preview server halted after timing out ($scopeKey). Simplify the view and save the file to retry.",
             )
           emitJson(out, PreviewJson.compact.encodeToString(CheckResponse.serializer(), resp))
-          return V5ExitCode.FAILED
+          return ClientExitCode.FAILED
         }
         return emitError(
           out,
-          V5ExitCode.NOT_READY,
+          ClientExitCode.NOT_READY,
           "server_unreachable",
           e.message ?: "Failed contacting preview server",
         )
@@ -405,25 +408,25 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
 
     if (http.status == 400 || http.status == 404) {
       emitJson(out, http.body.ifBlank { """{"ok":false,"error":"bad_request"}""" })
-      return V5ExitCode.USAGE
+      return ClientExitCode.USAGE
     }
     if (http.status == 409) {
       emitJson(out, http.body.ifBlank { """{"ok":false,"error":"server_replaced"}""" })
-      return V5ExitCode.FAILED
+      return ClientExitCode.FAILED
     }
     if (http.status >= 500) {
       emitJson(out, http.body.ifBlank { """{"ok":false,"error":"server_error"}""" })
-      return V5ExitCode.FAILED
+      return ClientExitCode.FAILED
     }
     emitJson(out, http.body)
     val parsedResp =
       try {
         PreviewJson.compact.decodeFromString(CheckResponse.serializer(), http.body)
       } catch (_: Exception) {
-        return V5ExitCode.FAILED
+        return ClientExitCode.FAILED
       }
-    return if (parsedResp.ok && parsedResp.valid && parsedResp.pass) V5ExitCode.OK
-    else V5ExitCode.FAILED
+    return if (parsedResp.ok && parsedResp.valid && parsedResp.pass) ClientExitCode.OK
+    else ClientExitCode.FAILED
   }
 
   companion object {
@@ -460,14 +463,14 @@ class TreeCommand(private val client: PreviewClient = PreviewClient()) : Command
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
     if (wantsHelp(args)) {
       out.println(HELP)
-      return V5ExitCode.OK
+      return ClientExitCode.OK
     }
     val (parsed, parseErr) =
-      parseV5Args(args, setOf("--direction", "--screen", "--overlay", "--view", "--max-depth"))
+      parseClientArgs(args, setOf("--direction", "--screen", "--overlay", "--view", "--max-depth"))
     if (parseErr != null || parsed == null) {
       return emitError(
         out,
-        V5ExitCode.USAGE,
+        ClientExitCode.USAGE,
         "usage",
         parseErr ?: "Invalid arguments",
         next = "android-design-preview tree --help",
@@ -479,7 +482,7 @@ class TreeCommand(private val client: PreviewClient = PreviewClient()) : Command
     if (rawFile.isNullOrBlank() || direction.isNullOrBlank() || view.isNullOrBlank()) {
       return emitError(
         out,
-        V5ExitCode.USAGE,
+        ClientExitCode.USAGE,
         "usage",
         "tree requires <file>, --direction <d>, and --view <v>",
         next = "android-design-preview tree <file> --direction <d> --view <v>",
@@ -490,21 +493,21 @@ class TreeCommand(private val client: PreviewClient = PreviewClient()) : Command
         raw.toIntOrNull()
           ?: return emitError(
             out,
-            V5ExitCode.USAGE,
+            ClientExitCode.USAGE,
             "usage",
             "--max-depth must be an integer",
           )
       }
     val sourcePath = Path.of(rawFile).toAbsolutePath().normalize()
     if (!Files.isRegularFile(sourcePath)) {
-      return emitError(out, V5ExitCode.USAGE, "no_such_file", "No such file: $sourcePath")
+      return emitError(out, ClientExitCode.USAGE, "no_such_file", "No such file: $sourcePath")
     }
     val repoRoot = ServerPaths.resolveRepoRoot(sourcePath)
     val ready =
       when (val lookup = client.ensureServer(repoRoot)) {
         is PreviewClient.ServerLookup.Ready -> lookup
         is PreviewClient.ServerLookup.NotReady ->
-          return emitError(out, V5ExitCode.NOT_READY, "server_not_ready", lookup.message)
+          return emitError(out, ClientExitCode.NOT_READY, "server_not_ready", lookup.message)
       }
 
     val req =
@@ -541,7 +544,7 @@ class TreeCommand(private val client: PreviewClient = PreviewClient()) : Command
             PreviewClient.DeadlineRecovery.RESTARTED
         return emitError(
           out,
-          V5ExitCode.FAILED,
+          ClientExitCode.FAILED,
           "timeout",
           if (restarted) {
             "tree request timed out; restarted unresponsive preview server."
@@ -552,19 +555,24 @@ class TreeCommand(private val client: PreviewClient = PreviewClient()) : Command
       } catch (e: Exception) {
         val repVer = client.checkReplacedByVersion(ready.record)
         if (repVer != null) {
-          return emitError(out, V5ExitCode.FAILED, "server_replaced", "replaced by v$repVer, rerun")
+          return emitError(
+            out,
+            ClientExitCode.FAILED,
+            "server_replaced",
+            "replaced by v$repVer, rerun",
+          )
         }
         if (client.checkRecordedTimeout(repoRoot, snapshot, treeScope, direction, screen, view)) {
           return emitError(
             out,
-            V5ExitCode.FAILED,
+            ClientExitCode.FAILED,
             "timeout",
             "Preview server halted after timing out ($treeScope).",
           )
         }
         return emitError(
           out,
-          V5ExitCode.NOT_READY,
+          ClientExitCode.NOT_READY,
           "server_unreachable",
           e.message ?: "Failed contacting preview server",
         )
@@ -578,11 +586,11 @@ class TreeCommand(private val client: PreviewClient = PreviewClient()) : Command
           } catch (_: Exception) {
             null
           }
-        if (resp?.ok == true) V5ExitCode.OK else V5ExitCode.FAILED
+        if (resp?.ok == true) ClientExitCode.OK else ClientExitCode.FAILED
       }
       400,
-      404 -> V5ExitCode.USAGE
-      else -> V5ExitCode.FAILED
+      404 -> ClientExitCode.USAGE
+      else -> ClientExitCode.FAILED
     }
   }
 
@@ -612,17 +620,17 @@ class SelectionCommand(private val client: PreviewClient = PreviewClient()) : Co
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
     if (wantsHelp(args)) {
       out.println(HELP)
-      return V5ExitCode.OK
+      return ClientExitCode.OK
     }
-    val (parsed, parseErr) = parseV5Args(args, emptySet())
+    val (parsed, parseErr) = parseClientArgs(args, emptySet())
     if (parseErr != null || parsed == null) {
-      return emitError(out, V5ExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
+      return emitError(out, ClientExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
     }
     val rawFile = parsed.positionals.firstOrNull()
     if (rawFile.isNullOrBlank() || parsed.positionals.size > 1) {
       return emitError(
         out,
-        V5ExitCode.USAGE,
+        ClientExitCode.USAGE,
         "usage",
         "selection requires one <file> path",
         next = "android-design-preview selection <file>",
@@ -641,7 +649,7 @@ class SelectionCommand(private val client: PreviewClient = PreviewClient()) : Co
               ask = "Click the element you mean on the preview board, then tell me to continue.",
             )
           emitJson(out, PreviewJson.compact.encodeToString(SelectionResponse.serializer(), resp))
-          return V5ExitCode.FAILED
+          return ClientExitCode.FAILED
         }
       }
     val encoded = URLEncoder.encode(sourcePath.toString(), Charsets.UTF_8)
@@ -651,13 +659,13 @@ class SelectionCommand(private val client: PreviewClient = PreviewClient()) : Co
       } catch (e: Exception) {
         return emitError(
           out,
-          V5ExitCode.NOT_READY,
+          ClientExitCode.NOT_READY,
           "server_unreachable",
           e.message ?: "Failed contacting preview server",
         )
       }
     emitJson(out, http.body)
-    return if (http.status == 200) V5ExitCode.OK else V5ExitCode.FAILED
+    return if (http.status == 200) ClientExitCode.OK else ClientExitCode.FAILED
   }
 
   companion object {
@@ -695,11 +703,11 @@ class OpenCommand(private val client: PreviewClient = PreviewClient()) : Command
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
     if (wantsHelp(args)) {
       out.println(HELP)
-      return V5ExitCode.OK
+      return ClientExitCode.OK
     }
-    val (parsed, parseErr) = parseV5Args(args, emptySet())
+    val (parsed, parseErr) = parseClientArgs(args, emptySet())
     if (parseErr != null || parsed == null) {
-      return emitError(out, V5ExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
+      return emitError(out, ClientExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
     }
     val rawFile = parsed.positionals.firstOrNull()
     val targetPath =
@@ -711,7 +719,7 @@ class OpenCommand(private val client: PreviewClient = PreviewClient()) : Command
       when (val lookup = client.ensureServer(repoRoot)) {
         is PreviewClient.ServerLookup.Ready -> lookup
         is PreviewClient.ServerLookup.NotReady ->
-          return emitError(out, V5ExitCode.NOT_READY, "server_not_ready", lookup.message)
+          return emitError(out, ClientExitCode.NOT_READY, "server_not_ready", lookup.message)
       }
 
     val isExploreFile =
@@ -748,7 +756,7 @@ class OpenCommand(private val client: PreviewClient = PreviewClient()) : Command
         sourcePath = if (rawFile != null) targetPath.toString() else null,
       )
     emitJson(out, PreviewJson.compact.encodeToString(OpenResponse.serializer(), resp))
-    return V5ExitCode.OK
+    return ClientExitCode.OK
   }
 
   private fun openBrowser(url: String): Boolean {
@@ -791,11 +799,11 @@ class StatusCommand(private val client: PreviewClient = PreviewClient()) : Comma
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
     if (wantsHelp(args)) {
       out.println(HELP)
-      return V5ExitCode.OK
+      return ClientExitCode.OK
     }
-    val (parsed, parseErr) = parseV5Args(args, emptySet())
+    val (parsed, parseErr) = parseClientArgs(args, emptySet())
     if (parseErr != null || parsed == null) {
-      return emitError(out, V5ExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
+      return emitError(out, ClientExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
     }
     val target =
       parsed.positionals.firstOrNull()?.let { Path.of(it).toAbsolutePath().normalize() }
@@ -810,12 +818,12 @@ class StatusCommand(private val client: PreviewClient = PreviewClient()) : Comma
             lookup.status,
           ),
         )
-        V5ExitCode.OK
+        ClientExitCode.OK
       }
       is PreviewClient.ServerLookup.NotReady ->
         emitError(
           out,
-          V5ExitCode.NOT_READY,
+          ClientExitCode.NOT_READY,
           "server_not_running",
           lookup.message,
           next = "android-design-preview start",
@@ -855,11 +863,11 @@ class StopCommand(private val client: PreviewClient = PreviewClient()) : Command
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
     if (wantsHelp(args)) {
       out.println(HELP)
-      return V5ExitCode.OK
+      return ClientExitCode.OK
     }
-    val (parsed, parseErr) = parseV5Args(args, emptySet())
+    val (parsed, parseErr) = parseClientArgs(args, emptySet())
     if (parseErr != null || parsed == null) {
-      return emitError(out, V5ExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
+      return emitError(out, ClientExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
     }
     val target =
       parsed.positionals.firstOrNull()?.let { Path.of(it).toAbsolutePath().normalize() }
@@ -874,7 +882,7 @@ class StopCommand(private val client: PreviewClient = PreviewClient()) : Command
         repoRoot = repoRoot.toString(),
       )
     emitJson(out, PreviewJson.compact.encodeToString(StopResponse.serializer(), resp))
-    return V5ExitCode.OK
+    return ClientExitCode.OK
   }
 
   companion object {
@@ -908,11 +916,11 @@ class InstallCommand : Command {
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
     if (wantsHelp(args)) {
       out.println(HELP)
-      return V5ExitCode.OK
+      return ClientExitCode.OK
     }
-    val (parsed, parseErr) = parseV5Args(args, setOf("--bin-dir", "--script"))
+    val (parsed, parseErr) = parseClientArgs(args, setOf("--bin-dir", "--script"))
     if (parseErr != null || parsed == null) {
-      return emitError(out, V5ExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
+      return emitError(out, ClientExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
     }
     val scriptPathStr =
       parsed.flags["--script"]
@@ -920,14 +928,19 @@ class InstallCommand : Command {
     if (scriptPathStr.isNullOrBlank()) {
       return emitError(
         out,
-        V5ExitCode.NOT_READY,
+        ClientExitCode.NOT_READY,
         "missing_script",
         "Run install through the explore skill's scripts/android-design-preview or pass --script <path>",
       )
     }
     val source = Path.of(scriptPathStr).toAbsolutePath().normalize()
     if (!Files.isRegularFile(source)) {
-      return emitError(out, V5ExitCode.USAGE, "no_such_file", "Bootstrap script not found: $source")
+      return emitError(
+        out,
+        ClientExitCode.USAGE,
+        "no_such_file",
+        "Bootstrap script not found: $source",
+      )
     }
     val binDir =
       parsed.flags["--bin-dir"]?.let { Path.of(it).toAbsolutePath().normalize() }
@@ -963,7 +976,7 @@ class InstallCommand : Command {
         tell = tell,
       )
     emitJson(out, PreviewJson.compact.encodeToString(InstallResponse.serializer(), resp))
-    return V5ExitCode.OK
+    return ClientExitCode.OK
   }
 
   companion object {

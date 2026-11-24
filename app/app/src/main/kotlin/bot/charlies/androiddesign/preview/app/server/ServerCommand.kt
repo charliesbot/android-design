@@ -6,7 +6,7 @@ import bot.charlies.androiddesign.preview.app.android.DeviceSetupResult
 import bot.charlies.androiddesign.preview.app.cli.Command
 import bot.charlies.androiddesign.preview.app.cli.ExitCode
 import bot.charlies.androiddesign.preview.app.cli.parseArgs
-import bot.charlies.androiddesign.preview.app.client.V5ExitCode
+import bot.charlies.androiddesign.preview.app.client.ClientExitCode
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import java.io.PrintStream
@@ -123,7 +123,7 @@ class ServerCommand : Command {
             out.println(msg)
             err.println(msg)
             recycleExecutor.shutdownNow()
-            return V5ExitCode.NOT_READY
+            return ClientExitCode.NOT_READY
           }
       val cpOverride =
         System.getenv(RuntimeIdentity.ROBOLECTRIC_CP_ENV)?.takeIf { it.isNotBlank() }?.let(Path::of)
@@ -141,7 +141,7 @@ class ServerCommand : Command {
         out.println(msg)
         err.println(msg)
         recycleExecutor.shutdownNow()
-        return V5ExitCode.NOT_READY
+        return ClientExitCode.NOT_READY
       }
       val roboBackend = RobolectricPreviewBackend(meta = meta, robolectricCp = robolectricCp)
       try {
@@ -159,7 +159,7 @@ class ServerCommand : Command {
         out.println(msg)
         err.println(msg)
         recycleExecutor.shutdownNow()
-        return V5ExitCode.NOT_READY
+        return ClientExitCode.NOT_READY
       }
       backend = roboBackend
     } else {
@@ -177,7 +177,7 @@ class ServerCommand : Command {
             out.println(msg)
             err.println(msg)
             recycleExecutor.shutdownNow()
-            return V5ExitCode.NOT_READY
+            return ClientExitCode.NOT_READY
           }
       val devMgr = DeviceManager(cacheRoot = cacheRoot)
       val headless = parsed.flags["--headless"].equals("true", ignoreCase = true)

@@ -1,6 +1,6 @@
 package bot.charlies.androiddesign.preview.app.android
 
-import bot.charlies.androiddesign.preview.app.client.V5ExitCode
+import bot.charlies.androiddesign.preview.app.client.ClientExitCode
 import bot.charlies.androiddesign.preview.app.server.ContentHasher
 import bot.charlies.androiddesign.preview.app.server.ServerPaths
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
@@ -124,7 +124,7 @@ class DeviceManager(
     val adbBin =
       resolveAdbBinary(sdkDir)
         ?: return DeviceSetupResult.Failed(
-          exitCode = V5ExitCode.NOT_READY,
+          exitCode = ClientExitCode.NOT_READY,
           error = "adb_not_found",
           message = "Cannot find `adb`. Ensure Android SDK platform-tools are installed.",
         )
@@ -145,7 +145,7 @@ class DeviceManager(
       val match = onlineDevices.firstOrNull { it.serial == wanted }
       if (match == null) {
         return DeviceSetupResult.Failed(
-          exitCode = V5ExitCode.USAGE,
+          exitCode = ClientExitCode.USAGE,
           error = "unknown_serial",
           message =
             "Device serial '$wanted' is not online (online: ${onlineDevices.joinToString { it.serial }.ifBlank { "none" }})",
@@ -167,7 +167,7 @@ class DeviceManager(
         val avds = listAvds(androidCli, sdkDir, cmdEnv)
         if (wanted !in avds) {
           return DeviceSetupResult.Failed(
-            exitCode = V5ExitCode.USAGE,
+            exitCode = ClientExitCode.USAGE,
             error = "unknown_avd",
             message =
               "AVD '$wanted' does not exist (available: ${avds.joinToString().ifBlank { "none" }})",
@@ -177,7 +177,7 @@ class DeviceManager(
         chosenSerial =
           startAvdAndWaitOnline(androidCli, adbBin, sdkDir, wanted, headless, cmdEnv)
             ?: return DeviceSetupResult.Failed(
-              exitCode = V5ExitCode.FAILED,
+              exitCode = ClientExitCode.FAILED,
               error = "emulator_start_failed",
               message = "Failed starting AVD '$wanted'.",
             )
@@ -197,7 +197,8 @@ class DeviceManager(
           ?: createDefaultAvd(androidCli, cmdEnv).let { created ->
             if (created == null) {
               return DeviceSetupResult.Failed(
-                exitCode = if (androidCli == null) V5ExitCode.NOT_READY else V5ExitCode.FAILED,
+                exitCode =
+                  if (androidCli == null) ClientExitCode.NOT_READY else ClientExitCode.FAILED,
                 error = if (androidCli == null) "android_cli_not_found" else "avd_create_failed",
                 message =
                   if (androidCli == null) {
@@ -213,7 +214,7 @@ class DeviceManager(
       val started =
         startAvdAndWaitOnline(androidCli, adbBin, sdkDir, targetAvd, headless, cmdEnv)
           ?: return DeviceSetupResult.Failed(
-            exitCode = V5ExitCode.FAILED,
+            exitCode = ClientExitCode.FAILED,
             error = "emulator_start_failed",
             message = "Failed starting AVD '$targetAvd'.",
           )
@@ -222,7 +223,7 @@ class DeviceManager(
 
     if (!waitUntilBootCompleted(adbBin, chosenSerial, cmdEnv)) {
       return DeviceSetupResult.Failed(
-        exitCode = V5ExitCode.FAILED,
+        exitCode = ClientExitCode.FAILED,
         error = "boot_timeout",
         message =
           "Device $chosenSerial did not report sys.boot_completed=1 within " +
@@ -247,7 +248,7 @@ class DeviceManager(
       val installOk = installApk(androidCli, adbBin, chosenSerial, meta.apkPath, cmdEnv)
       if (!installOk) {
         return DeviceSetupResult.Failed(
-          exitCode = V5ExitCode.FAILED,
+          exitCode = ClientExitCode.FAILED,
           error = "apk_install_failed",
           message = "Failed installing ${meta.apkPath} on device $chosenSerial.",
         )
@@ -274,7 +275,7 @@ class DeviceManager(
       aotNow = aotOut.exitCode == 0
       if (!aotNow) {
         return DeviceSetupResult.Failed(
-          exitCode = V5ExitCode.FAILED,
+          exitCode = ClientExitCode.FAILED,
           error = "aot_compile_failed",
           message =
             "AOT compile failed on $chosenSerial: ${(aotOut.stdout + aotOut.stderr).trim()}",
@@ -319,7 +320,7 @@ class DeviceManager(
     val forwardPort =
       ensureAdbForward(adbBin, chosenSerial, cmdEnv)
         ?: return DeviceSetupResult.Failed(
-          exitCode = V5ExitCode.FAILED,
+          exitCode = ClientExitCode.FAILED,
           error = "adb_forward_failed",
           message = "Failed forwarding host TCP port to device $chosenSerial:$DEVICE_REMOTE.",
         )
@@ -331,7 +332,7 @@ class DeviceManager(
     if (ping == null || !ping.ok || installedNow || ping.isWorkerStuck()) {
       if (!launchSandboxActivity(adbBin, chosenSerial, cmdEnv)) {
         return DeviceSetupResult.Failed(
-          exitCode = V5ExitCode.FAILED,
+          exitCode = ClientExitCode.FAILED,
           error = "sandbox_start_failed",
           message = "Failed starting $HOST_RENDER_ACTIVITY on $chosenSerial.",
         )
@@ -339,7 +340,7 @@ class DeviceManager(
       ping = awaitPing(forwardPort)
       if (ping == null || !ping.ok) {
         return DeviceSetupResult.Failed(
-          exitCode = V5ExitCode.FAILED,
+          exitCode = ClientExitCode.FAILED,
           error = "sandbox_ping_timeout",
           message =
             "Timed out waiting for RenderForegroundService ping on $chosenSerial (port $forwardPort).",
