@@ -7,7 +7,7 @@ Read this when `android-design-preview` cannot be found (neither on `PATH` nor b
 - **macOS or Linux** (Windows is unsupported)
 - **Java 17+** (system `java` on `PATH`, `JAVA_HOME`, or Android Studio's bundled JBR)
 - **Android SDK** (`ANDROID_HOME` or `ANDROID_SDK_ROOT`) and **`git`**
-- **`android` CLI and an emulator or connected device** for interactive live preview (`start`, `check`, `open`; Wear boards require a Wear OS AVD or connected watch; headless `render` uses Robolectric locally without booting a device)
+- **`android` CLI and an emulator or connected device** for interactive live preview (`start`, `check`, `open`; Wear boards run offscreen `check` on a phone AVD with a round screen layout, and only live interactive Wear viewing needs a Wear OS AVD or watch; headless `render` uses Robolectric locally without booting a device)
 
 On first run, if the cached runtime under `~/.cache/android-design-preview/<version>/` is missing, the bootstrap script sparse-checkouts `app/` from GitHub at tag `v<version>` and runs `./gradlew :host:exportBootstrap` once to build the previewer server/CLI, Android Host APK, and AndroidX compile and Robolectric bundles locally.
 
