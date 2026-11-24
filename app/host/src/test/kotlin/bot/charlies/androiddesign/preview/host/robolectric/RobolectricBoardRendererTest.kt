@@ -3,13 +3,24 @@ package bot.charlies.androiddesign.preview.host.robolectric
 import android.os.Looper
 import android.view.inspector.WindowInspector
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.blur.BlurRadiusSpec
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.dp
 import androidx.navigationevent.NavigationEventDispatcherOwner
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import bot.charlies.androiddesign.preview.domain.RenderReport
@@ -742,6 +753,65 @@ class RobolectricBoardRendererTest {
     assertTrue(
       "Wear views must stay dark even when darkOverride=false",
       resp.results.single().tree!!.view.dark,
+    )
+  }
+
+  @Test
+  fun rendersUniformAndProgressiveBlur() {
+    val board =
+      designBoard("Blur") {
+        screen("main") {
+          Box(Modifier.fillMaxSize().background(Color.White)) {
+            Box(
+              Modifier.offset(50.dp, 50.dp)
+                .size(100.dp)
+                .blur(16.dp, BlurredEdgeTreatment.Unbounded)
+                .background(Color.Black),
+            )
+            Box(
+              Modifier.offset(50.dp, 250.dp)
+                .size(100.dp)
+                .blur(
+                  blurRadiusSpec = BlurRadiusSpec.verticalGradient(0.dp, 16.dp),
+                  edgeTreatment = BlurredEdgeTreatment.Unbounded,
+                )
+                .background(Color.Black),
+            )
+            Box(Modifier.offset(250.dp, 50.dp).size(40.dp).background(Color.Red))
+          }
+        }
+      }
+    val frame =
+      RobolectricBoardRenderer.renderSingleView(
+          board = board,
+          direction = board.directions.single(),
+          screenId = "main",
+          view = Views.Light,
+          sourceFile = "RobolectricBoardRendererTest.kt",
+          sourceText = "",
+          density = 2f,
+        )
+        .frame
+    fun rgb(x: Int, y: Int): Triple<Int, Int, Int> {
+      val i = (y * frame.width + x) * 4
+      return Triple(
+        frame.bytes[i].toInt() and 0xFF,
+        frame.bytes[i + 1].toInt() and 0xFF,
+        frame.bytes[i + 2].toInt() and 0xFF,
+      )
+    }
+    fun isSoft(px: Triple<Int, Int, Int>) = px.first in 20..235
+
+    // 2dp outside the uniformly blurred square's left edge: white without blur, gray with it.
+    assertTrue("Uniform blur edge should be soft: ${rgb(96, 200)}", isSoft(rgb(96, 200)))
+    // The progressive square is sharp at its top (radius 0) and soft at its bottom (16dp).
+    assertTrue("Progressive top should stay sharp: ${rgb(200, 496)}", rgb(200, 496).first > 235)
+    assertTrue("Progressive bottom should be soft: ${rgb(200, 704)}", isSoft(rgb(200, 704)))
+    // Channel order matches RGBA.
+    val red = rgb(540, 140)
+    assertTrue(
+      "Expected red in RGBA order: $red",
+      red.first > 200 && red.second < 60 && red.third < 60,
     )
   }
 }

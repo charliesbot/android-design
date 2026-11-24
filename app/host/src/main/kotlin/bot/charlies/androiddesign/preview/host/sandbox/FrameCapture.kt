@@ -3,10 +3,6 @@ package bot.charlies.androiddesign.preview.host.sandbox
 import android.content.Context
 import android.content.ContextWrapper
 import android.graphics.Bitmap
-import android.graphics.HardwareRenderer
-import android.graphics.PixelFormat
-import android.graphics.RenderNode
-import android.hardware.HardwareBuffer
 import android.media.Image
 import android.media.ImageReader
 import android.os.Handler
@@ -36,41 +32,15 @@ import net.jpountz.lz4.LZ4Factory
 internal class FrameCapture {
   private val lz4Compressor = LZ4Factory.fastestInstance().fastCompressor()
   private val mainHandler = Handler(Looper.getMainLooper())
-  private var hardwareRenderer: HardwareRenderer? = null
-  private var renderNode: RenderNode? = null
-  private var hwImageReader: ImageReader? = null
-  private var hwWidth: Int = 0
-  private var hwHeight: Int = 0
+  private var frameRenderer: HardwareFrameRenderer? = null
 
   suspend fun capture(
     activity: HostRenderActivity,
     widthPx: Int,
     heightPx: Int,
   ): CapturedFrame {
-    if (hardwareRenderer == null) {
-      hardwareRenderer = HardwareRenderer()
-      renderNode = RenderNode("adp-frame")
-    }
-    if (hwImageReader == null || hwWidth != widthPx || hwHeight != heightPx) {
-      hwImageReader?.close()
-      hwImageReader =
-        ImageReader.newInstance(
-          widthPx,
-          heightPx,
-          PixelFormat.RGBA_8888,
-          2,
-          HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE or
-            HardwareBuffer.USAGE_GPU_COLOR_OUTPUT or
-            HardwareBuffer.USAGE_CPU_READ_OFTEN,
-        )
-      hwWidth = widthPx
-      hwHeight = heightPx
-      hardwareRenderer!!.setSurface(hwImageReader!!.surface)
-    }
-    val rn = renderNode!!
-    val hr = hardwareRenderer!!
-    val reader = hwImageReader!!
-
+    val hw = frameRenderer ?: HardwareFrameRenderer().also { frameRenderer = it }
+    val reader = hw.prepare(widthPx, heightPx)
     while (true) {
       val stale = reader.acquireLatestImage() ?: break
       stale.close()
@@ -81,33 +51,21 @@ internal class FrameCapture {
       measureMainActivityTarget(activity, widthPx, heightPx)
       val view = checkNotNull(activity.composeView)
       val overlays = collectOverlayWindows(activity)
-
-      rn.setPosition(0, 0, widthPx, heightPx)
-      val canvas = rn.beginRecording(widthPx, heightPx)
-      try {
-        overlayOffsets =
-          OverlayWindowHelper.drawWindowComposite(
-            canvas = canvas,
-            mainView = view,
-            mainDecorView = activity.window.decorView,
-            overlays = overlays,
-            widthPx = widthPx,
-            heightPx = heightPx,
-          )
-      } finally {
-        rn.endRecording()
+      overlayOffsets = hw.record { canvas ->
+        OverlayWindowHelper.drawWindowComposite(
+          canvas = canvas,
+          mainView = view,
+          mainDecorView = activity.window.decorView,
+          overlays = overlays,
+          widthPx = widthPx,
+          heightPx = heightPx,
+        )
       }
-      hr.setContentRoot(rn)
     }
 
-    val syncStatus = hr.createRenderRequest().setWaitForPresent(true).syncAndDraw()
-    check(
-      syncStatus == HardwareRenderer.SYNC_OK || syncStatus == HardwareRenderer.SYNC_FRAME_DROPPED,
-    ) {
-      "HardwareRenderer syncAndDraw status=$syncStatus"
-    }
+    hw.syncAndDraw()
     val image = acquireLatestOrWaitImage(reader)
-    return CapturedFrame(copyImageToRgba(image, widthPx, heightPx), overlayOffsets)
+    return CapturedFrame(image.toRawRgbaFrame(widthPx, heightPx), overlayOffsets)
   }
 
   suspend fun acquireLatestOrWaitImage(
@@ -150,46 +108,6 @@ internal class FrameCapture {
         mainHandler.removeCallbacks(timeoutRunnable)
         reader.setOnImageAvailableListener(null, null)
       }
-    }
-  }
-
-  private fun copyImageToRgba(image: Image, expectedW: Int, expectedH: Int): RawRgbaFrame {
-    try {
-      val plane = image.planes[0]
-      val buf = plane.buffer
-      val rowStride = plane.rowStride
-      val pixelStride = plane.pixelStride
-      val w = minOf(image.width, expectedW)
-      val h = minOf(image.height, expectedH)
-      val out = ByteArray(w * h * 4)
-      val expectedRowBytes = w * 4
-      if (pixelStride == 4 && rowStride == expectedRowBytes) {
-        buf.position(0)
-        buf.get(out, 0, out.size)
-      } else {
-        val rowTmp = ByteArray(rowStride)
-        for (y in 0 until h) {
-          buf.position(y * rowStride)
-          val toRead = minOf(rowStride, buf.remaining())
-          buf.get(rowTmp, 0, toRead)
-          if (pixelStride == 4) {
-            System.arraycopy(rowTmp, 0, out, y * expectedRowBytes, expectedRowBytes)
-          } else {
-            var dst = y * expectedRowBytes
-            var src = 0
-            for (x in 0 until w) {
-              out[dst++] = rowTmp[src]
-              out[dst++] = rowTmp[src + 1]
-              out[dst++] = rowTmp[src + 2]
-              out[dst++] = rowTmp[src + 3]
-              src += pixelStride
-            }
-          }
-        }
-      }
-      return RawRgbaFrame(w, h, out)
-    } finally {
-      image.close()
     }
   }
 

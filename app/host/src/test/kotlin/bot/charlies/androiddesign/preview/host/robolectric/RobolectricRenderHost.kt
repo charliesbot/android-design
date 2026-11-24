@@ -1,7 +1,5 @@
 package bot.charlies.androiddesign.preview.host.robolectric
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
 import android.os.Looper
 import android.view.View
@@ -28,7 +26,6 @@ import bot.charlies.androiddesign.preview.feature.preview.sandbox.InsetConsuming
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.MountedRenderSession
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.OverlayWindowHelper
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.PreparedRenderTarget
-import bot.charlies.androiddesign.preview.feature.preview.sandbox.RawRgbaFrame
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.RenderBoardContent
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.RenderWindowSnapshot
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.SettlePolicy
@@ -36,16 +33,19 @@ import bot.charlies.androiddesign.preview.feature.preview.sandbox.WearScrollDriv
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.WearScrollHelper
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
 import bot.charlies.androiddesign.preview.host.sandbox.GuardedRecomposer
+import bot.charlies.androiddesign.preview.host.sandbox.HardwareFrameRenderer
+import bot.charlies.androiddesign.preview.host.sandbox.toRawRgbaFrame
 import java.util.concurrent.atomic.AtomicReference
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
 
 /**
  * Headless Robolectric SDK 35 [BoardRenderHost] backed by an isolated `ComponentActivity` and
- * `Bitmap.getPixels` software frame capture.
+ * `HardwareRenderer` frame capture shared with the device host.
  */
 @OptIn(ComposeToolingApi::class)
 internal class RobolectricRenderHost : BoardRenderHost {
+  private val frameRenderer by lazy { HardwareFrameRenderer() }
 
   override suspend fun <T> withMountedTarget(
     target: PreparedRenderTarget,
@@ -124,7 +124,7 @@ internal class RobolectricRenderHost : BoardRenderHost {
           override val driver: WearScrollDriver = driver
 
           override suspend fun captureFrame(): CapturedFrame =
-            captureBitmapFrame(activity, cv, target.widthPx, target.heightPx)
+            captureHardwareFrame(activity, cv, target.widthPx, target.heightPx)
 
           override suspend fun <R> onUiThread(block: () -> R): R = block()
 
@@ -145,45 +145,45 @@ internal class RobolectricRenderHost : BoardRenderHost {
     }
   }
 
-  private fun captureBitmapFrame(
+  private fun captureHardwareFrame(
     activity: ComponentActivity,
     composeView: ComposeView,
     widthPx: Int,
     heightPx: Int,
   ): CapturedFrame {
-    val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
-    val rgba = ByteArray(widthPx * heightPx * 4)
     val mainDecor = activity.window.decorView
     val attachedWindows = WindowInspector.getGlobalWindowViews().filter { it.isAttachedToWindow }
     val overlays = attachedWindows.filter { it !== mainDecor }
     val mainView = if (mainDecor in attachedWindows) mainDecor else composeView
-    val explicitWindowOffsets =
-      try {
-        val offsets =
-          OverlayWindowHelper.drawWindowComposite(
-            canvas = Canvas(bitmap),
-            mainView = mainView,
-            mainDecorView = mainDecor,
-            overlays = overlays,
-            widthPx = widthPx,
-            heightPx = heightPx,
-            backgroundColor = AndroidColor.BLACK,
-          )
-        // Unpack via getPixels so RGBA byte order matches ImageReader RGBA_8888 across host Skia.
-        val ints = IntArray(widthPx * heightPx)
-        bitmap.getPixels(ints, 0, widthPx, 0, 0, widthPx, heightPx)
-        var d = 0
-        for (px in ints) {
-          rgba[d++] = ((px ushr 16) and 0xFF).toByte()
-          rgba[d++] = ((px ushr 8) and 0xFF).toByte()
-          rgba[d++] = (px and 0xFF).toByte()
-          rgba[d++] = ((px ushr 24) and 0xFF).toByte()
-        }
-        offsets
-      } finally {
-        bitmap.recycle()
-      }
-    return CapturedFrame(RawRgbaFrame(widthPx, heightPx, rgba), explicitWindowOffsets)
+    val reader = frameRenderer.prepare(widthPx, heightPx)
+    val offsets = frameRenderer.record { canvas ->
+      OverlayWindowHelper.drawWindowComposite(
+        canvas = canvas,
+        mainView = mainView,
+        mainDecorView = mainDecor,
+        overlays = overlays,
+        widthPx = widthPx,
+        heightPx = heightPx,
+        backgroundColor = AndroidColor.BLACK,
+      )
+    }
+    frameRenderer.syncAndDraw()
+    // Robolectric's acquireLatestImage never reports an empty queue, so take the one frame drawn.
+    val image = reader.acquireNextImage()
+    val frame = image.toRawRgbaFrame(widthPx, heightPx)
+    swapRedBlue(frame.bytes)
+    return CapturedFrame(frame, offsets)
+  }
+
+  /** Host Skia hands Robolectric's ImageReader BGRA bytes; the device's are RGBA. */
+  private fun swapRedBlue(bytes: ByteArray) {
+    var i = 0
+    while (i < bytes.size) {
+      val r = bytes[i]
+      bytes[i] = bytes[i + 2]
+      bytes[i + 2] = r
+      i += 4
+    }
   }
 
   private class FallbackNavigationEventDispatcherOwner : NavigationEventDispatcherOwner {
