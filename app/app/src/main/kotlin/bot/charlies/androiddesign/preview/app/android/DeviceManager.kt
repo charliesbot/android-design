@@ -78,6 +78,8 @@ sealed interface DeviceSetupResult {
     val aotCompiled: Boolean,
     val apkSha256: String,
     val sandboxPid: Int,
+    /** True only when this call started the AVD, so the server may shut it down on exit. */
+    val bootedEmulator: Boolean = false,
   ) : DeviceSetupResult
 
   data class Failed(
@@ -113,6 +115,33 @@ class DeviceManager(
     val avdName: String? = null,
   )
 
+  /**
+   * Checks a device request without booting or installing anything: adb is present, a requested
+   * serial is online, and a requested AVD is online or exists. `start` calls it so bad input fails
+   * fast in the CLI before the server, which does the actual setup, is started.
+   */
+  fun validateRequest(requestedSerial: String?, requestedAvd: String?): DeviceSetupResult.Failed? {
+    val sdkDir = resolveSdkDir()
+    val adbBin = resolveAdbBinary(sdkDir) ?: return adbNotFound()
+    val cmdEnv = sdkEnv(sdkDir)
+    if (!requestedSerial.isNullOrBlank()) {
+      val wanted = requestedSerial.trim()
+      val online = listOnlineDevices(adbBin, cmdEnv)
+      return if (online.any { it.serial == wanted }) null else unknownSerial(wanted, online)
+    }
+    if (!requestedAvd.isNullOrBlank()) {
+      val wanted = requestedAvd.trim()
+      val onlineMatch =
+        listOnlineDevices(adbBin, cmdEnv).any {
+          (it.avdName ?: queryAvdName(adbBin, it.serial, cmdEnv)) == wanted
+        }
+      if (onlineMatch) return null
+      val avds = listAvds(resolveAndroidCli(), sdkDir, cmdEnv)
+      return if (wanted in avds) null else unknownAvd(wanted, avds)
+    }
+    return null
+  }
+
   fun ensureDeviceReady(
     meta: BootstrapMeta,
     requestedSerial: String? = null,
@@ -121,36 +150,19 @@ class DeviceManager(
     forceReinstall: Boolean = false,
   ): DeviceSetupResult {
     val sdkDir = resolveSdkDir()
-    val adbBin =
-      resolveAdbBinary(sdkDir)
-        ?: return DeviceSetupResult.Failed(
-          exitCode = ClientExitCode.NOT_READY,
-          error = "adb_not_found",
-          message = "Cannot find `adb`. Ensure Android SDK platform-tools are installed.",
-        )
+    val adbBin = resolveAdbBinary(sdkDir) ?: return adbNotFound()
     val androidCli = resolveAndroidCli()
-    val cmdEnv = buildMap {
-      sdkDir?.let {
-        put("ANDROID_HOME", it.toString())
-        put("ANDROID_SDK_ROOT", it.toString())
-      }
-    }
+    val cmdEnv = sdkEnv(sdkDir)
 
     val onlineDevices = listOnlineDevices(adbBin, cmdEnv)
     val chosenSerial: String
+    var bootedEmulator = false
     var chosenAvd: String? = requestedAvd
 
     if (!requestedSerial.isNullOrBlank()) {
       val wanted = requestedSerial.trim()
       val match = onlineDevices.firstOrNull { it.serial == wanted }
-      if (match == null) {
-        return DeviceSetupResult.Failed(
-          exitCode = ClientExitCode.USAGE,
-          error = "unknown_serial",
-          message =
-            "Device serial '$wanted' is not online (online: ${onlineDevices.joinToString { it.serial }.ifBlank { "none" }})",
-        )
-      }
+      if (match == null) return unknownSerial(wanted, onlineDevices)
       chosenSerial = match.serial
       chosenAvd = match.avdName ?: queryAvdName(adbBin, chosenSerial, cmdEnv)
     } else if (!requestedAvd.isNullOrBlank()) {
@@ -165,14 +177,7 @@ class DeviceManager(
         chosenAvd = onlineMatch.avdName
       } else {
         val avds = listAvds(androidCli, sdkDir, cmdEnv)
-        if (wanted !in avds) {
-          return DeviceSetupResult.Failed(
-            exitCode = ClientExitCode.USAGE,
-            error = "unknown_avd",
-            message =
-              "AVD '$wanted' does not exist (available: ${avds.joinToString().ifBlank { "none" }})",
-          )
-        }
+        if (wanted !in avds) return unknownAvd(wanted, avds)
         chosenAvd = wanted
         chosenSerial =
           startAvdAndWaitOnline(androidCli, adbBin, sdkDir, wanted, headless, cmdEnv)
@@ -181,6 +186,7 @@ class DeviceManager(
               error = "emulator_start_failed",
               message = "Failed starting AVD '$wanted'.",
             )
+        bootedEmulator = true
       }
     } else if (onlineDevices.isNotEmpty()) {
       val annotated = onlineDevices.map { slot ->
@@ -219,6 +225,7 @@ class DeviceManager(
             message = "Failed starting AVD '$targetAvd'.",
           )
       chosenSerial = started
+      bootedEmulator = true
     }
 
     if (!waitUntilBootCompleted(adbBin, chosenSerial, cmdEnv)) {
@@ -356,7 +363,26 @@ class DeviceManager(
       aotCompiled = aotNow,
       apkSha256 = apkSha256,
       sandboxPid = ping.pid,
+      bootedEmulator = bootedEmulator,
     )
+  }
+
+  /**
+   * Shuts down the emulator at [serial] with `adb emu kill`. Callers pass only a serial this server
+   * booted ([DeviceSetupResult.Ready.bootedEmulator]); devices the user started stay up.
+   */
+  fun shutdownEmulator(serial: String): Boolean {
+    val sdkDir = resolveSdkDir()
+    val adbBin = resolveAdbBinary(sdkDir) ?: return false
+    val cmdEnv = buildMap {
+      sdkDir?.let {
+        put("ANDROID_HOME", it.toString())
+        put("ANDROID_SDK_ROOT", it.toString())
+      }
+    }
+    return runner
+      .run(listOf(adbBin, "-s", serial, "emu", "kill"), ADB_SHORT_TIMEOUT_MS, cmdEnv)
+      .exitCode == 0
   }
 
   fun launchLiveActivity(serial: String? = null): Boolean {
@@ -513,24 +539,20 @@ class DeviceManager(
     cmdEnv: Map<String, String>,
   ): String? {
     val before = listOnlineDevices(adbBin, cmdEnv).map { it.serial }.toSet()
-    if (androidCli != null) {
-      val cmd = buildList {
-        add(androidCli)
-        add("emulator")
-        add("start")
-        if (headless) add("--headless")
-        add(avdName)
-      }
-      val startOut = runner.run(cmd, BOOT_TIMEOUT_MS, cmdEnv)
-      if (startOut.exitCode != 0) return null
-    } else {
-      val emulatorBin =
-        sdkDir?.resolve("emulator/emulator")?.takeIf { Files.isExecutable(it) }?.toString()
-          ?: return null
+    // Prefer the SDK emulator with the host GPU: `android emulator start --headless` picks software
+    // rendering (lavapipe/SwiftShader), and recent system images never come online that way, and it
+    // cannot pass emulator flags. `-no-snapshot-save` keeps our shutdown from writing a quickboot
+    // snapshot into the user's AVD; booting from such a snapshot left the device offline for good.
+    val emulatorBin =
+      sdkDir?.resolve("emulator/emulator")?.takeIf { Files.isExecutable(it) }?.toString()
+    if (emulatorBin != null) {
       val cmd = buildList {
         add(emulatorBin)
         add("-avd")
         add(avdName)
+        add("-gpu")
+        add("host")
+        add("-no-snapshot-save")
         if (headless) add("-no-window")
       }
       if (runner === ProcessCommandRunner) {
@@ -544,6 +566,18 @@ class DeviceManager(
       } else {
         runner.run(cmd, BOOT_TIMEOUT_MS, cmdEnv)
       }
+    } else if (androidCli != null) {
+      val cmd = buildList {
+        add(androidCli)
+        add("emulator")
+        add("start")
+        if (headless) add("--headless")
+        add(avdName)
+      }
+      val startOut = runner.run(cmd, BOOT_TIMEOUT_MS, cmdEnv)
+      if (startOut.exitCode != 0) return null
+    } else {
+      return null
     }
 
     val deadline = System.currentTimeMillis() + BOOT_WAIT_MS
@@ -693,6 +727,36 @@ class DeviceManager(
     }
     return null
   }
+
+  private fun sdkEnv(sdkDir: Path?): Map<String, String> = buildMap {
+    sdkDir?.let {
+      put("ANDROID_HOME", it.toString())
+      put("ANDROID_SDK_ROOT", it.toString())
+    }
+  }
+
+  private fun adbNotFound() =
+    DeviceSetupResult.Failed(
+      exitCode = ClientExitCode.NOT_READY,
+      error = "adb_not_found",
+      message = "Cannot find `adb`. Ensure Android SDK platform-tools are installed.",
+    )
+
+  private fun unknownSerial(wanted: String, online: List<DeviceSlot>) =
+    DeviceSetupResult.Failed(
+      exitCode = ClientExitCode.USAGE,
+      error = "unknown_serial",
+      message =
+        "Device serial '$wanted' is not online (online: ${online.joinToString { it.serial }.ifBlank { "none" }})",
+    )
+
+  private fun unknownAvd(wanted: String, avds: List<String>) =
+    DeviceSetupResult.Failed(
+      exitCode = ClientExitCode.USAGE,
+      error = "unknown_avd",
+      message =
+        "AVD '$wanted' does not exist (available: ${avds.joinToString().ifBlank { "none" }})",
+    )
 
   private fun resolveSdkDir(): Path? {
     val candidates =

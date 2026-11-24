@@ -14,6 +14,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /** Internal subcommand launched by the CLI client to run the single shared HTTP/SSE host server. */
@@ -102,6 +103,7 @@ class ServerCommand : Command {
 
     val backend: PreviewBackend
     var deviceSerial: String? = null
+    var ownedEmulatorShutdown: (() -> Unit)? = null
     var forwardPort: Int? = null
     var apkSha256: String? = null
     val recycleExecutor = Executors.newSingleThreadExecutor { r ->
@@ -207,6 +209,9 @@ class ServerCommand : Command {
         is DeviceSetupResult.Ready -> {
           deviceSerial = setup.serial
           forwardPort = setup.forwardPort
+          if (setup.bootedEmulator) {
+            ownedEmulatorShutdown = { devMgr.shutdownEmulator(setup.serial) }
+          }
           apkSha256 = setup.apkSha256
           val currentPort = AtomicInteger(setup.forwardPort)
           lateinit var transport: AdbTcpDeviceTransport
@@ -260,11 +265,21 @@ class ServerCommand : Command {
         onProcessExit = { latch.countDown() },
       )
     val record = server.start()
+    // An emulator this server booted goes down with it, unless a newer version replaced this server
+    // and will reuse the running device. Devices the user started are never touched.
+    val emulatorReleased = AtomicBoolean(false)
+    val releaseOwnedEmulator = {
+      val shutdown = ownedEmulatorShutdown
+      if (shutdown != null && !server.wasReplaced && emulatorReleased.compareAndSet(false, true)) {
+        runCatching { shutdown() }
+      }
+    }
     Runtime.getRuntime()
       .addShutdownHook(
         Thread {
           server.stop(triggerExit = false)
           recycleExecutor.shutdownNow()
+          releaseOwnedEmulator()
           latch.countDown()
         },
       )
@@ -278,6 +293,7 @@ class ServerCommand : Command {
       server.stop(triggerExit = false)
     } finally {
       recycleExecutor.shutdownNow()
+      releaseOwnedEmulator()
     }
     return ExitCode.OK
   }

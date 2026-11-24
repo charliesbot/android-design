@@ -84,6 +84,11 @@ class PreviewHttpServer(
   private val closed = AtomicBoolean(false)
   private val recycleScheduled = AtomicBoolean(false)
   private val replacementSignal = CompletableFuture<String>()
+
+  /** True once a newer version asked this server to stop; its successor reuses the device. */
+  val wasReplaced: Boolean
+    get() = replacementSignal.isDone
+
   private val inFlightChecks = AtomicInteger(0)
   private val sseClients = CopyOnWriteArrayList<SseClient>()
   private val repos = ConcurrentHashMap<String, RepoState>()

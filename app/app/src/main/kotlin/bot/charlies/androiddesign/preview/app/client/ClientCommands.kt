@@ -1,7 +1,6 @@
 package bot.charlies.androiddesign.preview.app.client
 
 import bot.charlies.androiddesign.preview.app.android.DeviceManager
-import bot.charlies.androiddesign.preview.app.android.DeviceSetupResult
 import bot.charlies.androiddesign.preview.app.cli.Command
 import bot.charlies.androiddesign.preview.app.server.CheckRequest
 import bot.charlies.androiddesign.preview.app.server.CheckResponse
@@ -87,6 +86,7 @@ private fun parseClientArgs(
 class StartCommand(
   private val cacheRoot: Path = ServerPaths.cacheRoot(),
   private val env: Map<String, String> = System.getenv(),
+  /** Validates `--serial` / `--avd` only; the server does the device setup. */
   private val deviceManager: DeviceManager = DeviceManager(cacheRoot = cacheRoot, env = env),
   private val clientFactory: (BootstrapMeta) -> PreviewClient = { meta ->
     val startEnv =
@@ -101,17 +101,37 @@ class StartCommand(
     PreviewClient(cacheRoot = cacheRoot, env = startEnv)
   },
   private val bootstrapLocator: () -> BootstrapMeta? = { BootstrapMeta.locateOrNull(env) },
+  /**
+   * Starts or reuses the shared server. The server does the only device setup, so an emulator it
+   * boots is known to be its own and is shut down when the server stops.
+   */
+  private val startServer: (ServerRequest) -> PreviewClient.ServerLookup = { request ->
+    clientFactory(request.meta)
+      .ensureServer(
+        repoRoot = request.repoRoot,
+        requestedSerial = request.serial,
+        requestedAvd = request.avd,
+        headless = request.headless,
+        forceReinstallApk = false,
+      )
+  },
 ) : Command {
   override val name = "start"
+
+  data class ServerRequest(
+    val meta: BootstrapMeta,
+    val repoRoot: Path,
+    val serial: String?,
+    val avd: String?,
+    val headless: Boolean,
+  )
+
   override val usage = "start [--serial <id>] [--avd <name>] [--headless] [--help]"
 
   @Serializable
   data class StartResponse(
     val ok: Boolean = true,
     val serial: String,
-    val avd: String? = null,
-    val apkInstalled: Boolean,
-    val aotCompiled: Boolean,
     val forwardPort: Int,
     val serverPid: Long,
     val serverPort: Int,
@@ -156,32 +176,23 @@ class StartCommand(
     val requestedAvd = parsed.flags["--avd"]
     val headless = parsed.flags["--headless"] == "true"
 
-    val setup =
-      deviceManager.ensureDeviceReady(
-        meta = meta,
-        requestedSerial = requestedSerial,
-        requestedAvd = requestedAvd,
-        headless = headless,
-      )
-    val readyDevice =
-      when (setup) {
-        is DeviceSetupResult.Failed ->
-          return emitError(out, setup.exitCode, setup.error, setup.message)
-        is DeviceSetupResult.Ready -> setup
-      }
+    deviceManager.validateRequest(requestedSerial, requestedAvd)?.let { invalid ->
+      return emitError(out, invalid.exitCode, invalid.error, invalid.message)
+    }
 
     val targetDir =
       parsed.positionals.firstOrNull()?.let { Path.of(it).toAbsolutePath().normalize() }
         ?: Path.of(".").toAbsolutePath().normalize()
     val repoRoot = ServerPaths.resolveRepoRoot(targetDir)
-    val client = clientFactory(meta)
     val lookup =
-      client.ensureServer(
-        repoRoot = repoRoot,
-        requestedSerial = readyDevice.serial,
-        requestedAvd = readyDevice.avdName,
-        headless = headless,
-        forceReinstallApk = false,
+      startServer(
+        ServerRequest(
+          meta = meta,
+          repoRoot = repoRoot,
+          serial = requestedSerial,
+          avd = requestedAvd,
+          headless = headless,
+        ),
       )
     val readyServer =
       when (lookup) {
@@ -189,17 +200,26 @@ class StartCommand(
           return emitError(out, ClientExitCode.NOT_READY, "server_not_ready", lookup.message)
         is PreviewClient.ServerLookup.Ready -> lookup
       }
+    val status = readyServer.status
+    val serial = status.deviceSerial
+    val forwardPort = status.adbForwardPort
+    if (serial == null || forwardPort == null) {
+      return emitError(
+        out,
+        ClientExitCode.NOT_READY,
+        "server_not_ready",
+        "Preview server is running without an Android device (backend ${status.backend}).",
+        next = "android-design-preview stop",
+      )
+    }
 
     val resp =
       StartResponse(
         ok = true,
-        serial = readyDevice.serial,
-        avd = readyDevice.avdName,
-        apkInstalled = readyDevice.apkInstalled,
-        aotCompiled = readyDevice.aotCompiled,
-        forwardPort = readyDevice.forwardPort,
-        serverPid = readyServer.status.pid,
-        serverPort = readyServer.status.port,
+        serial = serial,
+        forwardPort = forwardPort,
+        serverPid = status.pid,
+        serverPort = status.port,
         boardUrl = readyServer.record.boardUrl(ServerPaths.repoHash(repoRoot)),
       )
     emitJson(out, PreviewJson.compact.encodeToString(StartResponse.serializer(), resp))
