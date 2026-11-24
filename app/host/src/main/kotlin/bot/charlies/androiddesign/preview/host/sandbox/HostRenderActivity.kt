@@ -10,30 +10,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
-import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.BroadcastFrameClock
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Recomposer
-import androidx.compose.runtime.currentComposer
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.tooling.ComposeToolingApi
 import androidx.compose.runtime.tooling.CompositionData
-import androidx.compose.runtime.tooling.LocalInspectionTables
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.SubcomposeLayout
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.compositionContext
 import androidx.compose.ui.platform.isDebugInspectorInfoEnabled
-import androidx.compose.ui.unit.Density
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -46,38 +33,25 @@ import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.navigationevent.NavigationEventDispatcher
 import androidx.navigationevent.NavigationEventDispatcherOwner
-import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.InsetConsumingFrameLayout
+import bot.charlies.androiddesign.preview.feature.preview.sandbox.PreparedRenderTarget
+import bot.charlies.androiddesign.preview.feature.preview.sandbox.RenderBoardContent
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
-import bot.charlies.androiddesign.preview.kit.DirectionSpec
-import bot.charlies.androiddesign.preview.kit.ExplorationBoard
-import bot.charlies.androiddesign.preview.kit.ExploreBoardFrame
-import bot.charlies.androiddesign.preview.model.DesignSystem
-import bot.charlies.androiddesign.preview.model.ViewSpec
 import java.lang.ref.WeakReference
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
 
+@OptIn(ComposeToolingApi::class)
 internal class ActiveRenderSession(
   val sessionKey: String,
-  val sourceFile: String,
-  val sourceText: String,
-  val board: ExplorationBoard,
-  val direction: DirectionSpec,
-  val screenId: String,
-  val view: ViewSpec,
-  val designSystem: DesignSystem,
-  val overlayId: String?,
-  val renderDensity: Float,
-  val fontScale: Float,
+  val target: PreparedRenderTarget,
   val overrideContext: Context,
   val overrideConfig: Configuration,
   val inspectionTables: MutableSet<CompositionData>,
-  val assetResolver: ((String) -> ImageBitmap?)?,
   val onRootCoordinates: (LayoutCoordinates) -> Unit,
   val onEmptyDetail: (String?) -> Unit,
 )
@@ -181,29 +155,15 @@ class HostRenderActivity : ComponentActivity() {
         val session = activeSession.value
         if (session != null) {
           key(session.sessionKey) {
-            CompositionLocalProvider(
-              LocalContext provides session.overrideContext,
-              LocalConfiguration provides session.overrideConfig,
-              LocalDensity provides
-                Density(session.renderDensity, fontScale = session.fontScale.coerceAtLeast(0.5f)),
-              LocalNavigationEventDispatcherOwner provides alwaysResumedOwners,
-            ) {
-              Box(Modifier.onGloballyPositioned { session.onRootCoordinates(it) }) {
-                InspectedSubcomposition(session.inspectionTables) {
-                  ExploreBoardFrame(
-                    board = session.board,
-                    direction = session.direction,
-                    screenId = session.screenId,
-                    view = session.view,
-                    designSystem = session.designSystem,
-                    explorationDir = null,
-                    overlayId = session.overlayId,
-                    assetResolver = session.assetResolver,
-                    onEmptyDetail = session.onEmptyDetail,
-                  )
-                }
-              }
-            }
+            RenderBoardContent(
+              target = session.target,
+              overrideContext = session.overrideContext,
+              overrideConfig = session.overrideConfig,
+              inspectionTables = session.inspectionTables,
+              navigationEventDispatcherOwner = alwaysResumedOwners,
+              onRootCoordinates = session.onRootCoordinates,
+              onEmptyDetail = session.onEmptyDetail,
+            )
           }
         }
       }
@@ -245,28 +205,6 @@ class HostRenderActivity : ComponentActivity() {
 
     fun resetLatch() {
       readyLatch = CountDownLatch(1)
-    }
-  }
-}
-
-@OptIn(ComposeToolingApi::class)
-@Composable
-internal fun InspectedSubcomposition(
-  tables: MutableSet<CompositionData>,
-  content: @Composable () -> Unit,
-) {
-  // Enable source/parameter markers only on the outer composer if root didn't enable them.
-  // Calling collectParameterInformation() inside subcompose(Unit) resets an already-populated
-  // SlotTable.sourceInformationMap mid-composition and drops child source info.
-  if (LocalInspectionTables.current == null) {
-    currentComposer.collectParameterInformation()
-  }
-  CompositionLocalProvider(LocalInspectionTables provides tables) {
-    SubcomposeLayout { constraints ->
-      val placeables = subcompose(Unit) { content() }.map { it.measure(constraints) }
-      val width = placeables.maxOfOrNull { it.width } ?: constraints.minWidth
-      val height = placeables.maxOfOrNull { it.height } ?: constraints.minHeight
-      layout(width, height) { placeables.forEach { it.placeRelative(0, 0) } }
     }
   }
 }

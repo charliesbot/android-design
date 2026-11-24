@@ -9,7 +9,7 @@ import java.nio.file.Files
 import java.nio.file.Paths
 
 /**
- * Stages a source-only request the way `RobolectricPreviewBackend` does, through the device path's
+ * Stages a source-only request the way `RobolectricRenderWorker` does, through the device path's
  * own compiler. The runner uses it for callers that send only `sourcePath` (the eval harness's
  * report renders and tests), so every Robolectric render goes through the same compile,
  * BytecodeGuard, and asset collection as the device.

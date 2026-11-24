@@ -1,6 +1,9 @@
 package bot.charlies.androiddesign.preview.feature.preview.sandbox
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Rect
 import android.view.Gravity
 import android.view.View
@@ -16,6 +19,7 @@ import androidx.compose.ui.layout.LayoutInfo
 import androidx.compose.ui.node.RootForTest
 import androidx.compose.ui.semantics.SemanticsNode
 import java.util.IdentityHashMap
+import kotlin.math.roundToInt
 
 /** Container that absorbs physical display window insets so offscreen Compose trees never shift. */
 internal class InsetConsumingFrameLayout(context: Context) : FrameLayout(context) {
@@ -175,5 +179,53 @@ internal object OverlayWindowHelper {
       table.compositionGroups.forEach(::indexGroupOffsets)
     }
     return layoutWindowOffsets
+  }
+
+  /**
+   * Draws [mainView] and every visible [overlays] window onto [canvas], applying `FLAG_DIM_BEHIND`
+   * scrims and returning measured window offsets keyed by window root view.
+   */
+  fun drawWindowComposite(
+    canvas: Canvas,
+    mainView: View,
+    mainDecorView: View,
+    overlays: List<View>,
+    widthPx: Int,
+    heightPx: Int,
+    backgroundColor: Int? = null,
+  ): Map<View, Offset> {
+    if (backgroundColor != null) {
+      canvas.drawColor(backgroundColor)
+    }
+    val mainLoc = IntArray(2)
+    mainDecorView.getLocationOnScreen(mainLoc)
+    val dimPaint = Paint()
+    val overlayOffsets = IdentityHashMap<View, Offset>()
+
+    mainView.draw(canvas)
+    for (win in overlays) {
+      val lp = win.layoutParams as? WindowManager.LayoutParams
+      if (
+        lp != null &&
+          (lp.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0 &&
+          lp.dimAmount > 0f
+      ) {
+        val alpha = (lp.dimAmount * 255f).roundToInt().coerceIn(0, 255)
+        dimPaint.color = Color.argb(alpha, 0, 0, 0)
+        canvas.drawRect(0f, 0f, widthPx.toFloat(), heightPx.toFloat(), dimPaint)
+      }
+      val measured = measureAndLayoutOverlayWindow(win, mainLoc, widthPx, heightPx)
+      val offset = measured.offset
+      overlayOffsets[win] = offset
+      canvas.save()
+      canvas.translate(offset.x, offset.y)
+      if (win.width == 0 && measured.width > 0 && win is ViewGroup && win.childCount > 0) {
+        win.getChildAt(0).draw(canvas)
+      } else {
+        win.draw(canvas)
+      }
+      canvas.restore()
+    }
+    return overlayOffsets
   }
 }
