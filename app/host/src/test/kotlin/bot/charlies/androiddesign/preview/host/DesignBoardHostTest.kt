@@ -109,6 +109,7 @@ class DesignBoardHostTest {
       M3Component.BottomSheet.wire,
       CallNameMapper.map("ModalBottomSheet", BoardSurface.Phone),
     )
+    assertEquals(M3Component.Scrim.wire, CallNameMapper.map("Scrim", BoardSurface.Phone))
     assertEquals(WearComponent.Screen.wire, CallNameMapper.map("ScreenScaffold", BoardSurface.Wear))
     assertEquals(WearComponent.EdgeButton.wire, CallNameMapper.map("EdgeButton", BoardSurface.Wear))
     assertEquals("DatePicker", CallNameMapper.map("DatePicker", BoardSurface.Wear))

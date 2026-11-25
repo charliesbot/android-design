@@ -28,7 +28,8 @@ import kotlin.math.round
  * A node with no area is not laid out (a closed overlay is never composed), so the rules that
  * measure geometry skip it. While a modal sheet or dialog is open, everything outside it is inert
  * behind the scrim: it is exempt from the touch target and contrast rules, and the primary action
- * check is skipped.
+ * check is skipped. A `Scrim` node does the same for what it covers among the nodes composed before
+ * it, which is how a manual modal sheet hides the screen under it.
  */
 object FindingRules {
   /** Interactive controls are measured against this touch area, unless the catalog sets another. */
@@ -115,8 +116,22 @@ object FindingRules {
     private val LayoutNode.isDropdown: Boolean
       get() = type == DATE_PICKER && variant == DatePickerSpec.Variant.Docked.wire
 
+    /**
+     * Laid out scrims, with each one's place in document order. A scrim draws over the nodes
+     * composed before it, so its position in the tree is its place in the drawing order.
+     */
+    private val scrims: List<IndexedValue<LayoutNode>> =
+      nodes.withIndex().filter { (_, node) ->
+        node.type == M3Component.Scrim.wire && node.isLaidOut
+      }
+
+    private val order: Map<String, Int> = buildMap {
+      nodes.forEachIndexed { index, node -> putIfAbsent(node.id, index) }
+    }
+
+    /** A modal surface or a scrim is open, so part of the view is inert behind it. */
     val modalOpen: Boolean
-      get() = modals.isNotEmpty()
+      get() = modals.isNotEmpty() || scrims.isNotEmpty()
 
     /** The parents of [node], nearest first. Stops on a cycle or a missing parent. */
     /** Every node below [node], at any depth. */
@@ -138,9 +153,29 @@ object FindingRules {
         item.parent?.let(byId::get)?.type == CAROUSEL
       }
 
-    /** True for a node outside every open modal: inert behind its scrim. */
+    /**
+     * True for a node that is inert: outside every open modal, or composed before a scrim that
+     * covers it. A manual modal sheet (`Scrim` then `BottomSheet`) has no modal node of its own, so
+     * the scrim is what marks the screen behind it.
+     */
     fun isBehindModal(node: LayoutNode): Boolean =
-      modalOpen && node.id !in modals && ancestors(node).none { it.id in modals }
+      (modals.isNotEmpty() && node.id !in modals && ancestors(node).none { it.id in modals }) ||
+        isBehindScrim(node)
+
+    private fun isBehindScrim(node: LayoutNode): Boolean {
+      val index = order[node.id] ?: return false
+      return scrims.any { (scrimIndex, scrim) ->
+        index < scrimIndex &&
+          ancestors(scrim).none { it.id == node.id } &&
+          scrim.bounds.covers(node.bounds)
+      }
+    }
+
+    private fun Bounds.covers(other: Bounds): Boolean =
+      other.x >= x - EDGE_SLACK_DP &&
+        other.y >= y - EDGE_SLACK_DP &&
+        other.x + other.width <= x + width + EDGE_SLACK_DP &&
+        other.y + other.height <= y + height + EDGE_SLACK_DP
   }
 
   // endregion

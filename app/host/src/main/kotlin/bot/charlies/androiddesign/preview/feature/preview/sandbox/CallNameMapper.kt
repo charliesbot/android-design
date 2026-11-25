@@ -19,7 +19,7 @@ internal object CallNameMapper {
       "Box" to M3Component.Box.wire,
       "Canvas" to M3Component.Box.wire,
       "Surface" to M3Component.Box.wire,
-      "Scrim" to M3Component.Box.wire,
+      "Scrim" to M3Component.Scrim.wire,
       "Spacer" to M3Component.Spacer.wire,
       "HorizontalDivider" to M3Component.Divider.wire,
       "VerticalDivider" to M3Component.Divider.wire,
