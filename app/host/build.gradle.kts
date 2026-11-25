@@ -43,6 +43,10 @@ android {
     }
   }
 
+  // Stored fonts are memory-mapped; compressed ones are copied onto the 192 MB Java heap once per
+  // Typeface, and ProposalFonts keeps one Typeface per weight and icon size.
+  androidResources { noCompress += "ttf" }
+
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
