@@ -69,9 +69,14 @@ interface DeviceTransport : AutoCloseable {
     entryClass: String,
     dexBytes: ByteArray?,
     request: DeviceBatchRequest,
+    assetBlobs: Map<String, ByteArray> = emptyMap(),
   ): DeviceBatchExecution
 
-  fun setLive(dexBytes: ByteArray?, request: DeviceLiveStateRequest): Boolean
+  fun setLive(
+    dexBytes: ByteArray?,
+    request: DeviceLiveStateRequest,
+    assetBlobs: Map<String, ByteArray> = emptyMap(),
+  ): Boolean
 
   fun recycle(): Boolean
 }
@@ -311,29 +316,7 @@ internal constructor(
     return synchronized(lock) {
       if (assetBlobs.keys.all { it in syncedAssetHashes }) return@synchronized 0
       try {
-        withReconnect(allowRetry = true) { out, inp ->
-          val unsynced = assetBlobs.filterKeys { it !in syncedAssetHashes }
-          if (unsynced.isEmpty()) return@withReconnect 0
-          DeviceWireCodec.writeHasAssetsRequest(
-            out,
-            DeviceHasAssetsRequest(unsynced.keys.toList()),
-          )
-          val missingHashes = DeviceWireCodec.readHasAssetsResponse(inp).missing
-          val toSend = missingHashes.mapNotNull { h -> unsynced[h]?.let { b -> h to b } }
-          val uploaded =
-            if (toSend.isEmpty()) {
-              0
-            } else {
-              DeviceWireCodec.writePutAssetsRequest(out, toSend)
-              val ack = DeviceWireCodec.readAck(inp)
-              if (!ack.ok) {
-                throw IOException(ack.error ?: "PUT_ASSETS failed")
-              }
-              toSend.size
-            }
-          syncedAssetHashes.addAll(unsynced.keys)
-          uploaded
-        }
+        withReconnect(allowRetry = true) { out, inp -> syncAssetsOnStream(out, inp, assetBlobs) }
       } catch (t: Throwable) {
         syncedAssetHashes.clear()
         throw t
@@ -346,29 +329,34 @@ internal constructor(
     entryClass: String,
     dexBytes: ByteArray?,
     request: DeviceBatchRequest,
+    assetBlobs: Map<String, ByteArray>,
   ): DeviceBatchExecution {
     val wireResult =
       synchronized(lock) {
         val readTimeout =
           maxOf(request.timeoutMs + 10_000L, DEFAULT_READ_TIMEOUT_MS.toLong()).toInt()
-        var sendDex =
-          if (dexBytes != null && (request.forceNewClassLoader || dexHash !in preloadedDexHashes)) {
-            dexBytes
-          } else {
-            null
-          }
+        var sentDex = false
         var result =
           withReconnect(allowRetry = dexBytes != null, readTimeoutMs = readTimeout) { out, inp ->
-            sendRenderBatchOnce(out, inp, sendDex, entryClass, request)
+            syncAssetsOnStream(out, inp, assetBlobs)
+            val attemptDex =
+              if (
+                dexBytes != null && (request.forceNewClassLoader || dexHash !in preloadedDexHashes)
+              ) {
+                dexBytes
+              } else {
+                null
+              }
+            sentDex = attemptDex != null
+            sendRenderBatchOnce(out, inp, attemptDex, entryClass, request)
           }
         val errText = result.response.error.orEmpty()
-        if (
-          !result.response.ok && "not preloaded" in errText && dexBytes != null && sendDex == null
-        ) {
-          sendDex = dexBytes
+        if (!result.response.ok && "not preloaded" in errText && dexBytes != null && !sentDex) {
+          clearSandboxCaches()
           result =
             withReconnect(allowRetry = true, readTimeoutMs = readTimeout) { out, inp ->
-              sendRenderBatchOnce(out, inp, sendDex, entryClass, request)
+              syncAssetsOnStream(out, inp, assetBlobs)
+              sendRenderBatchOnce(out, inp, dexBytes, entryClass, request)
             }
         }
         if (result.response.ok) {
@@ -390,20 +378,30 @@ internal constructor(
     return DeviceBatchExecution(wireResult.response, frames)
   }
 
-  override fun setLive(dexBytes: ByteArray?, request: DeviceLiveStateRequest): Boolean =
+  override fun setLive(
+    dexBytes: ByteArray?,
+    request: DeviceLiveStateRequest,
+    assetBlobs: Map<String, ByteArray>,
+  ): Boolean =
     synchronized(lock) {
-      val sendDex = if (request.dexHash in preloadedDexHashes) null else dexBytes
+      var sentDex = false
       var ack =
         withReconnect(allowRetry = true) { out, inp ->
-          sendSetLiveOnce(out, inp, sendDex, request)
+          syncAssetsOnStream(out, inp, assetBlobs)
+          val attemptDex = if (request.dexHash in preloadedDexHashes) null else dexBytes
+          sentDex = attemptDex != null
+          sendSetLiveOnce(out, inp, attemptDex, request)
         }
-      if (
-        !ack.ok && "not preloaded" in ack.error.orEmpty() && dexBytes != null && sendDex == null
-      ) {
+      if (!ack.ok && "not preloaded" in ack.error.orEmpty() && dexBytes != null && !sentDex) {
+        clearSandboxCaches()
         ack =
           withReconnect(allowRetry = true) { out, inp ->
+            syncAssetsOnStream(out, inp, assetBlobs)
             sendSetLiveOnce(out, inp, dexBytes, request)
           }
+      }
+      if (ack.ok) {
+        preloadedDexHashes.add(request.dexHash)
       }
       ack.ok
     }
@@ -444,6 +442,32 @@ internal constructor(
       check(!closed) { "AdbTcpDeviceTransport is closed" }
       decodeExecutor ?: decodeExecutorFactory(decodeParallelism).also { decodeExecutor = it }
     }
+
+  private fun syncAssetsOnStream(
+    out: DataOutputStream,
+    inp: DataInputStream,
+    assetBlobs: Map<String, ByteArray>,
+  ): Int {
+    if (assetBlobs.isEmpty()) return 0
+    val unsynced = assetBlobs.filterKeys { it !in syncedAssetHashes }
+    if (unsynced.isEmpty()) return 0
+    DeviceWireCodec.writeHasAssetsRequest(out, DeviceHasAssetsRequest(unsynced.keys.toList()))
+    val missingHashes = DeviceWireCodec.readHasAssetsResponse(inp).missing
+    val toSend = missingHashes.mapNotNull { h -> unsynced[h]?.let { b -> h to b } }
+    val uploaded =
+      if (toSend.isEmpty()) {
+        0
+      } else {
+        DeviceWireCodec.writePutAssetsRequest(out, toSend)
+        val ack = DeviceWireCodec.readAck(inp)
+        if (!ack.ok) {
+          throw IOException(ack.error ?: "PUT_ASSETS failed")
+        }
+        toSend.size
+      }
+    syncedAssetHashes.addAll(unsynced.keys)
+    return uploaded
+  }
 
   private fun sendRenderBatchOnce(
     out: DataOutputStream,

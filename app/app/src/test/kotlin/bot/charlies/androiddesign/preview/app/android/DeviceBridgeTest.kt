@@ -4,6 +4,7 @@ import bot.charlies.androiddesign.preview.model.DeviceAckResponse
 import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
 import bot.charlies.androiddesign.preview.model.DeviceBatchResponse
 import bot.charlies.androiddesign.preview.model.DeviceHasAssetsResponse
+import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
 import bot.charlies.androiddesign.preview.model.DeviceOp
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
 import bot.charlies.androiddesign.preview.model.DeviceWireCodec
@@ -467,6 +468,197 @@ class DeviceBridgeTest {
             assertEquals(1, transport.syncAssets(mapOf("hash-a" to blobA)))
             assertEquals(listOf("hash-a"), hasAssetsQueries.last())
             assertEquals(listOf("hash-a"), putAssetBatches.last())
+          }
+      } finally {
+        stopServer.set(1)
+        server.close()
+        serverTask.get(5, TimeUnit.SECONDS)
+        serverPool.shutdownNow()
+      }
+    }
+  }
+
+  @Test
+  fun `renderBatch and setLive re-sync assets on dead-socket reconnect and not-preloaded recovery`() {
+    val assets = mapOf("hash-a" to byteArrayOf(1, 2, 3))
+    val dexBytes = byteArrayOf(9, 8, 7, 6)
+    val eventLog = mutableListOf<String>()
+    val dropNextRenderBatch = AtomicInteger(0)
+    val replyNotPreloadedNextBatch = AtomicInteger(0)
+    val replyNotPreloadedNextLive = AtomicInteger(0)
+    val restarts = AtomicInteger(0)
+
+    ServerSocket(0, 4, InetAddress.getByName("127.0.0.1")).use { server ->
+      server.soTimeout = 5_000
+      val serverPool = Executors.newSingleThreadExecutor()
+      val stopServer = AtomicInteger(0)
+      val serverTask = serverPool.submit {
+        while (stopServer.get() == 0) {
+          val sock =
+            try {
+              server.accept()
+            } catch (_: Exception) {
+              break
+            }
+          sock.use { s ->
+            val inp = DataInputStream(BufferedInputStream(s.getInputStream()))
+            val out = DataOutputStream(BufferedOutputStream(s.getOutputStream()))
+            while (true) {
+              val op =
+                try {
+                  DeviceWireCodec.readOpOrNull(inp)
+                } catch (_: Exception) {
+                  null
+                } ?: break
+              when (op) {
+                DeviceOp.HAS_ASSETS -> {
+                  val req = DeviceWireCodec.readHasAssetsRequest(inp)
+                  eventLog += "HAS_ASSETS:${req.hashes.joinToString(",")}"
+                  DeviceWireCodec.writeHasAssetsResponse(
+                    out,
+                    DeviceHasAssetsResponse(missing = req.hashes),
+                  )
+                }
+                DeviceOp.PUT_ASSETS -> {
+                  val items = DeviceWireCodec.readPutAssetsRequest(inp)
+                  eventLog += "PUT_ASSETS:${items.joinToString(",") { it.first }}"
+                  DeviceWireCodec.writeAck(out, DeviceAckResponse(ok = true, stored = items.size))
+                }
+                DeviceOp.RENDER_BATCH -> {
+                  val payload = DeviceWireCodec.readRenderBatchRequest(inp)
+                  if (dropNextRenderBatch.compareAndSet(1, 0)) {
+                    eventLog += "RENDER_BATCH_DROP:dex=${payload.dexBytes != null}"
+                    break
+                  }
+                  if (replyNotPreloadedNextBatch.compareAndSet(1, 0)) {
+                    eventLog += "RENDER_BATCH_NOT_PRELOADED:dex=${payload.dexBytes != null}"
+                    DeviceWireCodec.writeRenderBatchResponse(
+                      out,
+                      DeviceBatchResponse(ok = false, error = "dex not preloaded"),
+                      emptyList(),
+                    )
+                  } else {
+                    eventLog += "RENDER_BATCH_OK:dex=${payload.dexBytes != null}"
+                    DeviceWireCodec.writeRenderBatchResponse(
+                      out,
+                      DeviceBatchResponse(ok = true),
+                      emptyList(),
+                    )
+                  }
+                }
+                DeviceOp.SET_LIVE -> {
+                  val payload = DeviceWireCodec.readSetLiveRequest(inp)
+                  if (replyNotPreloadedNextLive.compareAndSet(1, 0)) {
+                    eventLog += "SET_LIVE_NOT_PRELOADED:dex=${payload.dexBytes != null}"
+                    DeviceWireCodec.writeAck(
+                      out,
+                      DeviceAckResponse(ok = false, error = "dex not preloaded"),
+                    )
+                  } else {
+                    eventLog += "SET_LIVE_OK:dex=${payload.dexBytes != null}"
+                    DeviceWireCodec.writeAck(out, DeviceAckResponse(ok = true))
+                  }
+                }
+                else -> break
+              }
+            }
+          }
+        }
+      }
+
+      try {
+        AdbTcpDeviceTransport(
+            connectAndEnsurePort = { server.localPort },
+            restartSandboxActivity = { restarts.incrementAndGet() },
+          )
+          .use { transport ->
+            val batchReq =
+              DeviceBatchRequest(
+                dexHash = "dex-1",
+                entryClass = "TestEntry",
+                sourceFile = "test.explore.kt",
+                sourceText = "",
+                targets = emptyList(),
+              )
+            val liveReq =
+              DeviceLiveStateRequest(
+                dexHash = "dex-1",
+                entryClass = "TestEntry",
+                sourceFile = "test.explore.kt",
+                direction = "d1",
+                screen = "s1",
+              )
+
+            // 1. Initial sync + first renderBatch warms both asset and dex caches.
+            assertEquals(1, transport.syncAssets(assets))
+            assertTrue(
+              transport.renderBatch("dex-1", "TestEntry", dexBytes, batchReq, assets).response.ok,
+            )
+            // Warm second call sends no HAS_ASSETS / PUT_ASSETS and no dex bytes.
+            assertEquals(0, transport.syncAssets(assets))
+            assertTrue(
+              transport.renderBatch("dex-1", "TestEntry", dexBytes, batchReq, assets).response.ok,
+            )
+            assertEquals(
+              listOf(
+                "HAS_ASSETS:hash-a",
+                "PUT_ASSETS:hash-a",
+                "RENDER_BATCH_OK:dex=true",
+                "RENDER_BATCH_OK:dex=false",
+              ),
+              eventLog,
+            )
+            eventLog.clear()
+
+            // 2. Warm syncAssets short-circuits, then renderBatch hits a dead socket.
+            //    withReconnect must re-sync assets and resend dex before retrying RENDER_BATCH.
+            assertEquals(0, transport.syncAssets(assets))
+            dropNextRenderBatch.set(1)
+            assertTrue(
+              transport.renderBatch("dex-1", "TestEntry", dexBytes, batchReq, assets).response.ok,
+            )
+            assertEquals(1, restarts.get())
+            assertEquals(
+              listOf(
+                "RENDER_BATCH_DROP:dex=false",
+                "HAS_ASSETS:hash-a",
+                "PUT_ASSETS:hash-a",
+                "RENDER_BATCH_OK:dex=true",
+              ),
+              eventLog,
+            )
+            eventLog.clear()
+
+            // 3. External sandbox restart replies "not preloaded" on renderBatch:
+            //    must clear caches, re-sync assets, and resend dex.
+            replyNotPreloadedNextBatch.set(1)
+            assertTrue(
+              transport.renderBatch("dex-1", "TestEntry", dexBytes, batchReq, assets).response.ok,
+            )
+            assertEquals(
+              listOf(
+                "RENDER_BATCH_NOT_PRELOADED:dex=false",
+                "HAS_ASSETS:hash-a",
+                "PUT_ASSETS:hash-a",
+                "RENDER_BATCH_OK:dex=true",
+              ),
+              eventLog,
+            )
+            eventLog.clear()
+
+            // 4. External sandbox restart replies "not preloaded" on setLive:
+            //    must clear caches, re-sync assets, and resend dex.
+            replyNotPreloadedNextLive.set(1)
+            assertTrue(transport.setLive(dexBytes, liveReq, assets))
+            assertEquals(
+              listOf(
+                "SET_LIVE_NOT_PRELOADED:dex=false",
+                "HAS_ASSETS:hash-a",
+                "PUT_ASSETS:hash-a",
+                "SET_LIVE_OK:dex=true",
+              ),
+              eventLog,
+            )
           }
       } finally {
         stopServer.set(1)

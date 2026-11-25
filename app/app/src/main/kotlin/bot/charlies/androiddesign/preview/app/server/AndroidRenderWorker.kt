@@ -162,6 +162,7 @@ class AndroidRenderWorker(
           variantOverride = update.variantOverride,
           fontScale = update.fontScale,
         ),
+      assetBlobs = data.assetBlobs,
     )
   }
 
@@ -198,6 +199,7 @@ class AndroidRenderWorker(
           targets = targets,
           timeoutMs = batchTimeoutMs,
         ),
+      assetBlobs = data.assetBlobs,
     )
   }
 

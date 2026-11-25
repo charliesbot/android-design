@@ -142,6 +142,7 @@ class AndroidPreviewBackendTest {
       entryClass: String,
       dexBytes: ByteArray?,
       request: DeviceBatchRequest,
+      assetBlobs: Map<String, ByteArray>,
     ): DeviceBatchExecution {
       batchRequests += request
       request.targets.forEach { singleFormats += it.frameFormat }
@@ -241,7 +242,11 @@ class AndroidPreviewBackendTest {
       )
     }
 
-    override fun setLive(dexBytes: ByteArray?, request: DeviceLiveStateRequest): Boolean = true
+    override fun setLive(
+      dexBytes: ByteArray?,
+      request: DeviceLiveStateRequest,
+      assetBlobs: Map<String, ByteArray>,
+    ): Boolean = true
 
     override fun recycle(): Boolean = true
 
