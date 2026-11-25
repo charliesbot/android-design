@@ -1,5 +1,7 @@
 # Visual design exploration v6
 
+> **Proposed successor:** [Visual design exploration v7](visual-design-exploration-v7.md) replaces the emulator with layoutlib as the default renderer. v6 describes the running system until v7 is implemented.
+
 **Date:** 2026-11-22
 
 ## TL;DR
