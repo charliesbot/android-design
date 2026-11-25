@@ -513,4 +513,186 @@ class CheckExecutorTest {
       tmp.toFile().deleteRecursively()
     }
   }
+
+  @Test
+  fun `batch check groups device targets by view size and name, keeps base before overlay, and preserves output order`() {
+    val tmp = createTempDirectory("check-exec-view-group-")
+    try {
+      val sharedFinding = touchFinding("shared-btn")
+      val overlayFinding = touchFinding("sheet-btn")
+      val worker =
+        InMemoryRenderWorker(
+          targetBuilder = { target ->
+            val findings =
+              if (target.overlayId == null) listOf(sharedFinding)
+              else listOf(sharedFinding, overlayFinding)
+            WorkerTargetOutput(
+              direction = target.direction,
+              screen = target.screen,
+              viewName = target.viewName,
+              overlayId = target.overlayId,
+              renderMs = 1L,
+              tree = sampleTree(target, findings),
+              frame =
+                if (target.frameFormat == FrameFormat.NONE) null
+                else WorkerFrame(pngBytes("${target.direction}-${target.viewName}"), "image/png"),
+            )
+          },
+        )
+      val executor = CheckExecutor(worker)
+      val entry = compileEntry(tmp)
+      val directions =
+        listOf(
+          DirectionMeta(
+            "Alpha",
+            "phone",
+            "home",
+            listOf("home"),
+            listOf(OverlayMeta("sheet", "home")),
+          ),
+          DirectionMeta(
+            "Beta",
+            "phone",
+            "home",
+            listOf("home"),
+            listOf(OverlayMeta("dialog", "home")),
+          ),
+          DirectionMeta("Gamma", "phone", "home", listOf("home"), emptyList()),
+        )
+      val metaTargets = resolveMetaTargets(directions, screenFilter = null, directionFilter = null)
+      val views = listOf(Views.Light, Views.Dark, Views.Desktop)
+      val planned = planBatchTargets(metaTargets, views, includeOverlays = true)
+
+      val artifacts =
+        executor.renderBatchCheck(
+          entry,
+          planned,
+          scoped = false,
+          rendersRoot = tmp.resolve("renders"),
+        )
+
+      // Output order matches canonical planned order (direction -> screen -> base views ->
+      // overlays).
+      assertEquals(
+        planned.map { "${it.direction}/${it.screenId}/${it.overlayId ?: "base"}/${it.view.name}" },
+        artifacts.map { "${it.direction}/${it.screen}/${it.overlay ?: "base"}/${it.view.name}" },
+      )
+
+      // Device batch is grouped by (view.width, view.height, view.name): dark (411x923), light
+      // (411x923), desktop (1920x1080), with all base targets ahead of overlay targets per view.
+      val sent = worker.recordedBatches.first()
+      assertEquals(
+        listOf(
+          "Alpha/base/dark",
+          "Beta/base/dark",
+          "Gamma/base/dark",
+          "Alpha/sheet/dark",
+          "Beta/dialog/dark",
+          "Alpha/base/light",
+          "Beta/base/light",
+          "Gamma/base/light",
+          "Alpha/sheet/light",
+          "Beta/dialog/light",
+          "Alpha/base/desktop",
+          "Beta/base/desktop",
+          "Gamma/base/desktop",
+          "Alpha/sheet/desktop",
+          "Beta/dialog/desktop",
+        ),
+        sent.map { "${it.direction}/${it.overlayId ?: "base"}/${it.viewName}" },
+      )
+
+      // Overlay findings still diff against their base check.
+      val alphaSheetLight = artifacts.first {
+        it.direction == "Alpha" && it.overlay == "sheet" && it.view == Views.Light
+      }
+      assertEquals(listOf("sheet-btn"), alphaSheetLight.check.errors.flatMap { it.ids })
+    } finally {
+      tmp.toFile().deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `renderBatchReport sends one view-grouped LZ4 batch, diffs overlays, and preserves canonical order`() {
+    val tmp = createTempDirectory("check-exec-report-batch-")
+    try {
+      val finishCalls = AtomicInteger(0)
+      val baseFinding = touchFinding("base-btn")
+      val overlayFinding = touchFinding("overlay-btn")
+      val baseWorker =
+        InMemoryRenderWorker(
+          targetBuilder = { target ->
+            val findings =
+              if (target.overlayId == null) listOf(baseFinding)
+              else listOf(baseFinding, overlayFinding)
+            WorkerTargetOutput(
+              direction = target.direction,
+              screen = target.screen,
+              viewName = target.viewName,
+              overlayId = target.overlayId,
+              renderMs = 2L,
+              tree = sampleTree(target, findings),
+              frame =
+                WorkerFrame(
+                  pngBytes("${target.direction}-${target.overlayId ?: "base"}-${target.viewName}"),
+                  "image/png",
+                ),
+            )
+          },
+        )
+      val countingWorker =
+        object : RenderWorker by baseWorker {
+          override fun finishCheck() {
+            finishCalls.incrementAndGet()
+          }
+        }
+      val executor = CheckExecutor(countingWorker)
+      val entry = compileEntry(tmp)
+      val directions =
+        listOf(
+          DirectionMeta(
+            "One",
+            "phone",
+            "home",
+            listOf("home"),
+            listOf(OverlayMeta("modal", "home")),
+          ),
+          DirectionMeta("Two", "phone", "home", listOf("home"), emptyList()),
+        )
+      val planned =
+        planBatchTargets(
+          resolveMetaTargets(directions, screenFilter = null, directionFilter = null),
+          listOf(Views.Light, Views.Desktop),
+          includeOverlays = true,
+        )
+
+      val artifacts = executor.renderBatchReport(entry, planned, tmp.resolve("out"))
+
+      assertEquals(1, baseWorker.renderBatchCount.get(), "Report must execute in a single batch")
+      assertEquals(1, finishCalls.get())
+      val sent = baseWorker.recordedBatches.single()
+      assertTrue(sent.all { it.frameFormat == FrameFormat.LZ4_RGBA && it.includeEndFrame })
+      assertEquals(
+        listOf(
+          "One/base/light",
+          "Two/base/light",
+          "One/modal/light",
+          "One/base/desktop",
+          "Two/base/desktop",
+          "One/modal/desktop",
+        ),
+        sent.map { "${it.direction}/${it.overlayId ?: "base"}/${it.viewName}" },
+      )
+      assertEquals(
+        planned.map { "${it.direction}/${it.overlayId ?: "base"}/${it.view.name}" },
+        artifacts.map { "${it.direction}/${it.overlay ?: "base"}/${it.view.name}" },
+      )
+      val modalLight = artifacts.first {
+        it.direction == "One" && it.overlay == "modal" && it.view == Views.Light
+      }
+      assertEquals(listOf("overlay-btn"), modalLight.check.errors.flatMap { it.ids })
+    } finally {
+      tmp.toFile().deleteRecursively()
+    }
+  }
 }

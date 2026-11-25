@@ -77,8 +77,8 @@ find_java() {
   fi
 
   _picked=""
-  if [ -n "${JAVA_HOME:-}" ] && is_java_17_plus "$JAVA_HOME/bin/java"; then
-    _picked="$JAVA_HOME/bin/java"
+  if [ -n "${JAVA_HOME:-}" ] && is_java_17_plus "${JAVA_HOME%/}/bin/java"; then
+    _picked="${JAVA_HOME%/}/bin/java"
   fi
 
   if [ -z "$_picked" ] && [ -x /usr/libexec/java_home ]; then
@@ -113,6 +113,16 @@ find_java() {
   mkdir -p "$CACHE_ROOT"
   printf '%s\n' "$_picked" > "$_java_cache"
   printf '%s\n' "$_picked"
+}
+
+java_home_matches_cache() {
+  [ -n "${JAVA_HOME:-}" ] || return 1
+  _jh_java="${JAVA_HOME%/}/bin/java"
+  [ -x "$_jh_java" ] || return 1
+  _java_cache="$CACHE_ROOT/java-bin"
+  [ -f "$_java_cache" ] || return 1
+  IFS= read -r _cached_java < "$_java_cache" || _cached_java=""
+  [ -n "$_cached_java" ] && [ "$_jh_java" = "$_cached_java" ] && ! is_macos_java_stub "$_cached_java"
 }
 
 is_sdk_dir() {
@@ -190,7 +200,7 @@ acquire_lock() {
   LOCK_HELD=1
 }
 
-resolve_app_dir() {
+resolve_existing_app_dir() {
   _script_dir="$1"
 
   if [ -n "${ANDROID_DESIGN_PREVIEW_SRC:-}" ]; then
@@ -212,12 +222,23 @@ resolve_app_dir() {
     fi
   fi
 
-  _src_root="$CACHE_ROOT/$VERSION/src"
-  _src_app="$_src_root/app"
+  _src_app="$CACHE_ROOT/$VERSION/src/app"
   if [ -f "$_src_app/settings.gradle.kts" ] && [ -f "$_src_app/gradlew" ]; then
     APP_DIR="$_src_app"
     return 0
   fi
+
+  return 1
+}
+
+resolve_app_dir() {
+  _script_dir="$1"
+  if resolve_existing_app_dir "$_script_dir"; then
+    return 0
+  fi
+
+  _src_root="$CACHE_ROOT/$VERSION/src"
+  _src_app="$_src_root/app"
 
   command -v git >/dev/null 2>&1 || fail_json "missing_git" "git is required to sparse-checkout android-design app sources"
   _git_url="${ANDROID_DESIGN_PREVIEW_GIT_URL:-$DEFAULT_GIT_URL}"
@@ -307,8 +328,19 @@ bootstrap_valid() {
   [ -f "$_bdir/host-preview.apk" ] || return 1
   [ -f "$_bdir/androidx-compile-bundle.jar" ] || return 1
   validate_paths_file "$_bdir/bootstrap-paths.txt" || return 1
-  validate_cp_file "$_bdir/client.cp" || return 1
-  validate_cp_file "$_bdir/server.cp" || return 1
+  case "$_cmd" in
+    server)
+      validate_cp_file "$_bdir/server.cp" || return 1
+      ;;
+    check|tree|selection|open|status|stop|install|render)
+      [ -s "$_bdir/server.cp" ] || return 1
+      validate_cp_file "$_bdir/client.cp" || return 1
+      ;;
+    *)
+      validate_cp_file "$_bdir/client.cp" || return 1
+      validate_cp_file "$_bdir/server.cp" || return 1
+      ;;
+  esac
   return 0
 }
 
@@ -332,7 +364,22 @@ export ANDROID_SDK_ROOT="$SDK_DIR"
 
 # Gradle's ./gradlew reads JAVA_HOME, not JAVA_BIN. Keep an existing JAVA_HOME only
 # when it points at a working Java 17+; otherwise derive it from the resolved JAVA_BIN.
-if [ -z "${JAVA_HOME:-}" ] || ! is_java_17_plus "$JAVA_HOME/bin/java"; then
+_need_java_home=0
+if [ -z "${JAVA_HOME:-}" ]; then
+  _need_java_home=1
+elif ! java_home_matches_cache; then
+  _jh_java="${JAVA_HOME%/}/bin/java"
+  if is_java_17_plus "$_jh_java"; then
+    if [ -z "${ANDROID_DESIGN_PREVIEW_JAVA:-}" ] && ! is_macos_java_stub "$_jh_java"; then
+      mkdir -p "$CACHE_ROOT"
+      printf '%s\n' "$_jh_java" > "$CACHE_ROOT/java-bin"
+    fi
+  else
+    _need_java_home=1
+  fi
+fi
+
+if [ "$_need_java_home" -eq 1 ]; then
   _resolved_java="$(resolve_script_path "$JAVA_BIN")"
   _java_home_cand="$(CDPATH= cd -- "$(dirname -- "$_resolved_java")/.." && pwd -P)"
   _java_home_new=""
@@ -350,22 +397,35 @@ if [ -z "${JAVA_HOME:-}" ] || ! is_java_17_plus "$JAVA_HOME/bin/java"; then
   fi
 fi
 
-trap release_lock EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
-acquire_lock
-
-APP_DIR=""
-resolve_app_dir "$SCRIPT_DIR"
-BOOTSTRAP_DIR="${ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR:-$APP_DIR/host/build/bootstrap}"
 cmd="${1:-}"
-
-if ! bootstrap_valid "$BOOTSTRAP_DIR" "$cmd"; then
-  run_gradle_bootstrap "$APP_DIR"
-  bootstrap_valid "$BOOTSTRAP_DIR" "$cmd" || fail_json "bootstrap_invalid" "Gradle bootstrap completed but outputs in $BOOTSTRAP_DIR are incomplete"
+APP_DIR=""
+BOOTSTRAP_DIR=""
+_warm_ready=0
+if resolve_existing_app_dir "$SCRIPT_DIR"; then
+  BOOTSTRAP_DIR="${ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR:-$APP_DIR/host/build/bootstrap}"
+  if bootstrap_valid "$BOOTSTRAP_DIR" "$cmd"; then
+    _warm_ready=1
+  fi
 fi
 
-release_lock
+if [ "$_warm_ready" -ne 1 ]; then
+  trap release_lock EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  acquire_lock
+
+  if [ -z "$APP_DIR" ]; then
+    resolve_app_dir "$SCRIPT_DIR"
+    BOOTSTRAP_DIR="${ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR:-$APP_DIR/host/build/bootstrap}"
+  fi
+
+  if ! bootstrap_valid "$BOOTSTRAP_DIR" "$cmd"; then
+    run_gradle_bootstrap "$APP_DIR"
+    bootstrap_valid "$BOOTSTRAP_DIR" || fail_json "bootstrap_invalid" "Gradle bootstrap completed but outputs in $BOOTSTRAP_DIR are incomplete"
+  fi
+
+  release_lock
+fi
 
 export ANDROID_DESIGN_CACHE_DIR="$CACHE_ROOT"
 export ANDROID_DESIGN_PREVIEW_SRC="$APP_DIR"

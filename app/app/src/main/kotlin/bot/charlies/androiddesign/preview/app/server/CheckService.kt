@@ -3,6 +3,7 @@ package bot.charlies.androiddesign.preview.app.server
 import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.ValidationError
+import bot.charlies.androiddesign.preview.model.ViewSpec
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
@@ -31,6 +32,8 @@ internal interface CheckHost {
   fun markActiveRepo(repoId: String)
 
   fun markLiveOwner(repoId: String)
+
+  fun scheduleLiveUpdate(entry: CompileEntry, update: LivePreviewUpdate)
 
   fun clearTimeoutsIfHashChanged(repoRoot: Path, newHash: String)
 
@@ -260,36 +263,7 @@ internal class CheckService(
     }
 
     val renderStartNs = System.nanoTime()
-    val planned = buildList {
-      for (target in targets) {
-        for (view in views) {
-          add(
-            CheckTargetSpec(
-              target.direction.name,
-              target.screenId,
-              target.prefix,
-              null,
-              view,
-            ),
-          )
-        }
-        if (!scoped) {
-          for (overlay in target.direction.overlaysFor(target.screenId)) {
-            for (view in views) {
-              add(
-                CheckTargetSpec(
-                  target.direction.name,
-                  target.screenId,
-                  target.prefix,
-                  overlay.id,
-                  view,
-                ),
-              )
-            }
-          }
-        }
-      }
-    }
+    val planned = planBatchTargets(targets, views, includeOverlays = !scoped)
     val artifacts =
       try {
         host.awaitOrReplaced(
@@ -368,16 +342,6 @@ internal class CheckService(
       )
     }
 
-    host.markLiveOwner(state.repoId)
-    executor.updateLive(
-      entry = compileEntry,
-      LivePreviewUpdate(
-        direction = targets.first().direction.name,
-        screenId = targets.first().screenId,
-        overlayId = null,
-      ),
-    )
-
     val pendingSelection = selectionStore.consumePending(sourcePath)
     val resp =
       CheckResponse(
@@ -401,6 +365,18 @@ internal class CheckService(
         selection = pendingSelection,
       )
     reply(200, PreviewJson.compact.encodeToString(CheckResponse.serializer(), resp))
+
+    host.markLiveOwner(state.repoId)
+    host.scheduleLiveUpdate(
+      entry = compileEntry,
+      update =
+        LivePreviewUpdate(
+          direction = targets.first().direction.name,
+          screenId = targets.first().screenId,
+          overlayId = null,
+        ),
+    )
+
     if (needBackgroundBoard) {
       host.broadcastSse(
         state.repoId,
@@ -498,6 +474,11 @@ internal class CheckService(
   }
 }
 
+private val SANITIZE_SEGMENT_REGEX = Regex("""[^A-Za-z0-9._-]+""")
+
+internal fun sanitizeSegment(name: String): String =
+  name.trim().replace(SANITIZE_SEGMENT_REGEX, "_").ifBlank { "direction" }
+
 internal data class MetaScreenTarget(
   val direction: DirectionMeta,
   val screenId: String,
@@ -507,7 +488,7 @@ internal data class MetaScreenTarget(
 internal fun resolveMetaTargets(
   directions: List<DirectionMeta>,
   screenFilter: List<String>?,
-  directionFilter: Set<String>?,
+  directionFilter: Set<String>? = null,
 ): List<MetaScreenTarget> {
   val activeDirections =
     if (directionFilter.isNullOrEmpty()) directions
@@ -516,9 +497,8 @@ internal fun resolveMetaTargets(
   val filterSet = screenFilter?.toSet()
   return buildList {
     for (dir in activeDirections) {
+      val sanitizedDir = sanitizeSegment(dir.name)
       for (screenId in dir.screens) {
-        val sanitizedDir =
-          dir.name.trim().replace(Regex("""[^A-Za-z0-9._-]+"""), "_").ifBlank { "direction" }
         val prefix = if (singleDirection) screenId else "${sanitizedDir}__$screenId"
         val slashName = "${dir.name}/$screenId"
         if (
@@ -533,3 +513,61 @@ internal fun resolveMetaTargets(
     }
   }
 }
+
+/**
+ * Expands [targets] x [views] (plus overlays when [includeOverlays] is true) in deterministic
+ * canonical order (`direction/screen -> base views -> overlays -> views`).
+ */
+internal fun planBatchTargets(
+  targets: List<MetaScreenTarget>,
+  views: List<ViewSpec>,
+  includeOverlays: Boolean,
+): List<CheckTargetSpec> = buildList {
+  for (target in targets) {
+    for (view in views) {
+      add(
+        CheckTargetSpec(
+          direction = target.direction.name,
+          screenId = target.screenId,
+          prefix = target.prefix,
+          overlayId = null,
+          view = view,
+        ),
+      )
+    }
+    if (includeOverlays) {
+      for (overlay in target.direction.overlaysFor(target.screenId)) {
+        for (view in views) {
+          add(
+            CheckTargetSpec(
+              direction = target.direction.name,
+              screenId = target.screenId,
+              prefix = target.prefix,
+              overlayId = overlay.id,
+              view = view,
+            ),
+          )
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Orders batch render targets by `(view.width, view.height, view.name)` so consecutive renders
+ * reuse `ComposeView` and `ImageReader` across directions, while keeping every base screen ahead of
+ * its overlays and preserving deterministic relative order within each group.
+ */
+internal fun orderTargetsForBatchRender(targets: List<CheckTargetSpec>): List<CheckTargetSpec> =
+  targets
+    .withIndex()
+    .sortedWith(
+      compareBy<IndexedValue<CheckTargetSpec>>(
+        { it.value.view.width },
+        { it.value.view.height },
+        { it.value.view.name },
+        { it.value.overlayId != null },
+        { it.index },
+      ),
+    )
+    .map { it.value }

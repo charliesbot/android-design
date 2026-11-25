@@ -215,4 +215,45 @@ class AndroidExplorationCompilerTest {
       AndroidExplorationCompiler.compileClassStage(hostile, explicitDesign = null, meta = meta),
     )
   }
+
+  @Test
+  fun `compileClassStage reuses snapshot source bytes and precollected assets without re-walking disk`(
+    @TempDir tmp: Path,
+  ) {
+    val meta = BootstrapMeta.locate()
+    val assetsDir = tmp.resolve("assets")
+    Files.createDirectories(assetsDir)
+    val pngBytes = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 1, 2, 3, 4)
+    val coverFile = assetsDir.resolve("cover.png")
+    Files.write(coverFile, pngBytes)
+    val sourceFile = tmp.resolve("SnapReuse.explore.kt")
+    Files.writeString(
+      sourceFile,
+      validExploreSource(
+        """Image(painter = designPainter("assets/cover.png"), contentDescription = "Cover")""",
+      ),
+    )
+
+    val snapshot = ContentHasher.snapshot(sourceFile)
+    assertEquals(listOf("assets/cover.png"), snapshot.assets?.map { it.relativePath })
+
+    // Remove source and asset files after snapshotting to prove compileClassStage does not re-read
+    // the source file or re-walk assets/ on disk.
+    Files.delete(coverFile)
+    Files.delete(assetsDir)
+    Files.delete(sourceFile)
+
+    val ready =
+      assertIs<AndroidExplorationCompiler.ClassStageOutcome.Ready>(
+        AndroidExplorationCompiler.compileClassStage(
+          sourcePath = sourceFile,
+          explicitDesign = null,
+          meta = meta,
+          snapshot = snapshot,
+        ),
+      )
+    val expectedSha = ContentHasher.sha256Hex(pngBytes)
+    assertEquals(expectedSha, ready.stage.assetMap["assets/cover.png"])
+    assertEquals(pngBytes.toList(), ready.stage.assetBlobs[expectedSha]?.toList())
+  }
 }

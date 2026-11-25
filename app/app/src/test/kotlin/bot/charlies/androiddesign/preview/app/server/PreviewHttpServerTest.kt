@@ -1,8 +1,10 @@
 package bot.charlies.androiddesign.preview.app.server
 
 import bot.charlies.androiddesign.preview.app.cli.RenderEntry
+import bot.charlies.androiddesign.preview.app.cli.RenderReport
 import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
+import bot.charlies.androiddesign.preview.model.DeviceOverlayMeta
 import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.ViewSpec
@@ -17,6 +19,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.createTempDirectory
@@ -651,5 +654,270 @@ class PreviewHttpServerTest {
       server.stop()
       tmp.toFile().deleteRecursively()
     }
+  }
+
+  @Test
+  fun `api render executes all directions, views, and overlays in one view-grouped batch`() {
+    val tmp = createTempDirectory("v6-api-render-batch-")
+    val cacheDir = tmp.resolve("cache")
+    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
+    val source =
+      repo.resolve("board.explore.kt").also { Files.writeString(it, simpleBoard("Batch")) }
+    val outDir = tmp.resolve("renders-out")
+    val worker =
+      InMemoryRenderWorker(
+        name = RuntimeIdentity.BACKEND_ANDROID,
+        directions =
+          listOf(
+            DeviceDirectionMeta(
+              name = "Editorial",
+              surface = "phone",
+              startScreen = "home",
+              screens = listOf("home"),
+              overlays = listOf(DeviceOverlayMeta("sheet", "home")),
+            ),
+            DeviceDirectionMeta(
+              name = "Compact",
+              surface = "phone",
+              startScreen = "home",
+              screens = listOf("home"),
+              overlays = emptyList(),
+            ),
+          ),
+        views = PhoneSurface.views,
+      )
+    val server =
+      PreviewHttpServer(
+        repoRoot = repo,
+        cacheRoot = cacheDir,
+        preferredPort = 0,
+        worker = worker,
+        enableFileWatcher = false,
+      )
+    val rec = server.start()
+    try {
+      val (status, body) =
+        httpRequest(
+          rec.port,
+          "POST",
+          "/api/render",
+          headers = mapOf("X-Client-Secret" to rec.clientSecret),
+          body =
+            """{"path":"$source","outDir":"$outDir","views":["light","desktop"],"repoRoot":"$repo"}""",
+        )
+      assertEquals(200, status, body)
+      val parsed = PreviewJson.compact.decodeFromString(RenderResponse.serializer(), body)
+      assertTrue(parsed.ok && parsed.valid && parsed.pass, body)
+
+      // All 6 targets (2 directions x 2 views + 1 overlay x 2 views) run in 1 batch.
+      assertEquals(1, worker.renderBatchCount.get())
+      val sent = worker.recordedBatches.single()
+      assertEquals(
+        listOf(
+          "Editorial/base/light",
+          "Compact/base/light",
+          "Editorial/sheet/light",
+          "Editorial/base/desktop",
+          "Compact/base/desktop",
+          "Editorial/sheet/desktop",
+        ),
+        sent.map { "${it.direction}/${it.overlayId ?: "base"}/${it.viewName}" },
+      )
+
+      // report.json keeps deterministic canonical order: Editorial base, Editorial overlay,
+      // Compact.
+      val report =
+        PreviewJson.pretty.decodeFromString(
+          RenderReport.serializer(),
+          Files.readString(outDir.resolve("report.json")),
+        )
+      assertEquals(
+        listOf(
+          "Editorial__home/light",
+          "Editorial__home/desktop",
+          "Editorial__home+sheet/light",
+          "Editorial__home+sheet/desktop",
+          "Compact__home/light",
+          "Compact__home/desktop",
+        ),
+        report.renders.map { "${it.screen}/${it.view}" },
+      )
+    } finally {
+      server.stop()
+      tmp.toFile().deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `api check replies without blocking on slow updateLive`() {
+    val tmp = createTempDirectory("v6-async-live-")
+    val cacheDir = tmp.resolve("cache")
+    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
+    val source =
+      repo.resolve("board.explore.kt").also { Files.writeString(it, simpleBoard("AsyncLive")) }
+    val liveStarted = CountDownLatch(1)
+    val releaseLive = CountDownLatch(1)
+    val liveFinished = CountDownLatch(1)
+    val worker =
+      InMemoryRenderWorker(
+        name = RuntimeIdentity.BACKEND_ANDROID,
+        directions =
+          listOf(
+            DeviceDirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
+          ),
+        views = PhoneSurface.views,
+        onUpdateLive = { _, _ ->
+          liveStarted.countDown()
+          releaseLive.await(5, TimeUnit.SECONDS)
+          liveFinished.countDown()
+        },
+      )
+    val server =
+      PreviewHttpServer(
+        repoRoot = repo,
+        cacheRoot = cacheDir,
+        preferredPort = 0,
+        worker = worker,
+        enableFileWatcher = false,
+      )
+    val rec = server.start()
+    try {
+      val (status, body) =
+        httpRequest(
+          rec.port,
+          "POST",
+          "/api/check",
+          headers = mapOf("X-Client-Secret" to rec.clientSecret),
+          body = """{"path":"$source","direction":"Editorial","view":"light","repoRoot":"$repo"}""",
+        )
+      assertEquals(200, status, body)
+      // HTTP reply returned even though updateLive is still blocked on releaseLive.
+      assertTrue(liveStarted.await(2, TimeUnit.SECONDS), "updateLive must be dispatched async")
+      assertEquals(1L, liveFinished.count, "HTTP reply must not wait for updateLive")
+      releaseLive.countDown()
+      assertTrue(liveFinished.await(2, TimeUnit.SECONDS), "updateLive must complete asynchronously")
+      assertEquals("Editorial", worker.recordedUpdates.single().direction)
+    } finally {
+      releaseLive.countDown()
+      server.stop()
+      tmp.toFile().deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `explicit api live serializes after in-flight async scheduleLiveUpdate without being overwritten`() {
+    val tmp = createTempDirectory("v6-live-serialize-")
+    val cacheDir = tmp.resolve("cache")
+    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
+    val source =
+      repo.resolve("board.explore.kt").also { Files.writeString(it, simpleBoard("LiveOrder")) }
+    val asyncStarted = CountDownLatch(1)
+    val releaseAsync = CountDownLatch(1)
+    val appliedOrder = CopyOnWriteArrayList<String>()
+    val worker =
+      InMemoryRenderWorker(
+        name = RuntimeIdentity.BACKEND_ANDROID,
+        directions =
+          listOf(
+            DeviceDirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
+            DeviceDirectionMeta("Compact", "phone", "home", listOf("home"), emptyList()),
+          ),
+        views = PhoneSurface.views,
+        onUpdateLive = { _, update ->
+          if (update.direction == "Editorial") {
+            asyncStarted.countDown()
+            releaseAsync.await(5, TimeUnit.SECONDS)
+          }
+          appliedOrder += update.direction.orEmpty()
+        },
+      )
+    val server =
+      PreviewHttpServer(
+        repoRoot = repo,
+        cacheRoot = cacheDir,
+        preferredPort = 0,
+        worker = worker,
+        enableFileWatcher = false,
+      )
+    val rec = server.start()
+    val clientPool = Executors.newSingleThreadExecutor()
+    try {
+      // Trigger /api/check, which dispatches an async scheduleLiveUpdate("Editorial") on
+      // liveUpdateExecutor and blocks inside updateLive.
+      val (checkStatus, checkBody) =
+        httpRequest(
+          rec.port,
+          "POST",
+          "/api/check",
+          headers = mapOf("X-Client-Secret" to rec.clientSecret),
+          body = """{"path":"$source","direction":"Editorial","view":"light","repoRoot":"$repo"}""",
+        )
+      assertEquals(200, checkStatus, checkBody)
+      assertTrue(asyncStarted.await(5, TimeUnit.SECONDS), "async updateLive should be in flight")
+
+      // While async updateLive("Editorial") is still in flight, send an explicit /api/live
+      // focusing "Compact". It must serialize behind the in-flight async call.
+      val liveFuture =
+        clientPool.submit<Pair<Int, String>> {
+          httpRequest(
+            rec.port,
+            "POST",
+            "/api/live",
+            headers = mapOf("X-Client-Secret" to rec.clientSecret),
+            body =
+              """{"path":"$source","direction":"Compact","screen":"home","repoRoot":"$repo"}""",
+          )
+        }
+      Thread.sleep(100)
+      assertFalse(
+        liveFuture.isDone,
+        "explicit /api/live must wait for in-flight async updateLive on liveUpdateExecutor",
+      )
+
+      releaseAsync.countDown()
+      val (liveStatus, liveBody) = liveFuture.get(5, TimeUnit.SECONDS)
+      assertEquals(200, liveStatus, liveBody)
+      assertEquals(
+        listOf("Editorial", "Compact"),
+        appliedOrder,
+        "explicit /api/live must run strictly after in-flight async update and not be overwritten",
+      )
+    } finally {
+      releaseAsync.countDown()
+      clientPool.shutdownNow()
+      server.stop()
+      tmp.toFile().deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `shared resolveMetaTargets and sanitizeSegment handle single, multi, and filtered targets`() {
+    val single =
+      listOf(DirectionMeta("Main Flow!", "phone", "home", listOf("home", "detail"), emptyList()))
+    assertEquals(
+      listOf("home", "detail"),
+      resolveMetaTargets(single, screenFilter = null).map { it.prefix },
+    )
+    val multi =
+      listOf(
+        DirectionMeta("Main Flow!", "phone", "home", listOf("home"), emptyList()),
+        DirectionMeta("   ", "phone", "home", listOf("home"), emptyList()),
+      )
+    assertEquals("Main_Flow_", sanitizeSegment("Main Flow!"))
+    assertEquals("direction", sanitizeSegment("   "))
+    assertEquals(
+      listOf("Main_Flow___home", "direction__home"),
+      resolveMetaTargets(multi, screenFilter = null).map { it.prefix },
+    )
+    assertEquals(
+      listOf("Main_Flow___home"),
+      resolveMetaTargets(multi, screenFilter = listOf("Main Flow!/home")).map { it.prefix },
+    )
+    assertEquals(
+      listOf("Main_Flow___home"),
+      resolveMetaTargets(multi, screenFilter = null, directionFilter = setOf("Main Flow!")).map {
+        it.prefix
+      },
+    )
   }
 }

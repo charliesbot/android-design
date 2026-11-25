@@ -37,7 +37,12 @@ class AndroidRenderWorker(
   override fun compile(snapshot: ContentHasher.Snapshot): WorkerCompileResult =
     when (
       val outcome =
-        AndroidExplorationCompiler.compile(snapshot.sourcePath, snapshot.designPath, meta)
+        AndroidExplorationCompiler.compile(
+          sourcePath = snapshot.sourcePath,
+          explicitDesign = snapshot.designPath,
+          meta = meta,
+          snapshot = snapshot,
+        )
     ) {
       is AndroidCompileOutcome.Failed ->
         WorkerCompileResult.Failed(
@@ -62,7 +67,9 @@ class AndroidRenderWorker(
             dexHash = compiled.dexHash,
           )
         } else {
-          transport.syncAssets(compiled.assetBlobs)
+          if (compiled.assetBlobs.isNotEmpty()) {
+            transport.syncAssets(compiled.assetBlobs)
+          }
           val androidData =
             AndroidCompiledData(
               sourceFile = compiled.sourceFile,
@@ -135,7 +142,9 @@ class AndroidRenderWorker(
 
   override fun updateLive(entry: CompileEntry, update: LivePreviewUpdate) {
     val data = entry.androidData ?: return
-    transport.syncAssets(data.assetBlobs)
+    if (data.assetBlobs.isNotEmpty()) {
+      transport.syncAssets(data.assetBlobs)
+    }
     transport.setLive(
       dexBytes = data.dexBytes,
       request =
@@ -153,6 +162,7 @@ class AndroidRenderWorker(
           variantOverride = update.variantOverride,
           fontScale = update.fontScale,
         ),
+      assetBlobs = data.assetBlobs,
     )
   }
 
@@ -171,7 +181,9 @@ class AndroidRenderWorker(
     designTheme: ThemeOverride?,
     targets: List<DeviceRenderTarget>,
   ): DeviceBatchExecution {
-    transport.syncAssets(data.assetBlobs)
+    if (data.assetBlobs.isNotEmpty()) {
+      transport.syncAssets(data.assetBlobs)
+    }
     return transport.renderBatch(
       dexHash = data.dexHash,
       entryClass = data.entryClass,
@@ -187,6 +199,7 @@ class AndroidRenderWorker(
           targets = targets,
           timeoutMs = batchTimeoutMs,
         ),
+      assetBlobs = data.assetBlobs,
     )
   }
 

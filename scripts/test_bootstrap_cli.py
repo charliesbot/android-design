@@ -509,6 +509,235 @@ class BootstrapCliTest(unittest.TestCase):
       self.assertEqual(res.returncode, 3)
       self.assertIn("bootstrap_lock_timeout", res.stdout)
 
+  def test_warm_path_skips_lock_creation(self) -> None:
+    with tempfile.TemporaryDirectory() as td:
+      tmp = pathlib.Path(td)
+      capture = tmp / "java_capture.txt"
+      env = self._base_env(tmp, capture)
+      app_dir, marker = _make_fake_app_dir(tmp)
+      _populate_bootstrap(app_dir)
+      env["ANDROID_DESIGN_PREVIEW_SRC"] = str(app_dir)
+
+      res = subprocess.run(
+          [str(SKILL_SCRIPT), "status"],
+          env=env,
+          capture_output=True,
+          text=True,
+          timeout=15,
+      )
+      self.assertEqual(res.returncode, 0, res.stderr)
+      self.assertFalse(marker.exists())
+      version_dir = pathlib.Path(env["ANDROID_DESIGN_CACHE_DIR"]) / SCRIPT_VERSION
+      self.assertFalse(version_dir.exists(), "Warm path should not create version lock directory")
+
+      # Even when a live lock is held, a warm-path call with valid bootstrap does not block on it.
+      env["ANDROID_DESIGN_PREVIEW_LOCK_TIMEOUT"] = "1"
+      holder = subprocess.Popen(["sleep", "30"])
+      try:
+        lock = version_dir / ".lock"
+        version_dir.mkdir(parents=True)
+        os.symlink(str(holder.pid), lock)
+        res_locked = subprocess.run(
+            [str(SKILL_SCRIPT), "status"],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        self.assertTrue(lock.is_symlink(), "Warm path must not remove an active lock")
+      finally:
+        holder.kill()
+        holder.wait()
+      self.assertEqual(res_locked.returncode, 0, res_locked.stderr)
+
+  def test_warm_path_with_matching_java_home_skips_java_version(self) -> None:
+    with tempfile.TemporaryDirectory() as td:
+      tmp = pathlib.Path(td)
+      capture = tmp / "java_capture.txt"
+      version_log = tmp / "java_version_calls.txt"
+      jdk_dir = tmp / "jdk21"
+      java_bin = jdk_dir / "bin" / "java"
+      _write_executable(
+          java_bin,
+          f"""#!/bin/sh
+if [ "${{1:-}}" = "-version" ]; then
+  printf 'version\\n' >> "{version_log}"
+  echo 'openjdk version "21.0.2" 2024-01-16' 1>&2
+  exit 0
+fi
+printf 'JAVA_HOME=%s\\n' "${{JAVA_HOME:-}}" > "{capture}"
+exit 0
+""",
+      )
+      _write_executable(jdk_dir / "bin" / "javac", "#!/bin/sh\nexit 0\n")
+      (jdk_dir / "release").write_text('JAVA_VERSION="21.0.2"\n', encoding="utf-8")
+
+      sdk_dir = _make_fake_sdk(tmp)
+      app_dir, _ = _make_fake_app_dir(tmp)
+      _populate_bootstrap(app_dir)
+      cache_dir = tmp / "cache"
+      cache_dir.mkdir(parents=True)
+      (cache_dir / "java-bin").write_text(f"{java_bin}\n", encoding="utf-8")
+      (tmp / "home").mkdir(parents=True)
+
+      env = {
+          "PATH": "/usr/bin:/bin",
+          "HOME": str(tmp / "home"),
+          "JAVA_HOME": str(jdk_dir),
+          "ANDROID_HOME": str(sdk_dir),
+          "ANDROID_SDK_ROOT": str(sdk_dir),
+          "ANDROID_DESIGN_CACHE_DIR": str(cache_dir),
+          "ANDROID_DESIGN_PREVIEW_SRC": str(app_dir),
+      }
+      res = subprocess.run(
+          [str(SKILL_SCRIPT), "status"],
+          env=env,
+          capture_output=True,
+          text=True,
+          timeout=15,
+      )
+      self.assertEqual(res.returncode, 0, res.stderr)
+      self.assertFalse(version_log.exists(), "Warm path should not spawn java -version when JAVA_HOME matches java-bin cache")
+      self.assertIn(f"JAVA_HOME={jdk_dir}\n", capture.read_text(encoding="utf-8"))
+
+      # Trailing slash on JAVA_HOME still hits the cache.
+      env["JAVA_HOME"] = f"{jdk_dir}/"
+      res_slash = subprocess.run(
+          [str(SKILL_SCRIPT), "status"],
+          env=env,
+          capture_output=True,
+          text=True,
+          timeout=15,
+      )
+      self.assertEqual(res_slash.returncode, 0, res_slash.stderr)
+      self.assertFalse(version_log.exists(), "Trailing slash on JAVA_HOME should still skip java -version")
+
+      # Switching JAVA_HOME to another valid JDK validates once and updates the cache.
+      jdk17_dir = tmp / "jdk17"
+      version_log_17 = tmp / "java17_version_calls.txt"
+      java17_bin = jdk17_dir / "bin" / "java"
+      _write_executable(
+          java17_bin,
+          f"""#!/bin/sh
+if [ "${{1:-}}" = "-version" ]; then
+  printf 'version\\n' >> "{version_log_17}"
+  echo 'openjdk version "17.0.9" 2023-10-17' 1>&2
+  exit 0
+fi
+printf 'JAVA_HOME=%s\\n' "${{JAVA_HOME:-}}" > "{capture}"
+exit 0
+""",
+      )
+      _write_executable(jdk17_dir / "bin" / "javac", "#!/bin/sh\nexit 0\n")
+      (jdk17_dir / "release").write_text('JAVA_VERSION="17.0.9"\n', encoding="utf-8")
+
+      env["JAVA_HOME"] = str(jdk17_dir)
+      res_switch = subprocess.run(
+          [str(SKILL_SCRIPT), "status"],
+          env=env,
+          capture_output=True,
+          text=True,
+          timeout=15,
+      )
+      self.assertEqual(res_switch.returncode, 0, res_switch.stderr)
+      self.assertEqual(len(version_log_17.read_text(encoding="utf-8").splitlines()), 1)
+      self.assertEqual((cache_dir / "java-bin").read_text(encoding="utf-8").strip(), str(java17_bin))
+
+      # Next run with the new JAVA_HOME skips java -version again.
+      res_switch_warm = subprocess.run(
+          [str(SKILL_SCRIPT), "status"],
+          env=env,
+          capture_output=True,
+          text=True,
+          timeout=15,
+      )
+      self.assertEqual(res_switch_warm.returncode, 0, res_switch_warm.stderr)
+      self.assertEqual(len(version_log_17.read_text(encoding="utf-8").splitlines()), 1)
+
+  def test_bootstrap_valid_checks_only_relevant_cp_for_client_vs_server(self) -> None:
+    def setup_split_cp(root: pathlib.Path, name: str) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path]:
+      app_dir, marker = _make_fake_app_dir(root, name=name)
+      bdir = _populate_bootstrap(app_dir)
+      client_jar = bdir / "client-only.jar"
+      server_jar = bdir / "server-only.jar"
+      client_jar.write_text("client", encoding="utf-8")
+      server_jar.write_text("server", encoding="utf-8")
+      (bdir / "client.cp").write_text(f"-cp\n{bdir / 'dep1.jar'}:{client_jar}\n", encoding="utf-8")
+      (bdir / "server.cp").write_text(f"-cp\n{bdir / 'dep1.jar'}:{server_jar}\n", encoding="utf-8")
+      return app_dir, bdir, marker
+
+    with tempfile.TemporaryDirectory() as td:
+      tmp = pathlib.Path(td)
+      capture = tmp / "java_capture.txt"
+
+      # Missing server-only jar: client commands skip server.cp entries, server catches it.
+      app_a, bdir_a, marker_a = setup_split_cp(tmp, "app-a")
+      (bdir_a / "server-only.jar").unlink()
+      env_a = self._base_env(tmp, capture)
+      env_a["ANDROID_DESIGN_PREVIEW_SRC"] = str(app_a)
+
+      res_client = subprocess.run(
+          [str(SKILL_SCRIPT), "check"],
+          env=env_a,
+          capture_output=True,
+          text=True,
+          timeout=15,
+      )
+      self.assertEqual(res_client.returncode, 0, res_client.stderr)
+      self.assertFalse(marker_a.exists(), "Client command should not validate server.cp JAR entries")
+
+      res_server = subprocess.run(
+          [str(SKILL_SCRIPT), "server", "--repo", str(tmp)],
+          env=env_a,
+          capture_output=True,
+          text=True,
+          timeout=15,
+      )
+      self.assertEqual(res_server.returncode, 0, res_server.stderr)
+      self.assertTrue(marker_a.exists(), "Server command must catch missing server.cp JAR")
+
+      # Missing client-only jar: server skips client.cp entries, client command catches it.
+      app_b, bdir_b, marker_b = setup_split_cp(tmp, "app-b")
+      (bdir_b / "client-only.jar").unlink()
+      env_b = self._base_env(tmp, capture)
+      env_b["ANDROID_DESIGN_PREVIEW_SRC"] = str(app_b)
+
+      res_srv_ok = subprocess.run(
+          [str(SKILL_SCRIPT), "server", "--repo", str(tmp)],
+          env=env_b,
+          capture_output=True,
+          text=True,
+          timeout=15,
+      )
+      self.assertEqual(res_srv_ok.returncode, 0, res_srv_ok.stderr)
+      self.assertFalse(marker_b.exists(), "Server command should not validate client.cp JAR entries")
+
+      res_cli_rebuild = subprocess.run(
+          [str(SKILL_SCRIPT), "status"],
+          env=env_b,
+          capture_output=True,
+          text=True,
+          timeout=15,
+      )
+      self.assertEqual(res_cli_rebuild.returncode, 0, res_cli_rebuild.stderr)
+      self.assertTrue(marker_b.exists(), "Client command must catch missing client.cp JAR")
+
+      # start validates both client.cp and server.cp since it spawns the server.
+      app_c, bdir_c, marker_c = setup_split_cp(tmp, "app-c")
+      (bdir_c / "server-only.jar").unlink()
+      env_c = self._base_env(tmp, capture)
+      env_c["ANDROID_DESIGN_PREVIEW_SRC"] = str(app_c)
+
+      res_start = subprocess.run(
+          [str(SKILL_SCRIPT), "start"],
+          env=env_c,
+          capture_output=True,
+          text=True,
+          timeout=15,
+      )
+      self.assertEqual(res_start.returncode, 0, res_start.stderr)
+      self.assertTrue(marker_c.exists(), "start command must validate server.cp as well")
+
 
 if __name__ == "__main__":
   unittest.main()

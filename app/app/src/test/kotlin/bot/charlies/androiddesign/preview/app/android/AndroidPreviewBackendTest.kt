@@ -98,6 +98,7 @@ class AndroidPreviewBackendTest {
   ) : DeviceTransport {
     val preloaded = CopyOnWriteArrayList<String>()
     val syncedAssetHashes = CopyOnWriteArrayList<String>()
+    val syncAssetCalls = AtomicInteger(0)
     val batchRequests = CopyOnWriteArrayList<DeviceBatchRequest>()
     val singleFormats = CopyOnWriteArrayList<FrameFormat>()
 
@@ -131,6 +132,7 @@ class AndroidPreviewBackendTest {
     }
 
     override fun syncAssets(assetBlobs: Map<String, ByteArray>): Int {
+      syncAssetCalls.incrementAndGet()
       syncedAssetHashes.addAll(assetBlobs.keys)
       return assetBlobs.size
     }
@@ -140,6 +142,7 @@ class AndroidPreviewBackendTest {
       entryClass: String,
       dexBytes: ByteArray?,
       request: DeviceBatchRequest,
+      assetBlobs: Map<String, ByteArray>,
     ): DeviceBatchExecution {
       batchRequests += request
       request.targets.forEach { singleFormats += it.frameFormat }
@@ -239,7 +242,11 @@ class AndroidPreviewBackendTest {
       )
     }
 
-    override fun setLive(dexBytes: ByteArray?, request: DeviceLiveStateRequest): Boolean = true
+    override fun setLive(
+      dexBytes: ByteArray?,
+      request: DeviceLiveStateRequest,
+      assetBlobs: Map<String, ByteArray>,
+    ): Boolean = true
 
     override fun recycle(): Boolean = true
 
@@ -337,6 +344,7 @@ class AndroidPreviewBackendTest {
 
     val expectedAssetSha = ContentHasher.sha256Hex(assetBytes)
     assertTrue(expectedAssetSha in transport.syncedAssetHashes)
+    assertTrue(transport.syncAssetCalls.get() >= 1)
     assertEquals(listOf("memory_pressure"), recycleReasons)
     assertEquals(listOf(2), recycleAtBatchCount)
 
