@@ -47,6 +47,7 @@ enum class M3Component {
   LoadingIndicator,
   ProgressIndicator,
   BottomSheet,
+  Scrim,
   Dialog,
   DatePicker,
   TimePicker,

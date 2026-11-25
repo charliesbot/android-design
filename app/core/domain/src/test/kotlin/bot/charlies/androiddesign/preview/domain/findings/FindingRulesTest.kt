@@ -1052,6 +1052,54 @@ class FindingRulesTest {
     )
   }
 
+  /** The music overlay's shape: the screen, then a Scrim, then an unaligned BottomSheet. */
+  private fun scrimSheetBoard(sheetTextContent: String): Array<LayoutNode> =
+    arrayOf(
+      node("root", "Box", w = 411f, h = 923f),
+      node(
+        "artist",
+        "Text",
+        parent = "root",
+        y = 604f,
+        text = text("Mara Vale"),
+        typeRole = "titleMedium",
+        content = "#53652F",
+        container = "#6C6F62",
+      ),
+      node("tiny", "IconButton", parent = "root", y = 587f, w = 32f, h = 32f),
+      node("scrim", "Scrim", parent = "root", w = 411f, h = 923f),
+      node("sheet", "Column", parent = "root", y = 517f, w = 411f, h = 406f),
+      node(
+        "queue_title",
+        "Text",
+        parent = "sheet",
+        y = 565f,
+        text = text("Queue"),
+        typeRole = "titleLarge",
+        content = sheetTextContent,
+        container = "#F3F4E5",
+      ),
+    )
+
+  @Test
+  fun `content drawn before a covering scrim is exempt from touch target and contrast`() {
+    assertEquals(emptyList(), evaluate(tree(nodes = scrimSheetBoard("#1A1C16"))))
+  }
+
+  @Test
+  fun `content drawn after a scrim is still checked for contrast`() {
+    val findings = evaluate(tree(nodes = scrimSheetBoard("#E0E2D3"))).of(FindingRule.Contrast)
+    assertEquals(listOf("queue_title"), findings.map { it.id })
+  }
+
+  @Test
+  fun `a scrim exempts only the content it covers`() {
+    val scrim = node("scrim", "Scrim", y = 400f, w = 411f, h = 523f)
+    val above = node("tiny", "IconButton", y = 100f, w = 32f, h = 32f)
+    val findings = evaluate(tree(nodes = arrayOf(above, scrim))).of(FindingRule.TouchTarget)
+    assertEquals(listOf("tiny"), findings.map { it.id })
+  }
+
   @Test
   fun `the open modal and its content are still checked`() {
     val dialog = node("dialog", "Dialog", y = 300f, w = 300f, h = 200f, container = "#FFFFFF")
