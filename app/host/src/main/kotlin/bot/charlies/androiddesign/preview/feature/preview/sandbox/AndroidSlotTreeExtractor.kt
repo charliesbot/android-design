@@ -586,7 +586,18 @@ internal object AndroidSlotTreeExtractor {
           touchSemantics
             .map { it.touchBoundsInFrame(rootWindowPos, winOffset) }
             .fold<Rect, Rect?>(null) { acc, r -> if (acc == null) r else unionRect(acc, r) }
-        semTouch?.let { unionRect(it, layoutRectPx) } ?: layoutRectPx
+        // Layout modifiers such as `minimumInteractiveComponentSize()` grow the node around its
+        // content, and Compose takes taps in that grown area, so it counts as touch area.
+        val outerPx =
+          measureLayoutRectPx(
+            layout,
+            rootCoordinates,
+            rootWindowPos,
+            layoutWindowOffsets,
+            layout.outerCoordinates,
+          )
+        val laidOut = unionRect(layoutRectPx, outerPx)
+        semTouch?.let { unionRect(it, laidOut) } ?: laidOut
       }
     val boundsDp = visibleBoundsPx.toDp(density)
 
@@ -1004,8 +1015,8 @@ internal object AndroidSlotTreeExtractor {
     rootCoordinates: LayoutCoordinates?,
     rootWindowPos: Offset,
     layoutWindowOffsets: Map<LayoutInfo, Offset>,
+    coords: LayoutCoordinates = layout.coordinates,
   ): Rect {
-    val coords = layout.coordinates
     val winOffset = layoutWindowOffsets[layout]
     if (winOffset != null) {
       val pos = coords.localToWindow(Offset.Zero) + winOffset
@@ -1022,6 +1033,13 @@ internal object AndroidSlotTreeExtractor {
     val pos = coords.localToWindow(Offset.Zero) - rootWindowPos
     return Rect(pos.x, pos.y, pos.x + layout.width, pos.y + layout.height)
   }
+
+  /**
+   * The coordinates of [LayoutInfo]'s outermost modifier, which span every layout modifier on the
+   * node. [LayoutInfo.coordinates] is the inner content box.
+   */
+  private val LayoutInfo.outerCoordinates: LayoutCoordinates
+    get() = getModifierInfo().firstOrNull()?.coordinates ?: coordinates
 
   private fun clipWithin(semanticsRect: Rect, layoutRect: Rect): Rect {
     val left =

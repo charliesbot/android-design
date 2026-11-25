@@ -16,7 +16,7 @@ material:
 ```
 
 - `material.scheme.variant` is lowercase kebab-case (`tonal-spot`, `neutral`, `content`, `fidelity`, `monochrome`, `rainbow`, `fruit-salad`); avoid `expressive` and `vibrant` on phone because they flood surfaces with chroma.
-- Set `brandFont = BundledFont.Fraunces` (or `BricolageGrotesque`, `BigShouldersDisplay`, or `Doto` at Display only) directly on `designBoard(...)`. For custom axes in `DESIGN.md`, keys under `typography:` must be kebab-case Material type roles (`display-large: { fontFamily: Fraunces, fontVariation: "'opsz' 72" }`), never `typography.brand`.
+- Set `brandFont = BundledFont.Fraunces` (or `BricolageGrotesque`, `BigShouldersDisplay`, or `Doto` at Display only) directly on `designBoard(...)`. The board draws the face at its starting voice from the theming reference (Fraunces `wght` 600 with `SOFT` 100 and `WONK` 1, Bricolage Grotesque and Big Shoulders Display `wght` 800, Doto `wght` 700); give a hero `Text` its own `fontWeight` or axes when the direction wants a different voice. For custom axes in `DESIGN.md`, keys under `typography:` must be kebab-case Material type roles (`display-large: { fontFamily: Fraunces, fontVariation: "'opsz' 72" }`), never `typography.brand`.
 
 ## Exploration Kit & Responsive Sizing (`import bot.charlies.androiddesign.preview.kit.*`)
 
@@ -72,7 +72,7 @@ Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSp
 }
 SplitButtonLayout(leadingButton = { SplitButtonDefaults.LeadingButton(onClick = {}) { Text("...") } }, trailingButton = { SplitButtonDefaults.TrailingButton(checked = ..., onCheckedChange = {}) { ... } })
 FilterChip(selected = ..., onClick = {}, label = { Text("...") }, shapes = FilterChipDefaults.shapes()) // also ElevatedFilterChip, InputChip(shapes = InputChipDefaults.shapes())
-val sliderState = rememberSliderState(value = 0.5f); Slider(state = sliderState, onValueChange = { sliderState.value = it }, modifier = Modifier.heightIn(min = 48.dp)) // also VerticalSlider
+val sliderState = rememberSliderState(value = 0.5f); Slider(state = sliderState, onValueChange = { sliderState.value = it }) // also VerticalSlider
 val rangeState = rememberRangeSliderState(startValue = 0.2f, endValue = 0.8f); RangeSlider(state = rangeState, onValueChange = { rangeState.startValue = it.start; rangeState.endValue = it.endInclusive }) // startValue/endValue replace activeRangeStart/End
 MediumFloatingActionButton(onClick = {}) { ... } // or LargeFloatingActionButton
 FloatingActionButtonMenu(expanded = ..., button = { ToggleFloatingActionButton(checked = ..., onCheckedChange = {}) { ... } }) { FloatingActionButtonMenuItem(onClick = {}, text = {}, icon = {}) }

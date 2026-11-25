@@ -83,20 +83,41 @@ enum class TypeGroup {
  * the type groups the face may set and [roles] the single roles it may set beyond them. Google Sans
  * Flex and Google Sans Code serve every role, brand faces take display, headline and the large
  * title roles (a small top app bar or side sheet title draws in title large), and Doto is for
- * display sizes only. [scope] names what the face may set, for messages.
+ * display sizes only. [scope] names what the face may set, for messages. [voice] is a brand face's
+ * starting point from the theming reference, so a board that names the face draws it with intent
+ * rather than at regular weight; the two plain faces have none.
  */
 enum class BundledFont(
   val family: String,
   private val groups: Set<TypeGroup>,
   private val roles: Set<TypeRole>,
   val scope: String,
+  val voice: FontVoice? = null,
 ) {
   GoogleSansFlex("Google Sans Flex", TypeGroup.entries.toSet(), emptySet(), "any"),
   GoogleSansCode("Google Sans Code", TypeGroup.entries.toSet(), emptySet(), "any"),
-  Fraunces("Fraunces", BRAND_GROUPS, BRAND_ROLES, BRAND_SCOPE),
-  BricolageGrotesque("Bricolage Grotesque", BRAND_GROUPS, BRAND_ROLES, BRAND_SCOPE),
-  BigShouldersDisplay("Big Shoulders Display", BRAND_GROUPS, BRAND_ROLES, BRAND_SCOPE),
-  Doto("Doto", setOf(TypeGroup.Display), emptySet(), "display");
+  Fraunces(
+    "Fraunces",
+    BRAND_GROUPS,
+    BRAND_ROLES,
+    BRAND_SCOPE,
+    FontVoice(weight = 600, variation = "'SOFT' 100, 'WONK' 1"),
+  ),
+  BricolageGrotesque(
+    "Bricolage Grotesque",
+    BRAND_GROUPS,
+    BRAND_ROLES,
+    BRAND_SCOPE,
+    FontVoice(weight = 800),
+  ),
+  BigShouldersDisplay(
+    "Big Shoulders Display",
+    BRAND_GROUPS,
+    BRAND_ROLES,
+    BRAND_SCOPE,
+    FontVoice(weight = 800),
+  ),
+  Doto("Doto", setOf(TypeGroup.Display), emptySet(), "display", FontVoice(weight = 700));
 
   /** Whether the face may set text that has no type role, which only a face for every role may. */
   val setsAnyText: Boolean
@@ -117,6 +138,9 @@ enum class BundledFont(
     }
   }
 }
+
+/** A face's weight and any other axes, as a CSS-like list such as `'SOFT' 100`. */
+data class FontVoice(val weight: Int, val variation: String? = null)
 
 private val BRAND_GROUPS = setOf(TypeGroup.Display, TypeGroup.Headline)
 private val BRAND_ROLES = setOf(TypeRole.TitleLarge, TypeRole.TitleLargeEmphasized)
