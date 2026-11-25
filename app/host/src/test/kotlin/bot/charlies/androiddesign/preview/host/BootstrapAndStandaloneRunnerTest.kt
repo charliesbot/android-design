@@ -65,4 +65,20 @@ class BootstrapAndStandaloneRunnerTest {
       Files.exists(meta.bootstrapDir.resolve("robolectric.cp")),
     )
   }
+
+  /**
+   * A compressed font asset makes every Typeface built from it copy the whole file onto the Java
+   * heap, and ProposalFonts keeps one Typeface per weight or icon size. Stored fonts are mapped.
+   */
+  @Test
+  fun apkStoresFontAssetsUncompressed() {
+    val meta = BootstrapMeta.locate()
+    ZipFile(meta.apkPath.toFile()).use { apk ->
+      val fonts = apk.entries().toList().filter { it.name.endsWith(".ttf") }
+      assertTrue("Expected bundled fonts in the APK", fonts.isNotEmpty())
+      for (font in fonts) {
+        assertEquals("Font must be STORED: ${font.name}", ZipEntry.STORED, font.method)
+      }
+    }
+  }
 }
