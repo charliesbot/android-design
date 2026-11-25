@@ -468,6 +468,102 @@ class RenderQueue(
     return future
   }
 
+  /**
+   * Executes one view-grouped LZ4 PNG batch render for [ReportRenderer] serialized through the
+   * shared queue. Reuses cached 2x PNG artifacts only when every requested target already has a
+   * cached PNG and layout tree.
+   */
+  fun submitBatchReport(
+    entry: CompileEntry,
+    targets: List<CheckTargetSpec>,
+    outDir: Path,
+    priority: QueuePriority = QueuePriority.AGENT,
+  ): CompletableFuture<List<RenderArtifact>> {
+    replacedVersion?.let {
+      return CompletableFuture.failedFuture(ServerReplacedException(it))
+    }
+    if (targets.isEmpty()) {
+      return CompletableFuture.completedFuture(emptyList())
+    }
+    val key = FileCacheKey(canonicalKey(entry.repoRoot), canonicalKey(entry.sourcePath))
+    synchronized(cacheLock) {
+      val current = cachesByFile[key]
+      if (current != null && current.contentHash == entry.contentHash) {
+        val cached = targets.mapNotNull { t ->
+          current.rendered[RenderKey(t.direction, t.screenId, t.overlayId, t.view.name, 2)]
+            ?.takeIf { art ->
+              art.tree != null &&
+                art.imageMime == "image/png" &&
+                art.pngBytes != null &&
+                art.pngBytes.isNotEmpty()
+            }
+        }
+        if (cached.size == targets.size) {
+          return CompletableFuture.completedFuture(cached)
+        }
+      }
+    }
+    val future = CompletableFuture<List<RenderArtifact>>()
+    val job =
+      object :
+        QueueJob(
+          repoKey = key.repoKey,
+          sourceKey = key.sourceKey,
+          dexHash = entry.dexHash,
+          contentHash = entry.contentHash,
+          priority = priority,
+          seq = seqGen.incrementAndGet(),
+          cancellableOnNewSave = false,
+        ) {
+        override fun cancel(cause: CancellationException) {
+          future.completeExceptionally(cause)
+        }
+
+        override fun execute() {
+          if (cancelled.get()) {
+            cancel(CancellationException("cancelled"))
+            return
+          }
+          try {
+            val artifacts =
+              runWithWatchdog(
+                contentHash = entry.contentHash,
+                scope = "batch-report",
+                isCold = false,
+                repoRoot = entry.repoRoot,
+                minBudgetMs = Watchdog.BATCH_BUDGET_MS,
+              ) {
+                executor.renderBatchReport(entry, targets, outDir, densityScale = 2)
+              }
+            synchronized(cacheLock) {
+              val current = cachesByFile[key]
+              if (current != null && current.contentHash == entry.contentHash) {
+                for (art in artifacts) {
+                  val rk =
+                    RenderKey(
+                      art.direction,
+                      art.screen,
+                      art.overlay,
+                      art.view.name,
+                      art.densityScale,
+                    )
+                  current.rendered[rk] = art
+                }
+              }
+            }
+            for (art in artifacts) {
+              onViewRendered(entry.repoRoot, entry.sourcePath, entry.contentHash, art)
+            }
+            future.complete(artifacts)
+          } catch (t: Throwable) {
+            future.completeExceptionally(t)
+          }
+        }
+      }
+    queue.put(job)
+    return future
+  }
+
   private fun hasRequiredPngs(
     artifacts: List<RenderArtifact>,
     scoped: Boolean,

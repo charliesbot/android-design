@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -144,6 +145,10 @@ class PreviewHttpServer(
     Executors.newSingleThreadScheduledExecutor { r ->
       Thread(r, "android-design-housekeep").apply { isDaemon = true }
     }
+  private val liveUpdateExecutor = Executors.newSingleThreadExecutor { r ->
+    Thread(r, "android-design-live-update").apply { isDaemon = true }
+  }
+  private val pendingLiveUpdate = AtomicReference<Pair<CompileEntry, LivePreviewUpdate>?>(null)
 
   private val checkService =
     CheckService(
@@ -172,6 +177,9 @@ class PreviewHttpServer(
     override fun markLiveOwner(repoId: String) {
       server.liveOwnerRepoId = repoId
     }
+
+    override fun scheduleLiveUpdate(entry: CompileEntry, update: LivePreviewUpdate) =
+      server.scheduleLiveUpdate(entry, update)
 
     override fun clearTimeoutsIfHashChanged(repoRoot: Path, newHash: String) =
       server.clearTimeoutsIfHashChanged(repoRoot, newHash)
@@ -337,6 +345,8 @@ class PreviewHttpServer(
     }
     httpServer = null
     runCatching { executor.close() }
+    pendingLiveUpdate.set(null)
+    liveUpdateExecutor.shutdownNow()
     httpExecutor.shutdownNow()
     housekeepExecutor.shutdownNow()
     if (triggerExit) {
@@ -706,6 +716,7 @@ class PreviewHttpServer(
           ?: state.currentFocus?.screen
           ?: entry.boardMeta.directions.firstOrNull { it.name == dir }?.startScreen
       val ov = req.overlay ?: state.currentFocus?.overlay
+      pendingLiveUpdate.set(null)
       executor.updateLive(
         entry = entry,
         LivePreviewUpdate(
@@ -802,20 +813,13 @@ class PreviewHttpServer(
           compile = { snap ->
             awaitOrReplaced(renderQueue.submitCompile(state.repoRoot, snap, QueuePriority.AGENT))
           },
-          renderSingle = { entry, singleReq ->
+          renderBatch = { entry, targets ->
             awaitOrReplaced(
-              renderQueue.submitSingleRender(
+              renderQueue.submitBatchReport(
                 entry = entry,
-                direction = singleReq.direction,
-                screenId = singleReq.screenId,
-                prefix = singleReq.prefix,
-                overlayId = singleReq.overlayId,
-                view = singleReq.view,
-                densityScale = singleReq.densityScale,
-                baseCheck = singleReq.baseCheck,
+                targets = targets,
+                outDir = outDir,
                 priority = QueuePriority.AGENT,
-                writeFiles = false,
-                frameFormat = FrameFormat.LZ4_RGBA,
               ),
             )
           },
@@ -1475,6 +1479,18 @@ class PreviewHttpServer(
             (it.repoRoot != null && it.repoRoot != repoStr) || it.contentHash == newHash
           }
         if (kept.size == rec.timeouts.size) rec else rec.copy(timeouts = kept, haltedAt = null)
+      }
+    }
+  }
+
+  private fun scheduleLiveUpdate(entry: CompileEntry, update: LivePreviewUpdate) {
+    if (closed.get() || replacementSignal.isDone) return
+    pendingLiveUpdate.set(entry to update)
+    runCatching {
+      liveUpdateExecutor.execute {
+        if (closed.get() || replacementSignal.isDone) return@execute
+        val next = pendingLiveUpdate.getAndSet(null) ?: return@execute
+        runCatching { executor.updateLive(next.first, next.second) }
       }
     }
   }

@@ -5,6 +5,7 @@ import bot.charlies.androiddesign.preview.app.server.CheckExecutor
 import bot.charlies.androiddesign.preview.app.server.CheckTargetSpec
 import bot.charlies.androiddesign.preview.app.server.CompileEntry
 import bot.charlies.androiddesign.preview.app.server.ContentHasher
+import bot.charlies.androiddesign.preview.app.server.LivePreviewUpdate
 import bot.charlies.androiddesign.preview.app.server.SingleRenderRequest
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.Bounds
@@ -98,6 +99,7 @@ class AndroidPreviewBackendTest {
   ) : DeviceTransport {
     val preloaded = CopyOnWriteArrayList<String>()
     val syncedAssetHashes = CopyOnWriteArrayList<String>()
+    val syncAssetCalls = AtomicInteger(0)
     val batchRequests = CopyOnWriteArrayList<DeviceBatchRequest>()
     val singleFormats = CopyOnWriteArrayList<FrameFormat>()
 
@@ -131,6 +133,7 @@ class AndroidPreviewBackendTest {
     }
 
     override fun syncAssets(assetBlobs: Map<String, ByteArray>): Int {
+      syncAssetCalls.incrementAndGet()
       syncedAssetHashes.addAll(assetBlobs.keys)
       return assetBlobs.size
     }
@@ -337,9 +340,16 @@ class AndroidPreviewBackendTest {
 
     val expectedAssetSha = ContentHasher.sha256Hex(assetBytes)
     assertTrue(expectedAssetSha in transport.syncedAssetHashes)
+    assertEquals(
+      1,
+      transport.syncAssetCalls.get(),
+      "compile + 2-pass batch check must sync assets only once before recycle",
+    )
     assertEquals(listOf("memory_pressure"), recycleReasons)
     assertEquals(listOf(2), recycleAtBatchCount)
 
+    // After finishCheck recycled the sandbox, the next render re-syncs assets once and
+    // updateLive reuses the memoized hash without another syncAssets call.
     val cardArtifact =
       executor.renderSingle(
         entry = entry,
@@ -360,6 +370,33 @@ class AndroidPreviewBackendTest {
     assertEquals(FrameFormat.WEBP_LOSSLESS, transport.singleFormats.last())
     assertNotNull(cardArtifact.endTree)
     assertEquals(listOf(2, 3), recycleAtBatchCount)
+    assertEquals(2, transport.syncAssetCalls.get())
+
+    // Without recycle, consecutive updateLive calls do not repeat syncAssets.
+    val noRecycleTransport = FakeTransport(failDarkView = false, recommendRecycle = false)
+    val noRecycleWorker = AndroidRenderWorker(meta = meta, transport = noRecycleTransport)
+    val noRecycleExec = CheckExecutor(noRecycleWorker)
+    val compiledNoRecycle = noRecycleExec.compile(snapshot)
+    val entryNoRecycle = entry.copy(androidData = compiledNoRecycle.androidData)
+    noRecycleExec.renderBatchCheck(
+      entryNoRecycle,
+      targets,
+      scoped = false,
+      rendersRoot = rendersRoot,
+    )
+    noRecycleExec.updateLive(
+      entryNoRecycle,
+      LivePreviewUpdate(direction = "Main", screenId = "home"),
+    )
+    noRecycleExec.updateLive(
+      entryNoRecycle,
+      LivePreviewUpdate(direction = "Main", screenId = "home"),
+    )
+    assertEquals(
+      1,
+      noRecycleTransport.syncAssetCalls.get(),
+      "Memoized asset hashes must avoid redundant syncAssets calls across compile, batch, and updateLive",
+    )
   }
 
   @Test

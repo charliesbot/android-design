@@ -97,7 +97,7 @@ class RenderCommand(
                 boardTheme = compiled.boardTheme,
               )
             },
-            renderSingle = { entry, req -> executor.renderSingle(entry, req) },
+            renderBatch = { entry, targets -> executor.renderBatchReport(entry, targets, outDir) },
           )
         } finally {
           executor.close()
@@ -120,7 +120,7 @@ class RenderCommand(
           requestedViews = options.views,
           requestedScreens = options.screens,
           compile = { error("Unreachable compile during local validation") },
-          renderSingle = { _, _ -> error("Unreachable render during local validation") },
+          renderBatch = { _, _ -> error("Unreachable render during local validation") },
         )
       localOnly.messages.forEach(err::println)
       return localOnly.exitCode

@@ -9,7 +9,6 @@ import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.DesignSystem
-import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
@@ -23,7 +22,7 @@ import java.nio.file.Path
 
 /**
  * Compiles an exploration and writes `<screen>-<view>.png`, `<screen>-<view>.tree.json`, optional
- * `-end` files, and `report.json` into `outDir` via the provided [compile] and [renderSingle]
+ * `-end` files, and `report.json` into `outDir` via the provided [compile] and [renderBatch]
  * callbacks.
  */
 object ReportRenderer {
@@ -37,12 +36,6 @@ object ReportRenderer {
     val messages: List<String> = emptyList(),
   )
 
-  private data class ScreenTarget(
-    val direction: DirectionMeta,
-    val screenId: String,
-    val prefix: String,
-  )
-
   fun render(
     sourcePath: Path,
     outDir: Path,
@@ -50,7 +43,7 @@ object ReportRenderer {
     requestedViews: List<String>?,
     requestedScreens: List<String>?,
     compile: (ContentHasher.Snapshot) -> CompileEntry,
-    renderSingle: (CompileEntry, SingleRenderRequest) -> RenderArtifact,
+    renderBatch: (CompileEntry, List<CheckTargetSpec>) -> List<RenderArtifact>,
   ): Result {
     val normSource = sourcePath.toAbsolutePath().normalize()
     val normOut = outDir.toAbsolutePath().normalize()
@@ -196,45 +189,22 @@ object ReportRenderer {
       }
     }
 
-    val targets = resolveTargets(meta.directions, requestedScreens)
-    val entries = mutableListOf<RenderEntry>()
-    for (target in targets) {
-      val baseChecks = ArrayList<ViewCheck>(views.size)
-      for (view in views) {
-        val (check, renderEntry) =
-          renderSingleTarget(
-            renderSingle = renderSingle,
-            entry = entry,
-            direction = target.direction.name,
-            screenId = target.screenId,
-            prefix = target.prefix,
-            overlayId = null,
-            view = view,
-            baseCheck = null,
-            outDir = normOut,
-          )
-        baseChecks += check
-        entries += renderEntry
-      }
-      val overlays = target.direction.overlaysFor(target.screenId)
-      for (overlay in overlays) {
-        views.forEachIndexed { index, view ->
-          val (_, renderEntry) =
-            renderSingleTarget(
-              renderSingle = renderSingle,
-              entry = entry,
-              direction = target.direction.name,
-              screenId = target.screenId,
-              prefix = target.prefix,
-              overlayId = overlay.id,
-              view = view,
-              baseCheck = baseChecks[index],
-              outDir = normOut,
-            )
-          entries += renderEntry
+    val targets = resolveMetaTargets(meta.directions, requestedScreens, directionFilter = null)
+    val planned = planBatchTargets(targets, views, includeOverlays = true)
+    val entries =
+      try {
+        val artifacts = renderBatch(entry, planned)
+        artifacts.map { artifact -> writeArtifactAndBuildEntry(artifact, normOut) }
+      } catch (e: ServerReplacedException) {
+        throw e
+      } catch (e: Exception) {
+        val failed = ViewCheck.renderError(e)
+        planned.map { spec ->
+          val artifactName =
+            spec.overlayId?.let { ViewCheck.renderOverlayName(spec.prefix, it) } ?: spec.prefix
+          RenderEntry.of(artifactName, spec.view.name, null, failed)
         }
       }
-    }
 
     val report =
       writeReport(
@@ -259,49 +229,19 @@ object ReportRenderer {
     )
   }
 
-  private fun renderSingleTarget(
-    renderSingle: (CompileEntry, SingleRenderRequest) -> RenderArtifact,
-    entry: CompileEntry,
-    direction: String,
-    screenId: String,
-    prefix: String,
-    overlayId: String?,
-    view: ViewSpec,
-    baseCheck: ViewCheck?,
+  private fun writeArtifactAndBuildEntry(
+    artifact: RenderArtifact,
     outDir: Path,
-  ): Pair<ViewCheck, RenderEntry> {
-    val artifactName = overlayId?.let { ViewCheck.renderOverlayName(prefix, it) } ?: prefix
-    val artifact =
-      try {
-        renderSingle(
-          entry,
-          SingleRenderRequest(
-            direction = direction,
-            screenId = screenId,
-            prefix = prefix,
-            overlayId = overlayId,
-            view = view,
-            densityScale = 2,
-            baseCheck = baseCheck,
-            writeFiles = false,
-            rendersRoot = outDir,
-            frameFormat = FrameFormat.LZ4_RGBA,
-          ),
-        )
-      } catch (e: ServerReplacedException) {
-        throw e
-      } catch (e: Exception) {
-        val failed = ViewCheck.renderError(e)
-        return failed to RenderEntry.of(artifactName, view.name, null, failed)
-      }
-
+  ): RenderEntry {
+    val artifactName = artifact.artifactName
+    val viewName = artifact.view.name
     val tree = artifact.tree
     val png = artifact.pngBytes
     if (tree == null || png == null || png.isEmpty()) {
-      return artifact.check to RenderEntry.of(artifactName, view.name, null, artifact.check)
+      return RenderEntry.of(artifactName, viewName, null, artifact.check)
     }
 
-    val filesBase = "$artifactName-${view.name}"
+    val filesBase = "$artifactName-$viewName"
     writeArtifacts(outDir, filesBase, png, tree)
     val endPng = artifact.endPngBytes
     val endTree = artifact.endTree
@@ -313,32 +253,7 @@ object ReportRenderer {
       } else {
         null
       }
-    return artifact.check to
-      RenderEntry.of(artifactName, view.name, filesBase, artifact.check, endFiles)
-  }
-
-  private fun resolveTargets(
-    directions: List<DirectionMeta>,
-    screenFilter: List<String>?,
-  ): List<ScreenTarget> {
-    val singleDirection = directions.size == 1
-    val filterSet = screenFilter?.toSet()
-    return buildList {
-      for (dir in directions) {
-        for (screenId in dir.screens) {
-          val prefix = if (singleDirection) screenId else "${sanitizeSegment(dir.name)}__$screenId"
-          val slashName = "${dir.name}/$screenId"
-          if (
-            filterSet == null ||
-              screenId in filterSet ||
-              prefix in filterSet ||
-              slashName in filterSet
-          ) {
-            add(ScreenTarget(dir, screenId, prefix))
-          }
-        }
-      }
-    }
+    return RenderEntry.of(artifactName, viewName, filesBase, artifact.check, endFiles)
   }
 
   private fun resolveViews(
@@ -391,7 +306,4 @@ object ReportRenderer {
     )
     return report
   }
-
-  private fun sanitizeSegment(name: String): String =
-    name.trim().replace(Regex("""[^A-Za-z0-9._-]+"""), "_").ifBlank { "direction" }
 }

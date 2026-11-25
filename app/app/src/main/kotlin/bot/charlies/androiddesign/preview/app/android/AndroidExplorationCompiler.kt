@@ -71,12 +71,13 @@ object AndroidExplorationCompiler {
     sourcePath: Path,
     explicitDesign: Path?,
     meta: BootstrapMeta,
+    snapshot: ContentHasher.Snapshot? = null,
   ): AndroidCompileOutcome {
     val started = System.nanoTime()
     fun elapsedMs(): Long = (System.nanoTime() - started) / NANOS_PER_MS
 
     val stage =
-      when (val outcome = compileClassStage(sourcePath, explicitDesign, meta)) {
+      when (val outcome = compileClassStage(sourcePath, explicitDesign, meta, snapshot)) {
         is ClassStageOutcome.Failed ->
           return AndroidCompileOutcome.Failed(
             errors = outcome.errors,
@@ -137,12 +138,15 @@ object AndroidExplorationCompiler {
     sourcePath: Path,
     explicitDesign: Path?,
     meta: BootstrapMeta,
+    snapshot: ContentHasher.Snapshot? = null,
   ): ClassStageOutcome {
     val started = System.nanoTime()
     fun elapsedMs(): Long = (System.nanoTime() - started) / NANOS_PER_MS
 
     val normalized = sourcePath.toAbsolutePath().normalize()
-    if (!Files.isRegularFile(normalized)) {
+    val matchingSnapshot = snapshot?.takeIf { it.sourcePath == normalized }
+    val preReadSource = matchingSnapshot?.sourceBytes
+    if (preReadSource == null && !Files.isRegularFile(normalized)) {
       return ClassStageOutcome.Failed(
         errors = listOf(ValidationError(normalized.toString(), "No such file: $normalized")),
         compileMs = elapsedMs(),
@@ -154,7 +158,11 @@ object AndroidExplorationCompiler {
     }
     val sourceText =
       try {
-        Files.readString(normalized)
+        if (preReadSource != null) {
+          Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(preReadSource)).toString()
+        } else {
+          Files.readString(normalized)
+        }
       } catch (e: CharacterCodingException) {
         return ClassStageOutcome.Failed(
           listOf(ValidationError(normalized.toString(), "File is not valid UTF-8: ${e.message}")),
@@ -164,7 +172,8 @@ object AndroidExplorationCompiler {
         )
       }
     val fileName = normalized.fileName.toString()
-    val (assetMap, assetBlobs, assetErrors) = collectAssets(normalized.parent, fileName, sourceText)
+    val (assetMap, assetBlobs, assetErrors) =
+      collectAssets(normalized.parent, fileName, sourceText, matchingSnapshot?.assets)
     if (assetErrors.isNotEmpty()) {
       return ClassStageOutcome.Failed(assetErrors, elapsedMs(), design.path, design.theme)
     }
@@ -357,6 +366,7 @@ object AndroidExplorationCompiler {
     baseDir: Path?,
     fileName: String,
     sourceText: String,
+    precollectedAssets: List<ContentHasher.AssetEntry>? = null,
   ): AssetCollection {
     if (baseDir == null || !Files.isDirectory(baseDir)) {
       return AssetCollection(emptyMap(), emptyMap(), emptyList())
@@ -378,18 +388,25 @@ object AndroidExplorationCompiler {
       assetBlobs.putIfAbsent(sha, bytes)
     }
 
-    val assetsDir = baseDir.resolve("assets")
-    if (Files.isDirectory(assetsDir) && !Files.isSymbolicLink(assetsDir)) {
-      val assetsReal = runCatching { assetsDir.toRealPath() }.getOrNull()
-      if (assetsReal != null && assetsReal.startsWith(baseReal)) {
-        Files.walk(assetsDir, MAX_ASSET_WALK_DEPTH).use { stream ->
-          stream
-            .filter { Files.isRegularFile(it) && !Files.isSymbolicLink(it) }
-            .sorted()
-            .forEach { file ->
-              val rel = baseDir.relativize(file).toString().replace('\\', '/')
-              recordAsset(rel, file)
-            }
+    if (precollectedAssets != null) {
+      for (entry in precollectedAssets) {
+        assetMap[entry.relativePath] = entry.sha256
+        assetBlobs.putIfAbsent(entry.sha256, entry.bytes)
+      }
+    } else {
+      val assetsDir = baseDir.resolve("assets")
+      if (Files.isDirectory(assetsDir) && !Files.isSymbolicLink(assetsDir)) {
+        val assetsReal = runCatching { assetsDir.toRealPath() }.getOrNull()
+        if (assetsReal != null && assetsReal.startsWith(baseReal)) {
+          Files.walk(assetsDir, MAX_ASSET_WALK_DEPTH).use { stream ->
+            stream
+              .filter { Files.isRegularFile(it) && !Files.isSymbolicLink(it) }
+              .sorted()
+              .forEach { file ->
+                val rel = baseDir.relativize(file).toString().replace('\\', '/')
+                recordAsset(rel, file)
+              }
+          }
         }
       }
     }
