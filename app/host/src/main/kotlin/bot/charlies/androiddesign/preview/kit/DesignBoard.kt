@@ -144,7 +144,14 @@ internal constructor(
         buildMap {
           for (role in TypeRole.entries) {
             if (brandFont.allows(role.group, role)) {
-              put(role.kebab, TypographyOverride(fontFamily = brandFont.family))
+              put(
+                role.kebab,
+                TypographyOverride(
+                  fontFamily = brandFont.family,
+                  fontWeight = brandFont.voice?.weight,
+                  fontVariation = brandFont.voice?.variation,
+                ),
+              )
             }
           }
         }

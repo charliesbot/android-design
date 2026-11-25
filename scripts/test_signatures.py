@@ -21,6 +21,20 @@ class ComposeSignaturesTest(unittest.TestCase):
         self.assertLessEqual(len(actual.splitlines()), 220)
         self.assertNotIn("\u2014", actual)
 
+    def test_kit_enums_list_only_enum_entries_not_their_arguments(self):
+        _, fonts = gen.extract_kit_enums()
+        self.assertEqual(
+            fonts,
+            [
+                "GoogleSansFlex",
+                "GoogleSansCode",
+                "Fraunces",
+                "BricolageGrotesque",
+                "BigShouldersDisplay",
+                "Doto",
+            ],
+        )
+
     def test_all_curated_m3_symbols_exist_in_inventory(self):
         inventory = gen.load_inventory()
         missing = gen.verify_inventory(inventory)

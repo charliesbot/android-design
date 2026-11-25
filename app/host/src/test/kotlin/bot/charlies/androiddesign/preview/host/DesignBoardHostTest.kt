@@ -10,6 +10,7 @@ import bot.charlies.androiddesign.preview.feature.preview.sandbox.RawRgbaFrame
 import bot.charlies.androiddesign.preview.kit.BoardSurface
 import bot.charlies.androiddesign.preview.kit.designBoard
 import bot.charlies.androiddesign.preview.kit.resolveConfinedAsset
+import bot.charlies.androiddesign.preview.model.BundledFont
 import bot.charlies.androiddesign.preview.model.M3Component
 import bot.charlies.androiddesign.preview.model.WearComponent
 import java.nio.file.Files
@@ -111,5 +112,19 @@ class DesignBoardHostTest {
     assertEquals(WearComponent.Screen.wire, CallNameMapper.map("ScreenScaffold", BoardSurface.Wear))
     assertEquals(WearComponent.EdgeButton.wire, CallNameMapper.map("EdgeButton", BoardSurface.Wear))
     assertEquals("DatePicker", CallNameMapper.map("DatePicker", BoardSurface.Wear))
+  }
+
+  @Test
+  fun brandFontSetsItsStartingVoiceNotRegularWeight() {
+    val board =
+      designBoard("Voice", seed = 0xFFC2452DL, brandFont = BundledFont.Fraunces) {
+        screen { Text("Hi") }
+      }
+    val typography = board.toThemeOverride()!!.typography
+    val display = typography.getValue("display-large")
+    assertEquals("Fraunces", display.fontFamily)
+    assertEquals(600, display.fontWeight)
+    assertEquals("'SOFT' 100, 'WONK' 1", display.fontVariation)
+    assertEquals(null, typography["body-large"])
   }
 }

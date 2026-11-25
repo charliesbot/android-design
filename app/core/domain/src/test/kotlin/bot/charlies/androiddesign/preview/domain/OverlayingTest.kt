@@ -1,5 +1,12 @@
 package bot.charlies.androiddesign.preview.domain
 
+import bot.charlies.androiddesign.preview.domain.findings.node
+import bot.charlies.androiddesign.preview.domain.findings.text
+import bot.charlies.androiddesign.preview.domain.findings.tree
+import bot.charlies.androiddesign.preview.model.Finding
+import bot.charlies.androiddesign.preview.model.FindingRule
+import bot.charlies.androiddesign.preview.model.Severity
+import bot.charlies.androiddesign.preview.model.Views
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -78,5 +85,39 @@ class OverlayingTest {
       result.notes,
     )
     assertTrue(result.pass, "notes never fail a view")
+  }
+
+  @Test
+  fun `contrast on base text drawn again in place is dropped, because the overlay may cover it`() {
+    val artist = text("Late Summer")
+    val base =
+      ViewCheck.of(
+        tree(
+          Views.Light,
+          node("screen", "Column", w = 411f, h = 800f),
+          node("artist", "Text", y = 120f, parent = "screen", text = artist),
+        ),
+      )
+    // The overlay composable draws the screen again, so its copy of the base text gets a new id;
+    // the same call in the sheet, at other bounds, is the overlay's own text.
+    val overlayTree =
+      tree(
+        Views.Light,
+        node("screen", "Column", w = 411f, h = 800f),
+        node("artist", "Text", y = 120f, parent = "screen", text = artist),
+        node("artist_2", "Text", y = 120f, parent = "screen", text = artist),
+        node("sheet-artist", "Text", y = 600f, parent = "screen", text = artist),
+      )
+    val contrast = { id: String ->
+      Finding(id, FindingRule.Contrast, Severity.Error, detail = "1:1, needs 4.5:1")
+    }
+    val overlay =
+      ViewCheck.of(
+        overlayTree.copy(findings = listOf("artist", "artist_2", "sheet-artist").map(contrast)),
+      )
+
+    val result = overlay.overlaying(base)
+
+    assertEquals(listOf(listOf("sheet-artist")), result.errors.map { it.ids })
   }
 }
