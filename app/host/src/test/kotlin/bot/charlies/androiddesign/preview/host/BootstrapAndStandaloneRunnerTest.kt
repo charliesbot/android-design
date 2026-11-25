@@ -48,7 +48,7 @@ class BootstrapAndStandaloneRunnerTest {
     assertTrue("Expected >30 .kotlin_module entries, got $kotlinModules", kotlinModules > 30)
     assertTrue("Expected >=4 .kotlin_builtins entries, got $kotlinBuiltins", kotlinBuiltins >= 4)
 
-    for (argName in listOf("server.cp", "client.cp")) {
+    for (argName in listOf("server.cp", "client.cp", "worker.cp")) {
       val cpFile = meta.bootstrapDir.resolve(argName)
       assertTrue("Missing argfile $cpFile", Files.isRegularFile(cpFile))
       val lines = Files.readAllLines(cpFile).filter { it.isNotBlank() }
@@ -59,7 +59,28 @@ class BootstrapAndStandaloneRunnerTest {
         val p = Paths.get(entry)
         assertTrue("Missing classpath entry in $argName: $p", Files.exists(p))
       }
+      if (argName == "worker.cp") {
+        val layoutlibIdx = entries.indexOfFirst {
+          Paths.get(it).fileName.toString().startsWith("layoutlib-")
+        }
+        val androidIdx = entries.indexOfFirst { Paths.get(it) == meta.androidJar }
+        assertTrue("worker.cp must include layoutlib jar", layoutlibIdx >= 0)
+        assertTrue("worker.cp must include android.jar", androidIdx >= 0)
+        assertTrue("layoutlib must precede android.jar in worker.cp", layoutlibIdx < androidIdx)
+        assertEquals("android.jar must be last in worker.cp", entries.lastIndex, androidIdx)
+      }
     }
+    assertTrue("workerRJar must exist", Files.isRegularFile(meta.workerRJar))
+    assertTrue("workerResDirsFile must exist", Files.isRegularFile(meta.workerResDirsFile))
+    assertTrue("workerAssetsDir must exist", Files.isDirectory(meta.workerAssetsDir))
+    assertTrue(
+      "layoutlibRuntimeDir data must exist",
+      Files.isDirectory(meta.layoutlibRuntimeDir.resolve("data")),
+    )
+    assertTrue(
+      "layoutlibResourcesDir res must exist",
+      Files.isDirectory(meta.layoutlibResourcesDir.resolve("res")),
+    )
     assertFalse(
       "robolectric.cp should not be exported",
       Files.exists(meta.bootstrapDir.resolve("robolectric.cp")),

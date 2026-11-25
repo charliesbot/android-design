@@ -139,7 +139,8 @@ class InMemoryRenderWorker(
             mime = "image/webp",
             isPng = false,
           )
-        FrameFormat.LZ4_RGBA ->
+        FrameFormat.LZ4_RGBA,
+        FrameFormat.RAW_RGBA ->
           WorkerFrame(
             bytes =
               PNG_SIGNATURE +

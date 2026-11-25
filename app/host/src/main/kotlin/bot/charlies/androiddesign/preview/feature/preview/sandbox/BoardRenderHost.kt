@@ -32,10 +32,11 @@ import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.ThemeOverride
 import bot.charlies.androiddesign.preview.model.ViewSpec
+import java.nio.file.Path
 import kotlin.math.roundToInt
 
 /** Inputs for rendering a single screen/overlay target of an [ExplorationBoard]. */
-internal data class RenderTargetRequest(
+data class RenderTargetRequest(
   val board: ExplorationBoard,
   val direction: DirectionSpec,
   val screenId: String,
@@ -50,10 +51,11 @@ internal data class RenderTargetRequest(
   val seedOverride: String? = null,
   val variantOverride: String? = null,
   val assetResolver: ((String) -> ImageBitmap?)? = null,
+  val explorationDir: Path? = null,
 )
 
 /** Resolved dimensions, theme, and view configuration derived from a [RenderTargetRequest]. */
-internal data class PreparedRenderTarget(
+data class PreparedRenderTarget(
   val request: RenderTargetRequest,
   val effectiveView: ViewSpec,
   val effectiveFontScale: Float,
@@ -125,16 +127,16 @@ internal data class PreparedRenderTarget(
 }
 
 /** Captured RGBA frame alongside overlay window offsets measured during composition draw. */
-internal data class CapturedFrame(
+data class CapturedFrame(
   val frame: RawRgbaFrame,
   val explicitWindowOffsets: Map<View, Offset>,
 )
 
 /** Main decor view and active offscreen windows present in the host's window hierarchy. */
-internal data class RenderWindowSnapshot(val mainDecorView: View, val activeWindows: List<View>)
+data class RenderWindowSnapshot(val mainDecorView: View, val activeWindows: List<View>)
 
 /** Output of rendering, settling, and optionally scrolling a single board target. */
-internal data class BoardRenderResult(
+data class BoardRenderResult(
   val target: PreparedRenderTarget,
   val tree: LayoutTree,
   val endTree: LayoutTree?,
@@ -144,7 +146,7 @@ internal data class BoardRenderResult(
 )
 
 /** Surface mount used by [ComposeBoardRenderer] (Display 0 `HardwareRenderer` on Android). */
-internal interface BoardRenderHost {
+interface BoardRenderHost {
   suspend fun <T> withMountedTarget(
     target: PreparedRenderTarget,
     inspectionTables: MutableSet<CompositionData>,
@@ -155,7 +157,7 @@ internal interface BoardRenderHost {
 }
 
 /** Active mounted target handle providing frame capture, UI-thread dispatch, and window access. */
-internal interface MountedRenderSession {
+interface MountedRenderSession {
   val driver: WearScrollDriver
 
   suspend fun captureFrame(): CapturedFrame
@@ -167,7 +169,7 @@ internal interface MountedRenderSession {
 
 @OptIn(ComposeToolingApi::class)
 @Composable
-internal fun RenderBoardContent(
+fun RenderBoardContent(
   target: PreparedRenderTarget,
   overrideContext: Context,
   overrideConfig: Configuration,
@@ -196,7 +198,7 @@ internal fun RenderBoardContent(
           screenId = target.request.screenId,
           view = target.effectiveView,
           designSystem = target.designSystem,
-          explorationDir = null,
+          explorationDir = target.request.explorationDir,
           overlayId = target.request.overlayId,
           assetResolver = target.request.assetResolver,
           onEmptyDetail = onEmptyDetail,
@@ -208,7 +210,7 @@ internal fun RenderBoardContent(
 
 @OptIn(ComposeToolingApi::class)
 @Composable
-internal fun InspectedSubcomposition(
+fun InspectedSubcomposition(
   tables: MutableSet<CompositionData>,
   content: @Composable () -> Unit,
 ) {

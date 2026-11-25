@@ -121,6 +121,7 @@ internal class FrameCapture {
       when (target.frameFormat) {
         FrameFormat.LZ4_RGBA -> compressLz4(frame.bytes)
         FrameFormat.WEBP_LOSSLESS -> compressWebpLossless(frame)
+        FrameFormat.RAW_RGBA -> frame.bytes
         FrameFormat.NONE -> ByteArray(0)
       }
     return DeviceWireFrame(

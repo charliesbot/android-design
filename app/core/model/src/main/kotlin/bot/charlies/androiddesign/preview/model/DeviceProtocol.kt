@@ -17,6 +17,7 @@ enum class FrameFormat {
   NONE,
   LZ4_RGBA,
   WEBP_LOSSLESS,
+  RAW_RGBA,
 }
 
 @Serializable
@@ -97,6 +98,7 @@ data class DeviceBatchRequest(
   val targets: List<DeviceRenderTarget>,
   val timeoutMs: Long = 15_000L,
   val forceNewClassLoader: Boolean = false,
+  val explorationDir: String? = null,
 )
 
 @Serializable

@@ -28,11 +28,11 @@ internal class InsetConsumingFrameLayout(context: Context) : FrameLayout(context
   override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets = WindowInsets.CONSUMED
 }
 
-internal data class OverlayMeasureResult(val offset: Offset, val width: Int, val height: Int)
+data class OverlayMeasureResult(val offset: Offset, val width: Int, val height: Int)
 
 /** Android view-hierarchy helpers used by `:sandbox` offscreen capture and unit tests. */
 @OptIn(ComposeToolingApi::class)
-internal object OverlayWindowHelper {
+object OverlayWindowHelper {
   fun forceLayoutTree(v: View) {
     v.forceLayout()
     if (v is ViewGroup) {

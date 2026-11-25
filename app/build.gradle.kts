@@ -23,7 +23,9 @@ spotless {
 
 subprojects {
   plugins.withId("org.jetbrains.kotlin.jvm") {
-    extensions.configure<KotlinJvmProjectExtension> { jvmToolchain(17) }
+    if (path != ":render") {
+      extensions.configure<KotlinJvmProjectExtension> { jvmToolchain(17) }
+    }
 
     dependencies {
       add("testImplementation", platform(rootProject.libs.junit.bom))

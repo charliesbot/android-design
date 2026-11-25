@@ -148,6 +148,18 @@ object FrameCodec {
           imageBytes = frame.payload,
           imageMime = "image/webp",
         )
+      FrameFormat.RAW_RGBA -> {
+        val png = FastPngEncoder.encodeFast(frame.widthPx, frame.heightPx, frame.payload)
+        DecodedDeviceFrame(
+          key = key,
+          format = frame.format,
+          widthPx = frame.widthPx,
+          heightPx = frame.heightPx,
+          pngBytes = png,
+          imageBytes = png,
+          imageMime = "image/png",
+        )
+      }
       FrameFormat.NONE ->
         DecodedDeviceFrame(
           key = key,

@@ -30,6 +30,14 @@ class DeviceManagerTest {
     val d8Jar = bdir.resolve("d8.jar").also { Files.writeString(it, "d8") }
     val bundleJar = bdir.resolve("bundle.jar").also { Files.writeString(it, "bj") }
     val composeJar = bdir.resolve("compose.jar").also { Files.writeString(it, "cj") }
+    val workerCp = bdir.resolve("worker.cp").also { Files.writeString(it, "-cp\nfoo.jar\n") }
+    val llRuntime =
+      bdir.resolve("layoutlib/runtime").also { Files.createDirectories(it.resolve("data")) }
+    val llResources =
+      bdir.resolve("layoutlib/resources").also { Files.createDirectories(it.resolve("res")) }
+    val resDirsFile = bdir.resolve("worker-res-dirs.txt").also { Files.writeString(it, "") }
+    val assetsDir = bdir.resolve("assets").also { Files.createDirectories(it) }
+    val rJar = bdir.resolve("worker-r.jar").also { Files.writeString(it, "rj") }
     Files.writeString(bdir.resolve("server.cp"), "-cp\nfoo.jar\n")
     val sha = BootstrapMeta.computeSha256(apk)
     Files.writeString(
@@ -41,6 +49,12 @@ class DeviceManagerTest {
       apkPath=$apk
       apkSha256=$sha
       composeCompilerPluginJar=$composeJar
+      workerCp=$workerCp
+      layoutlibRuntimeDir=$llRuntime
+      layoutlibResourcesDir=$llResources
+      workerResDirsFile=$resDirsFile
+      workerAssetsDir=$assetsDir
+      workerRJar=$rJar
       """
         .trimIndent(),
     )

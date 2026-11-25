@@ -7,7 +7,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /** Raw RGBA_8888 pixel frame in row-major `[R, G, B, A]` byte order. */
-internal class RawRgbaFrame(val width: Int, val height: Int, val bytes: ByteArray)
+class RawRgbaFrame(val width: Int, val height: Int, val bytes: ByteArray)
 
 internal data class SampledContrast(val fgHex: String, val bgHex: String, val ratio: Double)
 
