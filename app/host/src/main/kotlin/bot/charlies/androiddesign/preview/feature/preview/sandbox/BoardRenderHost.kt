@@ -143,10 +143,7 @@ internal data class BoardRenderResult(
   val renderMs: Double,
 )
 
-/**
- * Platform-specific surface mount used by [ComposeBoardRenderer] (Display 0 `HardwareRenderer` on
- * Android, headless `ComponentActivity` + `Bitmap` on Robolectric).
- */
+/** Surface mount used by [ComposeBoardRenderer] (Display 0 `HardwareRenderer` on Android). */
 internal interface BoardRenderHost {
   suspend fun <T> withMountedTarget(
     target: PreparedRenderTarget,

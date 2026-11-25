@@ -115,7 +115,7 @@ object AndroidExplorationCompiler {
     )
   }
 
-  /** A compiled exploration before DEX lowering: what Robolectric (JVM bytecode) consumes. */
+  /** A compiled exploration before DEX lowering. */
   data class ClassStage(
     val sourcePath: Path,
     val sourceFile: String,
@@ -131,8 +131,7 @@ object AndroidExplorationCompiler {
 
   /**
    * Everything [compile] does except D8: design load, asset collection with its confinement errors,
-   * then lint, kotlinc with the Compose plugin, and [BytecodeGuard]. The Robolectric backend
-   * renders from this, so it applies the same rules as the device path.
+   * then lint, kotlinc with the Compose plugin, and [BytecodeGuard].
    */
   fun compileClassStage(
     sourcePath: Path,

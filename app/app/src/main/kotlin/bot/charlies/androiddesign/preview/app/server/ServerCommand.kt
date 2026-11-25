@@ -10,7 +10,6 @@ import bot.charlies.androiddesign.preview.app.client.ClientExitCode
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import java.io.PrintStream
-import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -22,7 +21,7 @@ class ServerCommand : Command {
   override val name = "server"
   override val usage =
     "server --repo <dir> [--preferred-port <port>] [--view-token <token>] [--idle-timeout-ms <ms>] " +
-      "[--backend android|robolectric] [--runtime-hash <hash>] [--device-serial <id>] [--avd <name>] " +
+      "[--backend android] [--runtime-hash <hash>] [--device-serial <id>] [--avd <name>] " +
       "[--headless true|false] [--force-reinstall-apk true|false]"
 
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
@@ -62,36 +61,21 @@ class ServerCommand : Command {
     val backendMode =
       parsed.flags["--backend"]?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
         ?: RuntimeIdentity.resolveBackend()
-    if (
-      backendMode != RuntimeIdentity.BACKEND_ANDROID &&
-        backendMode != RuntimeIdentity.BACKEND_ROBOLECTRIC
-    ) {
+    if (backendMode != RuntimeIdentity.BACKEND_ANDROID) {
       val msg =
         PreviewJson.compact.encodeToString(
           ErrorEnvelope.serializer(),
           ErrorEnvelope(
             error = "invalid_backend",
-            message = "Unsupported backend '$backendMode'; expected 'android' or 'robolectric'",
+            message = "Unsupported backend '$backendMode'; expected 'android'",
           ),
         )
       out.println(msg)
       err.println(msg)
       return ExitCode.USAGE
     }
-    val coldBudgetMs =
-      System.getenv(COLD_BUDGET_ENV)?.toLongOrNull()
-        ?: if (backendMode == RuntimeIdentity.BACKEND_ROBOLECTRIC) {
-          RobolectricRenderWorker.DEFAULT_COLD_BUDGET_MS
-        } else {
-          Watchdog.COLD_BUDGET_MS
-        }
-    val warmBudgetMs =
-      System.getenv(WARM_BUDGET_ENV)?.toLongOrNull()
-        ?: if (backendMode == RuntimeIdentity.BACKEND_ROBOLECTRIC) {
-          RobolectricRenderWorker.DEFAULT_WARM_BUDGET_MS
-        } else {
-          Watchdog.WARM_BUDGET_MS
-        }
+    val coldBudgetMs = System.getenv(COLD_BUDGET_ENV)?.toLongOrNull() ?: Watchdog.COLD_BUDGET_MS
+    val warmBudgetMs = System.getenv(WARM_BUDGET_ENV)?.toLongOrNull() ?: Watchdog.WARM_BUDGET_MS
     val env = System.getenv().toMutableMap().apply { put(RuntimeIdentity.BACKEND_ENV, backendMode) }
     parsed.flags["--runtime-hash"]
       ?.takeIf { it.isNotBlank() }
@@ -102,10 +86,10 @@ class ServerCommand : Command {
     val cacheRoot = ServerPaths.cacheRoot()
 
     val worker: RenderWorker
-    var deviceSerial: String? = null
-    var forwardPort: Int? = null
-    var apkSha256: String? = null
-    var onLaunchLiveActivity: () -> Unit = {}
+    val deviceSerial: String?
+    val forwardPort: Int?
+    val apkSha256: String?
+    val onLaunchLiveActivity: () -> Unit
     val recycleExecutor = Executors.newSingleThreadExecutor { r ->
       Thread(r, "android-design-sandbox-recycle").apply { isDaemon = true }
     }
@@ -128,138 +112,82 @@ class ServerCommand : Command {
     }
     Runtime.getRuntime().addShutdownHook(Thread { releaseLaunchedEmulator() })
 
-    if (backendMode == RuntimeIdentity.BACKEND_ROBOLECTRIC) {
-      val meta =
-        BootstrapMeta.locateOrNull()
-          ?: run {
-            val msg =
-              PreviewJson.compact.encodeToString(
-                ErrorEnvelope.serializer(),
-                ErrorEnvelope(
-                  error = "bootstrap_missing",
-                  message = "Cannot find bootstrap-meta.properties for Robolectric host server",
-                ),
-              )
-            out.println(msg)
-            err.println(msg)
-            recycleExecutor.shutdownNow()
-            return ClientExitCode.NOT_READY
-          }
-      val cpOverride =
-        System.getenv(RuntimeIdentity.ROBOLECTRIC_CP_ENV)?.takeIf { it.isNotBlank() }?.let(Path::of)
-      val robolectricCp = cpOverride ?: meta.bootstrapDir.resolve("robolectric.cp")
-      if (!Files.isRegularFile(robolectricCp)) {
-        val msg =
-          PreviewJson.compact.encodeToString(
-            ErrorEnvelope.serializer(),
-            ErrorEnvelope(
-              error = "bootstrap_missing",
-              message =
-                "Missing robolectric.cp at $robolectricCp; run `./gradlew :host:exportBootstrap` from app/",
-            ),
-          )
-        out.println(msg)
-        err.println(msg)
-        recycleExecutor.shutdownNow()
-        return ClientExitCode.NOT_READY
-      }
-      val roboWorker = RobolectricRenderWorker(meta = meta, robolectricCp = robolectricCp)
-      try {
-        roboWorker.warmUp()
-      } catch (e: Exception) {
-        roboWorker.close()
-        val msg =
-          PreviewJson.compact.encodeToString(
-            ErrorEnvelope.serializer(),
-            ErrorEnvelope(
-              error = "robolectric_init_failed",
-              message = e.message ?: "Failed warming Robolectric worker",
-            ),
-          )
-        out.println(msg)
-        err.println(msg)
-        recycleExecutor.shutdownNow()
-        return ClientExitCode.NOT_READY
-      }
-      worker = roboWorker
-    } else {
-      val meta =
-        BootstrapMeta.locateOrNull()
-          ?: run {
-            val msg =
-              PreviewJson.compact.encodeToString(
-                ErrorEnvelope.serializer(),
-                ErrorEnvelope(
-                  error = "bootstrap_missing",
-                  message = "Cannot find bootstrap-meta.properties for Android host server",
-                ),
-              )
-            out.println(msg)
-            err.println(msg)
-            recycleExecutor.shutdownNow()
-            return ClientExitCode.NOT_READY
-          }
-      val devMgr = DeviceManager(cacheRoot = cacheRoot)
-      emulatorLauncher = devMgr
-      val headless = parsed.flags["--headless"].equals("true", ignoreCase = true)
-      val forceReinstall = parsed.flags["--force-reinstall-apk"].equals("true", ignoreCase = true)
-      out.println("startup: preparing Android device (boot, install, warm-up)")
-      out.flush()
-      val setup =
-        devMgr.ensureDeviceReady(
-          meta = meta,
-          requestedSerial = parsed.flags["--device-serial"],
-          requestedAvd = parsed.flags["--avd"],
-          headless = headless,
-          forceReinstall = forceReinstall,
-        )
-      when (setup) {
-        is DeviceSetupResult.Failed -> {
+    val meta =
+      BootstrapMeta.locateOrNull()
+        ?: run {
           val msg =
             PreviewJson.compact.encodeToString(
               ErrorEnvelope.serializer(),
-              ErrorEnvelope(error = setup.error, message = setup.message),
+              ErrorEnvelope(
+                error = "bootstrap_missing",
+                message = "Cannot find bootstrap-meta.properties for Android host server",
+              ),
             )
           out.println(msg)
           err.println(msg)
           recycleExecutor.shutdownNow()
-          return setup.exitCode
+          return ClientExitCode.NOT_READY
         }
-        is DeviceSetupResult.Ready -> {
-          deviceSerial = setup.serial
-          forwardPort = setup.forwardPort
-          apkSha256 = setup.apkSha256
-          onLaunchLiveActivity = { devMgr.launchLiveActivity(setup.serial) }
-          val currentPort = AtomicInteger(setup.forwardPort)
-          lateinit var transport: AdbTcpDeviceTransport
-          transport =
-            AdbTcpDeviceTransport(
-              connectAndEnsurePort = {
-                val ping = DeviceManager.pingLocalForward(currentPort.get())
-                if (ping != null && ping.ok) {
-                  currentPort.get()
+    val devMgr = DeviceManager(cacheRoot = cacheRoot)
+    emulatorLauncher = devMgr
+    val headless = parsed.flags["--headless"].equals("true", ignoreCase = true)
+    val forceReinstall = parsed.flags["--force-reinstall-apk"].equals("true", ignoreCase = true)
+    out.println("startup: preparing Android device (boot, install, warm-up)")
+    out.flush()
+    val setup =
+      devMgr.ensureDeviceReady(
+        meta = meta,
+        requestedSerial = parsed.flags["--device-serial"],
+        requestedAvd = parsed.flags["--avd"],
+        headless = headless,
+        forceReinstall = forceReinstall,
+      )
+    when (setup) {
+      is DeviceSetupResult.Failed -> {
+        val msg =
+          PreviewJson.compact.encodeToString(
+            ErrorEnvelope.serializer(),
+            ErrorEnvelope(error = setup.error, message = setup.message),
+          )
+        out.println(msg)
+        err.println(msg)
+        recycleExecutor.shutdownNow()
+        return setup.exitCode
+      }
+      is DeviceSetupResult.Ready -> {
+        deviceSerial = setup.serial
+        forwardPort = setup.forwardPort
+        apkSha256 = setup.apkSha256
+        onLaunchLiveActivity = { devMgr.launchLiveActivity(setup.serial) }
+        val currentPort = AtomicInteger(setup.forwardPort)
+        lateinit var transport: AdbTcpDeviceTransport
+        transport =
+          AdbTcpDeviceTransport(
+            connectAndEnsurePort = {
+              val ping = DeviceManager.pingLocalForward(currentPort.get())
+              if (ping != null && ping.ok) {
+                currentPort.get()
+              } else {
+                val refreshed =
+                  devMgr.ensureDeviceReady(meta = meta, requestedSerial = setup.serial)
+                if (refreshed is DeviceSetupResult.Ready) {
+                  currentPort.set(refreshed.forwardPort)
+                  refreshed.forwardPort
                 } else {
-                  val refreshed =
-                    devMgr.ensureDeviceReady(meta = meta, requestedSerial = setup.serial)
-                  if (refreshed is DeviceSetupResult.Ready) {
-                    currentPort.set(refreshed.forwardPort)
-                    refreshed.forwardPort
-                  } else {
-                    currentPort.get()
-                  }
+                  currentPort.get()
                 }
-              },
-              restartSandboxActivity = { devMgr.restartSandboxOnSerial(setup.serial) },
-            )
-          worker =
-            AndroidRenderWorker(
-              meta = meta,
-              transport = transport,
-              onRecycleRecommended = {
-                recycleExecutor.execute { runCatching { transport.recycle() } }
-              },
-            )
-        }
+              }
+            },
+            restartSandboxActivity = { devMgr.restartSandboxOnSerial(setup.serial) },
+          )
+        worker =
+          AndroidRenderWorker(
+            meta = meta,
+            transport = transport,
+            onRecycleRecommended = {
+              recycleExecutor.execute { runCatching { transport.recycle() } }
+            },
+          )
       }
     }
 

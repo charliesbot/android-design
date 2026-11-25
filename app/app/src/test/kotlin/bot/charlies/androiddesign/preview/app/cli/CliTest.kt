@@ -1,11 +1,26 @@
 package bot.charlies.androiddesign.preview.app.cli
 
 import bot.charlies.androiddesign.preview.app.AppInfo
+import bot.charlies.androiddesign.preview.app.android.AndroidExplorationCompiler
+import bot.charlies.androiddesign.preview.app.server.InMemoryRenderWorker
 import bot.charlies.androiddesign.preview.app.server.RenderWorker
-import bot.charlies.androiddesign.preview.app.server.RobolectricRenderWorker
+import bot.charlies.androiddesign.preview.app.server.WorkerCompileResult
+import bot.charlies.androiddesign.preview.app.server.WorkerFrame
+import bot.charlies.androiddesign.preview.app.server.WorkerTargetOutput
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
+import bot.charlies.androiddesign.preview.domain.image.FastPngEncoder
+import bot.charlies.androiddesign.preview.model.DeviceBoardMeta
+import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
+import bot.charlies.androiddesign.preview.model.DeviceOverlayMeta
+import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.MaterialOverride
+import bot.charlies.androiddesign.preview.model.PaletteVariant
+import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
+import bot.charlies.androiddesign.preview.model.SchemeOverride
+import bot.charlies.androiddesign.preview.model.ThemeOverride
 import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.WearSurface
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.nio.file.Files
@@ -17,52 +32,158 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeAll
 
 class CliTest {
   private class Run(val code: Int, val out: String, val err: String)
 
-  companion object {
-    private lateinit var sharedWorker: RobolectricRenderWorker
-
-    @JvmStatic
-    @BeforeAll
-    fun setUpWorker() {
-      val bdir =
-        Path.of(
-          System.getProperty("adp.bootstrap.dir")
-            ?: error("adp.bootstrap.dir system property missing"),
-        )
-      val meta = BootstrapMeta.fromFile(bdir.resolve("bootstrap-meta.properties"))
-      sharedWorker =
-        RobolectricRenderWorker(
-          meta = meta,
-          robolectricCp = bdir.resolve("robolectric.cp"),
-          bootstrapDir = bdir,
-        )
-    }
-
-    @JvmStatic
-    @AfterAll
-    fun tearDownWorker() {
-      if (::sharedWorker.isInitialized) {
-        sharedWorker.close()
+  private val samplePng: ByteArray by lazy {
+    val rgba =
+      ByteArray(64 * 64 * 4) { idx ->
+        if (idx % 4 == 3) 0xFF.toByte() else ((idx * 37) xor (idx shr 3)).toByte()
       }
-    }
+    FastPngEncoder.encodeFast(64, 64, rgba)
   }
 
-  private fun nonClosingWorker(): RenderWorker =
-    object : RenderWorker by sharedWorker {
-      override fun close() {}
-    }
+  private fun testWorker(): RenderWorker {
+    val bdir =
+      Path.of(
+        System.getProperty("adp.bootstrap.dir")
+          ?: error("adp.bootstrap.dir system property missing"),
+      )
+    val meta = BootstrapMeta.fromFile(bdir.resolve("bootstrap-meta.properties"))
+    return InMemoryRenderWorker(
+      compileOverride = { snapshot ->
+        val classStage =
+          AndroidExplorationCompiler.compileClassStage(
+            snapshot.sourcePath,
+            snapshot.designPath,
+            meta,
+          )
+        when (classStage) {
+          is AndroidExplorationCompiler.ClassStageOutcome.Failed ->
+            WorkerCompileResult.Failed(
+              sourcePath = snapshot.sourcePath,
+              designPath = classStage.designPath,
+              designTheme = classStage.designTheme,
+              compileMs = classStage.compileMs,
+              errors = classStage.errors,
+            )
+          is AndroidExplorationCompiler.ClassStageOutcome.Ready -> {
+            val src = classStage.stage.sourceText
+            val isWear = "wearBoard(" in src
+            val hasPlates = "listDetail(" in src
+            val boardMeta =
+              when {
+                isWear ->
+                  DeviceBoardMeta(
+                    surface = "wear",
+                    boardName = "Watch",
+                    directions =
+                      listOf(
+                        DeviceDirectionMeta(
+                          name = "Watch",
+                          surface = "wear",
+                          startScreen = "list",
+                          screens = listOf("list", "fixed"),
+                          overlays = listOf(DeviceOverlayMeta("sure", "list")),
+                        ),
+                      ),
+                    views = WearSurface.views,
+                  )
+                hasPlates -> {
+                  val overlayScreen =
+                    if ("overlay(\"new_sheet\", screen = \"plates\")" in src) "plates" else null
+                  DeviceBoardMeta(
+                    surface = "phone",
+                    boardName = "Plates",
+                    directions =
+                      listOf(
+                        DeviceDirectionMeta(
+                          name = "Plates",
+                          surface = "phone",
+                          startScreen = "plates",
+                          screens = listOf("plates", "plate_detail"),
+                          overlays = listOf(DeviceOverlayMeta("new_sheet", overlayScreen)),
+                        ),
+                      ),
+                    views = PhoneSurface.views,
+                  )
+                }
+                else ->
+                  DeviceBoardMeta(
+                    surface = "phone",
+                    boardName = "Plain",
+                    directions =
+                      listOf(
+                        DeviceDirectionMeta(
+                          name = "Plain",
+                          surface = "phone",
+                          startScreen = "home",
+                          screens = listOf("home"),
+                        ),
+                      ),
+                    views = PhoneSurface.views,
+                  )
+              }
+            val boardTheme =
+              if (hasPlates) {
+                ThemeOverride(
+                  material =
+                    MaterialOverride(
+                      scheme =
+                        SchemeOverride(
+                          seed = "#B5523B",
+                          variant = PaletteVariant.TonalSpot.wire,
+                        ),
+                    ),
+                )
+              } else {
+                null
+              }
+            WorkerCompileResult.Ready(
+              sourcePath = snapshot.sourcePath,
+              designPath = classStage.stage.designPath,
+              designTheme = classStage.stage.designTheme,
+              compileMs = classStage.stage.compileMs,
+              boardMeta = boardMeta,
+              boardTheme = boardTheme,
+            )
+          }
+        }
+      },
+      targetBuilder = { target ->
+        val view = Views.byName(target.viewName) ?: Views.Light
+        val tree =
+          LayoutTree(
+            screen = target.screen,
+            view = view,
+            nodes = emptyList(),
+            findings = emptyList(),
+          )
+        val isScrollWear =
+          target.direction == "Watch" && target.screen == "list" && target.overlayId == null
+        WorkerTargetOutput(
+          direction = target.direction,
+          screen = target.screen,
+          viewName = target.viewName,
+          overlayId = target.overlayId,
+          renderMs = 4L,
+          tree = tree,
+          endTree = if (isScrollWear) tree else null,
+          frame = WorkerFrame(bytes = samplePng, mime = "image/png", isPng = true),
+          endFrame =
+            if (isScrollWear) WorkerFrame(bytes = samplePng, mime = "image/png", isPng = true)
+            else null,
+        )
+      },
+    )
+  }
 
   private fun runRender(vararg args: String): Run {
     val out = ByteArrayOutputStream()
     val err = ByteArrayOutputStream()
     val code =
-      RenderCommand(::nonClosingWorker)
-        .run(args.toList(), PrintStream(out, true), PrintStream(err, true))
+      RenderCommand(::testWorker).run(args.toList(), PrintStream(out, true), PrintStream(err, true))
     return Run(code, out.toString(), err.toString())
   }
 

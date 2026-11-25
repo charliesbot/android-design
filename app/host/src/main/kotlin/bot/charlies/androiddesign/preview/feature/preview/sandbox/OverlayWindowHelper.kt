@@ -30,10 +30,7 @@ internal class InsetConsumingFrameLayout(context: Context) : FrameLayout(context
 
 internal data class OverlayMeasureResult(val offset: Offset, val width: Int, val height: Int)
 
-/**
- * Shared Android view-hierarchy helpers used identically by `:sandbox` offscreen capture and the
- * headless Robolectric Native Graphics renderer.
- */
+/** Android view-hierarchy helpers used by `:sandbox` offscreen capture and unit tests. */
 @OptIn(ComposeToolingApi::class)
 internal object OverlayWindowHelper {
   fun forceLayoutTree(v: View) {

@@ -136,7 +136,7 @@ class MultiTurnTests(unittest.TestCase):
                 )
             self.assertEqual([c[0] for c in calls], ['claude', 'claude', 'claude'])
             self.assertEqual([c[1] for c in calls], [None, 'sess-fixed-1', 'sess-fixed-1'])
-            self.assertEqual([c[2] for c in calls], ['robolectric', 'robolectric', 'robolectric'])
+            self.assertEqual([c[2] for c in calls], ['android', 'android', 'android'])
             self.assertEqual(len({c[3] for c in calls}), 1)
             stopper.assert_called_once()
             self.assertEqual(report['pipeline'], 'v6')

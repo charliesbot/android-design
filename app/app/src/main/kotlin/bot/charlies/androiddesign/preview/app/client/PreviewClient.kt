@@ -32,6 +32,7 @@ class PreviewClient(
   internal val cacheRoot: Path = ServerPaths.cacheRoot(),
   private val env: Map<String, String> = System.getenv(),
   private val progress: (String) -> Unit = { System.err.println(it) },
+  internal val serverMainClass: String = DEFAULT_SERVER_MAIN,
 ) {
   data class HttpResult(val status: Int, val body: String)
 
@@ -148,8 +149,7 @@ class PreviewClient(
         return ServerLookup.Ready(existing, live)
       }
       if (
-        identity.backend == RuntimeIdentity.BACKEND_ANDROID &&
-          existing.apkSha256 != null &&
+        existing.apkSha256 != null &&
           identity.apkSha256 != null &&
           existing.apkSha256 != identity.apkSha256
       ) {
@@ -328,8 +328,7 @@ class PreviewClient(
     if (status.backend != identity.backend) return false
     if (record.runtimeHash != identity.runtimeHash) return false
     if (
-      identity.backend == RuntimeIdentity.BACKEND_ANDROID &&
-        identity.apkSha256 != null &&
+      identity.apkSha256 != null &&
         record.apkSha256 != null &&
         record.apkSha256 != identity.apkSha256
     ) {
@@ -436,7 +435,7 @@ class PreviewClient(
       add(javaBin)
       add("-Djava.awt.headless=true")
       add("@${bootstrapCp.toAbsolutePath().normalize()}")
-      add("bot.charlies.androiddesign.preview.app.MainKt")
+      add(serverMainClass)
       add("server")
       add("--repo")
       add(repoRoot.toString())
@@ -484,9 +483,6 @@ class PreviewClient(
     childEnv[RuntimeIdentity.BACKEND_ENV] = identity.backend
     identity.bootstrapDir?.let { childEnv[BootstrapMeta.BOOTSTRAP_DIR_ENV] = it.toString() }
     childEnv[RuntimeIdentity.SERVER_CP_ENV] = bootstrapCp.toString()
-    identity.robolectricCpFile?.let {
-      childEnv[RuntimeIdentity.ROBOLECTRIC_CP_ENV] = it.toString()
-    }
     identity.sourceDir?.let { childEnv[RuntimeIdentity.SRC_ENV] = it }
     env["ANDROID_HOME"]?.let { childEnv["ANDROID_HOME"] = it }
     env["ANDROID_SDK_ROOT"]?.let { childEnv["ANDROID_SDK_ROOT"] = it }
@@ -633,6 +629,7 @@ class PreviewClient(
   }
 
   companion object {
+    const val DEFAULT_SERVER_MAIN = "bot.charlies.androiddesign.preview.app.MainKt"
     const val NO_OPEN_ENV = "ANDROID_DESIGN_NO_OPEN"
     const val SCRIPT_ENV = "ANDROID_DESIGN_PREVIEW_SCRIPT"
     const val CLIENT_TIMEOUT_ENV = "ANDROID_DESIGN_CLIENT_TIMEOUT_MS"

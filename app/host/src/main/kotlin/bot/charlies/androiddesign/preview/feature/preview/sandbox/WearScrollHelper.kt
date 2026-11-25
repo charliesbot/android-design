@@ -10,7 +10,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import bot.charlies.androiddesign.preview.model.LayoutTree
 
-/** Shared Wear scrolling and circular-picker detection for both `:sandbox` and Robolectric. */
+/** Wear scrolling and circular-picker detection helper for `:sandbox`. */
 @OptIn(ComposeToolingApi::class)
 internal object WearScrollHelper {
   private const val MAX_FINITE_SCROLL_EXTENT_PX = 50_000f

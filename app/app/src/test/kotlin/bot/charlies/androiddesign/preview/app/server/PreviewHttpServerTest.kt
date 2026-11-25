@@ -74,7 +74,7 @@ class PreviewHttpServerTest {
     onRenderSingle: ((String, ViewSpec, Int) -> Unit)? = null,
   ): RenderWorker =
     InMemoryRenderWorker(
-      name = RuntimeIdentity.BACKEND_ROBOLECTRIC,
+      name = RuntimeIdentity.BACKEND_ANDROID,
       scopedCheckDensity = 1,
       boardName = "Plates",
       directions =
@@ -581,6 +581,74 @@ class PreviewHttpServerTest {
       assertEquals(snap2.contentHash, queue.latestCompiled(source)?.contentHash)
     } finally {
       queue.stop()
+      tmp.toFile().deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `api render writes PNGs even after board render cached WebP for the same view`() {
+    val tmp = createTempDirectory("v6-api-render-")
+    val cacheDir = tmp.resolve("cache")
+    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
+    val source =
+      repo.resolve("board.explore.kt").also { Files.writeString(it, simpleBoard("WebP")) }
+    val outDir = tmp.resolve("renders-out")
+    val worker = fakeWorker()
+    val server =
+      PreviewHttpServer(
+        repoRoot = repo,
+        cacheRoot = cacheDir,
+        preferredPort = 0,
+        worker = worker,
+        enableFileWatcher = false,
+      )
+    val rec = server.start()
+    val repoId = ServerPaths.repoHash(repo)
+    try {
+      // Populate cache with a check first.
+      val (chkStatus, _) =
+        httpRequest(
+          rec.port,
+          "POST",
+          "/api/check",
+          headers = mapOf("X-Client-Secret" to rec.clientSecret),
+          body = """{"path":"$source","direction":"Editorial","view":"dark","repoRoot":"$repo"}""",
+        )
+      assertEquals(200, chkStatus)
+
+      // Ask /api/board/render for dark -> caches WEBP_LOSSLESS in RenderQueue.
+      val (boardStatus, boardBody) =
+        httpRequest(
+          rec.port,
+          "POST",
+          "/api/board/render?view=${rec.viewToken}&repo=$repoId",
+          headers = mapOf("Origin" to "http://127.0.0.1:${rec.port}"),
+          body = """{"repo":"$repoId","direction":"Editorial","screen":"home","view":"dark"}""",
+        )
+      assertEquals(200, boardStatus, boardBody)
+      assertTrue(boardBody.contains("image/webp"), boardBody)
+
+      // Now call /api/render for dark -> must NOT return cached WebP bytes as a .png file.
+      val (renderStatus, renderBody) =
+        httpRequest(
+          rec.port,
+          "POST",
+          "/api/render",
+          headers = mapOf("X-Client-Secret" to rec.clientSecret),
+          body = """{"path":"$source","outDir":"$outDir","views":["dark"],"repoRoot":"$repo"}""",
+        )
+      assertEquals(200, renderStatus, renderBody)
+      val parsed = PreviewJson.compact.decodeFromString(RenderResponse.serializer(), renderBody)
+      assertTrue(parsed.valid, renderBody)
+      assertTrue(Files.isRegularFile(outDir.resolve("report.json")))
+      val pngBytes = Files.readAllBytes(outDir.resolve("Editorial__home-dark.png"))
+      assertEquals(
+        listOf(0x89.toByte(), 0x50, 0x4E, 0x47),
+        pngBytes.take(4),
+        "Expected PNG signature, not cached WebP",
+      )
+    } finally {
+      server.stop()
       tmp.toFile().deleteRecursively()
     }
   }

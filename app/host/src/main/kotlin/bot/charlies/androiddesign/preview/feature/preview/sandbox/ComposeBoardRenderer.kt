@@ -14,9 +14,9 @@ import bot.charlies.androiddesign.preview.model.LayoutTree
 import java.util.Collections
 
 /**
- * Shared Compose board rendering engine used by both `:sandbox` and the Robolectric runner. Owns
- * target preparation, Compose settling, frame + slot-tree capture, and Wear list auto-scroll on top
- * of a pluggable [BoardRenderHost].
+ * Compose board rendering engine used by `:sandbox` (and unit tests). Owns target preparation,
+ * Compose settling, frame + slot-tree capture, and Wear list auto-scroll on top of a pluggable
+ * [BoardRenderHost].
  */
 @OptIn(ComposeToolingApi::class)
 internal class ComposeBoardRenderer(private val host: BoardRenderHost) {

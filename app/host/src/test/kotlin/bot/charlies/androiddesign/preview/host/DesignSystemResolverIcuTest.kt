@@ -1,4 +1,4 @@
-package bot.charlies.androiddesign.preview.host.robolectric
+package bot.charlies.androiddesign.preview.host
 
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.model.MaterialOverride

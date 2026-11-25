@@ -1,30 +1,17 @@
 package bot.charlies.androiddesign.preview.app.cli
 
 import bot.charlies.androiddesign.preview.app.client.ClientExitCode
-import bot.charlies.androiddesign.preview.app.server.BoardMeta
+import bot.charlies.androiddesign.preview.app.client.PreviewClient
 import bot.charlies.androiddesign.preview.app.server.CheckExecutor
 import bot.charlies.androiddesign.preview.app.server.CompileEntry
-import bot.charlies.androiddesign.preview.app.server.ContentHasher
-import bot.charlies.androiddesign.preview.app.server.DirectionMeta
+import bot.charlies.androiddesign.preview.app.server.ErrorEnvelope
+import bot.charlies.androiddesign.preview.app.server.RenderRequest
+import bot.charlies.androiddesign.preview.app.server.RenderResponse
 import bot.charlies.androiddesign.preview.app.server.RenderWorker
-import bot.charlies.androiddesign.preview.app.server.RobolectricRenderWorker
-import bot.charlies.androiddesign.preview.app.server.RuntimeIdentity
-import bot.charlies.androiddesign.preview.app.server.SingleRenderRequest
-import bot.charlies.androiddesign.preview.domain.ViewCheck
-import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
-import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
-import bot.charlies.androiddesign.preview.model.BoardSurface
-import bot.charlies.androiddesign.preview.model.DesignSystem
-import bot.charlies.androiddesign.preview.model.FrameFormat
-import bot.charlies.androiddesign.preview.model.LayoutTree
-import bot.charlies.androiddesign.preview.model.PhoneSurface
+import bot.charlies.androiddesign.preview.app.server.ReportRenderer
+import bot.charlies.androiddesign.preview.app.server.ServerPaths
 import bot.charlies.androiddesign.preview.model.PreviewJson
-import bot.charlies.androiddesign.preview.model.SurfaceSpec
-import bot.charlies.androiddesign.preview.model.ValidationError
-import bot.charlies.androiddesign.preview.model.ViewSpec
-import bot.charlies.androiddesign.preview.model.WearSurface
 import java.io.PrintStream
-import java.nio.charset.CharacterCodingException
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -32,14 +19,15 @@ import java.nio.file.Path
  * `render <exploration.explore.kt> --out <dir> [--design <DESIGN.md>] [--views a,b]
  * [--screens a,b]`
  *
- * Compiles and draws each exploration screen and overlay at each view headlessly via
- * [RobolectricRenderWorker], writing `<screen>-<view>.png`, `<screen>-<view>.tree.json`, and
- * `report.json` into `<dir>`. Exit 0 when valid and every render passes, 1 when a render has error
- * findings or threw, 2 when the exploration fails validation/compilation, and 3 when the bootstrap
- * classpath is missing.
+ * Compiles and draws each exploration screen and overlay at each view via the shared Android
+ * preview server (`POST /api/render`), writing `<screen>-<view>.png`, `<screen>-<view>.tree.json`,
+ * and `report.json` into `<dir>`. Exit 0 when valid and every render passes, 1 when a render has
+ * error findings or threw, 2 when the exploration fails validation/compilation, and 3 when the
+ * preview server or prerequisites are not ready.
  */
 class RenderCommand(
   private val workerFactory: (() -> RenderWorker)? = null,
+  private val client: PreviewClient = PreviewClient(),
 ) : Command {
   override val name = "render"
   override val usage =
@@ -51,12 +39,6 @@ class RenderCommand(
     val design: Path?,
     val views: List<String>?,
     val screens: List<String>?,
-  )
-
-  private data class ScreenTarget(
-    val direction: DirectionMeta,
-    val screenId: String,
-    val prefix: String,
   )
 
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
@@ -72,7 +54,7 @@ class RenderCommand(
           0  Valid and every render passed
           1  One or more renders failed checks or threw
           2  Invalid exploration or compilation error
-          3  Missing Robolectric bootstrap classpath
+          3  Preview server or prerequisites not ready
         """
           .trimIndent(),
       )
@@ -84,271 +66,147 @@ class RenderCommand(
       err.println("no such file: $sourcePath")
       return ExitCode.USAGE
     }
-    Files.createDirectories(options.out)
+    val outDir = options.out.toAbsolutePath().normalize()
     val explicitDesign = options.design?.toAbsolutePath()?.normalize()
-    if (!sourcePath.fileName.toString().endsWith(".explore.kt")) {
-      val error = ValidationError(sourcePath.toString(), "Expected an .explore.kt exploration file")
-      writeReport(
-        outDir = options.out,
-        sourcePath = sourcePath,
-        designPath = explicitDesign,
-        system = DesignSystemResolver.resolve(null, null),
-        errors = listOf(error),
-        renders = emptyList(),
-      )
-      err.println("invalid: ${error.path}: ${error.message}")
-      return ExitCode.INVALID
-    }
 
-    try {
-      Files.readString(sourcePath, Charsets.UTF_8)
-    } catch (e: CharacterCodingException) {
-      val error =
-        ValidationError(
-          sourcePath.toString(),
-          "File is not valid UTF-8: ${e.message ?: e::class.simpleName}",
-        )
-      writeReport(
-        outDir = options.out,
-        sourcePath = sourcePath,
-        designPath = explicitDesign,
-        system = DesignSystemResolver.resolve(null, null),
-        errors = listOf(error),
-        renders = emptyList(),
-      )
-      err.println("invalid: ${error.path}: ${error.message}")
-      return ExitCode.INVALID
-    }
-
-    val designLoaded = DesignMdLoader.load(sourcePath, options.design)
-    if (designLoaded.errors.isNotEmpty()) {
-      writeReport(
-        outDir = options.out,
-        sourcePath = sourcePath,
-        designPath = designLoaded.path,
-        system = DesignSystemResolver.resolve(designLoaded.theme, null),
-        errors = designLoaded.errors,
-        renders = emptyList(),
-      )
-      designLoaded.errors.forEach { err.println("invalid: ${it.path}: ${it.message}") }
-      return ExitCode.INVALID
-    }
-
-    val worker =
-      workerFactory?.invoke() ?: createRobolectricWorker(err) ?: return ClientExitCode.NOT_READY
-    val executor = CheckExecutor(worker)
-    return try {
-      renderWithExecutor(
-        executor = executor,
-        sourcePath = sourcePath,
-        options = options,
-        err = err,
-      )
-    } finally {
-      executor.close()
-    }
-  }
-
-  private fun renderWithExecutor(
-    executor: CheckExecutor,
-    sourcePath: Path,
-    options: Options,
-    err: PrintStream,
-  ): Int {
-    val snapshot = ContentHasher.snapshot(sourcePath, options.design)
-    val compiled = executor.compile(snapshot)
-    val meta: BoardMeta? = compiled.boardMeta
-    if (compiled.loaded.errors.isNotEmpty() || meta == null) {
-      val errors =
-        compiled.loaded.errors.ifEmpty {
-          listOf(
-            ValidationError(
-              sourcePath.toString(),
-              "Exploration compilation returned no board metadata",
-            ),
+    val factory = workerFactory
+    if (factory != null) {
+      val executor = CheckExecutor(factory())
+      val result =
+        try {
+          ReportRenderer.render(
+            sourcePath = sourcePath,
+            outDir = outDir,
+            explicitDesign = explicitDesign,
+            requestedViews = options.views,
+            requestedScreens = options.screens,
+            compile = { snapshot ->
+              val compiled = executor.compile(snapshot)
+              CompileEntry(
+                sourcePath = sourcePath,
+                designPath = compiled.loaded.designPath,
+                contentHash = snapshot.contentHash,
+                loaded = compiled.loaded,
+                fromCache = false,
+                compileCountAtLoad = 1,
+                dexHash = compiled.dexHash,
+                surface = compiled.surface,
+                boardName = compiled.boardName,
+                boardMeta = compiled.boardMeta,
+                androidData = compiled.androidData,
+                boardTheme = compiled.boardTheme,
+              )
+            },
+            renderSingle = { entry, req -> executor.renderSingle(entry, req) },
           )
+        } finally {
+          executor.close()
         }
-      writeReport(
-        outDir = options.out,
-        sourcePath = sourcePath,
-        designPath = compiled.loaded.designPath,
-        system = compiled.loaded.designSystem,
-        errors = errors,
-        renders = emptyList(),
-      )
-      errors.forEach { err.println("invalid: ${it.path}: ${it.message}") }
-      return ExitCode.INVALID
+      result.messages.forEach(err::println)
+      return result.exitCode
     }
 
-    val surface: SurfaceSpec =
-      if (compiled.surface == BoardSurface.Wear) WearSurface else PhoneSurface
-    val views = resolveViews(options.views, surface, err) ?: return ExitCode.USAGE
-    val requestedScreens = options.screens
-    if (requestedScreens != null) {
-      val known =
-        meta.directions
-          .flatMap { dir ->
-            dir.screens.flatMap { sid ->
-              listOf(sid, "${dir.name}/$sid", "${sanitizeSegment(dir.name)}__$sid")
-            }
-          }
-          .toSet()
-      val unknown = requestedScreens.filter { it !in known }
-      if (unknown.isNotEmpty()) {
-        val allNames = meta.directions.flatMap { d -> d.screens.map { "${d.name}/$it" } }
-        err.println(
-          "no such screen: ${unknown.joinToString()} (screens: ${allNames.joinToString()})",
+    // Fast local input validation so invalid files don't boot a server/emulator just to fail.
+    if (
+      !sourcePath.fileName.toString().endsWith(".explore.kt") ||
+        !isValidUtf8(sourcePath) ||
+        DesignMdLoader.load(sourcePath, explicitDesign).errors.isNotEmpty()
+    ) {
+      val localOnly =
+        ReportRenderer.render(
+          sourcePath = sourcePath,
+          outDir = outDir,
+          explicitDesign = explicitDesign,
+          requestedViews = options.views,
+          requestedScreens = options.screens,
+          compile = { error("Unreachable compile during local validation") },
+          renderSingle = { _, _ -> error("Unreachable render during local validation") },
         )
-        return ExitCode.USAGE
-      }
+      localOnly.messages.forEach(err::println)
+      return localOnly.exitCode
     }
 
-    val targets = resolveTargets(meta.directions, requestedScreens)
-    val entry =
-      CompileEntry(
-        sourcePath = sourcePath,
-        designPath = compiled.loaded.designPath,
-        contentHash = snapshot.contentHash,
-        loaded = compiled.loaded,
-        fromCache = false,
-        compileCountAtLoad = 1,
-        dexHash = compiled.dexHash,
-        surface = compiled.surface,
-        boardName = compiled.boardName,
-        boardMeta = meta,
-        androidData = compiled.androidData,
-        boardTheme = compiled.boardTheme,
-      )
-
-    val entries = mutableListOf<RenderEntry>()
-    for (target in targets) {
-      val baseChecks = ArrayList<ViewCheck>(views.size)
-      for (view in views) {
-        val rendered =
-          renderSingleTarget(
-            executor = executor,
-            entry = entry,
-            direction = target.direction.name,
-            screenId = target.screenId,
-            prefix = target.prefix,
-            overlayId = null,
-            view = view,
-            baseCheck = null,
-            outDir = options.out,
-          )
-        baseChecks += rendered.first
-        entries += rendered.second
-      }
-      val overlays = target.direction.overlaysFor(target.screenId)
-      for (overlay in overlays) {
-        views.forEachIndexed { index, view ->
-          val (_, renderEntry) =
-            renderSingleTarget(
-              executor = executor,
-              entry = entry,
-              direction = target.direction.name,
-              screenId = target.screenId,
-              prefix = target.prefix,
-              overlayId = overlay.id,
-              view = view,
-              baseCheck = baseChecks[index],
-              outDir = options.out,
-            )
-          entries += renderEntry
+    val repoRoot = ServerPaths.resolveRepoRoot(sourcePath)
+    val ready =
+      when (val lookup = client.ensureServer(repoRoot, headless = true)) {
+        is PreviewClient.ServerLookup.Ready -> lookup
+        is PreviewClient.ServerLookup.NotReady -> {
+          err.println(lookup.message)
+          return ClientExitCode.NOT_READY
         }
       }
-    }
 
-    val report =
-      writeReport(
-        outDir = options.out,
-        sourcePath = sourcePath,
-        designPath = compiled.loaded.designPath,
-        system = compiled.loaded.designSystem,
-        errors = emptyList(),
-        renders = entries,
+    val req =
+      RenderRequest(
+        path = sourcePath.toString(),
+        outDir = outDir.toString(),
+        design = explicitDesign?.toString(),
+        views = options.views,
+        screens = options.screens,
+        repoRoot = repoRoot.toString(),
       )
-    entries
-      .filter { !it.pass }
-      .forEach { e ->
-        err.println("${e.screen}/${e.view}: ${e.failures.joinToString("; ")}")
-      }
-    return if (report.pass) ExitCode.OK else ExitCode.FINDINGS_FAILED
-  }
-
-  private fun renderSingleTarget(
-    executor: CheckExecutor,
-    entry: CompileEntry,
-    direction: String,
-    screenId: String,
-    prefix: String,
-    overlayId: String?,
-    view: ViewSpec,
-    baseCheck: ViewCheck?,
-    outDir: Path,
-  ): Pair<ViewCheck, RenderEntry> {
-    val artifactName = overlayId?.let { ViewCheck.renderOverlayName(prefix, it) } ?: prefix
-    val artifact =
+    val timeoutMs =
+      maxOf(client.deadlineMs(isCold = ready.status.compileCount == 0, scoped = false), 120_000)
+    val http =
       try {
-        executor.renderSingle(
-          entry = entry,
-          SingleRenderRequest(
-            direction = direction,
-            screenId = screenId,
-            prefix = prefix,
-            overlayId = overlayId,
-            view = view,
-            densityScale = 2,
-            baseCheck = baseCheck,
-            writeFiles = false,
-            rendersRoot = outDir,
-            frameFormat = FrameFormat.LZ4_RGBA,
-          ),
+        client.postJson(
+          ready.record,
+          "/api/render",
+          PreviewJson.compact.encodeToString(RenderRequest.serializer(), req),
+          readTimeoutMs = timeoutMs,
         )
       } catch (e: Exception) {
-        val failed = ViewCheck.renderError(e)
-        return failed to RenderEntry.of(artifactName, view.name, null, failed)
+        val repVer = client.checkReplacedByVersion(ready.record)
+        if (repVer != null) {
+          err.println("replaced by v$repVer, rerun")
+          return ExitCode.FINDINGS_FAILED
+        }
+        err.println(e.message ?: "Failed contacting preview server")
+        return ClientExitCode.NOT_READY
       }
 
-    val tree = artifact.tree
-    val png = artifact.pngBytes
-    if (tree == null || png == null || png.isEmpty()) {
-      return artifact.check to RenderEntry.of(artifactName, view.name, null, artifact.check)
-    }
-
-    val filesBase = "$artifactName-${view.name}"
-    writeArtifacts(outDir, filesBase, png, tree)
-    val endPng = artifact.endPngBytes
-    val endTree = artifact.endTree
-    val endFiles =
-      if (endPng != null && endPng.isNotEmpty() && endTree != null) {
-        val endBase = "$filesBase-end"
-        writeArtifacts(outDir, endBase, endPng, endTree)
-        endBase
-      } else {
-        null
+    return when (http.status) {
+      in 200..299 -> {
+        val parsed =
+          try {
+            PreviewJson.compact.decodeFromString(RenderResponse.serializer(), http.body)
+          } catch (e: Exception) {
+            err.println("Invalid render response from server: ${e.message}")
+            return ExitCode.FINDINGS_FAILED
+          }
+        parsed.messages.forEach(err::println)
+        parsed.exitCode
       }
-    return artifact.check to
-      RenderEntry.of(artifactName, view.name, filesBase, artifact.check, endFiles)
+      409 -> {
+        val msg = parseErrorMessage(http.body) ?: "Preview server was replaced, rerun"
+        err.println(msg)
+        ExitCode.FINDINGS_FAILED
+      }
+      400 -> {
+        err.println(parseErrorMessage(http.body) ?: http.body)
+        ExitCode.USAGE
+      }
+      else -> {
+        err.println(parseErrorMessage(http.body) ?: http.body)
+        ExitCode.FINDINGS_FAILED
+      }
+    }
   }
 
-  private fun createRobolectricWorker(err: PrintStream): RenderWorker? {
-    val meta = BootstrapMeta.locateOrNull()
-    val cpOverride =
-      System.getenv(RuntimeIdentity.ROBOLECTRIC_CP_ENV)?.takeIf { it.isNotBlank() }?.let(Path::of)
-    val robolectricCp = cpOverride ?: meta?.bootstrapDir?.resolve("robolectric.cp")
-    if (robolectricCp == null || !Files.isRegularFile(robolectricCp)) {
-      err.println(
-        "Missing robolectric.cp bootstrap artifact; run `./gradlew :host:exportBootstrap` from app/.",
-      )
-      return null
+  private fun isValidUtf8(path: Path): Boolean =
+    try {
+      Files.readString(path, Charsets.UTF_8)
+      true
+    } catch (_: Exception) {
+      false
     }
-    return RobolectricRenderWorker(
-      meta = meta,
-      robolectricCp = robolectricCp,
-      bootstrapDir = meta?.bootstrapDir ?: robolectricCp.toAbsolutePath().normalize().parent,
-    )
-  }
+
+  private fun parseErrorMessage(body: String): String? =
+    try {
+      PreviewJson.compact.decodeFromString(ErrorEnvelope.serializer(), body).message
+    } catch (_: Exception) {
+      null
+    }
 
   private fun parse(args: List<String>, err: PrintStream): Options? {
     val parsed =
@@ -370,81 +228,4 @@ class RenderCommand(
       screens = screens?.split(',')?.map { it.trim() },
     )
   }
-
-  private fun resolveTargets(
-    directions: List<DirectionMeta>,
-    screenFilter: List<String>?,
-  ): List<ScreenTarget> {
-    val singleDirection = directions.size == 1
-    val filterSet = screenFilter?.toSet()
-    return buildList {
-      for (dir in directions) {
-        for (screenId in dir.screens) {
-          val prefix = if (singleDirection) screenId else "${sanitizeSegment(dir.name)}__$screenId"
-          val slashName = "${dir.name}/$screenId"
-          if (
-            filterSet == null ||
-              screenId in filterSet ||
-              prefix in filterSet ||
-              slashName in filterSet
-          ) {
-            add(ScreenTarget(dir, screenId, prefix))
-          }
-        }
-      }
-    }
-  }
-
-  private fun resolveViews(
-    requested: List<String>?,
-    surface: SurfaceSpec,
-    err: PrintStream,
-  ): List<ViewSpec>? =
-    requested?.map { name ->
-      surface.views.firstOrNull { it.name == name }
-        ?: run {
-          err.println(
-            "unknown view '$name' (the ${surface.key} views: ${surface.views.joinToString { it.name }})",
-          )
-          return null
-        }
-    } ?: surface.views
-
-  private fun writeArtifacts(dir: Path, base: String, png: ByteArray, tree: LayoutTree) {
-    Files.write(dir.resolve("$base.png"), png)
-    Files.writeString(
-      dir.resolve("$base.tree.json"),
-      PreviewJson.pretty.encodeToString(LayoutTree.serializer(), tree) + "\n",
-    )
-  }
-
-  private fun writeReport(
-    outDir: Path,
-    sourcePath: Path,
-    designPath: Path?,
-    system: DesignSystem,
-    errors: List<ValidationError>,
-    renders: List<RenderEntry>,
-  ): RenderReport {
-    val valid = errors.isEmpty()
-    val report =
-      RenderReport(
-        proposal = sourcePath.toString(),
-        design = designPath?.toString(),
-        theme = ReportTheme(system.seed, system.variant.wire, system.contrast),
-        valid = valid,
-        errors = errors,
-        renders = renders,
-        pass = valid && renders.all { it.pass },
-      )
-    Files.createDirectories(outDir)
-    Files.writeString(
-      outDir.resolve("report.json"),
-      PreviewJson.pretty.encodeToString(RenderReport.serializer(), report) + "\n",
-    )
-    return report
-  }
-
-  private fun sanitizeSegment(name: String): String =
-    name.trim().replace(Regex("""[^A-Za-z0-9._-]+"""), "_").ifBlank { "direction" }
 }

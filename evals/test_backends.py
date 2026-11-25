@@ -47,7 +47,6 @@ class BackendTests(unittest.TestCase):
             bdir = Path(tmp) / 'bootstrap'
             bdir.mkdir()
             (bdir / 'server.cp').write_text('-cp\na.jar\n')
-            (bdir / 'robolectric.cp').write_text('-cp\nb.jar\n')
             custom_cache = Path(tmp) / 'eval-cache'
             with patch('backends.subprocess.run', return_value=subprocess.CompletedProcess([], 0, '{"result": "ok"}', '')) as call:
                 backends.execute(
@@ -58,7 +57,7 @@ class BackendTests(unittest.TestCase):
                     mcp_binary=BINARY,
                     preview_src='/tmp/repo/app',
                     bootstrap_dir=bdir,
-                    preview_backend='robolectric',
+                    preview_backend='android',
                     cache_dir=custom_cache,
                     client_timeout_ms=120000,
                 )
@@ -83,8 +82,8 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(env['ANDROID_DESIGN_PREVIEW_SRC'], '/tmp/repo/app')
         self.assertEqual(env['ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR'], str(bdir))
         self.assertEqual(env['ANDROID_DESIGN_PREVIEW_SERVER_CP'], str(bdir / 'server.cp'))
-        self.assertEqual(env['ANDROID_DESIGN_PREVIEW_ROBOLECTRIC_CP'], str(bdir / 'robolectric.cp'))
-        self.assertEqual(env['ANDROID_DESIGN_PREVIEW_BACKEND'], 'robolectric')
+        self.assertNotIn('ANDROID_DESIGN_PREVIEW_ROBOLECTRIC_CP', env)
+        self.assertEqual(env['ANDROID_DESIGN_PREVIEW_BACKEND'], 'android')
         self.assertEqual(env['ANDROID_DESIGN_CACHE_DIR'], str(custom_cache))
         self.assertEqual(env['ANDROID_DESIGN_CLIENT_TIMEOUT_MS'], '120000')
 
@@ -108,7 +107,7 @@ class BackendTests(unittest.TestCase):
                 role='generator',
                 mcp_binary=BINARY,
                 preview_src='/tmp/repo/app',
-                preview_backend='robolectric',
+                preview_backend='android',
             )
         cmd = call.call_args.args[0]
         env = call.call_args.kwargs['env']
@@ -121,7 +120,7 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(env['PATH'].split(os.pathsep)[0], str(Path(BINARY).resolve().parent))
         self.assertEqual(env['ANDROID_DESIGN_NO_OPEN'], '1')
         self.assertEqual(env['ANDROID_DESIGN_PREVIEW_SRC'], '/tmp/repo/app')
-        self.assertEqual(env['ANDROID_DESIGN_PREVIEW_BACKEND'], 'robolectric')
+        self.assertEqual(env['ANDROID_DESIGN_PREVIEW_BACKEND'], 'android')
         self.assertEqual(cmd[-1], '-')
 
     def test_codex_judge_gets_no_sandbox_network_override(self):
