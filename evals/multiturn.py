@@ -3,16 +3,21 @@
 import argparse
 import datetime
 import json
-import os
 import shutil
 import statistics
 import subprocess
-import time
 from pathlib import Path
 
 from backends import execute
 from checks import run as run_checks
-from preview_app import DEFAULT_EVAL_BACKEND, app_binary, bootstrap_dir, preview_src, server_cp
+from preview_app import (
+    DEFAULT_EVAL_BACKEND,
+    app_binary,
+    bootstrap_dir,
+    preview_server_session,
+    preview_src,
+    server_cp,
+)
 import run as eval_run
 
 HERE = Path(__file__).resolve().parent
@@ -290,18 +295,19 @@ def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout
     if bdir is None:
         server_cp()
 
-    created_cache = cache_dir is None
-    active_cache_dir = (
-        Path(cache_dir).resolve()
-        if cache_dir is not None
-        else (Path.home() / '.cache' / 'android-design-preview' / f'eval-mt-{os.getpid()}-{int(time.time())}').resolve()
-    )
-    active_cache_dir.mkdir(parents=True, exist_ok=True)
-
     session_id = None
     prev_cumulative_cost = None
     turn_records = []
-    try:
+    with preview_server_session(
+        out_dir,
+        mcp_binary,
+        src=resolved_src,
+        bdir=resolved_bdir,
+        backend=backend,
+        cache_dir=cache_dir,
+        cache_prefix='eval-mt',
+        stopper=eval_run._stop_preview_server,
+    ) as active_cache_dir:
         for idx, (title, body) in enumerate(revisions, start=1):
             prompt = (
                 first_turn_prompt(out_dir, body, total)
@@ -342,17 +348,6 @@ def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout
             bdir=resolved_bdir,
             cache_dir=active_cache_dir,
         )
-    finally:
-        eval_run._stop_preview_server(
-            out_dir,
-            mcp_binary,
-            src=resolved_src,
-            bdir=resolved_bdir,
-            backend=backend,
-            cache_dir=active_cache_dir,
-        )
-        if created_cache:
-            shutil.rmtree(active_cache_dir, ignore_errors=True)
     checks = run_checks(out_dir, 'phone')
     if render_error:
         checks['C-review'] = {'pass': False, 'detail': render_error}

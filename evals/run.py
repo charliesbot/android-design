@@ -2,7 +2,6 @@
 """Agent-independent artifacts: prepare, evaluate, score; optional automated run adapters."""
 import argparse
 import hashlib
-import os
 import re
 import json
 import shutil
@@ -16,17 +15,14 @@ from checks import read_report, run as run_checks
 from judge import judge, parse, aggregate, validate_runs, SCHEMA, prompt_for as judge_prompt
 from backends import BACKENDS, execute
 from preview_app import (
-    BACKEND_ENV,
-    BOOTSTRAP_DIR_ENV,
-    CACHE_DIR_ENV,
     DEFAULT_EVAL_BACKEND,
-    NO_OPEN_ENV,
-    SERVER_CP_ENV,
-    SRC_ENV,
     app_binary,
     bootstrap_dir,
+    build_cli_env,
+    preview_server_session,
     preview_src,
     server_cp,
+    stop_preview_server,
 )
 from report import METRIC_KEYS, generator_medians, label, write_report, write_summary
 
@@ -127,21 +123,7 @@ def generator_metrics_from(reply):
 
 
 def _build_cli_env(*, src=None, bdir=None, backend=DEFAULT_EVAL_BACKEND, cache_dir=None):
-    env = dict(os.environ)
-    env[NO_OPEN_ENV] = '1'
-    if src is not None:
-        env[SRC_ENV] = str(src)
-    if bdir is not None:
-        bpath = Path(bdir)
-        env[BOOTSTRAP_DIR_ENV] = str(bpath)
-        env.pop(SERVER_CP_ENV, None)
-        if (bpath / 'server.cp').is_file():
-            env[SERVER_CP_ENV] = str(bpath / 'server.cp')
-    if backend is not None:
-        env[BACKEND_ENV] = str(backend)
-    if cache_dir is not None:
-        env[CACHE_DIR_ENV] = str(cache_dir)
-    return env
+    return build_cli_env(src=src, bdir=bdir, backend=backend, cache_dir=cache_dir)
 
 
 def _start_preview_server(work_dir, binary, *, src=None, bdir=None, backend=DEFAULT_EVAL_BACKEND, cache_dir=None):
@@ -156,14 +138,14 @@ def _start_preview_server(work_dir, binary, *, src=None, bdir=None, backend=DEFA
 
 
 def _stop_preview_server(case_dir, binary, *, src=None, bdir=None, backend=DEFAULT_EVAL_BACKEND, cache_dir=None):
-    env = _build_cli_env(src=src, bdir=bdir, backend=backend, cache_dir=cache_dir)
-    try:
-        subprocess.run(
-            [str(binary), 'stop', str(case_dir)],
-            cwd=case_dir, env=env, capture_output=True, text=True, timeout=15, stdin=subprocess.DEVNULL,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        pass
+    return stop_preview_server(
+        case_dir,
+        binary,
+        src=src,
+        bdir=bdir,
+        backend=backend,
+        cache_dir=cache_dir,
+    )
 
 
 def _resolve_bootstrap_context():
@@ -286,8 +268,18 @@ def build(case, case_dir, backend, model=None):
         raise FileExistsError(f'Preserving existing case directory: {case_dir}')
     prepare(case, case_dir)
     (case_dir / 'prompt.md').write_text(prompt_for(case, case_dir))
-    reply = generate(case_dir, backend, model)
-    images, error = render(case_dir)
+    binary, src, bdir = _resolve_bootstrap_context()
+    with preview_server_session(
+        case_dir,
+        binary,
+        src=src,
+        bdir=bdir,
+        backend=DEFAULT_EVAL_BACKEND,
+        cache_prefix='eval-build',
+        stopper=_stop_preview_server,
+    ) as eval_cache_dir:
+        reply = generate(case_dir, backend, model, cache_dir=eval_cache_dir, stop_server=False)
+        images, error = render(case_dir, binary=binary, src=src, bdir=bdir, cache_dir=eval_cache_dir)
     if error:
         raise RuntimeError(error)
     return case_dir, reply, images
@@ -480,16 +472,15 @@ def main():
                 (out / result['name'] / 'judge.json').write_text(json.dumps(verdict, indent=2))
         else:
             binary, src, bdir = _resolve_bootstrap_context()
-            explicit_cache = os.environ.get(CACHE_DIR_ENV)
-            created_cache = not explicit_cache
-            eval_cache_dir = (
-                Path(explicit_cache).resolve()
-                if explicit_cache
-                else (Path.home() / '.cache' / 'android-design-preview' / f'eval-{args.command}-{os.getpid()}-{int(time.time())}').resolve()
-            )
-            eval_cache_dir.mkdir(parents=True, exist_ok=True)
-
-            try:
+            with preview_server_session(
+                out,
+                binary,
+                src=src,
+                bdir=bdir,
+                backend=DEFAULT_EVAL_BACKEND,
+                cache_prefix=f'eval-{args.command}',
+                stopper=_stop_preview_server,
+            ) as eval_cache_dir:
                 _start_preview_server(out, binary, src=src, bdir=bdir, cache_dir=eval_cache_dir)
 
                 def work(case):
@@ -521,19 +512,18 @@ def main():
                         result['status'] = 'failed'
                     return result
 
-                with ThreadPoolExecutor(max_workers=args.parallel) as pool:
-                    results = list(pool.map(work, cases))
-            finally:
-                _stop_preview_server(
-                    out,
-                    binary,
-                    src=src,
-                    bdir=bdir,
-                    backend=DEFAULT_EVAL_BACKEND,
-                    cache_dir=eval_cache_dir,
-                )
-                if created_cache:
-                    shutil.rmtree(eval_cache_dir, ignore_errors=True)
+                pool = ThreadPoolExecutor(max_workers=args.parallel)
+                interrupted = False
+                try:
+                    futures = [pool.submit(work, case) for case in cases]
+                    results = [f.result() for f in futures]
+                except BaseException:
+                    interrupted = True
+                    pool.shutdown(wait=False, cancel_futures=True)
+                    raise
+                finally:
+                    if not interrupted:
+                        pool.shutdown(wait=True)
         write_results(out, results, args.no_open)
         return exit_code(results)
     except (OSError, ValueError, RuntimeError) as error:

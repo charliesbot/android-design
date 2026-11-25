@@ -1105,6 +1105,22 @@
         els.livePill.textContent = "SSE reconnecting";
         els.livePill.className = "pill stale";
       });
+      events.addEventListener("stopped", (ev) => {
+        state.halted = true;
+        events.close();
+        els.livePill.textContent = "Server stopped";
+        els.livePill.className = "pill fail";
+        let reason = "";
+        try {
+          const payload = JSON.parse(ev.data);
+          if (payload.reason === "idle_timeout") reason = " after idle timeout";
+        } catch {
+          // Ignore malformed payload.
+        }
+        els.haltedBanner.textContent =
+          "Server stopped" + reason + ". Restart with: android-design-preview open <file>";
+        els.haltedBanner.classList.remove("hidden");
+      });
     }
 
     init();

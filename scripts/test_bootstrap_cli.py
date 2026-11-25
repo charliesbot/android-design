@@ -208,6 +208,34 @@ class BootstrapCliTest(unittest.TestCase):
       self.assertIn(":host:exportBootstrap", marker.read_text(encoding="utf-8"))
       self.assertTrue((bdir / "dep2.jar").is_file())
 
+  def test_cold_bootstrap_disables_gradle_and_kotlin_daemons(self) -> None:
+    with tempfile.TemporaryDirectory() as td:
+      tmp = pathlib.Path(td)
+      capture = tmp / "java_capture.txt"
+      env = self._base_env(tmp, capture)
+      app_dir, marker = _make_fake_app_dir(tmp)
+      env["ANDROID_DESIGN_PREVIEW_SRC"] = str(app_dir)
+
+      res = subprocess.run(
+          [str(BIN_WRAPPER), "status"],
+          env=env,
+          capture_output=True,
+          text=True,
+      )
+      self.assertEqual(res.returncode, 0, res.stderr)
+      self.assertTrue(marker.exists(), "Cold bootstrap should invoke gradlew")
+      args = marker.read_text(encoding="utf-8").split()
+      self.assertIn("--no-daemon", args)
+      self.assertIn("-Pkotlin.compiler.execution.strategy=in-process", args)
+      self.assertIn(":host:exportBootstrap", args)
+
+    install_script = (REPO_ROOT / "scripts" / "install_local_plugin.sh").read_text(encoding="utf-8")
+    gradlew_lines = [line for line in install_script.splitlines() if "./gradlew" in line]
+    self.assertTrue(gradlew_lines, "Expected ./gradlew invocation in install_local_plugin.sh")
+    for line in gradlew_lines:
+      self.assertIn("--no-daemon", line)
+      self.assertIn("-Pkotlin.compiler.execution.strategy=in-process", line)
+
   def test_evicted_bootstrap_path_triggers_gradle_rebootstrap(self) -> None:
     with tempfile.TemporaryDirectory() as td:
       tmp = pathlib.Path(td)

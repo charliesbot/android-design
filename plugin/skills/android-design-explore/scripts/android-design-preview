@@ -347,7 +347,7 @@ bootstrap_valid() {
 run_gradle_bootstrap() {
   _app_dir="$1"
   [ -x "$_app_dir/gradlew" ] || fail_json "missing_gradlew" "Expected executable gradlew in $_app_dir"
-  if ! (cd "$_app_dir" && ./gradlew --no-daemon :host:exportBootstrap) 1>&2; then
+  if ! (cd "$_app_dir" && ./gradlew --no-daemon -Pkotlin.compiler.execution.strategy=in-process :host:exportBootstrap) 1>&2; then
     fail_json "gradle_bootstrap_failed" "Gradle :host:exportBootstrap failed in $_app_dir"
   fi
 }

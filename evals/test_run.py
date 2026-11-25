@@ -402,6 +402,60 @@ class ArtifactPipelineTests(unittest.TestCase):
         starter.assert_called_once()
         stopper.assert_called_once()
 
+    def test_run_main_stops_server_and_cleans_cache_when_start_fails(self):
+        cases = [{'name': 'music', 'surface': 'phone', 'prompt': 'music', 'files': [], 'assertions': [{'type': 'code', 'id': 'C-valid'}]}]
+        seen_caches = []
+
+        def fake_stop(case_dir, binary, **kwargs):
+            seen_caches.append(kwargs.get('cache_dir'))
+            return True
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'run-out'
+            with mock.patch.object(run, 'select_cases', return_value=cases), \
+                    mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
+                    mock.patch.object(run, 'preview_src', return_value=Path(SRC_DIR)), \
+                    mock.patch.object(run, 'bootstrap_dir', return_value=Path(BOOTSTRAP_DIR)), \
+                    mock.patch.object(run, 'server_cp', return_value=Path(SERVER_CP)), \
+                    mock.patch.object(run, '_start_preview_server', side_effect=RuntimeError('start timed out')), \
+                    mock.patch.object(run, '_stop_preview_server', side_effect=fake_stop) as stopper, \
+                    mock.patch.object(run.sys, 'argv', ['run.py', 'run', '--out', str(out), '--generator', 'agy', '--judge', 'agy', '--no-open']):
+                with self.assertRaises(SystemExit) as ctx:
+                    run.main()
+        self.assertEqual(ctx.exception.code, 1)
+        stopper.assert_called_once()
+        self.assertEqual(len(seen_caches), 1)
+        self.assertIsNotNone(seen_caches[0])
+        self.assertFalse(seen_caches[0].exists())
+
+    def test_build_stops_preview_server_after_render_and_on_error(self):
+        case = next(iter(run.select_cases('music')))
+        with tempfile.TemporaryDirectory() as tmp:
+            case_dir = Path(tmp) / 'music'
+            with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
+                    mock.patch.object(run, 'preview_src', return_value=Path(SRC_DIR)), \
+                    mock.patch.object(run, 'bootstrap_dir', return_value=Path(BOOTSTRAP_DIR)), \
+                    mock.patch.object(run, 'server_cp', return_value=Path(SERVER_CP)), \
+                    mock.patch.object(run, 'generate', return_value={'message': 'ok'}) as gen, \
+                    mock.patch.object(run, 'render', return_value=(['/tmp/a.png'], None)) as rend, \
+                    mock.patch.object(run, '_stop_preview_server', return_value=True) as stopper:
+                run.build(case, case_dir, 'claude')
+            self.assertIs(gen.call_args.kwargs['stop_server'], False)
+            self.assertEqual(gen.call_args.kwargs['cache_dir'], rend.call_args.kwargs['cache_dir'])
+            stopper.assert_called_once()
+
+            case_dir2 = Path(tmp) / 'music-err'
+            with mock.patch.object(run, 'app_binary', return_value=Path(BINARY)), \
+                    mock.patch.object(run, 'preview_src', return_value=Path(SRC_DIR)), \
+                    mock.patch.object(run, 'bootstrap_dir', return_value=Path(BOOTSTRAP_DIR)), \
+                    mock.patch.object(run, 'server_cp', return_value=Path(SERVER_CP)), \
+                    mock.patch.object(run, 'generate', return_value={'message': 'ok'}), \
+                    mock.patch.object(run, 'render', return_value=([], 'render boom')), \
+                    mock.patch.object(run, '_stop_preview_server', return_value=True) as stopper2:
+                with self.assertRaisesRegex(RuntimeError, 'render boom'):
+                    run.build(case, case_dir2, 'claude')
+            stopper2.assert_called_once()
+
     def test_missing_judge_is_pending_not_passed(self):
         case = {'name': 'music', 'surface': 'phone', 'assertions': [{'type': 'rubric', 'id': 'R-one'}]}
         with tempfile.TemporaryDirectory() as tmp:

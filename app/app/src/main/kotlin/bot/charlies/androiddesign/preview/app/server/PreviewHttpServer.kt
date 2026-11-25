@@ -54,6 +54,7 @@ class PreviewHttpServer(
   private val deviceSerial: String? = null,
   private val adbForwardPort: Int? = null,
   private val apkSha256: String? = null,
+  private val ownedEmulatorSerial: String? = null,
   private val onWatchdogHalt: () -> Unit = { Runtime.getRuntime().halt(1) },
   private val onProcessExit: (() -> Unit)? = null,
   private val enableFileWatcher: Boolean = true,
@@ -290,9 +291,10 @@ class PreviewHttpServer(
         {
           if (
             !closed.get() &&
-              sseClients.isEmpty() &&
+              inFlightChecks.get() == 0 &&
               System.currentTimeMillis() - lastActivityMs.get() >= idleTimeoutMs
           ) {
+            broadcastSse(null, "stopped", """{"reason":"idle_timeout"}""")
             stop(triggerExit = true)
           }
         },
@@ -324,6 +326,7 @@ class PreviewHttpServer(
       deviceSerial = deviceSerial,
       adbForwardPort = adbForwardPort,
       apkSha256 = apkSha256 ?: runtimeIdentity?.apkSha256,
+      ownedEmulatorSerial = ownedEmulatorSerial,
     )
 
   fun stop(triggerExit: Boolean = false) {
@@ -755,6 +758,7 @@ class PreviewHttpServer(
     try {
       handleCheckBody(exchange, req)
     } finally {
+      lastActivityMs.set(System.currentTimeMillis())
       inFlightChecks.decrementAndGet()
     }
   }
@@ -780,6 +784,7 @@ class PreviewHttpServer(
     try {
       handleRenderBody(exchange, req)
     } finally {
+      lastActivityMs.set(System.currentTimeMillis())
       inFlightChecks.decrementAndGet()
     }
   }

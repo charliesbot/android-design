@@ -753,6 +753,60 @@ class DeviceManagerTest {
     assertFalse(cmds.any { "emu kill" in it }, "the user's emulator was killed: $cmds")
   }
 
+  @Test
+  fun `releaseLaunchedEmulator before launch aborts emulator startup during shutdown`(
+    @TempDir tmp: Path,
+  ) {
+    val env = fakeToolsEnv(tmp)
+    val meta = fakeBootstrap(tmp.resolve("b"), "apk-race-stop")
+    var launchCalled = false
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      when {
+        cmd.getOrNull(1) == "devices" -> CommandOutput(0, "List of devices attached\n")
+        "emulator list" in j -> CommandOutput(0, "Medium_Resizable_API_35\n")
+        else -> CommandOutput(0, "OK\n")
+      }
+    }
+    val dm =
+      DeviceManager(
+        cacheRoot = tmp.resolve("c"),
+        env = env + mapOf("ANDROID_HOME" to sdkWithEmulator(tmp).toString()),
+        runner = runner,
+        sleepFn = {},
+        launchEmulator = { _, _ ->
+          launchCalled = true
+          FakeProcess()
+        },
+      )
+
+    // Simulate SIGTERM shutdown hook firing before startAvdAndWaitOnline launches the emulator.
+    dm.releaseLaunchedEmulator()
+    val result = dm.ensureDeviceReady(meta)
+    assertIs<DeviceSetupResult.Failed>(result)
+    assertFalse(launchCalled, "emulator must not be launched after releaseLaunchedEmulator")
+  }
+
+  @Test
+  fun `adoptOwnedEmulator shuts down the adopted serial on release`(@TempDir tmp: Path) {
+    val env = fakeToolsEnv(tmp)
+    val cmds = mutableListOf<String>()
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      cmds += cmd.joinToString(" ")
+      CommandOutput(0, "OK\n")
+    }
+    val dm = DeviceManager(cacheRoot = tmp.resolve("c"), env = env, runner = runner, sleepFn = {})
+
+    dm.adoptOwnedEmulator("emulator-5564")
+    assertEquals("emulator-5564", dm.ownedEmulatorSerial())
+    assertTrue(dm.releaseLaunchedEmulator())
+    assertTrue(
+      cmds.any { it.endsWith("-s emulator-5564 emu kill") },
+      "adopted emulator must be shut down on release: $cmds",
+    )
+    assertEquals(null, dm.ownedEmulatorSerial())
+  }
+
   private fun sdkWithEmulator(tmp: Path): Path {
     val sdk = tmp.resolve("sdk")
     val emulatorBin = sdk.resolve("emulator/emulator")

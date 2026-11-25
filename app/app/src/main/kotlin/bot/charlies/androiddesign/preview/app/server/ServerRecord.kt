@@ -132,6 +132,7 @@ data class ServerRecord(
   val adbForwardPort: Int? = null,
   val apkSha256: String? = null,
   val replacedByVersion: String? = null,
+  val ownedEmulatorSerial: String? = null,
 ) {
   fun boardUrl(repoId: String? = null): String =
     if (repoId.isNullOrBlank()) {
