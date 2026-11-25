@@ -30,21 +30,15 @@ data class RuntimeIdentity(
   val apkSha256: String?,
   val serverCpFile: Path?,
   val bootstrapDir: Path?,
-  val robolectricCpFile: Path? = null,
 ) {
   companion object {
     const val BACKEND_ANDROID = "android"
-    const val BACKEND_ROBOLECTRIC = "robolectric"
     const val BACKEND_ENV = "ANDROID_DESIGN_PREVIEW_BACKEND"
     const val SRC_ENV = "ANDROID_DESIGN_PREVIEW_SRC"
     const val SERVER_CP_ENV = "ANDROID_DESIGN_PREVIEW_SERVER_CP"
-    const val ROBOLECTRIC_CP_ENV = "ANDROID_DESIGN_PREVIEW_ROBOLECTRIC_CP"
     const val RUNTIME_HASH_ENV = "ANDROID_DESIGN_PREVIEW_RUNTIME_HASH"
 
-    fun resolveBackend(env: Map<String, String> = System.getenv()): String {
-      val explicit = env[BACKEND_ENV]?.trim()?.lowercase()
-      return if (explicit == BACKEND_ROBOLECTRIC) BACKEND_ROBOLECTRIC else BACKEND_ANDROID
-    }
+    fun resolveBackend(env: Map<String, String> = System.getenv()): String = BACKEND_ANDROID
 
     fun compute(
       env: Map<String, String> = System.getenv(),
@@ -67,12 +61,7 @@ data class RuntimeIdentity(
       val serverCpFile =
         env[SERVER_CP_ENV]?.trim()?.takeIf { it.isNotBlank() }?.let(Path::of)
           ?: bootstrapDir?.resolve("server.cp")?.takeIf { Files.isRegularFile(it) }
-      val robolectricCpFile =
-        env[ROBOLECTRIC_CP_ENV]?.trim()?.takeIf { it.isNotBlank() }?.let(Path::of)
-          ?: bootstrapDir?.resolve("robolectric.cp")?.takeIf { Files.isRegularFile(it) }
-      val apkSha =
-        if (backend == BACKEND_ANDROID) runCatching { meta?.apkSha256OrCompute() }.getOrNull()
-        else null
+      val apkSha = runCatching { meta?.apkSha256OrCompute() }.getOrNull()
 
       val overrideHash = env[RUNTIME_HASH_ENV]?.trim()?.takeIf { it.isNotBlank() }
       val runtimeHash =
@@ -105,9 +94,6 @@ data class RuntimeIdentity(
               feed("apk:$apkSha")
             }
             feedClasspath("cp", serverCpFile)
-            if (backend == BACKEND_ROBOLECTRIC) {
-              feedClasspath("rcp", robolectricCpFile)
-            }
             append(digest.digest().joinToString("") { "%02x".format(it) }.take(24))
           }
 
@@ -118,7 +104,6 @@ data class RuntimeIdentity(
         apkSha256 = apkSha,
         serverCpFile = serverCpFile,
         bootstrapDir = bootstrapDir,
-        robolectricCpFile = robolectricCpFile,
       )
     }
   }

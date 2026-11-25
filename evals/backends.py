@@ -21,7 +21,6 @@ from preview_app import (
     CACHE_DIR_ENV,
     CLIENT_TIMEOUT_ENV,
     NO_OPEN_ENV,
-    ROBOLECTRIC_CP_ENV,
     SERVER_CP_ENV,
     SERVER_NAME,
     SRC_ENV,
@@ -777,11 +776,8 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
                 bdir = Path(bootstrap_dir)
                 proc_env[BOOTSTRAP_DIR_ENV] = str(bdir)
                 proc_env.pop(SERVER_CP_ENV, None)
-                proc_env.pop(ROBOLECTRIC_CP_ENV, None)
                 if (bdir / 'server.cp').is_file():
                     proc_env[SERVER_CP_ENV] = str(bdir / 'server.cp')
-                if (bdir / 'robolectric.cp').is_file():
-                    proc_env[ROBOLECTRIC_CP_ENV] = str(bdir / 'robolectric.cp')
             if preview_backend is not None:
                 proc_env[BACKEND_ENV] = str(preview_backend)
             if cache_dir is not None:

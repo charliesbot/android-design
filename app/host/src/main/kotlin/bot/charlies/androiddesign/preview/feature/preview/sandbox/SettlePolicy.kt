@@ -29,10 +29,7 @@ internal interface WearScrollDriver : FrameDriver {
   suspend fun scrollOnce(): Boolean
 }
 
-/**
- * The one frame-settling policy shared by `:sandbox` and Robolectric, so both renderers wait the
- * same virtual time before a capture. The device values are canonical.
- */
+/** Canonical frame-settling policy for `:sandbox` offscreen capture and render tests. */
 internal object SettlePolicy {
   const val FRAME_NS = 16_666_667L
   const val MAX_SETTLE_FRAMES = 120

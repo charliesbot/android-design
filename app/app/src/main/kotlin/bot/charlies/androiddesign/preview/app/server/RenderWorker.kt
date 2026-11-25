@@ -141,8 +141,7 @@ data class SingleRenderRequest(
 
 /**
  * Narrow port between [CheckExecutor] and the underlying compilation + frame-capture runtime
- * (Android Host APK over `adb forward`, headless Robolectric worker JVM, or in-memory test
- * doubles).
+ * (Android Host APK over `adb forward` or in-memory test doubles).
  */
 interface RenderWorker : AutoCloseable {
   val name: String

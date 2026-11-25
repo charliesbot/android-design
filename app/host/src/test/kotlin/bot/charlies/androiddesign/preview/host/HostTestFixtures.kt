@@ -8,10 +8,7 @@ import java.security.MessageDigest
 import java.util.zip.CRC32
 import java.util.zip.Deflater
 
-/**
- * Shared fixture `.explore.kt` sources and test asset generator for host/Robolectric/emulator
- * tests.
- */
+/** Shared fixture `.explore.kt` sources and test asset generator for host and emulator tests. */
 internal object HostTestFixtures {
   const val PHONE_EXPLORE_FILE = "PhoneFixture.explore.kt"
   const val WEAR_EXPLORE_FILE = "WearFixture.explore.kt"

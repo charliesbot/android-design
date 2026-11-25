@@ -33,7 +33,7 @@ class CacheCleanerTest {
 
     val noopWorker =
       InMemoryRenderWorker(
-        name = RuntimeIdentity.BACKEND_ROBOLECTRIC,
+        name = RuntimeIdentity.BACKEND_ANDROID,
         compileOverride = { error("unused in CacheCleanerTest") },
       )
 

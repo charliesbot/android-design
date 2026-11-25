@@ -10,7 +10,7 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.compose.material3.Text
 import androidx.compose.ui.geometry.Offset
-import bot.charlies.androiddesign.preview.host.robolectric.SandboxExcludingRobolectricTestRunner
+import bot.charlies.androiddesign.preview.host.SandboxExcludingRobolectricTestRunner
 import bot.charlies.androiddesign.preview.kit.designBoard
 import bot.charlies.androiddesign.preview.kit.wearBoard
 import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta

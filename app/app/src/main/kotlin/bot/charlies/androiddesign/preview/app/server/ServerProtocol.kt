@@ -77,6 +77,27 @@ data class CheckRequest(
 }
 
 @Serializable
+data class RenderRequest(
+  val path: String,
+  val outDir: String,
+  val design: String? = null,
+  val views: List<String>? = null,
+  val screens: List<String>? = null,
+  val repoRoot: String? = null,
+)
+
+@Serializable
+data class RenderResponse(
+  val ok: Boolean,
+  val valid: Boolean,
+  val pass: Boolean,
+  val exitCode: Int,
+  val reportPath: String? = null,
+  val error: String? = null,
+  val messages: List<String> = emptyList(),
+)
+
+@Serializable
 data class ImageOutput(
   val direction: String,
   val screen: String,

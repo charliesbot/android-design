@@ -53,7 +53,7 @@ class PreviewClientSessionTest {
     )
     val env =
       mapOf(
-        RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_ROBOLECTRIC,
+        RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_ANDROID,
         BootstrapMeta.BOOTSTRAP_DIR_ENV to bdir.toString(),
         RuntimeIdentity.SERVER_CP_ENV to bdir.resolve("server.cp").toString(),
       ) + extraEnv

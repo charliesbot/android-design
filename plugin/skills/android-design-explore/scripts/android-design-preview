@@ -309,9 +309,6 @@ bootstrap_valid() {
   validate_paths_file "$_bdir/bootstrap-paths.txt" || return 1
   validate_cp_file "$_bdir/client.cp" || return 1
   validate_cp_file "$_bdir/server.cp" || return 1
-  if [ "${ANDROID_DESIGN_PREVIEW_BACKEND:-}" = "robolectric" ] || [ "$_cmd" = "render" ]; then
-    validate_cp_file "$_bdir/robolectric.cp" || return 1
-  fi
   return 0
 }
 
@@ -375,12 +372,9 @@ export ANDROID_DESIGN_PREVIEW_SRC="$APP_DIR"
 export ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR="$BOOTSTRAP_DIR"
 export ANDROID_DESIGN_PREVIEW_SERVER_CP="$BOOTSTRAP_DIR/server.cp"
 export ANDROID_DESIGN_PREVIEW_CLIENT_CP="$BOOTSTRAP_DIR/client.cp"
-if [ -f "$BOOTSTRAP_DIR/robolectric.cp" ]; then
-  export ANDROID_DESIGN_PREVIEW_ROBOLECTRIC_CP="$BOOTSTRAP_DIR/robolectric.cp"
-fi
 
 case "$cmd" in
-  server|render)
+  server)
     exec "$JAVA_BIN" -Djava.awt.headless=true "@$BOOTSTRAP_DIR/server.cp" bot.charlies.androiddesign.preview.app.MainKt "$@"
     ;;
   *)

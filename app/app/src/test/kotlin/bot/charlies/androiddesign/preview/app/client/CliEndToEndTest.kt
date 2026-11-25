@@ -29,6 +29,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.junit.jupiter.api.Assumptions.assumeTrue
 
 class CliEndToEndTest {
   private val appDir: Path =
@@ -44,13 +45,12 @@ class CliEndToEndTest {
       System.getProperty("preview.bin") ?: error("preview.bin system property missing"),
     )
 
-  private fun robolectricEnv(): Map<String, String> =
+  private fun cliEnv(): Map<String, String> =
     mapOf(
       RuntimeIdentity.SRC_ENV to appDir.toString(),
       BootstrapMeta.BOOTSTRAP_DIR_ENV to bootstrapDir.toString(),
       RuntimeIdentity.SERVER_CP_ENV to bootstrapDir.resolve("server.cp").toString(),
-      RuntimeIdentity.ROBOLECTRIC_CP_ENV to bootstrapDir.resolve("robolectric.cp").toString(),
-      RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_ROBOLECTRIC,
+      RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_ANDROID,
     )
 
   private data class CliResult(val exitCode: Int, val stdout: String, val stderr: String)
@@ -62,7 +62,7 @@ class CliEndToEndTest {
     extraEnv: Map<String, String> = emptyMap(),
   ): CliResult {
     val pb = ProcessBuilder(listOf(binPath.toString()) + args).directory(cwd.toFile())
-    robolectricEnv().forEach { (k, v) -> pb.environment()[k] = v }
+    cliEnv().forEach { (k, v) -> pb.environment()[k] = v }
     pb.environment()[PreviewClient.NO_OPEN_ENV] = "1"
     pb.environment()[ServerPaths.CACHE_DIR_ENV] = cacheDir.toString()
     extraEnv.forEach { (k, v) -> pb.environment()[k] = v }
@@ -106,19 +106,74 @@ class CliEndToEndTest {
     """
       .trimIndent()
 
+  private fun startFakeServerSubprocess(repo: Path, cacheDir: Path): Process {
+    val javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString()
+    val testCp = System.getProperty("java.class.path")
+    val identity = RuntimeIdentity.compute(cliEnv())
+    val pb =
+      ProcessBuilder(
+          javaBin,
+          "-Djava.awt.headless=true",
+          "-cp",
+          testCp,
+          FakePreviewServerMain::class.java.name,
+          "--repo",
+          repo.toString(),
+          "--preferred-port",
+          "0",
+          "--runtime-hash",
+          identity.runtimeHash,
+        )
+        .directory(repo.toFile())
+    cliEnv().forEach { (k, v) -> pb.environment()[k] = v }
+    pb.environment()[ServerPaths.CACHE_DIR_ENV] = cacheDir.toString()
+    val proc = pb.start()
+    val recordPath = ServerPaths.sharedRecordPath(cacheDir)
+    val deadline = System.currentTimeMillis() + 15_000L
+    while (System.currentTimeMillis() < deadline) {
+      if (!proc.isAlive) {
+        val err = proc.errorStream.bufferedReader(Charsets.UTF_8).readText()
+        error("FakePreviewServerMain exited early (${proc.exitValue()}): $err")
+      }
+      val rec = ServerPaths.readRecord(recordPath)
+      if (rec != null && rec.pid == proc.pid()) {
+        val ready = runCatching {
+          val conn =
+            URI("http://127.0.0.1:${rec.port}/api/status").toURL().openConnection()
+              as HttpURLConnection
+          conn.connectTimeout = 500
+          conn.readTimeout = 500
+          conn.setRequestProperty("Host", "127.0.0.1:${rec.port}")
+          conn.setRequestProperty("X-Client-Secret", rec.clientSecret)
+          try {
+            conn.responseCode == 200
+          } finally {
+            conn.disconnect()
+          }
+        }
+          .getOrDefault(false)
+        if (ready) return proc
+      }
+      Thread.sleep(50)
+    }
+    proc.destroyForcibly()
+    error("Timed out waiting for FakePreviewServerMain")
+  }
+
   @Test
   fun `end-to-end bin script covers all subcommands, exit codes 0 to 3, and check selection delivery`() {
     assertTrue(Files.isExecutable(binPath), "bootstrap script must be executable: $binPath")
     assertTrue(Files.isRegularFile(bootstrapDir.resolve("server.cp")), "server.cp must exist")
-    assertTrue(
-      Files.isRegularFile(bootstrapDir.resolve("robolectric.cp")),
-      "robolectric.cp must exist",
+    assertFalse(
+      Files.exists(bootstrapDir.resolve("robolectric.cp")),
+      "robolectric.cp must not be exported",
     )
 
     val tmp = createTempDirectory("v6-e2e-")
     val cacheDir = tmp.resolve("cache")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
     val source = repo.resolve("plates.explore.kt").also { Files.writeString(it, sampleBoard()) }
+    var serverProc: Process? = null
     try {
       // --help exits 0 for top-level and subcommands.
       for (cmd in
@@ -154,8 +209,11 @@ class CliEndToEndTest {
       assertFalse(emptySelJson.ok)
       assertNotNull(emptySelJson.ask)
 
-      // Scoped check starts server, compiles, renders 1x PNG, exits 0, single JSON line, no
-      // selection yet.
+      // Start a child fake server subprocess so the POSIX CLI script exercises every live
+      // endpoint (including `stop`) without requiring an emulator boot in unit test runs.
+      serverProc = startFakeServerSubprocess(repo, cacheDir)
+
+      // Scoped check compiles, renders 1x PNG, exits 0, single JSON line, no selection yet.
       val check1 =
         execCli(
           repo,
@@ -291,7 +349,7 @@ class CliEndToEndTest {
       assertEquals(0, installCmd.exitCode, installCmd.stdout)
       assertTrue(Files.exists(fakeBin.resolve("android-design-preview")))
 
-      // `render` writes PNGs, trees, and report.json.
+      // `render` writes PNGs, trees, and report.json via POST /api/render.
       val renderOut = tmp.resolve("renders")
       val renderCmd =
         execCli(
@@ -306,6 +364,8 @@ class CliEndToEndTest {
         )
       assertEquals(0, renderCmd.exitCode, renderCmd.stderr)
       assertTrue(Files.isRegularFile(renderOut.resolve("report.json")))
+      assertTrue(Files.isRegularFile(renderOut.resolve("home-light.png")))
+      assertTrue(Files.isRegularFile(renderOut.resolve("home-light.tree.json")))
 
       // `stop` cleanly shuts down the server, and status then exits 3.
       val stopCmd = execCli(repo, cacheDir, "stop", repo.toString())
@@ -314,13 +374,13 @@ class CliEndToEndTest {
       val afterStopStatus = execCli(repo, cacheDir, "status", repo.toString())
       assertEquals(3, afterStopStatus.exitCode, afterStopStatus.stdout)
     } finally {
-      execCli(repo, cacheDir, "stop", repo.toString())
+      serverProc?.destroyForcibly()
       tmp.toFile().deleteRecursively()
     }
   }
 
   @Test
-  fun `dead server record with recorded timeout fast-fails before respawn and clears on edit`() {
+  fun `dead server record with recorded timeout fast-fails before respawn`() {
     val tmp = createTempDirectory("v6-e2e-timeout-record-")
     val cacheDir = tmp.resolve("cache")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
@@ -339,7 +399,7 @@ class CliEndToEndTest {
           repoRoot = repo.toAbsolutePath().normalize().toString(),
           clientSecret = ServerPaths.randomToken(),
           viewToken = ServerPaths.randomToken(),
-          backend = RuntimeIdentity.BACKEND_ROBOLECTRIC,
+          backend = RuntimeIdentity.BACKEND_ANDROID,
           timeouts = listOf(TimeoutEntry(snap.contentHash, "compile", System.currentTimeMillis())),
           haltedAt = System.currentTimeMillis(),
         ),
@@ -363,8 +423,78 @@ class CliEndToEndTest {
       assertEquals("timeout", resp.error)
       // Dead record PID was NOT overwritten.
       assertEquals(999_999L, ServerPaths.readRecord(recordPath)?.pid)
+    } finally {
+      tmp.toFile().deleteRecursively()
+    }
+  }
 
-      // Editing the file changes contentHash -> client respawns and succeeds!
+  @Test
+  fun `emulator end-to-end check, tree, render, and timeout clear on edit`() {
+    assumeTrue(
+      System.getProperty("adp.runEmulatorTests") == "true",
+      "Skipped unless -Dadp.runEmulatorTests=true",
+    )
+
+    val tmp = createTempDirectory("v6-e2e-emu-")
+    val cacheDir = tmp.resolve("cache")
+    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
+    val source = repo.resolve("plates.explore.kt").also { Files.writeString(it, sampleBoard()) }
+    try {
+      val check1 =
+        execCli(
+          repo,
+          cacheDir,
+          "check",
+          source.toString(),
+          "--direction",
+          "Editorial",
+          "--view",
+          "light",
+        )
+      assertEquals(0, check1.exitCode, "emulator check failed: ${check1.stdout} ${check1.stderr}")
+
+      val renderOut = tmp.resolve("renders")
+      val renderCmd =
+        execCli(
+          repo,
+          cacheDir,
+          "render",
+          source.toString(),
+          "--out",
+          renderOut.toString(),
+          "--views",
+          "light",
+        )
+      assertEquals(0, renderCmd.exitCode, renderCmd.stderr)
+      assertTrue(Files.isRegularFile(renderOut.resolve("report.json")))
+      assertTrue(Files.isRegularFile(renderOut.resolve("home-light.png")))
+      assertTrue(Files.isRegularFile(renderOut.resolve("home-light.tree.json")))
+
+      // Record a timeout for the current hash, verify fast-fail, then edit to clear and recover.
+      val stopFirst = execCli(repo, cacheDir, "stop", repo.toString())
+      assertEquals(0, stopFirst.exitCode, stopFirst.stdout)
+      val snap = ContentHasher.snapshot(source)
+      val recPath = ServerPaths.sharedRecordPath(cacheDir)
+      ServerPaths.updateRecord(recPath) { rec ->
+        rec.copy(
+          pid = 999_999L,
+          timeouts =
+            rec.timeouts + TimeoutEntry(snap.contentHash, "compile", System.currentTimeMillis()),
+        )
+      }
+      val fastFail =
+        execCli(
+          repo,
+          cacheDir,
+          "check",
+          source.toString(),
+          "--direction",
+          "Editorial",
+          "--view",
+          "light",
+        )
+      assertEquals(1, fastFail.exitCode, fastFail.stdout)
+
       Files.writeString(source, sampleBoard() + "\n// edited\n")
       val recovered =
         execCli(
@@ -386,11 +516,15 @@ class CliEndToEndTest {
 
   @Test
   fun `external client timeout kills wedged server, respawns fresh server, and returns timeout`() {
+    assumeTrue(
+      System.getProperty("adp.runEmulatorTests") == "true",
+      "Skipped unless -Dadp.runEmulatorTests=true",
+    )
     val tmp = createTempDirectory("v6-e2e-ext-timeout-")
     val cacheDir = tmp.resolve("cache")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
     val source = repo.resolve("wedged.explore.kt").also { Files.writeString(it, sampleBoard()) }
-    val identity = RuntimeIdentity.compute(robolectricEnv())
+    val identity = RuntimeIdentity.compute(cliEnv())
     // Launch a real dummy sleeper subprocess whose PID the client can kill, paired with a stub HTTP
     // server that hangs on /api/check.
     val dummyProc = ProcessBuilder("sleep", "60").start()
@@ -487,7 +621,7 @@ class CliEndToEndTest {
     val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
     val source = repo.resolve("hang2.explore.kt").also { Files.writeString(it, sampleBoard()) }
     val snap = ContentHasher.snapshot(source)
-    val identity = RuntimeIdentity.compute(robolectricEnv())
+    val identity = RuntimeIdentity.compute(cliEnv())
     val stubSecret = ServerPaths.randomToken()
     val stubView = ServerPaths.randomToken()
     val recordPath = ServerPaths.sharedRecordPath(cacheDir)
@@ -495,7 +629,7 @@ class CliEndToEndTest {
     val stubPort = stubServer.address.port
     stubServer.createContext("/api/status") { ex ->
       val body =
-        """{"ok":true,"running":true,"pid":${ProcessHandle.current().pid()},"port":$stubPort,"jarVersion":"${AppInfo.VERSION}","startedAt":1,"compileCount":1,"repoRoot":"$repo","boardUrl":"http://127.0.0.1:$stubPort/?view=$stubView","backend":"${identity.backend}","runtimeHash":"${identity.runtimeHash}"}"""
+        """{"ok":true,"running":true,"pid":999999,"port":$stubPort,"jarVersion":"${AppInfo.VERSION}","startedAt":1,"compileCount":1,"repoRoot":"$repo","boardUrl":"http://127.0.0.1:$stubPort/?view=$stubView","backend":"${identity.backend}","runtimeHash":"${identity.runtimeHash}"}"""
           .toByteArray()
       ex.sendResponseHeaders(200, body.size.toLong())
       ex.responseBody.use { it.write(body) }
@@ -515,7 +649,7 @@ class CliEndToEndTest {
       ServerPaths.writeRecord(
         recordPath,
         ServerRecord(
-          pid = ProcessHandle.current().pid(),
+          pid = 999_999L,
           port = stubPort,
           jarVersion = AppInfo.VERSION,
           startedAt = 1L,

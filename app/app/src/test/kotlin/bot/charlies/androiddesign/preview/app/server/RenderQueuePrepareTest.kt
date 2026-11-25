@@ -9,9 +9,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * A worker that must warm a fresh process (Robolectric after a watchdog kill) pays that cost in
- * [RenderWorker.prepare], outside the server watchdog's job budget, so a cold start never halts the
- * whole server.
+ * A worker that must warm a fresh process pays that cost in [RenderWorker.prepare], outside the
+ * server watchdog's job budget, so a cold start never halts the whole server.
  */
 class RenderQueuePrepareTest {
   @Test
@@ -27,7 +26,7 @@ class RenderQueuePrepareTest {
     val executor =
       CheckExecutor(
         InMemoryRenderWorker(
-          name = RuntimeIdentity.BACKEND_ROBOLECTRIC,
+          name = RuntimeIdentity.BACKEND_ANDROID,
           onPrepare = { if (prepared.compareAndSet(false, true)) Thread.sleep(600L) },
           onCompile = {
             // Without prepare(), the first job pays the warmup inside its watchdog budget.

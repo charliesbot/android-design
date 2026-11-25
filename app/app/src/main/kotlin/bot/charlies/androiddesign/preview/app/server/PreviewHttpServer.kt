@@ -531,6 +531,10 @@ class PreviewHttpServer(
         if (!requireClientSecret(exchange)) return
         handleCheck(exchange)
       }
+      path == "/api/render" && method == "POST" -> {
+        if (!requireClientSecret(exchange)) return
+        handleRender(exchange)
+      }
       path == "/api/tree" && method == "POST" -> {
         if (!requireClientSecret(exchange)) return
         handleTree(exchange)
@@ -745,6 +749,104 @@ class PreviewHttpServer(
 
   private fun handleCheckBody(exchange: HttpExchange, req: CheckRequest) {
     checkService.run(req) { status, json -> sendRawJson(exchange, status, json) }
+  }
+
+  private fun handleRender(exchange: HttpExchange) {
+    val body = readBodyString(exchange, MAX_BODY_BYTES) ?: return
+    val req =
+      try {
+        PreviewJson.compact.decodeFromString(RenderRequest.serializer(), body)
+      } catch (e: Exception) {
+        sendJson(
+          exchange,
+          400,
+          ErrorEnvelope(error = "bad_request", message = e.message ?: "Invalid JSON body"),
+        )
+        return
+      }
+    inFlightChecks.incrementAndGet()
+    try {
+      handleRenderBody(exchange, req)
+    } finally {
+      inFlightChecks.decrementAndGet()
+    }
+  }
+
+  private fun handleRenderBody(exchange: HttpExchange, req: RenderRequest) {
+    val sourcePath = Path.of(req.path).toAbsolutePath().normalize()
+    val outDir = Path.of(req.outDir).toAbsolutePath().normalize()
+    val explicitDesign = req.design?.takeIf { it.isNotBlank() }?.let(Path::of)
+    val reqRepoRoot =
+      req.repoRoot?.takeIf { it.isNotBlank() }?.let(Path::of)
+        ?: ServerPaths.resolveRepoRoot(sourcePath)
+    val state = getOrCreateRepo(reqRepoRoot)
+    lastActiveRepoId = state.repoId
+
+    if (!Files.isRegularFile(sourcePath)) {
+      sendJson(
+        exchange,
+        404,
+        ErrorEnvelope(error = "no_such_file", message = "No such file: $sourcePath"),
+      )
+      return
+    }
+
+    val result =
+      try {
+        ReportRenderer.render(
+          sourcePath = sourcePath,
+          outDir = outDir,
+          explicitDesign = explicitDesign,
+          requestedViews = req.views,
+          requestedScreens = req.screens,
+          compile = { snap ->
+            awaitOrReplaced(renderQueue.submitCompile(state.repoRoot, snap, QueuePriority.AGENT))
+          },
+          renderSingle = { entry, singleReq ->
+            awaitOrReplaced(
+              renderQueue.submitSingleRender(
+                entry = entry,
+                direction = singleReq.direction,
+                screenId = singleReq.screenId,
+                prefix = singleReq.prefix,
+                overlayId = singleReq.overlayId,
+                view = singleReq.view,
+                densityScale = singleReq.densityScale,
+                baseCheck = singleReq.baseCheck,
+                priority = QueuePriority.AGENT,
+                writeFiles = false,
+                frameFormat = FrameFormat.LZ4_RGBA,
+              ),
+            )
+          },
+        )
+      } catch (e: ServerReplacedException) {
+        sendJson(
+          exchange,
+          409,
+          ErrorEnvelope(
+            error = "server_replaced",
+            message = "replaced by v${e.replacedByVersion}, rerun",
+          ),
+        )
+        return
+      }
+    val resp =
+      RenderResponse(
+        ok = result.ok,
+        valid = result.valid,
+        pass = result.pass,
+        exitCode = result.exitCode,
+        reportPath = result.reportPath?.toString(),
+        error = result.error,
+        messages = result.messages,
+      )
+    sendRawJson(
+      exchange,
+      200,
+      PreviewJson.compact.encodeToString(RenderResponse.serializer(), resp),
+    )
+    maybeScheduleRecycle()
   }
 
   private fun handleTree(exchange: HttpExchange) {

@@ -48,22 +48,25 @@ class ServerReplacementTest {
       sourceBootstrapDir.resolve("bootstrap-meta.properties"),
       bdir.resolve("bootstrap-meta.properties"),
     )
-    Files.copy(sourceBootstrapDir.resolve("robolectric.cp"), bdir.resolve("robolectric.cp"))
 
     val origServerCp = Files.readString(sourceBootstrapDir.resolve("server.cp")).trimEnd()
+    val testCp = System.getProperty("java.class.path").orEmpty()
     val serverCp = bdir.resolve("server.cp")
-    Files.writeString(serverCp, "$origServerCp${File.pathSeparator}$dummyJar\n")
+    val combinedCp =
+      listOf(origServerCp, testCp, dummyJar.toString())
+        .filter { it.isNotBlank() }
+        .joinToString(File.pathSeparator)
+    Files.writeString(serverCp, "$combinedCp\n")
 
     val client =
       PreviewClient(
         cacheRoot = cache,
         env =
           mapOf(
-            RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_ROBOLECTRIC,
             BootstrapMeta.BOOTSTRAP_DIR_ENV to bdir.toString(),
             RuntimeIdentity.SERVER_CP_ENV to serverCp.toString(),
-            RuntimeIdentity.ROBOLECTRIC_CP_ENV to bdir.resolve("robolectric.cp").toString(),
           ),
+        serverMainClass = FakePreviewServerMain::class.java.name,
       )
     try {
       block(Fixture(repo, cache, dummyJar, serverCp, client))
@@ -92,7 +95,7 @@ class ServerReplacementTest {
     f.client.start(f.repo)
     val record = assertNotNull(ServerPaths.readRecord(ServerPaths.sharedRecordPath(f.cache)))
     assertNotNull(record.runtimeHash)
-    assertEquals(RuntimeIdentity.BACKEND_ROBOLECTRIC, record.backend)
+    assertEquals(RuntimeIdentity.BACKEND_ANDROID, record.backend)
   }
 
   @Test

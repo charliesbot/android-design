@@ -132,10 +132,15 @@ class RenderQueue(
     abstract fun execute()
   }
 
+  private class InFlightRender(
+    val format: FrameFormat,
+    val future: CompletableFuture<RenderArtifact>,
+  )
+
   private class FileHashCache(val contentHash: String) {
     @Volatile var compileFuture: CompletableFuture<CompileEntry>? = null
     @Volatile var compiled: CompileEntry? = null
-    val renderFutures = ConcurrentHashMap<RenderKey, CompletableFuture<RenderArtifact>>()
+    val renderFutures = ConcurrentHashMap<RenderKey, InFlightRender>()
     val rendered = ConcurrentHashMap<RenderKey, RenderArtifact>()
   }
 
@@ -523,18 +528,30 @@ class RenderQueue(
           }
       hashCache.rendered[renderKey]?.let { done ->
         val hasImageIfNeeded =
-          frameFormat == FrameFormat.NONE || (done.pngBytes != null && done.pngBytes.isNotEmpty())
+          when (frameFormat) {
+            FrameFormat.NONE -> true
+            FrameFormat.LZ4_RGBA ->
+              done.imageMime == "image/png" && done.pngBytes != null && done.pngBytes.isNotEmpty()
+            FrameFormat.WEBP_LOSSLESS -> done.pngBytes != null && done.pngBytes.isNotEmpty()
+          }
         if (hasImageIfNeeded && (!writeFiles || done.pngPath != null)) {
           return CompletableFuture.completedFuture(done)
         }
       }
       val existing = hashCache.renderFutures[renderKey]
-      if (existing != null && !existing.isCancelled && !existing.isCompletedExceptionally) {
-        future = existing
+      val compatibleInFlight =
+        existing != null &&
+          !existing.future.isCancelled &&
+          !existing.future.isCompletedExceptionally &&
+          (frameFormat == FrameFormat.NONE ||
+            existing.format == FrameFormat.LZ4_RGBA ||
+            existing.format == frameFormat)
+      if (compatibleInFlight) {
+        future = existing!!.future
         promoteQueuedJob(key, entry.contentHash, renderKey, priority)
       } else {
         future = CompletableFuture()
-        hashCache.renderFutures[renderKey] = future
+        hashCache.renderFutures[renderKey] = InFlightRender(frameFormat, future)
         needEnqueue = true
       }
     }
@@ -679,7 +696,8 @@ class RenderQueue(
       synchronized(cacheLock) {
         val current = cachesByFile[key]
         if (current != null && current.contentHash == contentHash) {
-          current.renderFutures.remove(renderKey, future)
+          val entry = current.renderFutures[renderKey]
+          if (entry?.future === future) current.renderFutures.remove(renderKey, entry)
         }
       }
       future.completeExceptionally(cause)
@@ -714,7 +732,13 @@ class RenderQueue(
         synchronized(cacheLock) {
           val current = cachesByFile[key]
           if (current != null && current.contentHash == contentHash) {
-            if (frameFormat != FrameFormat.NONE || current.rendered[renderKey] == null) {
+            val prev = current.rendered[renderKey]
+            val keepExistingPng =
+              frameFormat != FrameFormat.LZ4_RGBA &&
+                prev?.imageMime == "image/png" &&
+                prev.pngBytes != null &&
+                prev.pngBytes.isNotEmpty()
+            if (!keepExistingPng && (frameFormat != FrameFormat.NONE || prev == null)) {
               current.rendered[renderKey] = artifact
             }
           }
@@ -728,7 +752,8 @@ class RenderQueue(
         synchronized(cacheLock) {
           val current = cachesByFile[key]
           if (current != null && current.contentHash == contentHash) {
-            current.renderFutures.remove(renderKey, future)
+            val entry = current.renderFutures[renderKey]
+            if (entry?.future === future) current.renderFutures.remove(renderKey, entry)
           }
         }
         future.completeExceptionally(t)

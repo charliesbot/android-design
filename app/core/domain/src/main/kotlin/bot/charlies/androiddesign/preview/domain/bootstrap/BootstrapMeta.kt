@@ -59,8 +59,6 @@ data class BootstrapMeta(
             val p = runCatching { Paths.get(entry).toAbsolutePath().normalize() }.getOrNull()
             when {
               p == null -> null
-              p.fileName?.toString() == "robolectric-config" ->
-                p.parent?.resolve("bootstrap-meta.properties")?.takeIf { Files.isRegularFile(it) }
               Files.isDirectory(p) ->
                 p.resolve("bootstrap-meta.properties").takeIf { Files.isRegularFile(it) }
               else -> null

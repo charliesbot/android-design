@@ -2,8 +2,6 @@ package bot.charlies.androiddesign.preview.host
 
 import bot.charlies.androiddesign.preview.app.android.AndroidExplorationCompiler
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
-import bot.charlies.androiddesign.preview.host.robolectric.RobolectricStaging
-import bot.charlies.androiddesign.preview.host.robolectric.SandboxExcludingRobolectricTestRunner
 import bot.charlies.androiddesign.preview.model.DeviceAckResponse
 import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
 import bot.charlies.androiddesign.preview.model.DeviceBatchWireResult
@@ -16,8 +14,6 @@ import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
 import bot.charlies.androiddesign.preview.model.DeviceTransportSpec
 import bot.charlies.androiddesign.preview.model.DeviceWireCodec
 import bot.charlies.androiddesign.preview.model.FrameFormat
-import bot.charlies.androiddesign.preview.model.LayoutTree
-import bot.charlies.androiddesign.preview.model.RobolectricRenderRequest
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
@@ -27,7 +23,6 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
-import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -36,13 +31,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import org.junit.runner.RunWith
-import org.robolectric.annotation.Config
-import org.robolectric.annotation.GraphicsMode
 
-@RunWith(SandboxExcludingRobolectricTestRunner::class)
-@GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35])
 class HostEmulatorIntegrationTest {
   @get:Rule val tempFolder = TemporaryFolder()
 
@@ -52,7 +41,7 @@ class HostEmulatorIntegrationTest {
   private val HOST_PORT = 18765
 
   @Test
-  fun fullEmulatorEndToEndSecurityWatchdogAndRobolectricParity() {
+  fun fullEmulatorEndToEndSecurityAndWatchdog() {
     assumeTrue(
       "Skipping emulator test unless -Dadp.runEmulatorTests=true",
       System.getProperty("adp.runEmulatorTests") == "true",
@@ -257,52 +246,7 @@ class HostEmulatorIntegrationTest {
       assertTrue("Wear curved node present", wearResp.results[2].tree.nodes.isNotEmpty())
       assertTrue("Wear confirm dialog present", wearResp.results[3].tree.nodes.isNotEmpty())
 
-      // 3. Parity check: Emulator (Display 0 insets consumed) vs Robolectric (same fixtures)
-      val roboPhone1x =
-        RobolectricStaging.handle(
-            RobolectricRenderRequest(
-              id = "parity-p1",
-              sourcePath = phoneFile.toString(),
-              views = listOf("light"),
-              screens = listOf("home"),
-              density = 1f,
-              encodePng = false,
-            ),
-          )
-          .trees
-          .single()
-      val roboPhone2x =
-        RobolectricStaging.handle(
-            RobolectricRenderRequest(
-              id = "parity-p2",
-              sourcePath = phoneFile.toString(),
-              views = listOf("light"),
-              screens = listOf("home"),
-              density = 2f,
-              encodePng = false,
-            ),
-          )
-          .trees
-          .single()
-      val roboWearMain =
-        RobolectricStaging.handle(
-            RobolectricRenderRequest(
-              id = "parity-w1",
-              sourcePath = wearFile.toString(),
-              views = listOf("watch"),
-              screens = listOf("main"),
-              density = 2f,
-              encodePng = false,
-            ),
-          )
-          .trees
-          .single()
-
-      assertTreeParity("phone-1x", roboPhone1x, emuPhone1x)
-      assertTreeParity("phone-2x", roboPhone2x, emuPhone2x)
-      assertTreeParity("wear-main", roboWearMain, emuWearMain.tree)
-
-      // 4. OP_SET_LIVE updates LivePreviewActivity cleanly
+      // 3. OP_SET_LIVE updates LivePreviewActivity cleanly
       val liveAck =
         sendSetLive(
           output,
@@ -350,7 +294,10 @@ class HostEmulatorIntegrationTest {
         "Offscreen batch while LivePreviewActivity foreground failed: ${liveOpenResp.error}",
         liveOpenResp.ok,
       )
-      assertTreeParity("phone-1x-while-live-open", roboPhone1x, liveOpenResp.results[0].tree)
+      assertTrue(
+        "Expected live-open batch nodes",
+        liveOpenResp.results[0].tree.nodes.isNotEmpty(),
+      )
 
       // 5. Malicious DEX bypassing BytecodeGuard is rejected on-device by PolicyDexClassLoader
       val maliciousSource =
@@ -548,37 +495,6 @@ class HostEmulatorIntegrationTest {
       val newPing = startServiceAndAwaitPing(excludePid = oldPid)
       assertNotEquals("Expected new :sandbox PID after watchdog kill", oldPid, newPing.pid)
     }
-  }
-
-  private fun assertTreeParity(label: String, robo: LayoutTree, emu: LayoutTree) {
-    val rByKey =
-      robo.nodes.associateBy { "${it.type}:${it.text?.value ?: it.id.substringBefore('@')}" }
-    val eByKey =
-      emu.nodes.associateBy { "${it.type}:${it.text?.value ?: it.id.substringBefore('@')}" }
-    val common = rByKey.keys.intersect(eByKey.keys)
-    assertTrue("$label: expected matched nodes between Robolectric and Emulator", common.size >= 4)
-    val deltas = common.map { k ->
-      val r = rByKey[k]!!.bounds
-      val e = eByKey[k]!!.bounds
-      Triple(k, abs(r.width - e.width), abs(r.height - e.height))
-    }
-    val maxWDelta = deltas.maxOf { it.second }
-    val maxHDelta = deltas.maxOf { it.third }
-    val worstH = deltas.maxBy { it.third }
-    val colorMismatches = common.mapNotNull { k ->
-      val rNode = rByKey[k]
-      val eNode = eByKey[k]
-      val rc = rNode?.colors
-      val ec = eNode?.colors
-      if (rc != null && ec != null && (rc.content != ec.content || rc.container != ec.container)) {
-        "$k(robo=$rc@${rNode.bounds}/line=${rNode.sourceLine} vs emu=$ec@${eNode.bounds}/line=${eNode.sourceLine})"
-      } else {
-        null
-      }
-    }
-    assertTrue("$label: maxWDelta=$maxWDelta dp (>1dp)", maxWDelta <= 1.0f)
-    assertTrue("$label: maxHDelta=$maxHDelta dp (>1dp, worst=$worstH)", maxHDelta <= 2.5f)
-    assertTrue("$label: color mismatches: $colorMismatches", colorMismatches.isEmpty())
   }
 
   private fun startServiceAndAwaitPing(excludePid: Int? = null): DevicePingResponse {

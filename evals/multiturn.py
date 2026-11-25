@@ -12,7 +12,7 @@ from pathlib import Path
 
 from backends import execute
 from checks import run as run_checks
-from preview_app import DEFAULT_EVAL_BACKEND, app_binary, bootstrap_dir, preview_src, robolectric_cp, server_cp
+from preview_app import DEFAULT_EVAL_BACKEND, app_binary, bootstrap_dir, preview_src, server_cp
 import run as eval_run
 
 HERE = Path(__file__).resolve().parent
@@ -289,7 +289,6 @@ def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout
     resolved_bdir = bootstrap_dir() if bdir is None else Path(bdir)
     if bdir is None:
         server_cp()
-        robolectric_cp()
 
     created_cache = cache_dir is None
     active_cache_dir = (
@@ -303,53 +302,57 @@ def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout
     prev_cumulative_cost = None
     turn_records = []
     try:
-        try:
-            for idx, (title, body) in enumerate(revisions, start=1):
-                prompt = (
-                    first_turn_prompt(out_dir, body, total)
-                    if idx == 1
-                    else followup_turn_prompt(idx, total, title, body)
-                )
-                reply = execute(
-                    'claude', prompt, out_dir,
-                    role='generator', model=model, timeout=timeout,
-                    mcp_binary=mcp_binary,
-                    preview_src=resolved_src,
-                    bootstrap_dir=resolved_bdir,
-                    preview_backend=backend,
-                    cache_dir=active_cache_dir,
-                    client_timeout_ms=120000,
-                    resume_session=session_id,
-                )
-                if idx == 1:
-                    session_id = reply.get('session_id')
-                    if not session_id:
-                        raise RuntimeError('Claude did not return a session_id on turn 1; cannot resume session')
-                (out_dir / f'turn-{idx:02d}.json').write_text(json.dumps(reply, indent=2))
-                rec = _turn_record(idx, title, reply, prev_cumulative_cost=prev_cumulative_cost)
-                if isinstance(reply.get('cost'), (int, float)):
-                    prev_cumulative_cost = reply['cost']
-                turn_records.append(rec)
-                print(
-                    f"[turn {idx:02d}/{total}] {title}: {rec['wall_seconds']}s, "
-                    f"in+cache={rec['total_input_tokens']}, out={rec['output_tokens']}, "
-                    f"checks={rec['check_calls']}, retries={rec['compile_retries']}, skill_B={rec['skill_bytes_read']}",
-                    flush=True,
-                )
-        finally:
-            eval_run._stop_preview_server(
-                out_dir,
-                mcp_binary,
-                src=resolved_src,
-                bdir=resolved_bdir,
-                backend=backend,
-                cache_dir=active_cache_dir,
+        for idx, (title, body) in enumerate(revisions, start=1):
+            prompt = (
+                first_turn_prompt(out_dir, body, total)
+                if idx == 1
+                else followup_turn_prompt(idx, total, title, body)
             )
+            reply = execute(
+                'claude', prompt, out_dir,
+                role='generator', model=model, timeout=timeout,
+                mcp_binary=mcp_binary,
+                preview_src=resolved_src,
+                bootstrap_dir=resolved_bdir,
+                preview_backend=backend,
+                cache_dir=active_cache_dir,
+                client_timeout_ms=120000,
+                resume_session=session_id,
+            )
+            if idx == 1:
+                session_id = reply.get('session_id')
+                if not session_id:
+                    raise RuntimeError('Claude did not return a session_id on turn 1; cannot resume session')
+            (out_dir / f'turn-{idx:02d}.json').write_text(json.dumps(reply, indent=2))
+            rec = _turn_record(idx, title, reply, prev_cumulative_cost=prev_cumulative_cost)
+            if isinstance(reply.get('cost'), (int, float)):
+                prev_cumulative_cost = reply['cost']
+            turn_records.append(rec)
+            print(
+                f"[turn {idx:02d}/{total}] {title}: {rec['wall_seconds']}s, "
+                f"in+cache={rec['total_input_tokens']}, out={rec['output_tokens']}, "
+                f"checks={rec['check_calls']}, retries={rec['compile_retries']}, skill_B={rec['skill_bytes_read']}",
+                flush=True,
+            )
+
+        images, render_error = eval_run.render(
+            out_dir,
+            binary=mcp_binary,
+            src=resolved_src,
+            bdir=resolved_bdir,
+            cache_dir=active_cache_dir,
+        )
     finally:
+        eval_run._stop_preview_server(
+            out_dir,
+            mcp_binary,
+            src=resolved_src,
+            bdir=resolved_bdir,
+            backend=backend,
+            cache_dir=active_cache_dir,
+        )
         if created_cache:
             shutil.rmtree(active_cache_dir, ignore_errors=True)
-
-    images, render_error = eval_run.render(out_dir)
     checks = run_checks(out_dir, 'phone')
     if render_error:
         checks['C-review'] = {'pass': False, 'detail': render_error}

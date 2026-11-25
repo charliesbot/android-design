@@ -18,7 +18,7 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
 import java.util.concurrent.ConcurrentHashMap
 
-/** Directory containing the active exploration file; used on host JVM/Robolectric runs. */
+/** Directory containing the active exploration file; used by JVM test hosts. */
 internal val LocalExplorationDir = staticCompositionLocalOf<Path?> { null }
 
 /** Content-addressed asset resolver injected by `:sandbox` or host renderers. */

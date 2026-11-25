@@ -1,12 +1,19 @@
 package bot.charlies.androiddesign.preview.app.cli
 
 import bot.charlies.androiddesign.preview.app.server.CompileEntry
+import bot.charlies.androiddesign.preview.app.server.InMemoryRenderWorker
 import bot.charlies.androiddesign.preview.app.server.RenderWorker
-import bot.charlies.androiddesign.preview.app.server.RobolectricRenderWorker
 import bot.charlies.androiddesign.preview.app.server.WorkerBatchResult
-import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
+import bot.charlies.androiddesign.preview.app.server.WorkerFrame
+import bot.charlies.androiddesign.preview.app.server.WorkerTargetOutput
+import bot.charlies.androiddesign.preview.domain.image.FastPngEncoder
+import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
+import bot.charlies.androiddesign.preview.model.DeviceOverlayMeta
 import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
+import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
+import bot.charlies.androiddesign.preview.model.Views
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.nio.file.Files
@@ -20,18 +27,47 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RenderCrashTest {
+  private fun samplePngBytes(): ByteArray {
+    val rgba =
+      ByteArray(64 * 64 * 4) { idx ->
+        if (idx % 4 == 3) 0xFF.toByte() else ((idx * 37) xor (idx shr 3)).toByte()
+      }
+    return FastPngEncoder.encodeFast(64, 64, rgba)
+  }
+
   private fun flakyWorker(): RenderWorker {
-    val bdir =
-      Path.of(
-        System.getProperty("adp.bootstrap.dir")
-          ?: error("adp.bootstrap.dir system property missing"),
-      )
-    val meta = BootstrapMeta.fromFile(bdir.resolve("bootstrap-meta.properties"))
+    val png = samplePngBytes()
     val real =
-      RobolectricRenderWorker(
-        meta = meta,
-        robolectricCp = bdir.resolve("robolectric.cp"),
-        bootstrapDir = bdir,
+      InMemoryRenderWorker(
+        directions =
+          listOf(
+            DeviceDirectionMeta(
+              name = "Crash",
+              surface = "phone",
+              startScreen = "home",
+              screens = listOf("home", "detail"),
+              overlays = listOf(DeviceOverlayMeta("info", "home")),
+            ),
+          ),
+        views = PhoneSurface.views,
+        targetBuilder = { target ->
+          val view = Views.byName(target.viewName) ?: Views.Light
+          WorkerTargetOutput(
+            direction = target.direction,
+            screen = target.screen,
+            viewName = target.viewName,
+            overlayId = target.overlayId,
+            renderMs = 5L,
+            tree =
+              LayoutTree(
+                screen = target.screen,
+                view = view,
+                nodes = emptyList(),
+                findings = emptyList(),
+              ),
+            frame = WorkerFrame(bytes = png, mime = "image/png", isPng = true),
+          )
+        },
       )
     return object : RenderWorker by real {
       override fun renderTargets(

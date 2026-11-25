@@ -10,9 +10,8 @@ import android.media.ImageReader
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.RawRgbaFrame
 
 /**
- * Draws a frame through `HardwareRenderer` into an `ImageReader`. Both the device host and the
- * Robolectric host capture this way, because a software `Canvas(bitmap)` skips `RenderEffect`s such
- * as `Modifier.blur`.
+ * Draws a frame through `HardwareRenderer` into an `ImageReader`, because a software
+ * `Canvas(bitmap)` skips `RenderEffect`s such as `Modifier.blur`.
  */
 internal class HardwareFrameRenderer {
   private val renderer = HardwareRenderer()
