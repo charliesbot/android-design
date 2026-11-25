@@ -85,15 +85,22 @@ def _populate_bootstrap(app_dir: pathlib.Path, include_jars: bool = True) -> pat
   apk.write_text("apk", encoding="utf-8")
   bundle = bdir / "androidx-compile-bundle.jar"
   bundle.write_text("bundle", encoding="utf-8")
+  worker_r = bdir / "worker-r.jar"
+  worker_r.write_text("rjar", encoding="utf-8")
+  worker_res = bdir / "worker-res-dirs.txt"
+  worker_res.write_text("", encoding="utf-8")
+  (bdir / "layoutlib" / "runtime" / "data").mkdir(parents=True, exist_ok=True)
+  (bdir / "layoutlib" / "resources" / "res").mkdir(parents=True, exist_ok=True)
   (bdir / "bootstrap-meta.properties").write_text(
       f"apkPath={apk}\napkSha256=deadbeef\n", encoding="utf-8"
   )
   (bdir / "bootstrap-paths.txt").write_text(
-      f"{apk}\n{bundle}\n", encoding="utf-8"
+      f"{apk}\n{bundle}\n{worker_r}\n", encoding="utf-8"
   )
   cp_text = f"-cp\n{jar1}:{jar2}\n"
   (bdir / "client.cp").write_text(cp_text, encoding="utf-8")
   (bdir / "server.cp").write_text(cp_text, encoding="utf-8")
+  (bdir / "worker.cp").write_text(cp_text, encoding="utf-8")
   return bdir
 
 
@@ -111,15 +118,18 @@ printf '%s\\n' "${{JAVA_HOME:-}}" > "{marker}.javahome"
 printf 'run\\n' >> "{marker}.runs"
 sleep "${{FAKE_GRADLE_SLEEP:-0}}"
 bdir="$(pwd)/host/build/bootstrap"
-mkdir -p "$bdir"
+mkdir -p "$bdir/layoutlib/runtime/data" "$bdir/layoutlib/resources/res"
 printf 'jar1' > "$bdir/dep1.jar"
 printf 'jar2' > "$bdir/dep2.jar"
 printf 'apk' > "$bdir/host-preview.apk"
 printf 'bundle' > "$bdir/androidx-compile-bundle.jar"
+printf 'rjar' > "$bdir/worker-r.jar"
+: > "$bdir/worker-res-dirs.txt"
 printf 'apkPath=%s\\napkSha256=deadbeef\\n' "$bdir/host-preview.apk" > "$bdir/bootstrap-meta.properties"
-printf '%s\\n%s\\n' "$bdir/host-preview.apk" "$bdir/androidx-compile-bundle.jar" > "$bdir/bootstrap-paths.txt"
+printf '%s\\n%s\\n%s\\n' "$bdir/host-preview.apk" "$bdir/androidx-compile-bundle.jar" "$bdir/worker-r.jar" > "$bdir/bootstrap-paths.txt"
 printf -- '-cp\\n%s:%s\\n' "$bdir/dep1.jar" "$bdir/dep2.jar" > "$bdir/client.cp"
 printf -- '-cp\\n%s:%s\\n' "$bdir/dep1.jar" "$bdir/dep2.jar" > "$bdir/server.cp"
+printf -- '-cp\\n%s:%s\\n' "$bdir/dep1.jar" "$bdir/dep2.jar" > "$bdir/worker.cp"
 """,
   )
   return app_dir, marker
@@ -361,14 +371,14 @@ class BootstrapCliTest(unittest.TestCase):
       jdk_dir = tmp / "jdk"
       java_bin = _make_fake_java(jdk_dir / "bin", capture)
       _write_executable(jdk_dir / "bin" / "javac", "#!/bin/sh\nexit 0\n")
-      (jdk_dir / "release").write_text('JAVA_VERSION="17.0.20"\n', encoding="utf-8")
+      (jdk_dir / "release").write_text('JAVA_VERSION="21.0.2"\n', encoding="utf-8")
 
       sdk_dir = _make_fake_sdk(tmp)
       app_dir, _ = _make_fake_app_dir(tmp)
       _populate_bootstrap(app_dir)
       cache_dir = tmp / "cache"
       cache_dir.mkdir(parents=True, exist_ok=True)
-      (cache_dir / "java-bin").write_text("/usr/bin/java\n", encoding="utf-8")
+      (cache_dir / "java-bin-21").write_text("/usr/bin/java\n", encoding="utf-8")
       (tmp / "home").mkdir(parents=True, exist_ok=True)
 
       env = {
@@ -391,7 +401,7 @@ class BootstrapCliTest(unittest.TestCase):
       self.assertTrue(capture.is_file())
       captured = capture.read_text(encoding="utf-8")
       self.assertNotIn("JAVA_HOME=/usr\n", captured)
-      cached_java = (cache_dir / "java-bin").read_text(encoding="utf-8").strip()
+      cached_java = (cache_dir / "java-bin-21").read_text(encoding="utf-8").strip()
       self.assertIn(cached_java, {str(java_bin), str(java_bin.resolve())})
 
   def test_derives_java_home_for_real_jdk_but_never_usr(self) -> None:
@@ -401,7 +411,7 @@ class BootstrapCliTest(unittest.TestCase):
       jdk_dir = tmp / "jdk"
       java_bin = _make_fake_java(jdk_dir / "bin", capture)
       _write_executable(jdk_dir / "bin" / "javac", "#!/bin/sh\nexit 0\n")
-      (jdk_dir / "release").write_text('JAVA_VERSION="17.0.20"\n', encoding="utf-8")
+      (jdk_dir / "release").write_text('JAVA_VERSION="21.0.2"\n', encoding="utf-8")
 
       sdk_dir = _make_fake_sdk(tmp)
       app_dir, _ = _make_fake_app_dir(tmp)
@@ -434,9 +444,9 @@ class BootstrapCliTest(unittest.TestCase):
 
   def _old_java_home_env(self, tmp: pathlib.Path) -> tuple[dict[str, str], pathlib.Path, pathlib.Path]:
     capture = tmp / "java_capture.txt"
-    old_jdk = tmp / "jdk11"
+    old_jdk = tmp / "jdk17"
     new_jdk = tmp / "jdk21"
-    _make_fake_jdk(old_jdk, "11.0.2", capture)
+    _make_fake_jdk(old_jdk, "17.0.9", capture)
     new_java = _make_fake_jdk(new_jdk, "21.0.2", capture)
     env = self._base_env(tmp, capture)
     env["PATH"] = "/usr/bin:/bin"
@@ -462,7 +472,7 @@ class BootstrapCliTest(unittest.TestCase):
       del env["ANDROID_DESIGN_PREVIEW_JAVA"]
       cache = pathlib.Path(env["ANDROID_DESIGN_CACHE_DIR"])
       cache.mkdir(parents=True)
-      (cache / "java-bin").write_text(f"{new_jdk / 'bin' / 'java'}\n", encoding="utf-8")
+      (cache / "java-bin-21").write_text(f"{new_jdk / 'bin' / 'java'}\n", encoding="utf-8")
       res = subprocess.run([str(SKILL_SCRIPT), "status"], env=env, capture_output=True, text=True, timeout=30)
       self.assertEqual(res.returncode, 0, res.stderr)
       gradle_home = pathlib.Path(str(marker) + ".javahome").read_text(encoding="utf-8").strip()
@@ -472,8 +482,8 @@ class BootstrapCliTest(unittest.TestCase):
     with tempfile.TemporaryDirectory() as td:
       tmp = pathlib.Path(td)
       env, new_jdk, marker = self._old_java_home_env(tmp)
-      keep = tmp / "jdk17"
-      _make_fake_jdk(keep, "17.0.9", tmp / "other_capture.txt")
+      keep = tmp / "jdk21_other"
+      _make_fake_jdk(keep, "21.0.5", tmp / "other_capture.txt")
       env["JAVA_HOME"] = str(keep)
       res = subprocess.run([str(SKILL_SCRIPT), "status"], env=env, capture_output=True, text=True, timeout=30)
       self.assertEqual(res.returncode, 0, res.stderr)
@@ -605,7 +615,7 @@ exit 0
       _populate_bootstrap(app_dir)
       cache_dir = tmp / "cache"
       cache_dir.mkdir(parents=True)
-      (cache_dir / "java-bin").write_text(f"{java_bin}\n", encoding="utf-8")
+      (cache_dir / "java-bin-21").write_text(f"{java_bin}\n", encoding="utf-8")
       (tmp / "home").mkdir(parents=True)
 
       env = {
@@ -640,26 +650,26 @@ exit 0
       self.assertEqual(res_slash.returncode, 0, res_slash.stderr)
       self.assertFalse(version_log.exists(), "Trailing slash on JAVA_HOME should still skip java -version")
 
-      # Switching JAVA_HOME to another valid JDK validates once and updates the cache.
-      jdk17_dir = tmp / "jdk17"
-      version_log_17 = tmp / "java17_version_calls.txt"
-      java17_bin = jdk17_dir / "bin" / "java"
+      # Switching JAVA_HOME to another valid JDK 21+ validates once and updates the cache.
+      jdk22_dir = tmp / "jdk22"
+      version_log_22 = tmp / "java22_version_calls.txt"
+      java22_bin = jdk22_dir / "bin" / "java"
       _write_executable(
-          java17_bin,
+          java22_bin,
           f"""#!/bin/sh
 if [ "${{1:-}}" = "-version" ]; then
-  printf 'version\\n' >> "{version_log_17}"
-  echo 'openjdk version "17.0.9" 2023-10-17' 1>&2
+  printf 'version\\n' >> "{version_log_22}"
+  echo 'openjdk version "22.0.1" 2024-04-16' 1>&2
   exit 0
 fi
 printf 'JAVA_HOME=%s\\n' "${{JAVA_HOME:-}}" > "{capture}"
 exit 0
 """,
       )
-      _write_executable(jdk17_dir / "bin" / "javac", "#!/bin/sh\nexit 0\n")
-      (jdk17_dir / "release").write_text('JAVA_VERSION="17.0.9"\n', encoding="utf-8")
+      _write_executable(jdk22_dir / "bin" / "javac", "#!/bin/sh\nexit 0\n")
+      (jdk22_dir / "release").write_text('JAVA_VERSION="22.0.1"\n', encoding="utf-8")
 
-      env["JAVA_HOME"] = str(jdk17_dir)
+      env["JAVA_HOME"] = str(jdk22_dir)
       res_switch = subprocess.run(
           [str(SKILL_SCRIPT), "status"],
           env=env,
@@ -668,8 +678,8 @@ exit 0
           timeout=15,
       )
       self.assertEqual(res_switch.returncode, 0, res_switch.stderr)
-      self.assertEqual(len(version_log_17.read_text(encoding="utf-8").splitlines()), 1)
-      self.assertEqual((cache_dir / "java-bin").read_text(encoding="utf-8").strip(), str(java17_bin))
+      self.assertEqual(len(version_log_22.read_text(encoding="utf-8").splitlines()), 1)
+      self.assertEqual((cache_dir / "java-bin-21").read_text(encoding="utf-8").strip(), str(java22_bin))
 
       # Next run with the new JAVA_HOME skips java -version again.
       res_switch_warm = subprocess.run(
@@ -680,7 +690,7 @@ exit 0
           timeout=15,
       )
       self.assertEqual(res_switch_warm.returncode, 0, res_switch_warm.stderr)
-      self.assertEqual(len(version_log_17.read_text(encoding="utf-8").splitlines()), 1)
+      self.assertEqual(len(version_log_22.read_text(encoding="utf-8").splitlines()), 1)
 
   def test_bootstrap_valid_checks_only_relevant_cp_for_client_vs_server(self) -> None:
     def setup_split_cp(root: pathlib.Path, name: str) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path]:
@@ -765,6 +775,60 @@ exit 0
       )
       self.assertEqual(res_start.returncode, 0, res_start.stderr)
       self.assertTrue(marker_c.exists(), "start command must validate server.cp as well")
+
+  def test_jdk_17_only_fails_with_missing_java_21_error(self) -> None:
+    with tempfile.TemporaryDirectory() as td:
+      tmp = pathlib.Path(td)
+      capture = tmp / "java_capture.txt"
+      jdk17 = tmp / "jdk17"
+      java17 = _make_fake_jdk(jdk17, "17.0.20", capture)
+      sdk_dir = _make_fake_sdk(tmp)
+      app_dir, _ = _make_fake_app_dir(tmp)
+      _populate_bootstrap(app_dir)
+      (tmp / "home").mkdir(parents=True, exist_ok=True)
+      env = {
+          "PATH": f"{jdk17 / 'bin'}:/usr/bin:/bin",
+          "HOME": str(tmp / "home"),
+          "JAVA_HOME": str(jdk17),
+          "ANDROID_DESIGN_PREVIEW_JAVA": str(java17),
+          "ANDROID_HOME": str(sdk_dir),
+          "ANDROID_SDK_ROOT": str(sdk_dir),
+          "ANDROID_DESIGN_CACHE_DIR": str(tmp / "cache"),
+          "ANDROID_DESIGN_PREVIEW_SRC": str(app_dir),
+      }
+      res = subprocess.run(
+          [str(SKILL_SCRIPT), "status"],
+          env=env,
+          capture_output=True,
+          text=True,
+          timeout=15,
+      )
+      self.assertEqual(res.returncode, 3)
+      payload = json.loads(res.stdout)
+      self.assertFalse(payload["ok"])
+      self.assertEqual(payload["errors"][0]["code"], "missing_java")
+      self.assertIn("21", payload["errors"][0]["message"])
+
+  def test_missing_worker_artifacts_triggers_gradle_rebootstrap(self) -> None:
+    with tempfile.TemporaryDirectory() as td:
+      tmp = pathlib.Path(td)
+      capture = tmp / "java_capture.txt"
+      env = self._base_env(tmp, capture)
+      app_dir, marker = _make_fake_app_dir(tmp)
+      bdir = _populate_bootstrap(app_dir)
+      (bdir / "worker.cp").unlink()
+      env["ANDROID_DESIGN_PREVIEW_SRC"] = str(app_dir)
+
+      res = subprocess.run(
+          [str(SKILL_SCRIPT), "start"],
+          env=env,
+          capture_output=True,
+          text=True,
+          timeout=15,
+      )
+      self.assertEqual(res.returncode, 0, res.stderr)
+      self.assertTrue(marker.exists(), "Missing worker.cp should trigger gradlew")
+      self.assertTrue((bdir / "worker.cp").is_file())
 
 
 if __name__ == "__main__":

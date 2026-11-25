@@ -3,7 +3,7 @@ package bot.charlies.androiddesign.preview.feature.preview.sandbox
 import kotlinx.coroutines.delay
 
 /** What one virtual frame left behind, as reported by a [FrameDriver]. */
-internal data class FrameStatus(
+data class FrameStatus(
   /** The frame clock has awaiters or the recomposer still has work queued. */
   val workPending: Boolean,
   /** At least one popup, dialog, or sheet window exists besides the main activity window. */
@@ -13,7 +13,7 @@ internal data class FrameStatus(
 )
 
 /** The renderer-specific half of settling: how one virtual frame is produced and laid out. */
-internal interface FrameDriver {
+interface FrameDriver {
   /**
    * Sends one [SettlePolicy.FRAME_NS] virtual frame, lays windows out, and reports what remains.
    */
@@ -24,13 +24,13 @@ internal interface FrameDriver {
 }
 
 /** A [FrameDriver] whose composition hosts a vertical Wear scroller. */
-internal interface WearScrollDriver : FrameDriver {
+interface WearScrollDriver : FrameDriver {
   /** Scrolls the Wear list by half a viewport; false when it cannot move any further. */
   suspend fun scrollOnce(): Boolean
 }
 
 /** Canonical frame-settling policy for `:sandbox` offscreen capture and render tests. */
-internal object SettlePolicy {
+object SettlePolicy {
   const val FRAME_NS = 16_666_667L
   const val MAX_SETTLE_FRAMES = 120
   const val MIN_STEPS = 4

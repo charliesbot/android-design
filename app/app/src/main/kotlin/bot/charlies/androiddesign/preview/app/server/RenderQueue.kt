@@ -619,7 +619,8 @@ class RenderQueue(
         val hasImageIfNeeded =
           when (frameFormat) {
             FrameFormat.NONE -> true
-            FrameFormat.LZ4_RGBA ->
+            FrameFormat.LZ4_RGBA,
+            FrameFormat.RAW_RGBA ->
               done.imageMime == "image/png" && done.pngBytes != null && done.pngBytes.isNotEmpty()
             FrameFormat.WEBP_LOSSLESS -> done.pngBytes != null && done.pngBytes.isNotEmpty()
           }

@@ -11,6 +11,7 @@ import bot.charlies.androiddesign.preview.model.DeviceBoardMeta
 import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
 import bot.charlies.androiddesign.preview.model.DeviceOverlayMeta
 import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.ThemeOverride
 import java.util.Collections
 
 /**
@@ -19,7 +20,7 @@ import java.util.Collections
  * [BoardRenderHost].
  */
 @OptIn(ComposeToolingApi::class)
-internal class ComposeBoardRenderer(private val host: BoardRenderHost) {
+class ComposeBoardRenderer(private val host: BoardRenderHost) {
 
   suspend fun render(request: RenderTargetRequest): BoardRenderResult {
     val startNs = System.nanoTime()
@@ -164,5 +165,7 @@ internal class ComposeBoardRenderer(private val host: BoardRenderHost) {
           },
         views = board.surfaceSpec.views,
       )
+
+    fun boardThemeOverride(board: ExplorationBoard): ThemeOverride? = board.toThemeOverride()
   }
 }

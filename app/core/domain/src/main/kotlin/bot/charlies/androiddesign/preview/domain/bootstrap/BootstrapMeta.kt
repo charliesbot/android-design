@@ -19,6 +19,12 @@ data class BootstrapMeta(
   val composeCompilerPluginJar: Path,
   val apkPath: Path,
   val apkSha256: String? = null,
+  val workerCp: Path,
+  val layoutlibRuntimeDir: Path,
+  val layoutlibResourcesDir: Path,
+  val workerResDirsFile: Path,
+  val workerAssetsDir: Path,
+  val workerRJar: Path,
 ) {
   /** Returns [apkSha256] when recorded in metadata, or computes the APK's SHA-256 digest. */
   fun apkSha256OrCompute(): String = apkSha256?.takeIf { it.isNotBlank() } ?: computeSha256(apkPath)
@@ -100,6 +106,12 @@ data class BootstrapMeta(
         composeCompilerPluginJar = reqPath("composeCompilerPluginJar"),
         apkPath = reqPath("apkPath"),
         apkSha256 = props.getProperty("apkSha256")?.trim()?.takeIf { it.isNotEmpty() },
+        workerCp = reqPath("workerCp"),
+        layoutlibRuntimeDir = reqPath("layoutlibRuntimeDir"),
+        layoutlibResourcesDir = reqPath("layoutlibResourcesDir"),
+        workerResDirsFile = reqPath("workerResDirsFile"),
+        workerAssetsDir = reqPath("workerAssetsDir"),
+        workerRJar = reqPath("workerRJar"),
       )
     }
 

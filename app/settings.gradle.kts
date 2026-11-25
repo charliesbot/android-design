@@ -37,3 +37,5 @@ include(":core:data")
 include(":app")
 
 include(":host")
+
+include(":render")

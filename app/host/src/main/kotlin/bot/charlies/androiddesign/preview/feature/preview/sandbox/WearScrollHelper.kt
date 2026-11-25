@@ -12,7 +12,7 @@ import bot.charlies.androiddesign.preview.model.LayoutTree
 
 /** Wear scrolling and circular-picker detection helper for `:sandbox`. */
 @OptIn(ComposeToolingApi::class)
-internal object WearScrollHelper {
+object WearScrollHelper {
   private const val MAX_FINITE_SCROLL_EXTENT_PX = 50_000f
   private val PICKER_FUNCTIONS = setOf("DatePicker", "TimePicker", "Picker", "PickerGroup")
   private val PICKER_SOURCE_FILES = setOf("DatePicker.kt", "TimePicker.kt", "Picker.kt")
