@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
@@ -813,5 +814,58 @@ class RobolectricBoardRendererTest {
       "Expected red in RGBA order: $red",
       red.first > 200 && red.second < 60 && red.third < 60,
     )
+  }
+
+  @Test
+  fun rendersShaderMaskBlur() {
+    val board =
+      designBoard("ShaderBlur") {
+        screen("main") {
+          // Mask alpha 0 on the left half (sharp), 1 on the right half (blurred).
+          val mask = remember {
+            android.graphics.RuntimeShader(
+              """
+              uniform float2 size;
+              half4 main(float2 coord) {
+                return half4(0.0, 0.0, 0.0, half(step(0.5, coord.x / size.x)));
+              }
+              """
+                .trimIndent(),
+            )
+          }
+          val spec =
+            remember(mask) {
+              BlurRadiusSpec.shader(maxRadius = 16.dp) { sizePx ->
+                mask.setFloatUniform("size", sizePx.width, sizePx.height)
+                mask
+              }
+            }
+          Box(Modifier.fillMaxSize().background(Color.White)) {
+            Box(
+              Modifier.offset(50.dp, 50.dp)
+                .size(100.dp)
+                .blur(blurRadiusSpec = spec, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                .background(Color.Black),
+            )
+          }
+        }
+      }
+    val frame =
+      RobolectricBoardRenderer.renderSingleView(
+          board = board,
+          direction = board.directions.single(),
+          screenId = "main",
+          view = Views.Light,
+          sourceFile = "RobolectricBoardRendererTest.kt",
+          sourceText = "",
+          density = 2f,
+        )
+        .frame
+    fun red(x: Int, y: Int) = frame.bytes[(y * frame.width + x) * 4].toInt() and 0xFF
+
+    // 2dp outside each edge of the square (x 100..300 px): the left edge stays sharp, the right
+    // blurs.
+    assertTrue("Unmasked left edge should stay sharp: ${red(96, 200)}", red(96, 200) > 235)
+    assertTrue("Masked right edge should be soft: ${red(304, 200)}", red(304, 200) in 20..235)
   }
 }
