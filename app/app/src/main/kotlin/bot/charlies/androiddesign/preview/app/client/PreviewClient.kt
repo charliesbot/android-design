@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.app.client
 
 import bot.charlies.androiddesign.preview.app.AppInfo
+import bot.charlies.androiddesign.preview.app.android.DeviceManager
 import bot.charlies.androiddesign.preview.app.server.CheckScope
 import bot.charlies.androiddesign.preview.app.server.ContentHasher
 import bot.charlies.androiddesign.preview.app.server.LiveFocusRequest
@@ -137,6 +138,7 @@ class PreviewClient(
     val identity = RuntimeIdentity.compute(env)
     val existing = ServerPaths.readRecord(recordPath)
     var apkChanged = forceReinstallApk
+    var inheritedOwnedSerial: String? = null
     if (existing != null) {
       val live = probeRecord(existing, repoId)
       val serialMatches = requestedSerial.isNullOrBlank() || live?.deviceSerial == requestedSerial
@@ -155,18 +157,27 @@ class PreviewClient(
       ) {
         apkChanged = true
       }
+      inheritedOwnedSerial = existing.ownedEmulatorSerial?.takeIf { it.isNotBlank() }
       stopServer(existing, graceful = live != null, replacedByVersion = AppInfo.VERSION)
     }
-    return spawnServer(
-      repoRoot = normRepo,
-      reusePort = existing?.port ?: ServerPaths.SHARED_PREFERRED_PORT,
-      reuseViewToken = existing?.viewToken,
-      identity = identity,
-      forceReinstallApk = apkChanged,
-      deviceSerial = requestedSerial,
-      avdName = requestedAvd,
-      headless = headless,
-    )
+    val spawned =
+      spawnServer(
+        repoRoot = normRepo,
+        reusePort = existing?.port ?: ServerPaths.SHARED_PREFERRED_PORT,
+        reuseViewToken = existing?.viewToken,
+        identity = identity,
+        forceReinstallApk = apkChanged,
+        deviceSerial = requestedSerial,
+        avdName = requestedAvd,
+        headless = headless,
+        ownedEmulatorSerial = inheritedOwnedSerial,
+      )
+    if (spawned is ServerLookup.NotReady && inheritedOwnedSerial != null) {
+      runCatching {
+        DeviceManager(cacheRoot = cacheRoot, env = env).releaseEmulatorSerial(inheritedOwnedSerial)
+      }
+    }
+    return spawned
   }
 
   /** Stops the shared server, answering or not. Returns its record, or null when none ran. */
@@ -193,17 +204,26 @@ class PreviewClient(
     }
     val normRepo = repoRoot.toAbsolutePath().normalize()
     val identity = RuntimeIdentity.compute(env)
+    val inheritedOwnedSerial = deadRecord.ownedEmulatorSerial?.takeIf { it.isNotBlank() }
     stopServer(deadRecord, graceful = false, replacedByVersion = null)
-    spawnServer(
-      repoRoot = normRepo,
-      reusePort = deadRecord.port,
-      reuseViewToken = deadRecord.viewToken,
-      identity = identity,
-      forceReinstallApk = false,
-      deviceSerial = deadRecord.deviceSerial,
-      avdName = null,
-      headless = false,
-    )
+    val spawned =
+      spawnServer(
+        repoRoot = normRepo,
+        reusePort = deadRecord.port,
+        reuseViewToken = deadRecord.viewToken,
+        identity = identity,
+        forceReinstallApk = false,
+        deviceSerial = deadRecord.deviceSerial,
+        avdName = null,
+        headless = false,
+        ownedEmulatorSerial = inheritedOwnedSerial,
+      )
+    if (spawned is ServerLookup.NotReady && inheritedOwnedSerial != null) {
+      runCatching {
+        DeviceManager(cacheRoot = cacheRoot, env = env).releaseEmulatorSerial(inheritedOwnedSerial)
+      }
+    }
+    spawned
   }
 
   /** Outcome of [recoverFromDeadline]. */
@@ -360,15 +380,18 @@ class PreviewClient(
         } catch (_: Exception) {
           false
         }
-      if (handle != null && waitForExit(handle)) return true
+      if (handle != null && waitForExit(handle, SERVER_TERM_GRACE_MS)) return true
       if (handle == null && asked && waitUntilSilent(record)) return true
     }
     if (handle == null) return false
+    // SIGTERM first so the server's shutdown hook can cleanly stop any emulator it launched.
+    handle.destroy()
+    if (waitForExit(handle, SERVER_TERM_GRACE_MS)) return true
     handle.destroyForcibly()
-    return waitForExit(handle)
+    return waitForExit(handle, STOP_WAIT_MS)
   }
 
-  private fun serverProcess(record: ServerRecord): ProcessHandle? {
+  internal fun serverProcess(record: ServerRecord): ProcessHandle? {
     val handle = ProcessHandle.of(record.pid).orElse(null)?.takeIf { it.isAlive } ?: return null
     val info = handle.info()
     val started = info.startInstant().orElse(null)?.toEpochMilli()
@@ -387,13 +410,13 @@ class PreviewClient(
       if (System.currentTimeMillis() >= deadline) return false
       Thread.sleep(50)
     }
-    ProcessHandle.of(record.pid).ifPresent { waitForExit(it) }
+    ProcessHandle.of(record.pid).ifPresent { waitForExit(it, SERVER_TERM_GRACE_MS) }
     return true
   }
 
-  private fun waitForExit(handle: ProcessHandle): Boolean =
+  private fun waitForExit(handle: ProcessHandle, timeoutMs: Long = STOP_WAIT_MS): Boolean =
     try {
-      handle.onExit().get(STOP_WAIT_MS, TimeUnit.MILLISECONDS)
+      handle.onExit().get(timeoutMs, TimeUnit.MILLISECONDS)
       true
     } catch (_: Exception) {
       !handle.isAlive
@@ -423,6 +446,7 @@ class PreviewClient(
     deviceSerial: String?,
     avdName: String?,
     headless: Boolean,
+    ownedEmulatorSerial: String? = null,
   ): ServerLookup {
     val bootstrapCp =
       identity.serverCpFile
@@ -467,6 +491,10 @@ class PreviewClient(
         add("--force-reinstall-apk")
         add("true")
       }
+      if (!ownedEmulatorSerial.isNullOrBlank()) {
+        add("--owned-emulator-serial")
+        add(ownedEmulatorSerial)
+      }
     }
 
     val logDir = ServerPaths.serversDir(cacheRoot)
@@ -478,6 +506,10 @@ class PreviewClient(
         .directory(repoRoot.toFile())
         .redirectOutput(ProcessBuilder.Redirect.appendTo(logFile))
         .redirectErrorStream(true)
+    val devNull = java.io.File("/dev/null")
+    if (devNull.exists()) {
+      pb.redirectInput(ProcessBuilder.Redirect.from(devNull))
+    }
     val childEnv = pb.environment()
     childEnv[ServerPaths.CACHE_DIR_ENV] = cacheRoot.toString()
     childEnv[RuntimeIdentity.BACKEND_ENV] = identity.backend
@@ -490,6 +522,8 @@ class PreviewClient(
     env["ANDROID_DESIGN_ANDROID_CLI"]?.let { childEnv["ANDROID_DESIGN_ANDROID_CLI"] = it }
     env["ANDROID_DESIGN_PREVIEW_JAVA"]?.let { childEnv["ANDROID_DESIGN_PREVIEW_JAVA"] = it }
     env[RuntimeIdentity.RUNTIME_HASH_ENV]?.let { childEnv[RuntimeIdentity.RUNTIME_HASH_ENV] = it }
+    env[ServerCommand.IDLE_TIMEOUT_ENV]?.let { childEnv[ServerCommand.IDLE_TIMEOUT_ENV] = it }
+    env[ServerCommand.MAX_COMPILES_ENV]?.let { childEnv[ServerCommand.MAX_COMPILES_ENV] = it }
     env[ServerCommand.COLD_BUDGET_ENV]?.let { childEnv[ServerCommand.COLD_BUDGET_ENV] = it }
     env[ServerCommand.WARM_BUDGET_ENV]?.let { childEnv[ServerCommand.WARM_BUDGET_ENV] = it }
 
@@ -649,7 +683,7 @@ class PreviewClient(
     private const val STOP_WAIT_MS = 3_000L
     private const val SERVER_TERM_GRACE_MS = 15_000L
     private const val START_CLOCK_SLACK_MS = 2_000L
-    private const val MAX_SERVER_BOOT_MS = 120_000L
+    private const val MAX_SERVER_BOOT_MS = ANDROID_STARTUP_WAIT_MS + 30_000L
     private val inProcessLock = Any()
   }
 }

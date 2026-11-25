@@ -22,6 +22,8 @@ import subprocess
 import tempfile
 import time
 
+from preview_app import build_cli_env, preview_server_session
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "plugin" / "skills" / "android-design-explore" / "scripts" / "android-design-preview"
 FIXTURE = pathlib.Path(__file__).resolve().parent / "bench_fixture"
@@ -80,9 +82,8 @@ def main() -> int:
     parser.add_argument("--runs", type=int, default=7)
     args = parser.parse_args()
 
-    env = dict(os.environ)
-    env.setdefault("ANDROID_DESIGN_PREVIEW_SRC", str(REPO_ROOT / "app"))
-    env["ANDROID_DESIGN_NO_OPEN"] = "1"
+    src = pathlib.Path(os.environ.get("ANDROID_DESIGN_PREVIEW_SRC", str(REPO_ROOT / "app")))
+    env = build_cli_env(src=src)
 
     with tempfile.TemporaryDirectory(prefix="adp-bench-") as tmp:
         repo = pathlib.Path(tmp) / "repo"
@@ -90,8 +91,14 @@ def main() -> int:
         (repo / ".git").mkdir()
         source = repo / "design" / "bench.explore.kt"
 
-        run_cli(["start", "--headless"], env, repo)
-        try:
+        with preview_server_session(
+            repo,
+            SCRIPT,
+            src=src,
+            cache_prefix="eval-bench",
+        ) as active_cache_dir:
+            env = build_cli_env(src=src, cache_dir=active_cache_dir)
+            run_cli(["start", "--headless"], env, repo)
             marker = 1
             for _ in range(3):  # Warm the compiler, D8, and device JIT before timing.
                 bump(source, marker)
@@ -111,8 +118,6 @@ def main() -> int:
                 marker += 1
                 ms, last = timed_check(["check", str(source)], env, repo, renders=15)
                 full.append(ms)
-        finally:
-            subprocess.run([str(SCRIPT), "stop"], env=env, cwd=repo, capture_output=True, text=True)
 
     result = {
         "device": device_name(env),

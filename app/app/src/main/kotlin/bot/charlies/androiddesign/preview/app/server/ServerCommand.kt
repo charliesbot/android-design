@@ -15,6 +15,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 /** Internal subcommand launched by the CLI client to run the single shared HTTP/SSE host server. */
 class ServerCommand : Command {
@@ -22,7 +23,7 @@ class ServerCommand : Command {
   override val usage =
     "server --repo <dir> [--preferred-port <port>] [--view-token <token>] [--idle-timeout-ms <ms>] " +
       "[--backend android] [--runtime-hash <hash>] [--device-serial <id>] [--avd <name>] " +
-      "[--headless true|false] [--force-reinstall-apk true|false]"
+      "[--headless true|false] [--force-reinstall-apk true|false] [--owned-emulator-serial <id>]"
 
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
     val parsed =
@@ -40,6 +41,7 @@ class ServerCommand : Command {
           "--avd",
           "--headless",
           "--force-reinstall-apk",
+          "--owned-emulator-serial",
         ),
         err,
       ) ?: return ExitCode.USAGE
@@ -93,24 +95,39 @@ class ServerCommand : Command {
     val recycleExecutor = Executors.newSingleThreadExecutor { r ->
       Thread(r, "android-design-sandbox-recycle").apply { isDaemon = true }
     }
-    // An emulator this server launched goes down with it, unless a newer version replaced this
-    // server and reuses the running device. The hook is registered before device setup so a SIGTERM
-    // mid-boot (the CLI's startup timeout) still stops it. Devices the user started are never
-    // touched.
-    var emulatorLauncher: DeviceManager? = null
-    var runningServer: PreviewHttpServer? = null
+    // An emulator this server launched (or inherited from a predecessor it replaced) goes down
+    // with it, unless a newer version replaced this server and reuses the running device. The
+    // single shutdown hook is registered before device setup so a SIGTERM mid-boot still stops it.
+    // Devices the user started are never touched.
+    val inheritedOwnedSerial =
+      parsed.flags["--owned-emulator-serial"]?.trim()?.takeIf { it.isNotBlank() }
+    val pendingInheritedSerial = AtomicReference<String?>(inheritedOwnedSerial)
+    val emulatorLauncher = AtomicReference<DeviceManager?>(null)
+    val runningServer = AtomicReference<PreviewHttpServer?>(null)
     val emulatorReleased = AtomicBoolean(false)
+    val latch = CountDownLatch(1)
     val releaseLaunchedEmulator = {
-      val manager = emulatorLauncher
+      val manager = emulatorLauncher.get()
       if (
         manager != null &&
-          runningServer?.wasReplaced != true &&
+          runningServer.get()?.wasReplaced != true &&
           emulatorReleased.compareAndSet(false, true)
       ) {
         runCatching { manager.releaseLaunchedEmulator() }
+        pendingInheritedSerial.getAndSet(null)?.let { serial ->
+          runCatching { manager.releaseEmulatorSerial(serial) }
+        }
       }
     }
-    Runtime.getRuntime().addShutdownHook(Thread { releaseLaunchedEmulator() })
+    Runtime.getRuntime()
+      .addShutdownHook(
+        Thread {
+          runningServer.get()?.stop(triggerExit = false)
+          recycleExecutor.shutdownNow()
+          releaseLaunchedEmulator()
+          latch.countDown()
+        },
+      )
 
     val meta =
       BootstrapMeta.locateOrNull()
@@ -129,7 +146,7 @@ class ServerCommand : Command {
           return ClientExitCode.NOT_READY
         }
     val devMgr = DeviceManager(cacheRoot = cacheRoot)
-    emulatorLauncher = devMgr
+    emulatorLauncher.set(devMgr)
     val headless = parsed.flags["--headless"].equals("true", ignoreCase = true)
     val forceReinstall = parsed.flags["--force-reinstall-apk"].equals("true", ignoreCase = true)
     out.println("startup: preparing Android device (boot, install, warm-up)")
@@ -144,6 +161,9 @@ class ServerCommand : Command {
       )
     when (setup) {
       is DeviceSetupResult.Failed -> {
+        pendingInheritedSerial.getAndSet(null)?.let { serial ->
+          runCatching { devMgr.releaseEmulatorSerial(serial) }
+        }
         val msg =
           PreviewJson.compact.encodeToString(
             ErrorEnvelope.serializer(),
@@ -155,6 +175,13 @@ class ServerCommand : Command {
         return setup.exitCode
       }
       is DeviceSetupResult.Ready -> {
+        pendingInheritedSerial.getAndSet(null)?.let { serial ->
+          if (setup.serial == serial) {
+            devMgr.adoptOwnedEmulator(serial)
+          } else {
+            runCatching { devMgr.releaseEmulatorSerial(serial) }
+          }
+        }
         deviceSerial = setup.serial
         forwardPort = setup.forwardPort
         apkSha256 = setup.apkSha256
@@ -191,7 +218,6 @@ class ServerCommand : Command {
       }
     }
 
-    val latch = CountDownLatch(1)
     val server =
       PreviewHttpServer(
         repoRoot = repoRoot,
@@ -207,20 +233,13 @@ class ServerCommand : Command {
         deviceSerial = deviceSerial,
         adbForwardPort = forwardPort,
         apkSha256 = apkSha256,
+        ownedEmulatorSerial = devMgr.ownedEmulatorSerial(),
+        onWatchdogHalt = watchdogHaltAction(releaseLaunchedEmulator),
         onProcessExit = { latch.countDown() },
         onLaunchLiveActivity = onLaunchLiveActivity,
       )
-    runningServer = server
+    runningServer.set(server)
     val record = server.start()
-    Runtime.getRuntime()
-      .addShutdownHook(
-        Thread {
-          server.stop(triggerExit = false)
-          recycleExecutor.shutdownNow()
-          releaseLaunchedEmulator()
-          latch.countDown()
-        },
-      )
     out.println(
       """{"ok":true,"pid":${record.pid},"port":${record.port},"backend":"${record.backend}","boardUrl":"${record.boardUrl(ServerPaths.repoHash(repoRoot))}"}""",
     )
@@ -241,5 +260,14 @@ class ServerCommand : Command {
     const val MAX_COMPILES_ENV = "ANDROID_DESIGN_MAX_COMPILES"
     const val COLD_BUDGET_ENV = "ANDROID_DESIGN_WATCHDOG_COLD_MS"
     const val WARM_BUDGET_ENV = "ANDROID_DESIGN_WATCHDOG_WARM_MS"
+
+    /** Releases any managed emulator before `Runtime.halt` skips JVM shutdown hooks. */
+    internal fun watchdogHaltAction(
+      releaseEmulator: () -> Unit,
+      haltProcess: () -> Unit = { Runtime.getRuntime().halt(1) },
+    ): () -> Unit = {
+      runCatching { releaseEmulator() }
+      haltProcess()
+    }
   }
 }

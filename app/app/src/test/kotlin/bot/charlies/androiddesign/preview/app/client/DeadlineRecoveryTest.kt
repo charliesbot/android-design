@@ -242,4 +242,68 @@ class DeadlineRecoveryTest {
       proc.waitFor()
       assertTrue(Files.exists(marker), "a SIGKILL skips the server's emulator cleanup")
     }
+
+  @Test
+  fun `stop sends SIGTERM before SIGKILL and waits past 3s for cleanup on unresponsive server`(
+    @TempDir tmp: Path,
+  ) =
+    withEnv(tmp) { e ->
+      val ready = tmp.resolve("trap-ready")
+      val marker = tmp.resolve("term-cleaned")
+      // Emulates an unresponsive server that needs > 3s to shut down its managed emulator on TERM.
+      val proc =
+        fakeChild(
+          "trap 'sleep 3.3; touch $marker; exit 0' TERM; touch $ready; while true; do sleep 0.1; done",
+        )
+      try {
+        val readyDeadline = System.currentTimeMillis() + 5_000L
+        while (!Files.exists(ready) && System.currentTimeMillis() < readyDeadline) {
+          Thread.sleep(20)
+        }
+        assertTrue(Files.exists(ready), "fake child must install TERM trap before stop")
+        val rec =
+          record(
+            e.identity,
+            e.repo,
+            pid = proc.pid(),
+            port = freePort(),
+            startedAt = System.currentTimeMillis(),
+          )
+        ServerPaths.writeRecord(ServerPaths.sharedRecordPath(e.cache), rec)
+
+        val stopped = e.client.stop(e.repo)
+
+        assertEquals(proc.pid(), stopped?.pid)
+        assertFalse(proc.isAlive)
+        assertTrue(
+          Files.exists(marker),
+          "stop must send SIGTERM and wait past 3s before SIGKILL so emulator cleanup completes",
+        )
+      } finally {
+        proc.destroyForcibly()
+      }
+    }
+
+  @Test
+  fun `serverProcess recognizes a server whose cold device boot took 200 seconds`(
+    @TempDir tmp: Path,
+  ) =
+    withEnv(tmp) { e ->
+      val proc = fakeChild("sleep 30")
+      try {
+        val procStartMs = proc.toHandle().info().startInstant().orElseThrow().toEpochMilli()
+        val rec =
+          record(
+            e.identity,
+            e.repo,
+            pid = proc.pid(),
+            port = freePort(),
+            startedAt = procStartMs + 200_000L,
+          )
+        val handle = e.client.serverProcess(rec)
+        assertEquals(proc.pid(), handle?.pid(), "server taking 200s to boot must be recognized")
+      } finally {
+        proc.destroyForcibly()
+      }
+    }
 }

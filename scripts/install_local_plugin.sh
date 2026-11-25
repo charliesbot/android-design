@@ -14,7 +14,7 @@ VERSION="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["ver
 CACHE_DIR="${ANDROID_DESIGN_CACHE_DIR:-${ANDROID_DESIGN_PREVIEW_CACHE_DIR:-$HOME/.cache/android-design-preview}}/$VERSION"
 
 if [ "${1:-}" != "--skip-build" ]; then
-  (cd "$ROOT/app" && ./gradlew --no-daemon :host:exportBootstrap --console=plain -q)
+  (cd "$ROOT/app" && ./gradlew --no-daemon -Pkotlin.compiler.execution.strategy=in-process :host:exportBootstrap --console=plain -q)
 fi
 rm -f "$CACHE_DIR/android-design-preview.jar"
 mkdir -p "$CACHE_DIR/src"

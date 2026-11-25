@@ -920,4 +920,133 @@ class PreviewHttpServerTest {
       },
     )
   }
+
+  @Test
+  fun `idle timeout stops server even with an open SSE client and broadcasts stopped event`() {
+    val tmp = createTempDirectory("v6-idle-sse-")
+    val cache = tmp.resolve("cache")
+    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
+    val exited = CountDownLatch(1)
+    val server =
+      PreviewHttpServer(
+        repoRoot = repo,
+        cacheRoot = cache,
+        preferredPort = 0,
+        idleTimeoutMs = 300L,
+        worker = fakeWorker(),
+        onProcessExit = { exited.countDown() },
+        enableFileWatcher = false,
+      )
+    val sseExec = Executors.newSingleThreadExecutor()
+    try {
+      val rec = server.start()
+      val sseEvents = CopyOnWriteArrayList<String>()
+      val sseConnected = CountDownLatch(1)
+      val sseConn =
+        URI("http://127.0.0.1:${rec.port}/api/events?view=${rec.viewToken}")
+          .toURL()
+          .openConnection() as HttpURLConnection
+      sseConn.connectTimeout = 2_000
+      sseConn.readTimeout = 3_000
+      sseExec.submit {
+        try {
+          sseConn.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
+            var line = reader.readLine()
+            while (line != null) {
+              if (line.startsWith(": connected")) sseConnected.countDown()
+              sseEvents += line
+              line = reader.readLine()
+            }
+          }
+        } catch (_: Exception) {
+          // Stream closed on server shutdown.
+        }
+      }
+      assertTrue(sseConnected.await(2, TimeUnit.SECONDS), "SSE client must connect")
+      assertTrue(
+        exited.await(3, TimeUnit.SECONDS),
+        "idle timeout must stop server even while an SSE tab is open",
+      )
+      val joined = sseEvents.joinToString("\n")
+      assertTrue("event: stopped" in joined, "expected stopped SSE event before shutdown: $joined")
+      assertTrue("idle_timeout" in joined, "expected idle_timeout reason in SSE event: $joined")
+      sseConn.disconnect()
+    } finally {
+      sseExec.shutdownNow()
+      server.stop()
+      tmp.toFile().deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `idle timeout does not stop server while a check is in flight`() {
+    val tmp = createTempDirectory("v6-idle-inflight-")
+    val cache = tmp.resolve("cache")
+    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
+    val source = repo.resolve("board.explore.kt").also { Files.writeString(it, simpleBoard()) }
+    val compileStarted = CountDownLatch(1)
+    val releaseCompile = CountDownLatch(1)
+    val exited = CountDownLatch(1)
+    val server =
+      PreviewHttpServer(
+        repoRoot = repo,
+        cacheRoot = cache,
+        preferredPort = 0,
+        idleTimeoutMs = 250L,
+        worker =
+          fakeWorker(
+            onCompile = {
+              compileStarted.countDown()
+              releaseCompile.await(5, TimeUnit.SECONDS)
+            },
+          ),
+        onProcessExit = { exited.countDown() },
+        enableFileWatcher = false,
+      )
+    val clientExec = Executors.newSingleThreadExecutor()
+    try {
+      val rec = server.start()
+      val checkFuture =
+        clientExec.submit<Pair<Int, String>> {
+          httpRequest(
+            rec.port,
+            "POST",
+            "/api/check",
+            headers = mapOf("X-Client-Secret" to rec.clientSecret),
+            body =
+              """{"path":"$source","direction":"Editorial","view":"light","repoRoot":"$repo"}""",
+          )
+        }
+      assertTrue(compileStarted.await(2, TimeUnit.SECONDS), "check should be in flight")
+      // Wait longer than idleTimeoutMs while check is still running.
+      assertFalse(
+        exited.await(600, TimeUnit.MILLISECONDS),
+        "idle timeout must not fire while a check is in flight",
+      )
+      releaseCompile.countDown()
+      val (status, body) = checkFuture.get(5, TimeUnit.SECONDS)
+      assertEquals(200, status, body)
+      assertTrue(
+        exited.await(3, TimeUnit.SECONDS),
+        "idle timeout must fire once the check completes and server stays idle",
+      )
+    } finally {
+      releaseCompile.countDown()
+      clientExec.shutdownNow()
+      server.stop()
+      tmp.toFile().deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `ServerCommand watchdogHaltAction releases managed emulator before halting`() {
+    val events = CopyOnWriteArrayList<String>()
+    val action =
+      ServerCommand.watchdogHaltAction(
+        releaseEmulator = { events += "release" },
+        haltProcess = { events += "halt" },
+      )
+    action()
+    assertEquals(listOf("release", "halt"), events)
+  }
 }

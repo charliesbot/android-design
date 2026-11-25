@@ -1,7 +1,12 @@
+import io
 import json
+import os
+import signal
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import preview_app
 
@@ -76,3 +81,147 @@ class PreviewAppTests(unittest.TestCase):
 
             custom_bdir = make_file(tmp, "custom-bdir/server.cp", "-cp\nc.jar\n").parent
             self.assertEqual(preview_app.server_cp({preview_app.BOOTSTRAP_DIR_ENV: str(custom_bdir)}), custom_bdir / "server.cp")
+
+    def test_stop_preview_server_returns_true_on_zero_exit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp) / "work"
+            work.mkdir()
+            cache = Path(tmp) / "cache"
+            with mock.patch.object(
+                preview_app.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess([], 0, "", ""),
+            ) as run_call:
+                stopped = preview_app.stop_preview_server(work, Path("/bin/preview"), cache_dir=cache)
+            self.assertTrue(stopped)
+            self.assertEqual(run_call.call_args.kwargs["timeout"], preview_app.DEFAULT_STOP_TIMEOUT)
+            self.assertGreaterEqual(preview_app.DEFAULT_STOP_TIMEOUT, 45)
+
+    def test_stop_preview_server_falls_back_to_active_json_pid_on_timeout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp) / "work"
+            work.mkdir()
+            cache = Path(tmp) / "cache"
+            make_file(cache, "servers/active.json", json.dumps({"pid": 999999, "port": 49210}))
+            signals = []
+
+            def fake_kill(pid, sig):
+                signals.append((pid, sig))
+                if sig == signal.SIGKILL:
+                    return None
+                if sig == 0 and any(s == signal.SIGKILL for _, s in signals):
+                    raise ProcessLookupError
+                return None
+
+            with mock.patch.object(
+                preview_app.subprocess,
+                "run",
+                side_effect=subprocess.TimeoutExpired(["preview", "stop"], 60),
+            ), mock.patch.object(preview_app.os, "kill", side_effect=fake_kill):
+                stopped = preview_app.stop_preview_server(
+                    work,
+                    Path("/bin/preview"),
+                    cache_dir=cache,
+                    grace_seconds=0.02,
+                    kill_wait_seconds=0.05,
+                    poll_interval=0.005,
+                )
+            self.assertTrue(stopped)
+            self.assertEqual(signals[0], (999999, signal.SIGTERM))
+            self.assertIn((999999, signal.SIGKILL), signals)
+
+    def test_stop_preview_server_rejects_invalid_and_own_pid(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp) / "work"
+            work.mkdir()
+            for bad_pid in (0, -5, True, "1234", os.getpid()):
+                cache = Path(tmp) / f"cache-{bad_pid}"
+                make_file(cache, "servers/active.json", json.dumps({"pid": bad_pid}))
+                with mock.patch.object(
+                    preview_app.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess([], 1, "", "err"),
+                ), mock.patch.object(preview_app.os, "kill") as kill_mock:
+                    stopped = preview_app.stop_preview_server(work, Path("/bin/preview"), cache_dir=cache)
+                self.assertFalse(stopped)
+                kill_mock.assert_not_called()
+
+    def test_stop_preview_server_handles_process_lookup_and_permission_errors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp) / "work"
+            work.mkdir()
+            cache = Path(tmp) / "cache"
+            make_file(cache, "servers/active.json", json.dumps({"pid": 888888}))
+            with mock.patch.object(
+                preview_app.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess([], 1, "", "err"),
+            ), mock.patch.object(preview_app.os, "kill", side_effect=ProcessLookupError):
+                self.assertTrue(preview_app.stop_preview_server(work, Path("/bin/preview"), cache_dir=cache))
+
+            with mock.patch.object(
+                preview_app.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess([], 1, "", "err"),
+            ), mock.patch.object(preview_app.os, "kill", side_effect=PermissionError):
+                self.assertFalse(preview_app.stop_preview_server(work, Path("/bin/preview"), cache_dir=cache))
+
+    def test_preview_server_session_stops_and_cleans_on_normal_and_exception_exit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp) / "work"
+            work.mkdir()
+            stopper = mock.Mock(return_value=True)
+            with preview_app.preview_server_session(
+                work, Path("/bin/preview"), stopper=stopper, environ={}
+            ) as cache_dir:
+                self.assertTrue(cache_dir.is_dir())
+            stopper.assert_called_once()
+            self.assertFalse(cache_dir.exists())
+
+            stopper.reset_mock()
+            created = None
+            with self.assertRaisesRegex(RuntimeError, "boom"):
+                with preview_app.preview_server_session(
+                    work, Path("/bin/preview"), stopper=stopper, environ={}
+                ) as cache_dir:
+                    created = cache_dir
+                    raise RuntimeError("boom")
+            stopper.assert_called_once()
+            self.assertFalse(created.exists())
+
+    def test_preview_server_session_stops_and_cleans_on_sigterm(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp) / "work"
+            work.mkdir()
+            stopper = mock.Mock(return_value=True)
+            created = None
+            with self.assertRaises(SystemExit) as ctx:
+                with preview_app.preview_server_session(
+                    work, Path("/bin/preview"), stopper=stopper, environ={}
+                ) as cache_dir:
+                    created = cache_dir
+                    os.kill(os.getpid(), signal.SIGTERM)
+            self.assertEqual(ctx.exception.code, 128 + signal.SIGTERM)
+            stopper.assert_called_once()
+            self.assertFalse(created.exists())
+
+    def test_preview_server_session_preserves_created_cache_when_stop_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp) / "work"
+            work.mkdir()
+            stopper = mock.Mock(return_value=False)
+            stderr = io.StringIO()
+            with mock.patch("sys.stderr", stderr):
+                with preview_app.preview_server_session(
+                    work, Path("/bin/preview"), stopper=stopper, environ={}
+                ) as cache_dir:
+                    make_file(cache_dir, "servers/active.json", json.dumps({"pid": 424242}))
+            try:
+                stopper.assert_called_once()
+                self.assertTrue(cache_dir.exists())
+                self.assertIn("424242", stderr.getvalue())
+                self.assertIn(str(cache_dir), stderr.getvalue())
+            finally:
+                if cache_dir.exists():
+                    import shutil
+                    shutil.rmtree(cache_dir, ignore_errors=True)

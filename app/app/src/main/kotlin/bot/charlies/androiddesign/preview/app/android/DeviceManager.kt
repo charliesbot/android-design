@@ -48,24 +48,41 @@ object ProcessCommandRunner : ExternalCommandRunner {
     val outThread = Thread {
       stdout = proc.inputStream.bufferedReader(StandardCharsets.UTF_8).readText()
     }
+      .apply { isDaemon = true }
     val errThread = Thread {
       stderr = proc.errorStream.bufferedReader(StandardCharsets.UTF_8).readText()
     }
+      .apply { isDaemon = true }
     outThread.start()
     errThread.start()
-    val finished = proc.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+    val finished =
+      try {
+        proc.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+      } catch (_: InterruptedException) {
+        proc.destroyForcibly()
+        Thread.currentThread().interrupt()
+        return CommandOutput(
+          exitCode = -1,
+          stdout = stdout,
+          stderr = "Command interrupted: ${command.joinToString(" ")}",
+        )
+      }
     if (!finished) {
       proc.destroyForcibly()
-      outThread.join(1_000)
-      errThread.join(1_000)
+      runCatching { outThread.join(1_000) }
+      runCatching { errThread.join(1_000) }
       return CommandOutput(
         exitCode = -1,
         stdout = stdout,
         stderr = "Command timed out: ${command.joinToString(" ")}",
       )
     }
-    outThread.join(5_000)
-    errThread.join(5_000)
+    try {
+      outThread.join(5_000)
+      errThread.join(5_000)
+    } catch (_: InterruptedException) {
+      Thread.currentThread().interrupt()
+    }
     return CommandOutput(proc.exitValue(), stdout, stderr)
   }
 }
@@ -137,6 +154,38 @@ class DeviceManager(
   }
 
   @Volatile private var launched: LaunchedEmulator? = null
+  @Volatile private var released: Boolean = false
+
+  /** Returns the serial of the emulator owned by this manager, if any. */
+  fun ownedEmulatorSerial(): String? = synchronized(this) { launched?.takeIf { it.owned }?.serial }
+
+  /**
+   * Adopts ownership of an already-running emulator booted by a predecessor server so this manager
+   * shuts it down on exit.
+   */
+  fun adoptOwnedEmulator(serial: String) {
+    val trimmed = serial.trim()
+    if (trimmed.isEmpty()) return
+    val shutDownNow =
+      synchronized(this) {
+        if (released) {
+          true
+        } else {
+          if (launched == null) {
+            launched =
+              LaunchedEmulator(avdName = "", process = null).apply {
+                this.serial = trimmed
+                this.owned = true
+              }
+          }
+          false
+        }
+      }
+    if (shutDownNow) shutdownEmulator(trimmed)
+  }
+
+  /** Shuts down a specific emulator serial that was owned by a predecessor server. */
+  fun releaseEmulatorSerial(serial: String): Boolean = shutdownEmulator(serial)
 
   data class DeviceSlot(
     val serial: String,
@@ -181,27 +230,48 @@ class DeviceManager(
     val launchedBefore = launched
     val result = prepareDevice(meta, requestedSerial, requestedAvd, headless, forceReinstall)
     // An emulator this call launched must not outlive its failed setup.
-    if (result is DeviceSetupResult.Failed && launched !== launchedBefore) releaseLaunchedEmulator()
+    if (result is DeviceSetupResult.Failed && launched !== launchedBefore) {
+      releaseLaunchedEmulator(markShuttingDown = false)
+    }
     return result
   }
 
   /**
    * Shuts down the emulator this manager launched: `emu kill` on its serial when it owns that
-   * device, and the launched process itself if it is still running. Devices it did not launch are
-   * never touched. Returns whether anything was stopped.
+   * device, and the launched process tree itself if it is still running. Devices it did not launch
+   * are never touched. Returns whether anything was stopped.
    */
-  fun releaseLaunchedEmulator(): Boolean {
-    val emulator = synchronized(this) { launched.also { launched = null } } ?: return false
+  fun releaseLaunchedEmulator(markShuttingDown: Boolean = true): Boolean {
+    val emulator =
+      synchronized(this) {
+        if (markShuttingDown) released = true
+        launched.also { launched = null }
+      } ?: return false
     var stopped = false
     val serial = emulator.serial
     if (emulator.owned && serial != null) stopped = shutdownEmulator(serial)
     val process = emulator.process
-    if (process != null && process.isAlive) {
-      process.destroy()
-      if (!process.waitFor(EMULATOR_EXIT_WAIT_MS, TimeUnit.MILLISECONDS)) process.destroyForcibly()
+    if (process != null && terminateProcessTree(process)) {
       stopped = true
     }
     return stopped
+  }
+
+  private fun terminateProcessTree(process: Process): Boolean {
+    val descendants = runCatching { process.descendants().toList() }.getOrDefault(emptyList())
+    val wasAlive = process.isAlive || descendants.any { it.isAlive }
+    if (!wasAlive) return false
+    descendants.forEach { runCatching { it.destroy() } }
+    if (process.isAlive) runCatching { process.destroy() }
+    val exited = runCatching {
+      process.waitFor(EMULATOR_EXIT_WAIT_MS, TimeUnit.MILLISECONDS)
+    }
+      .getOrDefault(false)
+    if (!exited) {
+      descendants.forEach { runCatching { if (it.isAlive) it.destroyForcibly() } }
+      runCatching { if (process.isAlive) process.destroyForcibly() }
+    }
+    return true
   }
 
   private fun prepareDevice(
@@ -600,6 +670,7 @@ class DeviceManager(
     headless: Boolean,
     cmdEnv: Map<String, String>,
   ): String? {
+    if (synchronized(this) { released }) return null
     val before = listOnlineDevices(adbBin, cmdEnv).map { it.serial }.toSet()
     // Prefer the SDK emulator with the host GPU: `android emulator start --headless` picks software
     // rendering (lavapipe/SwiftShader), and recent system images never come online that way, and it
@@ -617,7 +688,21 @@ class DeviceManager(
         add("-no-snapshot-save")
         if (headless) add("-no-window")
       }
-      launched = LaunchedEmulator(avdName, launchEmulator(cmd, cmdEnv))
+      if (synchronized(this) { released }) return null
+      val proc = launchEmulator(cmd, cmdEnv)
+      val aborted =
+        synchronized(this) {
+          if (released) {
+            true
+          } else {
+            launched = LaunchedEmulator(avdName, proc)
+            false
+          }
+        }
+      if (aborted) {
+        terminateProcessTree(proc)
+        return null
+      }
     } else if (androidCli != null) {
       val cmd = buildList {
         add(androidCli)
@@ -626,7 +711,16 @@ class DeviceManager(
         if (headless) add("--headless")
         add(avdName)
       }
-      launched = LaunchedEmulator(avdName, process = null)
+      val aborted =
+        synchronized(this) {
+          if (released) {
+            true
+          } else {
+            launched = LaunchedEmulator(avdName, process = null)
+            false
+          }
+        }
+      if (aborted) return null
       val startOut = runner.run(cmd, BOOT_TIMEOUT_MS, cmdEnv)
       if (startOut.exitCode != 0) return null
     } else {
@@ -636,6 +730,7 @@ class DeviceManager(
     val emulator = launched ?: return null
     val deadline = nowMs() + BOOT_WAIT_MS
     while (nowMs() < deadline) {
+      if (released) return null
       val added = listOnlineDevices(adbBin, cmdEnv).filter { it.serial !in before }
       val ours = added.firstOrNull {
         (it.avdName ?: queryAvdName(adbBin, it.serial, cmdEnv)) == avdName

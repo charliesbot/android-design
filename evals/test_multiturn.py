@@ -150,6 +150,21 @@ class MultiTurnTests(unittest.TestCase):
             saved = json.loads((out / 'multiturn-results.json').read_text())
             self.assertEqual(saved['turns_count'], 3)
 
+    def test_run_multiturn_stops_server_on_turn_error_and_respects_env_cache_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'run-err'
+            env_cache = Path(tmp) / 'env-cache'
+            with mock.patch.dict('os.environ', {'ANDROID_DESIGN_CACHE_DIR': str(env_cache)}), \
+                    mock.patch.object(multiturn, 'execute', side_effect=RuntimeError('turn 1 boom')), \
+                    mock.patch.object(multiturn.eval_run, '_stop_preview_server', return_value=True) as stopper:
+                with self.assertRaisesRegex(RuntimeError, 'turn 1 boom'):
+                    multiturn.run_multiturn(
+                        out, max_turns=2, binary='/tmp/bin', src='/tmp/app', bdir='/tmp/bdir',
+                    )
+            stopper.assert_called_once()
+            self.assertEqual(stopper.call_args.kwargs['cache_dir'], env_cache.resolve())
+            self.assertTrue(env_cache.is_dir())
+
 
 if __name__ == '__main__':
     unittest.main()
