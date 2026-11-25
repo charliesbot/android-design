@@ -830,6 +830,11 @@ class RenderQueue(
             if (!keepExistingPng && (frameFormat != FrameFormat.NONE || prev == null)) {
               current.store(artifact, renderKey)
             }
+            // A render error is not shared either: the next request must render again.
+            if (artifact.check.isRenderError) {
+              val inFlight = current.renderFutures[renderKey]
+              if (inFlight?.future === future) current.renderFutures.remove(renderKey, inFlight)
+            }
           }
         }
         try {

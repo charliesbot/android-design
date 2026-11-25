@@ -108,4 +108,83 @@ class RenderQueueErrorCacheTest {
       root.toFile().deleteRecursively()
     }
   }
+
+  @Test
+  fun `a single render that failed on the device renders again on the next request`() {
+    val root = createTempDirectory("queue-single-error-")
+    val repo = root.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
+    val source = repo.resolve("design/proposal.explore.kt")
+    Files.createDirectories(source.parent)
+    Files.writeString(source, "val x = 1\n")
+
+    val calls = AtomicInteger(0)
+    val worker =
+      InMemoryRenderWorker(
+        batchOverride = { _, deviceTargets, _ ->
+          val t = deviceTargets.single()
+          val failing = calls.incrementAndGet() == 1
+          WorkerBatchResult(
+            ok = true,
+            targets =
+              listOf(
+                WorkerTargetOutput(
+                  direction = t.direction,
+                  screen = t.screen,
+                  viewName = t.viewName,
+                  overlayId = t.overlayId,
+                  tree =
+                    if (failing) null
+                    else
+                      LayoutTree(
+                        t.screen,
+                        Views.Light,
+                        nodes = emptyList(),
+                        findings = emptyList(),
+                      ),
+                  frame =
+                    if (failing) null
+                    else
+                      WorkerFrame(
+                        bytes = InMemoryRenderWorker.PNG_SIGNATURE + t.viewName.toByteArray(),
+                        mime = "image/png",
+                        isPng = true,
+                      ),
+                  error =
+                    if (failing) "Timed out waiting for HostRenderActivity on Display 0" else null,
+                ),
+              ),
+          )
+        },
+      )
+    val queue = RenderQueue(rendersRoot = root.resolve("renders"), executor = CheckExecutor(worker))
+    queue.start()
+    try {
+      val entry =
+        queue
+          .submitCompile(repo, ContentHasher.snapshot(source), QueuePriority.AGENT)
+          .get(10, TimeUnit.SECONDS)
+      fun render() =
+        queue
+          .submitSingleRender(
+            entry = entry,
+            direction = "A",
+            screenId = "home",
+            prefix = "A-home",
+            overlayId = null,
+            view = Views.Light,
+            densityScale = 2,
+            baseCheck = null,
+            priority = QueuePriority.AGENT,
+          )
+          .get(10, TimeUnit.SECONDS)
+
+      assertTrue(render().check.isRenderError)
+      val second = render()
+      assertEquals(2, calls.get(), "a render error must not be shared with the next request")
+      assertTrue(second.check.errors.isEmpty(), "the rerun must replace the failure")
+    } finally {
+      queue.stop()
+      root.toFile().deleteRecursively()
+    }
+  }
 }
