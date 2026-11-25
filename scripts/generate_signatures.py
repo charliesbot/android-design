@@ -375,7 +375,7 @@ def render_markdown(require_wear_cache: bool = False) -> str:
         "AppBarWithSearch(state = searchState, inputField = { ... })",
         "",
         "// Sheets, Scrim, Carousels & Tooltips",
-        "BottomSheet(state = rememberBottomSheetState(initialValue = SheetValue.Expanded), onDismissRequest = {}) { ... } // static non-modal; modal: ModalBottomSheet(...)",
+        "BottomSheet(state = rememberBottomSheetState(initialValue = SheetValue.Expanded), onDismissRequest = {}) { ... } // static non-modal; place it after Scrim as a sibling filling the screen, never Modifier.align(Alignment.BottomCenter) (it offsets itself to the bottom, so aligning pushes it offscreen); modal: ModalBottomSheet(...)",
         "Scrim(contentDescription = \"Dismiss\", onClick = {}, alpha = { 0.32f })",
         "HorizontalCenteredHeroCarousel(state = rememberCarouselState { n }, preferredItemWidth = 220.dp, itemSpacing = CarouselDefaults.ItemSpacing, contentPadding = CarouselDefaults.ContentPadding) { i -> ... } // preferredItemWidth replaces maxItemWidth; also HorizontalMultiBrowseCarousel, HorizontalUncontainedCarousel",
         "TooltipBox(positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above), tooltip = { PlainTooltip(caretShape = TooltipDefaults.caretShape()) { Text(\"...\") } }, state = rememberTooltipState()) { ... } // or RichTooltip",
