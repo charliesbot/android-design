@@ -455,6 +455,26 @@ class DeviceManager(
       ADB_SHORT_TIMEOUT_MS,
       cmdEnv,
     )
+    // The system can destroy the backgrounded HostRenderActivity mid-batch, and the :sandbox
+    // foreground service must then relaunch it. A foreground service alone does not exempt that
+    // launch from background activity launch restrictions; this grant does
+    // (BAL_ALLOW_SAW_PERMISSION). The host never draws an overlay.
+    runner.run(
+      listOf(
+        adbBin,
+        "-s",
+        chosenSerial,
+        "shell",
+        "cmd",
+        "appops",
+        "set",
+        HOST_PACKAGE,
+        "SYSTEM_ALERT_WINDOW",
+        "allow",
+      ),
+      ADB_SHORT_TIMEOUT_MS,
+      cmdEnv,
+    )
 
     val forwardPort =
       ensureAdbForward(adbBin, chosenSerial, cmdEnv)

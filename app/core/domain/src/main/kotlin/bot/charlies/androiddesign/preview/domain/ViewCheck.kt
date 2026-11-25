@@ -53,6 +53,10 @@ private constructor(
   val pass: Boolean
     get() = checkNotNull(verdict) { "this entry repeats the view '$same'; read that one" }
 
+  /** Whether the render threw ([RENDER_ERROR]) instead of producing a layout to check. */
+  val isRenderError: Boolean
+    get() = errors.any { it.rule == RENDER_ERROR }
+
   /**
    * The verdict on a render of a screen with an overlay open, given [base], the verdict on the same
    * screen at the same view without it: only the errors and notes [base] does not already report,
