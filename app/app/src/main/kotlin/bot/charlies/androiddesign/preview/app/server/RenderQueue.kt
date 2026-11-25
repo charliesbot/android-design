@@ -142,6 +142,19 @@ class RenderQueue(
     @Volatile var compiled: CompileEntry? = null
     val renderFutures = ConcurrentHashMap<RenderKey, InFlightRender>()
     val rendered = ConcurrentHashMap<RenderKey, RenderArtifact>()
+
+    /**
+     * Caches [art] under its [RenderKey]. A render error is never cached: it may come from the
+     * device (a dead host activity, a timeout) rather than the board, so the next request must
+     * render again instead of repeating it until the server restarts.
+     */
+    fun store(
+      art: RenderArtifact,
+      key: RenderKey =
+        RenderKey(art.direction, art.screen, art.overlay, art.view.name, art.densityScale),
+    ) {
+      if (!art.check.isRenderError) rendered[key] = art
+    }
   }
 
   private val queue = PriorityBlockingQueue<QueueJob>()
@@ -442,17 +455,7 @@ class RenderQueue(
             synchronized(cacheLock) {
               val current = cachesByFile[key]
               if (current != null && current.contentHash == entry.contentHash) {
-                for (art in artifacts) {
-                  val rk =
-                    RenderKey(
-                      art.direction,
-                      art.screen,
-                      art.overlay,
-                      art.view.name,
-                      art.densityScale,
-                    )
-                  current.rendered[rk] = art
-                }
+                artifacts.forEach(current::store)
               }
             }
             for (art in artifacts) {
@@ -538,17 +541,7 @@ class RenderQueue(
             synchronized(cacheLock) {
               val current = cachesByFile[key]
               if (current != null && current.contentHash == entry.contentHash) {
-                for (art in artifacts) {
-                  val rk =
-                    RenderKey(
-                      art.direction,
-                      art.screen,
-                      art.overlay,
-                      art.view.name,
-                      art.densityScale,
-                    )
-                  current.rendered[rk] = art
-                }
+                artifacts.forEach(current::store)
               }
             }
             for (art in artifacts) {
@@ -835,7 +828,7 @@ class RenderQueue(
                 prev.pngBytes != null &&
                 prev.pngBytes.isNotEmpty()
             if (!keepExistingPng && (frameFormat != FrameFormat.NONE || prev == null)) {
-              current.rendered[renderKey] = artifact
+              current.store(artifact, renderKey)
             }
           }
         }

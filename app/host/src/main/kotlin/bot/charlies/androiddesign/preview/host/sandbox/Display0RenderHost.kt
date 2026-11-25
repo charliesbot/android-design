@@ -93,6 +93,12 @@ internal class Display0RenderHost(
     }
   }
 
+  /**
+   * Starts [HostRenderActivity] when it is not running, including after the system destroyed it in
+   * the background mid-batch. This launch comes from a background foreground service, so it relies
+   * on the `SYSTEM_ALERT_WINDOW` app op that `DeviceManager` grants at device setup; without it
+   * Android blocks the launch and the wait below times out.
+   */
   private fun ensureDisplay0ActivityHost() {
     if (HostRenderActivity.current() != null) return
     HostRenderActivity.resetLatch()

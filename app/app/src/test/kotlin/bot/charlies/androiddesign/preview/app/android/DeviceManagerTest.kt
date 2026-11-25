@@ -128,6 +128,13 @@ class DeviceManagerTest {
         "cmd appops set ${DeviceManager.HOST_PACKAGE} RUN_ANY_IN_BACKGROUND allow" in it
       },
     )
+    // The :sandbox service relaunches HostRenderActivity from the background after the system
+    // destroys it; without this grant Android blocks the launch (BAL_BLOCK).
+    assertTrue(
+      joinedAll.any {
+        "cmd appops set ${DeviceManager.HOST_PACKAGE} SYSTEM_ALERT_WINDOW allow" in it
+      },
+    )
     assertTrue(joinedAll.any { "forward tcp:18999 localabstract:adp-render-sandbox" in it })
     assertTrue(
       joinedAll.any {
