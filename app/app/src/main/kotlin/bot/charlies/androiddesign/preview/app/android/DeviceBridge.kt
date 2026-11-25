@@ -4,6 +4,7 @@ import bot.charlies.androiddesign.preview.domain.image.FastPngEncoder
 import bot.charlies.androiddesign.preview.model.DeviceAckResponse
 import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
 import bot.charlies.androiddesign.preview.model.DeviceBatchResponse
+import bot.charlies.androiddesign.preview.model.DeviceBatchWireResult
 import bot.charlies.androiddesign.preview.model.DeviceHasAssetsRequest
 import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
@@ -18,7 +19,15 @@ import java.io.DataOutputStream
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.serialization.SerializationException
 import net.jpountz.lz4.LZ4Factory
 
@@ -68,6 +77,12 @@ interface DeviceTransport : AutoCloseable {
 }
 
 object FrameCodec {
+  private const val MAX_DECODE_THREADS = 8
+  private const val DECODE_THREAD_KEEP_ALIVE_SECONDS = 30L
+
+  internal val DEFAULT_DECODE_PARALLELISM: Int =
+    Runtime.getRuntime().availableProcessors().coerceIn(1, MAX_DECODE_THREADS)
+
   private val lz4Decompressor by lazy { LZ4Factory.fastestInstance().fastDecompressor() }
 
   /**
@@ -89,24 +104,169 @@ object FrameCodec {
     lz4Decompressor.decompress(lz4Payload, 0, rgba, 0, rawLength)
     return FastPngEncoder.encodeFast(widthPx, heightPx, rgba)
   }
+
+  internal fun decodeWireFrame(frame: DeviceWireFrame): DecodedDeviceFrame {
+    val key =
+      FrameKey(
+        direction = frame.direction,
+        screen = frame.screen,
+        overlayId = frame.overlayId,
+        viewName = frame.viewName,
+        isEndFrame = frame.isEndFrame,
+      )
+    return when (frame.format) {
+      FrameFormat.LZ4_RGBA -> {
+        val png =
+          decodeLz4ToPng(
+            widthPx = frame.widthPx,
+            heightPx = frame.heightPx,
+            rawLength = frame.rawLength,
+            lz4Payload = frame.payload,
+          )
+        DecodedDeviceFrame(
+          key = key,
+          format = frame.format,
+          widthPx = frame.widthPx,
+          heightPx = frame.heightPx,
+          pngBytes = png,
+          imageBytes = png,
+          imageMime = "image/png",
+        )
+      }
+      FrameFormat.WEBP_LOSSLESS ->
+        DecodedDeviceFrame(
+          key = key,
+          format = frame.format,
+          widthPx = frame.widthPx,
+          heightPx = frame.heightPx,
+          pngBytes = null,
+          imageBytes = frame.payload,
+          imageMime = "image/webp",
+        )
+      FrameFormat.NONE ->
+        DecodedDeviceFrame(
+          key = key,
+          format = frame.format,
+          widthPx = frame.widthPx,
+          heightPx = frame.heightPx,
+          pngBytes = null,
+          imageBytes = ByteArray(0),
+          imageMime = "application/octet-stream",
+        )
+    }
+  }
+
+  /**
+   * Decodes a batch of wire frames into a map preserving wire order. Batches with fewer than two
+   * [FrameFormat.LZ4_RGBA] frames decode directly on the calling thread with no executor overhead;
+   * larger batches decode LZ4 frames in parallel on the supplied executor.
+   */
+  internal fun decodeWireFrames(
+    wireFrames: List<DeviceWireFrame>,
+    executorProvider: () -> ExecutorService,
+    maxParallelism: Int = DEFAULT_DECODE_PARALLELISM,
+    decoder: (DeviceWireFrame) -> DecodedDeviceFrame = ::decodeWireFrame,
+  ): Map<FrameKey, DecodedDeviceFrame> {
+    if (wireFrames.isEmpty()) return emptyMap()
+    val lz4Count = wireFrames.count { it.format == FrameFormat.LZ4_RGBA }
+    if (lz4Count < 2 || maxParallelism <= 1) {
+      val frames = LinkedHashMap<FrameKey, DecodedDeviceFrame>(wireFrames.size)
+      for (frame in wireFrames) {
+        val decoded = decoder(frame)
+        frames[decoded.key] = decoded
+      }
+      return frames
+    }
+
+    val executor = executorProvider()
+    val futures = arrayOfNulls<Future<DecodedDeviceFrame>>(wireFrames.size)
+    try {
+      for (i in wireFrames.indices) {
+        val frame = wireFrames[i]
+        if (frame.format == FrameFormat.LZ4_RGBA) {
+          futures[i] = executor.submit(Callable { decoder(frame) })
+        }
+      }
+      val frames = LinkedHashMap<FrameKey, DecodedDeviceFrame>(wireFrames.size)
+      for (i in wireFrames.indices) {
+        val future = futures[i]
+        val decoded = future?.get() ?: decoder(wireFrames[i])
+        frames[decoded.key] = decoded
+      }
+      return frames
+    } catch (e: ExecutionException) {
+      cancelAll(futures)
+      throw e.cause ?: e
+    } catch (e: InterruptedException) {
+      cancelAll(futures)
+      Thread.currentThread().interrupt()
+      throw e
+    } catch (t: Throwable) {
+      cancelAll(futures)
+      throw t
+    }
+  }
+
+  internal fun createDecodeExecutor(maxThreads: Int): ExecutorService {
+    val bounded = maxThreads.coerceAtLeast(1)
+    val threadCounter = AtomicInteger(1)
+    return ThreadPoolExecutor(
+        bounded,
+        bounded,
+        DECODE_THREAD_KEEP_ALIVE_SECONDS,
+        TimeUnit.SECONDS,
+        LinkedBlockingQueue(),
+      ) { runnable ->
+        Thread(runnable, "device-frame-decode-${threadCounter.getAndIncrement()}").apply {
+          isDaemon = true
+        }
+      }
+      .apply { allowCoreThreadTimeOut(true) }
+  }
+
+  private fun cancelAll(futures: Array<Future<DecodedDeviceFrame>?>) {
+    for (future in futures) {
+      future?.cancel(true)
+    }
+  }
 }
 
 /**
  * Persistent keep-alive TCP bridge speaking `DeviceOp` via [DeviceWireCodec] to
  * `RenderForegroundService` over `adb forward` on `127.0.0.1:<port>`.
  */
-class AdbTcpDeviceTransport(
-  private val host: String = "127.0.0.1",
+class AdbTcpDeviceTransport
+internal constructor(
+  private val host: String,
   private val connectAndEnsurePort: () -> Int,
   private val restartSandboxActivity: () -> Unit,
+  private val decodeParallelism: Int,
+  private val decodeExecutorFactory: (Int) -> ExecutorService,
+  private val wireFrameDecoder: (DeviceWireFrame) -> DecodedDeviceFrame,
 ) : DeviceTransport {
+  constructor(
+    host: String = "127.0.0.1",
+    connectAndEnsurePort: () -> Int,
+    restartSandboxActivity: () -> Unit,
+  ) : this(
+    host = host,
+    connectAndEnsurePort = connectAndEnsurePort,
+    restartSandboxActivity = restartSandboxActivity,
+    decodeParallelism = FrameCodec.DEFAULT_DECODE_PARALLELISM,
+    decodeExecutorFactory = FrameCodec::createDecodeExecutor,
+    wireFrameDecoder = FrameCodec::decodeWireFrame,
+  )
+
   private val lock = Any()
+  private val decodeExecutorLock = Any()
   private var socket: Socket? = null
   private var output: DataOutputStream? = null
   private var input: DataInputStream? = null
   private var activePort: Int = -1
   private var lastSandboxPid: Int = -1
   private val preloadedDexHashes = ConcurrentHashMap.newKeySet<String>()
+  private var decodeExecutor: ExecutorService? = null
+  private var closed: Boolean = false
 
   override fun ping(): DevicePingResponse =
     synchronized(lock) {
@@ -172,38 +332,49 @@ class AdbTcpDeviceTransport(
     entryClass: String,
     dexBytes: ByteArray?,
     request: DeviceBatchRequest,
-  ): DeviceBatchExecution =
-    synchronized(lock) {
-      val readTimeout = maxOf(request.timeoutMs + 10_000L, DEFAULT_READ_TIMEOUT_MS.toLong()).toInt()
-      var sendDex =
-        if (dexBytes != null && (request.forceNewClassLoader || dexHash !in preloadedDexHashes)) {
-          dexBytes
-        } else {
-          null
-        }
-      var result =
-        withReconnect(allowRetry = dexBytes != null, readTimeoutMs = readTimeout) { out, inp ->
-          sendRenderBatchOnce(out, inp, sendDex, entryClass, request)
-        }
-      val errText = result.response.error.orEmpty()
-      if (
-        !result.response.ok && "not preloaded" in errText && dexBytes != null && sendDex == null
-      ) {
-        sendDex = dexBytes
-        result =
-          withReconnect(allowRetry = true, readTimeoutMs = readTimeout) { out, inp ->
+  ): DeviceBatchExecution {
+    val wireResult =
+      synchronized(lock) {
+        val readTimeout =
+          maxOf(request.timeoutMs + 10_000L, DEFAULT_READ_TIMEOUT_MS.toLong()).toInt()
+        var sendDex =
+          if (dexBytes != null && (request.forceNewClassLoader || dexHash !in preloadedDexHashes)) {
+            dexBytes
+          } else {
+            null
+          }
+        var result =
+          withReconnect(allowRetry = dexBytes != null, readTimeoutMs = readTimeout) { out, inp ->
             sendRenderBatchOnce(out, inp, sendDex, entryClass, request)
           }
+        val errText = result.response.error.orEmpty()
+        if (
+          !result.response.ok && "not preloaded" in errText && dexBytes != null && sendDex == null
+        ) {
+          sendDex = dexBytes
+          result =
+            withReconnect(allowRetry = true, readTimeoutMs = readTimeout) { out, inp ->
+              sendRenderBatchOnce(out, inp, sendDex, entryClass, request)
+            }
+        }
+        if (result.response.ok) {
+          preloadedDexHashes.add(dexHash)
+        }
+        if (result.response.recycleReason == "watchdog_timeout") {
+          closeSocketQuietly()
+          preloadedDexHashes.clear()
+        }
+        result
       }
-      if (result.response.ok) {
-        preloadedDexHashes.add(dexHash)
-      }
-      if (result.response.recycleReason == "watchdog_timeout") {
-        closeSocketQuietly()
-        preloadedDexHashes.clear()
-      }
-      result
-    }
+    val frames =
+      FrameCodec.decodeWireFrames(
+        wireFrames = wireResult.frames,
+        executorProvider = ::getOrCreateDecodeExecutor,
+        maxParallelism = decodeParallelism,
+        decoder = wireFrameDecoder,
+      )
+    return DeviceBatchExecution(wireResult.response, frames)
+  }
 
   override fun setLive(dexBytes: ByteArray?, request: DeviceLiveStateRequest): Boolean =
     synchronized(lock) {
@@ -243,7 +414,19 @@ class AdbTcpDeviceTransport(
 
   override fun close() {
     synchronized(lock) { closeSocketQuietly() }
+    val executor =
+      synchronized(decodeExecutorLock) {
+        closed = true
+        decodeExecutor.also { decodeExecutor = null }
+      }
+    executor?.shutdown()
   }
+
+  private fun getOrCreateDecodeExecutor(): ExecutorService =
+    synchronized(decodeExecutorLock) {
+      check(!closed) { "AdbTcpDeviceTransport is closed" }
+      decodeExecutor ?: decodeExecutorFactory(decodeParallelism).also { decodeExecutor = it }
+    }
 
   private fun sendRenderBatchOnce(
     out: DataOutputStream,
@@ -251,66 +434,9 @@ class AdbTcpDeviceTransport(
     dexBytes: ByteArray?,
     entryClass: String,
     request: DeviceBatchRequest,
-  ): DeviceBatchExecution {
+  ): DeviceBatchWireResult {
     DeviceWireCodec.writeRenderBatchRequest(out, dexBytes, entryClass, request)
-    val wireResult = DeviceWireCodec.readRenderBatchResponse(inp)
-    val frames = LinkedHashMap<FrameKey, DecodedDeviceFrame>(wireResult.frames.size)
-    for (frame in wireResult.frames) {
-      val decoded = decodeWireFrame(frame)
-      frames[decoded.key] = decoded
-    }
-    return DeviceBatchExecution(wireResult.response, frames)
-  }
-
-  private fun decodeWireFrame(frame: DeviceWireFrame): DecodedDeviceFrame {
-    val key =
-      FrameKey(
-        direction = frame.direction,
-        screen = frame.screen,
-        overlayId = frame.overlayId,
-        viewName = frame.viewName,
-        isEndFrame = frame.isEndFrame,
-      )
-    return when (frame.format) {
-      FrameFormat.LZ4_RGBA -> {
-        val png =
-          FrameCodec.decodeLz4ToPng(
-            widthPx = frame.widthPx,
-            heightPx = frame.heightPx,
-            rawLength = frame.rawLength,
-            lz4Payload = frame.payload,
-          )
-        DecodedDeviceFrame(
-          key = key,
-          format = frame.format,
-          widthPx = frame.widthPx,
-          heightPx = frame.heightPx,
-          pngBytes = png,
-          imageBytes = png,
-          imageMime = "image/png",
-        )
-      }
-      FrameFormat.WEBP_LOSSLESS ->
-        DecodedDeviceFrame(
-          key = key,
-          format = frame.format,
-          widthPx = frame.widthPx,
-          heightPx = frame.heightPx,
-          pngBytes = null,
-          imageBytes = frame.payload,
-          imageMime = "image/webp",
-        )
-      FrameFormat.NONE ->
-        DecodedDeviceFrame(
-          key = key,
-          format = frame.format,
-          widthPx = frame.widthPx,
-          heightPx = frame.heightPx,
-          pngBytes = null,
-          imageBytes = ByteArray(0),
-          imageMime = "application/octet-stream",
-        )
-    }
+    return DeviceWireCodec.readRenderBatchResponse(inp)
   }
 
   private fun sendSetLiveOnce(
