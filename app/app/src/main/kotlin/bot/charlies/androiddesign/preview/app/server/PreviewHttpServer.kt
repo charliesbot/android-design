@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -716,14 +717,14 @@ class PreviewHttpServer(
           ?: state.currentFocus?.screen
           ?: entry.boardMeta.directions.firstOrNull { it.name == dir }?.startScreen
       val ov = req.overlay ?: state.currentFocus?.overlay
-      pendingLiveUpdate.set(null)
-      executor.updateLive(
+      runLiveUpdateSync(
         entry = entry,
-        LivePreviewUpdate(
-          direction = dir,
-          screenId = screen,
-          overlayId = ov,
-        ),
+        update =
+          LivePreviewUpdate(
+            direction = dir,
+            screenId = screen,
+            overlayId = ov,
+          ),
       )
     }
     if (req.launchActivity) {
@@ -1480,6 +1481,28 @@ class PreviewHttpServer(
           }
         if (kept.size == rec.timeouts.size) rec else rec.copy(timeouts = kept, haltedAt = null)
       }
+    }
+  }
+
+  private fun runLiveUpdateSync(entry: CompileEntry, update: LivePreviewUpdate) {
+    if (closed.get() || replacementSignal.isDone) return
+    pendingLiveUpdate.set(null)
+    val future =
+      try {
+        liveUpdateExecutor.submit {
+          if (closed.get() || replacementSignal.isDone) return@submit
+          executor.updateLive(entry, update)
+        }
+      } catch (_: RejectedExecutionException) {
+        return
+      }
+    try {
+      future.get()
+    } catch (e: ExecutionException) {
+      throw e.cause ?: e
+    } catch (e: InterruptedException) {
+      Thread.currentThread().interrupt()
+      throw e
     }
   }
 

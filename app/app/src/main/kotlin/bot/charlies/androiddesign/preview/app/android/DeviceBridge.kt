@@ -265,6 +265,7 @@ internal constructor(
   private var activePort: Int = -1
   private var lastSandboxPid: Int = -1
   private val preloadedDexHashes = ConcurrentHashMap.newKeySet<String>()
+  private val syncedAssetHashes = ConcurrentHashMap.newKeySet<String>()
   private var decodeExecutor: ExecutorService? = null
   private var closed: Boolean = false
 
@@ -308,21 +309,34 @@ internal constructor(
   override fun syncAssets(assetBlobs: Map<String, ByteArray>): Int {
     if (assetBlobs.isEmpty()) return 0
     return synchronized(lock) {
-      val missingHashes =
+      if (assetBlobs.keys.all { it in syncedAssetHashes }) return@synchronized 0
+      try {
         withReconnect(allowRetry = true) { out, inp ->
+          val unsynced = assetBlobs.filterKeys { it !in syncedAssetHashes }
+          if (unsynced.isEmpty()) return@withReconnect 0
           DeviceWireCodec.writeHasAssetsRequest(
             out,
-            DeviceHasAssetsRequest(assetBlobs.keys.toList()),
+            DeviceHasAssetsRequest(unsynced.keys.toList()),
           )
-          DeviceWireCodec.readHasAssetsResponse(inp).missing
+          val missingHashes = DeviceWireCodec.readHasAssetsResponse(inp).missing
+          val toSend = missingHashes.mapNotNull { h -> unsynced[h]?.let { b -> h to b } }
+          val uploaded =
+            if (toSend.isEmpty()) {
+              0
+            } else {
+              DeviceWireCodec.writePutAssetsRequest(out, toSend)
+              val ack = DeviceWireCodec.readAck(inp)
+              if (!ack.ok) {
+                throw IOException(ack.error ?: "PUT_ASSETS failed")
+              }
+              toSend.size
+            }
+          syncedAssetHashes.addAll(unsynced.keys)
+          uploaded
         }
-      if (missingHashes.isEmpty()) return@synchronized 0
-      val toSend = missingHashes.mapNotNull { h -> assetBlobs[h]?.let { b -> h to b } }
-      if (toSend.isEmpty()) return@synchronized 0
-      withReconnect(allowRetry = true) { out, inp ->
-        DeviceWireCodec.writePutAssetsRequest(out, toSend)
-        DeviceWireCodec.readAck(inp)
-        toSend.size
+      } catch (t: Throwable) {
+        syncedAssetHashes.clear()
+        throw t
       }
     }
   }
@@ -362,7 +376,7 @@ internal constructor(
         }
         if (result.response.recycleReason == "watchdog_timeout") {
           closeSocketQuietly()
-          preloadedDexHashes.clear()
+          clearSandboxCaches()
         }
         result
       }
@@ -406,14 +420,17 @@ internal constructor(
           false
         } finally {
           closeSocketQuietly()
-          preloadedDexHashes.clear()
+          clearSandboxCaches()
         }
       restartSandboxActivity()
       ack
     }
 
   override fun close() {
-    synchronized(lock) { closeSocketQuietly() }
+    synchronized(lock) {
+      closeSocketQuietly()
+      clearSandboxCaches()
+    }
     val executor =
       synchronized(decodeExecutorLock) {
         closed = true
@@ -467,7 +484,7 @@ internal constructor(
         lastErr = e
         closeSocketQuietly()
         if (!allowRetry || attempt >= 2) break
-        preloadedDexHashes.clear()
+        clearSandboxCaches()
         restartSandboxActivity()
       }
     }
@@ -495,9 +512,14 @@ internal constructor(
 
   private fun noteSandboxPid(pid: Int) {
     if (pid > 0 && pid != lastSandboxPid) {
-      if (lastSandboxPid > 0) preloadedDexHashes.clear()
+      if (lastSandboxPid > 0) clearSandboxCaches()
       lastSandboxPid = pid
     }
+  }
+
+  private fun clearSandboxCaches() {
+    preloadedDexHashes.clear()
+    syncedAssetHashes.clear()
   }
 
   private fun closeSocketQuietly() {

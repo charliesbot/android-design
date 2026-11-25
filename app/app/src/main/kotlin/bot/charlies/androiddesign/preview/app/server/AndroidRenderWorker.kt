@@ -13,7 +13,6 @@ import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
 import bot.charlies.androiddesign.preview.model.ThemeOverride
 import bot.charlies.androiddesign.preview.model.ValidationError
 import java.nio.file.Path
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -34,7 +33,6 @@ class AndroidRenderWorker(
   private data class PendingRecycle(val reason: String?)
 
   private val pendingRecycle = AtomicReference<PendingRecycle?>(null)
-  private val syncedAssetHashes = ConcurrentHashMap.newKeySet<String>()
 
   override fun compile(snapshot: ContentHasher.Snapshot): WorkerCompileResult =
     when (
@@ -56,13 +54,7 @@ class AndroidRenderWorker(
         )
       is AndroidCompileOutcome.Success -> {
         val compiled = outcome.compiled
-        val preload =
-          try {
-            transport.preloadDex(compiled.dexHash, compiled.entryClass, compiled.dexBytes)
-          } catch (t: Throwable) {
-            syncedAssetHashes.clear()
-            throw t
-          }
+        val preload = transport.preloadDex(compiled.dexHash, compiled.entryClass, compiled.dexBytes)
         val boardMeta = preload.boardMeta
         if (!preload.ok || boardMeta == null) {
           val errMsg = preload.error ?: "Host APK PRELOAD_DEX returned no board metadata"
@@ -75,7 +67,9 @@ class AndroidRenderWorker(
             dexHash = compiled.dexHash,
           )
         } else {
-          syncMissingAssets(compiled.assetBlobs)
+          if (compiled.assetBlobs.isNotEmpty()) {
+            transport.syncAssets(compiled.assetBlobs)
+          }
           val androidData =
             AndroidCompiledData(
               sourceFile = compiled.sourceFile,
@@ -112,11 +106,7 @@ class AndroidRenderWorker(
     val resp = exec.response
     if (resp.recycleReason == "watchdog_timeout") {
       pendingRecycle.set(null)
-      syncedAssetHashes.clear()
       throw SandboxWatchdogException(resp.error ?: "Render timed out on :sandbox")
-    }
-    if (!resp.ok) {
-      syncedAssetHashes.clear()
     }
     if (resp.recycleRecommended) {
       pendingRecycle.set(PendingRecycle(resp.recycleReason))
@@ -152,59 +142,37 @@ class AndroidRenderWorker(
 
   override fun updateLive(entry: CompileEntry, update: LivePreviewUpdate) {
     val data = entry.androidData ?: return
-    syncMissingAssets(data.assetBlobs)
-    val ok =
-      try {
-        transport.setLive(
-          dexBytes = data.dexBytes,
-          request =
-            DeviceLiveStateRequest(
-              dexHash = data.dexHash,
-              entryClass = data.entryClass,
-              sourceFile = data.sourceFile,
-              designTheme = entry.loaded.designTheme,
-              assetMap = data.assetMap,
-              direction = update.direction,
-              screen = update.screenId,
-              overlayId = update.overlayId,
-              darkOverride = update.darkOverride,
-              seedOverride = update.seedOverride,
-              variantOverride = update.variantOverride,
-              fontScale = update.fontScale,
-            ),
-        )
-      } catch (t: Throwable) {
-        syncedAssetHashes.clear()
-        throw t
-      }
-    if (!ok) {
-      syncedAssetHashes.clear()
+    if (data.assetBlobs.isNotEmpty()) {
+      transport.syncAssets(data.assetBlobs)
     }
+    transport.setLive(
+      dexBytes = data.dexBytes,
+      request =
+        DeviceLiveStateRequest(
+          dexHash = data.dexHash,
+          entryClass = data.entryClass,
+          sourceFile = data.sourceFile,
+          designTheme = entry.loaded.designTheme,
+          assetMap = data.assetMap,
+          direction = update.direction,
+          screen = update.screenId,
+          overlayId = update.overlayId,
+          darkOverride = update.darkOverride,
+          seedOverride = update.seedOverride,
+          variantOverride = update.variantOverride,
+          fontScale = update.fontScale,
+        ),
+    )
   }
 
   override fun finishCheck() {
     val pending = pendingRecycle.getAndSet(null) ?: return
-    syncedAssetHashes.clear()
     onRecycleRecommended(pending.reason)
   }
 
   override fun close() {
     pendingRecycle.set(null)
-    syncedAssetHashes.clear()
     transport.close()
-  }
-
-  private fun syncMissingAssets(assetBlobs: Map<String, ByteArray>) {
-    if (assetBlobs.isEmpty()) return
-    val unsynced = assetBlobs.filterKeys { it !in syncedAssetHashes }
-    if (unsynced.isEmpty()) return
-    try {
-      transport.syncAssets(unsynced)
-      syncedAssetHashes.addAll(unsynced.keys)
-    } catch (t: Throwable) {
-      syncedAssetHashes.clear()
-      throw t
-    }
   }
 
   private fun executeBatchWithAssetSync(
@@ -212,28 +180,25 @@ class AndroidRenderWorker(
     designTheme: ThemeOverride?,
     targets: List<DeviceRenderTarget>,
   ): DeviceBatchExecution {
-    syncMissingAssets(data.assetBlobs)
-    return try {
-      transport.renderBatch(
-        dexHash = data.dexHash,
-        entryClass = data.entryClass,
-        dexBytes = data.dexBytes,
-        request =
-          DeviceBatchRequest(
-            dexHash = data.dexHash,
-            entryClass = data.entryClass,
-            sourceFile = data.sourceFile,
-            sourceText = data.sourceText,
-            designTheme = designTheme,
-            assetMap = data.assetMap,
-            targets = targets,
-            timeoutMs = batchTimeoutMs,
-          ),
-      )
-    } catch (t: Throwable) {
-      syncedAssetHashes.clear()
-      throw t
+    if (data.assetBlobs.isNotEmpty()) {
+      transport.syncAssets(data.assetBlobs)
     }
+    return transport.renderBatch(
+      dexHash = data.dexHash,
+      entryClass = data.entryClass,
+      dexBytes = data.dexBytes,
+      request =
+        DeviceBatchRequest(
+          dexHash = data.dexHash,
+          entryClass = data.entryClass,
+          sourceFile = data.sourceFile,
+          sourceText = data.sourceText,
+          designTheme = designTheme,
+          assetMap = data.assetMap,
+          targets = targets,
+          timeoutMs = batchTimeoutMs,
+        ),
+    )
   }
 
   private fun DecodedDeviceFrame.toWorkerFrame(): WorkerFrame? {

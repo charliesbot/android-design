@@ -643,7 +643,7 @@ class RenderQueue(
             existing.format == FrameFormat.LZ4_RGBA ||
             existing.format == frameFormat)
       if (compatibleInFlight) {
-        future = existing!!.future
+        future = existing.future
         promoteQueuedJob(key, entry.contentHash, renderKey, priority)
       } else {
         future = CompletableFuture()
