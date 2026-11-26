@@ -72,6 +72,15 @@ class PluginManifestsTest(unittest.TestCase):
         self.assertIsNotNone(match, "AppInfo.VERSION not found in Main.kt")
         self.assertEqual(match.group(1), version)
 
+        # A root Antigravity manifest lets `agy plugin install https://github.com/<owner>/<repo>`
+        # work without the /tree/main/plugin path. It mirrors plugin/plugin.json and points its
+        # skills and logo into plugin/, so it carries no fields of its own to drift.
+        root_agy = json.loads((ROOT / ".antigravity-plugin/plugin.json").read_text())
+        self.assertEqual(root_agy.pop("$schema"), "https://antigravity.google/schemas/v1/plugin.json")
+        self.assertEqual(root_agy.pop("skills"), ["plugin/skills"])
+        self.assertEqual(root_agy.pop("logo"), f"plugin/{agy_plugin['logo']}")
+        self.assertEqual(root_agy, {k: v for k, v in agy_plugin.items() if k != "logo"})
+
         claude_plugin = json.loads((PLUGIN_DIR / ".claude-plugin/plugin.json").read_text())
         self.assertEqual(claude_plugin["name"], agy_plugin["name"])
         self.assertEqual(claude_plugin["version"], version)
