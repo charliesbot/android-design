@@ -1,5 +1,6 @@
 package app.cash.paparazzi.internal.interceptors;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import net.bytebuddy.asm.Advice;
 
 /**
@@ -11,15 +12,28 @@ public final class RasterizeSkipAdvice {
   public static final ThreadLocal<Boolean> SKIP_RASTERIZATION =
       ThreadLocal.withInitial(() -> Boolean.FALSE);
 
+  public static final AtomicInteger SKIPPED_COUNT = new AtomicInteger();
+  public static final AtomicInteger RASTERIZED_COUNT = new AtomicInteger();
+
   private RasterizeSkipAdvice() {}
 
-  public static boolean shouldSkip() {
-    return Boolean.TRUE.equals(SKIP_RASTERIZATION.get());
+  public static void resetCounters() {
+    SKIPPED_COUNT.set(0);
+    RASTERIZED_COUNT.set(0);
+  }
+
+  public static boolean recordAndShouldSkip() {
+    if (Boolean.TRUE.equals(SKIP_RASTERIZATION.get())) {
+      SKIPPED_COUNT.incrementAndGet();
+      return true;
+    }
+    RASTERIZED_COUNT.incrementAndGet();
+    return false;
   }
 
   @Advice.OnMethodEnter(skipOn = Advice.OnNonDefaultValue.class)
   public static boolean onEnter() {
-    return RasterizeSkipAdvice.shouldSkip();
+    return RasterizeSkipAdvice.recordAndShouldSkip();
   }
 
   @Advice.OnMethodExit

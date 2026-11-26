@@ -59,6 +59,7 @@ import androidx.wear.compose.material3.Button as WearButton
 import androidx.wear.compose.material3.MaterialTheme as WearMaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text as WearText
+import app.cash.paparazzi.internal.interceptors.RasterizeSkipAdvice
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.SettlePolicy
 import bot.charlies.androiddesign.preview.feature.preview.theme.FontFace
@@ -513,11 +514,21 @@ class LayoutlibDriverTest {
 
     // Warm up layoutlib and Compose on desktop before timing the blurred pass.
     val unblurred = renderSettled(desktopConfig()) { LyricsPane(blurSpec = null) }
+    RasterizeSkipAdvice.resetCounters()
     lateinit var blurred: BufferedImage
     val elapsedMs = measureTimeMillis {
       blurred = renderSettled(desktopConfig()) { LyricsPane(blurSpec = fourStop16) }
     }
 
+    assertEquals(
+      1,
+      RasterizeSkipAdvice.RASTERIZED_COUNT.get(),
+      "Expected only captureFrame to rasterize during desktop settle",
+    )
+    assertTrue(
+      RasterizeSkipAdvice.SKIPPED_COUNT.get() >= SettlePolicy.MIN_STEPS + SettlePolicy.IDLE_STREAK,
+      "Expected settle frames to skip rasterization, got ${RasterizeSkipAdvice.SKIPPED_COUNT.get()}",
+    )
     assertTrue(
       elapsedMs < 3_500L,
       "Expected bounded desktop progressive blur to settle within 3500ms, took ${elapsedMs}ms",
@@ -555,7 +566,38 @@ class LayoutlibDriverTest {
           ),
       )
 
+    @Composable
+    fun SheetOverRows(blurSpec: BlurRadiusSpec?) {
+      MaterialTheme {
+        Box(Modifier.fillMaxSize().background(Color.White)) {
+          val blurMod =
+            if (blurSpec != null) {
+              Modifier.blur(
+                blurRadiusSpec = blurSpec,
+                edgeTreatment = BlurredEdgeTreatment.Rectangle,
+              )
+            } else {
+              Modifier
+            }
+          Column(
+            Modifier.fillMaxSize().then(blurMod).background(Color(0xFF141218)).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            repeat(6) { idx -> Text("Background row $idx", color = Color(0xFFE6E0E9)) }
+          }
+          ModalBottomSheet(
+            onDismissRequest = {},
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+          ) {
+            Column(Modifier.fillMaxWidth().padding(24.dp)) { Text("Bottom Sheet Title") }
+          }
+        }
+      }
+    }
+
+    val unblurredSheetImage = renderSettled(phoneConfig(600, 800)) { SheetOverRows(null) }
     var sheetWindows: List<View> = emptyList()
+    RasterizeSkipAdvice.resetCounters()
     lateinit var sheetImage: BufferedImage
     val elapsedMs = measureTimeMillis {
       sheetImage =
@@ -563,30 +605,20 @@ class LayoutlibDriverTest {
           phoneConfig(600, 800),
           onBeforeClose = { sheetWindows = it },
         ) {
-          MaterialTheme {
-            Box(Modifier.fillMaxSize().background(Color.White)) {
-              Column(
-                Modifier.fillMaxSize()
-                  .blur(blurRadiusSpec = fourStop16, edgeTreatment = BlurredEdgeTreatment.Rectangle)
-                  .background(Color(0xFF141218))
-                  .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-              ) {
-                repeat(6) { idx -> Text("Background row $idx", color = Color(0xFFE6E0E9)) }
-              }
-              ModalBottomSheet(
-                onDismissRequest = {},
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-              ) {
-                Column(Modifier.fillMaxWidth().padding(24.dp)) {
-                  Text("Bottom Sheet Title")
-                }
-              }
-            }
-          }
+          SheetOverRows(fourStop16)
         }
     }
 
+    assertEquals(
+      1,
+      RasterizeSkipAdvice.RASTERIZED_COUNT.get(),
+      "Expected only captureFrame to rasterize during overlay settle",
+    )
+    assertTrue(
+      RasterizeSkipAdvice.SKIPPED_COUNT.get() >=
+        SettlePolicy.MIN_OVERLAY_STEPS + SettlePolicy.IDLE_STREAK,
+      "Expected overlay settle frames to skip rasterization, got ${RasterizeSkipAdvice.SKIPPED_COUNT.get()}",
+    )
     assertTrue(sheetWindows.size >= 2, "Expected secondary window for ModalBottomSheet")
     assertTrue(sheetWindows.all { it.isInTouchMode }, "All windows must be in touch mode")
     var sheetDiffs = 0
@@ -598,6 +630,16 @@ class LayoutlibDriverTest {
     assertTrue(
       sheetDiffs > 1_000,
       "Expected ModalBottomSheet visible in bottom half ($sheetDiffs px)",
+    )
+    var blurDiffs = 0
+    for (y in 0 until 200) {
+      for (x in 0 until sheetImage.width) {
+        if (sheetImage.getRGB(x, y) != unblurredSheetImage.getRGB(x, y)) blurDiffs++
+      }
+    }
+    assertTrue(
+      blurDiffs > 100,
+      "Expected progressive blur visible in upper background behind scrim ($blurDiffs px)",
     )
     assertTrue(
       elapsedMs < 3_500L,

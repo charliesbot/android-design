@@ -306,7 +306,7 @@ object ReducedMotionScheme : MotionScheme {
 ## Blur, shadows, and gradients
 
 - **Blur:** blurs the composable's own surface content (not a backdrop/frosted-glass blur behind it). Requires Android 12 (`Modifier.blur`), Android 13 (`ui` 1.13) for progressive `BlurRadiusSpec`; older devices render unblurred, so keep an active-item cue (color, weight, indicator) and back text over blurred photos with a scrim, gradient, or solid/tonal surface.
-  - **Progressive API:** import `BlurRadiusSpec` and `BlurStop` from `androidx.compose.ui.graphics.blur` (`blur` and `BlurredEdgeTreatment` from `androidx.compose.ui.draw`). Pass `verticalGradient`, `horizontalGradient`, `linearGradient(start, end)`, or `radialGradient(center, fallOffRadius)` with 2 to 16 `BlurStop(fraction, radius)` (`0.dp` across sharp bands; radii clamp at 150px). Use `Modifier.blur { }` when geometry depends on layer `size`. `BlurredEdgeTreatment(shape)` matches card/image corners; `BlurredEdgeTreatment.Unbounded` dissolves scrolling/canvas edges.
+  - **Progressive API:** import `BlurRadiusSpec` and `BlurStop` from `androidx.compose.ui.graphics.blur` (`blur` and `BlurredEdgeTreatment` from `androidx.compose.ui.draw`). Pass `verticalGradient`, `horizontalGradient`, `linearGradient(start, end)`, or `radialGradient(center, fallOffRadius)` with 2 to 16 `BlurStop(fraction, radius)` (`0.dp` across sharp bands; radii clamp at 150px). Use `Modifier.blur { }` when geometry depends on layer `size`. `BlurredEdgeTreatment(shape)` matches card/image corners; `BlurredEdgeTreatment.Unbounded` dissolves scrolling/canvas edges (in desktop explorations, use `BlurredEdgeTreatment.Rectangle` on a bounded pane or strip instead of `Unbounded`, which expands CPU blur to the full viewport).
 
 ```kotlin
 LazyColumn(
@@ -319,7 +319,7 @@ LazyColumn(
                 BlurStop(fraction = 1f, radius = 16.dp),
             ),
         ),
-        edgeTreatment = BlurredEdgeTreatment.Unbounded,
+        edgeTreatment = BlurredEdgeTreatment.Unbounded, // desktop previews: use BlurredEdgeTreatment.Rectangle on a bounded pane/strip
     ),
 ) { /* items */ }
 ```

@@ -40,7 +40,7 @@ internal object InterceptorRegistrar {
 
   fun addMethodAdvice(receiverClass: String, methodName: String, advice: Class<*>) {
     val typeResolution = systemTypePool.describe(receiverClass)
-    if (!typeResolution.isResolved) return
+    check(typeResolution.isResolved) { "Cannot resolve $receiverClass for ByteBuddy advice" }
 
     methodInterceptors += {
       byteBuddy
