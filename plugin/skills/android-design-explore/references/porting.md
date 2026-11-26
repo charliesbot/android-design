@@ -1,6 +1,6 @@
 # Porting an approved exploration into the app
 
-Read this only after the user approves a direction in `design/<slug>.explore.kt` (or `-wear.explore.kt`) and wants it wired into the project. Keep any host repository rules for planning, branches, tests, and review. Never change library versions without asking.
+Read this only after the user approves a direction in `design/<slug>.explore.kt` (or `-wear.explore.kt`) and wants it wired into the project. Keep any host repository rules for planning, branches, tests, and review, and keep library versions unchanged unless asked.
 
 ## 1. Map the app target and theme
 
@@ -9,7 +9,7 @@ Read this only after the user approves a direction in `design/<slug>.explore.kt`
 
 ## 2. Move composables and replace kit helpers
 
-Move the approved `@Composable` screen functions out of `design/<slug>.explore.kt` (and delete `designBoard` / `wearBoard` / `direction` scaffolding) into the app's UI files, wiring real ViewModel state and callbacks:
+Move the approved `@Composable` screen functions out of `design/<slug>.explore.kt` (removing `designBoard` / `wearBoard` / `direction` scaffolding) into the app's UI files, wiring real ViewModel state and callbacks:
 
 | Exploration helper | Production Android replacement |
 | --- | --- |
@@ -23,6 +23,5 @@ Move the approved `@Composable` screen functions out of `design/<slug>.explore.k
 
 After wiring into the project:
 
-1. **On macOS when `kakao/prevue` is available:** render the live `@Preview` functions of the ported composables with `kakao/prevue` across phone, foldable, tablet, and desktop (or both Wear watch sizes) and compare structure and emphasis against the approved exploration renders.
-2. **Elsewhere (or when `prevue` is unavailable):** verify through the `compose-preview` skill.
-3. Re-run `android-design`'s Screen check questions and code checks against the wired composables.
+1. Render live `@Preview` functions of the ported composables across phone, foldable, tablet, and desktop (or both Wear watch sizes) through the `compose-preview` skill and compare structure and emphasis against the approved exploration renders.
+2. Re-run `android-design`'s Screen check questions and code checks against the wired composables.
