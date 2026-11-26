@@ -4,7 +4,7 @@ import bot.charlies.androiddesign.preview.app.cli.Cli
 import kotlin.system.exitProcess
 
 object AppInfo {
-  const val VERSION = "0.7.2"
+  const val VERSION = "0.7.3"
 }
 
 fun main(args: Array<String>) {
