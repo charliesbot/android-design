@@ -4,11 +4,10 @@ import bot.charlies.androiddesign.preview.app.android.AndroidExplorationCompiler
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.ClassBundleCodec
-import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
-import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
-import bot.charlies.androiddesign.preview.model.DeviceWireCodec
-import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.WorkerBatchRequest
+import bot.charlies.androiddesign.preview.model.WorkerPipeCodec
+import bot.charlies.androiddesign.preview.model.WorkerRenderTarget
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
@@ -84,10 +83,9 @@ class LayoutlibWorkerProcessTest {
       val out = DataOutputStream(BufferedOutputStream(proc.outputStream, 65536))
       val inp = DataInputStream(BufferedInputStream(proc.inputStream, 65536))
 
-      DeviceWireCodec.writePingRequest(out)
-      val ping = DeviceWireCodec.readPingResponse(inp)
+      WorkerPipeCodec.writePingRequest(out)
+      val ping = WorkerPipeCodec.readPingResponse(inp)
       assertTrue(ping.ok)
-      assertEquals("pong", ping.status)
       assertTrue(ping.pid > 0)
 
       out.close()
@@ -109,8 +107,8 @@ class LayoutlibWorkerProcessTest {
     val classHash = sha256(bundleBytes)
 
     withWorker { inp, out, _ ->
-      DeviceWireCodec.writePreloadDexRequest(out, classHash, stage.entryClass, bundleBytes)
-      val preload = DeviceWireCodec.readPreloadDexResponse(inp)
+      WorkerPipeCodec.writePreloadClassesRequest(out, classHash, stage.entryClass, bundleBytes)
+      val preload = WorkerPipeCodec.readPreloadClassesResponse(inp)
       assertTrue(preload.ok, "Preload failed: ${preload.error}")
       val boardMeta = checkNotNull(preload.boardMeta)
 
@@ -119,11 +117,11 @@ class LayoutlibWorkerProcessTest {
           val baseTargets =
             dir.screens.flatMap { screen ->
               boardMeta.views.map { view ->
-                DeviceRenderTarget(
+                WorkerRenderTarget(
                   direction = dir.name,
                   screen = screen,
                   viewName = view.name,
-                  frameFormat = FrameFormat.NONE,
+                  includeFrame = false,
                 )
               }
             }
@@ -131,12 +129,12 @@ class LayoutlibWorkerProcessTest {
             dir.overlays.flatMap { ovl ->
               val scr = ovl.screen ?: dir.startScreen
               boardMeta.views.map { view ->
-                DeviceRenderTarget(
+                WorkerRenderTarget(
                   direction = dir.name,
                   screen = scr,
                   viewName = view.name,
                   overlayId = ovl.id,
-                  frameFormat = FrameFormat.NONE,
+                  includeFrame = false,
                 )
               }
             }
@@ -145,13 +143,13 @@ class LayoutlibWorkerProcessTest {
 
       assertEquals(15, targets.size, "Expected 15 phone-family targets in multiturn fixture")
 
-      DeviceWireCodec.writeRenderBatchRequest(
+      WorkerPipeCodec.writeRenderBatchRequest(
         out,
-        dexBytes = null,
+        classBundle = null,
         entryClass = stage.entryClass,
         request =
-          DeviceBatchRequest(
-            dexHash = classHash,
+          WorkerBatchRequest(
+            classHash = classHash,
             entryClass = stage.entryClass,
             sourceFile = stage.sourceFile,
             sourceText = stage.sourceText,
@@ -160,12 +158,12 @@ class LayoutlibWorkerProcessTest {
             explorationDir = fixturePath.parent.toString(),
           ),
       )
-      val batch = DeviceWireCodec.readRenderBatchResponse(inp)
+      val batch = WorkerPipeCodec.readRenderBatchResponse(inp)
       assertTrue(batch.response.ok, "Batch failed: ${batch.response.error}")
       assertEquals(15, batch.response.results.size)
 
       for (res in batch.response.results) {
-        val check = ViewCheck.of(res.tree)
+        val check = ViewCheck.of(checkNotNull(res.tree))
         assertTrue(
           check.errors.isEmpty(),
           "Expected zero finding errors on ${res.direction}/${res.screen}/${res.viewName}, got: ${check.errors}",
@@ -186,25 +184,25 @@ class LayoutlibWorkerProcessTest {
       fun renderAllErrors(path: Path, stage: AndroidExplorationCompiler.ClassStage): Set<String> {
         val bundle = ClassBundleCodec.encode(stage.classBytes)
         val hash = sha256(bundle)
-        DeviceWireCodec.writePreloadDexRequest(out, hash, stage.entryClass, bundle)
-        val preload = DeviceWireCodec.readPreloadDexResponse(inp)
+        WorkerPipeCodec.writePreloadClassesRequest(out, hash, stage.entryClass, bundle)
+        val preload = WorkerPipeCodec.readPreloadClassesResponse(inp)
         assertTrue(preload.ok, preload.error)
         val metaBoard = checkNotNull(preload.boardMeta)
         val targets =
           metaBoard.directions.flatMap { dir ->
             dir.screens.flatMap { scr ->
               metaBoard.views.map { v ->
-                DeviceRenderTarget(dir.name, scr, v.name, frameFormat = FrameFormat.NONE)
+                WorkerRenderTarget(dir.name, scr, v.name, includeFrame = false)
               }
             }
           }
-        DeviceWireCodec.writeRenderBatchRequest(
+        WorkerPipeCodec.writeRenderBatchRequest(
           out,
-          dexBytes = null,
+          classBundle = null,
           entryClass = stage.entryClass,
           request =
-            DeviceBatchRequest(
-              dexHash = hash,
+            WorkerBatchRequest(
+              classHash = hash,
               entryClass = stage.entryClass,
               sourceFile = stage.sourceFile,
               sourceText = stage.sourceText,
@@ -213,10 +211,10 @@ class LayoutlibWorkerProcessTest {
               explorationDir = path.parent.toString(),
             ),
         )
-        val batch = DeviceWireCodec.readRenderBatchResponse(inp)
+        val batch = WorkerPipeCodec.readRenderBatchResponse(inp)
         assertTrue(batch.response.ok, batch.response.error)
         return batch.response.results
-          .flatMap { ViewCheck.of(it.tree).errors }
+          .flatMap { ViewCheck.of(checkNotNull(it.tree)).errors }
           .map { it.rule }
           .toSet()
       }
@@ -244,34 +242,40 @@ class LayoutlibWorkerProcessTest {
     val hash = sha256(bundle)
 
     withWorker { inp, out, _ ->
-      DeviceWireCodec.writePreloadDexRequest(out, hash, stage.entryClass, bundle)
-      val preload = DeviceWireCodec.readPreloadDexResponse(inp)
+      WorkerPipeCodec.writePreloadClassesRequest(out, hash, stage.entryClass, bundle)
+      val preload = WorkerPipeCodec.readPreloadClassesResponse(inp)
       assertTrue(preload.ok, preload.error)
       val dirName = preload.boardMeta!!.directions.single().name
 
       val wearViews = listOf(Views.Watch, Views.WatchLarge)
       val targets = wearViews.flatMap { view ->
         listOf(
-          DeviceRenderTarget(dirName, "main", view.name, frameFormat = FrameFormat.RAW_RGBA),
-          DeviceRenderTarget(dirName, "curved", view.name, frameFormat = FrameFormat.RAW_RGBA),
-          DeviceRenderTarget(dirName, "date", view.name, frameFormat = FrameFormat.NONE),
-          DeviceRenderTarget(
+          WorkerRenderTarget(
+            dirName,
+            "main",
+            view.name,
+            includeFrame = true,
+            includeEndFrame = true,
+          ),
+          WorkerRenderTarget(dirName, "curved", view.name, includeFrame = true),
+          WorkerRenderTarget(dirName, "date", view.name, includeFrame = false),
+          WorkerRenderTarget(
             dirName,
             "main",
             view.name,
             overlayId = "confirm",
-            frameFormat = FrameFormat.RAW_RGBA,
+            includeFrame = true,
           ),
         )
       }
 
-      DeviceWireCodec.writeRenderBatchRequest(
+      WorkerPipeCodec.writeRenderBatchRequest(
         out,
-        dexBytes = null,
+        classBundle = null,
         entryClass = stage.entryClass,
         request =
-          DeviceBatchRequest(
-            dexHash = hash,
+          WorkerBatchRequest(
+            classHash = hash,
             entryClass = stage.entryClass,
             sourceFile = stage.sourceFile,
             sourceText = stage.sourceText,
@@ -279,7 +283,7 @@ class LayoutlibWorkerProcessTest {
             explorationDir = tmp.toString(),
           ),
       )
-      val batch = DeviceWireCodec.readRenderBatchResponse(inp)
+      val batch = WorkerPipeCodec.readRenderBatchResponse(inp)
       assertTrue(batch.response.ok, batch.response.error)
       assertEquals(8, batch.response.results.size)
 
@@ -289,12 +293,20 @@ class LayoutlibWorkerProcessTest {
             it.screen == "main" && it.viewName == viewSpec.name && it.overlayId == null
           }
         assertNotNull(mainRes.endTree, "Expected scrolled endTree for Wear main/${viewSpec.name}")
-        assertTrue(mainRes.hasEndFrame, "Expected scrolled endFrame for Wear main/${viewSpec.name}")
+        assertTrue(
+          batch.frames.any {
+            it.screen == "main" &&
+              it.viewName == viewSpec.name &&
+              it.overlayId == null &&
+              it.isEndFrame
+          },
+          "Expected scrolled endFrame for Wear main/${viewSpec.name}",
+        )
 
         val curvedRes =
           batch.response.results.first { it.screen == "curved" && it.viewName == viewSpec.name }
         assertTrue(
-          curvedRes.tree.nodes.isNotEmpty(),
+          curvedRes.tree!!.nodes.isNotEmpty(),
           "Expected nodes for Wear curved/${viewSpec.name}",
         )
 
@@ -302,9 +314,8 @@ class LayoutlibWorkerProcessTest {
           batch.response.results.first {
             it.screen == "main" && it.viewName == viewSpec.name && it.overlayId == "confirm"
           }
-        assertTrue(confirmRes.hasFrame, "Expected frame for Wear confirm/${viewSpec.name}")
         assertTrue(
-          confirmRes.tree.nodes.isNotEmpty(),
+          confirmRes.tree!!.nodes.isNotEmpty(),
           "Expected tree nodes for Wear confirm/${viewSpec.name}",
         )
         val confirmFrame =
@@ -351,44 +362,44 @@ class LayoutlibWorkerProcessTest {
     val hash = sha256(bundle)
 
     withWorker { inp, out, _ ->
-      DeviceWireCodec.writePreloadDexRequest(out, hash, stage.entryClass, bundle)
-      val preload = DeviceWireCodec.readPreloadDexResponse(inp)
+      WorkerPipeCodec.writePreloadClassesRequest(out, hash, stage.entryClass, bundle)
+      val preload = WorkerPipeCodec.readPreloadClassesResponse(inp)
       assertTrue(preload.ok, preload.error)
       val dirName = preload.boardMeta!!.directions.single().name
 
       val targets =
         listOf(
-          DeviceRenderTarget(dirName, "home", Views.Light.name, frameFormat = FrameFormat.RAW_RGBA),
-          DeviceRenderTarget(
+          WorkerRenderTarget(dirName, "home", Views.Light.name, includeFrame = true),
+          WorkerRenderTarget(
             dirName,
             "home",
             Views.Light.name,
             overlayId = "dialog",
-            frameFormat = FrameFormat.RAW_RGBA,
+            includeFrame = true,
           ),
-          DeviceRenderTarget(
+          WorkerRenderTarget(
             dirName,
             "home",
             Views.Light.name,
             overlayId = "sheet",
-            frameFormat = FrameFormat.RAW_RGBA,
+            includeFrame = true,
           ),
-          DeviceRenderTarget(
+          WorkerRenderTarget(
             dirName,
             "home",
             Views.Light.name,
             overlayId = "popup",
-            frameFormat = FrameFormat.RAW_RGBA,
+            includeFrame = true,
           ),
         )
 
-      DeviceWireCodec.writeRenderBatchRequest(
+      WorkerPipeCodec.writeRenderBatchRequest(
         out,
-        dexBytes = null,
+        classBundle = null,
         entryClass = stage.entryClass,
         request =
-          DeviceBatchRequest(
-            dexHash = hash,
+          WorkerBatchRequest(
+            classHash = hash,
             entryClass = stage.entryClass,
             sourceFile = stage.sourceFile,
             sourceText = stage.sourceText,
@@ -397,7 +408,7 @@ class LayoutlibWorkerProcessTest {
             explorationDir = tmp.toString(),
           ),
       )
-      val batch = DeviceWireCodec.readRenderBatchResponse(inp)
+      val batch = WorkerPipeCodec.readRenderBatchResponse(inp)
       assertTrue(batch.response.ok, batch.response.error)
       assertEquals(4, batch.response.results.size)
       assertEquals(4, batch.frames.size)
@@ -433,7 +444,7 @@ class LayoutlibWorkerProcessTest {
         )
       for ((ovlId, needle) in expectedTextByOverlay) {
         val res = batch.response.results.first { it.overlayId == ovlId }
-        val matchingNodes = res.tree.nodes.filter { node -> needle in node.text?.value.orEmpty() }
+        val matchingNodes = res.tree!!.nodes.filter { node -> needle in node.text?.value.orEmpty() }
         assertTrue(
           matchingNodes.isNotEmpty(),
           "Expected node containing '$needle' in overlay '$ovlId'",

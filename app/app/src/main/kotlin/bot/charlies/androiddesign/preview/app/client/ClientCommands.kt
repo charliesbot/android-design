@@ -1,6 +1,7 @@
 package bot.charlies.androiddesign.preview.app.client
 
 import bot.charlies.androiddesign.preview.app.cli.Command
+import bot.charlies.androiddesign.preview.app.cli.parseArgsResult
 import bot.charlies.androiddesign.preview.app.server.CheckRequest
 import bot.charlies.androiddesign.preview.app.server.CheckResponse
 import bot.charlies.androiddesign.preview.app.server.CheckScope
@@ -78,35 +79,6 @@ private fun emitDeadlineExceeded(
 
 private fun wantsHelp(args: List<String>): Boolean = args.any { it == "--help" || it == "-h" }
 
-private data class SimpleArgs(
-  val positionals: List<String>,
-  val flags: Map<String, String>,
-)
-
-private fun parseClientArgs(
-  args: List<String>,
-  valueFlags: Set<String>,
-  booleanFlags: Set<String> = emptySet(),
-): Pair<SimpleArgs?, String?> {
-  val positionals = mutableListOf<String>()
-  val flags = LinkedHashMap<String, String>()
-  var i = 0
-  while (i < args.size) {
-    val arg = args[i]
-    when {
-      arg in booleanFlags -> flags[arg] = "true"
-      arg in valueFlags -> {
-        val value = args.getOrNull(++i) ?: return null to "$arg requires a value"
-        flags[arg] = value
-      }
-      arg.startsWith("--") -> return null to "Unknown option: $arg"
-      else -> positionals += arg
-    }
-    i++
-  }
-  return SimpleArgs(positionals, flags) to null
-}
-
 /** `start [<file-or-dir>]` */
 class StartCommand(
   private val cacheRoot: Path = ServerPaths.cacheRoot(),
@@ -156,7 +128,7 @@ class StartCommand(
       out.println(HELP)
       return ClientExitCode.OK
     }
-    val (parsed, parseErr) = parseClientArgs(args, emptySet())
+    val (parsed, parseErr) = parseArgsResult(args, emptySet())
     if (parseErr != null || parsed == null) {
       return emitError(
         out,
@@ -241,7 +213,7 @@ class CheckCommand(private val client: PreviewClient = PreviewClient()) : Comman
       return ClientExitCode.OK
     }
     val (parsed, parseErr) =
-      parseClientArgs(args, setOf("--direction", "--screen", "--view", "--design"))
+      parseArgsResult(args, setOf("--direction", "--screen", "--view", "--design"))
     if (parseErr != null || parsed == null) {
       return emitError(
         out,
@@ -453,7 +425,7 @@ class TreeCommand(private val client: PreviewClient = PreviewClient()) : Command
       return ClientExitCode.OK
     }
     val (parsed, parseErr) =
-      parseClientArgs(args, setOf("--direction", "--screen", "--overlay", "--view", "--max-depth"))
+      parseArgsResult(args, setOf("--direction", "--screen", "--overlay", "--view", "--max-depth"))
     if (parseErr != null || parsed == null) {
       return emitError(
         out,
@@ -594,7 +566,7 @@ class SelectionCommand(private val client: PreviewClient = PreviewClient()) : Co
       out.println(HELP)
       return ClientExitCode.OK
     }
-    val (parsed, parseErr) = parseClientArgs(args, emptySet())
+    val (parsed, parseErr) = parseArgsResult(args, emptySet())
     if (parseErr != null || parsed == null) {
       return emitError(out, ClientExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
     }
@@ -697,7 +669,7 @@ class OpenCommand(
       return ClientExitCode.OK
     }
     val (parsed, parseErr) =
-      parseClientArgs(args, setOf("--serial", "--avd"), booleanFlags = setOf("--live"))
+      parseArgsResult(args, setOf("--serial", "--avd"), booleanFlags = setOf("--live"))
     if (parseErr != null || parsed == null) {
       return emitError(
         out,
@@ -846,7 +818,7 @@ class StatusCommand(private val client: PreviewClient = PreviewClient()) : Comma
       out.println(HELP)
       return ClientExitCode.OK
     }
-    val (parsed, parseErr) = parseClientArgs(args, emptySet())
+    val (parsed, parseErr) = parseArgsResult(args, emptySet())
     if (parseErr != null || parsed == null) {
       return emitError(out, ClientExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
     }
@@ -911,7 +883,7 @@ class StopCommand(private val client: PreviewClient = PreviewClient()) : Command
       out.println(HELP)
       return ClientExitCode.OK
     }
-    val (parsed, parseErr) = parseClientArgs(args, emptySet())
+    val (parsed, parseErr) = parseArgsResult(args, emptySet())
     if (parseErr != null || parsed == null) {
       return emitError(out, ClientExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
     }
@@ -964,7 +936,7 @@ class InstallCommand : Command {
       out.println(HELP)
       return ClientExitCode.OK
     }
-    val (parsed, parseErr) = parseClientArgs(args, setOf("--bin-dir", "--script"))
+    val (parsed, parseErr) = parseArgsResult(args, setOf("--bin-dir", "--script"))
     if (parseErr != null || parsed == null) {
       return emitError(out, ClientExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
     }

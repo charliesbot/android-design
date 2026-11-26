@@ -16,10 +16,10 @@ import bot.charlies.androiddesign.preview.model.DeviceAckResponse
 import bot.charlies.androiddesign.preview.model.DeviceHasAssetsRequest
 import bot.charlies.androiddesign.preview.model.DeviceHasAssetsResponse
 import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
-import bot.charlies.androiddesign.preview.model.DeviceOp
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
 import bot.charlies.androiddesign.preview.model.DeviceTransportSpec
-import bot.charlies.androiddesign.preview.model.DeviceWireCodec
+import bot.charlies.androiddesign.preview.model.LiveDeviceCodec
+import bot.charlies.androiddesign.preview.model.LiveDeviceOp
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
@@ -129,29 +129,29 @@ class RenderForegroundService : Service() {
         while (running) {
           val op =
             try {
-              DeviceWireCodec.readOpOrNull(input)
+              LiveDeviceCodec.readOpOrNull(input)
             } catch (_: IOException) {
               null
             } ?: break
           when (op) {
-            DeviceOp.PING -> handlePing(sink)
-            DeviceOp.PUT_ASSETS -> {
-              val items = DeviceWireCodec.readPutAssetsRequest(input)
+            LiveDeviceOp.PING -> handlePing(sink)
+            LiveDeviceOp.PUT_ASSETS -> {
+              val items = LiveDeviceCodec.readPutAssetsRequest(input)
               runGuarded("PUT_ASSETS", OP_BUDGET_MS, sink) { executePutAssets(items) }
             }
-            DeviceOp.HAS_ASSETS -> {
-              val req = DeviceWireCodec.readHasAssetsRequest(input)
+            LiveDeviceOp.HAS_ASSETS -> {
+              val req = LiveDeviceCodec.readHasAssetsRequest(input)
               runGuarded("HAS_ASSETS", OP_BUDGET_MS, sink) { executeHasAssets(req) }
             }
-            DeviceOp.SET_LIVE -> {
-              val wireReq = DeviceWireCodec.readSetLiveRequest(input)
+            LiveDeviceOp.SET_LIVE -> {
+              val wireReq = LiveDeviceCodec.readSetLiveRequest(input)
               runGuarded("SET_LIVE", OP_BUDGET_MS, sink) {
                 executeSetLive(wireReq.dexBytes, wireReq.request)
               }
             }
             else -> {
               sink.send { out ->
-                DeviceWireCodec.writeAck(
+                LiveDeviceCodec.writeAck(
                   out,
                   DeviceAckResponse(ok = false, error = "unknown op $op"),
                 )
@@ -222,7 +222,7 @@ class RenderForegroundService : Service() {
         inFlightAgeMs = inFlight?.let { guardedWorker.ageMs(it) } ?: 0L,
         inFlightBudgetMs = inFlight?.budgetMs ?: 0L,
       )
-    sink.send { out -> DeviceWireCodec.writePingResponse(out, resp) }
+    sink.send { out -> LiveDeviceCodec.writePingResponse(out, resp) }
   }
 
   private fun executePutAssets(items: List<Pair<String, ByteArray>>): OpReply {
@@ -235,7 +235,7 @@ class RenderForegroundService : Service() {
   private fun executeHasAssets(req: DeviceHasAssetsRequest): OpReply {
     val missing = renderer.assetCache.missing(req.hashes)
     return OpReply { out ->
-      DeviceWireCodec.writeHasAssetsResponse(out, DeviceHasAssetsResponse(missing = missing))
+      LiveDeviceCodec.writeHasAssetsResponse(out, DeviceHasAssetsResponse(missing = missing))
     }
   }
 
@@ -260,7 +260,7 @@ class RenderForegroundService : Service() {
     )
 
   private fun ackReply(ack: DeviceAckResponse): OpReply = OpReply { out ->
-    DeviceWireCodec.writeAck(out, ack)
+    LiveDeviceCodec.writeAck(out, ack)
   }
 
   companion object {

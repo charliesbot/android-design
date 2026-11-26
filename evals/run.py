@@ -122,12 +122,8 @@ def generator_metrics_from(reply):
     return {key: reply.get(key) for key in METRIC_KEYS}
 
 
-def _build_cli_env(*, src=None, bdir=None, cache_dir=None):
-    return build_cli_env(src=src, bdir=bdir, cache_dir=cache_dir)
-
-
 def _start_preview_server(work_dir, binary, *, src=None, bdir=None, cache_dir=None):
-    env = _build_cli_env(src=src, bdir=bdir, cache_dir=cache_dir)
+    env = build_cli_env(src=src, bdir=bdir, cache_dir=cache_dir)
     cmd = [str(binary), 'start', str(work_dir)]
     done = subprocess.run(
         cmd,
@@ -136,16 +132,6 @@ def _start_preview_server(work_dir, binary, *, src=None, bdir=None, cache_dir=No
     if done.returncode != 0:
         detail = (done.stderr or done.stdout)[-1500:]
         raise RuntimeError(f'preview server start failed (exit {done.returncode}): {detail}')
-
-
-def _stop_preview_server(case_dir, binary, *, src=None, bdir=None, cache_dir=None):
-    return stop_preview_server(
-        case_dir,
-        binary,
-        src=src,
-        bdir=bdir,
-        cache_dir=cache_dir,
-    )
 
 
 def _resolve_bootstrap_context():
@@ -173,7 +159,7 @@ def generate(case_dir, backend, model=None, *, cache_dir=None, stop_server=True)
         )
     finally:
         if stop_server:
-            _stop_preview_server(
+            stop_preview_server(
                 case_dir,
                 binary,
                 src=src,
@@ -209,7 +195,7 @@ def render(case_dir, *, binary=None, src=None, bdir=None, cache_dir=None):
     cmd = [str(cli_bin), 'render', str(proposal_path(case_dir)), '--out', str(renders)]
     if design.is_file():
         cmd += ['--design', str(design)]
-    env = _build_cli_env(
+    env = build_cli_env(
         src=resolved_src,
         bdir=resolved_bdir,
         cache_dir=cache_dir,
@@ -272,7 +258,7 @@ def build(case, case_dir, backend, model=None):
         src=src,
         bdir=bdir,
         cache_prefix='eval-build',
-        stopper=_stop_preview_server,
+        stopper=stop_preview_server,
     ) as eval_cache_dir:
         reply = generate(case_dir, backend, model, cache_dir=eval_cache_dir, stop_server=False)
         images, error = render(case_dir, binary=binary, src=src, bdir=bdir, cache_dir=eval_cache_dir)
@@ -474,7 +460,7 @@ def main():
                 src=src,
                 bdir=bdir,
                 cache_prefix=f'eval-{args.command}',
-                stopper=_stop_preview_server,
+                stopper=stop_preview_server,
             ) as eval_cache_dir:
                 _start_preview_server(out, binary, src=src, bdir=bdir, cache_dir=eval_cache_dir)
 

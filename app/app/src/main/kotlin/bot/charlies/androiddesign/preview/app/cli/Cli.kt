@@ -30,42 +30,55 @@ interface Command {
   fun run(args: List<String>, out: PrintStream, err: PrintStream): Int
 }
 
-/** The arguments of a command: its one positional argument and the value of each flag given. */
-class ParsedArgs(val positional: String?, val flags: Map<String, String>)
+/** The arguments of a command: its positional arguments and the values/flags given. */
+class ParsedArgs(val positionals: List<String>, val flags: Map<String, String>) {
+  val positional: String?
+    get() = positionals.firstOrNull()
+}
 
 /**
- * Splits [args] into one positional argument and the values of [flags], which each take a value.
- * Prints the mistake to [err] and returns null for an unknown option, a flag without a value, or a
- * second positional argument.
+ * Splits [args] into positional arguments, [valueFlags] (each consuming the following token), and
+ * [booleanFlags]. Returns `null to errorMessage` for an unknown option, missing flag value, or
+ * excess positional arguments when [maxPositionals] is set.
  */
-fun parseArgs(args: List<String>, flags: Set<String>, err: PrintStream): ParsedArgs? {
-  var positional: String? = null
-  val values = mutableMapOf<String, String>()
+fun parseArgsResult(
+  args: List<String>,
+  valueFlags: Set<String>,
+  booleanFlags: Set<String> = emptySet(),
+  maxPositionals: Int? = null,
+): Pair<ParsedArgs?, String?> {
+  val positionals = mutableListOf<String>()
+  val values = LinkedHashMap<String, String>()
   var index = 0
   while (index < args.size) {
     val arg = args[index]
     when {
-      arg in flags -> {
-        val value = args.getOrNull(++index)
-        if (value == null) {
-          err.println("$arg needs a value")
-          return null
-        }
+      arg in booleanFlags -> values[arg] = "true"
+      arg in valueFlags -> {
+        val value = args.getOrNull(++index) ?: return null to "$arg requires a value"
         values[arg] = value
       }
-      arg.startsWith("--") -> {
-        err.println("unknown option $arg")
-        return null
-      }
-      positional == null -> positional = arg
-      else -> {
-        err.println("unexpected argument $arg")
-        return null
-      }
+      arg.startsWith("--") -> return null to "Unknown option: $arg"
+      maxPositionals != null && positionals.size >= maxPositionals ->
+        return null to "Unexpected argument: $arg"
+      else -> positionals += arg
     }
     index++
   }
-  return ParsedArgs(positional, values)
+  return ParsedArgs(positionals, values) to null
+}
+
+/**
+ * Convenience wrapper around [parseArgsResult] allowing at most one positional argument and
+ * printing any error message to [err].
+ */
+fun parseArgs(args: List<String>, flags: Set<String>, err: PrintStream): ParsedArgs? {
+  val (parsed, error) = parseArgsResult(args, flags, maxPositionals = 1)
+  if (error != null) {
+    err.println(error)
+    return null
+  }
+  return parsed
 }
 
 /**

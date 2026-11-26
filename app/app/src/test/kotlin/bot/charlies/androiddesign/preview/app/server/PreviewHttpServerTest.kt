@@ -3,8 +3,8 @@ package bot.charlies.androiddesign.preview.app.server
 import bot.charlies.androiddesign.preview.app.cli.RenderEntry
 import bot.charlies.androiddesign.preview.app.cli.RenderReport
 import bot.charlies.androiddesign.preview.model.BoardSurface
-import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
-import bot.charlies.androiddesign.preview.model.DeviceOverlayMeta
+import bot.charlies.androiddesign.preview.model.DirectionMeta
+import bot.charlies.androiddesign.preview.model.OverlayMeta
 import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.ViewSpec
@@ -81,12 +81,11 @@ class PreviewHttpServerTest {
   ): RenderWorker =
     InMemoryRenderWorker(
       name = RuntimeIdentity.BACKEND_LAYOUTLIB,
-      scopedCheckDensity = 1,
       boardName = "Plates",
       directions =
         listOf(
-          DeviceDirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
-          DeviceDirectionMeta("Compact", "phone", "home", listOf("home"), emptyList()),
+          DirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
+          DirectionMeta("Compact", "phone", "home", listOf("home"), emptyList()),
         ),
       views = PhoneSurface.views,
       onCompile = { snapshot ->
@@ -158,7 +157,7 @@ class PreviewHttpServerTest {
     try {
       val rec = server.start()
 
-      // First scoped check compiles once and renders 1x PNG.
+      // First scoped check compiles once and renders 2x PNG.
       val scopedBody =
         PreviewJson.compact.encodeToString(
           CheckRequest.serializer(),
@@ -178,7 +177,7 @@ class PreviewHttpServerTest {
       assertFalse(r1.cached)
       assertEquals(1, compileCalls.get())
       assertEquals(1, r1.images.size)
-      assertEquals(1, r1.images.single().density)
+      assertEquals(2, r1.images.single().density)
       assertTrue(Files.isRegularFile(Path.of(r1.images.single().path)))
 
       // Repeat identical scoped check hits content-hash cache (no recompile).
@@ -258,7 +257,7 @@ class PreviewHttpServerTest {
     }
 
     val selected =
-      CheckService.selectImagesForResponse(
+      CheckImagePolicy.selectResponseImages(
         artifacts =
           listOf(
             fakeArt("foldable", identicalPng),
@@ -267,8 +266,8 @@ class PreviewHttpServerTest {
             fakeArt("dark", distinctPngB), // 3rd distinct failure: capped at 2!
           ),
         scoped = false,
-        allPass = false,
         surface = BoardSurface.Phone,
+        allPass = false,
       )
     assertEquals(listOf("foldable", "desktop"), selected.map { it.view })
   }
@@ -672,14 +671,14 @@ class PreviewHttpServerTest {
         name = RuntimeIdentity.BACKEND_LAYOUTLIB,
         directions =
           listOf(
-            DeviceDirectionMeta(
+            DirectionMeta(
               name = "Editorial",
               surface = "phone",
               startScreen = "home",
               screens = listOf("home"),
-              overlays = listOf(DeviceOverlayMeta("sheet", "home")),
+              overlays = listOf(OverlayMeta("sheet", "home")),
             ),
-            DeviceDirectionMeta(
+            DirectionMeta(
               name = "Compact",
               surface = "phone",
               startScreen = "home",
@@ -815,7 +814,7 @@ class PreviewHttpServerTest {
         name = RuntimeIdentity.BACKEND_LAYOUTLIB,
         directions =
           listOf(
-            DeviceDirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
+            DirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
           ),
         views = PhoneSurface.views,
       )
@@ -880,8 +879,8 @@ class PreviewHttpServerTest {
         name = RuntimeIdentity.BACKEND_LAYOUTLIB,
         directions =
           listOf(
-            DeviceDirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
-            DeviceDirectionMeta("Compact", "phone", "home", listOf("home"), emptyList()),
+            DirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
+            DirectionMeta("Compact", "phone", "home", listOf("home"), emptyList()),
           ),
         views = PhoneSurface.views,
       )
@@ -961,7 +960,7 @@ class PreviewHttpServerTest {
         name = RuntimeIdentity.BACKEND_LAYOUTLIB,
         directions =
           listOf(
-            DeviceDirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
+            DirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
           ),
         views = PhoneSurface.views,
       )
@@ -1054,7 +1053,7 @@ class PreviewHttpServerTest {
         name = RuntimeIdentity.BACKEND_LAYOUTLIB,
         directions =
           listOf(
-            DeviceDirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
+            DirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
           ),
         views = PhoneSurface.views,
       )

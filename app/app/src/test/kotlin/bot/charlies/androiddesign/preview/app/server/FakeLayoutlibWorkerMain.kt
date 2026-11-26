@@ -1,17 +1,16 @@
 package bot.charlies.androiddesign.preview.app.server
 
-import bot.charlies.androiddesign.preview.model.DeviceBatchResponse
-import bot.charlies.androiddesign.preview.model.DeviceBoardMeta
-import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
-import bot.charlies.androiddesign.preview.model.DeviceOp
-import bot.charlies.androiddesign.preview.model.DevicePingResponse
-import bot.charlies.androiddesign.preview.model.DevicePreloadResponse
-import bot.charlies.androiddesign.preview.model.DeviceTargetResult
-import bot.charlies.androiddesign.preview.model.DeviceWireCodec
-import bot.charlies.androiddesign.preview.model.DeviceWireFrame
-import bot.charlies.androiddesign.preview.model.FrameFormat
+import bot.charlies.androiddesign.preview.model.BoardMeta
+import bot.charlies.androiddesign.preview.model.DirectionMeta
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.WorkerBatchResponse
+import bot.charlies.androiddesign.preview.model.WorkerPingResponse
+import bot.charlies.androiddesign.preview.model.WorkerPipeCodec
+import bot.charlies.androiddesign.preview.model.WorkerPipeOp
+import bot.charlies.androiddesign.preview.model.WorkerPreloadResponse
+import bot.charlies.androiddesign.preview.model.WorkerTargetResult
+import bot.charlies.androiddesign.preview.model.WorkerWireFrame
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
@@ -21,7 +20,7 @@ import java.nio.file.Path
 import kotlin.system.exitProcess
 
 /**
- * Deterministic child JVM fake speaking [DeviceWireCodec] over stdin/stdout to test timeout,
+ * Deterministic child JVM fake speaking [WorkerPipeCodec] over stdin/stdout to test timeout,
  * respawn, recycle, and clean stdin-EOF exit in [LayoutlibRenderWorkerTest].
  */
 object FakeLayoutlibWorkerMain {
@@ -52,9 +51,9 @@ object FakeLayoutlibWorkerMain {
     }
 
     while (true) {
-      val op = DeviceWireCodec.readOpOrNull(inp) ?: break
+      val op = WorkerPipeCodec.readOpOrNull(inp) ?: break
       when (op) {
-        DeviceOp.PING -> {
+        WorkerPipeOp.PING -> {
           val pingCall =
             if (mode == "hang-first-ping" || mode == "fail-first-ping") {
               nextCounter("ping-count.txt")
@@ -65,24 +64,24 @@ object FakeLayoutlibWorkerMain {
             Thread.sleep(60_000L)
           }
           val pingOk = !(mode == "fail-first-ping" && pingCall == 1)
-          DeviceWireCodec.writePingResponse(
+          WorkerPipeCodec.writePingResponse(
             out,
-            DevicePingResponse(ok = pingOk, pid = ProcessHandle.current().pid().toInt()),
+            WorkerPingResponse(ok = pingOk, pid = ProcessHandle.current().pid().toInt()),
           )
         }
-        DeviceOp.PRELOAD_DEX -> {
-          DeviceWireCodec.readPreloadDexRequest(inp)
-          DeviceWireCodec.writePreloadDexResponse(
+        WorkerPipeOp.PRELOAD_CLASSES -> {
+          WorkerPipeCodec.readPreloadClassesRequest(inp)
+          WorkerPipeCodec.writePreloadClassesResponse(
             out,
-            DevicePreloadResponse(
+            WorkerPreloadResponse(
               ok = true,
               boardMeta =
-                DeviceBoardMeta(
+                BoardMeta(
                   surface = "phone",
                   boardName = "Fake",
                   directions =
                     listOf(
-                      DeviceDirectionMeta(
+                      DirectionMeta(
                         name = "Main",
                         surface = "phone",
                         startScreen = "home",
@@ -94,11 +93,11 @@ object FakeLayoutlibWorkerMain {
             ),
           )
         }
-        DeviceOp.RENDER_BATCH -> {
-          val wire = DeviceWireCodec.readRenderBatchRequest(inp)
+        WorkerPipeOp.RENDER_BATCH -> {
+          val wire = WorkerPipeCodec.readRenderBatchRequest(inp)
           batchCalls++
           if (markerDir != null) {
-            val tag = if (wire.dexBytes == null) "null-bytes\n" else "with-bytes\n"
+            val tag = if (wire.classBundle == null) "null-bytes\n" else "with-bytes\n"
             val logFile = markerDir.resolve("wire-bytes-log.txt")
             val prev = if (Files.isRegularFile(logFile)) Files.readString(logFile) else ""
             Files.writeString(logFile, prev + tag)
@@ -108,15 +107,15 @@ object FakeLayoutlibWorkerMain {
               Thread.sleep(60_000L)
             }
           }
-          if (mode == "evict-after-preload" && wire.dexBytes == null && !evictedOnce) {
+          if (mode == "evict-after-preload" && wire.classBundle == null && !evictedOnce) {
             evictedOnce = true
-            DeviceWireCodec.writeRenderBatchResponse(
+            WorkerPipeCodec.writeRenderBatchResponse(
               out,
-              DeviceBatchResponse(
+              WorkerBatchResponse(
                 ok = false,
                 renderTotalMs = 0.0,
                 reloadCount = batchCalls,
-                error = "Classes '${wire.request.dexHash}' not preloaded and no bytes supplied",
+                error = "Classes '${wire.request.classHash}' not preloaded and no bytes supplied",
                 results = emptyList(),
               ),
               emptyList(),
@@ -126,13 +125,12 @@ object FakeLayoutlibWorkerMain {
           val results =
             wire.request.targets.map { t ->
               val view = Views.byName(t.viewName) ?: Views.Light
-              DeviceTargetResult(
+              WorkerTargetResult(
                 direction = t.direction,
                 screen = t.screen,
                 viewName = t.viewName,
                 overlayId = t.overlayId,
                 renderMs = 1.0,
-                pass = true,
                 tree =
                   LayoutTree(
                     screen = t.screen,
@@ -140,38 +138,33 @@ object FakeLayoutlibWorkerMain {
                     nodes = emptyList(),
                     findings = emptyList(),
                   ),
-                hasFrame = t.frameFormat != FrameFormat.NONE,
-                frameFormat = t.frameFormat,
               )
             }
           val frames =
             wire.request.targets.mapNotNull { t ->
-              if (t.frameFormat == FrameFormat.NONE) {
+              if (!t.includeFrame) {
                 null
               } else {
-                DeviceWireFrame(
+                WorkerWireFrame(
                   direction = t.direction,
                   screen = t.screen,
                   viewName = t.viewName,
                   overlayId = t.overlayId,
                   isEndFrame = false,
-                  format = FrameFormat.RAW_RGBA,
                   widthPx = 2,
                   heightPx = 2,
-                  rawLength = 16,
                   payload = ByteArray(16) { 0x7F.toByte() },
                 )
               }
             }
           val shouldRecycle = mode == "recycle-always" && batchCalls >= 1
-          DeviceWireCodec.writeRenderBatchResponse(
+          WorkerPipeCodec.writeRenderBatchResponse(
             out,
-            DeviceBatchResponse(
+            WorkerBatchResponse(
               ok = true,
               renderTotalMs = 1.0,
               reloadCount = batchCalls,
               recycleRecommended = shouldRecycle,
-              recycleReason = if (shouldRecycle) "fake_recycle" else null,
               results = results,
             ),
             frames,

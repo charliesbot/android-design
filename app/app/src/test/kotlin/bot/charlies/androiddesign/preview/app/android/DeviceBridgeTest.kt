@@ -3,9 +3,9 @@ package bot.charlies.androiddesign.preview.app.android
 import bot.charlies.androiddesign.preview.model.DeviceAckResponse
 import bot.charlies.androiddesign.preview.model.DeviceHasAssetsResponse
 import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
-import bot.charlies.androiddesign.preview.model.DeviceOp
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
-import bot.charlies.androiddesign.preview.model.DeviceWireCodec
+import bot.charlies.androiddesign.preview.model.LiveDeviceCodec
+import bot.charlies.androiddesign.preview.model.LiveDeviceOp
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
@@ -49,32 +49,32 @@ class DeviceBridgeTest {
             while (true) {
               val op =
                 try {
-                  DeviceWireCodec.readOpOrNull(inp)
+                  LiveDeviceCodec.readOpOrNull(inp)
                 } catch (_: Exception) {
                   null
                 } ?: break
               when (op) {
-                DeviceOp.PING -> {
-                  DeviceWireCodec.writePingResponse(
+                LiveDeviceOp.PING -> {
+                  LiveDeviceCodec.writePingResponse(
                     out,
                     DevicePingResponse(ok = true, pid = sandboxPid.get()),
                   )
                 }
-                DeviceOp.HAS_ASSETS -> {
-                  val req = DeviceWireCodec.readHasAssetsRequest(inp)
+                LiveDeviceOp.HAS_ASSETS -> {
+                  val req = LiveDeviceCodec.readHasAssetsRequest(inp)
                   if (dropNextHasAssets.compareAndSet(1, 0)) {
                     break
                   }
                   hasAssetsQueries += req.hashes
-                  DeviceWireCodec.writeHasAssetsResponse(
+                  LiveDeviceCodec.writeHasAssetsResponse(
                     out,
                     DeviceHasAssetsResponse(missing = req.hashes),
                   )
                 }
-                DeviceOp.PUT_ASSETS -> {
-                  val items = DeviceWireCodec.readPutAssetsRequest(inp)
+                LiveDeviceOp.PUT_ASSETS -> {
+                  val items = LiveDeviceCodec.readPutAssetsRequest(inp)
                   putAssetBatches += items.map { it.first }
-                  DeviceWireCodec.writeAck(out, DeviceAckResponse(ok = true, stored = items.size))
+                  LiveDeviceCodec.writeAck(out, DeviceAckResponse(ok = true, stored = items.size))
                 }
                 else -> break
               }
@@ -158,39 +158,39 @@ class DeviceBridgeTest {
             while (true) {
               val op =
                 try {
-                  DeviceWireCodec.readOpOrNull(inp)
+                  LiveDeviceCodec.readOpOrNull(inp)
                 } catch (_: Exception) {
                   null
                 } ?: break
               when (op) {
-                DeviceOp.HAS_ASSETS -> {
-                  val req = DeviceWireCodec.readHasAssetsRequest(inp)
+                LiveDeviceOp.HAS_ASSETS -> {
+                  val req = LiveDeviceCodec.readHasAssetsRequest(inp)
                   eventLog += "HAS_ASSETS:${req.hashes.joinToString(",")}"
-                  DeviceWireCodec.writeHasAssetsResponse(
+                  LiveDeviceCodec.writeHasAssetsResponse(
                     out,
                     DeviceHasAssetsResponse(missing = req.hashes),
                   )
                 }
-                DeviceOp.PUT_ASSETS -> {
-                  val items = DeviceWireCodec.readPutAssetsRequest(inp)
+                LiveDeviceOp.PUT_ASSETS -> {
+                  val items = LiveDeviceCodec.readPutAssetsRequest(inp)
                   eventLog += "PUT_ASSETS:${items.joinToString(",") { it.first }}"
-                  DeviceWireCodec.writeAck(out, DeviceAckResponse(ok = true, stored = items.size))
+                  LiveDeviceCodec.writeAck(out, DeviceAckResponse(ok = true, stored = items.size))
                 }
-                DeviceOp.SET_LIVE -> {
-                  val payload = DeviceWireCodec.readSetLiveRequest(inp)
+                LiveDeviceOp.SET_LIVE -> {
+                  val payload = LiveDeviceCodec.readSetLiveRequest(inp)
                   if (dropNextSetLive.compareAndSet(1, 0)) {
                     eventLog += "SET_LIVE_DROP:dex=${payload.dexBytes != null}"
                     break
                   }
                   if (replyNotPreloadedNextLive.compareAndSet(1, 0)) {
                     eventLog += "SET_LIVE_NOT_PRELOADED:dex=${payload.dexBytes != null}"
-                    DeviceWireCodec.writeAck(
+                    LiveDeviceCodec.writeAck(
                       out,
                       DeviceAckResponse(ok = false, error = "dex not preloaded"),
                     )
                   } else {
                     eventLog += "SET_LIVE_OK:dex=${payload.dexBytes != null}"
-                    DeviceWireCodec.writeAck(out, DeviceAckResponse(ok = true))
+                    LiveDeviceCodec.writeAck(out, DeviceAckResponse(ok = true))
                   }
                 }
                 else -> break
@@ -210,7 +210,6 @@ class DeviceBridgeTest {
               DeviceLiveStateRequest(
                 dexHash = "dex-1",
                 entryClass = "TestEntry",
-                sourceFile = "test.explore.kt",
                 direction = "d1",
                 screen = "s1",
               )

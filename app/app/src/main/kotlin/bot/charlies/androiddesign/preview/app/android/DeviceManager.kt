@@ -6,7 +6,7 @@ import bot.charlies.androiddesign.preview.app.server.ServerPaths
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
 import bot.charlies.androiddesign.preview.model.DeviceTransportSpec
-import bot.charlies.androiddesign.preview.model.DeviceWireCodec
+import bot.charlies.androiddesign.preview.model.LiveDeviceCodec
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.isWorkerStuck
 import java.io.BufferedInputStream
@@ -986,8 +986,8 @@ class DeviceManager(
           sock.soTimeout = 2_000
           val out = DataOutputStream(BufferedOutputStream(sock.getOutputStream()))
           val inp = DataInputStream(BufferedInputStream(sock.getInputStream()))
-          DeviceWireCodec.writePingRequest(out)
-          DeviceWireCodec.readPingResponse(inp)
+          LiveDeviceCodec.writePingRequest(out)
+          LiveDeviceCodec.readPingResponse(inp)
         }
       } catch (_: Exception) {
         null

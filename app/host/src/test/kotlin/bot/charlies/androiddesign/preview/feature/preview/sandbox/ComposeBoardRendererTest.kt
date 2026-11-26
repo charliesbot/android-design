@@ -5,8 +5,8 @@ import androidx.compose.material3.Text
 import bot.charlies.androiddesign.preview.host.SandboxExcludingRobolectricTestRunner
 import bot.charlies.androiddesign.preview.kit.designBoard
 import bot.charlies.androiddesign.preview.kit.wearBoard
-import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
-import bot.charlies.androiddesign.preview.model.DeviceOverlayMeta
+import bot.charlies.androiddesign.preview.model.DirectionMeta
+import bot.charlies.androiddesign.preview.model.OverlayMeta
 import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.Views
 import bot.charlies.androiddesign.preview.model.WearSurface
@@ -116,12 +116,12 @@ class ComposeBoardRendererTest {
     assertEquals(PhoneSurface.views, meta.views)
     assertEquals(
       listOf(
-        DeviceDirectionMeta(
+        DirectionMeta(
           name = "Main",
           surface = "phone",
           startScreen = "home",
           screens = listOf("home", "detail"),
-          overlays = listOf(DeviceOverlayMeta(id = "confirm", screen = "home")),
+          overlays = listOf(OverlayMeta(id = "confirm", screen = "home")),
         ),
       ),
       meta.directions,

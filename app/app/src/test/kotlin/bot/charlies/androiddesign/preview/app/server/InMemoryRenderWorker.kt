@@ -1,12 +1,11 @@
 package bot.charlies.androiddesign.preview.app.server
 
-import bot.charlies.androiddesign.preview.model.DeviceBoardMeta
-import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
-import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
-import bot.charlies.androiddesign.preview.model.FrameFormat
+import bot.charlies.androiddesign.preview.model.BoardMeta
+import bot.charlies.androiddesign.preview.model.DirectionMeta
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.WorkerRenderTarget
 import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
@@ -14,17 +13,15 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Configurable in-memory [RenderWorker] for JVM unit tests covering [CheckExecutor], [RenderQueue],
- * [CheckService], and [PreviewHttpServer].
+ * [PreviewSessionCoordinator], and [PreviewHttpServer].
  */
 class InMemoryRenderWorker(
   override val name: String = RuntimeIdentity.BACKEND_LAYOUTLIB,
-  override val supportsHeadlessSpeculativePrecompile: Boolean = false,
-  override val scopedCheckDensity: Int = 2,
   private val surface: String = "phone",
   private val boardName: String? = "Board",
-  private val directions: List<DeviceDirectionMeta> =
+  private val directions: List<DirectionMeta> =
     listOf(
-      DeviceDirectionMeta(
+      DirectionMeta(
         name = "A",
         surface = surface,
         startScreen = "home",
@@ -32,25 +29,24 @@ class InMemoryRenderWorker(
       ),
     ),
   private val views: List<ViewSpec> = Views.all,
-  private val dexHashFor: ((ContentHasher.Snapshot) -> String?)? = null,
   private val onPrepare: () -> Unit = {},
   private val compileOverride: ((ContentHasher.Snapshot) -> WorkerCompileResult)? = null,
   private val onCompile: (ContentHasher.Snapshot) -> Unit = {},
-  private val onRenderBatch: (List<DeviceRenderTarget>) -> Unit = {},
+  private val onRenderBatch: (List<WorkerRenderTarget>) -> Unit = {},
   private val aroundRenderBatch:
-    ((List<DeviceRenderTarget>, () -> WorkerBatchResult) -> WorkerBatchResult)? =
+    ((List<WorkerRenderTarget>, () -> WorkerBatchResult) -> WorkerBatchResult)? =
     null,
-  private val onRenderTarget: (DeviceRenderTarget) -> Unit = {},
+  private val onRenderTarget: (WorkerRenderTarget) -> Unit = {},
   private val batchOverride:
-    ((CompileEntry, List<DeviceRenderTarget>, Path) -> WorkerBatchResult)? =
+    ((CompileEntry, List<WorkerRenderTarget>, Path) -> WorkerBatchResult)? =
     null,
-  private val targetBuilder: ((DeviceRenderTarget) -> WorkerTargetOutput)? = null,
+  private val targetBuilder: ((WorkerRenderTarget) -> WorkerTargetOutput)? = null,
   private val onClose: () -> Unit = {},
 ) : RenderWorker {
   val prepareCount = AtomicInteger(0)
   val compileCount = AtomicInteger(0)
   val renderBatchCount = AtomicInteger(0)
-  val recordedBatches = CopyOnWriteArrayList<List<DeviceRenderTarget>>()
+  val recordedBatches = CopyOnWriteArrayList<List<WorkerRenderTarget>>()
   val closed = AtomicBoolean(false)
 
   override fun prepare() {
@@ -70,19 +66,18 @@ class InMemoryRenderWorker(
       designTheme = null,
       compileMs = 5L,
       boardMeta =
-        DeviceBoardMeta(
+        BoardMeta(
           surface = surface,
           boardName = boardName,
           directions = directions,
           views = views,
         ),
-      dexHash = dexHashFor?.invoke(snapshot),
     )
   }
 
   override fun renderTargets(
     entry: CompileEntry,
-    targets: List<DeviceRenderTarget>,
+    targets: List<WorkerRenderTarget>,
     stageRoot: Path,
   ): WorkerBatchResult {
     renderBatchCount.incrementAndGet()
@@ -108,7 +103,7 @@ class InMemoryRenderWorker(
     }
   }
 
-  private fun defaultTargetOutput(target: DeviceRenderTarget): WorkerTargetOutput {
+  private fun defaultTargetOutput(target: WorkerRenderTarget): WorkerTargetOutput {
     val view =
       Views.byName(target.viewName)
         ?: views.firstOrNull { it.name == target.viewName }
@@ -121,17 +116,15 @@ class InMemoryRenderWorker(
         findings = emptyList(),
       )
     val frame =
-      when (target.frameFormat) {
-        FrameFormat.NONE -> null
-        FrameFormat.RAW_RGBA ->
-          WorkerFrame(
-            bytes =
-              PNG_SIGNATURE +
-                "${target.direction}/${target.screen}/${target.overlayId}/${target.viewName}@${target.densityScale}"
-                  .toByteArray(),
-            mime = "image/png",
-            isPng = true,
-          )
+      if (!target.includeFrame) {
+        null
+      } else {
+        WorkerFrame(
+          bytes =
+            PNG_SIGNATURE +
+              "${target.direction}/${target.screen}/${target.overlayId}/${target.viewName}@${target.densityScale}"
+                .toByteArray(),
+        )
       }
     return WorkerTargetOutput(
       direction = target.direction,

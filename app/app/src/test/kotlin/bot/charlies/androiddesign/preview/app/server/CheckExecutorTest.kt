@@ -3,18 +3,18 @@ package bot.charlies.androiddesign.preview.app.server
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.Bounds
-import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
+import bot.charlies.androiddesign.preview.model.DirectionMeta
 import bot.charlies.androiddesign.preview.model.Finding
 import bot.charlies.androiddesign.preview.model.FindingRule
-import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.OverlayMeta
 import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.Severity
 import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.WorkerRenderTarget
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -62,7 +62,7 @@ class CheckExecutorTest {
     )
 
   private fun sampleTree(
-    target: DeviceRenderTarget,
+    target: WorkerRenderTarget,
     findings: List<Finding> = emptyList(),
   ): LayoutTree =
     LayoutTree(
@@ -73,51 +73,34 @@ class CheckExecutorTest {
     )
 
   @Test
-  fun `primaryCheckViews returns Phone and Wear primary views`() {
-    assertEquals(setOf("light", "desktop"), CheckExecutor.primaryCheckViews(BoardSurface.Phone))
-    assertEquals(
-      setOf("watch", "watch-large"),
-      CheckExecutor.primaryCheckViews(BoardSurface.Wear),
-    )
-  }
-
-  @Test
-  fun `scoped batch check respects worker scopedCheckDensity, requests RAW_RGBA for every target, and writes PNGs`() {
+  fun `scoped batch check renders at 2x density, requests frames for every target, and writes PNGs`() {
     val tmp = createTempDirectory("check-exec-scoped-")
     try {
-      for (expectedDensity in listOf(1, 2)) {
-        val worker = InMemoryRenderWorker(scopedCheckDensity = expectedDensity)
-        val executor = CheckExecutor(worker)
-        val entry = compileEntry(tmp)
-        val targets =
-          listOf(
-            CheckTargetSpec("Main", "home", "Main-home", null, Views.Dark),
-            CheckTargetSpec("Main", "home", "Main-home", "sheet", Views.Foldable),
-          )
-        val rendersRoot = tmp.resolve("renders-$expectedDensity")
-
-        val artifacts = executor.renderBatchCheck(entry, targets, scoped = true, rendersRoot)
-
-        assertEquals(2, artifacts.size)
-        val requested = worker.recordedBatches.single()
-        assertEquals(
-          listOf(FrameFormat.RAW_RGBA, FrameFormat.RAW_RGBA),
-          requested.map { it.frameFormat },
+      val worker = InMemoryRenderWorker()
+      val executor = CheckExecutor(worker)
+      val entry = compileEntry(tmp)
+      val targets =
+        listOf(
+          CheckTargetSpec("Main", "home", "Main-home", null, Views.Dark),
+          CheckTargetSpec("Main", "home", "Main-home", "sheet", Views.Foldable),
         )
-        assertEquals(
-          listOf(expectedDensity.toFloat(), expectedDensity.toFloat()),
-          requested.map { it.densityScale },
-        )
-        assertTrue(artifacts.all { it.densityScale == expectedDensity })
-        assertTrue(artifacts.all { it.pngPath != null && Files.isRegularFile(it.pngPath) })
-      }
+      val rendersRoot = tmp.resolve("renders")
+
+      val artifacts = executor.renderBatchCheck(entry, targets, scoped = true, rendersRoot)
+
+      assertEquals(2, artifacts.size)
+      val requested = worker.recordedBatches.single()
+      assertEquals(listOf(true, true), requested.map { it.includeFrame })
+      assertEquals(listOf(2f, 2f), requested.map { it.densityScale })
+      assertTrue(artifacts.all { it.densityScale == 2 })
+      assertTrue(artifacts.all { it.pngPath != null && Files.isRegularFile(it.pngPath) })
     } finally {
       tmp.toFile().deleteRecursively()
     }
   }
 
   @Test
-  fun `unscoped passing check requests RAW_RGBA only for primary non-overlay targets and writes only primary PNGs`() {
+  fun `unscoped passing check requests frames only for primary non-overlay targets and writes only primary PNGs`() {
     val tmp = createTempDirectory("check-exec-unscoped-")
     try {
       val worker = InMemoryRenderWorker()
@@ -134,15 +117,15 @@ class CheckExecutorTest {
       assertEquals(6, artifacts.size)
       assertEquals(1, worker.renderBatchCount.get())
       val batchTargets = worker.recordedBatches.single()
-      val requestedFormats = batchTargets.associate {
-        "${it.viewName}:${it.overlayId ?: "base"}" to it.frameFormat
+      val requestedFrames = batchTargets.associate {
+        "${it.viewName}:${it.overlayId ?: "base"}" to it.includeFrame
       }
-      assertEquals(FrameFormat.RAW_RGBA, requestedFormats["light:base"])
-      assertEquals(FrameFormat.RAW_RGBA, requestedFormats["desktop:base"])
-      assertEquals(FrameFormat.NONE, requestedFormats["dark:base"])
-      assertEquals(FrameFormat.NONE, requestedFormats["foldable:base"])
-      assertEquals(FrameFormat.NONE, requestedFormats["tablet:base"])
-      assertEquals(FrameFormat.NONE, requestedFormats["light:dialog"])
+      assertEquals(true, requestedFrames["light:base"])
+      assertEquals(true, requestedFrames["desktop:base"])
+      assertEquals(false, requestedFrames["dark:base"])
+      assertEquals(false, requestedFrames["foldable:base"])
+      assertEquals(false, requestedFrames["tablet:base"])
+      assertEquals(false, requestedFrames["light:dialog"])
 
       val writtenViews =
         artifacts
@@ -178,12 +161,8 @@ class CheckExecutorTest {
               renderMs = 2L,
               tree = sampleTree(target, findings),
               frame =
-                if (target.frameFormat == FrameFormat.NONE) null
-                else
-                  WorkerFrame(
-                    pngBytes("${target.viewName}-${target.overlayId ?: "base"}"),
-                    "image/png",
-                  ),
+                if (!target.includeFrame) null
+                else WorkerFrame(pngBytes("${target.viewName}-${target.overlayId ?: "base"}")),
             )
           },
         )
@@ -232,10 +211,10 @@ class CheckExecutorTest {
               else listOf(touchFinding("fail-${target.screen}"))
             val frame =
               when {
-                target.frameFormat == FrameFormat.NONE -> null
+                !target.includeFrame -> null
                 target.viewName == "dark" || target.viewName == "foldable" ->
-                  WorkerFrame(sharedFailBytes, "image/png")
-                else -> WorkerFrame(distinctFailBytes + target.viewName.toByteArray(), "image/png")
+                  WorkerFrame(sharedFailBytes)
+                else -> WorkerFrame(distinctFailBytes + target.viewName.toByteArray())
               }
             WorkerTargetOutput(
               direction = target.direction,
@@ -266,7 +245,7 @@ class CheckExecutorTest {
       assertEquals(2, worker.renderBatchCount.get(), "Expected initial batch + 1 follow-up batch")
       val followUpTargets = worker.recordedBatches[1]
       assertEquals(listOf("dark", "foldable", "tablet"), followUpTargets.map { it.viewName })
-      assertTrue(followUpTargets.all { it.frameFormat == FrameFormat.RAW_RGBA })
+      assertTrue(followUpTargets.all { it.includeFrame })
 
       // dark and foldable share identical SHA-256 bytes, so dark and tablet are written (cap 2).
       val written = artifacts.filter { it.pngPath != null }
@@ -291,8 +270,8 @@ class CheckExecutorTest {
               renderMs = 1L,
               tree = sampleTree(target, listOf(touchFinding("err-${target.viewName}"))),
               frame =
-                if (target.frameFormat == FrameFormat.NONE) null
-                else WorkerFrame(pngBytes("fail-${target.viewName}"), "image/png"),
+                if (!target.includeFrame) null
+                else WorkerFrame(pngBytes("fail-${target.viewName}")),
             )
           },
         )
@@ -336,8 +315,8 @@ class CheckExecutorTest {
               renderMs = 3L,
               tree = mainTree,
               endTree = settledTree,
-              frame = WorkerFrame(pngBytes("main"), "image/png"),
-              endFrame = WorkerFrame(pngBytes("end"), "image/png"),
+              frame = WorkerFrame(pngBytes("main")),
+              endFrame = WorkerFrame(pngBytes("end")),
             )
           },
         )
@@ -354,7 +333,7 @@ class CheckExecutorTest {
             view = Views.Light,
             writeFiles = true,
             rendersRoot = tmp.resolve("renders"),
-            frameFormat = FrameFormat.RAW_RGBA,
+            includeFrame = true,
           ),
         )
 
@@ -371,7 +350,7 @@ class CheckExecutorTest {
   }
 
   @Test
-  fun `renderSingle requests RAW_RGBA and writes PNG only when writeFiles is true`() {
+  fun `renderSingle requests frame and writes PNG only when writeFiles is true`() {
     val tmp = createTempDirectory("check-exec-single-format-")
     try {
       val worker = InMemoryRenderWorker()
@@ -389,10 +368,10 @@ class CheckExecutorTest {
             view = Views.Light,
             writeFiles = true,
             rendersRoot = rendersRoot,
-            frameFormat = FrameFormat.RAW_RGBA,
+            includeFrame = true,
           ),
         )
-      assertEquals(FrameFormat.RAW_RGBA, worker.recordedBatches[0].single().frameFormat)
+      assertTrue(worker.recordedBatches[0].single().includeFrame)
       assertEquals("image/png", written.imageMime)
       assertNotNull(written.pngPath)
       assertTrue(Files.isRegularFile(written.pngPath))
@@ -407,10 +386,10 @@ class CheckExecutorTest {
             view = Views.Light,
             writeFiles = false,
             rendersRoot = rendersRoot,
-            frameFormat = FrameFormat.RAW_RGBA,
+            includeFrame = true,
           ),
         )
-      assertEquals(FrameFormat.RAW_RGBA, worker.recordedBatches[1].single().frameFormat)
+      assertTrue(worker.recordedBatches[1].single().includeFrame)
       assertEquals("image/png", inMemory.imageMime)
       assertNull(inMemory.pngPath)
     } finally {
@@ -450,71 +429,6 @@ class CheckExecutorTest {
   }
 
   @Test
-  fun `finishCheck runs once after two-pass batch check and even when renderTargets throws`() {
-    val tmp = createTempDirectory("check-exec-finish-")
-    try {
-      val finishCalls = AtomicInteger(0)
-      val baseWorker =
-        InMemoryRenderWorker(
-          targetBuilder = { target ->
-            WorkerTargetOutput(
-              direction = target.direction,
-              screen = target.screen,
-              viewName = target.viewName,
-              renderMs = 1L,
-              tree = sampleTree(target, listOf(touchFinding("err-${target.viewName}"))),
-              frame =
-                if (target.frameFormat == FrameFormat.NONE) null
-                else WorkerFrame(pngBytes("fail-${target.viewName}"), "image/png"),
-            )
-          },
-        )
-      val countingWorker =
-        object : RenderWorker by baseWorker {
-          override fun finishCheck() {
-            finishCalls.incrementAndGet()
-          }
-        }
-      val executor = CheckExecutor(countingWorker)
-      val entry = compileEntry(tmp)
-      executor.renderBatchCheck(
-        entry,
-        listOf(
-          CheckTargetSpec("Main", "home", "Main-home", null, Views.Light),
-          CheckTargetSpec("Main", "home", "Main-home", null, Views.Dark),
-        ),
-        scoped = false,
-        rendersRoot = tmp.resolve("renders"),
-      )
-      assertEquals(2, baseWorker.renderBatchCount.get())
-      assertEquals(1, finishCalls.get())
-
-      val throwingWorker =
-        object : RenderWorker by InMemoryRenderWorker(onRenderBatch = { error("boom") }) {
-          override fun finishCheck() {
-            finishCalls.incrementAndGet()
-          }
-        }
-      runCatching {
-        CheckExecutor(throwingWorker)
-          .renderSingle(
-            entry,
-            SingleRenderRequest(
-              direction = "Main",
-              screenId = "home",
-              prefix = "Main-home",
-              view = Views.Light,
-              rendersRoot = tmp.resolve("renders"),
-            ),
-          )
-      }
-      assertEquals(2, finishCalls.get())
-    } finally {
-      tmp.toFile().deleteRecursively()
-    }
-  }
-
-  @Test
   fun `batch check groups device targets by view size and name, keeps base before overlay, and preserves output order`() {
     val tmp = createTempDirectory("check-exec-view-group-")
     try {
@@ -534,8 +448,8 @@ class CheckExecutorTest {
               renderMs = 1L,
               tree = sampleTree(target, findings),
               frame =
-                if (target.frameFormat == FrameFormat.NONE) null
-                else WorkerFrame(pngBytes("${target.direction}-${target.viewName}"), "image/png"),
+                if (!target.includeFrame) null
+                else WorkerFrame(pngBytes("${target.direction}-${target.viewName}")),
             )
           },
         )
@@ -613,10 +527,9 @@ class CheckExecutorTest {
   }
 
   @Test
-  fun `renderBatchReport sends one view-grouped RAW_RGBA batch, diffs overlays, and preserves canonical order`() {
+  fun `renderBatchReport sends one view-grouped PNG batch, diffs overlays, and preserves canonical order`() {
     val tmp = createTempDirectory("check-exec-report-batch-")
     try {
-      val finishCalls = AtomicInteger(0)
       val baseFinding = touchFinding("base-btn")
       val overlayFinding = touchFinding("overlay-btn")
       val baseWorker =
@@ -635,18 +548,11 @@ class CheckExecutorTest {
               frame =
                 WorkerFrame(
                   pngBytes("${target.direction}-${target.overlayId ?: "base"}-${target.viewName}"),
-                  "image/png",
                 ),
             )
           },
         )
-      val countingWorker =
-        object : RenderWorker by baseWorker {
-          override fun finishCheck() {
-            finishCalls.incrementAndGet()
-          }
-        }
-      val executor = CheckExecutor(countingWorker)
+      val executor = CheckExecutor(baseWorker)
       val entry = compileEntry(tmp)
       val directions =
         listOf(
@@ -669,9 +575,8 @@ class CheckExecutorTest {
       val artifacts = executor.renderBatchReport(entry, planned, tmp.resolve("out"))
 
       assertEquals(1, baseWorker.renderBatchCount.get(), "Report must execute in a single batch")
-      assertEquals(1, finishCalls.get())
       val sent = baseWorker.recordedBatches.single()
-      assertTrue(sent.all { it.frameFormat == FrameFormat.RAW_RGBA && it.includeEndFrame })
+      assertTrue(sent.all { it.includeFrame && it.includeEndFrame })
       assertEquals(
         listOf(
           "One/base/light",

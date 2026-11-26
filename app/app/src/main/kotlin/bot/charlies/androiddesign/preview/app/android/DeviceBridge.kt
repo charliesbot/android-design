@@ -4,7 +4,7 @@ import bot.charlies.androiddesign.preview.model.DeviceAckResponse
 import bot.charlies.androiddesign.preview.model.DeviceHasAssetsRequest
 import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
-import bot.charlies.androiddesign.preview.model.DeviceWireCodec
+import bot.charlies.androiddesign.preview.model.LiveDeviceCodec
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
@@ -31,7 +31,7 @@ interface DeviceTransport : AutoCloseable {
 }
 
 /**
- * Persistent keep-alive TCP bridge speaking `DeviceOp` via [DeviceWireCodec] to
+ * Persistent keep-alive TCP bridge speaking `LiveDeviceOp` via [LiveDeviceCodec] to
  * `RenderForegroundService` over `adb forward` on `127.0.0.1:<port>`.
  */
 class AdbTcpDeviceTransport(
@@ -51,8 +51,8 @@ class AdbTcpDeviceTransport(
   override fun ping(): DevicePingResponse =
     synchronized(lock) {
       withReconnect(allowRetry = true) { out, inp ->
-        DeviceWireCodec.writePingRequest(out)
-        val resp = DeviceWireCodec.readPingResponse(inp)
+        LiveDeviceCodec.writePingRequest(out)
+        val resp = LiveDeviceCodec.readPingResponse(inp)
         noteSandboxPid(resp.pid)
         preloadedDexHashes.clear()
         preloadedDexHashes.addAll(resp.loadedDexHashes)
@@ -116,15 +116,15 @@ class AdbTcpDeviceTransport(
     if (assetBlobs.isEmpty()) return 0
     val unsynced = assetBlobs.filterKeys { it !in syncedAssetHashes }
     if (unsynced.isEmpty()) return 0
-    DeviceWireCodec.writeHasAssetsRequest(out, DeviceHasAssetsRequest(unsynced.keys.toList()))
-    val missingHashes = DeviceWireCodec.readHasAssetsResponse(inp).missing
+    LiveDeviceCodec.writeHasAssetsRequest(out, DeviceHasAssetsRequest(unsynced.keys.toList()))
+    val missingHashes = LiveDeviceCodec.readHasAssetsResponse(inp).missing
     val toSend = missingHashes.mapNotNull { h -> unsynced[h]?.let { b -> h to b } }
     val uploaded =
       if (toSend.isEmpty()) {
         0
       } else {
-        DeviceWireCodec.writePutAssetsRequest(out, toSend)
-        val ack = DeviceWireCodec.readAck(inp)
+        LiveDeviceCodec.writePutAssetsRequest(out, toSend)
+        val ack = LiveDeviceCodec.readAck(inp)
         if (!ack.ok) {
           throw IOException(ack.error ?: "PUT_ASSETS failed")
         }
@@ -140,8 +140,8 @@ class AdbTcpDeviceTransport(
     dexBytes: ByteArray?,
     request: DeviceLiveStateRequest,
   ): DeviceAckResponse {
-    DeviceWireCodec.writeSetLiveRequest(out, dexBytes, request)
-    return DeviceWireCodec.readAck(inp)
+    LiveDeviceCodec.writeSetLiveRequest(out, dexBytes, request)
+    return LiveDeviceCodec.readAck(inp)
   }
 
   private inline fun <T> withReconnect(

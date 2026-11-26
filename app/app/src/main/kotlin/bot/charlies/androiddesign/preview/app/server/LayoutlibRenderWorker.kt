@@ -4,14 +4,13 @@ import bot.charlies.androiddesign.preview.app.android.AndroidExplorationCompiler
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.domain.image.FastPngEncoder
 import bot.charlies.androiddesign.preview.model.ClassBundleCodec
-import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
-import bot.charlies.androiddesign.preview.model.DeviceBatchWireResult
-import bot.charlies.androiddesign.preview.model.DevicePreloadResponse
-import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
-import bot.charlies.androiddesign.preview.model.DeviceWireCodec
-import bot.charlies.androiddesign.preview.model.DeviceWireFrame
-import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.ValidationError
+import bot.charlies.androiddesign.preview.model.WorkerBatchRequest
+import bot.charlies.androiddesign.preview.model.WorkerBatchWireResult
+import bot.charlies.androiddesign.preview.model.WorkerPipeCodec
+import bot.charlies.androiddesign.preview.model.WorkerPreloadResponse
+import bot.charlies.androiddesign.preview.model.WorkerRenderTarget
+import bot.charlies.androiddesign.preview.model.WorkerWireFrame
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
@@ -28,7 +27,7 @@ import kotlin.io.path.exists
 
 /**
  * [RenderWorker] that runs a child JVM hosting layoutlib (`LayoutlibWorkerMainKt`) over stdin and
- * stdout using [DeviceWireCodec] frames, with no Android device or D8 step.
+ * stdout using [WorkerPipeCodec] frames, with no Android device or D8 step.
  */
 class LayoutlibRenderWorker(
   private val meta: BootstrapMeta,
@@ -40,8 +39,6 @@ class LayoutlibRenderWorker(
   },
 ) : RenderWorker {
   override val name: String = RuntimeIdentity.BACKEND_LAYOUTLIB
-  override val supportsHeadlessSpeculativePrecompile: Boolean = true
-  override val scopedCheckDensity: Int = 2
 
   private class WorkerProcess(
     val process: Process,
@@ -76,8 +73,8 @@ class LayoutlibRenderWorker(
       try {
         val ping =
           runWithTimeout(proc, controlTimeoutMs, "PING") {
-            DeviceWireCodec.writePingRequest(proc.out)
-            DeviceWireCodec.readPingResponse(proc.inp)
+            WorkerPipeCodec.writePingRequest(proc.out)
+            WorkerPipeCodec.readPingResponse(proc.inp)
           }
         check(ping.ok) { "Layoutlib worker PING returned ok=false" }
       } catch (t: Throwable) {
@@ -125,7 +122,6 @@ class LayoutlibRenderWorker(
                     "Layoutlib preload failed: ${t.message ?: t::class.simpleName}",
                   ),
                 ),
-              dexHash = classHash,
             )
           }
 
@@ -139,7 +135,6 @@ class LayoutlibRenderWorker(
             compileMs = stage.compileMs,
             errors = listOf(ValidationError(stage.sourceFile, errMsg)),
             boardTheme = preload.boardTheme,
-            dexHash = classHash,
           )
         }
 
@@ -163,7 +158,6 @@ class LayoutlibRenderWorker(
           compileMs = stage.compileMs,
           boardMeta = boardMeta,
           boardTheme = preload.boardTheme,
-          dexHash = classHash,
           compiledData = compiledData,
         )
       }
@@ -172,25 +166,19 @@ class LayoutlibRenderWorker(
 
   override fun renderTargets(
     entry: CompileEntry,
-    targets: List<DeviceRenderTarget>,
+    targets: List<WorkerRenderTarget>,
     stageRoot: Path,
   ): WorkerBatchResult {
     val data =
       checkNotNull(entry.compiledData) { "Missing CompiledBoardData for ${entry.sourcePath}" }
-    val mappedTargets = targets.map { target ->
-      val wireFormat =
-        if (target.frameFormat == FrameFormat.NONE) FrameFormat.NONE else FrameFormat.RAW_RGBA
-      target.copy(frameFormat = wireFormat)
-    }
     val request =
-      DeviceBatchRequest(
-        dexHash = data.classHash,
+      WorkerBatchRequest(
+        classHash = data.classHash,
         entryClass = data.entryClass,
         sourceFile = data.sourceFile,
         sourceText = data.sourceText,
         designTheme = entry.loaded.designTheme,
-        assetMap = data.assetMap,
-        targets = mappedTargets,
+        targets = targets,
         timeoutMs = batchTimeoutMs,
         explorationDir = data.explorationDir?.toString(),
       )
@@ -246,7 +234,7 @@ class LayoutlibRenderWorker(
       }
 
     val resp = batchWire.response
-    val framesByKey = HashMap<FrameKey, DeviceWireFrame>(batchWire.frames.size * 2)
+    val framesByKey = HashMap<FrameKey, WorkerWireFrame>(batchWire.frames.size * 2)
     for (frame in batchWire.frames) {
       framesByKey[
         FrameKey(
@@ -288,10 +276,6 @@ class LayoutlibRenderWorker(
     )
   }
 
-  override fun finishCheck() {
-    // Worker recycling runs synchronously between batches in renderTargets when recommended.
-  }
-
   override fun close() {
     synchronized(lock) {
       if (closed) return
@@ -307,7 +291,7 @@ class LayoutlibRenderWorker(
   internal fun currentWorkerPid(): Long? = activeProcess?.takeIf { it.isAlive() }?.pid()
 
   private sealed interface BatchWireAttempt {
-    data class Completed(val wire: DeviceBatchWireResult) : BatchWireAttempt
+    data class Completed(val wire: WorkerBatchWireResult) : BatchWireAttempt
 
     data class Failed(val error: String) : BatchWireAttempt
   }
@@ -316,13 +300,13 @@ class LayoutlibRenderWorker(
     proc: WorkerProcess,
     wireBytes: ByteArray?,
     entryClass: String,
-    request: DeviceBatchRequest,
+    request: WorkerBatchRequest,
   ): BatchWireAttempt {
     return try {
       val res =
         runWithTimeout(proc, batchTimeoutMs, "RENDER_BATCH") {
-          DeviceWireCodec.writeRenderBatchRequest(proc.out, wireBytes, entryClass, request)
-          DeviceWireCodec.readRenderBatchResponse(proc.inp)
+          WorkerPipeCodec.writeRenderBatchRequest(proc.out, wireBytes, entryClass, request)
+          WorkerPipeCodec.readRenderBatchResponse(proc.inp)
         }
       BatchWireAttempt.Completed(res)
     } catch (timeout: TimeoutException) {
@@ -349,7 +333,7 @@ class LayoutlibRenderWorker(
     classHash: String,
     entryClass: String,
     bundle: ByteArray,
-  ): DevicePreloadResponse {
+  ): WorkerPreloadResponse {
     synchronized(lock) {
       check(!closed) { "LayoutlibRenderWorker is closed" }
       var lastError: Throwable? = null
@@ -358,8 +342,8 @@ class LayoutlibRenderWorker(
         try {
           val resp =
             runWithTimeout(proc, controlTimeoutMs, "PRELOAD") {
-              DeviceWireCodec.writePreloadDexRequest(proc.out, classHash, entryClass, bundle)
-              DeviceWireCodec.readPreloadDexResponse(proc.inp)
+              WorkerPipeCodec.writePreloadClassesRequest(proc.out, classHash, entryClass, bundle)
+              WorkerPipeCodec.readPreloadClassesResponse(proc.inp)
             }
           if (resp.ok) {
             proc.preloadedHashes.add(classHash)
@@ -481,10 +465,10 @@ class LayoutlibRenderWorker(
     runCatching { proc.process.waitFor(1_000, TimeUnit.MILLISECONDS) }
   }
 
-  private fun DeviceWireFrame.toPngWorkerFrame(): WorkerFrame? {
+  private fun WorkerWireFrame.toPngWorkerFrame(): WorkerFrame? {
     if (payload.isEmpty() || widthPx <= 0 || heightPx <= 0) return null
     val png = FastPngEncoder.encodeFast(widthPx, heightPx, payload)
-    return WorkerFrame(bytes = png, mime = "image/png", isPng = true)
+    return WorkerFrame(bytes = png)
   }
 
   private data class FrameKey(

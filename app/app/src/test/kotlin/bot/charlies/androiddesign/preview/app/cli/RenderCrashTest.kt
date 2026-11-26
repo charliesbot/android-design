@@ -7,13 +7,13 @@ import bot.charlies.androiddesign.preview.app.server.WorkerBatchResult
 import bot.charlies.androiddesign.preview.app.server.WorkerFrame
 import bot.charlies.androiddesign.preview.app.server.WorkerTargetOutput
 import bot.charlies.androiddesign.preview.domain.image.FastPngEncoder
-import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
-import bot.charlies.androiddesign.preview.model.DeviceOverlayMeta
-import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
+import bot.charlies.androiddesign.preview.model.DirectionMeta
 import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.OverlayMeta
 import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.WorkerRenderTarget
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.nio.file.Files
@@ -41,12 +41,12 @@ class RenderCrashTest {
       InMemoryRenderWorker(
         directions =
           listOf(
-            DeviceDirectionMeta(
+            DirectionMeta(
               name = "Crash",
               surface = "phone",
               startScreen = "home",
               screens = listOf("home", "detail"),
-              overlays = listOf(DeviceOverlayMeta("info", "home")),
+              overlays = listOf(OverlayMeta("info", "home")),
             ),
           ),
         views = PhoneSurface.views,
@@ -65,14 +65,14 @@ class RenderCrashTest {
                 nodes = emptyList(),
                 findings = emptyList(),
               ),
-            frame = WorkerFrame(bytes = png, mime = "image/png", isPng = true),
+            frame = WorkerFrame(bytes = png),
           )
         },
       )
     return object : RenderWorker by real {
       override fun renderTargets(
         entry: CompileEntry,
-        targets: List<DeviceRenderTarget>,
+        targets: List<WorkerRenderTarget>,
         stageRoot: Path,
       ): WorkerBatchResult {
         if (targets.any { it.screen == "detail" && it.viewName == "dark" }) {

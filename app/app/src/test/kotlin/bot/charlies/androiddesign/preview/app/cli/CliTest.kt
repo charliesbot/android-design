@@ -9,11 +9,11 @@ import bot.charlies.androiddesign.preview.app.server.WorkerFrame
 import bot.charlies.androiddesign.preview.app.server.WorkerTargetOutput
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.domain.image.FastPngEncoder
-import bot.charlies.androiddesign.preview.model.DeviceBoardMeta
-import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
-import bot.charlies.androiddesign.preview.model.DeviceOverlayMeta
+import bot.charlies.androiddesign.preview.model.BoardMeta
+import bot.charlies.androiddesign.preview.model.DirectionMeta
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.MaterialOverride
+import bot.charlies.androiddesign.preview.model.OverlayMeta
 import bot.charlies.androiddesign.preview.model.PaletteVariant
 import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
@@ -75,17 +75,17 @@ class CliTest {
             val boardMeta =
               when {
                 isWear ->
-                  DeviceBoardMeta(
+                  BoardMeta(
                     surface = "wear",
                     boardName = "Watch",
                     directions =
                       listOf(
-                        DeviceDirectionMeta(
+                        DirectionMeta(
                           name = "Watch",
                           surface = "wear",
                           startScreen = "list",
                           screens = listOf("list", "fixed"),
-                          overlays = listOf(DeviceOverlayMeta("sure", "list")),
+                          overlays = listOf(OverlayMeta("sure", "list")),
                         ),
                       ),
                     views = WearSurface.views,
@@ -93,29 +93,29 @@ class CliTest {
                 hasPlates -> {
                   val overlayScreen =
                     if ("overlay(\"new_sheet\", screen = \"plates\")" in src) "plates" else null
-                  DeviceBoardMeta(
+                  BoardMeta(
                     surface = "phone",
                     boardName = "Plates",
                     directions =
                       listOf(
-                        DeviceDirectionMeta(
+                        DirectionMeta(
                           name = "Plates",
                           surface = "phone",
                           startScreen = "plates",
                           screens = listOf("plates", "plate_detail"),
-                          overlays = listOf(DeviceOverlayMeta("new_sheet", overlayScreen)),
+                          overlays = listOf(OverlayMeta("new_sheet", overlayScreen)),
                         ),
                       ),
                     views = PhoneSurface.views,
                   )
                 }
                 else ->
-                  DeviceBoardMeta(
+                  BoardMeta(
                     surface = "phone",
                     boardName = "Plain",
                     directions =
                       listOf(
-                        DeviceDirectionMeta(
+                        DirectionMeta(
                           name = "Plain",
                           surface = "phone",
                           startScreen = "home",
@@ -170,10 +170,8 @@ class CliTest {
           renderMs = 4L,
           tree = tree,
           endTree = if (isScrollWear) tree else null,
-          frame = WorkerFrame(bytes = samplePng, mime = "image/png", isPng = true),
-          endFrame =
-            if (isScrollWear) WorkerFrame(bytes = samplePng, mime = "image/png", isPng = true)
-            else null,
+          frame = WorkerFrame(bytes = samplePng),
+          endFrame = if (isScrollWear) WorkerFrame(bytes = samplePng) else null,
         )
       },
     )

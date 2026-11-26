@@ -13,7 +13,6 @@ import time
 ROOT = Path(__file__).resolve().parent.parent
 REPO_APP = ROOT / "app"
 CLI_BIN = ROOT / "plugin/skills/android-design-explore/scripts/android-design-preview"
-SUPERVISOR_BIN = CLI_BIN
 PLUGIN_MANIFEST = ROOT / "plugin/plugin.json"
 
 EXECUTABLE_ENV = "ANDROID_DESIGN_PREVIEW"

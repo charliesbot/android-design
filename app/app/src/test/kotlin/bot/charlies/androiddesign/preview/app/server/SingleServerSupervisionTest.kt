@@ -1,7 +1,7 @@
 package bot.charlies.androiddesign.preview.app.server
 
 import bot.charlies.androiddesign.preview.app.client.ClientExitCode
-import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
+import bot.charlies.androiddesign.preview.model.DirectionMeta
 import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import java.io.BufferedReader
@@ -51,7 +51,7 @@ class SingleServerSupervisionTest {
   }
 
   private val fakeDirections =
-    listOf(DeviceDirectionMeta("Dir", "phone", "home", listOf("home"), emptyList()))
+    listOf(DirectionMeta("Dir", "phone", "home", listOf("home"), emptyList()))
 
   private fun httpCall(
     url: String,
@@ -93,7 +93,6 @@ class SingleServerSupervisionTest {
     val worker =
       InMemoryRenderWorker(
         name = RuntimeIdentity.BACKEND_LAYOUTLIB,
-        supportsHeadlessSpeculativePrecompile = true,
         directions = fakeDirections,
         views = PhoneSurface.views,
         aroundRenderBatch = { _, proceed ->
@@ -292,10 +291,8 @@ class SingleServerSupervisionTest {
     val worker =
       InMemoryRenderWorker(
         name = "fake-watch",
-        supportsHeadlessSpeculativePrecompile = true,
         directions = fakeDirections,
         views = PhoneSurface.views,
-        dexHashFor = { "dex-${it.contentHash}" },
         onCompile = {
           compileCount.incrementAndGet()
           compiledLatches.get().countDown()
@@ -375,7 +372,6 @@ class SingleServerSupervisionTest {
         name = "slow",
         directions = fakeDirections,
         views = PhoneSurface.views,
-        dexHashFor = { "dex" },
         onRenderBatch = {
           renderStarted.countDown()
           Thread.sleep(10_000)

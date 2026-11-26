@@ -1,15 +1,14 @@
 package bot.charlies.androiddesign.preview.app.server
 
 import bot.charlies.androiddesign.preview.domain.ViewCheck
+import bot.charlies.androiddesign.preview.model.BoardMeta
 import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.DesignSystem
-import bot.charlies.androiddesign.preview.model.DeviceBoardMeta
-import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
-import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.ThemeOverride
 import bot.charlies.androiddesign.preview.model.ValidationError
 import bot.charlies.androiddesign.preview.model.ViewSpec
+import bot.charlies.androiddesign.preview.model.WorkerRenderTarget
 import java.nio.file.Path
 
 /** Exploration compile inputs, resolved design system, and any validation/compiler errors. */
@@ -47,7 +46,6 @@ data class CheckTargetSpec(
 
 data class BackendCompileOutput(
   val loaded: LoadedExploration,
-  val dexHash: String?,
   val surface: BoardSurface,
   val boardName: String?,
   val boardMeta: BoardMeta?,
@@ -57,16 +55,15 @@ data class BackendCompileOutput(
 
 class SandboxWatchdogException(message: String) : RuntimeException(message)
 
-/** Outcome returned by a [RenderWorker] after compiling/preloading an exploration. */
+/** Outcome returned by a [RenderWorker] after compiling and preloading an exploration. */
 sealed interface WorkerCompileResult {
   data class Ready(
     val sourcePath: Path,
     val designPath: Path?,
     val designTheme: ThemeOverride?,
     val compileMs: Long,
-    val boardMeta: DeviceBoardMeta,
+    val boardMeta: BoardMeta,
     val boardTheme: ThemeOverride? = null,
-    val dexHash: String? = null,
     val compiledData: CompiledBoardData? = null,
   ) : WorkerCompileResult
 
@@ -77,18 +74,18 @@ sealed interface WorkerCompileResult {
     val compileMs: Long,
     val errors: List<ValidationError>,
     val boardTheme: ThemeOverride? = null,
-    val dexHash: String? = null,
   ) : WorkerCompileResult
 }
 
-/** Encoded image frame returned from a [RenderWorker] target render. */
-data class WorkerFrame(
-  val bytes: ByteArray,
-  val mime: String,
-  val isPng: Boolean = mime == "image/png",
-)
+/** Encoded PNG frame returned from a [RenderWorker] target render. */
+data class WorkerFrame(val bytes: ByteArray) {
+  override fun equals(other: Any?): Boolean =
+    this === other || (other is WorkerFrame && bytes.contentEquals(other.bytes))
 
-/** Per-target tree and optional rendered frame bytes returned from a [RenderWorker]. */
+  override fun hashCode(): Int = bytes.contentHashCode()
+}
+
+/** Per-target tree and optional PNG frame bytes returned from a [RenderWorker]. */
 data class WorkerTargetOutput(
   val direction: String,
   val screen: String,
@@ -132,7 +129,7 @@ data class SingleRenderRequest(
   val baseCheck: ViewCheck? = null,
   val writeFiles: Boolean = false,
   val rendersRoot: Path,
-  val frameFormat: FrameFormat = FrameFormat.RAW_RGBA,
+  val includeFrame: Boolean = true,
   val fontScale: Float = 1f,
   val seedOverride: String? = null,
   val variantOverride: String? = null,
@@ -140,13 +137,11 @@ data class SingleRenderRequest(
 )
 
 /**
- * Narrow port between [CheckExecutor] and the underlying compilation + frame-capture runtime
+ * Narrow boundary between [CheckExecutor] and the underlying compilation + frame-capture runtime
  * ([LayoutlibRenderWorker] or in-memory test doubles).
  */
 interface RenderWorker : AutoCloseable {
   val name: String
-  val supportsHeadlessSpeculativePrecompile: Boolean
-  val scopedCheckDensity: Int
 
   /**
    * Brings the worker to a warm state before a job starts. [RenderQueue] calls this outside the job
@@ -158,16 +153,9 @@ interface RenderWorker : AutoCloseable {
 
   fun renderTargets(
     entry: CompileEntry,
-    targets: List<DeviceRenderTarget>,
+    targets: List<WorkerRenderTarget>,
     stageRoot: Path,
   ): WorkerBatchResult
-
-  /**
-   * Called once after a top-level [CheckExecutor] batch or single-view render finishes, so workers
-   * can flush deferred post-check maintenance without racing follow-up frame fetches inside the
-   * same check.
-   */
-  fun finishCheck() {}
 
   override fun close() {}
 }
