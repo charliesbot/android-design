@@ -32,7 +32,7 @@ codex plugin add android-design@charliesbot-android-design
 **Antigravity:**
 
 ```bash
-agy plugin install https://github.com/charliesbot/android-design/tree/main/plugin
+agy plugin install https://github.com/charliesbot/android-design
 ```
 
 **Standalone skills (`npx skills` or Chai):**
