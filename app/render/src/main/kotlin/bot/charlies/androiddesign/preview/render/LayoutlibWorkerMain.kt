@@ -268,7 +268,6 @@ internal class LayoutlibWorkerSession(private val sdk: PaparazziSdk) {
           designMd = request.designTheme,
           overlayId = target.overlayId,
           density = target.densityScale,
-          fontScale = target.fontScale,
           darkOverride = target.darkOverride,
           seedOverride = target.seedOverride,
           variantOverride = target.variantOverride,

@@ -68,7 +68,6 @@ internal class VirtualClockComposeRenderer(
         overlayId = request.overlayId,
         designSystem = designSystem,
         dark = dark,
-        fontScale = request.fontScale,
         assetResolver = resolver,
       )
     mainHandler.post { LivePreviewState.session.value = nextSession }

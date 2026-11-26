@@ -808,9 +808,7 @@ internal class PreviewSessionCoordinator(
             ErrorEnvelope(error = "invalid_variant", message = "Unknown variant '$wire'"),
           )
       }
-    val fontScale = (req.fontScale ?: 1f).coerceIn(0.5f, 2.5f)
-    val hasThemeOverride =
-      req.seed != null || req.variant != null || req.dark != null || fontScale != 1f
+    val hasThemeOverride = req.seed != null || req.variant != null || req.dark != null
     val artifact =
       try {
         if (!hasThemeOverride) {
@@ -846,7 +844,6 @@ internal class PreviewSessionCoordinator(
               view = effectiveView,
               densityScale = CheckExecutor.CHECK_DENSITY_SCALE,
               includeFrame = true,
-              fontScale = fontScale,
               seedOverride = req.seed,
               variantOverride = variantOverride?.wire,
               darkOverride = if (entry.surface == BoardSurface.Phone) req.dark else null,
@@ -867,7 +864,6 @@ internal class PreviewSessionCoordinator(
           darkOverride = if (entry.surface == BoardSurface.Phone) req.dark else null,
           seedOverride = req.seed,
           variantOverride = variantOverride?.wire,
-          fontScale = fontScale,
         ),
     )
 

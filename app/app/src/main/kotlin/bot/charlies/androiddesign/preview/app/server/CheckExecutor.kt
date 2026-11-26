@@ -93,7 +93,6 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
           viewName = t.view.name,
           overlayId = t.overlayId,
           densityScale = densityScale.toFloat(),
-          fontScale = 1f,
           includeFrame = wantFrame,
           includeEndFrame = wantFrame,
         )
@@ -185,7 +184,6 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
           viewName = t.view.name,
           overlayId = t.overlayId,
           densityScale = densityScale.toFloat(),
-          fontScale = 1f,
           includeFrame = true,
           includeEndFrame = true,
         )
@@ -280,7 +278,6 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
         viewName = request.view.name,
         overlayId = request.overlayId,
         densityScale = request.densityScale.toFloat(),
-        fontScale = request.fontScale,
         darkOverride = request.darkOverride,
         seedOverride = request.seedOverride,
         variantOverride = request.variantOverride,
@@ -405,7 +402,6 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
           viewName = spec.view.name,
           overlayId = spec.overlayId,
           densityScale = densityScale.toFloat(),
-          fontScale = 1f,
           includeFrame = true,
           includeEndFrame = true,
         )

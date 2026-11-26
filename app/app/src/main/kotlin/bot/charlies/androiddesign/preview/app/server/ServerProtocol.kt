@@ -228,7 +228,6 @@ data class BoardRenderRequest(
   val seed: String? = null,
   val variant: String? = null,
   val dark: Boolean? = null,
-  val fontScale: Float? = null,
 )
 
 @Serializable

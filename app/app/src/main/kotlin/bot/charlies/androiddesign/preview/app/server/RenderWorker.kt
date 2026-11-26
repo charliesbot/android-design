@@ -115,7 +115,6 @@ data class LivePreviewUpdate(
   val darkOverride: Boolean? = null,
   val seedOverride: String? = null,
   val variantOverride: String? = null,
-  val fontScale: Float = 1f,
 )
 
 /** Parameters for a single-view render executed through [CheckExecutor.renderSingle]. */
@@ -130,7 +129,6 @@ data class SingleRenderRequest(
   val writeFiles: Boolean = false,
   val rendersRoot: Path,
   val includeFrame: Boolean = true,
-  val fontScale: Float = 1f,
   val seedOverride: String? = null,
   val variantOverride: String? = null,
   val darkOverride: Boolean? = null,

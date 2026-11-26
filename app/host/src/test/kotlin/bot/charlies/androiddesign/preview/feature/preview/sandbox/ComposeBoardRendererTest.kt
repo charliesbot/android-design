@@ -25,7 +25,7 @@ import org.robolectric.annotation.GraphicsMode
 class ComposeBoardRendererTest {
 
   @Test
-  fun preparedRenderTargetScalesDimensionsClampsFontScaleAndScopesDarkOverrideToPhone() {
+  fun preparedRenderTargetScalesDimensionsPinsFontScaleAndScopesDarkOverrideToPhone() {
     val phoneBoard =
       designBoard("PhoneTest") {
         direction("Editorial") { screen("home") { Text("Hi") } }
@@ -40,12 +40,10 @@ class ComposeBoardRendererTest {
           sourceFile = "Phone.explore.kt",
           sourceText = "",
           density = 2f,
-          fontScale = 0.25f,
           darkOverride = true,
         ),
       )
     assertTrue(phonePrepared.effectiveView.dark)
-    assertEquals(0.5f, phonePrepared.effectiveFontScale, 0.001f)
     assertEquals(Views.Light.width * 2, phonePrepared.widthPx)
     assertEquals(Views.Light.height * 2, phonePrepared.heightPx)
     assertEquals(320, phonePrepared.dpi)
@@ -54,7 +52,7 @@ class ComposeBoardRendererTest {
     val (_, phoneCfg) = phonePrepared.createOverrideContext(RuntimeEnvironment.getApplication())
     assertEquals(Views.Light.width, phoneCfg.screenWidthDp)
     assertEquals(Views.Light.height, phoneCfg.screenHeightDp)
-    assertEquals(0.5f, phoneCfg.fontScale, 0.001f)
+    assertEquals(1f, phoneCfg.fontScale, 0.001f)
     assertEquals(
       Configuration.UI_MODE_NIGHT_YES,
       phoneCfg.uiMode and Configuration.UI_MODE_NIGHT_MASK,
@@ -78,7 +76,6 @@ class ComposeBoardRendererTest {
           sourceFile = "Wear.explore.kt",
           sourceText = "",
           density = 1.5f,
-          fontScale = 1.2f,
           darkOverride = false,
         ),
       )

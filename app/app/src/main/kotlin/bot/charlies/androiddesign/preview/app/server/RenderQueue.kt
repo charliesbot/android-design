@@ -652,8 +652,8 @@ class RenderQueue(
   }
 
   /**
-   * Serializes a single ad-hoc override render (theme/seed/variant/dark/fontScale) through the
-   * priority queue and [watchdog] without populating the shared render cache or disk artifacts.
+   * Serializes a single ad-hoc override render (theme/seed/variant/dark) through the priority queue
+   * and [watchdog] without populating the shared render cache or disk artifacts.
    */
   fun renderOverride(
     entry: CompileEntry,
@@ -664,7 +664,6 @@ class RenderQueue(
     view: ViewSpec,
     densityScale: Int = CheckExecutor.CHECK_DENSITY_SCALE,
     includeFrame: Boolean = true,
-    fontScale: Float = 1f,
     seedOverride: String? = null,
     variantOverride: String? = null,
     darkOverride: Boolean? = null,
@@ -716,7 +715,6 @@ class RenderQueue(
                       writeFiles = false,
                       rendersRoot = rendersRootForRepo(entry.repoRoot),
                       includeFrame = includeFrame,
-                      fontScale = fontScale,
                       seedOverride = seedOverride,
                       variantOverride = variantOverride,
                       darkOverride = darkOverride,

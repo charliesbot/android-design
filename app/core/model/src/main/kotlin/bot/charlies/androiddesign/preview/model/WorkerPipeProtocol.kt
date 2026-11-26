@@ -32,7 +32,6 @@ data class WorkerRenderTarget(
   val viewName: String,
   val overlayId: String? = null,
   val densityScale: Float = 2f,
-  val fontScale: Float = 1f,
   val darkOverride: Boolean? = null,
   val seedOverride: String? = null,
   val variantOverride: String? = null,

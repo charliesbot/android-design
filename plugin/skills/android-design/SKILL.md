@@ -68,7 +68,7 @@ For an exploration, run `android-design-explore`'s Check step instead of renderi
 - Does every expressive choice serve the direction?
 - Does color reinforce hierarchy and atmosphere, with accents only on elements that have a job?
 - Are supporting actions easy to find and clearly tappable (with text-only buttons kept inside a clear action group such as a dialog, card, or snackbar)?
-- Does it hold up with real content lengths, 200% text scaling, and a smaller window?
+- Does it hold up with real content lengths and a smaller window?
 - Would it remain clear with expressive flourishes removed?
 - Is it still a template? A screen resembling the Material component catalog is incomplete.
 
@@ -173,7 +173,7 @@ Read [references/components.md](references/components.md) when choosing, writing
 ### Accessibility and writing
 
 - **Contrast and targets:** 4.5:1 small text, 3:1 large text, icons, and controls; honor system contrast ([contrast levels](references/theming.md#contrast-levels)); pair color with icon, label, or underline. Keep touch targets at least 48dp with 8dp separation.
-- **Scaling and wrapping:** support 200% text scaling (text grows, padding/icons/controls stay fixed, layouts reflow). Wrap text by default; ellipsize only when full text is reachable (tooltip, link, expanded view).
+- **Wrapping:** wrap text by default; ellipsize only when full text is reachable (tooltip, link, expanded view).
 - **Compose semantics:** section titles take `Modifier.semantics { heading() }`. Toggle/select rows carry row-level `toggleable` or `selectable` with a `role` (or `SegmentedListItem(onClick = ...)` with `Modifier.semantics { role = Role.Switch; toggleableState = ToggleableState(checked) }` for switch rows, or its `checked` / `selected` overloads) and pass `null` as the child `Checkbox`/`Switch`/`RadioButton` callback. Rely on built-in merging on clickables, buttons, and `ListItem`. Hide decorative or repeated text via `hideFromAccessibility()`; use `clearAndSetSemantics` only when merging cannot describe the control; add semantics manually to custom `Canvas` controls.
 - **Writing:** content descriptions state purpose ("Voice search"), not appearance or role. Sentence case, second person, contractions, no periods on single-sentence labels, exclamation points only for real celebrations.
 
