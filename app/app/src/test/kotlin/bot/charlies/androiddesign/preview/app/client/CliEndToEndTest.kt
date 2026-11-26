@@ -211,7 +211,7 @@ class CliEndToEndTest {
       // endpoint (including `stop`) without requiring an emulator boot in unit test runs.
       serverProc = startFakeServerSubprocess(repo, cacheDir)
 
-      // Scoped check compiles, renders 1x PNG, exits 0, single JSON line, no selection yet.
+      // Scoped check compiles, renders 2x PNG, exits 0, single JSON line, no selection yet.
       val check1 =
         execCli(
           repo,
@@ -230,7 +230,7 @@ class CliEndToEndTest {
       assertTrue(r1.ok && r1.valid && r1.pass && r1.scoped)
       assertNull(r1.selection)
       assertEquals(1, r1.images.size)
-      assertEquals(1, r1.images.single().density)
+      assertEquals(2, r1.images.single().density)
       assertTrue(Files.isRegularFile(Path.of(r1.images.single().path)))
 
       // Warm status exits 0 and reports running server.

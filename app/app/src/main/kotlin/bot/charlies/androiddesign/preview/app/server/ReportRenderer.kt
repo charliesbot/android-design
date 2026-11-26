@@ -14,7 +14,6 @@ import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.SurfaceSpec
 import bot.charlies.androiddesign.preview.model.ValidationError
-import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.WearSurface
 import java.nio.charset.CharacterCodingException
 import java.nio.file.Files
@@ -152,45 +151,23 @@ object ReportRenderer {
     }
 
     val surface: SurfaceSpec = if (entry.surface == BoardSurface.Wear) WearSurface else PhoneSurface
-    val views =
-      resolveViews(requestedViews, surface).getOrElse { err ->
-        return Result(
-          ok = false,
-          valid = true,
-          pass = false,
-          exitCode = ExitCode.USAGE,
-          error = "unknown_view",
-          messages = listOf(err.message ?: "Unknown view"),
-        )
+    val planned =
+      when (
+        val resolved =
+          TargetResolver.resolveReportTargets(meta, surface, requestedViews, requestedScreens)
+      ) {
+        is TargetResolution.Ok -> resolved.value
+        is TargetResolution.Error ->
+          return Result(
+            ok = false,
+            valid = true,
+            pass = false,
+            exitCode = ExitCode.USAGE,
+            error = resolved.code,
+            messages = listOf(resolved.message),
+          )
       }
-    if (requestedScreens != null) {
-      val known =
-        meta.directions
-          .flatMap { dir ->
-            dir.screens.flatMap { sid ->
-              listOf(sid, "${dir.name}/$sid", "${sanitizeSegment(dir.name)}__$sid")
-            }
-          }
-          .toSet()
-      val unknown = requestedScreens.filter { it !in known }
-      if (unknown.isNotEmpty()) {
-        val allNames = meta.directions.flatMap { d -> d.screens.map { "${d.name}/$it" } }
-        return Result(
-          ok = false,
-          valid = true,
-          pass = false,
-          exitCode = ExitCode.USAGE,
-          error = "unknown_screen",
-          messages =
-            listOf(
-              "no such screen: ${unknown.joinToString()} (screens: ${allNames.joinToString()})",
-            ),
-        )
-      }
-    }
 
-    val targets = resolveMetaTargets(meta.directions, requestedScreens, directionFilter = null)
-    val planned = planBatchTargets(targets, views, includeOverlays = true)
     val entries =
       try {
         val artifacts = renderBatch(entry, planned)
@@ -254,22 +231,6 @@ object ReportRenderer {
         null
       }
     return RenderEntry.of(artifactName, viewName, filesBase, artifact.check, endFiles)
-  }
-
-  private fun resolveViews(
-    requested: List<String>?,
-    surface: SurfaceSpec,
-  ): kotlin.Result<List<ViewSpec>> {
-    if (requested == null) return kotlin.Result.success(surface.views)
-    val mapped = requested.map { name ->
-      surface.views.firstOrNull { it.name == name }
-        ?: return kotlin.Result.failure(
-          IllegalArgumentException(
-            "unknown view '$name' (the ${surface.key} views: ${surface.views.joinToString { it.name }})",
-          ),
-        )
-    }
-    return kotlin.Result.success(mapped)
   }
 
   private fun writeArtifacts(dir: Path, base: String, png: ByteArray, tree: LayoutTree) {

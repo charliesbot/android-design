@@ -27,7 +27,6 @@ data class RuntimeIdentity(
   val backend: String,
   val runtimeHash: String,
   val sourceDir: String?,
-  val apkSha256: String?,
   val serverCpFile: Path?,
   val bootstrapDir: Path?,
 ) {
@@ -62,7 +61,6 @@ data class RuntimeIdentity(
       val workerCpFile =
         env[WORKER_CP_ENV]?.trim()?.takeIf { it.isNotBlank() }?.let(Path::of)
           ?: bootstrapDir?.resolve("worker.cp")?.takeIf { Files.isRegularFile(it) }
-      val apkSha: String? = null
 
       val overrideHash = env[RUNTIME_HASH_ENV]?.trim()?.takeIf { it.isNotBlank() }
       val runtimeHash =
@@ -100,7 +98,6 @@ data class RuntimeIdentity(
         backend = backend,
         runtimeHash = runtimeHash,
         sourceDir = sourceDir,
-        apkSha256 = apkSha,
         serverCpFile = serverCpFile,
         bootstrapDir = bootstrapDir,
       )

@@ -128,7 +128,7 @@ class MultiTurnTests(unittest.TestCase):
             out = Path(tmp) / 'run'
             cache_dir = Path(tmp) / 'cache'
             with mock.patch.object(multiturn, 'execute', side_effect=fake_execute), \
-                    mock.patch.object(multiturn.eval_run, '_stop_preview_server') as stopper, \
+                    mock.patch.object(multiturn.eval_run, 'stop_preview_server') as stopper, \
                     mock.patch.object(multiturn.eval_run, 'render', return_value=(['/tmp/a.png'], None)), \
                     mock.patch.object(multiturn, 'run_checks', return_value={'C-valid': {'pass': True}}):
                 report = multiturn.run_multiturn(
@@ -156,7 +156,7 @@ class MultiTurnTests(unittest.TestCase):
             env_cache = Path(tmp) / 'env-cache'
             with mock.patch.dict('os.environ', {'ANDROID_DESIGN_CACHE_DIR': str(env_cache)}), \
                     mock.patch.object(multiturn, 'execute', side_effect=RuntimeError('turn 1 boom')), \
-                    mock.patch.object(multiturn.eval_run, '_stop_preview_server', return_value=True) as stopper:
+                    mock.patch.object(multiturn.eval_run, 'stop_preview_server', return_value=True) as stopper:
                 with self.assertRaisesRegex(RuntimeError, 'turn 1 boom'):
                     multiturn.run_multiturn(
                         out, max_turns=2, binary='/tmp/bin', src='/tmp/app', bdir='/tmp/bdir',
@@ -176,7 +176,7 @@ class MultiTurnTests(unittest.TestCase):
                     mock.patch.object(multiturn, 'preview_src', return_value=Path('/tmp/app')), \
                     mock.patch.object(multiturn, 'bootstrap_dir', return_value=Path('/tmp/bdir')), \
                     mock.patch.object(multiturn, 'server_cp', return_value=Path('/tmp/bdir/server.cp')), \
-                    mock.patch.object(multiturn.eval_run, '_stop_preview_server'), \
+                    mock.patch.object(multiturn.eval_run, 'stop_preview_server'), \
                     mock.patch.object(multiturn.eval_run, 'render', return_value=(['/tmp/a.png'], None)) as rend, \
                     mock.patch.object(multiturn, 'run_checks', return_value={'C-valid': {'pass': True}}):
                 checks, images = multiturn.evaluate_multiturn_dir(out)

@@ -7,10 +7,10 @@ import androidx.compose.ui.platform.isDebugInspectorInfoEnabled
 import bot.charlies.androiddesign.preview.domain.findings.ScrolledTree
 import bot.charlies.androiddesign.preview.kit.BoardSurface
 import bot.charlies.androiddesign.preview.kit.ExplorationBoard
-import bot.charlies.androiddesign.preview.model.DeviceBoardMeta
-import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
-import bot.charlies.androiddesign.preview.model.DeviceOverlayMeta
+import bot.charlies.androiddesign.preview.model.BoardMeta
+import bot.charlies.androiddesign.preview.model.DirectionMeta
 import bot.charlies.androiddesign.preview.model.LayoutTree
+import bot.charlies.androiddesign.preview.model.OverlayMeta
 import bot.charlies.androiddesign.preview.model.ThemeOverride
 import java.util.Collections
 
@@ -149,18 +149,18 @@ class ComposeBoardRenderer(private val host: BoardRenderHost) {
   companion object {
     private const val NANOS_PER_MS = 1_000_000.0
 
-    fun buildBoardMeta(board: ExplorationBoard): DeviceBoardMeta =
-      DeviceBoardMeta(
+    fun buildBoardMeta(board: ExplorationBoard): BoardMeta =
+      BoardMeta(
         surface = board.surfaceSpec.key,
         boardName = board.name,
         directions =
           board.directions.map { d ->
-            DeviceDirectionMeta(
+            DirectionMeta(
               name = d.name,
               surface = board.surfaceSpec.key,
               startScreen = d.startScreen,
               screens = d.screenIds,
-              overlays = d.overlays.map { o -> DeviceOverlayMeta(o.id, o.screen) },
+              overlays = d.overlays.map { o -> OverlayMeta(o.id, o.screen) },
             )
           },
         views = board.surfaceSpec.views,

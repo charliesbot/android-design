@@ -488,11 +488,6 @@ val exportBootstrap =
     outputs.file(outPathsFile)
 
     doLast {
-      val robolectricConfigDir =
-        layout.buildDirectory.dir("bootstrap/robolectric-config").get().asFile
-      robolectricConfigDir.deleteRecursively()
-      layout.buildDirectory.file("bootstrap/robolectric.cp").get().asFile.delete()
-
       val appEntries = linkedSetOf<String>()
       for (f in appJarOutputs.get().files) {
         if (f.exists()) appEntries.add(f.absolutePath)

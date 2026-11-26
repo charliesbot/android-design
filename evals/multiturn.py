@@ -132,7 +132,7 @@ def followup_turn_prompt(turn_number, total_turns, title, revision_text):
     verify = (
         'run ONE unscoped `android-design-preview check` across all views and open its returned `light` and `desktop` PNGs'
         if turn_number == total_turns
-        else 'run ONE scoped `android-design-preview check` on the single changed direction, screen (if multiple), and view, and open that single returned 1x PNG to verify the visual change'
+        else 'run ONE scoped `android-design-preview check` on the single changed direction, screen (if multiple), and view, and open that single returned PNG to verify the visual change'
     )
     return (
         f'Revision {turn_number} of {total_turns} ({title}):\n\n'
@@ -202,7 +202,7 @@ def _sum_optional(values, round_digits=None):
     return int(total) if all(isinstance(v, int) for v in nums) else round(float(total), 2)
 
 
-def aggregate_multiturn(turn_records, *, model=None, commit_sha=None, pipeline='v6', final_checks=None, captured_at=None, backend='claude', render_backend=None):
+def aggregate_multiturn(turn_records, *, model=None, commit_sha=None, pipeline='v7', final_checks=None, captured_at=None, backend='claude', render_backend=None):
     """Aggregate per-turn records into session totals and per-turn means/medians."""
     merged_files = {}
     for rec in turn_records:
@@ -324,7 +324,7 @@ def evaluate_multiturn_dir(out_dir, *, binary=None, src=None, bdir=None, cache_d
         bdir=resolved_bdir,
         cache_dir=cache_dir,
         cache_prefix='eval-mt-eval',
-        stopper=eval_run._stop_preview_server,
+        stopper=eval_run.stop_preview_server,
     ) as active_cache_dir:
         images, render_error = eval_run.render(
             out_dir,
@@ -362,7 +362,7 @@ def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v7', timeout
         bdir=resolved_bdir,
         cache_dir=cache_dir,
         cache_prefix='eval-mt',
-        stopper=eval_run._stop_preview_server,
+        stopper=eval_run.stop_preview_server,
     ) as active_cache_dir:
         for idx, (title, body) in enumerate(revisions, start=1):
             prompt = (

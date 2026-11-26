@@ -361,7 +361,7 @@ class ArtifactPipelineTests(unittest.TestCase):
                     mock.patch.object(run, 'preview_src', return_value=Path(SRC_DIR)), \
                     mock.patch.object(run, 'bootstrap_dir', return_value=Path(BOOTSTRAP_DIR)), \
                     mock.patch.object(run, 'server_cp', return_value=Path(SERVER_CP)), \
-                    mock.patch.object(run, '_stop_preview_server') as stopper, \
+                    mock.patch.object(run, 'stop_preview_server') as stopper, \
                     mock.patch.object(run, 'execute', return_value=reply) as agent:
                 run.generate(directory, 'claude', cache_dir=Path(tmp) / 'cache')
             self.assertEqual(agent.call_args.kwargs['mcp_binary'], Path(BINARY))
@@ -392,7 +392,7 @@ class ArtifactPipelineTests(unittest.TestCase):
                     mock.patch.object(run, 'generate', side_effect=fake_gen), \
                     mock.patch.object(run, 'render', return_value=([], None)), \
                     mock.patch.object(run, 'run_checks', return_value={'C-valid': {'pass': True}}), \
-                    mock.patch.object(run, '_stop_preview_server') as stopper, \
+                    mock.patch.object(run, 'stop_preview_server') as stopper, \
                     mock.patch.object(run.sys, 'argv', ['run.py', 'run', '--out', str(out), '--generator', 'agy', '--judge', 'agy', '--parallel', '2', '--no-open']):
                 rc = run.main()
         self.assertEqual(rc, 2)
@@ -418,7 +418,7 @@ class ArtifactPipelineTests(unittest.TestCase):
                     mock.patch.object(run, 'bootstrap_dir', return_value=Path(BOOTSTRAP_DIR)), \
                     mock.patch.object(run, 'server_cp', return_value=Path(SERVER_CP)), \
                     mock.patch.object(run, '_start_preview_server', side_effect=RuntimeError('start timed out')), \
-                    mock.patch.object(run, '_stop_preview_server', side_effect=fake_stop) as stopper, \
+                    mock.patch.object(run, 'stop_preview_server', side_effect=fake_stop) as stopper, \
                     mock.patch.object(run.sys, 'argv', ['run.py', 'run', '--out', str(out), '--generator', 'agy', '--judge', 'agy', '--no-open']):
                 with self.assertRaises(SystemExit) as ctx:
                     run.main()
@@ -438,7 +438,7 @@ class ArtifactPipelineTests(unittest.TestCase):
                     mock.patch.object(run, 'server_cp', return_value=Path(SERVER_CP)), \
                     mock.patch.object(run, 'generate', return_value={'message': 'ok'}) as gen, \
                     mock.patch.object(run, 'render', return_value=(['/tmp/a.png'], None)) as rend, \
-                    mock.patch.object(run, '_stop_preview_server', return_value=True) as stopper:
+                    mock.patch.object(run, 'stop_preview_server', return_value=True) as stopper:
                 run.build(case, case_dir, 'claude')
             self.assertIs(gen.call_args.kwargs['stop_server'], False)
             self.assertEqual(gen.call_args.kwargs['cache_dir'], rend.call_args.kwargs['cache_dir'])
@@ -451,7 +451,7 @@ class ArtifactPipelineTests(unittest.TestCase):
                     mock.patch.object(run, 'server_cp', return_value=Path(SERVER_CP)), \
                     mock.patch.object(run, 'generate', return_value={'message': 'ok'}), \
                     mock.patch.object(run, 'render', return_value=([], 'render boom')), \
-                    mock.patch.object(run, '_stop_preview_server', return_value=True) as stopper2:
+                    mock.patch.object(run, 'stop_preview_server', return_value=True) as stopper2:
                 with self.assertRaisesRegex(RuntimeError, 'render boom'):
                     run.build(case, case_dir2, 'claude')
             stopper2.assert_called_once()
@@ -630,7 +630,7 @@ class ArtifactPipelineTests(unittest.TestCase):
                     mock.patch.object(run, 'preview_src', return_value=Path(SRC_DIR)), \
                     mock.patch.object(run, 'bootstrap_dir', return_value=Path(BOOTSTRAP_DIR)), \
                     mock.patch.object(run, 'server_cp', return_value=Path(SERVER_CP)), \
-                    mock.patch.object(run, '_stop_preview_server'), \
+                    mock.patch.object(run, 'stop_preview_server'), \
                     mock.patch.object(run, 'execute', return_value=reply):
                 run.generate(directory, 'agy')
             metrics = json.loads((directory / 'generator-metrics.json').read_text())

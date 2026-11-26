@@ -1,7 +1,7 @@
 package bot.charlies.androiddesign.preview.app.server
 
 import bot.charlies.androiddesign.preview.model.Bounds
-import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
+import bot.charlies.androiddesign.preview.model.DirectionMeta
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PhoneSurface
@@ -29,8 +29,8 @@ class BoardAndSelectionTest {
       boardName = "Plates",
       directions =
         listOf(
-          DeviceDirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
-          DeviceDirectionMeta("Cards", "phone", "home", listOf("home"), emptyList()),
+          DirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
+          DirectionMeta("Cards", "phone", "home", listOf("home"), emptyList()),
         ),
       views = PhoneSurface.views,
     )

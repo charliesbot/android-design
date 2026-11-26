@@ -60,8 +60,6 @@ class RenderQueueErrorCacheTest {
                     else
                       WorkerFrame(
                         bytes = InMemoryRenderWorker.PNG_SIGNATURE + t.viewName.toByteArray(),
-                        mime = "image/png",
-                        isPng = true,
                       ),
                   error =
                     if (deviceFailure) "Timed out waiting for layoutlib worker render" else null,
@@ -145,8 +143,6 @@ class RenderQueueErrorCacheTest {
                     else
                       WorkerFrame(
                         bytes = InMemoryRenderWorker.PNG_SIGNATURE + t.viewName.toByteArray(),
-                        mime = "image/png",
-                        isPng = true,
                       ),
                   error = if (failing) "Timed out waiting for layoutlib worker render" else null,
                 ),

@@ -89,7 +89,6 @@ class RenderCommand(
                 loaded = compiled.loaded,
                 fromCache = false,
                 compileCountAtLoad = 1,
-                dexHash = compiled.dexHash,
                 surface = compiled.surface,
                 boardName = compiled.boardName,
                 boardMeta = compiled.boardMeta,
@@ -147,29 +146,19 @@ class RenderCommand(
       )
     val timeoutMs =
       maxOf(client.deadlineMs(isCold = ready.status.compileCount == 0, scoped = false), 120_000)
-    val http =
-      try {
-        client.postJson(
-          ready.record,
-          "/api/render",
-          PreviewJson.compact.encodeToString(RenderRequest.serializer(), req),
-          readTimeoutMs = timeoutMs,
-        )
-      } catch (e: Exception) {
-        val repVer = client.checkReplacedByVersion(ready.record)
-        if (repVer != null) {
-          err.println("replaced by v$repVer, rerun")
-          return ExitCode.FINDINGS_FAILED
-        }
-        err.println(e.message ?: "Failed contacting preview server")
-        return ClientExitCode.NOT_READY
-      }
+    val outcome =
+      client.postClassified(
+        ready = ready,
+        path = "/api/render",
+        jsonBody = PreviewJson.compact.encodeToString(RenderRequest.serializer(), req),
+        readTimeoutMs = timeoutMs,
+      )
 
-    return when (http.status) {
-      in 200..299 -> {
+    return when (outcome) {
+      is PreviewClient.PostOutcome.Ok -> {
         val parsed =
           try {
-            PreviewJson.compact.decodeFromString(RenderResponse.serializer(), http.body)
+            PreviewJson.compact.decodeFromString(RenderResponse.serializer(), outcome.body)
           } catch (e: Exception) {
             err.println("Invalid render response from server: ${e.message}")
             return ExitCode.FINDINGS_FAILED
@@ -177,17 +166,32 @@ class RenderCommand(
         parsed.messages.forEach(err::println)
         parsed.exitCode
       }
-      409 -> {
-        val msg = parseErrorMessage(http.body) ?: "Preview server was replaced, rerun"
+      is PreviewClient.PostOutcome.Replaced -> {
+        val msg =
+          outcome.body?.let(::parseErrorMessage)
+            ?: outcome.replacedByVersion?.let { "replaced by v$it, rerun" }
+            ?: "Preview server was replaced, rerun"
         err.println(msg)
         ExitCode.FINDINGS_FAILED
       }
-      400 -> {
-        err.println(parseErrorMessage(http.body) ?: http.body)
-        ExitCode.USAGE
+      is PreviewClient.PostOutcome.ClientError -> {
+        err.println(parseErrorMessage(outcome.body) ?: outcome.body)
+        if (outcome.status == 400) ExitCode.USAGE else ExitCode.FINDINGS_FAILED
       }
-      else -> {
-        err.println(parseErrorMessage(http.body) ?: http.body)
+      is PreviewClient.PostOutcome.ServerError -> {
+        err.println(parseErrorMessage(outcome.body) ?: outcome.body)
+        ExitCode.FINDINGS_FAILED
+      }
+      is PreviewClient.PostOutcome.Unreachable -> {
+        err.println(outcome.message)
+        ClientExitCode.NOT_READY
+      }
+      is PreviewClient.PostOutcome.DeadlineExceeded -> {
+        err.println("Timed out waiting for render response")
+        ClientExitCode.NOT_READY
+      }
+      is PreviewClient.PostOutcome.WatchdogHalted -> {
+        err.println("Preview render halted after exceeding watchdog budget")
         ExitCode.FINDINGS_FAILED
       }
     }

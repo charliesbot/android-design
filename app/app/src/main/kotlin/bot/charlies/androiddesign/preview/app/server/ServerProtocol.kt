@@ -3,10 +3,10 @@ package bot.charlies.androiddesign.preview.app.server
 import bot.charlies.androiddesign.preview.app.cli.ReportTheme
 import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.layout.ViewLayout
+import bot.charlies.androiddesign.preview.model.BoardMeta
 import bot.charlies.androiddesign.preview.model.Bounds
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.ValidationError
-import bot.charlies.androiddesign.preview.model.ViewSpec
 import kotlinx.serialization.Serializable
 
 /** Target filter shared by `check`, `tree`, and recorded watchdog timeout matching. */
@@ -256,27 +256,6 @@ data class BoardViewRef(
   val screen: String,
   val overlay: String? = null,
   val view: String,
-)
-
-@Serializable data class OverlayMeta(val id: String, val screen: String? = null)
-
-@Serializable
-data class DirectionMeta(
-  val name: String,
-  val surface: String,
-  val startScreen: String,
-  val screens: List<String>,
-  val overlays: List<OverlayMeta>,
-) {
-  fun overlaysFor(screenId: String): List<OverlayMeta> = overlays.filter {
-    (it.screen ?: startScreen) == screenId
-  }
-}
-
-@Serializable
-data class BoardMeta(
-  val directions: List<DirectionMeta>,
-  val views: List<ViewSpec>,
 )
 
 @Serializable

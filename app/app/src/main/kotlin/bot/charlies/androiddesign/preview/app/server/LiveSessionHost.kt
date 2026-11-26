@@ -286,7 +286,6 @@ class AndroidLiveSessionHost(
         DeviceLiveStateRequest(
           dexHash = dex.dexHash,
           entryClass = data.entryClass,
-          sourceFile = data.sourceFile,
           designTheme = entry.loaded.designTheme,
           assetMap = data.assetMap,
           direction = update.direction,

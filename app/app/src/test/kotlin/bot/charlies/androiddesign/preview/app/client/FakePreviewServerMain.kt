@@ -8,7 +8,7 @@ import bot.charlies.androiddesign.preview.app.server.WorkerFrame
 import bot.charlies.androiddesign.preview.app.server.WorkerTargetOutput
 import bot.charlies.androiddesign.preview.domain.image.FastPngEncoder
 import bot.charlies.androiddesign.preview.model.Bounds
-import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
+import bot.charlies.androiddesign.preview.model.DirectionMeta
 import bot.charlies.androiddesign.preview.model.LayoutNode
 import bot.charlies.androiddesign.preview.model.LayoutTree
 import bot.charlies.androiddesign.preview.model.PhoneSurface
@@ -50,10 +50,9 @@ object FakePreviewServerMain {
     val worker =
       InMemoryRenderWorker(
         name = RuntimeIdentity.BACKEND_LAYOUTLIB,
-        scopedCheckDensity = 1,
         boardName = "Plates",
         directions =
-          listOf(DeviceDirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList())),
+          listOf(DirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList())),
         views = PhoneSurface.views,
         targetBuilder = { target ->
           val view = Views.byName(target.viewName) ?: Views.Light
@@ -78,7 +77,7 @@ object FakePreviewServerMain {
                 nodes = listOf(node),
                 findings = emptyList(),
               ),
-            frame = WorkerFrame(bytes = png, mime = "image/png", isPng = true),
+            frame = WorkerFrame(bytes = png),
           )
         },
       )

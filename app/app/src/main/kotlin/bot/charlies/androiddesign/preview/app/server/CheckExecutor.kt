@@ -5,30 +5,22 @@ import bot.charlies.androiddesign.preview.domain.ViewCheck
 import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
 import bot.charlies.androiddesign.preview.domain.layout.ViewLayout
 import bot.charlies.androiddesign.preview.model.BoardSurface
-import bot.charlies.androiddesign.preview.model.DeviceBoardMeta
-import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
-import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.SurfaceSpec
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.WearSurface
+import bot.charlies.androiddesign.preview.model.WorkerRenderTarget
 import java.nio.file.Files
 import java.nio.file.Path
 
 /**
  * Owns check orchestration, `ViewCheck` evaluation, overlay diffing, failing-frame follow-up
- * fetches, SHA-256 PNG deduplication, primary-view policy, and host PNG persistence above a
+ * fetches, host PNG persistence, and policy application via [CheckImagePolicy] above a
  * [RenderWorker] seam.
  */
 class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
   val name: String
     get() = worker.name
-
-  val supportsHeadlessSpeculativePrecompile: Boolean
-    get() = worker.supportsHeadlessSpeculativePrecompile
-
-  val scopedCheckDensity: Int
-    get() = worker.scopedCheckDensity
 
   fun prepare() = worker.prepare()
 
@@ -47,7 +39,6 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
               compileMs = res.compileMs,
               errors = res.errors,
             ),
-          dexHash = res.dexHash,
           surface = BoardSurface.Phone,
           boardName = null,
           boardMeta = null,
@@ -69,10 +60,9 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
               compileMs = res.compileMs,
               errors = emptyList(),
             ),
-          dexHash = res.dexHash,
           surface = boardSurface,
           boardName = res.boardMeta.boardName,
-          boardMeta = toBoardMeta(res.boardMeta),
+          boardMeta = res.boardMeta,
           compiledData = res.compiledData,
           boardTheme = res.boardTheme,
         )
@@ -84,29 +74,34 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
     targets: List<CheckTargetSpec>,
     scoped: Boolean,
     rendersRoot: Path,
-  ): List<RenderArtifact> = withCheckLifecycle {
+  ): List<RenderArtifact> {
     val surfaceSpec = surfaceSpecFor(entry.surface)
-    val densityScale = if (scoped) worker.scopedCheckDensity else 2
-    val primaryViews = primaryCheckViews(entry.surface)
+    val densityScale = CHECK_DENSITY_SCALE
 
-    val deviceTargets =
+    val workerTargets =
       orderTargetsForBatchRender(targets).map { t ->
-        val wantFrame = scoped || (t.overlayId == null && t.view.name in primaryViews)
-        DeviceRenderTarget(
+        val wantFrame =
+          CheckImagePolicy.shouldRequestInitialFrame(
+            scoped = scoped,
+            surface = entry.surface,
+            overlayId = t.overlayId,
+            viewName = t.view.name,
+          )
+        WorkerRenderTarget(
           direction = t.direction,
           screen = t.screenId,
           viewName = t.view.name,
           overlayId = t.overlayId,
           densityScale = densityScale.toFloat(),
           fontScale = 1f,
-          frameFormat = if (wantFrame) FrameFormat.RAW_RGBA else FrameFormat.NONE,
+          includeFrame = wantFrame,
           includeEndFrame = wantFrame,
         )
       }
 
-    val batch = worker.renderTargets(entry, deviceTargets, rendersRoot)
+    val batch = worker.renderTargets(entry, workerTargets, rendersRoot)
     if (!batch.ok && batch.targets.isEmpty()) {
-      return@withCheckLifecycle buildBatchFailureArtifacts(
+      return buildBatchFailureArtifacts(
         targets,
         densityScale,
         batch.renderTotalMs,
@@ -119,13 +114,30 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
     collectBatchOutputs(batch.targets, resultsByKey, framesByKey)
 
     val evaluated = evaluateTargets(targets, resultsByKey, surfaceSpec)
+    val evaluatedByKey = evaluated.associateBy { targetKey(it.spec) }
     val allPass = evaluated.all { it.check.pass }
     if (!scoped && !allPass) {
-      fetchMissingFailingFrames(entry, evaluated, densityScale, rendersRoot, framesByKey)
+      fetchMissingFailingFrames(
+        entry = entry,
+        targets = targets,
+        evaluatedByKey = evaluatedByKey,
+        densityScale = densityScale,
+        rendersRoot = rendersRoot,
+        framesByKey = framesByKey,
+      )
     }
 
-    val writeSet = selectTargetsToWrite(evaluated, framesByKey, scoped, allPass, primaryViews)
-    evaluated.map { ev ->
+    val writeKeys =
+      CheckImagePolicy.selectSpecsToWrite(
+          specs = evaluated.map { it.spec },
+          scoped = scoped,
+          surface = entry.surface,
+          isPass = { spec -> evaluatedByKey.getValue(targetKey(spec)).check.pass },
+          frameBytesFor = { spec -> framesByKey[frameKey(spec, isEndFrame = false)]?.bytes },
+        )
+        .mapTo(LinkedHashSet(), ::targetKey)
+
+    return evaluated.map { ev ->
       val t = ev.spec
       val key = targetKey(t)
       val mainFrame =
@@ -146,9 +158,8 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
         output = ev.output,
         mainFrame = mainFrame,
         endFrame = endFrame,
-        writeFiles = key in writeSet,
+        writeFiles = key in writeKeys,
         rendersRoot = rendersRoot,
-        fallbackMime = "image/png",
       )
     }
   }
@@ -162,20 +173,20 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
     entry: CompileEntry,
     targets: List<CheckTargetSpec>,
     rendersRoot: Path,
-    densityScale: Int = 2,
-  ): List<RenderArtifact> = withCheckLifecycle {
-    if (targets.isEmpty()) return@withCheckLifecycle emptyList()
+    densityScale: Int = CHECK_DENSITY_SCALE,
+  ): List<RenderArtifact> {
+    if (targets.isEmpty()) return emptyList()
     val surfaceSpec = surfaceSpecFor(entry.surface)
-    val deviceTargets =
+    val workerTargets =
       orderTargetsForBatchRender(targets).map { t ->
-        DeviceRenderTarget(
+        WorkerRenderTarget(
           direction = t.direction,
           screen = t.screenId,
           viewName = t.view.name,
           overlayId = t.overlayId,
           densityScale = densityScale.toFloat(),
           fontScale = 1f,
-          frameFormat = FrameFormat.RAW_RGBA,
+          includeFrame = true,
           includeEndFrame = true,
         )
       }
@@ -184,15 +195,15 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
     val framesByKey = LinkedHashMap<FrameKey, WorkerFrame>(targets.size * 2)
     val batch =
       try {
-        worker.renderTargets(entry, deviceTargets, rendersRoot)
+        worker.renderTargets(entry, workerTargets, rendersRoot)
       } catch (e: ServerReplacedException) {
         throw e
       } catch (e: SandboxWatchdogException) {
         throw e
       } catch (e: Exception) {
-        if (deviceTargets.size <= 1) throw e
+        if (workerTargets.size <= 1) throw e
         // Isolate per-target crashes so healthy screens are still written to the report.
-        for (singleTarget in deviceTargets) {
+        for (singleTarget in workerTargets) {
           val singleKey =
             TargetKey(
               singleTarget.direction,
@@ -223,7 +234,7 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
 
     if (batch != null) {
       if (!batch.ok && batch.targets.isEmpty()) {
-        return@withCheckLifecycle buildBatchFailureArtifacts(
+        return buildBatchFailureArtifacts(
           targets,
           densityScale,
           batch.renderTotalMs,
@@ -234,7 +245,7 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
     }
 
     val evaluated = evaluateTargets(targets, resultsByKey, surfaceSpec)
-    evaluated.map { ev ->
+    return evaluated.map { ev ->
       val t = ev.spec
       val mainFrame =
         framesByKey[FrameKey(t.direction, t.screenId, t.overlayId, t.view.name, false)]
@@ -256,92 +267,77 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
         endFrame = endFrame,
         writeFiles = false,
         rendersRoot = rendersRoot,
-        fallbackMime = "image/png",
       )
     }
   }
 
-  fun renderSingle(entry: CompileEntry, request: SingleRenderRequest): RenderArtifact =
-    withCheckLifecycle {
-      val surfaceSpec = surfaceSpecFor(entry.surface)
-      val effectiveFormat = request.frameFormat
-      val fallbackMime = "image/png"
-      val target =
-        DeviceRenderTarget(
-          direction = request.direction,
-          screen = request.screenId,
-          viewName = request.view.name,
-          overlayId = request.overlayId,
-          densityScale = request.densityScale.toFloat(),
-          fontScale = request.fontScale,
-          darkOverride = request.darkOverride,
-          seedOverride = request.seedOverride,
-          variantOverride = request.variantOverride,
-          frameFormat = effectiveFormat,
-          includeEndFrame = effectiveFormat != FrameFormat.NONE,
-        )
-
-      val batch = worker.renderTargets(entry, listOf(target), request.rendersRoot)
-      val artName = artifactName(request.prefix, request.overlayId)
-      val output = batch.targets.firstOrNull()
-      val tree = output?.tree
-      if ((!batch.ok && output == null) || output == null || output.error != null || tree == null) {
-        val msg =
-          output?.error
-            ?: batch.error
-            ?: "Render failed for ${request.direction}/${request.screenId}"
-        val failed = ViewCheck.renderError(RuntimeException(msg))
-        return@withCheckLifecycle RenderArtifact(
-          direction = request.direction,
-          screen = request.screenId,
-          overlay = request.overlayId,
-          view = request.view,
-          densityScale = request.densityScale,
-          artifactName = artName,
-          pass = false,
-          renderMs = output?.renderMs ?: batch.renderTotalMs,
-          check = failed,
-          layout = null,
-          tree = null,
-          pngPath = null,
-          endPngPath = null,
-          pngBytes = null,
-          endPngBytes = null,
-          pngSha256 = null,
-          entry = RenderEntry.of(artName, request.view.name, null, failed),
-          imageMime = fallbackMime,
-        )
-      }
-
-      val full = ViewCheck.of(tree, surfaceSpec)
-      val check = if (request.baseCheck == null) full else full.overlaying(request.baseCheck)
-      val layout = if (request.overlayId == null) full.layout else null
-      buildRenderArtifact(
-        contentHash = entry.contentHash,
+  fun renderSingle(entry: CompileEntry, request: SingleRenderRequest): RenderArtifact {
+    val surfaceSpec = surfaceSpecFor(entry.surface)
+    val target =
+      WorkerRenderTarget(
         direction = request.direction,
-        screenId = request.screenId,
+        screen = request.screenId,
+        viewName = request.view.name,
         overlayId = request.overlayId,
+        densityScale = request.densityScale.toFloat(),
+        fontScale = request.fontScale,
+        darkOverride = request.darkOverride,
+        seedOverride = request.seedOverride,
+        variantOverride = request.variantOverride,
+        includeFrame = request.includeFrame,
+        includeEndFrame = request.includeFrame,
+      )
+
+    val batch = worker.renderTargets(entry, listOf(target), request.rendersRoot)
+    val artName = artifactName(request.prefix, request.overlayId)
+    val output = batch.targets.firstOrNull()
+    val tree = output?.tree
+    if ((!batch.ok && output == null) || output == null || output.error != null || tree == null) {
+      val msg =
+        output?.error ?: batch.error ?: "Render failed for ${request.direction}/${request.screenId}"
+      val failed = ViewCheck.renderError(RuntimeException(msg))
+      return RenderArtifact(
+        direction = request.direction,
+        screen = request.screenId,
+        overlay = request.overlayId,
         view = request.view,
         densityScale = request.densityScale,
         artifactName = artName,
-        renderMs = output.renderMs,
-        check = check,
-        layout = layout,
-        output = output,
-        mainFrame = output.frame,
-        endFrame = output.endFrame,
-        writeFiles = request.writeFiles,
-        rendersRoot = request.rendersRoot,
-        fallbackMime = fallbackMime,
+        pass = false,
+        renderMs = output?.renderMs ?: batch.renderTotalMs,
+        check = failed,
+        layout = null,
+        tree = null,
+        pngPath = null,
+        endPngPath = null,
+        pngBytes = null,
+        endPngBytes = null,
+        pngSha256 = null,
+        entry = RenderEntry.of(artName, request.view.name, null, failed),
       )
     }
 
-  private inline fun <T> withCheckLifecycle(block: () -> T): T =
-    try {
-      block()
-    } finally {
-      worker.finishCheck()
-    }
+    val full = ViewCheck.of(tree, surfaceSpec)
+    val check = if (request.baseCheck == null) full else full.overlaying(request.baseCheck)
+    val layout = if (request.overlayId == null) full.layout else null
+    return buildRenderArtifact(
+      contentHash = entry.contentHash,
+      direction = request.direction,
+      screenId = request.screenId,
+      overlayId = request.overlayId,
+      view = request.view,
+      densityScale = request.densityScale,
+      artifactName = artName,
+      renderMs = output.renderMs,
+      check = check,
+      layout = layout,
+      output = output,
+      mainFrame = output.frame,
+      endFrame = output.endFrame,
+      writeFiles = request.writeFiles,
+      rendersRoot = request.rendersRoot,
+    )
+  }
 
   private fun evaluateTargets(
     targets: List<CheckTargetSpec>,
@@ -349,8 +345,6 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
     surfaceSpec: SurfaceSpec,
   ): List<EvaluatedTarget> {
     val baseChecks = HashMap<BaseKey, ViewCheck>()
-    // Pre-compute base screen checks so overlays always diff against their base regardless of
-    // order.
     for (t in targets) {
       if (t.overlayId != null) continue
       val res = resultsByKey[targetKey(t)]
@@ -386,48 +380,33 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
     return evaluated
   }
 
-  /**
-   * Unscoped checks skip frames on non-primary views during the first pass; if any non-primary view
-   * fails, fetch up to 3 failing frames so the response can return up to 2 deduplicated failing
-   * PNGs.
-   */
   private fun fetchMissingFailingFrames(
     entry: CompileEntry,
-    evaluated: List<EvaluatedTarget>,
+    targets: List<CheckTargetSpec>,
+    evaluatedByKey: Map<TargetKey, EvaluatedTarget>,
     densityScale: Int,
     rendersRoot: Path,
     framesByKey: MutableMap<FrameKey, WorkerFrame>,
   ) {
-    val existingFailingHashes = LinkedHashSet<String>()
-    for (ev in evaluated) {
-      if (ev.check.pass) continue
-      val bytes = framesByKey[frameKey(ev.spec, isEndFrame = false)]?.bytes
-      if (bytes != null && bytes.isNotEmpty()) {
-        existingFailingHashes += ContentHasher.sha256Hex(bytes)
-      }
-    }
-    if (existingFailingHashes.size >= 2) return
-
     val missingFailing =
-      evaluated
-        .filter { ev ->
-          !ev.check.pass &&
-            ev.output?.error == null &&
-            framesByKey[frameKey(ev.spec, isEndFrame = false)] == null
-        }
-        .take(3)
+      CheckImagePolicy.selectFollowUpFailingSpecs(
+        specs = targets,
+        isPass = { spec -> evaluatedByKey.getValue(targetKey(spec)).check.pass },
+        hasRenderError = { spec -> evaluatedByKey.getValue(targetKey(spec)).output?.error != null },
+        frameBytesFor = { spec -> framesByKey[frameKey(spec, isEndFrame = false)]?.bytes },
+      )
     if (missingFailing.isEmpty()) return
 
     val followUpTargets =
-      orderTargetsForBatchRender(missingFailing.map { it.spec }).map { spec ->
-        DeviceRenderTarget(
+      orderTargetsForBatchRender(missingFailing).map { spec ->
+        WorkerRenderTarget(
           direction = spec.direction,
           screen = spec.screenId,
           viewName = spec.view.name,
           overlayId = spec.overlayId,
           densityScale = densityScale.toFloat(),
           fontScale = 1f,
-          frameFormat = FrameFormat.RAW_RGBA,
+          includeFrame = true,
           includeEndFrame = true,
         )
       }
@@ -435,37 +414,6 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
     for (r in followUp.targets) {
       storeFrames(r, framesByKey)
     }
-  }
-
-  private fun selectTargetsToWrite(
-    evaluated: List<EvaluatedTarget>,
-    framesByKey: Map<FrameKey, WorkerFrame>,
-    scoped: Boolean,
-    allPass: Boolean,
-    primaryViews: Set<String>,
-  ): Set<TargetKey> {
-    val writeSet = LinkedHashSet<TargetKey>()
-    if (scoped) {
-      for (ev in evaluated) writeSet += targetKey(ev.spec)
-      return writeSet
-    }
-    val seenSha = LinkedHashSet<String>()
-    val candidates =
-      if (!allPass) {
-        evaluated.asSequence().filter { !it.check.pass }
-      } else {
-        evaluated.asSequence().filter {
-          it.spec.overlayId == null && it.spec.view.name in primaryViews
-        }
-      }
-    for (ev in candidates) {
-      val frame = framesByKey[frameKey(ev.spec, isEndFrame = false)]
-      val png = frame?.bytes?.takeIf { frame.isPng && it.isNotEmpty() } ?: continue
-      if (!seenSha.add(ContentHasher.sha256Hex(png))) continue
-      writeSet += targetKey(ev.spec)
-      if (!allPass && writeSet.size >= 2) break
-    }
-    return writeSet
   }
 
   private fun buildBatchFailureArtifacts(
@@ -495,7 +443,6 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
         endPngBytes = null,
         pngSha256 = null,
         entry = RenderEntry.of(artName, t.view.name, null, failedCheck),
-        imageMime = "image/png",
       )
     }
   }
@@ -516,19 +463,18 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
     endFrame: WorkerFrame?,
     writeFiles: Boolean,
     rendersRoot: Path,
-    fallbackMime: String,
   ): RenderArtifact {
     val mainBytes = mainFrame?.bytes?.takeIf { it.isNotEmpty() }
     val endBytes = endFrame?.bytes?.takeIf { it.isNotEmpty() }
     var pngPath: Path? = null
     var endPngPath: Path? = null
-    if (writeFiles && mainFrame != null && mainFrame.isPng && mainBytes != null) {
+    if (writeFiles && mainBytes != null) {
       val hashDir = rendersRoot.resolve(contentHash.take(12))
       Files.createDirectories(hashDir)
       val baseFile = "${sanitizeFileName(artifactName)}-${view.name}-${densityScale}x"
       pngPath = hashDir.resolve("$baseFile.png").toAbsolutePath().normalize()
       Files.write(pngPath, mainBytes)
-      if (endFrame != null && endFrame.isPng && endBytes != null) {
+      if (endBytes != null) {
         endPngPath = hashDir.resolve("$baseFile-end.png").toAbsolutePath().normalize()
         Files.write(endPngPath, endBytes)
       }
@@ -554,7 +500,6 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
       endPngBytes = endBytes,
       pngSha256 = sha,
       entry = RenderEntry.of(artifactName, view.name, baseName, check, endName),
-      imageMime = mainFrame?.mime ?: fallbackMime,
       endTree = output?.endTree,
     )
   }
@@ -586,21 +531,6 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
 
   private fun surfaceSpecFor(surface: BoardSurface): SurfaceSpec =
     if (surface == BoardSurface.Wear) WearSurface else PhoneSurface
-
-  private fun toBoardMeta(devMeta: DeviceBoardMeta): BoardMeta =
-    BoardMeta(
-      directions =
-        devMeta.directions.map { d ->
-          DirectionMeta(
-            name = d.name,
-            surface = d.surface,
-            startScreen = d.startScreen,
-            screens = d.screens,
-            overlays = d.overlays.map { ov -> OverlayMeta(ov.id, ov.screen) },
-          )
-        },
-      views = devMeta.views,
-    )
 
   private fun artifactName(prefix: String, overlayId: String?): String =
     overlayId?.let { ViewCheck.renderOverlayName(prefix, it) } ?: prefix
@@ -643,7 +573,6 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
   )
 
   companion object {
-    fun primaryCheckViews(surface: BoardSurface): Set<String> =
-      if (surface == BoardSurface.Wear) setOf("watch", "watch-large") else setOf("light", "desktop")
+    const val CHECK_DENSITY_SCALE = 2
   }
 }

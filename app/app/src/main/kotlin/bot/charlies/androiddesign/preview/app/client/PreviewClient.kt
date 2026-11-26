@@ -186,6 +186,42 @@ class PreviewClient(
   }
 
   /**
+   * Sends a JSON POST request to [path] on the active server, classifying HTTP errors, 409/record
+   * server replacement, and transport exceptions via [onTransportFailure].
+   */
+  fun postClassified(
+    ready: ServerLookup.Ready,
+    path: String,
+    jsonBody: String,
+    readTimeoutMs: Int,
+    onTransportFailure: ((Exception) -> PostOutcome)? = null,
+  ): PostOutcome {
+    val http =
+      try {
+        postJson(ready.record, path, jsonBody, readTimeoutMs = readTimeoutMs)
+      } catch (e: Exception) {
+        val repVer = checkReplacedByVersion(ready.record)
+        if (repVer != null) {
+          return PostOutcome.Replaced(replacedByVersion = repVer)
+        }
+        return onTransportFailure?.invoke(e)
+          ?: PostOutcome.Unreachable(e.message ?: "Failed contacting preview server")
+      }
+
+    return when (http.status) {
+      400,
+      404 -> PostOutcome.ClientError(http.status, http.body)
+      409 ->
+        PostOutcome.Replaced(
+          replacedByVersion = checkReplacedByVersion(ready.record),
+          body = http.body,
+        )
+      in 200..299 -> PostOutcome.Ok(http.body)
+      else -> PostOutcome.ServerError(http.status, http.body)
+    }
+  }
+
+  /**
    * Sends a JSON POST request (`check` or `tree`) to the active server under [scope]'s client
    * deadline and classifies HTTP errors, server replacement (409 or record supersession), watchdog
    * halts, and deadline recovery into [PostOutcome].
@@ -199,35 +235,15 @@ class PreviewClient(
     scope: CheckScope,
   ): PostOutcome {
     val timeoutMs = deadlineMs(isCold = ready.status.compileCount == 0, scoped = scope.isScoped)
-    val http =
-      try {
-        postJson(ready.record, path, jsonBody, readTimeoutMs = timeoutMs)
-      } catch (e: Exception) {
-        val repVer = checkReplacedByVersion(ready.record)
-        if (repVer != null) {
-          return PostOutcome.Replaced(replacedByVersion = repVer)
+    return postClassified(ready, path, jsonBody, readTimeoutMs = timeoutMs) { e ->
+      when {
+        e is SocketTimeoutException -> {
+          val restarted = recoverFromDeadline(repoRoot, ready.record) == DeadlineRecovery.RESTARTED
+          PostOutcome.DeadlineExceeded(timeoutMs = timeoutMs, restarted = restarted)
         }
-        return when {
-          e is SocketTimeoutException -> {
-            val restarted =
-              recoverFromDeadline(repoRoot, ready.record) == DeadlineRecovery.RESTARTED
-            PostOutcome.DeadlineExceeded(timeoutMs = timeoutMs, restarted = restarted)
-          }
-          checkRecordedTimeout(snapshot, scope) -> PostOutcome.WatchdogHalted(scope)
-          else -> PostOutcome.Unreachable(e.message ?: "Failed contacting preview server")
-        }
+        checkRecordedTimeout(snapshot, scope) -> PostOutcome.WatchdogHalted(scope)
+        else -> PostOutcome.Unreachable(e.message ?: "Failed contacting preview server")
       }
-
-    return when (http.status) {
-      400,
-      404 -> PostOutcome.ClientError(http.status, http.body)
-      409 ->
-        PostOutcome.Replaced(
-          replacedByVersion = checkReplacedByVersion(ready.record),
-          body = http.body,
-        )
-      in 200..299 -> PostOutcome.Ok(http.body)
-      else -> PostOutcome.ServerError(http.status, http.body)
     }
   }
 

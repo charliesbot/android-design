@@ -8,10 +8,9 @@ import bot.charlies.androiddesign.preview.app.client.StatusCommand
 import bot.charlies.androiddesign.preview.app.client.TreeCommand
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import bot.charlies.androiddesign.preview.model.ClassBundleCodec
-import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
-import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.WorkerRenderTarget
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.net.HttpURLConnection
@@ -75,7 +74,6 @@ class LayoutlibRenderWorkerTest {
         ),
       fromCache = false,
       compileCountAtLoad = 1,
-      dexHash = hash,
       compiledData =
         CompiledBoardData(
           sourceFile = sourceFile.fileName.toString(),
@@ -139,22 +137,8 @@ class LayoutlibRenderWorkerTest {
             ),
           fromCache = false,
           compileCountAtLoad = 1,
-          dexHash = compiled.dexHash,
           boardName = compiled.boardMeta.boardName,
-          boardMeta =
-            BoardMeta(
-              directions =
-                compiled.boardMeta.directions.map {
-                  DirectionMeta(
-                    it.name,
-                    it.surface,
-                    it.startScreen,
-                    it.screens,
-                    it.overlays.map { o -> OverlayMeta(o.id, o.screen) },
-                  )
-                },
-              views = compiled.boardMeta.views,
-            ),
+          boardMeta = compiled.boardMeta,
           compiledData = boardData,
           boardTheme = compiled.boardTheme,
         )
@@ -163,18 +147,8 @@ class LayoutlibRenderWorkerTest {
       val screenName = compiled.boardMeta.directions.first().startScreen
       val targets =
         listOf(
-          DeviceRenderTarget(
-            dirName,
-            screenName,
-            Views.Light.name,
-            frameFormat = FrameFormat.RAW_RGBA,
-          ),
-          DeviceRenderTarget(
-            dirName,
-            screenName,
-            Views.Dark.name,
-            frameFormat = FrameFormat.NONE,
-          ),
+          WorkerRenderTarget(dirName, screenName, Views.Light.name, includeFrame = true),
+          WorkerRenderTarget(dirName, screenName, Views.Dark.name, includeFrame = false),
         )
       val batch = worker.renderTargets(entry, targets, tmp)
       assertTrue(batch.ok, batch.error)
@@ -184,8 +158,6 @@ class LayoutlibRenderWorkerTest {
       val lightTree = assertNotNull(light.tree)
       assertTrue(lightTree.nodes.isNotEmpty())
       val frame = assertNotNull(light.frame)
-      assertEquals("image/png", frame.mime)
-      assertTrue(frame.isPng)
       assertTrue(frame.bytes.size > 8)
       assertEquals(0x89.toByte(), frame.bytes[0])
       assertEquals(0x50.toByte(), frame.bytes[1])
@@ -245,7 +217,7 @@ class LayoutlibRenderWorkerTest {
     val entry = fakeCompiledEntry(src)
     val target =
       listOf(
-        DeviceRenderTarget("Main", "home", Views.Light.name, frameFormat = FrameFormat.NONE),
+        WorkerRenderTarget("Main", "home", Views.Light.name, includeFrame = false),
       )
 
     LayoutlibRenderWorker(
@@ -289,12 +261,7 @@ class LayoutlibRenderWorkerTest {
         val firstPid = assertNotNull(worker.currentWorkerPid())
         val target =
           listOf(
-            DeviceRenderTarget(
-              "Main",
-              "home",
-              Views.Light.name,
-              frameFormat = FrameFormat.RAW_RGBA,
-            ),
+            WorkerRenderTarget("Main", "home", Views.Light.name, includeFrame = true),
           )
         val first = worker.renderTargets(entry, target, tmp)
         assertFalse(first.ok, "Timed-out batch must return ok=false")
@@ -306,7 +273,8 @@ class LayoutlibRenderWorkerTest {
         val recovery = worker.renderTargets(entry, target, tmp)
         assertTrue(recovery.ok, recovery.error)
         assertEquals(1, recovery.targets.size)
-        assertEquals("image/png", recovery.targets.single().frame?.mime)
+        val recFrame = assertNotNull(recovery.targets.single().frame)
+        assertTrue(recFrame.bytes.size > 8)
       }
   }
 
@@ -325,7 +293,7 @@ class LayoutlibRenderWorkerTest {
         val pid1 = assertNotNull(worker.currentWorkerPid())
         val target =
           listOf(
-            DeviceRenderTarget("Main", "home", Views.Light.name, frameFormat = FrameFormat.NONE),
+            WorkerRenderTarget("Main", "home", Views.Light.name, includeFrame = false),
           )
         val b1 = worker.renderTargets(entry, target, tmp)
         assertTrue(b1.ok, b1.error)

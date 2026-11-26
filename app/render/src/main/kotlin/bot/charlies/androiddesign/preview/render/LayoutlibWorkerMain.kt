@@ -12,19 +12,18 @@ import bot.charlies.androiddesign.preview.feature.preview.sandbox.ComposeBoardRe
 import bot.charlies.androiddesign.preview.feature.preview.sandbox.RenderTargetRequest
 import bot.charlies.androiddesign.preview.kit.ExplorationBoard
 import bot.charlies.androiddesign.preview.model.ClassBundleCodec
-import bot.charlies.androiddesign.preview.model.DeviceAckResponse
-import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
-import bot.charlies.androiddesign.preview.model.DeviceBatchResponse
-import bot.charlies.androiddesign.preview.model.DeviceMemoryStats
-import bot.charlies.androiddesign.preview.model.DeviceOp
-import bot.charlies.androiddesign.preview.model.DevicePingResponse
-import bot.charlies.androiddesign.preview.model.DevicePreloadResponse
-import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
-import bot.charlies.androiddesign.preview.model.DeviceTargetResult
-import bot.charlies.androiddesign.preview.model.DeviceWireCodec
-import bot.charlies.androiddesign.preview.model.DeviceWireFrame
-import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.Views
+import bot.charlies.androiddesign.preview.model.WorkerAckResponse
+import bot.charlies.androiddesign.preview.model.WorkerBatchRequest
+import bot.charlies.androiddesign.preview.model.WorkerBatchResponse
+import bot.charlies.androiddesign.preview.model.WorkerMemoryStats
+import bot.charlies.androiddesign.preview.model.WorkerPingResponse
+import bot.charlies.androiddesign.preview.model.WorkerPipeCodec
+import bot.charlies.androiddesign.preview.model.WorkerPipeOp
+import bot.charlies.androiddesign.preview.model.WorkerPreloadResponse
+import bot.charlies.androiddesign.preview.model.WorkerRenderTarget
+import bot.charlies.androiddesign.preview.model.WorkerTargetResult
+import bot.charlies.androiddesign.preview.model.WorkerWireFrame
 import com.android.resources.Density
 import com.android.resources.ScreenOrientation
 import java.io.BufferedInputStream
@@ -149,34 +148,34 @@ internal class LayoutlibWorkerSession(private val sdk: PaparazziSdk) {
 
   fun serve(inp: DataInputStream, out: DataOutputStream) {
     while (true) {
-      val op = DeviceWireCodec.readOpOrNull(inp) ?: break
+      val op = WorkerPipeCodec.readOpOrNull(inp) ?: break
       when (op) {
-        DeviceOp.PING -> {
+        WorkerPipeOp.PING -> {
           val resp =
-            DevicePingResponse(
+            WorkerPingResponse(
               ok = true,
-              status = "pong",
               pid = ProcessHandle.current().pid().toInt(),
               reloadCount = reloadCount,
-              loadedDexHashes = boardCache.keys.toList(),
+              loadedClassHashes = boardCache.keys.toList(),
               memory = collectMemoryStats(),
             )
-          DeviceWireCodec.writePingResponse(out, resp)
+          WorkerPipeCodec.writePingResponse(out, resp)
         }
-        DeviceOp.PRELOAD_DEX -> {
-          val req = DeviceWireCodec.readPreloadDexRequest(inp)
-          val resp = executePreload(req.dexHash, req.entryClass, req.dexBytes)
-          DeviceWireCodec.writePreloadDexResponse(out, resp)
+        WorkerPipeOp.PRELOAD_CLASSES -> {
+          val req = WorkerPipeCodec.readPreloadClassesRequest(inp)
+          val resp = executePreload(req.classHash, req.entryClass, req.classBundle)
+          WorkerPipeCodec.writePreloadClassesResponse(out, resp)
         }
-        DeviceOp.RENDER_BATCH -> {
-          val wireReq = DeviceWireCodec.readRenderBatchRequest(inp)
-          val (resp, frames) = executeBatch(wireReq.dexBytes, wireReq.entryClass, wireReq.request)
-          DeviceWireCodec.writeRenderBatchResponse(out, resp, frames)
+        WorkerPipeOp.RENDER_BATCH -> {
+          val wireReq = WorkerPipeCodec.readRenderBatchRequest(inp)
+          val (resp, frames) =
+            executeBatch(wireReq.classBundle, wireReq.entryClass, wireReq.request)
+          WorkerPipeCodec.writeRenderBatchResponse(out, resp, frames)
         }
         else -> {
-          DeviceWireCodec.writeAck(
+          WorkerPipeCodec.writeAck(
             out,
-            DeviceAckResponse(ok = false, error = "unknown op $op"),
+            WorkerAckResponse(ok = false, error = "unknown op $op"),
           )
         }
       }
@@ -187,44 +186,37 @@ internal class LayoutlibWorkerSession(private val sdk: PaparazziSdk) {
     classHash: String,
     entryClass: String,
     bundleBytes: ByteArray,
-  ): DevicePreloadResponse {
+  ): WorkerPreloadResponse {
     return try {
       val board =
         synchronized(boardCache) {
           boardCache[classHash]?.board ?: loadBoard(classHash, entryClass, bundleBytes).board
         }
-      val defaultSystem = board.resolveDesignSystem(null)
-      DevicePreloadResponse(
+      WorkerPreloadResponse(
         ok = true,
-        dexHash = classHash,
+        classHash = classHash,
         boardMeta = ComposeBoardRenderer.buildBoardMeta(board),
         boardTheme = ComposeBoardRenderer.boardThemeOverride(board),
-        defaultSeed = defaultSystem.seed,
-        defaultVariant = defaultSystem.variant.wire,
-        defaultContrast = defaultSystem.contrast,
       )
     } catch (t: Throwable) {
       t.printStackTrace(System.err)
-      DevicePreloadResponse(ok = false, error = "${t::class.java.name}: ${t.message}")
+      WorkerPreloadResponse(ok = false, error = "${t::class.java.name}: ${t.message}")
     }
   }
 
   private fun executeBatch(
     bundleBytes: ByteArray?,
     entryClass: String,
-    request: DeviceBatchRequest,
-  ): Pair<DeviceBatchResponse, List<DeviceWireFrame>> {
+    request: WorkerBatchRequest,
+  ): Pair<WorkerBatchResponse, List<WorkerWireFrame>> {
     val totalStartNs = System.nanoTime()
     return try {
-      val loadStartNs = System.nanoTime()
-      val loaded =
-        resolveBoard(request.dexHash, entryClass, bundleBytes, request.forceNewClassLoader)
-      val loadMs = (System.nanoTime() - loadStartNs) / NANOS_PER_MS
+      val loaded = resolveBoard(request.classHash, entryClass, bundleBytes)
       val board = loaded.board
       val explorationDir = request.explorationDir?.takeIf { it.isNotBlank() }?.let(Path::of)
 
-      val results = mutableListOf<DeviceTargetResult>()
-      val frames = mutableListOf<DeviceWireFrame>()
+      val results = mutableListOf<WorkerTargetResult>()
+      val frames = mutableListOf<WorkerWireFrame>()
       runBlocking {
         for (target in request.targets) {
           val (res, wireFrames) = renderSingleTarget(board, request, target, explorationDir)
@@ -234,36 +226,31 @@ internal class LayoutlibWorkerSession(private val sdk: PaparazziSdk) {
       }
 
       val memStats = collectMemoryStats()
-      val recycleReason = evaluateRecycleReason(reloadCount, memStats)
+      val recycleRecommended = shouldRecycle(reloadCount, memStats)
       val totalMs = (System.nanoTime() - totalStartNs) / NANOS_PER_MS
-      DeviceBatchResponse(
+      WorkerBatchResponse(
         ok = true,
-        dexLoadMs = loadMs,
         renderTotalMs = totalMs,
         reloadCount = reloadCount,
-        recycleRecommended = recycleReason != null,
-        recycleReason = recycleReason,
-        boardMeta = ComposeBoardRenderer.buildBoardMeta(board),
+        recycleRecommended = recycleRecommended,
         results = results,
-        memoryAfter = memStats,
       ) to frames
     } catch (t: Throwable) {
       t.printStackTrace(System.err)
-      DeviceBatchResponse(
+      WorkerBatchResponse(
         ok = false,
         error = "${t::class.java.name}: ${t.message}\n${t.stackTraceToString()}",
         reloadCount = reloadCount,
-        memoryAfter = collectMemoryStats(),
       ) to emptyList()
     }
   }
 
   private suspend fun renderSingleTarget(
     board: ExplorationBoard,
-    request: DeviceBatchRequest,
-    target: DeviceRenderTarget,
+    request: WorkerBatchRequest,
+    target: WorkerRenderTarget,
     explorationDir: Path?,
-  ): Pair<DeviceTargetResult, List<DeviceWireFrame>> {
+  ): Pair<WorkerTargetResult, List<WorkerWireFrame>> {
     val direction =
       board.directions.firstOrNull { it.name == target.direction }
         ?: error("No direction '${target.direction}'")
@@ -290,56 +277,43 @@ internal class LayoutlibWorkerSession(private val sdk: PaparazziSdk) {
       )
 
     val viewName = rendered.target.effectiveView.name
-    val payloads = mutableListOf<DeviceWireFrame>()
-    val wantFrame = target.frameFormat != FrameFormat.NONE
+    val payloads = mutableListOf<WorkerWireFrame>()
     val endFrame = rendered.endFrame
-    if (wantFrame) {
+    if (target.includeFrame) {
       payloads +=
-        DeviceWireFrame(
+        WorkerWireFrame(
           direction = target.direction,
           screen = target.screen,
           viewName = viewName,
           overlayId = target.overlayId,
           isEndFrame = false,
-          format = FrameFormat.RAW_RGBA,
           widthPx = rendered.frame.width,
           heightPx = rendered.frame.height,
-          rawLength = rendered.frame.bytes.size,
           payload = rendered.frame.bytes,
         )
       if (target.includeEndFrame && endFrame != null) {
         payloads +=
-          DeviceWireFrame(
+          WorkerWireFrame(
             direction = target.direction,
             screen = target.screen,
             viewName = viewName,
             overlayId = target.overlayId,
             isEndFrame = true,
-            format = FrameFormat.RAW_RGBA,
             widthPx = endFrame.width,
             heightPx = endFrame.height,
-            rawLength = endFrame.bytes.size,
             payload = endFrame.bytes,
           )
       }
     }
 
-    val resultFormat = if (wantFrame) FrameFormat.RAW_RGBA else FrameFormat.NONE
-    return DeviceTargetResult(
+    return WorkerTargetResult(
       direction = target.direction,
       screen = target.screen,
       viewName = target.viewName,
       overlayId = target.overlayId,
-      densityScale = target.densityScale,
-      widthPx = rendered.target.widthPx,
-      heightPx = rendered.target.heightPx,
       renderMs = rendered.renderMs,
-      pass = rendered.tree.pass,
       tree = rendered.tree,
       endTree = rendered.endTree,
-      hasFrame = wantFrame,
-      hasEndFrame = wantFrame && target.includeEndFrame && endFrame != null,
-      frameFormat = resultFormat,
     ) to payloads
   }
 
@@ -347,13 +321,10 @@ internal class LayoutlibWorkerSession(private val sdk: PaparazziSdk) {
     classHash: String,
     entryClass: String,
     bundleBytes: ByteArray?,
-    forceNew: Boolean,
   ): LoadedBoard {
     synchronized(boardCache) {
-      if (!forceNew) {
-        boardCache[classHash]?.let {
-          return it
-        }
+      boardCache[classHash]?.let {
+        return it
       }
       val bytes =
         bundleBytes?.takeIf { it.isNotEmpty() }
@@ -396,20 +367,15 @@ internal class LayoutlibWorkerSession(private val sdk: PaparazziSdk) {
     return loaded
   }
 
-  private fun collectMemoryStats(): DeviceMemoryStats {
+  private fun collectMemoryStats(): WorkerMemoryStats {
     val rt = Runtime.getRuntime()
     val usedJava = rt.totalMemory() - rt.freeMemory()
-    return DeviceMemoryStats(
+    return WorkerMemoryStats(
       javaHeapUsedBytes = usedJava,
       javaHeapMaxBytes = rt.maxMemory(),
     )
   }
 
-  private fun evaluateRecycleReason(reloads: Int, mem: DeviceMemoryStats): String? =
-    when {
-      reloads >= RECYCLE_RELOAD_LIMIT -> "reload_limit:$reloads"
-      mem.javaHeapUsedBytes > RECYCLE_HEAP_BYTES ->
-        "java_heap_mb:${mem.javaHeapUsedBytes / (1024 * 1024)}"
-      else -> null
-    }
+  private fun shouldRecycle(reloads: Int, mem: WorkerMemoryStats): Boolean =
+    reloads >= RECYCLE_RELOAD_LIMIT || mem.javaHeapUsedBytes > RECYCLE_HEAP_BYTES
 }
