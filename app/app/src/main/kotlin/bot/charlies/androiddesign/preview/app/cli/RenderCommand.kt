@@ -93,7 +93,7 @@ class RenderCommand(
                 surface = compiled.surface,
                 boardName = compiled.boardName,
                 boardMeta = compiled.boardMeta,
-                androidData = compiled.androidData,
+                compiledData = compiled.compiledData,
                 boardTheme = compiled.boardTheme,
               )
             },

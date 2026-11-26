@@ -1,0 +1,77 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The cover photo and large Fraunces 'Everest Base Camp Trek' title establish the trip context first, followed by the Day 1 preview, the single high-emphasis 'Open packing' primary button, and the day-by-day itinerary."
+  },
+  "R-fill": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Only the 'Open packing' Button uses a strong saturated primary fill, while the 'In 20 days' badge, 'Share' tonal button, and selected itinerary row use muted container tones."
+  },
+  "R-surfaces": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Calm neutral surface containers separate the Day 1 preview, packing card, supporting itinerary pane, and selected day row without competing colored fills."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Every action reads as its own tappable control: 'Share' is a FilledTonalButton, 'Open packing' is a pill Button, navigation items sit in ShortNavigationBar or WideNavigationRail, and itinerary rows use SegmentedListItem."
+  },
+  "R-font": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Fraunces renders the display/headline 'Everest Base Camp Trek' title and titleLarge headers with clear editorial serif weight, Google Sans Flex carries body and secondary titles, and Google Sans Code with tnum carries altitudes, dates, and counts."
+  },
+  "R-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The screen follows Android conventions with edge-to-edge Scaffold layout, ShortNavigationBar/WideNavigationRail navigation, no disclosure chevrons on list rows, and no iOS top-bar Cancel/Done text."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All text is crisp, unclipped, and non-overlapping across light, dark, foldable, tablet, and desktop renders, with scrolling itinerary content terminating cleanly at the bottom viewport edge."
+  },
+  "R-dark": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "In trip-dark.png, all text, icons, badges, wavy progress track, and bottom navigation items have strong contrast against their dark surfaces."
+  },
+  "R-adaptive": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The layout adapts across all four breakpoints: compact phone uses a bottom bar and stacked cards, foldable switches to a collapsed rail with side-by-side summary cards, tablet adds a second itinerary pane with a selected-day spotlight, and desktop expands the navigation rail."
+  },
+  "R-idea": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The Alpine Journal direction pairs Fraunces editorial titles, tabular monospace elevation/date readouts, a wavy packing progress indicator, and a spotlighted segmented itinerary tailored to the trek."
+  },
+  "R-semantics": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All section titles ('Day 1 preview', 'Packing gear', 'Day-by-day itinerary', and the sheet's 'Packing checklist') carry Modifier.semantics { heading() }, ItineraryDayItem uses SegmentedListItem's selected overload, and PackingModalBody uses SegmentedListItem's checked overload with Checkbox(onCheckedChange = null)."
+  },
+  "R-fields": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The proposal source contains no text input fields or search bars."
+  },
+  "R-visibility": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Hidden or expanding UI leaves composition cleanly via AnimatedVisibility around day.detail in ItineraryDayItem and conditional if blocks for showPacking and showSpotlight, with no zero-alpha hiding."
+  },
+  "R-blur": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The proposal source uses no Modifier.blur anywhere and places no text over the cover photo."
+  },
+  "R-trek-forms": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Trip metadata uses wrapped pill badges below the cover photo, Day 1 preview uses an icon-badged leg card, packing uses a wavy progress card with a primary button, itinerary uses segmented rows, and no unreadable text sits over the photo."
+  }
+}

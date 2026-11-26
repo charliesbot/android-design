@@ -116,11 +116,15 @@ class StartCommand(
   private val clientFactory: (BootstrapMeta) -> PreviewClient = { meta ->
     val startEnv =
       env.toMutableMap().apply {
-        put(RuntimeIdentity.BACKEND_ENV, RuntimeIdentity.BACKEND_ANDROID)
+        put(RuntimeIdentity.BACKEND_ENV, RuntimeIdentity.resolveBackend(env))
         put(BootstrapMeta.BOOTSTRAP_DIR_ENV, meta.bootstrapDir.toString())
         val serverCp = meta.bootstrapDir.resolve("server.cp")
         if (Files.isRegularFile(serverCp)) {
           put(RuntimeIdentity.SERVER_CP_ENV, serverCp.toString())
+        }
+        val workerCp = meta.bootstrapDir.resolve("worker.cp")
+        if (Files.isRegularFile(workerCp)) {
+          put(RuntimeIdentity.WORKER_CP_ENV, workerCp.toString())
         }
       }
     PreviewClient(cacheRoot = cacheRoot, env = startEnv)
@@ -156,8 +160,9 @@ class StartCommand(
   @Serializable
   data class StartResponse(
     val ok: Boolean = true,
-    val serial: String,
-    val forwardPort: Int,
+    val backend: String = RuntimeIdentity.BACKEND_ANDROID,
+    val serial: String? = null,
+    val forwardPort: Int? = null,
     val serverPid: Long,
     val serverPort: Int,
     val boardUrl: String,
@@ -197,12 +202,15 @@ class StartCommand(
           "Bootstrap artifacts missing (bootstrap-meta.properties). Run `./gradlew :host:exportBootstrap` from app/ or invoke the bundled CLI script.",
         )
 
+    val backend = RuntimeIdentity.resolveBackend(env)
     val requestedSerial = parsed.flags["--serial"]
     val requestedAvd = parsed.flags["--avd"]
     val headless = parsed.flags["--headless"] == "true"
 
-    deviceManager.validateRequest(requestedSerial, requestedAvd)?.let { invalid ->
-      return emitError(out, invalid.exitCode, invalid.error, invalid.message)
+    if (backend != RuntimeIdentity.BACKEND_LAYOUTLIB) {
+      deviceManager.validateRequest(requestedSerial, requestedAvd)?.let { invalid ->
+        return emitError(out, invalid.exitCode, invalid.error, invalid.message)
+      }
     }
 
     val targetDir =
@@ -228,7 +236,9 @@ class StartCommand(
     val status = readyServer.status
     val serial = status.deviceSerial
     val forwardPort = status.adbForwardPort
-    if (serial == null || forwardPort == null) {
+    if (
+      status.backend == RuntimeIdentity.BACKEND_ANDROID && (serial == null || forwardPort == null)
+    ) {
       return emitError(
         out,
         ClientExitCode.NOT_READY,
@@ -241,6 +251,7 @@ class StartCommand(
     val resp =
       StartResponse(
         ok = true,
+        backend = status.backend,
         serial = serial,
         forwardPort = forwardPort,
         serverPid = status.pid,

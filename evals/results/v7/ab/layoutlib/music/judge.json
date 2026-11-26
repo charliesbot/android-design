@@ -1,0 +1,77 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The scalloped album art, Fraunces 'Golden Hour' title, and primary 'Pause' pill button clearly lead every render while the header, Up Next pane, and floating toolbar remain subordinate."
+  },
+  "R-fill": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Only the primary 'Pause' pill stands out as the hero filled CTA alongside a muted tertiaryContainer state toggle for the liked heart, while all surrounding cards and surfaces stay neutral."
+  },
+  "R-surfaces": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Calm surface, surfaceContainerLow, and surfaceContainerHigh tones cleanly separate the player backdrop, ListeningContextPane, segmented queue rows, and lyric card."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Every action (header icon buttons, Like toggle, Shuffle, Previous, Pause pill, Next, Repeat, and the three distinct icon buttons in the floating toolbar) looks tappable and reads as its own control."
+  },
+  "R-font": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The hero title 'Golden Hour' and large pane title 'Late Summer' use Fraunces at expressive display/title weights while supporting text uses Google Sans Flex and timestamps use tabular Google Sans Code."
+  },
+  "R-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All renders draw edge-to-edge with Android top-bar minimize/cast icons and segmented list rows free of iOS disclosure chevrons or Cancel/Done text."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All labels, track titles, lyrics, credits, and timestamps render cleanly without clipping, overlap, or unintended truncation across all five screenshots."
+  },
+  "R-dark": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "In main-dark.png, all light text, icons, wavy progress bar, Pause pill, and floating toolbar icons have strong contrast against the dark surfaces."
+  },
+  "R-adaptive": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The layout progresses from a single-column player on phone (411x923), to revealing an 'Up next' queue preview on foldable (704x933), to a two-pane layout with a full ListeningContextPane and VerticalFloatingToolbar on tablet (1280x800), and side-by-side hero art and controls on desktop (1920x1080)."
+  },
+  "R-idea": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The scalloped 12-sided cookie album frame, wavy progress indicator, Fraunces editorial voice, and desktop/tablet Listening Room context pane create a cohesive music-specific concept."
+  },
+  "R-semantics": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "In proposal.explore.kt, every section heading ('Up next', 'Late Summer', and panel.title) applies Modifier.semantics { heading() } and there are no split-target toggling rows."
+  },
+  "R-fields": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The proposal contains no text fields or search inputs, so the TextFieldState requirement passes."
+  },
+  "R-visibility": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Hidden overlays are conditionally removed from composition using an if branch for ModalBottomSheet, AnimatedVisibility for the expanded side panel and scrim, and AnimatedContent for panel switching, with no zero-alpha hiding."
+  },
+  "R-blur": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No Modifier.blur is used in proposal.explore.kt and all text sits on solid or tonal surfaces."
+  },
+  "R-music-actions": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Lyrics, Queue, and Credits appear as three separate, clearly spaced icon toggle buttons inside HorizontalFloatingToolbar on phone/foldable and VerticalFloatingToolbar on tablet/desktop."
+  }
+}

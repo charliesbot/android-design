@@ -1,0 +1,47 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "On main/watch and main/watch-large the compact Today header leads without overshadowing the actionable reminder rows, add highlights the Book flights draft above quick picks, and each screen ends with a single mint EdgeButton primary action."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Every reminder row is a distinct full-width CheckboxButton pill, the add screen uses full-width FilledTonalButton/Button pills for the draft and quick picks, and Add and Save appear as distinct EdgeButtons."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All visible text across main, add, and add+confirmation renders is crisp and non-overlapping, with only scrolling items partially off the top or bottom edge."
+  },
+  "R-wear-round": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "TimeText, headers, confirmation circle, and list cards stay inside the circular safe area with TransformingLazyColumn margins on both 204x204 and 227x227 watches, and EdgeButtons fit the bottom curve cleanly."
+  },
+  "R-wear-glance": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Each screen focuses on one task at a glance: a scrollable list of single-line reminders on main, a single draft plus scrollable quick picks on add, and a centered checkmark confirmation."
+  },
+  "R-wear-hero": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "On main/watch and main/watch-large, Today is set in titleMedium (nearly the same visual size as the labelMedium reminder rows) and the key count status (3 left and 1/4) sits in labelMedium/labelSmall rather than a Display/Numeral style or clearly largest hero element."
+  },
+  "R-wear-sizes": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Both watch sizes are complete and uncramped, and watch-large adds value past the 225dp breakpoint (a linear progress bar with 1/4 count on main, and four quick picks instead of two on add) without breaking or dropping content."
+  },
+  "R-wear-color": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All screens sit on a pure black background with neutral surfaceContainer cards for list items and bright mint primary accent reserved for checkboxes, status indicators, confirmation check, and the primary EdgeButton."
+  },
+  "R-reminder-list": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Each reminder row is a single tappable CheckboxButton, add renders as its own screen, and Pick up laundry is clearly marked done in main/watch-end and main/watch-large-end with both a checked box and strikethrough text."
+  }
+}

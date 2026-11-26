@@ -705,6 +705,33 @@ class ArtifactPipelineTests(unittest.TestCase):
         self.assertNotIn('\u2014', summary_text)
         self.assertNotIn('\u2014', report_html)
 
+    def test_layoutlib_backend_omits_headless_on_start_and_propagates_env_to_render(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            fake_case(directory)
+            seen_start = []
+            seen_render_env = []
+
+            def fake_subproc(cmd, **kwargs):
+                if 'start' in cmd:
+                    seen_start.append((cmd, kwargs.get('env', {}).get('ANDROID_DESIGN_PREVIEW_BACKEND')))
+                    return subprocess.CompletedProcess(cmd, 0, '', '')
+                seen_render_env.append(kwargs.get('env', {}).get('ANDROID_DESIGN_PREVIEW_BACKEND'))
+                write_report(directory, valid=True, views=('light',))
+                return subprocess.CompletedProcess(cmd, 0, '', '')
+
+            with mock.patch.object(run.subprocess, 'run', side_effect=fake_subproc):
+                run._start_preview_server(
+                    directory, Path(BINARY), src=Path(SRC_DIR), bdir=Path(BOOTSTRAP_DIR), backend='layoutlib',
+                )
+                images, error = run.render(
+                    directory, binary=Path(BINARY), src=Path(SRC_DIR), bdir=Path(BOOTSTRAP_DIR), backend='layoutlib',
+                )
+            self.assertEqual(seen_start, [([BINARY, 'start', str(directory)], 'layoutlib')])
+            self.assertEqual(seen_render_env, ['layoutlib'])
+            self.assertIsNone(error)
+            self.assertEqual(len(images), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

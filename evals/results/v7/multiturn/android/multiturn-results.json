@@ -1,0 +1,321 @@
+{
+  "pipeline": "v7",
+  "backend": "antigravity",
+  "model": "gemini-4-hydrogen-high",
+  "commit_sha": "b8306e8668f7419ee0c4a657f44632596ac01350",
+  "captured_at": "2026-11-26T00:47:50Z",
+  "turns_count": 10,
+  "final_checks_pass": true,
+  "final_checks": {
+    "C-valid": {
+      "pass": true,
+      "detail": ""
+    },
+    "C-review": {
+      "pass": true,
+      "detail": ""
+    },
+    "C-palette": {
+      "pass": true,
+      "detail": ""
+    }
+  },
+  "totals": {
+    "wall_seconds": 378.0,
+    "agent_turns": 59,
+    "input_tokens": 226707,
+    "cache_read_tokens": 4983404,
+    "cache_creation_tokens": 0,
+    "total_input_tokens": 5210111,
+    "output_tokens": 46288,
+    "total_tokens": 5256399,
+    "cost": null,
+    "check_calls": 10,
+    "compile_retries": 0,
+    "skill_bytes_read": 63229,
+    "skill_read_calls": 4,
+    "skill_unique_files": 4,
+    "skill_files_read": {
+      "android-design-explore/SKILL.md": {
+        "reads": 1,
+        "bytes": 7773
+      },
+      "android-design-explore/references/compose-signatures.md": {
+        "reads": 1,
+        "bytes": 15764
+      },
+      "android-design/SKILL.md": {
+        "reads": 1,
+        "bytes": 26155
+      },
+      "android-design/references/layout.md": {
+        "reads": 1,
+        "bytes": 13537
+      }
+    }
+  },
+  "per_turn": {
+    "wall_seconds": {
+      "mean": 37.8,
+      "median": 35.0
+    },
+    "input_tokens": {
+      "mean": 22670.7,
+      "median": 16891.5
+    },
+    "total_input_tokens": {
+      "mean": 521011.1,
+      "median": 520440.5
+    },
+    "output_tokens": {
+      "mean": 4628.8,
+      "median": 4235.5
+    },
+    "total_tokens": {
+      "mean": 525639.9,
+      "median": 525745.5
+    },
+    "check_calls": {
+      "mean": 1.0,
+      "median": 1.0
+    },
+    "compile_retries": {
+      "mean": 0.0,
+      "median": 0.0
+    },
+    "cost": {
+      "mean": null,
+      "median": null
+    }
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "title": "Layout shift (Editorial split)",
+      "wall_seconds": 65.0,
+      "agent_turns": 7,
+      "input_tokens": 66948,
+      "cache_read_tokens": 287321,
+      "cache_creation_tokens": 0,
+      "total_input_tokens": 354269,
+      "output_tokens": 11707,
+      "total_tokens": 365976,
+      "cost": null,
+      "cumulative_cost": null,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 63229,
+      "skill_read_calls": 4,
+      "skill_unique_files": 4,
+      "skill_files_read": {
+        "android-design-explore/SKILL.md": {
+          "reads": 1,
+          "bytes": 7773
+        },
+        "android-design-explore/references/compose-signatures.md": {
+          "reads": 1,
+          "bytes": 15764
+        },
+        "android-design/SKILL.md": {
+          "reads": 1,
+          "bytes": 26155
+        },
+        "android-design/references/layout.md": {
+          "reads": 1,
+          "bytes": 13537
+        }
+      },
+      "model": "gemini-4-hydrogen-high"
+    },
+    {
+      "turn": 2,
+      "title": "Typography emphasis (Editorial split)",
+      "wall_seconds": 25.0,
+      "agent_turns": 5,
+      "input_tokens": 14671,
+      "cache_read_tokens": 309495,
+      "cache_creation_tokens": 0,
+      "total_input_tokens": 324166,
+      "output_tokens": 3824,
+      "total_tokens": 327990,
+      "cost": null,
+      "cumulative_cost": null,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "gemini-4-hydrogen-high"
+    },
+    {
+      "turn": 3,
+      "title": "Targeted element tweak (Editorial split)",
+      "wall_seconds": 31.0,
+      "agent_turns": 5,
+      "input_tokens": 14312,
+      "cache_read_tokens": 341611,
+      "cache_creation_tokens": 0,
+      "total_input_tokens": 355923,
+      "output_tokens": 4406,
+      "total_tokens": 360329,
+      "cost": null,
+      "cumulative_cost": null,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "gemini-4-hydrogen-high"
+    },
+    {
+      "turn": 4,
+      "title": "Theme and contrast adjustment (shared)",
+      "wall_seconds": 21.0,
+      "agent_turns": 5,
+      "input_tokens": 14040,
+      "cache_read_tokens": 365136,
+      "cache_creation_tokens": 0,
+      "total_input_tokens": 379176,
+      "output_tokens": 1515,
+      "total_tokens": 380691,
+      "cost": null,
+      "cumulative_cost": null,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "gemini-4-hydrogen-high"
+    },
+    {
+      "turn": 5,
+      "title": "Layout shift (Quick pantry)",
+      "wall_seconds": 46.0,
+      "agent_turns": 7,
+      "input_tokens": 22042,
+      "cache_read_tokens": 558273,
+      "cache_creation_tokens": 0,
+      "total_input_tokens": 580315,
+      "output_tokens": 5593,
+      "total_tokens": 585908,
+      "cost": null,
+      "cumulative_cost": null,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "gemini-4-hydrogen-high"
+    },
+    {
+      "turn": 6,
+      "title": "Targeted element tweak (Quick pantry)",
+      "wall_seconds": 38.0,
+      "agent_turns": 5,
+      "input_tokens": 15665,
+      "cache_read_tokens": 444901,
+      "cache_creation_tokens": 0,
+      "total_input_tokens": 460566,
+      "output_tokens": 5017,
+      "total_tokens": 465583,
+      "cost": null,
+      "cumulative_cost": null,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "gemini-4-hydrogen-high"
+    },
+    {
+      "turn": 7,
+      "title": "Adaptive fix (Editorial split detail pane)",
+      "wall_seconds": 35.0,
+      "agent_turns": 6,
+      "input_tokens": 17618,
+      "cache_read_tokens": 575488,
+      "cache_creation_tokens": 0,
+      "total_input_tokens": 593106,
+      "output_tokens": 4065,
+      "total_tokens": 597171,
+      "cost": null,
+      "cumulative_cost": null,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "gemini-4-hydrogen-high"
+    },
+    {
+      "turn": 8,
+      "title": "Typography emphasis (Quick pantry)",
+      "wall_seconds": 28.0,
+      "agent_turns": 6,
+      "input_tokens": 16627,
+      "cache_read_tokens": 608535,
+      "cache_creation_tokens": 0,
+      "total_input_tokens": 625162,
+      "output_tokens": 1400,
+      "total_tokens": 626562,
+      "cost": null,
+      "cumulative_cost": null,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "gemini-4-hydrogen-high"
+    },
+    {
+      "turn": 9,
+      "title": "Theme and contrast adjustment (Editorial split)",
+      "wall_seconds": 35.0,
+      "agent_turns": 6,
+      "input_tokens": 17156,
+      "cache_read_tokens": 645043,
+      "cache_creation_tokens": 0,
+      "total_input_tokens": 662199,
+      "output_tokens": 2906,
+      "total_tokens": 665105,
+      "cost": null,
+      "cumulative_cost": null,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "gemini-4-hydrogen-high"
+    },
+    {
+      "turn": 10,
+      "title": "Final polish and full verification",
+      "wall_seconds": 54.0,
+      "agent_turns": 7,
+      "input_tokens": 27628,
+      "cache_read_tokens": 847601,
+      "cache_creation_tokens": 0,
+      "total_input_tokens": 875229,
+      "output_tokens": 5855,
+      "total_tokens": 881084,
+      "cost": null,
+      "cumulative_cost": null,
+      "check_calls": 1,
+      "compile_retries": 0,
+      "skill_bytes_read": 0,
+      "skill_read_calls": 0,
+      "skill_unique_files": 0,
+      "skill_files_read": {},
+      "model": "gemini-4-hydrogen-high"
+    }
+  ],
+  "render_backend": "android"
+}

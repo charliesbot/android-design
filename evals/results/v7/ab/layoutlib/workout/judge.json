@@ -1,0 +1,47 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "In both main-watch and main-watch-large, the 24:18 elapsed time leads as the clear focal hero above the subordinate 3.1 of 5 km distance and 148 bpm | 5:12 /km pill, with the larger primary-colored pause button clearly emphasized over the end button."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Every action on main (pause and stop icon buttons) and main+end-confirm (confirm check and keep-running play icon buttons) is rendered as a distinct, separated filled button with clear 48dp+ touch targets."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All labels, numerals, and units across main-watch, main-watch-large, and both end-confirm renders are crisp with no clipping, unintended truncation, or overlapping text."
+  },
+  "R-wear-round": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The circular progress ring hugs the perimeter without clipping, and the curved 10:08 time, headers, metrics pill, and bottom buttons all sit comfortably inside the round safe area on both 204x204 and 227x227 watches."
+  },
+  "R-wear-glance": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The active-run screen communicates the four key run metrics and two actions cleanly in three scannable tiers, and the end-confirm overlay presents a single focused prompt with two icon buttons."
+  },
+  "R-wear-hero": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The 24:18 timer uses a large bold numeral style (36sp on watch, 42sp on watch-large) that clearly outweighs all secondary metrics, while distance, heart rate, and pace remain legible."
+  },
+  "R-wear-sizes": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Both main and end-confirm fit cleanly without crowding on the 204x204 watch, and the 227x227 watch-large layout expands naturally to add the Active status and 62% \u2022 1.9 left badge without breaking."
+  },
+  "R-wear-color": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All renders build from a pure black background and reserve bright primary lime-green for the progress arc, distance line, and primary action while keeping secondary metrics and the end action in neutral and container roles."
+  },
+  "R-workout-hero": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "On both main-watch and main-watch-large, elapsed time (24:18) is clearly larger than distance (3.1 of 5 km), heart rate (148 bpm), and pace (5:12 /km), with all four values displayed cleanly without crowding."
+  }
+}

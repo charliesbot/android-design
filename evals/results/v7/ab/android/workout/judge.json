@@ -1,0 +1,47 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Elapsed time 24:18 leads the center of the active-run screen in large numeral type above the metrics and below-centered action cluster, where the lime primary FilledIconButton clearly stands out as the main pause action."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Pause and end render as distinct FilledIconButton and FilledTonalIconButton pills inside a spaced ButtonGroup on the run screen, and the confirmation dialog uses separate dismiss (X) and confirm (checkmark) icon buttons."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All labels and values (10:08, 3.1 / 5 km, 24:18, 148 bpm / HR \u00b7 bpm, 5:12 /km / Pace \u00b7 /km, and the dialog title and summary) are complete with no clipping, truncation, or overlap in any render."
+  },
+  "R-wear-round": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The progress ring, header, hero timer, metric pills, button cluster, and confirmation dialog controls all sit comfortably inside the circular safe area on both 204x204 and 227x227 watches with no edge clipping."
+  },
+  "R-wear-glance": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The active-run screen presents one focused workout cockpit with four cleanly grouped metrics and two clear actions that read at a glance without grid clutter or crowding."
+  },
+  "R-wear-hero": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The 24:18 timer is set in large Wear numeral typography (numeralMedium on watch, numeralLarge on watch-large), clearly outweighing all secondary metrics while keeping distance, heart rate, and pace crisp and readable."
+  },
+  "R-wear-sizes": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The small watch layout is complete and uncramped, and the large watch layout scales up appropriately past the 225dp breakpoint with numeralLarge, wider progress stroke, larger buttons, and added HR/Pace labels."
+  },
+  "R-wear-color": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Both screens use a true black background, reserve bright lime primary color for the progress arc, current distance, and primary pause/confirm actions, and keep secondary pills and end control on dark neutral containers."
+  },
+  "R-workout-hero": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "On both active-run renders, elapsed time 24:18 is clearly the largest hero value and all four required metrics (24:18, 3.1 / 5 km, 148 bpm, and 5:12 /km) appear cleanly without crowding."
+  }
+}

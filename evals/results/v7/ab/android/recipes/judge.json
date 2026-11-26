@@ -1,0 +1,77 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "On discover, the search bar, featured photo carousel, category chips, and recipe list establish clear scan order without competing elements; on recipe-detail, the hero photo, headline, metadata pills, and filled Save recipe button clearly lead."
+  },
+  "R-fill": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "At most one strong saturated fill competes for attention on each screen, such as the primary Save recipe button on recipe-detail and the single small tertiaryContainer skillet emblem on discover."
+  },
+  "R-surfaces": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Warm tonal surfaces (surface, surfaceBright on detail, surfaceContainerHigh on search and list items, surfaceContainerLow on the Ingredients card, and secondaryContainer for active selection) clearly group content without flattening hierarchy."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Every interactive element reads as its own distinct tappable control: navigation bar/rail items, contained search bar, clickable carousel cards, outlined/tonal FilterChips, SegmentedListItems, TopAppBar back IconButton, and 56dp Save recipe Button."
+  },
+  "R-font": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Bundled Fraunces is used with deliberate editorial weight on display and titleLarge headings (Simmer, Discover, This week, Browse, Shakshuka, Ingredients, Method), while Google Sans Flex carries body/list text and Google Sans Code handles tabular times, ratings, servings, and step numbers."
+  },
+  "R-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Follows Android conventions edge to edge with no iOS disclosure chevrons on list rows and no Cancel/Done text buttons in the top bar."
+  },
+  "R-text": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "In discover-desktop.png, the second featured card in the This week carousel shows a caption pill whose title truncates mid-word to \"Miso mushro...\" because maxLines = 1 clips it inside the 440dp browse pane."
+  },
+  "R-dark": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Both discover-dark.png and recipe-detail-dark.png are crisp and legible, with light text/icons on dark surfaces, dark text on the peach Save recipe button, and high contrast on the yellow skillet badge and caption pill."
+  },
+  "R-adaptive": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Navigation shifts from ShortNavigationBar on phone to collapsed WideNavigationRail on foldable/tablet and expanded WideNavigationRail on desktop; discover-tablet and discover-desktop reveal the recipe detail pane alongside the list, and recipe-detail-desktop reveals Method alongside Ingredients."
+  },
+  "R-idea": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The Editorial Cookbook direction combines warm terracotta-cream tones, Fraunces editorial headers, tabular Google Sans Code recipe metrics, a 9-sided cookie skillet motif, and a food-led hero carousel into a cohesive culinary experience."
+  },
+  "R-semantics": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All section headings (discover header, This week, Browse, Ingredients, Method) carry Modifier.semantics { heading() }, category FilterChips are single Material controls, and no list row embeds a separate Switch, Checkbox, or RadioButton callback."
+  },
+  "R-fields": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The search field uses TextFieldState with SearchBarDefaults.InputField(textFieldState = textFieldState, searchBarState = searchBarState) rather than a value/onValueChange String overload."
+  },
+  "R-visibility": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All shown/hidden UI (single-pane detail, navigation bar vs rail, second pane, carousel section, empty state, back bar, and recipe switching) uses conditional if branches or AnimatedContent rather than zero-alpha hiding."
+  },
+  "R-blur": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No Modifier.blur is used anywhere in the proposal, and carousel captions sit inside opaque surfaceContainerLowest Surface cards for readability."
+  },
+  "R-recipes-browse": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Search sits at the top in a SearchBar, featured recipes lead with food photography in a HorizontalCenteredHeroCarousel with high-contrast surface pills for titles, and categories use FilterChips above SegmentedListItems."
+  }
+}

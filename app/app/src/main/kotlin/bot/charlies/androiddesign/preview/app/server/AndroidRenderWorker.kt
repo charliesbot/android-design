@@ -7,6 +7,7 @@ import bot.charlies.androiddesign.preview.app.android.DeviceBatchExecution
 import bot.charlies.androiddesign.preview.app.android.DeviceTransport
 import bot.charlies.androiddesign.preview.app.android.FrameKey
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
+import bot.charlies.androiddesign.preview.model.ClassBundleCodec
 import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
 import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
 import bot.charlies.androiddesign.preview.model.DeviceRenderTarget
@@ -70,16 +71,21 @@ class AndroidRenderWorker(
           if (compiled.assetBlobs.isNotEmpty()) {
             transport.syncAssets(compiled.assetBlobs)
           }
-          val androidData =
-            AndroidCompiledData(
+          val classBundle = ClassBundleCodec.encode(compiled.classBytes)
+          val compiledData =
+            CompiledBoardData(
               sourceFile = compiled.sourceFile,
               sourceText = compiled.sourceText,
               entryClass = compiled.entryClass,
-              dexBytes = compiled.dexBytes,
-              dexHash = compiled.dexHash,
+              classBytes = compiled.classBytes,
+              classBundleBytes = classBundle,
+              classHash = ContentHasher.sha256Hex(classBundle),
+              explorationDir = compiled.sourcePath.parent,
               assetMap = compiled.assetMap,
               assetBlobs = compiled.assetBlobs,
               boardTheme = preload.boardTheme,
+              dexBytes = compiled.dexBytes,
+              dexHash = compiled.dexHash,
             )
           WorkerCompileResult.Ready(
             sourcePath = compiled.sourcePath,
@@ -89,7 +95,7 @@ class AndroidRenderWorker(
             boardMeta = boardMeta,
             boardTheme = preload.boardTheme,
             dexHash = compiled.dexHash,
-            androidData = androidData,
+            compiledData = compiledData,
           )
         }
       }
@@ -101,7 +107,7 @@ class AndroidRenderWorker(
     stageRoot: Path,
   ): WorkerBatchResult {
     val data =
-      checkNotNull(entry.androidData) { "Missing AndroidCompiledData for ${entry.sourcePath}" }
+      checkNotNull(entry.compiledData) { "Missing CompiledBoardData for ${entry.sourcePath}" }
     val exec = executeBatchWithAssetSync(data, entry.loaded.designTheme, targets)
     val resp = exec.response
     if (resp.recycleReason == "watchdog_timeout") {
@@ -141,15 +147,17 @@ class AndroidRenderWorker(
   }
 
   override fun updateLive(entry: CompileEntry, update: LivePreviewUpdate) {
-    val data = entry.androidData ?: return
+    val data = entry.compiledData ?: return
+    val dexBytes = data.dexBytes ?: return
+    val dexHash = data.dexHash ?: return
     if (data.assetBlobs.isNotEmpty()) {
       transport.syncAssets(data.assetBlobs)
     }
     transport.setLive(
-      dexBytes = data.dexBytes,
+      dexBytes = dexBytes,
       request =
         DeviceLiveStateRequest(
-          dexHash = data.dexHash,
+          dexHash = dexHash,
           entryClass = data.entryClass,
           sourceFile = data.sourceFile,
           designTheme = entry.loaded.designTheme,
@@ -177,20 +185,22 @@ class AndroidRenderWorker(
   }
 
   private fun executeBatchWithAssetSync(
-    data: AndroidCompiledData,
+    data: CompiledBoardData,
     designTheme: ThemeOverride?,
     targets: List<DeviceRenderTarget>,
   ): DeviceBatchExecution {
+    val dexBytes = checkNotNull(data.dexBytes) { "Missing DEX bytes for ${data.sourceFile}" }
+    val dexHash = checkNotNull(data.dexHash) { "Missing DEX hash for ${data.sourceFile}" }
     if (data.assetBlobs.isNotEmpty()) {
       transport.syncAssets(data.assetBlobs)
     }
     return transport.renderBatch(
-      dexHash = data.dexHash,
+      dexHash = dexHash,
       entryClass = data.entryClass,
-      dexBytes = data.dexBytes,
+      dexBytes = dexBytes,
       request =
         DeviceBatchRequest(
-          dexHash = data.dexHash,
+          dexHash = dexHash,
           entryClass = data.entryClass,
           sourceFile = data.sourceFile,
           sourceText = data.sourceText,

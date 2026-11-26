@@ -2,6 +2,7 @@
 """Agent-independent artifacts: prepare, evaluate, score; optional automated run adapters."""
 import argparse
 import hashlib
+import os
 import re
 import json
 import shutil
@@ -15,6 +16,7 @@ from checks import read_report, run as run_checks
 from judge import judge, parse, aggregate, validate_runs, SCHEMA, prompt_for as judge_prompt
 from backends import BACKENDS, execute
 from preview_app import (
+    BACKEND_ENV,
     DEFAULT_EVAL_BACKEND,
     app_binary,
     bootstrap_dir,
@@ -122,14 +124,23 @@ def generator_metrics_from(reply):
     return {key: reply.get(key) for key in METRIC_KEYS}
 
 
+def _resolve_backend(backend=None):
+    return backend or os.environ.get(BACKEND_ENV) or DEFAULT_EVAL_BACKEND
+
+
 def _build_cli_env(*, src=None, bdir=None, backend=DEFAULT_EVAL_BACKEND, cache_dir=None):
     return build_cli_env(src=src, bdir=bdir, backend=backend, cache_dir=cache_dir)
 
 
-def _start_preview_server(work_dir, binary, *, src=None, bdir=None, backend=DEFAULT_EVAL_BACKEND, cache_dir=None):
-    env = _build_cli_env(src=src, bdir=bdir, backend=backend, cache_dir=cache_dir)
+def _start_preview_server(work_dir, binary, *, src=None, bdir=None, backend=None, cache_dir=None):
+    resolved_backend = _resolve_backend(backend)
+    env = _build_cli_env(src=src, bdir=bdir, backend=resolved_backend, cache_dir=cache_dir)
+    cmd = [str(binary), 'start']
+    if resolved_backend != 'layoutlib':
+        cmd.append('--headless')
+    cmd.append(str(work_dir))
     done = subprocess.run(
-        [str(binary), 'start', '--headless', str(work_dir)],
+        cmd,
         cwd=work_dir, env=env, capture_output=True, text=True, timeout=450, stdin=subprocess.DEVNULL,
     )
     if done.returncode != 0:
@@ -156,8 +167,9 @@ def _resolve_bootstrap_context():
     return binary, src, bdir
 
 
-def generate(case_dir, backend, model=None, *, cache_dir=None, stop_server=True):
+def generate(case_dir, backend, model=None, *, cache_dir=None, stop_server=True, preview_backend=None):
     binary, src, bdir = _resolve_bootstrap_context()
+    resolved_preview_backend = _resolve_backend(preview_backend)
     try:
         reply = execute(
             backend,
@@ -168,7 +180,7 @@ def generate(case_dir, backend, model=None, *, cache_dir=None, stop_server=True)
             mcp_binary=binary,
             preview_src=src,
             bootstrap_dir=bdir,
-            preview_backend=DEFAULT_EVAL_BACKEND,
+            preview_backend=resolved_preview_backend,
             cache_dir=cache_dir,
             client_timeout_ms=120000,
         )
@@ -179,7 +191,7 @@ def generate(case_dir, backend, model=None, *, cache_dir=None, stop_server=True)
                 binary,
                 src=src,
                 bdir=bdir,
-                backend=DEFAULT_EVAL_BACKEND,
+                backend=resolved_preview_backend,
                 cache_dir=cache_dir,
             )
     (case_dir / 'agent.json').write_text(json.dumps(reply, indent=2))
@@ -187,7 +199,7 @@ def generate(case_dir, backend, model=None, *, cache_dir=None, stop_server=True)
     return reply
 
 
-def render(case_dir, *, binary=None, src=None, bdir=None, cache_dir=None):
+def render(case_dir, *, binary=None, src=None, bdir=None, cache_dir=None, backend=None):
     """Renders the exploration via `android-design-preview render` into <case>/renders/.
 
     Stale renders are removed first. Returns (images, error). An invalid exploration (exit 2 with
@@ -206,6 +218,7 @@ def render(case_dir, *, binary=None, src=None, bdir=None, cache_dir=None):
     cli_bin = Path(binary) if binary is not None else app_binary()
     resolved_src = preview_src() if src is None else Path(src)
     resolved_bdir = bootstrap_dir() if bdir is None else Path(bdir)
+    resolved_backend = _resolve_backend(backend)
     if bdir is None:
         server_cp()
     cmd = [str(cli_bin), 'render', str(proposal_path(case_dir)), '--out', str(renders)]
@@ -214,7 +227,7 @@ def render(case_dir, *, binary=None, src=None, bdir=None, cache_dir=None):
     env = _build_cli_env(
         src=resolved_src,
         bdir=resolved_bdir,
-        backend=DEFAULT_EVAL_BACKEND,
+        backend=resolved_backend,
         cache_dir=cache_dir,
     )
     try:
@@ -262,24 +275,31 @@ def image_labels(case_dir):
     return {r['png_path']: label(r) for r in report_renders(case_dir)}
 
 
-def build(case, case_dir, backend, model=None):
+def build(case, case_dir, backend, model=None, *, preview_backend=None):
     """Optional automated generation for a scored run."""
     if case_dir.exists():
         raise FileExistsError(f'Preserving existing case directory: {case_dir}')
     prepare(case, case_dir)
     (case_dir / 'prompt.md').write_text(prompt_for(case, case_dir))
     binary, src, bdir = _resolve_bootstrap_context()
+    resolved_preview_backend = _resolve_backend(preview_backend)
     with preview_server_session(
         case_dir,
         binary,
         src=src,
         bdir=bdir,
-        backend=DEFAULT_EVAL_BACKEND,
+        backend=resolved_preview_backend,
         cache_prefix='eval-build',
         stopper=_stop_preview_server,
     ) as eval_cache_dir:
-        reply = generate(case_dir, backend, model, cache_dir=eval_cache_dir, stop_server=False)
-        images, error = render(case_dir, binary=binary, src=src, bdir=bdir, cache_dir=eval_cache_dir)
+        gen_kwargs = {'cache_dir': eval_cache_dir, 'stop_server': False}
+        if preview_backend is not None:
+            gen_kwargs['preview_backend'] = resolved_preview_backend
+        reply = generate(case_dir, backend, model, **gen_kwargs)
+        render_kwargs = {'binary': binary, 'src': src, 'bdir': bdir, 'cache_dir': eval_cache_dir}
+        if preview_backend is not None:
+            render_kwargs['backend'] = resolved_preview_backend
+        images, error = render(case_dir, **render_kwargs)
     if error:
         raise RuntimeError(error)
     return case_dir, reply, images
@@ -349,10 +369,13 @@ def overall_status(checks, verdict):
 
 
 def evaluate_case(case, out, judge_backend=None, judge_model=None, judge_runs=1, *,
-                  binary=None, src=None, bdir=None, cache_dir=None):
+                  binary=None, src=None, bdir=None, cache_dir=None, backend=None):
     started = time.time()
     directory = out / case['name']
-    images, render_error = render(directory, binary=binary, src=src, bdir=bdir, cache_dir=cache_dir)
+    render_kwargs = {'binary': binary, 'src': src, 'bdir': bdir, 'cache_dir': cache_dir}
+    if backend is not None:
+        render_kwargs['backend'] = backend
+    images, render_error = render(directory, **render_kwargs)
     renders = [{k: r.get(k) for k in ('screen', 'view', 'png', 'pass', 'end') if k in r} for r in report_renders(directory)]
     checks = run_checks(directory, case['surface'])
     if render_error:
@@ -426,6 +449,7 @@ def main():
             command.add_argument('--no-open', action='store_true')
         if name in ('evaluate', 'run'):
             command.add_argument('--parallel', type=int, default=3)
+            command.add_argument('--backend', choices=('android', 'layoutlib'), default=None)
             command.add_argument('--judge', choices=BACKENDS, required=name == 'run')
             command.add_argument('--judge-model')
             command.add_argument('--judge-runs', type=int, default=1)
@@ -471,41 +495,44 @@ def main():
                               status=overall_status(result['checks'], verdict))
                 (out / result['name'] / 'judge.json').write_text(json.dumps(verdict, indent=2))
         else:
+            resolved_backend = _resolve_backend(getattr(args, 'backend', None))
             binary, src, bdir = _resolve_bootstrap_context()
             with preview_server_session(
                 out,
                 binary,
                 src=src,
                 bdir=bdir,
-                backend=DEFAULT_EVAL_BACKEND,
+                backend=resolved_backend,
                 cache_prefix=f'eval-{args.command}',
                 stopper=_stop_preview_server,
             ) as eval_cache_dir:
-                _start_preview_server(out, binary, src=src, bdir=bdir, cache_dir=eval_cache_dir)
+                _start_preview_server(out, binary, src=src, bdir=bdir, backend=resolved_backend, cache_dir=eval_cache_dir)
 
                 def work(case):
                     generation_error = None
                     if args.command == 'run':
                         try:
+                            gen_kwargs = {'cache_dir': eval_cache_dir, 'stop_server': False}
+                            if args.backend is not None:
+                                gen_kwargs['preview_backend'] = resolved_backend
                             generate(
                                 out / case['name'],
                                 args.generator,
                                 args.generator_model,
-                                cache_dir=eval_cache_dir,
-                                stop_server=False,
+                                **gen_kwargs,
                             )
                         except RuntimeError as error:
                             generation_error = str(error)
+                    eval_kwargs = {'binary': binary, 'src': src, 'bdir': bdir, 'cache_dir': eval_cache_dir}
+                    if args.backend is not None:
+                        eval_kwargs['backend'] = resolved_backend
                     result = evaluate_case(
                         case,
                         out,
                         None if generation_error else args.judge,
                         args.judge_model,
                         args.judge_runs,
-                        binary=binary,
-                        src=src,
-                        bdir=bdir,
-                        cache_dir=eval_cache_dir,
+                        **eval_kwargs,
                     )
                     if generation_error:
                         result['checks']['C-generation'] = {'pass': False, 'detail': generation_error}

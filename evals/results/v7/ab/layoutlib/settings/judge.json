@@ -1,0 +1,77 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The settings groups (Appearance, Notifications, Backup & sync) and primary \"Back up now\" button lead the visual hierarchy while the compact NotePreviewCard and supporting Live preview pane reinforce Appearance changes without overshadowing controls."
+  },
+  "R-fill": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Only the primary accent role (selected System button, active switch tracks, slider active track, and \"Back up now\" button) and one small tertiaryContainer badge (\"Dynamic \u00b7 16 sp\") use saturated fills against neutral surface containers."
+  },
+  "R-surfaces": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Warm-tinted neutral surface containers cleanly group settings rows with SegmentedListItem (surfaceContainerHigh), separate the note preview (surfaceContainerLowest), and frame the supporting pane (surfaceContainerLow)."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Navigation items, connected ToggleButtons for Theme, Switch rows, the Text size Slider, and the filled \"Back up now\" Button each read as distinct tappable controls with no lone text-only actions or merged toolbar pills."
+  },
+  "R-font": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Fraunces is used with clear bold intent for the \"Settings\" top bar title and titleLarge headings (\"Field notes, autumn\", \"Live preview\"), while UI labels and body text stay in Google Sans Flex and numeric/status values (\"16sp\", \"2 min ago\") use Google Sans Code."
+  },
+  "R-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All renders follow Android conventions with edge-to-edge framing, no disclosure chevrons on rows, and no iOS-style \"Cancel\"/\"Done\" actions in the top bar."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All titles, subtitles, labels, controls, and status rows render cleanly with no clipping, truncation, or overlapping text across all five screenshots."
+  },
+  "R-dark": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "In settings-dark.png, all light text, icons, badge labels, switches, and navigation items have clear contrast against the dark surface containers."
+  },
+  "R-adaptive": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Layout adapts from a bottom ShortNavigationBar single column on phone to a collapsed WideNavigationRail on foldable, adds a second Live preview and Active configuration pane on tablet, and expands the rail with three panes on desktop revealing Backup & sync alongside Appearance and Live preview without stretching cards past 420dp."
+  },
+  "R-idea": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The screen pairs Jot's appearance controls with a live Fraunces \"NOTE PREVIEW\" card on compact screens and expands it into a dedicated Live preview and Active configuration pane on tablet and desktop."
+  },
+  "R-semantics": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All section headings (\"Appearance\", \"Notifications\", \"Backup & sync\", \"Live preview\", \"Active configuration\") apply Modifier.semantics { heading() }, and every SettingsSwitchRow uses SegmentedListItem(onClick = ...) with Role.Switch and toggleableState semantics while setting onCheckedChange = null on its Switch."
+  },
+  "R-fields": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No TextField, OutlinedTextField, BasicTextField, SearchBar, or password fields appear in proposal.explore.kt."
+  },
+  "R-visibility": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Conditional UI branches use Compose if/else blocks rather than alpha(0f) or graphicsLayer alpha hiding, so hidden branches do not remain composed."
+  },
+  "R-blur": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No Modifier.blur is used anywhere in proposal.explore.kt."
+  },
+  "R-settings-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The screen omits app version, licenses, and account management rows, uses Switches for on/off toggles, uses a connected ToggleButton group for Theme, and groups rows under section headings."
+  }
+}

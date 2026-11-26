@@ -165,6 +165,25 @@ class MultiTurnTests(unittest.TestCase):
             self.assertEqual(stopper.call_args.kwargs['cache_dir'], env_cache.resolve())
             self.assertTrue(env_cache.is_dir())
 
+    def test_prepare_turns_manifest_and_evaluate_only_forward_backend(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'mt-prep'
+            manifest = multiturn.prepare_turns_manifest(out, max_turns=2)
+            self.assertEqual(manifest['total_turns'], 2)
+            self.assertEqual(len(manifest['turns']), 2)
+            self.assertTrue((out / 'turns.json').is_file())
+            with mock.patch.object(multiturn, 'app_binary', return_value=Path('/tmp/bin')), \
+                    mock.patch.object(multiturn, 'preview_src', return_value=Path('/tmp/app')), \
+                    mock.patch.object(multiturn, 'bootstrap_dir', return_value=Path('/tmp/bdir')), \
+                    mock.patch.object(multiturn, 'server_cp', return_value=Path('/tmp/bdir/server.cp')), \
+                    mock.patch.object(multiturn.eval_run, '_stop_preview_server'), \
+                    mock.patch.object(multiturn.eval_run, 'render', return_value=(['/tmp/a.png'], None)) as rend, \
+                    mock.patch.object(multiturn, 'run_checks', return_value={'C-valid': {'pass': True}}):
+                checks, images = multiturn.evaluate_multiturn_dir(out, backend='layoutlib')
+            self.assertTrue(checks['C-valid']['pass'])
+            self.assertEqual(images, ['/tmp/a.png'])
+            self.assertEqual(rend.call_args.kwargs['backend'], 'layoutlib')
+
 
 if __name__ == '__main__':
     unittest.main()

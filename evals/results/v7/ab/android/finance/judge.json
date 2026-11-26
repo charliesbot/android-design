@@ -1,0 +1,77 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The $1,284.50 monthly spend hero card and primary Add expense control lead clearly above the 4-category breakdown and recent transactions across all views."
+  },
+  "R-fill": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Only the hero budget card (primaryContainer) and the primary Add expense control (primary) use strong green fills while category tiles, pace card, and transaction rows stay on neutral surface containers."
+  },
+  "R-surfaces": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Tonal surface steps (surface backdrop, surfaceContainerLow cards, surfaceContainerHigh segmented rows, and primaryContainer hero) establish clear grouping and separation in every render."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Every interactive element (Add expense button/FAB, category tiles, FilterChip bar, SegmentedListItem rows, and navigation items) reads as an individual tappable control."
+  },
+  "R-font": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Bold Fraunces gives a clear editorial voice to the Pocket title and hero monetary figures ($1,284.50, $51.38/day, -$148.50), paired with Google Sans Flex labels and Google Sans Code tabular numbers."
+  },
+  "R-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The app uses Android edge-to-edge layout, Material top bar without Cancel/Done text, and transaction rows without iOS disclosure chevrons."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All text fits cleanly without clipping, unintended truncation, or overlap across light, dark, foldable, tablet, and desktop renders."
+  },
+  "R-dark": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "In home-dark.png, all titles, tabular amounts, category icons, filter chips, and bottom navigation items remain crisp and legible against dark surfaces."
+  },
+  "R-adaptive": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The layout adapts from a single-column phone layout with bottom bar to a collapsed rail and 4-column categories on foldable, a 2-pane layout with Monthly pace and activity list on tablet, and an expanded rail with a 3rd transaction detail pane on desktop."
+  },
+  "R-idea": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The Warm Editorial Ledger combines serif Fraunces currency headlines, monospaced tabular figures, an expressive wavy budget progress bar, and distinct MaterialShapes category badges."
+  },
+  "R-semantics": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "SectionTitle and the Add expense form header apply Modifier.semantics { heading() }, ExpenseRow uses SegmentedListItem's selected overload, and FilterChips are single controls with no split row/widget callbacks."
+  },
+  "R-fields": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Both OutlinedTextField inputs in AddExpenseForm use state = rememberTextFieldState() rather than value/onValueChange overloads."
+  },
+  "R-visibility": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Conditional UI (tabs, Show all button, Add expense sheet/dialog, and desktop detail pane) uses if branches so hidden content leaves composition rather than fading to zero alpha."
+  },
+  "R-blur": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No Modifier.blur is used anywhere in the proposal source."
+  },
+  "R-finance-categories": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "Fun uses neutral surfaceContainerHighest for both its badge and its LinearProgressIndicator color on a surfaceContainerHighest track, making its 13% progress segment invisible against the track and lacking a distinct hue alongside Transport's muted secondaryContainer green."
+  }
+}

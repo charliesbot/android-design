@@ -157,8 +157,14 @@ class PreviewClient(
       ) {
         apkChanged = true
       }
-      inheritedOwnedSerial = existing.ownedEmulatorSerial?.takeIf { it.isNotBlank() }
-      stopServer(existing, graceful = live != null, replacedByVersion = AppInfo.VERSION)
+      // Only transfer emulator ownership when replacing with another android server; otherwise
+      // the outgoing android server shuts down its managed emulator itself.
+      val keepingAndroidBackend = identity.backend == RuntimeIdentity.BACKEND_ANDROID
+      inheritedOwnedSerial =
+        if (keepingAndroidBackend) existing.ownedEmulatorSerial?.takeIf { it.isNotBlank() }
+        else null
+      val replacedVersion = if (keepingAndroidBackend) AppInfo.VERSION else null
+      stopServer(existing, graceful = live != null, replacedByVersion = replacedVersion)
     }
     val spawned =
       spawnServer(
@@ -515,6 +521,7 @@ class PreviewClient(
     childEnv[RuntimeIdentity.BACKEND_ENV] = identity.backend
     identity.bootstrapDir?.let { childEnv[BootstrapMeta.BOOTSTRAP_DIR_ENV] = it.toString() }
     childEnv[RuntimeIdentity.SERVER_CP_ENV] = bootstrapCp.toString()
+    env[RuntimeIdentity.WORKER_CP_ENV]?.let { childEnv[RuntimeIdentity.WORKER_CP_ENV] = it }
     identity.sourceDir?.let { childEnv[RuntimeIdentity.SRC_ENV] = it }
     env["ANDROID_HOME"]?.let { childEnv["ANDROID_HOME"] = it }
     env["ANDROID_SDK_ROOT"]?.let { childEnv["ANDROID_SDK_ROOT"] = it }

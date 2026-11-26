@@ -22,18 +22,20 @@ data class LoadedExploration(
   val errors: List<ValidationError>,
 )
 
-/**
- * Android-compiled artifacts cached per `(repoRoot, sourcePath, contentHash)` on the host server.
- */
-data class AndroidCompiledData(
+/** Compiled exploration artifacts cached per `(repoRoot, sourcePath, contentHash)`. */
+data class CompiledBoardData(
   val sourceFile: String,
   val sourceText: String,
   val entryClass: String,
-  val dexBytes: ByteArray,
-  val dexHash: String,
-  val assetMap: Map<String, String>,
-  val assetBlobs: Map<String, ByteArray>,
-  val boardTheme: ThemeOverride?,
+  val classBytes: Map<String, ByteArray>,
+  val classBundleBytes: ByteArray,
+  val classHash: String,
+  val explorationDir: Path? = null,
+  val assetMap: Map<String, String> = emptyMap(),
+  val assetBlobs: Map<String, ByteArray> = emptyMap(),
+  val boardTheme: ThemeOverride? = null,
+  val dexBytes: ByteArray? = null,
+  val dexHash: String? = null,
 )
 
 /** One target screen/overlay/view tuple planned for a check or board render. */
@@ -51,7 +53,7 @@ data class BackendCompileOutput(
   val surface: BoardSurface,
   val boardName: String?,
   val boardMeta: BoardMeta?,
-  val androidData: AndroidCompiledData?,
+  val compiledData: CompiledBoardData?,
   val boardTheme: ThemeOverride? = null,
 )
 
@@ -67,7 +69,7 @@ sealed interface WorkerCompileResult {
     val boardMeta: DeviceBoardMeta,
     val boardTheme: ThemeOverride? = null,
     val dexHash: String? = null,
-    val androidData: AndroidCompiledData? = null,
+    val compiledData: CompiledBoardData? = null,
   ) : WorkerCompileResult
 
   data class Failed(

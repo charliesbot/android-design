@@ -1,0 +1,42 @@
+{
+  "wall_seconds": 258.0,
+  "turns": 19,
+  "input_tokens": 143305,
+  "cache_read_tokens": 1726938,
+  "cache_creation_tokens": 0,
+  "output_tokens": 47973,
+  "cost": null,
+  "check_calls": 4,
+  "compile_retries": 0,
+  "skill_bytes_read": 115241,
+  "skill_read_calls": 6,
+  "skill_unique_files": 6,
+  "skill_files_read": {
+    "android-design-explore/SKILL.md": {
+      "reads": 1,
+      "bytes": 7773
+    },
+    "android-design-explore/references/compose-signatures.md": {
+      "reads": 1,
+      "bytes": 15764
+    },
+    "android-design/SKILL.md": {
+      "reads": 1,
+      "bytes": 26155
+    },
+    "android-design/references/components.md": {
+      "reads": 1,
+      "bytes": 34105
+    },
+    "android-design/references/layout.md": {
+      "reads": 1,
+      "bytes": 13537
+    },
+    "android-design/references/theming.md": {
+      "reads": 1,
+      "bytes": 17907
+    }
+  },
+  "model": "gemini-4-hydrogen-high",
+  "backend": "antigravity"
+}
