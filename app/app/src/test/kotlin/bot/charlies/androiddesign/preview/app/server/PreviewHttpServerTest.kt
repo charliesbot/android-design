@@ -9,6 +9,7 @@ import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
 import bot.charlies.androiddesign.preview.model.ViewSpec
 import bot.charlies.androiddesign.preview.model.Views
+import java.io.IOException
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.InetAddress
@@ -21,6 +22,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
@@ -28,6 +30,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PreviewHttpServerTest {
@@ -77,7 +80,7 @@ class PreviewHttpServerTest {
     onRenderSingle: ((String, ViewSpec, Int) -> Unit)? = null,
   ): RenderWorker =
     InMemoryRenderWorker(
-      name = RuntimeIdentity.BACKEND_ANDROID,
+      name = RuntimeIdentity.BACKEND_LAYOUTLIB,
       scopedCheckDensity = 1,
       boardName = "Plates",
       directions =
@@ -619,7 +622,7 @@ class PreviewHttpServerTest {
         )
       assertEquals(200, chkStatus)
 
-      // Ask /api/board/render for dark -> caches WEBP_LOSSLESS in RenderQueue.
+      // Ask /api/board/render for dark -> caches PNG in RenderQueue.
       val (boardStatus, boardBody) =
         httpRequest(
           rec.port,
@@ -629,9 +632,9 @@ class PreviewHttpServerTest {
           body = """{"repo":"$repoId","direction":"Editorial","screen":"home","view":"dark"}""",
         )
       assertEquals(200, boardStatus, boardBody)
-      assertTrue(boardBody.contains("image/webp"), boardBody)
+      assertTrue(boardBody.contains("image/png"), boardBody)
 
-      // Now call /api/render for dark -> must NOT return cached WebP bytes as a .png file.
+      // Now call /api/render for dark -> writes PNG bytes.
       val (renderStatus, renderBody) =
         httpRequest(
           rec.port,
@@ -648,7 +651,7 @@ class PreviewHttpServerTest {
       assertEquals(
         listOf(0x89.toByte(), 0x50, 0x4E, 0x47),
         pngBytes.take(4),
-        "Expected PNG signature, not cached WebP",
+        "Expected PNG signature",
       )
     } finally {
       server.stop()
@@ -666,7 +669,7 @@ class PreviewHttpServerTest {
     val outDir = tmp.resolve("renders-out")
     val worker =
       InMemoryRenderWorker(
-        name = RuntimeIdentity.BACKEND_ANDROID,
+        name = RuntimeIdentity.BACKEND_LAYOUTLIB,
         directions =
           listOf(
             DeviceDirectionMeta(
@@ -748,8 +751,49 @@ class PreviewHttpServerTest {
     }
   }
 
+  private class FakeLiveSessionHost(initialActive: Boolean = false) : LiveSessionHost {
+    @Volatile override var isActive: Boolean = initialActive
+    override val deviceSerial: String?
+      get() = if (isActive) "emulator-5554" else null
+
+    override val adbForwardPort: Int?
+      get() = if (isActive) 38_420 else null
+
+    val recordedUpdates = CopyOnWriteArrayList<LivePreviewUpdate>()
+    val startRequests = CopyOnWriteArrayList<Triple<String?, String?, LivePreviewUpdate?>>()
+    val closed = AtomicBoolean(false)
+    var onUpdate: (CompileEntry, LivePreviewUpdate) -> Unit = { _, _ -> }
+    var startResultProvider:
+      (String?, String?, CompileEntry?, LivePreviewUpdate?) -> LiveSessionStartResult =
+      { serial, _, _, _ ->
+        isActive = true
+        LiveSessionStartResult.Ready(serial ?: "emulator-5554", 38_420)
+      }
+
+    override fun startSession(
+      serial: String?,
+      avd: String?,
+      entry: CompileEntry?,
+      update: LivePreviewUpdate?,
+    ): LiveSessionStartResult {
+      startRequests += Triple(serial, avd, update)
+      return startResultProvider(serial, avd, entry, update)
+    }
+
+    override fun updateIfActive(entry: CompileEntry, update: LivePreviewUpdate) {
+      if (!isActive) return
+      recordedUpdates += update
+      onUpdate(entry, update)
+    }
+
+    override fun close() {
+      closed.set(true)
+      isActive = false
+    }
+  }
+
   @Test
-  fun `api check replies without blocking on slow updateLive`() {
+  fun `api check replies without blocking on slow active live host update`() {
     val tmp = createTempDirectory("v6-async-live-")
     val cacheDir = tmp.resolve("cache")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
@@ -758,19 +802,22 @@ class PreviewHttpServerTest {
     val liveStarted = CountDownLatch(1)
     val releaseLive = CountDownLatch(1)
     val liveFinished = CountDownLatch(1)
+    val liveHost =
+      FakeLiveSessionHost(initialActive = true).apply {
+        onUpdate = { _, _ ->
+          liveStarted.countDown()
+          releaseLive.await(5, TimeUnit.SECONDS)
+          liveFinished.countDown()
+        }
+      }
     val worker =
       InMemoryRenderWorker(
-        name = RuntimeIdentity.BACKEND_ANDROID,
+        name = RuntimeIdentity.BACKEND_LAYOUTLIB,
         directions =
           listOf(
             DeviceDirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
           ),
         views = PhoneSurface.views,
-        onUpdateLive = { _, _ ->
-          liveStarted.countDown()
-          releaseLive.await(5, TimeUnit.SECONDS)
-          liveFinished.countDown()
-        },
       )
     val server =
       PreviewHttpServer(
@@ -778,6 +825,7 @@ class PreviewHttpServerTest {
         cacheRoot = cacheDir,
         preferredPort = 0,
         worker = worker,
+        liveSessionHost = liveHost,
         enableFileWatcher = false,
       )
     val rec = server.start()
@@ -791,12 +839,15 @@ class PreviewHttpServerTest {
           body = """{"path":"$source","direction":"Editorial","view":"light","repoRoot":"$repo"}""",
         )
       assertEquals(200, status, body)
-      // HTTP reply returned even though updateLive is still blocked on releaseLive.
-      assertTrue(liveStarted.await(2, TimeUnit.SECONDS), "updateLive must be dispatched async")
-      assertEquals(1L, liveFinished.count, "HTTP reply must not wait for updateLive")
+      // HTTP reply returned even though updateIfActive is still blocked on releaseLive.
+      assertTrue(liveStarted.await(2, TimeUnit.SECONDS), "updateIfActive must be dispatched async")
+      assertEquals(1L, liveFinished.count, "HTTP reply must not wait for updateIfActive")
       releaseLive.countDown()
-      assertTrue(liveFinished.await(2, TimeUnit.SECONDS), "updateLive must complete asynchronously")
-      assertEquals("Editorial", worker.recordedUpdates.single().direction)
+      assertTrue(
+        liveFinished.await(2, TimeUnit.SECONDS),
+        "updateIfActive must complete asynchronously",
+      )
+      assertEquals("Editorial", liveHost.recordedUpdates.single().direction)
     } finally {
       releaseLive.countDown()
       server.stop()
@@ -814,22 +865,25 @@ class PreviewHttpServerTest {
     val asyncStarted = CountDownLatch(1)
     val releaseAsync = CountDownLatch(1)
     val appliedOrder = CopyOnWriteArrayList<String>()
+    val liveHost =
+      FakeLiveSessionHost(initialActive = true).apply {
+        onUpdate = { _, update ->
+          if (update.direction == "Editorial") {
+            asyncStarted.countDown()
+            releaseAsync.await(5, TimeUnit.SECONDS)
+          }
+          appliedOrder += update.direction.orEmpty()
+        }
+      }
     val worker =
       InMemoryRenderWorker(
-        name = RuntimeIdentity.BACKEND_ANDROID,
+        name = RuntimeIdentity.BACKEND_LAYOUTLIB,
         directions =
           listOf(
             DeviceDirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
             DeviceDirectionMeta("Compact", "phone", "home", listOf("home"), emptyList()),
           ),
         views = PhoneSurface.views,
-        onUpdateLive = { _, update ->
-          if (update.direction == "Editorial") {
-            asyncStarted.countDown()
-            releaseAsync.await(5, TimeUnit.SECONDS)
-          }
-          appliedOrder += update.direction.orEmpty()
-        },
       )
     val server =
       PreviewHttpServer(
@@ -837,13 +891,14 @@ class PreviewHttpServerTest {
         cacheRoot = cacheDir,
         preferredPort = 0,
         worker = worker,
+        liveSessionHost = liveHost,
         enableFileWatcher = false,
       )
     val rec = server.start()
     val clientPool = Executors.newSingleThreadExecutor()
     try {
       // Trigger /api/check, which dispatches an async scheduleLiveUpdate("Editorial") on
-      // liveUpdateExecutor and blocks inside updateLive.
+      // liveUpdateExecutor and blocks inside updateIfActive.
       val (checkStatus, checkBody) =
         httpRequest(
           rec.port,
@@ -853,9 +908,12 @@ class PreviewHttpServerTest {
           body = """{"path":"$source","direction":"Editorial","view":"light","repoRoot":"$repo"}""",
         )
       assertEquals(200, checkStatus, checkBody)
-      assertTrue(asyncStarted.await(5, TimeUnit.SECONDS), "async updateLive should be in flight")
+      assertTrue(
+        asyncStarted.await(5, TimeUnit.SECONDS),
+        "async updateIfActive should be in flight",
+      )
 
-      // While async updateLive("Editorial") is still in flight, send an explicit /api/live
+      // While async updateIfActive("Editorial") is still in flight, send an explicit /api/live
       // focusing "Compact". It must serialize behind the in-flight async call.
       val liveFuture =
         clientPool.submit<Pair<Int, String>> {
@@ -871,7 +929,7 @@ class PreviewHttpServerTest {
       Thread.sleep(100)
       assertFalse(
         liveFuture.isDone,
-        "explicit /api/live must wait for in-flight async updateLive on liveUpdateExecutor",
+        "explicit /api/live must wait for in-flight async updateIfActive on liveUpdateExecutor",
       )
 
       releaseAsync.countDown()
@@ -885,6 +943,175 @@ class PreviewHttpServerTest {
     } finally {
       releaseAsync.countDown()
       clientPool.shutdownNow()
+      server.stop()
+      tmp.toFile().deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `live host remains inactive during check and focus until api live startLive activates it`() {
+    val tmp = createTempDirectory("v7-lazy-live-")
+    val cacheDir = tmp.resolve("cache")
+    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
+    val source =
+      repo.resolve("board.explore.kt").also { Files.writeString(it, simpleBoard("LazyLive")) }
+    val liveHost = FakeLiveSessionHost(initialActive = false)
+    val worker =
+      InMemoryRenderWorker(
+        name = RuntimeIdentity.BACKEND_LAYOUTLIB,
+        directions =
+          listOf(
+            DeviceDirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
+          ),
+        views = PhoneSurface.views,
+      )
+    val server =
+      PreviewHttpServer(
+        repoRoot = repo,
+        cacheRoot = cacheDir,
+        preferredPort = 0,
+        worker = worker,
+        liveSessionHost = liveHost,
+        enableFileWatcher = false,
+      )
+    val rec = server.start()
+    try {
+      val (chkStatus, _) =
+        httpRequest(
+          rec.port,
+          "POST",
+          "/api/check",
+          headers = mapOf("X-Client-Secret" to rec.clientSecret),
+          body = """{"path":"$source","direction":"Editorial","view":"light","repoRoot":"$repo"}""",
+        )
+      assertEquals(200, chkStatus)
+      assertFalse(liveHost.isActive)
+      assertTrue(liveHost.startRequests.isEmpty())
+      assertTrue(liveHost.recordedUpdates.isEmpty())
+
+      val (_, statusBefore) =
+        httpRequest(
+          rec.port,
+          "GET",
+          "/api/status",
+          headers = mapOf("X-Client-Secret" to rec.clientSecret),
+        )
+      val parsedBefore =
+        PreviewJson.compact.decodeFromString(StatusResponse.serializer(), statusBefore)
+      assertNull(parsedBefore.deviceSerial)
+      assertNull(parsedBefore.adbForwardPort)
+
+      val (startStatus, startBody) =
+        httpRequest(
+          rec.port,
+          "POST",
+          "/api/live",
+          headers = mapOf("X-Client-Secret" to rec.clientSecret),
+          body =
+            """{"path":"$source","direction":"Editorial","screen":"home","repoRoot":"$repo","avd":"Pixel_10_Pro_XL","startLive":true}""",
+        )
+      assertEquals(200, startStatus, startBody)
+      assertTrue(liveHost.isActive)
+      assertEquals(1, liveHost.startRequests.size)
+      assertEquals("Pixel_10_Pro_XL", liveHost.startRequests.single().second)
+
+      val (_, statusAfter) =
+        httpRequest(
+          rec.port,
+          "GET",
+          "/api/status",
+          headers = mapOf("X-Client-Secret" to rec.clientSecret),
+        )
+      val parsedAfter =
+        PreviewJson.compact.decodeFromString(StatusResponse.serializer(), statusAfter)
+      assertEquals("emulator-5554", parsedAfter.deviceSerial)
+      assertEquals(38_420, parsedAfter.adbForwardPort)
+    } finally {
+      server.stop()
+      assertTrue(liveHost.closed.get(), "server.stop() must close LiveSessionHost")
+      tmp.toFile().deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `board render, focus, and api live stay HTTP 200 when active LiveSessionHost throws on update`() {
+    val tmp = createTempDirectory("v7-live-disconnect-http-")
+    val cacheDir = tmp.resolve("cache")
+    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
+    val repoId = ServerPaths.repoHash(repo.toAbsolutePath().normalize())
+    val source =
+      repo.resolve("board.explore.kt").also { Files.writeString(it, simpleBoard("LiveDisconnect")) }
+    val updateAttempted = CountDownLatch(2)
+    val liveHost =
+      FakeLiveSessionHost(initialActive = true).apply {
+        onUpdate = { _, _ ->
+          updateAttempted.countDown()
+          throw IOException("emulator closed")
+        }
+      }
+    val worker =
+      InMemoryRenderWorker(
+        name = RuntimeIdentity.BACKEND_LAYOUTLIB,
+        directions =
+          listOf(
+            DeviceDirectionMeta("Editorial", "phone", "home", listOf("home"), emptyList()),
+          ),
+        views = PhoneSurface.views,
+      )
+    val server =
+      PreviewHttpServer(
+        repoRoot = repo,
+        cacheRoot = cacheDir,
+        preferredPort = 0,
+        worker = worker,
+        liveSessionHost = liveHost,
+        enableFileWatcher = false,
+      )
+    val rec = server.start()
+    try {
+      val (chkStatus, _) =
+        httpRequest(
+          rec.port,
+          "POST",
+          "/api/check",
+          headers = mapOf("X-Client-Secret" to rec.clientSecret),
+          body = """{"path":"$source","direction":"Editorial","view":"light","repoRoot":"$repo"}""",
+        )
+      assertEquals(200, chkStatus)
+
+      val (boardStatus, boardBody) =
+        httpRequest(
+          rec.port,
+          "POST",
+          "/api/board/render?view=${rec.viewToken}&repo=$repoId",
+          headers = mapOf("Origin" to "http://127.0.0.1:${rec.port}"),
+          body = """{"repo":"$repoId","direction":"Editorial","screen":"home","view":"dark"}""",
+        )
+      assertEquals(200, boardStatus, boardBody)
+      assertTrue(boardBody.contains("image/png"), boardBody)
+
+      val (focusStatus, focusBody) =
+        httpRequest(
+          rec.port,
+          "POST",
+          "/api/board/focus?view=${rec.viewToken}&repo=$repoId",
+          headers = mapOf("Origin" to "http://127.0.0.1:${rec.port}"),
+          body = """{"repo":"$repoId","direction":"Editorial","screen":"home","view":"dark"}""",
+        )
+      assertEquals(200, focusStatus, focusBody)
+
+      val (liveStatus, liveBody) =
+        httpRequest(
+          rec.port,
+          "POST",
+          "/api/live",
+          headers = mapOf("X-Client-Secret" to rec.clientSecret),
+          body =
+            """{"path":"$source","direction":"Editorial","screen":"home","repoRoot":"$repo"}""",
+        )
+      assertEquals(200, liveStatus, liveBody)
+      assertTrue(updateAttempted.await(2, TimeUnit.SECONDS))
+    } finally {
       server.stop()
       tmp.toFile().deleteRecursively()
     }
@@ -1043,7 +1270,7 @@ class PreviewHttpServerTest {
     val events = CopyOnWriteArrayList<String>()
     val action =
       ServerCommand.watchdogHaltAction(
-        releaseEmulator = { events += "release" },
+        releaseResources = { events += "release" },
         haltProcess = { events += "halt" },
       )
     action()

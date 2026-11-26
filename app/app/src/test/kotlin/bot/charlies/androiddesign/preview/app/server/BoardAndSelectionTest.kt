@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 class BoardAndSelectionTest {
   private fun fakeBoardWorker(): RenderWorker =
     InMemoryRenderWorker(
-      name = RuntimeIdentity.BACKEND_ANDROID,
+      name = RuntimeIdentity.BACKEND_LAYOUTLIB,
       boardName = "Plates",
       directions =
         listOf(

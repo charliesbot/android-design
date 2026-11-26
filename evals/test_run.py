@@ -352,7 +352,7 @@ class ArtifactPipelineTests(unittest.TestCase):
                     self.assertRaisesRegex(RuntimeError, 'exportBootstrap'):
                 run.render(directory)
 
-    def test_generation_hands_the_v6_cli_and_bootstrap_context_to_the_agent(self):
+    def test_generation_hands_the_v7_cli_and_bootstrap_context_to_the_agent(self):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             (directory / 'prompt.md').write_text('brief')
@@ -367,7 +367,7 @@ class ArtifactPipelineTests(unittest.TestCase):
             self.assertEqual(agent.call_args.kwargs['mcp_binary'], Path(BINARY))
             self.assertEqual(agent.call_args.kwargs['preview_src'], Path(SRC_DIR))
             self.assertEqual(agent.call_args.kwargs['bootstrap_dir'], Path(BOOTSTRAP_DIR))
-            self.assertEqual(agent.call_args.kwargs['preview_backend'], 'android')
+            self.assertNotIn('preview_backend', agent.call_args.kwargs)
             self.assertEqual(agent.call_args.kwargs['cache_dir'], Path(tmp) / 'cache')
             self.assertEqual(agent.call_args.kwargs['role'], 'generator')
             stopper.assert_called_once()
@@ -705,7 +705,7 @@ class ArtifactPipelineTests(unittest.TestCase):
         self.assertNotIn('\u2014', summary_text)
         self.assertNotIn('\u2014', report_html)
 
-    def test_layoutlib_backend_omits_headless_on_start_and_propagates_env_to_render(self):
+    def test_start_preview_server_omits_headless_and_sets_no_backend_env(self):
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             fake_case(directory)
@@ -714,21 +714,21 @@ class ArtifactPipelineTests(unittest.TestCase):
 
             def fake_subproc(cmd, **kwargs):
                 if 'start' in cmd:
-                    seen_start.append((cmd, kwargs.get('env', {}).get('ANDROID_DESIGN_PREVIEW_BACKEND')))
+                    seen_start.append((cmd, kwargs.get('timeout'), 'ANDROID_DESIGN_PREVIEW_BACKEND' in kwargs.get('env', {})))
                     return subprocess.CompletedProcess(cmd, 0, '', '')
-                seen_render_env.append(kwargs.get('env', {}).get('ANDROID_DESIGN_PREVIEW_BACKEND'))
+                seen_render_env.append('ANDROID_DESIGN_PREVIEW_BACKEND' in kwargs.get('env', {}))
                 write_report(directory, valid=True, views=('light',))
                 return subprocess.CompletedProcess(cmd, 0, '', '')
 
             with mock.patch.object(run.subprocess, 'run', side_effect=fake_subproc):
                 run._start_preview_server(
-                    directory, Path(BINARY), src=Path(SRC_DIR), bdir=Path(BOOTSTRAP_DIR), backend='layoutlib',
+                    directory, Path(BINARY), src=Path(SRC_DIR), bdir=Path(BOOTSTRAP_DIR),
                 )
                 images, error = run.render(
-                    directory, binary=Path(BINARY), src=Path(SRC_DIR), bdir=Path(BOOTSTRAP_DIR), backend='layoutlib',
+                    directory, binary=Path(BINARY), src=Path(SRC_DIR), bdir=Path(BOOTSTRAP_DIR),
                 )
-            self.assertEqual(seen_start, [([BINARY, 'start', str(directory)], 'layoutlib')])
-            self.assertEqual(seen_render_env, ['layoutlib'])
+            self.assertEqual(seen_start, [([BINARY, 'start', str(directory)], 120, False)])
+            self.assertEqual(seen_render_env, [False])
             self.assertIsNone(error)
             self.assertEqual(len(images), 1)
 

@@ -11,7 +11,6 @@ from pathlib import Path
 from backends import execute
 from checks import run as run_checks
 from preview_app import (
-    DEFAULT_EVAL_BACKEND,
     app_binary,
     bootstrap_dir,
     preview_server_session,
@@ -310,10 +309,9 @@ def prepare_turns_manifest(out_dir, max_turns=None):
     return manifest
 
 
-def evaluate_multiturn_dir(out_dir, *, binary=None, src=None, bdir=None, backend=None, cache_dir=None):
+def evaluate_multiturn_dir(out_dir, *, binary=None, src=None, bdir=None, cache_dir=None):
     """Render and run deterministic checks on an already-edited multiturn directory."""
     out_dir = Path(out_dir).resolve()
-    resolved_backend = eval_run._resolve_backend(backend)
     mcp_binary = app_binary() if binary is None else Path(binary)
     resolved_src = preview_src() if src is None else Path(src)
     resolved_bdir = bootstrap_dir() if bdir is None else Path(bdir)
@@ -324,7 +322,6 @@ def evaluate_multiturn_dir(out_dir, *, binary=None, src=None, bdir=None, backend
         mcp_binary,
         src=resolved_src,
         bdir=resolved_bdir,
-        backend=resolved_backend,
         cache_dir=cache_dir,
         cache_prefix='eval-mt-eval',
         stopper=eval_run._stop_preview_server,
@@ -335,7 +332,6 @@ def evaluate_multiturn_dir(out_dir, *, binary=None, src=None, bdir=None, backend
             src=resolved_src,
             bdir=resolved_bdir,
             cache_dir=active_cache_dir,
-            backend=resolved_backend,
         )
     checks = run_checks(out_dir, 'phone')
     if render_error:
@@ -344,13 +340,12 @@ def evaluate_multiturn_dir(out_dir, *, binary=None, src=None, bdir=None, backend
     return checks, images
 
 
-def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout=1200,
-                  binary=None, src=None, bdir=None, backend=None, cache_dir=None):
+def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v7', timeout=1200,
+                  binary=None, src=None, bdir=None, cache_dir=None):
     out_dir = Path(out_dir).resolve()
     prepare_multiturn(out_dir)
     revisions = REVISIONS[:max_turns] if max_turns is not None else REVISIONS
     total = len(revisions)
-    resolved_backend = eval_run._resolve_backend(backend)
     mcp_binary = app_binary() if binary is None else Path(binary)
     resolved_src = preview_src() if src is None else Path(src)
     resolved_bdir = bootstrap_dir() if bdir is None else Path(bdir)
@@ -365,7 +360,6 @@ def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout
         mcp_binary,
         src=resolved_src,
         bdir=resolved_bdir,
-        backend=resolved_backend,
         cache_dir=cache_dir,
         cache_prefix='eval-mt',
         stopper=eval_run._stop_preview_server,
@@ -382,7 +376,6 @@ def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout
                 mcp_binary=mcp_binary,
                 preview_src=resolved_src,
                 bootstrap_dir=resolved_bdir,
-                preview_backend=resolved_backend,
                 cache_dir=active_cache_dir,
                 client_timeout_ms=120000,
                 resume_session=session_id,
@@ -409,7 +402,6 @@ def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout
             src=resolved_src,
             bdir=resolved_bdir,
             cache_dir=active_cache_dir,
-            backend=resolved_backend,
         )
     checks = run_checks(out_dir, 'phone')
     if render_error:
@@ -422,7 +414,7 @@ def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout
         commit_sha=_git_head_sha(),
         pipeline=pipeline,
         final_checks=checks,
-        render_backend=resolved_backend,
+        render_backend='layoutlib',
     )
     report['session_id'] = session_id
     report['rendered_images'] = len(images)
@@ -437,8 +429,7 @@ def main():
     parser.add_argument('--out', required=True, type=Path, help='Output directory for the fixture and turn artifacts')
     parser.add_argument('--model', help='Optional Claude model override')
     parser.add_argument('--turns', type=int, default=len(REVISIONS), help='Number of revision turns to run (default: 10)')
-    parser.add_argument('--pipeline', default='v6', choices=('v4', 'v5', 'v6', 'v7'), help='Label recorded in the report')
-    parser.add_argument('--backend', choices=('android', 'layoutlib'), default=None, help='Render backend (default: ANDROID_DESIGN_PREVIEW_BACKEND or android)')
+    parser.add_argument('--pipeline', default='v7', choices=('v4', 'v5', 'v6', 'v7'), help='Label recorded in the report')
     parser.add_argument('--prepare-only', action='store_true', help='Prepare fixture and write turns.json without invoking claude')
     parser.add_argument('--evaluate-only', action='store_true', help='Render and check an existing prepared directory without invoking claude')
     parser.add_argument('--timeout', type=int, default=1200, help='Per-turn timeout in seconds')
@@ -453,10 +444,10 @@ def main():
         print(f"Prepared {manifest['total_turns']} turns in {args.out}: {manifest['proposal']}")
         return 0
     if args.evaluate_only:
-        checks, images = evaluate_multiturn_dir(args.out, backend=args.backend)
+        checks, images = evaluate_multiturn_dir(args.out)
         print(json.dumps({'rendered_images': len(images), 'checks': checks}, indent=2))
         return 0 if all(v.get('pass') is True for v in checks.values()) else 1
-    report = run_multiturn(args.out, model=args.model, max_turns=args.turns, pipeline=args.pipeline, timeout=args.timeout, backend=args.backend)
+    report = run_multiturn(args.out, model=args.model, max_turns=args.turns, pipeline=args.pipeline, timeout=args.timeout)
     print(format_summary(report))
     if args.write_baseline:
         args.write_baseline.parent.mkdir(parents=True, exist_ok=True)

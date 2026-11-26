@@ -1,4 +1,4 @@
-"""Locates v6 preview CLI, Gradle bootstrap paths, and preview server lifecycle helpers."""
+"""Locates preview CLI, Gradle bootstrap paths, and preview server lifecycle helpers."""
 from contextlib import contextmanager
 import json
 import os
@@ -20,14 +20,12 @@ EXECUTABLE_ENV = "ANDROID_DESIGN_PREVIEW"
 SRC_ENV = "ANDROID_DESIGN_PREVIEW_SRC"
 BOOTSTRAP_DIR_ENV = "ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR"
 SERVER_CP_ENV = "ANDROID_DESIGN_PREVIEW_SERVER_CP"
-BACKEND_ENV = "ANDROID_DESIGN_PREVIEW_BACKEND"
 CACHE_DIR_ENV = "ANDROID_DESIGN_CACHE_DIR"
 CLIENT_TIMEOUT_ENV = "ANDROID_DESIGN_CLIENT_TIMEOUT_MS"
 JAVA_ENV = "ANDROID_DESIGN_PREVIEW_JAVA"
 NO_OPEN_ENV = "ANDROID_DESIGN_NO_OPEN"
 SERVER_NAME = "android_design_preview"
 
-DEFAULT_EVAL_BACKEND = "android"
 DEFAULT_STOP_TIMEOUT = 60
 
 
@@ -117,8 +115,8 @@ def server_cp(environ=None, home=None):
     return _cp_file("server.cp", SERVER_CP_ENV, environ=environ, home=home)
 
 
-def build_cli_env(*, src=None, bdir=None, backend=DEFAULT_EVAL_BACKEND, cache_dir=None, base_env=None):
-    """Build environment variables for invoking android-design-preview headlessly."""
+def build_cli_env(*, src=None, bdir=None, cache_dir=None, base_env=None):
+    """Build environment variables for invoking android-design-preview device-free."""
     env = dict(os.environ if base_env is None else base_env)
     env[NO_OPEN_ENV] = "1"
     if src is not None:
@@ -129,8 +127,6 @@ def build_cli_env(*, src=None, bdir=None, backend=DEFAULT_EVAL_BACKEND, cache_di
         env.pop(SERVER_CP_ENV, None)
         if (bpath / "server.cp").is_file():
             env[SERVER_CP_ENV] = str(bpath / "server.cp")
-    if backend is not None:
-        env[BACKEND_ENV] = str(backend)
     if cache_dir is not None:
         env[CACHE_DIR_ENV] = str(cache_dir)
     return env
@@ -206,7 +202,6 @@ def stop_preview_server(
     *,
     src=None,
     bdir=None,
-    backend=DEFAULT_EVAL_BACKEND,
     cache_dir=None,
     timeout=DEFAULT_STOP_TIMEOUT,
     grace_seconds=10.0,
@@ -214,7 +209,7 @@ def stop_preview_server(
     poll_interval=0.1,
 ):
     """Stop the preview server for work_dir/cache_dir. Returns True when confirmed stopped."""
-    env = build_cli_env(src=src, bdir=bdir, backend=backend, cache_dir=cache_dir)
+    env = build_cli_env(src=src, bdir=bdir, cache_dir=cache_dir)
     cli_ok = False
     try:
         done = subprocess.run(
@@ -251,7 +246,6 @@ def preview_server_session(
     *,
     src=None,
     bdir=None,
-    backend=DEFAULT_EVAL_BACKEND,
     cache_dir=None,
     cache_prefix="eval",
     stopper=None,
@@ -304,7 +298,6 @@ def preview_server_session(
                     binary,
                     src=src,
                     bdir=bdir,
-                    backend=backend,
                     cache_dir=active_cache_dir,
                 )
             )

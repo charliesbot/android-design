@@ -1,15 +1,7 @@
 package bot.charlies.androiddesign.preview.feature.preview.sandbox
 
 import android.content.res.Configuration
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.view.Gravity
-import android.view.View
-import android.view.WindowManager
-import android.widget.FrameLayout
 import androidx.compose.material3.Text
-import androidx.compose.ui.geometry.Offset
 import bot.charlies.androiddesign.preview.host.SandboxExcludingRobolectricTestRunner
 import bot.charlies.androiddesign.preview.kit.designBoard
 import bot.charlies.androiddesign.preview.kit.wearBoard
@@ -139,55 +131,5 @@ class ComposeBoardRendererTest {
     val wearMeta = ComposeBoardRenderer.buildBoardMeta(wear)
     assertEquals("wear", wearMeta.surface)
     assertEquals(WearSurface.views, wearMeta.views)
-  }
-
-  @Test
-  fun drawWindowCompositeAppliesDimBehindScrimAndRecordsOverlayOffsets() {
-    val ctx = RuntimeEnvironment.getApplication()
-    val widthPx = 100
-    val heightPx = 100
-    val mainView =
-      View(ctx).apply {
-        setBackgroundColor(Color.GREEN)
-        measure(
-          View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY),
-          View.MeasureSpec.makeMeasureSpec(heightPx, View.MeasureSpec.EXACTLY),
-        )
-        layout(0, 0, widthPx, heightPx)
-      }
-    val overlayView =
-      FrameLayout(ctx).apply {
-        setBackgroundColor(Color.WHITE)
-        layoutParams =
-          WindowManager.LayoutParams().apply {
-            width = 40
-            height = 20
-            gravity = Gravity.CENTER
-            flags = WindowManager.LayoutParams.FLAG_DIM_BEHIND
-            dimAmount = 0.5f
-          }
-      }
-
-    val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
-    try {
-      val offsets =
-        OverlayWindowHelper.drawWindowComposite(
-          canvas = Canvas(bitmap),
-          mainView = mainView,
-          mainDecorView = mainView,
-          overlays = listOf(overlayView),
-          widthPx = widthPx,
-          heightPx = heightPx,
-        )
-      assertEquals(Offset(30f, 40f), offsets[overlayView])
-      val backgroundPixel = bitmap.getPixel(5, 5)
-      assertTrue(
-        "Dim scrim should darken green background below 255 green channel",
-        Color.green(backgroundPixel) in 100..150 && Color.red(backgroundPixel) == 0,
-      )
-      assertEquals(Color.WHITE, bitmap.getPixel(50, 50))
-    } finally {
-      bitmap.recycle()
-    }
   }
 }

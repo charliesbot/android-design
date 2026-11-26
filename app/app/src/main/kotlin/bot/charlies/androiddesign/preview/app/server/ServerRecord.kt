@@ -32,16 +32,11 @@ data class RuntimeIdentity(
   val bootstrapDir: Path?,
 ) {
   companion object {
-    const val BACKEND_ANDROID = "android"
     const val BACKEND_LAYOUTLIB = "layoutlib"
-    const val BACKEND_ENV = "ANDROID_DESIGN_PREVIEW_BACKEND"
     const val SRC_ENV = "ANDROID_DESIGN_PREVIEW_SRC"
     const val SERVER_CP_ENV = "ANDROID_DESIGN_PREVIEW_SERVER_CP"
     const val WORKER_CP_ENV = "ANDROID_DESIGN_PREVIEW_WORKER_CP"
     const val RUNTIME_HASH_ENV = "ANDROID_DESIGN_PREVIEW_RUNTIME_HASH"
-
-    fun resolveBackend(env: Map<String, String> = System.getenv()): String =
-      env[BACKEND_ENV]?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: BACKEND_ANDROID
 
     fun compute(
       env: Map<String, String> = System.getenv(),
@@ -56,7 +51,7 @@ data class RuntimeIdentity(
           } ?: BootstrapMeta.locateOrNull(env),
       version: String = AppInfo.VERSION,
     ): RuntimeIdentity {
-      val backend = resolveBackend(env)
+      val backend = BACKEND_LAYOUTLIB
       val sourceDir = env[SRC_ENV]?.trim()?.takeIf { it.isNotBlank() }
       val bootstrapDir =
         env[BootstrapMeta.BOOTSTRAP_DIR_ENV]?.trim()?.takeIf { it.isNotBlank() }?.let(Path::of)
@@ -67,12 +62,7 @@ data class RuntimeIdentity(
       val workerCpFile =
         env[WORKER_CP_ENV]?.trim()?.takeIf { it.isNotBlank() }?.let(Path::of)
           ?: bootstrapDir?.resolve("worker.cp")?.takeIf { Files.isRegularFile(it) }
-      val apkSha =
-        if (backend == BACKEND_LAYOUTLIB) {
-          null
-        } else {
-          runCatching { meta?.apkSha256OrCompute() }.getOrNull()
-        }
+      val apkSha: String? = null
 
       val overrideHash = env[RUNTIME_HASH_ENV]?.trim()?.takeIf { it.isNotBlank() }
       val runtimeHash =
@@ -101,13 +91,8 @@ data class RuntimeIdentity(
             feed("ver:$version")
             feed("backend:$backend")
             feed("src:${sourceDir.orEmpty()}")
-            if (apkSha != null) {
-              feed("apk:$apkSha")
-            }
             feedClasspath("cp", serverCpFile)
-            if (backend == BACKEND_LAYOUTLIB) {
-              feedClasspath("worker-cp", workerCpFile)
-            }
+            feedClasspath("worker-cp", workerCpFile)
             append(digest.digest().joinToString("") { "%02x".format(it) }.take(24))
           }
 
@@ -138,15 +123,11 @@ data class ServerRecord(
   val viewToken: String,
   val timeouts: List<TimeoutEntry> = emptyList(),
   val haltedAt: Long? = null,
-  /** Shared runtime version/checkout hash, backend mode, and active Android device metadata. */
+  /** Shared runtime version/checkout hash and backend mode. */
   val runtimeHash: String? = null,
   val sourceDir: String? = null,
-  val backend: String = RuntimeIdentity.BACKEND_ANDROID,
-  val deviceSerial: String? = null,
-  val adbForwardPort: Int? = null,
-  val apkSha256: String? = null,
+  val backend: String = RuntimeIdentity.BACKEND_LAYOUTLIB,
   val replacedByVersion: String? = null,
-  val ownedEmulatorSerial: String? = null,
 ) {
   fun boardUrl(repoId: String? = null): String =
     if (repoId.isNullOrBlank()) {

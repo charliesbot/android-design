@@ -102,7 +102,7 @@ class MultiTurnTests(unittest.TestCase):
         calls = []
 
         def fake_execute(backend, prompt, cwd, **kwargs):
-            calls.append((backend, kwargs.get('resume_session'), kwargs.get('preview_backend'), kwargs.get('cache_dir'), prompt))
+            calls.append((backend, kwargs.get('resume_session'), kwargs.get('cache_dir'), prompt))
             turn_idx = len(calls)
             return {
                 'backend': 'claude',
@@ -136,10 +136,10 @@ class MultiTurnTests(unittest.TestCase):
                 )
             self.assertEqual([c[0] for c in calls], ['claude', 'claude', 'claude'])
             self.assertEqual([c[1] for c in calls], [None, 'sess-fixed-1', 'sess-fixed-1'])
-            self.assertEqual([c[2] for c in calls], ['android', 'android', 'android'])
-            self.assertEqual(len({c[3] for c in calls}), 1)
+            self.assertEqual(len({c[2] for c in calls}), 1)
             stopper.assert_called_once()
-            self.assertEqual(report['pipeline'], 'v6')
+            self.assertEqual(report['pipeline'], 'v7')
+            self.assertEqual(report['render_backend'], 'layoutlib')
             self.assertEqual(report['turns_count'], 3)
             self.assertEqual(report['totals']['check_calls'], 3)
             self.assertEqual(report['totals']['cost'], 0.15)
@@ -165,7 +165,7 @@ class MultiTurnTests(unittest.TestCase):
             self.assertEqual(stopper.call_args.kwargs['cache_dir'], env_cache.resolve())
             self.assertTrue(env_cache.is_dir())
 
-    def test_prepare_turns_manifest_and_evaluate_only_forward_backend(self):
+    def test_prepare_turns_manifest_and_evaluate_only_runs_device_free(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / 'mt-prep'
             manifest = multiturn.prepare_turns_manifest(out, max_turns=2)
@@ -179,10 +179,10 @@ class MultiTurnTests(unittest.TestCase):
                     mock.patch.object(multiturn.eval_run, '_stop_preview_server'), \
                     mock.patch.object(multiturn.eval_run, 'render', return_value=(['/tmp/a.png'], None)) as rend, \
                     mock.patch.object(multiturn, 'run_checks', return_value={'C-valid': {'pass': True}}):
-                checks, images = multiturn.evaluate_multiturn_dir(out, backend='layoutlib')
+                checks, images = multiturn.evaluate_multiturn_dir(out)
             self.assertTrue(checks['C-valid']['pass'])
             self.assertEqual(images, ['/tmp/a.png'])
-            self.assertEqual(rend.call_args.kwargs['backend'], 'layoutlib')
+            self.assertNotIn('backend', rend.call_args.kwargs)
 
 
 if __name__ == '__main__':

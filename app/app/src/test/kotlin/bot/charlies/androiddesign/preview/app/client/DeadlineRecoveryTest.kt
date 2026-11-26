@@ -44,7 +44,6 @@ class DeadlineRecoveryTest {
       d8Jar=/tmp/d8.jar
       bundleJar=/tmp/bundle.jar
       apkPath=/tmp/host.apk
-      apkSha256=sha-1
       composeCompilerPluginJar=/tmp/compose.jar
       """
         .trimIndent(),
@@ -57,7 +56,6 @@ class DeadlineRecoveryTest {
     fakeJava.toFile().setExecutable(true)
     val env =
       mapOf(
-        RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_ANDROID,
         BootstrapMeta.BOOTSTRAP_DIR_ENV to bdir.toString(),
         RuntimeIdentity.SERVER_CP_ENV to bdir.resolve("server.cp").toString(),
       )
@@ -129,7 +127,6 @@ class DeadlineRecoveryTest {
       viewToken = "view",
       backend = identity.backend,
       runtimeHash = identity.runtimeHash,
-      apkSha256 = identity.apkSha256,
     )
 
   private fun freePort(): Int =
@@ -285,7 +282,7 @@ class DeadlineRecoveryTest {
     }
 
   @Test
-  fun `serverProcess recognizes a server whose cold device boot took 200 seconds`(
+  fun `serverProcess recognizes a server whose cold boot took 30 seconds`(
     @TempDir tmp: Path,
   ) =
     withEnv(tmp) { e ->
@@ -298,10 +295,10 @@ class DeadlineRecoveryTest {
             e.repo,
             pid = proc.pid(),
             port = freePort(),
-            startedAt = procStartMs + 200_000L,
+            startedAt = procStartMs + 30_000L,
           )
         val handle = e.client.serverProcess(rec)
-        assertEquals(proc.pid(), handle?.pid(), "server taking 200s to boot must be recognized")
+        assertEquals(proc.pid(), handle?.pid(), "server taking 30s to boot must be recognized")
       } finally {
         proc.destroyForcibly()
       }

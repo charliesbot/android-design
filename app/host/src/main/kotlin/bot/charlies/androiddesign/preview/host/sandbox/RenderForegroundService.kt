@@ -13,14 +13,11 @@ import android.os.Process
 import android.util.Log
 import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
 import bot.charlies.androiddesign.preview.model.DeviceAckResponse
-import bot.charlies.androiddesign.preview.model.DeviceBatchRequest
-import bot.charlies.androiddesign.preview.model.DeviceBatchResponse
 import bot.charlies.androiddesign.preview.model.DeviceHasAssetsRequest
 import bot.charlies.androiddesign.preview.model.DeviceHasAssetsResponse
 import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
 import bot.charlies.androiddesign.preview.model.DeviceOp
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
-import bot.charlies.androiddesign.preview.model.DevicePreloadResponse
 import bot.charlies.androiddesign.preview.model.DeviceTransportSpec
 import bot.charlies.androiddesign.preview.model.DeviceWireCodec
 import java.io.BufferedInputStream
@@ -46,7 +43,7 @@ class RenderForegroundService : Service() {
   override fun onCreate() {
     super.onCreate()
     ProposalFonts.init(assets)
-    renderer = VirtualClockComposeRenderer(this)
+    renderer = VirtualClockComposeRenderer()
     startAsForeground()
     startSocketServer()
   }
@@ -73,15 +70,15 @@ class RenderForegroundService : Service() {
       mgr.createNotificationChannel(
         NotificationChannel(
           channelId,
-          "Preview Render Sandbox",
+          "Preview Live Sandbox",
           NotificationManager.IMPORTANCE_LOW,
         ),
       )
     }
     val notification =
       Notification.Builder(this, channelId)
-        .setContentTitle("Android Design Preview Sandbox")
-        .setContentText("Offscreen Compose renderer active")
+        .setContentTitle("Android Design Preview Host")
+        .setContentText("Live preview session active")
         .setSmallIcon(android.R.drawable.stat_notify_sync)
         .setOngoing(true)
         .build()
@@ -138,12 +135,6 @@ class RenderForegroundService : Service() {
             } ?: break
           when (op) {
             DeviceOp.PING -> handlePing(sink)
-            DeviceOp.PRELOAD_DEX -> {
-              val req = DeviceWireCodec.readPreloadDexRequest(input)
-              runGuarded("PRELOAD_DEX", OP_BUDGET_MS, sink) {
-                executePreloadDex(req.dexHash, req.entryClass, req.dexBytes)
-              }
-            }
             DeviceOp.PUT_ASSETS -> {
               val items = DeviceWireCodec.readPutAssetsRequest(input)
               runGuarded("PUT_ASSETS", OP_BUDGET_MS, sink) { executePutAssets(items) }
@@ -152,27 +143,11 @@ class RenderForegroundService : Service() {
               val req = DeviceWireCodec.readHasAssetsRequest(input)
               runGuarded("HAS_ASSETS", OP_BUDGET_MS, sink) { executeHasAssets(req) }
             }
-            DeviceOp.RENDER_BATCH -> {
-              val wireReq = DeviceWireCodec.readRenderBatchRequest(input)
-              val timeoutMs = wireReq.request.timeoutMs.coerceAtLeast(MIN_BATCH_BUDGET_MS)
-              runGuarded(
-                "RENDER_BATCH",
-                timeoutMs,
-                sink,
-                timeoutReply = batchTimeoutReply(timeoutMs),
-              ) {
-                executeRenderBatch(wireReq.dexBytes, wireReq.entryClass, wireReq.request)
-              }
-            }
             DeviceOp.SET_LIVE -> {
               val wireReq = DeviceWireCodec.readSetLiveRequest(input)
               runGuarded("SET_LIVE", OP_BUDGET_MS, sink) {
                 executeSetLive(wireReq.dexBytes, wireReq.request)
               }
-            }
-            DeviceOp.RECYCLE -> {
-              handleRecycle(sink)
-              return
             }
             else -> {
               sink.send { out ->
@@ -250,27 +225,6 @@ class RenderForegroundService : Service() {
     sink.send { out -> DeviceWireCodec.writePingResponse(out, resp) }
   }
 
-  private fun executePreloadDex(dexHash: String, entryClass: String, dexBytes: ByteArray): OpReply {
-    val resp =
-      try {
-        val board = renderer.preloadDex(dexHash, entryClass, dexBytes)
-        val defaultSystem = board.resolveDesignSystem(null)
-        DevicePreloadResponse(
-          ok = true,
-          dexHash = dexHash,
-          boardMeta = renderer.buildBoardMeta(board),
-          boardTheme = board.toThemeOverride(),
-          defaultSeed = defaultSystem.seed,
-          defaultVariant = defaultSystem.variant.wire,
-          defaultContrast = defaultSystem.contrast,
-        )
-      } catch (t: Throwable) {
-        Log.e(TAG, "PRELOAD_DEX failed", t)
-        DevicePreloadResponse(ok = false, error = "${t::class.java.name}: ${t.message}")
-      }
-    return OpReply { out -> DeviceWireCodec.writePreloadDexResponse(out, resp) }
-  }
-
   private fun executePutAssets(items: List<Pair<String, ByteArray>>): OpReply {
     for ((hash, bytes) in items) {
       renderer.assetCache.put(hash, bytes)
@@ -285,26 +239,6 @@ class RenderForegroundService : Service() {
     }
   }
 
-  private fun executeRenderBatch(
-    dexBytes: ByteArray?,
-    entryClass: String,
-    request: DeviceBatchRequest,
-  ): OpReply {
-    val (response, frames) =
-      try {
-        renderer.executeBatch(dexBytes, entryClass, request)
-      } catch (t: Throwable) {
-        Log.e(TAG, "Batch render failed", t)
-        DeviceBatchResponse(
-          ok = false,
-          error = "${t::class.java.name}: ${t.message}\n${t.stackTraceToString()}",
-          reloadCount = renderer.currentReloadCount(),
-          memoryAfter = renderer.collectMemoryStats(),
-        ) to emptyList()
-      }
-    return OpReply { out -> DeviceWireCodec.writeRenderBatchResponse(out, response, frames) }
-  }
-
   private fun executeSetLive(dexBytes: ByteArray?, req: DeviceLiveStateRequest): OpReply {
     val ack =
       try {
@@ -315,18 +249,6 @@ class RenderForegroundService : Service() {
         DeviceAckResponse(ok = false, error = "${t::class.java.name}: ${t.message}")
       }
     return ackReply(ack)
-  }
-
-  private fun batchTimeoutReply(timeoutMs: Long): OpReply = OpReply { out ->
-    val resp =
-      DeviceBatchResponse(
-        ok = false,
-        error = "Batch render timed out after $timeoutMs ms",
-        reloadCount = renderer.currentReloadCount(),
-        recycleRecommended = true,
-        recycleReason = "watchdog_timeout",
-      )
-    DeviceWireCodec.writeRenderBatchResponse(out, resp, emptyList())
   }
 
   private fun opTimeoutReply(name: String, budgetMs: Long): OpReply =
@@ -341,21 +263,8 @@ class RenderForegroundService : Service() {
     DeviceWireCodec.writeAck(out, ack)
   }
 
-  private fun handleRecycle(sink: ReplySink) {
-    sink.send { out -> DeviceWireCodec.writeAck(out, DeviceAckResponse(ok = true)) }
-    Thread(
-        {
-          Thread.sleep(50)
-          Process.killProcess(Process.myPid())
-        },
-        "adp-recycle",
-      )
-      .start()
-  }
-
   companion object {
     private const val TAG = "AdpRenderService"
     private const val OP_BUDGET_MS = 30_000L
-    private const val MIN_BATCH_BUDGET_MS = 250L
   }
 }

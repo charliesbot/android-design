@@ -13,13 +13,13 @@ python3 scripts/check_coverage.py
 (cd app && ./gradlew build spotlessCheck)
 ```
 
-Requires Java 17+ and Android SDK (`./gradlew :host:exportBootstrap` builds the Android Host APK, compile bundle, and classpath argfiles). No Node.js or Chrome binary is required.
+Requires Java 21+ and Android SDK (`./gradlew :host:exportBootstrap` exports the layoutlib runtime, compile bundle, Host APK for optional `open --live`, and classpath argfiles). No Node.js, Chrome binary, or connected device is required.
 
-The Gradle tests cover source linting, bytecode/classloader sandbox policy, Compose tooling slot extraction, pixel contrast sampling, finding rules with reference anchors, the Kotlin HTTP/SSE server, per-view priority queue, browser board security and selection re-resolution, `HttpURLConnection` CLI commands, and headless `render`. The Python tests cover manifests, source coverage, eval runner, `report.json` checks, multi-turn aggregation, and per-harness transcript audits without model calls.
+The Gradle tests cover source linting, bytecode/classloader sandbox policy, Compose tooling slot extraction, pixel contrast sampling, finding rules with reference anchors, the Kotlin HTTP/SSE server, per-view priority queue, browser board security and selection re-resolution, `HttpURLConnection` CLI commands, and device-free layoutlib `render`. The Python tests cover manifests, source coverage, eval runner, `report.json` checks, multi-turn aggregation, and per-harness transcript audits without model calls.
 
 ## Exploration smoke check
 
-Run in an expendable folder (a Git repository or not). Needs Java 17+. Install the plugin with one command and nothing else: the agent runs `android-design-preview` from `PATH` (Claude Code's plugin `bin/`) or the explore skill's bundled `scripts/android-design-preview`.
+Run in an expendable folder (a Git repository or not). Needs Java 21+ and Android SDK. Install the plugin with one command and nothing else: the agent runs `android-design-preview` from `PATH` (Claude Code's plugin `bin/`) or the explore skill's bundled `scripts/android-design-preview`.
 
 1. Start an interactive session: verify `android-design-preview status` works. When missing or exiting `3`, the agent reports the missing prerequisite and links `plugin/skills/android-design-explore/references/setup.md` rather than falling back to HTML or editing user sandbox config unasked.
 2. Have the agent author `<fixture-folder>/design/<slug>.explore.kt` with its own seed color in `designBoard(...)` using verified signatures from `plugin/skills/android-design-explore/references/compose-signatures.md`. Ask for three ideas in one exploration: expect three `direction(...)` blocks inside `<slug>.explore.kt` or cleanly distinct directions, each compiled and verified with `android-design-preview check`.

@@ -46,14 +46,12 @@ class PreviewClientSessionTest {
       d8Jar=/tmp/d8.jar
       bundleJar=/tmp/bundle.jar
       apkPath=/tmp/host.apk
-      apkSha256=sha-1
       composeCompilerPluginJar=/tmp/compose.jar
       """
         .trimIndent(),
     )
     val env =
       mapOf(
-        RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_ANDROID,
         BootstrapMeta.BOOTSTRAP_DIR_ENV to bdir.toString(),
         RuntimeIdentity.SERVER_CP_ENV to bdir.resolve("server.cp").toString(),
       ) + extraEnv
@@ -76,7 +74,6 @@ class PreviewClientSessionTest {
         viewToken = "view",
         backend = identity.backend,
         runtimeHash = identity.runtimeHash,
-        apkSha256 = identity.apkSha256,
       )
       .also { ServerPaths.writeRecord(ServerPaths.sharedRecordPath(cache), it) }
 
@@ -272,7 +269,7 @@ class PreviewClientSessionTest {
   }
 
   @Test
-  fun `OpenCommand routes live activity launch through server and respects NO_OPEN_ENV`(
+  fun `OpenCommand opens browser only by default and starts live session only with --live`(
     @TempDir tmp: Path,
   ) {
     val (cache, repo, baseEnv) = setupEnv(tmp)
@@ -306,14 +303,16 @@ class PreviewClientSessionTest {
     http.createContext("/api/live") { ex ->
       val body = ex.requestBody.bufferedReader(StandardCharsets.UTF_8).readText()
       liveRequests += PreviewJson.compact.decodeFromString(LiveFocusRequest.serializer(), body)
-      val bytes = """{"ok":true}""".toByteArray(StandardCharsets.UTF_8)
+      val bytes =
+        """{"ok":true,"repoId":"repo","boardUrl":"http://127.0.0.1:${http.address.port}","deviceSerial":"emulator-5554","adbForwardPort":38420}"""
+          .toByteArray(StandardCharsets.UTF_8)
       ex.sendResponseHeaders(200, bytes.size.toLong())
       ex.responseBody.use { it.write(bytes) }
     }
     http.start()
     try {
-      // Case 1: cold server (activeFile == null) with opening enabled -> /api/check +
-      // launchActivity=true
+      // Case 1: cold server (activeFile == null) without --live -> /api/check + browser open,
+      // no /api/live call.
       val openedUrls = mutableListOf<String>()
       val openClient = PreviewClient(cacheRoot = cache, env = baseEnv, progress = {})
       val code1 =
@@ -331,13 +330,12 @@ class PreviewClientSessionTest {
           )
       assertEquals(ClientExitCode.OK, code1)
       assertEquals(1, checkCalls.size)
-      assertEquals(1, liveRequests.size)
-      assertTrue(liveRequests.single().launchActivity)
+      assertTrue(liveRequests.isEmpty(), "open without --live must not call /api/live")
       assertEquals(1, openedUrls.size)
 
-      // Case 2: warm server (activeFile != null) with NO_OPEN_ENV=1 -> launchActivity=false
+      // Case 2: warm server with NO_OPEN_ENV=1 and --live --avd Pixel_10 -> calls /api/live
+      // with startLive=true, avd="Pixel_10", skips browser, and returns deviceSerial.
       activeFileOnStatus = source.toString()
-      liveRequests.clear()
       openedUrls.clear()
       val quietClient =
         PreviewClient(
@@ -345,6 +343,7 @@ class PreviewClientSessionTest {
           env = baseEnv + (PreviewClient.NO_OPEN_ENV to "1"),
           progress = {},
         )
+      val liveOut = ByteArrayOutputStream()
       val code2 =
         OpenCommand(
             client = quietClient,
@@ -354,14 +353,32 @@ class PreviewClientSessionTest {
             },
           )
           .run(
-            listOf(source.toString()),
-            PrintStream(ByteArrayOutputStream()),
+            listOf("--live", "--avd", "Pixel_10", source.toString()),
+            PrintStream(liveOut),
             PrintStream(ByteArrayOutputStream()),
           )
       assertEquals(ClientExitCode.OK, code2)
       assertEquals(1, liveRequests.size)
-      assertFalse(liveRequests.single().launchActivity)
+      val req = liveRequests.single()
+      assertTrue(req.startLive)
+      assertEquals("Pixel_10", req.avd)
       assertTrue(openedUrls.isEmpty())
+      val parsed =
+        PreviewJson.compact.decodeFromString(
+          OpenCommand.OpenResponse.serializer(),
+          liveOut.toString(StandardCharsets.UTF_8).trim(),
+        )
+      assertEquals("emulator-5554", parsed.deviceSerial)
+
+      // Case 3: --avd without --live -> USAGE error.
+      val badCode =
+        OpenCommand(client = quietClient, openBrowser = { false })
+          .run(
+            listOf("--avd", "Pixel_10"),
+            PrintStream(ByteArrayOutputStream()),
+            PrintStream(ByteArrayOutputStream()),
+          )
+      assertEquals(ClientExitCode.USAGE, badCode)
     } finally {
       http.stop(0)
     }

@@ -19,8 +19,9 @@ def make_file(root, relative, content=""):
 
 
 class PreviewAppTests(unittest.TestCase):
-    def test_default_eval_backend_is_android(self):
-        self.assertEqual(preview_app.DEFAULT_EVAL_BACKEND, "android")
+    def test_backend_env_and_default_eval_backend_are_retired(self):
+        self.assertFalse(hasattr(preview_app, "BACKEND_ENV"))
+        self.assertFalse(hasattr(preview_app, "DEFAULT_EVAL_BACKEND"))
 
     def test_env_override_wins_for_supervisor_binary(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -34,8 +34,6 @@ data class CompiledBoardData(
   val assetMap: Map<String, String> = emptyMap(),
   val assetBlobs: Map<String, ByteArray> = emptyMap(),
   val boardTheme: ThemeOverride? = null,
-  val dexBytes: ByteArray? = null,
-  val dexHash: String? = null,
 )
 
 /** One target screen/overlay/view tuple planned for a check or board render. */
@@ -134,7 +132,7 @@ data class SingleRenderRequest(
   val baseCheck: ViewCheck? = null,
   val writeFiles: Boolean = false,
   val rendersRoot: Path,
-  val frameFormat: FrameFormat = FrameFormat.LZ4_RGBA,
+  val frameFormat: FrameFormat = FrameFormat.RAW_RGBA,
   val fontScale: Float = 1f,
   val seedOverride: String? = null,
   val variantOverride: String? = null,
@@ -143,7 +141,7 @@ data class SingleRenderRequest(
 
 /**
  * Narrow port between [CheckExecutor] and the underlying compilation + frame-capture runtime
- * (Android Host APK over `adb forward` or in-memory test doubles).
+ * ([LayoutlibRenderWorker] or in-memory test doubles).
  */
 interface RenderWorker : AutoCloseable {
   val name: String
@@ -164,12 +162,10 @@ interface RenderWorker : AutoCloseable {
     stageRoot: Path,
   ): WorkerBatchResult
 
-  fun updateLive(entry: CompileEntry, update: LivePreviewUpdate) {}
-
   /**
    * Called once after a top-level [CheckExecutor] batch or single-view render finishes, so workers
-   * can flush deferred post-check maintenance (such as recycling `:sandbox`) without racing
-   * follow-up frame fetches inside the same check.
+   * can flush deferred post-check maintenance without racing follow-up frame fetches inside the
+   * same check.
    */
   fun finishCheck() {}
 

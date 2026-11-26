@@ -1,12 +1,12 @@
 package bot.charlies.androiddesign.preview.app.client
 
-import bot.charlies.androiddesign.preview.app.android.DeviceManager
 import bot.charlies.androiddesign.preview.app.cli.Command
 import bot.charlies.androiddesign.preview.app.server.CheckRequest
 import bot.charlies.androiddesign.preview.app.server.CheckResponse
 import bot.charlies.androiddesign.preview.app.server.CheckScope
 import bot.charlies.androiddesign.preview.app.server.ContentHasher
 import bot.charlies.androiddesign.preview.app.server.ErrorEnvelope
+import bot.charlies.androiddesign.preview.app.server.LiveFocusResponse
 import bot.charlies.androiddesign.preview.app.server.RuntimeIdentity
 import bot.charlies.androiddesign.preview.app.server.SelectionResponse
 import bot.charlies.androiddesign.preview.app.server.ServerPaths
@@ -107,16 +107,13 @@ private fun parseClientArgs(
   return SimpleArgs(positionals, flags) to null
 }
 
-/** `start [--serial <id>] [--avd <name>] [--headless] [--help]` */
+/** `start [<file-or-dir>]` */
 class StartCommand(
   private val cacheRoot: Path = ServerPaths.cacheRoot(),
   private val env: Map<String, String> = System.getenv(),
-  /** Validates `--serial` / `--avd` only; the server does the device setup. */
-  private val deviceManager: DeviceManager = DeviceManager(cacheRoot = cacheRoot, env = env),
   private val clientFactory: (BootstrapMeta) -> PreviewClient = { meta ->
     val startEnv =
       env.toMutableMap().apply {
-        put(RuntimeIdentity.BACKEND_ENV, RuntimeIdentity.resolveBackend(env))
         put(BootstrapMeta.BOOTSTRAP_DIR_ENV, meta.bootstrapDir.toString())
         val serverCp = meta.bootstrapDir.resolve("server.cp")
         if (Files.isRegularFile(serverCp)) {
@@ -130,19 +127,8 @@ class StartCommand(
     PreviewClient(cacheRoot = cacheRoot, env = startEnv)
   },
   private val bootstrapLocator: () -> BootstrapMeta? = { BootstrapMeta.locateOrNull(env) },
-  /**
-   * Starts or reuses the shared server. The server does the only device setup, so an emulator it
-   * boots is known to be its own and is shut down when the server stops.
-   */
   private val startServer: (ServerRequest) -> PreviewClient.ServerLookup = { request ->
-    clientFactory(request.meta)
-      .ensureServer(
-        repoRoot = request.repoRoot,
-        requestedSerial = request.serial,
-        requestedAvd = request.avd,
-        headless = request.headless,
-        forceReinstallApk = false,
-      )
+    clientFactory(request.meta).ensureServer(repoRoot = request.repoRoot)
   },
 ) : Command {
   override val name = "start"
@@ -150,17 +136,14 @@ class StartCommand(
   data class ServerRequest(
     val meta: BootstrapMeta,
     val repoRoot: Path,
-    val serial: String?,
-    val avd: String?,
-    val headless: Boolean,
   )
 
-  override val usage = "start [--serial <id>] [--avd <name>] [--headless] [--help]"
+  override val usage = "start [<file-or-dir>] [--help]"
 
   @Serializable
   data class StartResponse(
     val ok: Boolean = true,
-    val backend: String = RuntimeIdentity.BACKEND_ANDROID,
+    val backend: String,
     val serial: String? = null,
     val forwardPort: Int? = null,
     val serverPid: Long,
@@ -173,8 +156,7 @@ class StartCommand(
       out.println(HELP)
       return ClientExitCode.OK
     }
-    val (parsed, parseErr) =
-      parseClientArgs(args, setOf("--serial", "--avd"), booleanFlags = setOf("--headless"))
+    val (parsed, parseErr) = parseClientArgs(args, emptySet())
     if (parseErr != null || parsed == null) {
       return emitError(
         out,
@@ -202,31 +184,11 @@ class StartCommand(
           "Bootstrap artifacts missing (bootstrap-meta.properties). Run `./gradlew :host:exportBootstrap` from app/ or invoke the bundled CLI script.",
         )
 
-    val backend = RuntimeIdentity.resolveBackend(env)
-    val requestedSerial = parsed.flags["--serial"]
-    val requestedAvd = parsed.flags["--avd"]
-    val headless = parsed.flags["--headless"] == "true"
-
-    if (backend != RuntimeIdentity.BACKEND_LAYOUTLIB) {
-      deviceManager.validateRequest(requestedSerial, requestedAvd)?.let { invalid ->
-        return emitError(out, invalid.exitCode, invalid.error, invalid.message)
-      }
-    }
-
     val targetDir =
       parsed.positionals.firstOrNull()?.let { Path.of(it).toAbsolutePath().normalize() }
         ?: Path.of(".").toAbsolutePath().normalize()
     val repoRoot = ServerPaths.resolveRepoRoot(targetDir)
-    val lookup =
-      startServer(
-        ServerRequest(
-          meta = meta,
-          repoRoot = repoRoot,
-          serial = requestedSerial,
-          avd = requestedAvd,
-          headless = headless,
-        ),
-      )
+    val lookup = startServer(ServerRequest(meta = meta, repoRoot = repoRoot))
     val readyServer =
       when (lookup) {
         is PreviewClient.ServerLookup.NotReady ->
@@ -234,26 +196,13 @@ class StartCommand(
         is PreviewClient.ServerLookup.Ready -> lookup
       }
     val status = readyServer.status
-    val serial = status.deviceSerial
-    val forwardPort = status.adbForwardPort
-    if (
-      status.backend == RuntimeIdentity.BACKEND_ANDROID && (serial == null || forwardPort == null)
-    ) {
-      return emitError(
-        out,
-        ClientExitCode.NOT_READY,
-        "server_not_ready",
-        "Preview server is running without an Android device (backend ${status.backend}).",
-        next = "android-design-preview stop",
-      )
-    }
 
     val resp =
       StartResponse(
         ok = true,
         backend = status.backend,
-        serial = serial,
-        forwardPort = forwardPort,
+        serial = status.deviceSerial,
+        forwardPort = status.adbForwardPort,
         serverPid = status.pid,
         serverPort = status.port,
         boardUrl = readyServer.record.boardUrl(ServerPaths.repoHash(repoRoot)),
@@ -265,17 +214,16 @@ class StartCommand(
   companion object {
     val HELP =
       """
-      Usage: android-design-preview start [--serial <id>] [--avd <name>] [--headless]
+      Usage: android-design-preview start [<file-or-dir>]
 
-      Ensure a compatible Android emulator or device is running (reusing a `resizable` AVD if
-      present, else creating `medium_phone`), install + AOT-compile host-preview.apk, establish
-      adb forward, start the :sandbox host service, and ensure the shared host server is ready.
+      Start the shared host server and its device-free layoutlib render worker JVM. Use
+      `android-design-preview open --live` separately if you want an interactive device session.
 
       Exit codes:
-        0  Device, Host APK, and shared server are ready
-        1  Device boot, APK install, AOT compile, or sandbox start failed
-        2  Usage error (unknown flag, unknown serial, or unknown AVD)
-        3  Prerequisites missing (Java, Android SDK, adb, android CLI, or bootstrap artifacts)
+        0  Shared server and layoutlib worker are ready
+        1  Worker start failed
+        2  Usage error (unknown flag or extra positional arguments)
+        3  Prerequisites missing (Java 21+, Android SDK, or bootstrap artifacts)
       """
         .trimIndent()
   }
@@ -725,13 +673,13 @@ private fun openSystemBrowser(url: String): Boolean {
   }
 }
 
-/** `open <file>` */
+/** `open [<file>] [--live] [--serial <id>] [--avd <name>]` */
 class OpenCommand(
   private val client: PreviewClient = PreviewClient(),
   private val openBrowser: (String) -> Boolean = ::openSystemBrowser,
 ) : Command {
   override val name = "open"
-  override val usage = "open <file> [--help]"
+  override val usage = "open [<file>] [--live] [--serial <id>] [--avd <name>] [--help]"
 
   @Serializable
   data class OpenResponse(
@@ -739,6 +687,7 @@ class OpenCommand(
     val boardUrl: String,
     val opened: Boolean,
     val sourcePath: String? = null,
+    val deviceSerial: String? = null,
     val tell: String? = null,
   )
 
@@ -747,10 +696,38 @@ class OpenCommand(
       out.println(HELP)
       return ClientExitCode.OK
     }
-    val (parsed, parseErr) = parseClientArgs(args, emptySet())
+    val (parsed, parseErr) =
+      parseClientArgs(args, setOf("--serial", "--avd"), booleanFlags = setOf("--live"))
     if (parseErr != null || parsed == null) {
-      return emitError(out, ClientExitCode.USAGE, "usage", parseErr ?: "Invalid arguments")
+      return emitError(
+        out,
+        ClientExitCode.USAGE,
+        "usage",
+        parseErr ?: "Invalid arguments",
+        next = "android-design-preview open --help",
+      )
     }
+    if (parsed.positionals.size > 1) {
+      return emitError(
+        out,
+        ClientExitCode.USAGE,
+        "usage",
+        "Unexpected arguments: ${parsed.positionals.joinToString(" ")}",
+      )
+    }
+    val startLive = parsed.flags["--live"] == "true"
+    val requestedSerial = parsed.flags["--serial"]
+    val requestedAvd = parsed.flags["--avd"]
+    if (!startLive && (requestedSerial != null || requestedAvd != null)) {
+      return emitError(
+        out,
+        ClientExitCode.USAGE,
+        "usage",
+        "--serial and --avd require --live",
+        next = "android-design-preview open --help",
+      )
+    }
+
     val rawFile = parsed.positionals.firstOrNull()
     val targetPath =
       rawFile?.let { Path.of(it).toAbsolutePath().normalize() }
@@ -764,7 +741,6 @@ class OpenCommand(
           return emitError(out, ClientExitCode.NOT_READY, "server_not_ready", lookup.message)
       }
 
-    val noOpen = client.noOpen
     val isExploreFile =
       rawFile != null &&
         Files.isRegularFile(targetPath) &&
@@ -781,26 +757,61 @@ class OpenCommand(
       } catch (_: Exception) {
         // Still return boardUrl even if initial compile failed or timed out.
       }
-      if (!noOpen) {
-        client.notifyLive(ready.record, targetPath, repoRoot, launchActivity = true)
+    }
+
+    var liveSerial: String? = null
+    if (startLive) {
+      val liveHttp =
+        try {
+          client.startLive(
+            record = ready.record,
+            sourcePath = if (isExploreFile) targetPath else null,
+            repoRoot = repoRoot,
+            serial = requestedSerial,
+            avd = requestedAvd,
+          )
+        } catch (e: Exception) {
+          return emitError(
+            out,
+            ClientExitCode.FAILED,
+            "live_start_failed",
+            e.message ?: "Failed starting live preview session",
+          )
+        }
+      when (liveHttp.status) {
+        400 -> return emitHttpBodyFailure(out, ClientExitCode.USAGE, liveHttp.body, "bad_request")
+        503 ->
+          return emitHttpBodyFailure(
+            out,
+            ClientExitCode.NOT_READY,
+            liveHttp.body,
+            "server_not_ready",
+          )
+        !in 200..299 ->
+          return emitHttpBodyFailure(
+            out,
+            ClientExitCode.FAILED,
+            liveHttp.body,
+            "live_start_failed",
+          )
       }
-    } else {
-      client.notifyLive(
-        ready.record,
-        if (isExploreFile) targetPath else null,
-        repoRoot,
-        launchActivity = !noOpen,
-      )
+      liveSerial =
+        runCatching {
+          PreviewJson.compact.decodeFromString(LiveFocusResponse.serializer(), liveHttp.body)
+        }
+          .getOrNull()
+          ?.deviceSerial
     }
 
     val url = ready.record.boardUrl(repoId)
-    val opened = if (noOpen) false else openBrowser(url)
+    val opened = if (client.noOpen) false else openBrowser(url)
     val resp =
       OpenResponse(
         ok = true,
         boardUrl = url,
         opened = opened,
         sourcePath = if (rawFile != null) targetPath.toString() else null,
+        deviceSerial = liveSerial,
       )
     emitJson(out, PreviewJson.compact.encodeToString(OpenResponse.serializer(), resp))
     return ClientExitCode.OK
@@ -809,13 +820,15 @@ class OpenCommand(
   companion object {
     val HELP =
       """
-      Usage: android-design-preview open [<file>]
+      Usage: android-design-preview open [<file>] [--live] [--serial <id>] [--avd <name>]
 
-      Ensure the preview server is running, transfer live device ownership, print its boardUrl JSON
-      line, and open it in the default browser (suppressed when ANDROID_DESIGN_NO_OPEN=1).
+      Ensure the preview server is running, print its boardUrl JSON line, and open it in the
+      default browser (suppressed when ANDROID_DESIGN_NO_OPEN=1). Pass --live to boot or connect
+      an emulator/device with a visible window for interactive LivePreviewActivity playback.
 
       Exit codes:
-        0  Board URL printed
+        0  Board URL printed (and live session started when --live is passed)
+        1  Live device boot, install, or connection failed
         2  Usage error
         3  Server or prerequisites not ready
       """
@@ -868,7 +881,8 @@ class StatusCommand(private val client: PreviewClient = PreviewClient()) : Comma
       """
       Usage: android-design-preview status [<file-or-dir>]
 
-      Report shared server state (pid, port, jarVersion, backend, deviceSerial, compileCount, boardUrl).
+      Report shared server state (pid, port, jarVersion, backend, compileCount, boardUrl, plus
+      deviceSerial and adbForwardPort while a live session is active).
 
       Exit codes:
         0  Server is running and answering

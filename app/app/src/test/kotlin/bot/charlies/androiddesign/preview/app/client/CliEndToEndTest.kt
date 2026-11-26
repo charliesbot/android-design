@@ -29,7 +29,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Assumptions.assumeTrue
 
 class CliEndToEndTest {
   private val appDir: Path =
@@ -50,7 +49,6 @@ class CliEndToEndTest {
       RuntimeIdentity.SRC_ENV to appDir.toString(),
       BootstrapMeta.BOOTSTRAP_DIR_ENV to bootstrapDir.toString(),
       RuntimeIdentity.SERVER_CP_ENV to bootstrapDir.resolve("server.cp").toString(),
-      RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_ANDROID,
     )
 
   private data class CliResult(val exitCode: Int, val stdout: String, val stderr: String)
@@ -399,7 +397,7 @@ class CliEndToEndTest {
           repoRoot = repo.toAbsolutePath().normalize().toString(),
           clientSecret = ServerPaths.randomToken(),
           viewToken = ServerPaths.randomToken(),
-          backend = RuntimeIdentity.BACKEND_ANDROID,
+          backend = RuntimeIdentity.BACKEND_LAYOUTLIB,
           timeouts = listOf(TimeoutEntry(snap.contentHash, "compile", System.currentTimeMillis())),
           haltedAt = System.currentTimeMillis(),
         ),
@@ -429,13 +427,8 @@ class CliEndToEndTest {
   }
 
   @Test
-  fun `emulator end-to-end check, tree, render, and timeout clear on edit`() {
-    assumeTrue(
-      System.getProperty("adp.runEmulatorTests") == "true",
-      "Skipped unless -Dadp.runEmulatorTests=true",
-    )
-
-    val tmp = createTempDirectory("v6-e2e-emu-")
+  fun `layoutlib end-to-end check, tree, render, and timeout clear on edit`() {
+    val tmp = createTempDirectory("v7-e2e-ll-")
     val cacheDir = tmp.resolve("cache")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
     val source = repo.resolve("plates.explore.kt").also { Files.writeString(it, sampleBoard()) }
@@ -516,11 +509,7 @@ class CliEndToEndTest {
 
   @Test
   fun `external client timeout kills wedged server, respawns fresh server, and returns timeout`() {
-    assumeTrue(
-      System.getProperty("adp.runEmulatorTests") == "true",
-      "Skipped unless -Dadp.runEmulatorTests=true",
-    )
-    val tmp = createTempDirectory("v6-e2e-ext-timeout-")
+    val tmp = createTempDirectory("v7-e2e-ext-timeout-")
     val cacheDir = tmp.resolve("cache")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
     val source = repo.resolve("wedged.explore.kt").also { Files.writeString(it, sampleBoard()) }

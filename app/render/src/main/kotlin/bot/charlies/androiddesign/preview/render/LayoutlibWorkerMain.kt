@@ -173,10 +173,6 @@ internal class LayoutlibWorkerSession(private val sdk: PaparazziSdk) {
           val (resp, frames) = executeBatch(wireReq.dexBytes, wireReq.entryClass, wireReq.request)
           DeviceWireCodec.writeRenderBatchResponse(out, resp, frames)
         }
-        DeviceOp.RECYCLE -> {
-          DeviceWireCodec.writeAck(out, DeviceAckResponse(ok = true))
-          break
-        }
         else -> {
           DeviceWireCodec.writeAck(
             out,

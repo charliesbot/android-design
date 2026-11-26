@@ -108,7 +108,6 @@ dependencies {
   implementation(libs.material.kolor)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.serialization.json)
-  implementation(libs.lz4.java)
 
   composeCompilerPlugin(libs.kotlin.compose.compiler.embeddable)
   layoutlibRuntimeArchive(libs.layoutlib.runtime) { artifact { type = "jar" } }

@@ -41,7 +41,7 @@ data class StatusResponse(
   val repoRoot: String,
   val boardUrl: String,
   val activeFile: String? = null,
-  val backend: String = RuntimeIdentity.BACKEND_ANDROID,
+  val backend: String = RuntimeIdentity.BACKEND_LAYOUTLIB,
   val runtimeHash: String? = null,
   val deviceSerial: String? = null,
   val adbForwardPort: Int? = null,
@@ -61,7 +61,18 @@ data class LiveFocusRequest(
   val direction: String? = null,
   val screen: String? = null,
   val overlay: String? = null,
-  val launchActivity: Boolean = false,
+  val serial: String? = null,
+  val avd: String? = null,
+  val startLive: Boolean = false,
+)
+
+@Serializable
+data class LiveFocusResponse(
+  val ok: Boolean = true,
+  val repoId: String,
+  val boardUrl: String,
+  val deviceSerial: String? = null,
+  val adbForwardPort: Int? = null,
 )
 
 @Serializable

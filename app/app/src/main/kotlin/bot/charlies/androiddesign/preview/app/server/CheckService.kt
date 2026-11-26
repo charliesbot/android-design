@@ -419,7 +419,7 @@ internal class CheckService(
 
   companion object {
     /**
-     * Image output policy (`visual-design-exploration-v6.md`):
+     * Image output policy (`visual-design-exploration-v7.md`):
      * - Scoped checks always return their PNG path(s), whether findings pass or fail.
      * - Failing full checks return at most 2 failing view paths, deduplicating identical PNGs.
      * - Passing full checks return `light` and `desktop` (`watch` and `watch-large` on Wear).

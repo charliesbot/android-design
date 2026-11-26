@@ -64,8 +64,7 @@ class RenderQueueErrorCacheTest {
                         isPng = true,
                       ),
                   error =
-                    if (deviceFailure) "Timed out waiting for HostRenderActivity on Display 0"
-                    else null,
+                    if (deviceFailure) "Timed out waiting for layoutlib worker render" else null,
                 )
               },
           )
@@ -149,8 +148,7 @@ class RenderQueueErrorCacheTest {
                         mime = "image/png",
                         isPng = true,
                       ),
-                  error =
-                    if (failing) "Timed out waiting for HostRenderActivity on Display 0" else null,
+                  error = if (failing) "Timed out waiting for layoutlib worker render" else null,
                 ),
               ),
           )

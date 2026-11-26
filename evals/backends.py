@@ -1,8 +1,8 @@
 """Optional CLI adapters. Evaluation artifacts do not depend on these launchers.
 
 A generator invokes the `android-design-preview` CLI from the explore skill's `scripts/` placed on `PATH`, passing
-`ANDROID_DESIGN_NO_OPEN=1` and v6 bootstrap environment variables (`ANDROID_DESIGN_PREVIEW_SRC`,
-`ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR`, `ANDROID_DESIGN_PREVIEW_BACKEND`, etc.). Judges never receive the
+`ANDROID_DESIGN_NO_OPEN=1` and v7 bootstrap environment variables (`ANDROID_DESIGN_PREVIEW_SRC`,
+`ANDROID_DESIGN_PREVIEW_BOOTSTRAP_DIR`, etc.). Judges never receive the
 preview CLI or shell access.
 """
 import json
@@ -16,7 +16,6 @@ import tomllib
 from pathlib import Path
 
 from preview_app import (
-    BACKEND_ENV,
     BOOTSTRAP_DIR_ENV,
     CACHE_DIR_ENV,
     CLIENT_TIMEOUT_ENV,
@@ -752,7 +751,7 @@ def _parse_agy(stdout, role, model, cwd=None):
 
 
 def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, timeout=3600,
-            mcp_binary=None, preview_src=None, bootstrap_dir=None, preview_backend=None,
+            mcp_binary=None, preview_src=None, bootstrap_dir=None,
             cache_dir=None, client_timeout_ms=None, resume_session=None):
     if backend not in BACKENDS:
         raise ValueError(f'Unknown backend: {backend}')
@@ -778,8 +777,6 @@ def execute(backend, prompt, cwd, *, role, images=(), schema=None, model=None, t
                 proc_env.pop(SERVER_CP_ENV, None)
                 if (bdir / 'server.cp').is_file():
                     proc_env[SERVER_CP_ENV] = str(bdir / 'server.cp')
-            if preview_backend is not None:
-                proc_env[BACKEND_ENV] = str(preview_backend)
             if cache_dir is not None:
                 proc_env[CACHE_DIR_ENV] = str(cache_dir)
             if client_timeout_ms is not None:

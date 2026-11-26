@@ -128,7 +128,7 @@ class RenderCommand(
 
     val repoRoot = ServerPaths.resolveRepoRoot(sourcePath)
     val ready =
-      when (val lookup = client.ensureServer(repoRoot, headless = true)) {
+      when (val lookup = client.ensureServer(repoRoot)) {
         is PreviewClient.ServerLookup.Ready -> lookup
         is PreviewClient.ServerLookup.NotReady -> {
           err.println(lookup.message)
