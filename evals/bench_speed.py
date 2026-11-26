@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Measure the v6 speed gate on a running emulator and write raw results as JSON.
+"""Measure the v7 layoutlib speed gate locally and write raw results as JSON.
 
-Each timed run edits the fixture first, so every `check` pays a real warm compile, D8, device
+Each timed run edits the fixture first, so every `check` pays a real warm compile, layoutlib
 render, and host PNG encode. Scoped runs check one direction in the `light` view; full runs check
 every direction in every phone view (3 x 5). Gate: scoped median <= 500 ms, full median <= 2800 ms.
 
-Usage: python3 evals/bench_speed.py --out evals/results/v6/speed.json [--runs 7]
+Usage: python3 evals/bench_speed.py --out evals/results/v7/speed.json [--runs 7]
 """
 
 from __future__ import annotations
@@ -70,12 +70,6 @@ def summarize(samples: list[float], gate: float) -> dict:
     }
 
 
-def device_name(env: dict[str, str]) -> str:
-    adb = shutil.which("adb") or os.path.join(env.get("ANDROID_HOME", ""), "platform-tools", "adb")
-    res = subprocess.run([adb, "emu", "avd", "name"], capture_output=True, text=True)
-    return res.stdout.splitlines()[0].strip() if res.returncode == 0 and res.stdout else "unknown"
-
-
 def _pid_rss_mb(pid: int | None) -> float | None:
     if pid is None or pid <= 0:
         return None
@@ -131,15 +125,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", required=True, type=pathlib.Path)
     parser.add_argument("--runs", type=int, default=7)
-    parser.add_argument(
-        "--backend",
-        choices=("android", "layoutlib"),
-        default=os.environ.get("ANDROID_DESIGN_PREVIEW_BACKEND", "android").strip().lower() or "android",
-    )
     args = parser.parse_args()
 
     src = pathlib.Path(os.environ.get("ANDROID_DESIGN_PREVIEW_SRC", str(REPO_ROOT / "app")))
-    env = build_cli_env(src=src, backend=args.backend)
 
     with tempfile.TemporaryDirectory(prefix="adp-bench-") as tmp:
         repo = pathlib.Path(tmp) / "repo"
@@ -151,15 +139,11 @@ def main() -> int:
             repo,
             SCRIPT,
             src=src,
-            backend=args.backend,
             cache_prefix="eval-bench",
         ) as active_cache_dir:
-            env = build_cli_env(src=src, backend=args.backend, cache_dir=active_cache_dir)
+            env = build_cli_env(src=src, cache_dir=active_cache_dir)
             cold_started = time.perf_counter()
-            if args.backend == "layoutlib":
-                run_cli(["start"], env, repo)
-            else:
-                run_cli(["start", "--headless"], env, repo)
+            run_cli(["start"], env, repo)
             marker = 1
             # First check completes the cold-start-to-first-check measurement and warms iteration 1 of 3.
             timed_check(["check", str(source)], env, repo, renders=15)
@@ -185,8 +169,8 @@ def main() -> int:
             warm_memory_mb = _read_server_and_worker_rss_mb(active_cache_dir)
 
     result = {
-        "backend": args.backend,
-        "device": "layoutlib" if args.backend == "layoutlib" else device_name(env),
+        "backend": "layoutlib",
+        "device": "layoutlib",
         "host": f"{platform.system()} {platform.machine()}",
         "git_head": subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True

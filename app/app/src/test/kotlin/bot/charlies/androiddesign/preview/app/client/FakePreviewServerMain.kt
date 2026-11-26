@@ -49,7 +49,7 @@ object FakePreviewServerMain {
     val png = FastPngEncoder.encodeFast(64, 64, rgba)
     val worker =
       InMemoryRenderWorker(
-        name = RuntimeIdentity.BACKEND_ANDROID,
+        name = RuntimeIdentity.BACKEND_LAYOUTLIB,
         scopedCheckDensity = 1,
         boardName = "Plates",
         directions =

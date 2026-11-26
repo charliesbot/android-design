@@ -9,14 +9,11 @@ object DeviceOp {
   const val HAS_ASSETS: Int = 4
   const val RENDER_BATCH: Int = 5
   const val SET_LIVE: Int = 6
-  const val RECYCLE: Int = 7
 }
 
 @Serializable
 enum class FrameFormat {
   NONE,
-  LZ4_RGBA,
-  WEBP_LOSSLESS,
   RAW_RGBA,
 }
 

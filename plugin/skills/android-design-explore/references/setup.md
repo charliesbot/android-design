@@ -5,13 +5,11 @@ Read this when `android-design-preview` cannot be found (neither on `PATH` nor b
 ## Prerequisites
 
 - **macOS or Linux** (Windows is unsupported)
-- **Java 17+** (system `java` on `PATH`, `JAVA_HOME`, or Android Studio's bundled JBR)
+- **Java 21+** (JDK on `PATH`, `JAVA_HOME`, `/usr/libexec/java_home -v 21`, or Android Studio's bundled JBR)
 - **Android SDK** (`ANDROID_HOME` or `ANDROID_SDK_ROOT`) and **`git`**
-- **`android` CLI and an emulator or connected device** for previewing (`start`, `check`, `open`, `render`; Wear boards run offscreen `check` and `render` on a phone AVD with a round screen layout, and only live interactive Wear viewing needs a Wear OS AVD or watch)
+- **Optional for `open --live`:** `adb` and an Android emulator (`android` CLI) or USB device, only needed when launching opt-in live interaction (`start`, `check`, `tree`, `render`, and plain `open` never boot or contact a device)
 
-When no device is online, `start`, `check`, or `render` boots an AVD (an existing resizable one first, otherwise a new `medium_phone`) and shuts it down again when the preview server stops or idles out. A device or emulator that was already running is reused and left running, and so is an emulator booted by an older version of the server it replaced.
-
-On first run, if the cached runtime under `~/.cache/android-design-preview/<version>/` is missing, the bootstrap script sparse-checkouts `app/` from GitHub at tag `v<version>` and runs `./gradlew :host:exportBootstrap` once to build the previewer server/CLI, Android Host APK, and AndroidX compile bundle locally.
+On first run, if the cached runtime under `~/.cache/android-design-preview/<version>/` is missing, the bootstrap script sparse-checkouts `app/` from GitHub at tag `v<version>` and runs `./gradlew :host:exportBootstrap` once to build the previewer server/CLI, layoutlib worker bundle, Android Host APK (for live mode), and AndroidX compile bundle locally.
 
 ## Where `android-design-preview` comes from
 

@@ -1,31 +1,25 @@
 package bot.charlies.androiddesign.preview.app.client
 
-import bot.charlies.androiddesign.preview.app.android.CommandOutput
-import bot.charlies.androiddesign.preview.app.android.DeviceManager
-import bot.charlies.androiddesign.preview.app.android.ExternalCommandRunner
+import bot.charlies.androiddesign.preview.app.server.RuntimeIdentity
 import bot.charlies.androiddesign.preview.app.server.ServerPaths
 import bot.charlies.androiddesign.preview.app.server.ServerRecord
 import bot.charlies.androiddesign.preview.app.server.StatusResponse
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.io.TempDir
 
-/**
- * `start` leaves device setup to the server. The server is then the process that boots an emulator,
- * so it knows the emulator is its own and shuts it down when it stops.
- */
+/** `start` starts only the shared host server and layoutlib worker JVM with no device setup. */
 class StartCommandTest {
   @Test
-  fun `start hands the device request to the server and reports the server's device`(
-    @TempDir tmp: Path,
-  ) {
+  fun `start requests device-free server start and reports layoutlib backend`(@TempDir tmp: Path) {
     val meta = fakeBootstrap(tmp)
     val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
     val requests = mutableListOf<StartCommand.ServerRequest>()
@@ -38,32 +32,11 @@ class StartCommandTest {
         repoRoot = repo.toString(),
         clientSecret = "s",
         viewToken = "v",
-        deviceSerial = "emulator-5554",
-        adbForwardPort = 18765,
-      )
-    val deviceCmds = mutableListOf<String>()
-    val env = fakeToolsEnv(tmp)
-    val deviceManager =
-      DeviceManager(
-        cacheRoot = tmp.resolve("cache"),
-        env = env,
-        runner =
-          ExternalCommandRunner { cmd, _, _ ->
-            val j = cmd.joinToString(" ")
-            deviceCmds += j
-            when {
-              cmd.getOrNull(1) == "devices" -> CommandOutput(0, "List of devices attached\n")
-              "emulator list" in j -> CommandOutput(0, "Pixel_10_Pro_XL\n")
-              else -> CommandOutput(0, "")
-            }
-          },
-        sleepFn = {},
       )
     val command =
       StartCommand(
         cacheRoot = tmp.resolve("cache"),
-        env = env,
-        deviceManager = deviceManager,
+        env = emptyMap(),
         bootstrapLocator = { meta },
         startServer = { request ->
           requests += request
@@ -77,8 +50,7 @@ class StartCommandTest {
               compileCount = 0,
               repoRoot = repo.toString(),
               boardUrl = "http://127.0.0.1:4100/",
-              deviceSerial = "emulator-5554",
-              adbForwardPort = 18765,
+              backend = RuntimeIdentity.BACKEND_LAYOUTLIB,
             ),
           )
         },
@@ -87,49 +59,52 @@ class StartCommandTest {
 
     val code =
       command.run(
-        listOf("--avd", "Pixel_10_Pro_XL", "--headless", repo.toString()),
+        listOf(repo.toString()),
         PrintStream(bytes),
         PrintStream(ByteArrayOutputStream()),
       )
 
     assertEquals(ClientExitCode.OK, code)
     assertEquals(
-      listOf(
-        StartCommand.ServerRequest(
-          meta = meta,
-          repoRoot = ServerPaths.resolveRepoRoot(repo),
-          serial = null,
-          avd = "Pixel_10_Pro_XL",
-          headless = true,
-        ),
-      ),
+      listOf(StartCommand.ServerRequest(meta = meta, repoRoot = ServerPaths.resolveRepoRoot(repo))),
       requests,
     )
-    assertFalse(
-      deviceCmds.any { "emulator start" in it || "emulator/emulator" in it || "install" in it },
-      "start must leave booting and installing to the server: $deviceCmds",
-    )
     val json = bytes.toString()
-    assertContains(json, "\"serial\":\"emulator-5554\"")
-    assertContains(json, "\"forwardPort\":18765")
+    assertContains(json, "\"backend\":\"layoutlib\"")
     assertContains(json, "\"serverPid\":42")
   }
 
-  private fun fakeToolsEnv(root: Path): Map<String, String> {
-    val sdk = root.resolve("sdk")
-    val adb = sdk.resolve("platform-tools/adb")
-    val android = root.resolve("bin/android")
-    Files.createDirectories(adb.parent)
-    Files.createDirectories(android.parent)
-    for (tool in listOf(adb, android)) {
-      Files.writeString(tool, "#!/bin/sh\nexit 0\n")
-      tool.toFile().setExecutable(true)
+  @Test
+  fun `start rejects retired device flags and reports usage, help, and missing bootstrap`(
+    @TempDir tmp: Path,
+  ) {
+    val meta = fakeBootstrap(tmp)
+    for (badFlag in listOf("--serial", "--avd", "--headless", "--bogus")) {
+      val code =
+        StartCommand(tmp.resolve("c"), emptyMap(), bootstrapLocator = { meta })
+          .run(
+            listOf(badFlag),
+            PrintStream(ByteArrayOutputStream()),
+            PrintStream(ByteArrayOutputStream()),
+          )
+      assertEquals(ClientExitCode.USAGE, code, "Expected USAGE for $badFlag")
     }
-    return mapOf(
-      "ANDROID_HOME" to sdk.toString(),
-      DeviceManager.ADB_ENV to adb.toString(),
-      DeviceManager.ANDROID_CLI_ENV to android.toString(),
-    )
+
+    val helpOut = ByteArrayOutputStream()
+    val helpCode =
+      StartCommand(tmp.resolve("c"), emptyMap(), bootstrapLocator = { meta })
+        .run(listOf("--help"), PrintStream(helpOut), PrintStream(ByteArrayOutputStream()))
+    assertEquals(ClientExitCode.OK, helpCode)
+    val helpText = helpOut.toString(StandardCharsets.UTF_8)
+    assertTrue("layoutlib" in helpText, helpText)
+    assertTrue("--headless" !in helpText, helpText)
+
+    val notReadyOut = ByteArrayOutputStream()
+    val notReadyCode =
+      StartCommand(tmp.resolve("c"), emptyMap(), bootstrapLocator = { null })
+        .run(emptyList(), PrintStream(notReadyOut), PrintStream(ByteArrayOutputStream()))
+    assertEquals(ClientExitCode.NOT_READY, notReadyCode)
+    assertTrue("bootstrap_missing" in notReadyOut.toString(StandardCharsets.UTF_8))
   }
 
   private fun fakeBootstrap(root: Path): BootstrapMeta {
@@ -155,7 +130,6 @@ class StartCommandTest {
       d8Jar=$d8Jar
       bundleJar=$bundleJar
       apkPath=$apk
-      apkSha256=${BootstrapMeta.computeSha256(apk)}
       composeCompilerPluginJar=$composeJar
       workerCp=$workerCp
       layoutlibRuntimeDir=$llRuntime

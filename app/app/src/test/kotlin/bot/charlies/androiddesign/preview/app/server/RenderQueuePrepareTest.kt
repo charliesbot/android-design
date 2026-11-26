@@ -26,7 +26,7 @@ class RenderQueuePrepareTest {
     val executor =
       CheckExecutor(
         InMemoryRenderWorker(
-          name = RuntimeIdentity.BACKEND_ANDROID,
+          name = RuntimeIdentity.BACKEND_LAYOUTLIB,
           onPrepare = { if (prepared.compareAndSet(false, true)) Thread.sleep(600L) },
           onCompile = {
             // Without prepare(), the first job pays the warmup inside its watchdog budget.

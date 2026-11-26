@@ -1,17 +1,12 @@
 package bot.charlies.androiddesign.preview.app.server
 
-import bot.charlies.androiddesign.preview.app.AppInfo
-import bot.charlies.androiddesign.preview.app.client.PreviewClient
-import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
+import bot.charlies.androiddesign.preview.app.client.ClientExitCode
 import bot.charlies.androiddesign.preview.model.DeviceDirectionMeta
 import bot.charlies.androiddesign.preview.model.PhoneSurface
 import bot.charlies.androiddesign.preview.model.PreviewJson
-import com.sun.net.httpserver.HttpServer
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
-import java.net.InetAddress
-import java.net.InetSocketAddress
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -97,11 +92,10 @@ class SingleServerSupervisionTest {
 
     val worker =
       InMemoryRenderWorker(
-        name = "fake",
+        name = RuntimeIdentity.BACKEND_LAYOUTLIB,
         supportsHeadlessSpeculativePrecompile = true,
         directions = fakeDirections,
         views = PhoneSurface.views,
-        dexHashFor = { ContentHasher.sha256Hex(it.sourcePath.toString().toByteArray()) },
         aroundRenderBatch = { _, proceed ->
           val cur = concurrentRenders.incrementAndGet()
           maxConcurrent.updateAndGet { maxOf(it, cur) }
@@ -112,10 +106,24 @@ class SingleServerSupervisionTest {
             concurrentRenders.decrementAndGet()
           }
         },
-        onUpdateLive = { entry, _ ->
-          liveOwners += entry.sourcePath.toAbsolutePath().normalize().toString()
-        },
       )
+    val liveHost =
+      object : LiveSessionHost {
+        override val isActive: Boolean = true
+        override val deviceSerial: String? = null
+        override val adbForwardPort: Int? = null
+
+        override fun startSession(
+          serial: String?,
+          avd: String?,
+          entry: CompileEntry?,
+          update: LivePreviewUpdate?,
+        ): LiveSessionStartResult = LiveSessionStartResult.Ready("emulator-5554", 38_420)
+
+        override fun updateIfActive(entry: CompileEntry, update: LivePreviewUpdate) {
+          liveOwners += entry.sourcePath.toAbsolutePath().normalize().toString()
+        }
+      }
 
     val server =
       PreviewHttpServer(
@@ -123,6 +131,7 @@ class SingleServerSupervisionTest {
         cacheRoot = cache,
         preferredPort = 0,
         worker = worker,
+        liveSessionHost = liveHost,
         enableFileWatcher = false,
       )
     val record = server.start()
@@ -428,260 +437,41 @@ class SingleServerSupervisionTest {
   }
 
   @Test
-  fun `apkSha256 change triggers replacement with --force-reinstall-apk`(@TempDir tmp: Path) {
-    val cache = tmp.resolve("cache")
-    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
-    val bdir = tmp.resolve("bootstrap").also { Files.createDirectories(it) }
-    Files.writeString(bdir.resolve("server.cp"), "-cp\nfoo.jar\n")
-    Files.writeString(
-      bdir.resolve("bootstrap-meta.properties"),
-      """
-      androidJar=/tmp/android.jar
-      d8Jar=/tmp/d8.jar
-      bundleJar=/tmp/bundle.jar
-      apkPath=/tmp/host.apk
-      apkSha256=new-sha-2222
-      composeCompilerPluginJar=/tmp/compose.jar
-      """
-        .trimIndent(),
-    )
-
-    // Write active.json pointing to an in-process stub HTTP server advertising old apkSha256 =
-    // old-sha-1111. Use a nonexistent PID so stopServer waits for the stub HTTP server to stop.
-    val stopRequested = CountDownLatch(1)
-    val stubHttp = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
-    val secret = "sec-123"
-    stubHttp.createContext("/api/status") { ex ->
-      val body =
-        PreviewJson.compact.encodeToString(
-          StatusResponse.serializer(),
-          StatusResponse(
-            pid = 999_999_999L,
-            port = stubHttp.address.port,
-            jarVersion = AppInfo.VERSION,
-            startedAt = System.currentTimeMillis(),
-            compileCount = 0,
-            repoRoot = repo.toString(),
-            boardUrl = "http://127.0.0.1:${stubHttp.address.port}",
-            backend = RuntimeIdentity.BACKEND_ANDROID,
-            runtimeHash = "old-hash",
-          ),
-        )
-      val bytes = body.toByteArray(StandardCharsets.UTF_8)
-      ex.sendResponseHeaders(200, bytes.size.toLong())
-      ex.responseBody.use { it.write(bytes) }
-    }
-    stubHttp.createContext("/api/stop") { ex ->
-      val bytes = """{"ok":true}""".toByteArray(StandardCharsets.UTF_8)
-      ex.sendResponseHeaders(200, bytes.size.toLong())
-      ex.responseBody.use { it.write(bytes) }
-      stopRequested.countDown()
-      Thread { stubHttp.stop(0) }.start()
-    }
-    stubHttp.start()
-
-    val recordPath = ServerPaths.sharedRecordPath(cache)
-    ServerPaths.writeRecord(
-      recordPath,
-      ServerRecord(
-        pid = 999_999_999L,
-        port = stubHttp.address.port,
-        viewToken = "view-tok",
-        clientSecret = secret,
-        jarVersion = AppInfo.VERSION,
-        startedAt = System.currentTimeMillis(),
-        repoRoot = repo.toString(),
-        backend = RuntimeIdentity.BACKEND_ANDROID,
-        runtimeHash = "old-hash",
-        apkSha256 = "old-sha-1111",
-      ),
-    )
-
-    val argsCapture = tmp.resolve("spawn_args.txt")
-    val fakeJdk = tmp.resolve("fake-jdk")
-    val fakeJava = fakeJdk.resolve("bin/java")
-    Files.createDirectories(fakeJava.parent)
-    Files.writeString(
-      fakeJava,
-      """#!/bin/sh
-printf '%s\n' "${'$'}@" > "$argsCapture"
-exit 1
-""",
-    )
-    fakeJava.toFile().setExecutable(true)
-
-    val prevJavaHome = System.getProperty("java.home")
-    try {
-      System.setProperty("java.home", fakeJdk.toString())
-      val client =
-        PreviewClient(
-          cacheRoot = cache,
-          env =
-            mapOf(
-              RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_ANDROID,
-              BootstrapMeta.BOOTSTRAP_DIR_ENV to bdir.toString(),
-              RuntimeIdentity.SERVER_CP_ENV to bdir.resolve("server.cp").toString(),
-            ),
-        )
-      client.ensureServer(repo)
-      assertTrue(stopRequested.await(2, TimeUnit.SECONDS), "Old server should receive /api/stop")
-      val spawnedArgs = Files.readAllLines(argsCapture)
-      assertTrue(
-        "--force-reinstall-apk" in spawnedArgs,
-        "Expected --force-reinstall-apk in $spawnedArgs",
-      )
-      val flagIdx = spawnedArgs.indexOf("--force-reinstall-apk")
-      assertEquals("true", spawnedArgs[flagIdx + 1])
-    } finally {
-      System.setProperty("java.home", prevJavaHome)
-      stubHttp.stop(0)
-    }
-  }
-
-  @Test
-  fun `requestedSerial mismatch replaces shared server and passes --device-serial`(
+  fun `POST api live starts LiveSessionHost only when startLive is true and maps failures cleanly`(
     @TempDir tmp: Path,
   ) {
     val cache = tmp.resolve("cache")
     val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
-    val bdir = tmp.resolve("bootstrap").also { Files.createDirectories(it) }
-    val apk = bdir.resolve("host.apk").also { Files.writeString(it, "apk") }
-    val androidJar = bdir.resolve("android.jar").also { Files.writeString(it, "aj") }
-    val d8Jar = bdir.resolve("d8.jar").also { Files.writeString(it, "d8") }
-    val bundleJar = bdir.resolve("bundle.jar").also { Files.writeString(it, "bj") }
-    val composeJar = bdir.resolve("compose.jar").also { Files.writeString(it, "cj") }
-    val workerCp = bdir.resolve("worker.cp").also { Files.writeString(it, "-cp\nfoo.jar\n") }
-    val llRuntime =
-      bdir.resolve("layoutlib/runtime").also { Files.createDirectories(it.resolve("data")) }
-    val llResources =
-      bdir.resolve("layoutlib/resources").also { Files.createDirectories(it.resolve("res")) }
-    val resDirsFile = bdir.resolve("worker-res-dirs.txt").also { Files.writeString(it, "") }
-    val assetsDir = bdir.resolve("assets").also { Files.createDirectories(it) }
-    val rJar = bdir.resolve("worker-r.jar").also { Files.writeString(it, "rj") }
-    Files.writeString(bdir.resolve("server.cp"), "-cp\nfoo.jar\n")
-    val sha = BootstrapMeta.computeSha256(apk)
-    Files.writeString(
-      bdir.resolve("bootstrap-meta.properties"),
-      """
-      androidJar=$androidJar
-      d8Jar=$d8Jar
-      bundleJar=$bundleJar
-      apkPath=$apk
-      apkSha256=$sha
-      composeCompilerPluginJar=$composeJar
-      workerCp=$workerCp
-      layoutlibRuntimeDir=$llRuntime
-      layoutlibResourcesDir=$llResources
-      workerResDirsFile=$resDirsFile
-      workerAssetsDir=$assetsDir
-      workerRJar=$rJar
-      """
-        .trimIndent(),
-    )
+    val startCount = AtomicInteger(0)
+    var nextStartResult: LiveSessionStartResult =
+      LiveSessionStartResult.Ready("emulator-5554", 38_420)
+    val liveHost =
+      object : LiveSessionHost {
+        override var isActive: Boolean = false
+        override val deviceSerial: String?
+          get() = if (isActive) "emulator-5554" else null
 
-    val env =
-      mapOf(
-        RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_ANDROID,
-        BootstrapMeta.BOOTSTRAP_DIR_ENV to bdir.toString(),
-        RuntimeIdentity.SERVER_CP_ENV to bdir.resolve("server.cp").toString(),
-      )
-    val id =
-      RuntimeIdentity.compute(
-        env,
-        meta = BootstrapMeta.fromFile(bdir.resolve("bootstrap-meta.properties")),
-      )
+        override val adbForwardPort: Int?
+          get() = if (isActive) 38_420 else null
 
-    val stopRequested = CountDownLatch(1)
-    val stubHttp = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
-    stubHttp.createContext("/api/status") { ex ->
-      val body =
-        PreviewJson.compact.encodeToString(
-          StatusResponse.serializer(),
-          StatusResponse(
-            pid = 999_999_999L,
-            port = stubHttp.address.port,
-            jarVersion = AppInfo.VERSION,
-            startedAt = System.currentTimeMillis(),
-            compileCount = 0,
-            repoRoot = repo.toString(),
-            boardUrl = "http://127.0.0.1:${stubHttp.address.port}",
-            backend = id.backend,
-            runtimeHash = id.runtimeHash,
-            deviceSerial = "emulator-5554",
-          ),
-        )
-      val bytes = body.toByteArray(StandardCharsets.UTF_8)
-      ex.sendResponseHeaders(200, bytes.size.toLong())
-      ex.responseBody.use { it.write(bytes) }
-    }
-    stubHttp.createContext("/api/stop") { ex ->
-      val bytes = """{"ok":true}""".toByteArray(StandardCharsets.UTF_8)
-      ex.sendResponseHeaders(200, bytes.size.toLong())
-      ex.responseBody.use { it.write(bytes) }
-      stopRequested.countDown()
-      Thread { stubHttp.stop(0) }.start()
-    }
-    stubHttp.start()
+        override fun startSession(
+          serial: String?,
+          avd: String?,
+          entry: CompileEntry?,
+          update: LivePreviewUpdate?,
+        ): LiveSessionStartResult {
+          startCount.incrementAndGet()
+          if (nextStartResult is LiveSessionStartResult.Ready) isActive = true
+          return nextStartResult
+        }
 
-    ServerPaths.writeRecord(
-      ServerPaths.sharedRecordPath(cache),
-      ServerRecord(
-        pid = 999_999_999L,
-        port = stubHttp.address.port,
-        viewToken = "vt",
-        clientSecret = "sec",
-        jarVersion = AppInfo.VERSION,
-        startedAt = System.currentTimeMillis(),
-        repoRoot = repo.toString(),
-        backend = id.backend,
-        runtimeHash = id.runtimeHash,
-        deviceSerial = "emulator-5554",
-        apkSha256 = sha,
-      ),
-    )
-
-    val argsCapture = tmp.resolve("spawn_args.txt")
-    val fakeJdk = tmp.resolve("fake-jdk")
-    val fakeJava = fakeJdk.resolve("bin/java")
-    Files.createDirectories(fakeJava.parent)
-    Files.writeString(
-      fakeJava,
-      """#!/bin/sh
-printf '%s\n' "${'$'}@" > "$argsCapture"
-exit 1
-""",
-    )
-    fakeJava.toFile().setExecutable(true)
-
-    val prevJavaHome = System.getProperty("java.home")
-    try {
-      System.setProperty("java.home", fakeJdk.toString())
-      val client = PreviewClient(cacheRoot = cache, env = env)
-      client.ensureServer(repo, requestedSerial = "emulator-5556")
-      assertTrue(stopRequested.await(2, TimeUnit.SECONDS), "Mismatched serial must stop old server")
-      val spawnedArgs = Files.readAllLines(argsCapture)
-      val serialIdx = spawnedArgs.indexOf("--device-serial")
-      assertTrue(serialIdx >= 0, "Expected --device-serial in $spawnedArgs")
-      assertEquals("emulator-5556", spawnedArgs[serialIdx + 1])
-    } finally {
-      System.setProperty("java.home", prevJavaHome)
-      stubHttp.stop(0)
-    }
-  }
-
-  @Test
-  fun `POST api live invokes onLaunchLiveActivity only when launchActivity is true`(
-    @TempDir tmp: Path,
-  ) {
-    val cache = tmp.resolve("cache")
-    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
-    val launchCount = AtomicInteger(0)
+        override fun updateIfActive(entry: CompileEntry, update: LivePreviewUpdate) {}
+      }
     val worker =
       InMemoryRenderWorker(
-        name = "fake-live",
+        name = RuntimeIdentity.BACKEND_LAYOUTLIB,
         directions = fakeDirections,
         views = PhoneSurface.views,
-        dexHashFor = { "dex" },
       )
     val server =
       PreviewHttpServer(
@@ -689,8 +479,8 @@ exit 1
         cacheRoot = cache,
         preferredPort = 0,
         worker = worker,
+        liveSessionHost = liveHost,
         enableFileWatcher = false,
-        onLaunchLiveActivity = { launchCount.incrementAndGet() },
       )
     val record = server.start()
     try {
@@ -703,13 +493,14 @@ exit 1
           body =
             PreviewJson.compact.encodeToString(
               LiveFocusRequest.serializer(),
-              LiveFocusRequest(repoRoot = repo.toString(), launchActivity = false),
+              LiveFocusRequest(repoRoot = repo.toString(), startLive = false),
             ),
         )
       assertEquals(200, cFalse)
-      assertEquals(0, launchCount.get())
+      assertEquals(0, startCount.get())
 
-      val (cTrue, _) =
+      nextStartResult = LiveSessionStartResult.Failed(ClientExitCode.USAGE, "usage", "Bad avd")
+      val (cUsage, bUsage) =
         httpCall(
           "$base/api/live",
           method = "POST",
@@ -717,223 +508,45 @@ exit 1
           body =
             PreviewJson.compact.encodeToString(
               LiveFocusRequest.serializer(),
-              LiveFocusRequest(repoRoot = repo.toString(), launchActivity = true),
+              LiveFocusRequest(repoRoot = repo.toString(), avd = "missing", startLive = true),
             ),
         )
-      assertEquals(200, cTrue)
-      assertEquals(1, launchCount.get())
+      assertEquals(400, cUsage, bUsage)
+
+      nextStartResult =
+        LiveSessionStartResult.Failed(ClientExitCode.NOT_READY, "device_not_ready", "No device")
+      val (cNotReady, bNotReady) =
+        httpCall(
+          "$base/api/live",
+          method = "POST",
+          secret = record.clientSecret,
+          body =
+            PreviewJson.compact.encodeToString(
+              LiveFocusRequest.serializer(),
+              LiveFocusRequest(repoRoot = repo.toString(), startLive = true),
+            ),
+        )
+      assertEquals(503, cNotReady, bNotReady)
+
+      nextStartResult = LiveSessionStartResult.Ready("emulator-5554", 38_420)
+      val (cTrue, bTrue) =
+        httpCall(
+          "$base/api/live",
+          method = "POST",
+          secret = record.clientSecret,
+          body =
+            PreviewJson.compact.encodeToString(
+              LiveFocusRequest.serializer(),
+              LiveFocusRequest(repoRoot = repo.toString(), startLive = true),
+            ),
+        )
+      assertEquals(200, cTrue, bTrue)
+      val resp = PreviewJson.compact.decodeFromString(LiveFocusResponse.serializer(), bTrue)
+      assertEquals("emulator-5554", resp.deviceSerial)
+      assertEquals(38_420, resp.adbForwardPort)
+      assertEquals(3, startCount.get())
     } finally {
       server.stop()
-    }
-  }
-
-  @Test
-  fun `replacement forwards ownedEmulatorSerial from ServerRecord to the new server`(
-    @TempDir tmp: Path,
-  ) {
-    val cache = tmp.resolve("cache")
-    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
-    val bdir = tmp.resolve("bootstrap").also { Files.createDirectories(it) }
-    Files.writeString(bdir.resolve("server.cp"), "-cp\nfoo.jar\n")
-    Files.writeString(
-      bdir.resolve("bootstrap-meta.properties"),
-      """
-      androidJar=/tmp/android.jar
-      d8Jar=/tmp/d8.jar
-      bundleJar=/tmp/bundle.jar
-      apkPath=/tmp/host.apk
-      apkSha256=new-sha-2222
-      composeCompilerPluginJar=/tmp/compose.jar
-      """
-        .trimIndent(),
-    )
-
-    val stubHttp = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
-    stubHttp.createContext("/api/status") { ex ->
-      val body =
-        PreviewJson.compact.encodeToString(
-          StatusResponse.serializer(),
-          StatusResponse(
-            pid = 999_999_999L,
-            port = stubHttp.address.port,
-            jarVersion = AppInfo.VERSION,
-            startedAt = System.currentTimeMillis(),
-            compileCount = 0,
-            repoRoot = repo.toString(),
-            boardUrl = "http://127.0.0.1:${stubHttp.address.port}",
-            backend = RuntimeIdentity.BACKEND_ANDROID,
-            runtimeHash = "old-hash",
-            deviceSerial = "emulator-5554",
-          ),
-        )
-      val bytes = body.toByteArray(StandardCharsets.UTF_8)
-      ex.sendResponseHeaders(200, bytes.size.toLong())
-      ex.responseBody.use { it.write(bytes) }
-    }
-    stubHttp.createContext("/api/stop") { ex ->
-      val bytes = """{"ok":true}""".toByteArray(StandardCharsets.UTF_8)
-      ex.sendResponseHeaders(200, bytes.size.toLong())
-      ex.responseBody.use { it.write(bytes) }
-      Thread { stubHttp.stop(0) }.start()
-    }
-    stubHttp.start()
-
-    ServerPaths.writeRecord(
-      ServerPaths.sharedRecordPath(cache),
-      ServerRecord(
-        pid = 999_999_999L,
-        port = stubHttp.address.port,
-        viewToken = "vt",
-        clientSecret = "sec",
-        jarVersion = AppInfo.VERSION,
-        startedAt = System.currentTimeMillis(),
-        repoRoot = repo.toString(),
-        backend = RuntimeIdentity.BACKEND_ANDROID,
-        runtimeHash = "old-hash",
-        deviceSerial = "emulator-5554",
-        apkSha256 = "old-sha-1111",
-        ownedEmulatorSerial = "emulator-5554",
-      ),
-    )
-
-    val argsCapture = tmp.resolve("spawn_args.txt")
-    val fakeJdk = tmp.resolve("fake-jdk")
-    val fakeJava = fakeJdk.resolve("bin/java")
-    Files.createDirectories(fakeJava.parent)
-    Files.writeString(
-      fakeJava,
-      """#!/bin/sh
-printf '%s\n' "${'$'}@" > "$argsCapture"
-exit 1
-""",
-    )
-    fakeJava.toFile().setExecutable(true)
-
-    val prevJavaHome = System.getProperty("java.home")
-    try {
-      System.setProperty("java.home", fakeJdk.toString())
-      val client =
-        PreviewClient(
-          cacheRoot = cache,
-          env =
-            mapOf(
-              RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_ANDROID,
-              BootstrapMeta.BOOTSTRAP_DIR_ENV to bdir.toString(),
-              RuntimeIdentity.SERVER_CP_ENV to bdir.resolve("server.cp").toString(),
-            ),
-        )
-      client.ensureServer(repo)
-      val spawnedArgs = Files.readAllLines(argsCapture)
-      val idx = spawnedArgs.indexOf("--owned-emulator-serial")
-      assertTrue(idx >= 0, "Expected --owned-emulator-serial in $spawnedArgs")
-      assertEquals("emulator-5554", spawnedArgs[idx + 1])
-    } finally {
-      System.setProperty("java.home", prevJavaHome)
-      stubHttp.stop(0)
-    }
-  }
-
-  @Test
-  fun `switching from android with owned emulator to layoutlib clears ownedEmulatorSerial and passes replacedByVersion null`(
-    @TempDir tmp: Path,
-  ) {
-    val cache = tmp.resolve("cache")
-    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
-    val bdir = tmp.resolve("bootstrap").also { Files.createDirectories(it) }
-    Files.writeString(bdir.resolve("server.cp"), "-cp\nfoo.jar\n")
-    Files.writeString(bdir.resolve("bootstrap-meta.properties"), "")
-
-    val capturedStopBody = AtomicReference<String?>(null)
-    val stubHttp = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
-    stubHttp.createContext("/api/status") { ex ->
-      val body =
-        PreviewJson.compact.encodeToString(
-          StatusResponse.serializer(),
-          StatusResponse(
-            pid = 999_999_999L,
-            port = stubHttp.address.port,
-            jarVersion = AppInfo.VERSION,
-            startedAt = System.currentTimeMillis(),
-            compileCount = 0,
-            repoRoot = repo.toString(),
-            boardUrl = "http://127.0.0.1:${stubHttp.address.port}",
-            backend = RuntimeIdentity.BACKEND_ANDROID,
-            runtimeHash = "old-hash",
-            deviceSerial = "emulator-5554",
-          ),
-        )
-      val bytes = body.toByteArray(StandardCharsets.UTF_8)
-      ex.sendResponseHeaders(200, bytes.size.toLong())
-      ex.responseBody.use { it.write(bytes) }
-    }
-    stubHttp.createContext("/api/stop") { ex ->
-      capturedStopBody.set(String(ex.requestBody.readAllBytes(), StandardCharsets.UTF_8))
-      val bytes = """{"ok":true}""".toByteArray(StandardCharsets.UTF_8)
-      ex.sendResponseHeaders(200, bytes.size.toLong())
-      ex.responseBody.use { it.write(bytes) }
-      Thread { stubHttp.stop(0) }.start()
-    }
-    stubHttp.start()
-
-    ServerPaths.writeRecord(
-      ServerPaths.sharedRecordPath(cache),
-      ServerRecord(
-        pid = 999_999_999L,
-        port = stubHttp.address.port,
-        viewToken = "vt",
-        clientSecret = "sec",
-        jarVersion = AppInfo.VERSION,
-        startedAt = System.currentTimeMillis(),
-        repoRoot = repo.toString(),
-        backend = RuntimeIdentity.BACKEND_ANDROID,
-        runtimeHash = "old-hash",
-        deviceSerial = "emulator-5554",
-        ownedEmulatorSerial = "emulator-5554",
-      ),
-    )
-
-    val argsCapture = tmp.resolve("spawn_args.txt")
-    val fakeJdk = tmp.resolve("fake-jdk")
-    val fakeJava = fakeJdk.resolve("bin/java")
-    Files.createDirectories(fakeJava.parent)
-    Files.writeString(
-      fakeJava,
-      """#!/bin/sh
-printf '%s\n' "${'$'}@" > "$argsCapture"
-exit 1
-""",
-    )
-    fakeJava.toFile().setExecutable(true)
-
-    val prevJavaHome = System.getProperty("java.home")
-    try {
-      System.setProperty("java.home", fakeJdk.toString())
-      val client =
-        PreviewClient(
-          cacheRoot = cache,
-          env =
-            mapOf(
-              RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_LAYOUTLIB,
-              BootstrapMeta.BOOTSTRAP_DIR_ENV to bdir.toString(),
-              RuntimeIdentity.SERVER_CP_ENV to bdir.resolve("server.cp").toString(),
-              RuntimeIdentity.WORKER_CP_ENV to "worker.cp",
-            ),
-        )
-      client.ensureServer(repo)
-      val stopReq =
-        PreviewJson.compact.decodeFromString(
-          StopRequest.serializer(),
-          capturedStopBody.get() ?: error("Missing /api/stop body"),
-        )
-      assertEquals(null, stopReq.replacedByVersion)
-      val spawnedArgs = Files.readAllLines(argsCapture)
-      assertFalse(
-        spawnedArgs.contains("--owned-emulator-serial"),
-        "Layoutlib server must not inherit --owned-emulator-serial: $spawnedArgs",
-      )
-    } finally {
-      System.setProperty("java.home", prevJavaHome)
-      stubHttp.stop(0)
     }
   }
 }

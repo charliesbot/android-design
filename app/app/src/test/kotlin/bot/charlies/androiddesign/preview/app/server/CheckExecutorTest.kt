@@ -82,7 +82,7 @@ class CheckExecutorTest {
   }
 
   @Test
-  fun `scoped batch check respects worker scopedCheckDensity, requests LZ4 for every target, and writes PNGs`() {
+  fun `scoped batch check respects worker scopedCheckDensity, requests RAW_RGBA for every target, and writes PNGs`() {
     val tmp = createTempDirectory("check-exec-scoped-")
     try {
       for (expectedDensity in listOf(1, 2)) {
@@ -101,7 +101,7 @@ class CheckExecutorTest {
         assertEquals(2, artifacts.size)
         val requested = worker.recordedBatches.single()
         assertEquals(
-          listOf(FrameFormat.LZ4_RGBA, FrameFormat.LZ4_RGBA),
+          listOf(FrameFormat.RAW_RGBA, FrameFormat.RAW_RGBA),
           requested.map { it.frameFormat },
         )
         assertEquals(
@@ -117,7 +117,7 @@ class CheckExecutorTest {
   }
 
   @Test
-  fun `unscoped passing check requests LZ4 only for primary non-overlay targets and writes only primary PNGs`() {
+  fun `unscoped passing check requests RAW_RGBA only for primary non-overlay targets and writes only primary PNGs`() {
     val tmp = createTempDirectory("check-exec-unscoped-")
     try {
       val worker = InMemoryRenderWorker()
@@ -137,8 +137,8 @@ class CheckExecutorTest {
       val requestedFormats = batchTargets.associate {
         "${it.viewName}:${it.overlayId ?: "base"}" to it.frameFormat
       }
-      assertEquals(FrameFormat.LZ4_RGBA, requestedFormats["light:base"])
-      assertEquals(FrameFormat.LZ4_RGBA, requestedFormats["desktop:base"])
+      assertEquals(FrameFormat.RAW_RGBA, requestedFormats["light:base"])
+      assertEquals(FrameFormat.RAW_RGBA, requestedFormats["desktop:base"])
       assertEquals(FrameFormat.NONE, requestedFormats["dark:base"])
       assertEquals(FrameFormat.NONE, requestedFormats["foldable:base"])
       assertEquals(FrameFormat.NONE, requestedFormats["tablet:base"])
@@ -266,7 +266,7 @@ class CheckExecutorTest {
       assertEquals(2, worker.renderBatchCount.get(), "Expected initial batch + 1 follow-up batch")
       val followUpTargets = worker.recordedBatches[1]
       assertEquals(listOf("dark", "foldable", "tablet"), followUpTargets.map { it.viewName })
-      assertTrue(followUpTargets.all { it.frameFormat == FrameFormat.LZ4_RGBA })
+      assertTrue(followUpTargets.all { it.frameFormat == FrameFormat.RAW_RGBA })
 
       // dark and foldable share identical SHA-256 bytes, so dark and tablet are written (cap 2).
       val written = artifacts.filter { it.pngPath != null }
@@ -354,7 +354,7 @@ class CheckExecutorTest {
             view = Views.Light,
             writeFiles = true,
             rendersRoot = tmp.resolve("renders"),
-            frameFormat = FrameFormat.LZ4_RGBA,
+            frameFormat = FrameFormat.RAW_RGBA,
           ),
         )
 
@@ -371,7 +371,7 @@ class CheckExecutorTest {
   }
 
   @Test
-  fun `renderSingle converts WEBP_LOSSLESS to LZ4_RGBA when writeFiles is true and keeps WEBP when false`() {
+  fun `renderSingle requests RAW_RGBA and writes PNG only when writeFiles is true`() {
     val tmp = createTempDirectory("check-exec-single-format-")
     try {
       val worker = InMemoryRenderWorker()
@@ -389,10 +389,10 @@ class CheckExecutorTest {
             view = Views.Light,
             writeFiles = true,
             rendersRoot = rendersRoot,
-            frameFormat = FrameFormat.WEBP_LOSSLESS,
+            frameFormat = FrameFormat.RAW_RGBA,
           ),
         )
-      assertEquals(FrameFormat.LZ4_RGBA, worker.recordedBatches[0].single().frameFormat)
+      assertEquals(FrameFormat.RAW_RGBA, worker.recordedBatches[0].single().frameFormat)
       assertEquals("image/png", written.imageMime)
       assertNotNull(written.pngPath)
       assertTrue(Files.isRegularFile(written.pngPath))
@@ -407,11 +407,11 @@ class CheckExecutorTest {
             view = Views.Light,
             writeFiles = false,
             rendersRoot = rendersRoot,
-            frameFormat = FrameFormat.WEBP_LOSSLESS,
+            frameFormat = FrameFormat.RAW_RGBA,
           ),
         )
-      assertEquals(FrameFormat.WEBP_LOSSLESS, worker.recordedBatches[1].single().frameFormat)
-      assertEquals("image/webp", inMemory.imageMime)
+      assertEquals(FrameFormat.RAW_RGBA, worker.recordedBatches[1].single().frameFormat)
+      assertEquals("image/png", inMemory.imageMime)
       assertNull(inMemory.pngPath)
     } finally {
       tmp.toFile().deleteRecursively()
@@ -613,7 +613,7 @@ class CheckExecutorTest {
   }
 
   @Test
-  fun `renderBatchReport sends one view-grouped LZ4 batch, diffs overlays, and preserves canonical order`() {
+  fun `renderBatchReport sends one view-grouped RAW_RGBA batch, diffs overlays, and preserves canonical order`() {
     val tmp = createTempDirectory("check-exec-report-batch-")
     try {
       val finishCalls = AtomicInteger(0)
@@ -671,7 +671,7 @@ class CheckExecutorTest {
       assertEquals(1, baseWorker.renderBatchCount.get(), "Report must execute in a single batch")
       assertEquals(1, finishCalls.get())
       val sent = baseWorker.recordedBatches.single()
-      assertTrue(sent.all { it.frameFormat == FrameFormat.LZ4_RGBA && it.includeEndFrame })
+      assertTrue(sent.all { it.frameFormat == FrameFormat.RAW_RGBA && it.includeEndFrame })
       assertEquals(
         listOf(
           "One/base/light",

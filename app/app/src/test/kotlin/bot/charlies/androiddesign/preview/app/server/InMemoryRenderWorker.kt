@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * [CheckService], and [PreviewHttpServer].
  */
 class InMemoryRenderWorker(
-  override val name: String = "android",
+  override val name: String = RuntimeIdentity.BACKEND_LAYOUTLIB,
   override val supportsHeadlessSpeculativePrecompile: Boolean = false,
   override val scopedCheckDensity: Int = 2,
   private val surface: String = "phone",
@@ -45,14 +45,12 @@ class InMemoryRenderWorker(
     ((CompileEntry, List<DeviceRenderTarget>, Path) -> WorkerBatchResult)? =
     null,
   private val targetBuilder: ((DeviceRenderTarget) -> WorkerTargetOutput)? = null,
-  private val onUpdateLive: (CompileEntry, LivePreviewUpdate) -> Unit = { _, _ -> },
   private val onClose: () -> Unit = {},
 ) : RenderWorker {
   val prepareCount = AtomicInteger(0)
   val compileCount = AtomicInteger(0)
   val renderBatchCount = AtomicInteger(0)
   val recordedBatches = CopyOnWriteArrayList<List<DeviceRenderTarget>>()
-  val recordedUpdates = CopyOnWriteArrayList<LivePreviewUpdate>()
   val closed = AtomicBoolean(false)
 
   override fun prepare() {
@@ -104,11 +102,6 @@ class InMemoryRenderWorker(
     return aroundRenderBatch?.invoke(targets, proceed) ?: proceed()
   }
 
-  override fun updateLive(entry: CompileEntry, update: LivePreviewUpdate) {
-    recordedUpdates += update
-    onUpdateLive(entry, update)
-  }
-
   override fun close() {
     if (closed.compareAndSet(false, true)) {
       onClose()
@@ -130,16 +123,6 @@ class InMemoryRenderWorker(
     val frame =
       when (target.frameFormat) {
         FrameFormat.NONE -> null
-        FrameFormat.WEBP_LOSSLESS ->
-          WorkerFrame(
-            bytes =
-              ("RIFF\u0000\u0000\u0000\u0000WEBP" +
-                  "${target.direction}/${target.screen}/${target.overlayId}/${target.viewName}@${target.densityScale}")
-                .toByteArray(),
-            mime = "image/webp",
-            isPng = false,
-          )
-        FrameFormat.LZ4_RGBA,
         FrameFormat.RAW_RGBA ->
           WorkerFrame(
             bytes =

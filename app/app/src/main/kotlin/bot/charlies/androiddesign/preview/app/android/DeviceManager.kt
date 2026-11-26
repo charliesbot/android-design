@@ -129,7 +129,8 @@ private data class InstalledApkStamp(
 
 /**
  * Supervises AVD lifecycle via `android emulator` / `android install` plus `adb` AOT compilation,
- * background idle exemptions, `adb forward`, and `:sandbox` `HostRenderActivity` startup.
+ * background idle exemptions, `adb forward`, and `:sandbox` `LivePreviewActivity` startup for
+ * opt-in live mode.
  */
 class DeviceManager(
   private val cacheRoot: Path = ServerPaths.cacheRoot(),
@@ -224,11 +225,10 @@ class DeviceManager(
     meta: BootstrapMeta,
     requestedSerial: String? = null,
     requestedAvd: String? = null,
-    headless: Boolean = false,
     forceReinstall: Boolean = false,
   ): DeviceSetupResult {
     val launchedBefore = launched
-    val result = prepareDevice(meta, requestedSerial, requestedAvd, headless, forceReinstall)
+    val result = prepareDevice(meta, requestedSerial, requestedAvd, forceReinstall)
     // An emulator this call launched must not outlive its failed setup.
     if (result is DeviceSetupResult.Failed && launched !== launchedBefore) {
       releaseLaunchedEmulator(markShuttingDown = false)
@@ -278,7 +278,6 @@ class DeviceManager(
     meta: BootstrapMeta,
     requestedSerial: String?,
     requestedAvd: String?,
-    headless: Boolean,
     forceReinstall: Boolean,
   ): DeviceSetupResult {
     val sdkDir = resolveSdkDir()
@@ -312,7 +311,7 @@ class DeviceManager(
         if (wanted !in avds) return unknownAvd(wanted, avds)
         chosenAvd = wanted
         chosenSerial =
-          startAvdAndWaitOnline(androidCli, adbBin, sdkDir, wanted, headless, cmdEnv)
+          startAvdAndWaitOnline(androidCli, adbBin, sdkDir, wanted, cmdEnv)
             ?: return DeviceSetupResult.Failed(
               exitCode = ClientExitCode.FAILED,
               error = "emulator_start_failed",
@@ -350,7 +349,7 @@ class DeviceManager(
           }
       chosenAvd = targetAvd
       val started =
-        startAvdAndWaitOnline(androidCli, adbBin, sdkDir, targetAvd, headless, cmdEnv)
+        startAvdAndWaitOnline(androidCli, adbBin, sdkDir, targetAvd, cmdEnv)
           ?: return DeviceSetupResult.Failed(
             exitCode = ClientExitCode.FAILED,
             error = "emulator_start_failed",
@@ -424,7 +423,7 @@ class DeviceManager(
       writeStamp(stampFile, InstalledApkStamp(apkSha256, newPmPath, System.currentTimeMillis()))
     }
 
-    // Apply background idle exemptions every start so :sandbox stays reachable while offscreen.
+    // Apply background idle exemptions every start so :sandbox stays reachable while open.
     runner.run(
       listOf(
         adbBin,
@@ -455,26 +454,6 @@ class DeviceManager(
       ADB_SHORT_TIMEOUT_MS,
       cmdEnv,
     )
-    // The system can destroy the backgrounded HostRenderActivity mid-batch, and the :sandbox
-    // foreground service must then relaunch it. A foreground service alone does not exempt that
-    // launch from background activity launch restrictions; this grant does
-    // (BAL_ALLOW_SAW_PERMISSION). The host never draws an overlay.
-    runner.run(
-      listOf(
-        adbBin,
-        "-s",
-        chosenSerial,
-        "shell",
-        "cmd",
-        "appops",
-        "set",
-        HOST_PACKAGE,
-        "SYSTEM_ALERT_WINDOW",
-        "allow",
-      ),
-      ADB_SHORT_TIMEOUT_MS,
-      cmdEnv,
-    )
 
     val forwardPort =
       ensureAdbForward(adbBin, chosenSerial, cmdEnv)
@@ -493,7 +472,7 @@ class DeviceManager(
         return DeviceSetupResult.Failed(
           exitCode = ClientExitCode.FAILED,
           error = "sandbox_start_failed",
-          message = "Failed starting $HOST_RENDER_ACTIVITY on $chosenSerial.",
+          message = "Failed starting $LIVE_ACTIVITY on $chosenSerial.",
         )
       }
       ping = awaitPing(forwardPort)
@@ -687,15 +666,12 @@ class DeviceManager(
     adbBin: String,
     sdkDir: Path?,
     avdName: String,
-    headless: Boolean,
     cmdEnv: Map<String, String>,
   ): String? {
     if (synchronized(this) { released }) return null
     val before = listOnlineDevices(adbBin, cmdEnv).map { it.serial }.toSet()
-    // Prefer the SDK emulator with the host GPU: `android emulator start --headless` picks software
-    // rendering (lavapipe/SwiftShader), and recent system images never come online that way, and it
-    // cannot pass emulator flags. `-no-snapshot-save` keeps our shutdown from writing a quickboot
-    // snapshot into the user's AVD; booting from such a snapshot left the device offline for good.
+    // Prefer the SDK emulator with the host GPU; `-no-snapshot-save` keeps shutdown from writing a
+    // quickboot snapshot into the user's AVD. Live mode always opens a visible window.
     val emulatorBin =
       sdkDir?.resolve("emulator/emulator")?.takeIf { Files.isExecutable(it) }?.toString()
     if (emulatorBin != null) {
@@ -706,7 +682,6 @@ class DeviceManager(
         add("-gpu")
         add("host")
         add("-no-snapshot-save")
-        if (headless) add("-no-window")
       }
       if (synchronized(this) { released }) return null
       val proc = launchEmulator(cmd, cmdEnv)
@@ -724,13 +699,7 @@ class DeviceManager(
         return null
       }
     } else if (androidCli != null) {
-      val cmd = buildList {
-        add(androidCli)
-        add("emulator")
-        add("start")
-        if (headless) add("--headless")
-        add(avdName)
-      }
+      val cmd = listOf(androidCli, "emulator", "start", avdName)
       val aborted =
         synchronized(this) {
           if (released) {
@@ -874,20 +843,7 @@ class DeviceManager(
   ): Boolean {
     val res =
       runner.run(
-        listOf(
-          adbBin,
-          "-s",
-          serial,
-          "shell",
-          "am",
-          "start",
-          "-W",
-          "-n",
-          HOST_RENDER_ACTIVITY,
-          "--ez",
-          "move_to_back",
-          "true",
-        ),
+        listOf(adbBin, "-s", serial, "shell", "am", "start", "-W", "-n", LIVE_ACTIVITY),
         ADB_SHORT_TIMEOUT_MS,
         cmdEnv,
       )
@@ -995,7 +951,6 @@ class DeviceManager(
 
   companion object {
     const val HOST_PACKAGE = "bot.charlies.androiddesign.preview.host"
-    const val HOST_RENDER_ACTIVITY = "$HOST_PACKAGE/.sandbox.HostRenderActivity"
     const val LIVE_ACTIVITY = "$HOST_PACKAGE/.LivePreviewActivity"
     const val DEVICE_REMOTE = DeviceTransportSpec.ADB_REMOTE
     const val DEFAULT_DEVICE_PORT = 18765

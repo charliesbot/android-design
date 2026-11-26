@@ -1,6 +1,6 @@
 # Visual design exploration v6
 
-> **Proposed successor:** [Visual design exploration v7](visual-design-exploration-v7.md) replaces the emulator with layoutlib as the default renderer. v6 describes the running system until v7 is implemented.
+> **Archived:** Superseded by [Visual design exploration v7](../design/visual-design-exploration-v7.md). v7 keeps v6's host server, compiler pipeline, browser board, and CLI while replacing offscreen emulator rendering with a device-free layoutlib worker and keeping `LivePreviewActivity` as opt-in `open --live`.
 
 **Date:** 2026-11-22
 
@@ -170,4 +170,4 @@ Validation spike ([#159](https://github.com/charliesbot/android-design/issues/15
 - [Wear OS in the previewer](../archive/wear-os-previewer.md)
 - [Visual design exploration v4](../archive/visual-design-exploration-v4.md)
 - [Visual design exploration v3](../archive/visual-design-exploration-v3.md)
-- [Script ban eval baseline](script-ban-eval.md)
+- [Script ban eval baseline](../design/script-ban-eval.md)

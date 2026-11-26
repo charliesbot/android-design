@@ -591,7 +591,7 @@ class RenderQueue(
     baseCheck: ViewCheck?,
     priority: QueuePriority,
     writeFiles: Boolean = true,
-    frameFormat: FrameFormat = FrameFormat.LZ4_RGBA,
+    frameFormat: FrameFormat = FrameFormat.RAW_RGBA,
   ): CompletableFuture<RenderArtifact> {
     replacedVersion?.let {
       return CompletableFuture.failedFuture(ServerReplacedException(it))
@@ -619,10 +619,8 @@ class RenderQueue(
         val hasImageIfNeeded =
           when (frameFormat) {
             FrameFormat.NONE -> true
-            FrameFormat.LZ4_RGBA,
             FrameFormat.RAW_RGBA ->
               done.imageMime == "image/png" && done.pngBytes != null && done.pngBytes.isNotEmpty()
-            FrameFormat.WEBP_LOSSLESS -> done.pngBytes != null && done.pngBytes.isNotEmpty()
           }
         if (hasImageIfNeeded && (!writeFiles || done.pngPath != null)) {
           return CompletableFuture.completedFuture(done)
@@ -634,7 +632,7 @@ class RenderQueue(
           !existing.future.isCancelled &&
           !existing.future.isCompletedExceptionally &&
           (frameFormat == FrameFormat.NONE ||
-            existing.format == FrameFormat.LZ4_RGBA ||
+            existing.format == FrameFormat.RAW_RGBA ||
             existing.format == frameFormat)
       if (compatibleInFlight) {
         future = existing.future
@@ -684,7 +682,7 @@ class RenderQueue(
     overlayId: String?,
     view: ViewSpec,
     densityScale: Int = 2,
-    frameFormat: FrameFormat = FrameFormat.LZ4_RGBA,
+    frameFormat: FrameFormat = FrameFormat.RAW_RGBA,
     fontScale: Float = 1f,
     seedOverride: String? = null,
     variantOverride: String? = null,
@@ -824,7 +822,7 @@ class RenderQueue(
           if (current != null && current.contentHash == contentHash) {
             val prev = current.rendered[renderKey]
             val keepExistingPng =
-              frameFormat != FrameFormat.LZ4_RGBA &&
+              frameFormat != FrameFormat.RAW_RGBA &&
                 prev?.imageMime == "image/png" &&
                 prev.pngBytes != null &&
                 prev.pngBytes.isNotEmpty()

@@ -40,7 +40,7 @@ class BenchSpeedTests(unittest.TestCase):
             self.assertIn("eval-bench-", cache_dir)
             stopper.assert_called_once()
 
-    def test_bench_speed_layoutlib_skips_headless_and_adb(self):
+    def test_bench_speed_runs_layoutlib_without_adb_or_headless(self):
         seen_cmds = []
 
         def fake_run_cli(args, env, cwd):
@@ -53,13 +53,12 @@ class BenchSpeedTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             out_json = Path(tmp) / "speed.json"
             with mock.patch.object(bench_speed, "run_cli", side_effect=fake_run_cli), \
-                    mock.patch.object(bench_speed, "device_name") as dev_name, \
                     mock.patch.object(preview_app, "stop_preview_server", return_value=True), \
-                    mock.patch("sys.argv", ["bench_speed.py", "--backend", "layoutlib", "--out", str(out_json), "--runs", "1"]):
+                    mock.patch("sys.argv", ["bench_speed.py", "--out", str(out_json), "--runs", "1"]):
                 rc = bench_speed.main()
             self.assertEqual(rc, 0)
             self.assertEqual(seen_cmds[0], ["start"])
-            dev_name.assert_not_called()
+            self.assertFalse(hasattr(bench_speed, "device_name"))
             data = bench_speed.json.loads(out_json.read_text(encoding="utf-8"))
             self.assertEqual(data["backend"], "layoutlib")
             self.assertEqual(data["device"], "layoutlib")

@@ -155,8 +155,6 @@ class LayoutlibRenderWorker(
             assetMap = stage.assetMap,
             assetBlobs = stage.assetBlobs,
             boardTheme = preload.boardTheme,
-            dexBytes = null,
-            dexHash = null,
           )
         WorkerCompileResult.Ready(
           sourcePath = stage.sourcePath,
@@ -288,10 +286,6 @@ class LayoutlibRenderWorker(
       error = resp.error,
       targets = outputs,
     )
-  }
-
-  override fun updateLive(entry: CompileEntry, update: LivePreviewUpdate) {
-    // Layoutlib backend renders only into the browser board.
   }
 
   override fun finishCheck() {

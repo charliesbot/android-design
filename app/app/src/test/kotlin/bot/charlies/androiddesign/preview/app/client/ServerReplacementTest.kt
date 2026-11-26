@@ -95,7 +95,7 @@ class ServerReplacementTest {
     f.client.start(f.repo)
     val record = assertNotNull(ServerPaths.readRecord(ServerPaths.sharedRecordPath(f.cache)))
     assertNotNull(record.runtimeHash)
-    assertEquals(RuntimeIdentity.BACKEND_ANDROID, record.backend)
+    assertEquals(RuntimeIdentity.BACKEND_LAYOUTLIB, record.backend)
   }
 
   @Test

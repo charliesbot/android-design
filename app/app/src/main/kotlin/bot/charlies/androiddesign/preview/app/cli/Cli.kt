@@ -74,11 +74,11 @@ fun parseArgs(args: List<String>, flags: Set<String>, err: PrintStream): ParsedA
 object Cli {
   private val commandUsages =
     listOf(
-      "start [--serial <id>] [--avd <name>] [--headless] [--help]",
+      "start [<dir>] [--help]",
       "check <file> [--direction d] [--screen s] [--view v] [--design path] [--help]",
       "tree <file> --direction d --view v [--screen s] [--overlay o] [--max-depth n] [--help]",
       "selection <file> [--help]",
-      "open <file> [--help]",
+      "open [<file>] [--live] [--serial <id>] [--avd <name>] [--help]",
       "status [<file-or-dir>] [--help]",
       "stop [<file-or-dir>] [--help]",
       "render <exploration.explore.kt> --out <dir> [--design <DESIGN.md>] [--views light,dark,...] [--screens a,b]",

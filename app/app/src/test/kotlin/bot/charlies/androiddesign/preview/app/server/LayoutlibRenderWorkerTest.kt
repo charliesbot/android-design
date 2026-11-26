@@ -115,8 +115,6 @@ class LayoutlibRenderWorkerTest {
         "Expected Ready, got $compiled",
       )
       val boardData = assertNotNull(compiled.compiledData)
-      assertNull(boardData.dexBytes, "Layoutlib worker must not lower classes to DEX")
-      assertNull(boardData.dexHash)
       assertTrue(boardData.classHash.isNotBlank())
       assertEquals(5, compiled.boardMeta.views.size)
       assertEquals(2, compiled.boardMeta.directions.size)
@@ -169,7 +167,7 @@ class LayoutlibRenderWorkerTest {
             dirName,
             screenName,
             Views.Light.name,
-            frameFormat = FrameFormat.LZ4_RGBA,
+            frameFormat = FrameFormat.RAW_RGBA,
           ),
           DeviceRenderTarget(
             dirName,
@@ -383,7 +381,6 @@ exit 99
     val bdir = meta.bootstrapDir
     val env =
       mapOf(
-        RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_LAYOUTLIB,
         RuntimeIdentity.SRC_ENV to repoRoot.resolve("app").toString(),
         BootstrapMeta.BOOTSTRAP_DIR_ENV to bdir.toString(),
         RuntimeIdentity.SERVER_CP_ENV to bdir.resolve("server.cp").toString(),

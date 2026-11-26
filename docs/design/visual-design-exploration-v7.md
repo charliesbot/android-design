@@ -14,7 +14,7 @@ In spikes on Apple Silicon, layoutlib 17.0.4 (API 37) with the repo's real kit m
 
 ### Why v7
 
-v6 ([Visual design exploration v6](visual-design-exploration-v6.md)) reached real AndroidX fidelity by rendering on an emulator. That fixed v5's Compose Multiplatform lag, but it left three problems:
+v6 ([Visual design exploration v6](../archive/visual-design-exploration-v6.md)) reached real AndroidX fidelity by rendering on an emulator. That fixed v5's Compose Multiplatform lag, but it left three problems:
 
 1. **Two tools wired together.** The result experience is a browser board plus an emulator that is sometimes visible and sometimes not. In practice agents run `check` and share `boardUrl`, so the person only ever sees images, while a multi-gigabyte emulator runs out of sight.
 2. **A device to keep alive.** The server must boot, own, and shut down an emulator. Several paths can leave one running with no owner: a crash mid-boot, `stop` against a dead server, an adopted emulator with no process handle, and a closed board tab that does not shorten the idle timer.
@@ -96,7 +96,7 @@ Parity was measured against the emulator host, and the comparison exposed three 
 - **Overlay insets from the wrong display.** The host's main window consumes all insets, so base screens lay out with none. Its secondary windows still receive the physical AVD's navigation bar inset, read at the overridden density, which adds 36 dp to the bottom of a modal sheet on a phone view. In v7 every window of a view gets the same insets as the main window, which stay at none, so base screens do not change and a modal sheet is 36 dp shorter than today.
 - **Menu placement.** Compose positions a dropdown against the AVD's real display, and the host then clamps it into the view, which puts the menu flush against the edge and raises a false `overflow` finding. layoutlib positions it against the view's window.
 
-These three change rendered output and findings relative to today's eval baselines: shadows appear, modal sheets get shorter, and dropdown menus move and stop raising that `overflow` error. They follow from how Compose and the framework behave in a window of the view's size; none was checked against a physical device.
+These three change rendered output and findings relative to v6's emulator eval baselines: shadows appear, modal sheets get shorter, and dropdown menus move and stop raising that `overflow` error. They follow from how Compose and the framework behave in a window of the view's size; none was checked against a physical device.
 
 ### The emulator after v7
 
@@ -148,7 +148,7 @@ Limits of this evidence, which bound what the table proves:
 
 ## Links
 
-- [Visual design exploration v6](visual-design-exploration-v6.md)
+- [Visual design exploration v6](../archive/visual-design-exploration-v6.md)
 - [Visual design exploration v5](../archive/visual-design-exploration-v5.md)
 - [layoutlib on Google Maven](https://dl.google.com/android/maven2/com/android/tools/layoutlib/layoutlib/maven-metadata.xml)
 - [Paparazzi](https://github.com/cashapp/paparazzi) (driver source, Apache-2.0)

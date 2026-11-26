@@ -608,9 +608,19 @@ class CliTest {
   }
 
   @Test
-  fun `version prints to stdout`() {
+  fun `version and open help usage checks`() {
     val version = runCli("--version")
     assertEquals(ExitCode.OK, version.code)
     assertEquals(AppInfo.VERSION, version.out.trim())
+
+    val openHelp = runCli("open", "--help")
+    assertEquals(ExitCode.OK, openHelp.code)
+    assertTrue("--live" in openHelp.out, openHelp.out)
+    assertTrue("--serial" in openHelp.out, openHelp.out)
+    assertTrue("--avd" in openHelp.out, openHelp.out)
+
+    val badOpen = runCli("open", "--avd", "Pixel_10")
+    assertEquals(2, badOpen.code, badOpen.out)
+    assertTrue("--live" in badOpen.out, badOpen.out)
   }
 }

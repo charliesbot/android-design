@@ -1,19 +1,21 @@
 package bot.charlies.androiddesign.preview.app.android
 
 import bot.charlies.androiddesign.preview.app.client.ClientExitCode
-import bot.charlies.androiddesign.preview.app.client.StartCommand
-import bot.charlies.androiddesign.preview.app.server.RuntimeIdentity
-import bot.charlies.androiddesign.preview.app.server.ServerPaths
-import bot.charlies.androiddesign.preview.app.server.ServerRecord
-import bot.charlies.androiddesign.preview.app.server.StatusResponse
+import bot.charlies.androiddesign.preview.app.server.AndroidLiveSessionHost
+import bot.charlies.androiddesign.preview.app.server.CompileEntry
+import bot.charlies.androiddesign.preview.app.server.CompiledBoardData
+import bot.charlies.androiddesign.preview.app.server.LivePreviewUpdate
+import bot.charlies.androiddesign.preview.app.server.LiveSessionStartResult
+import bot.charlies.androiddesign.preview.app.server.LoadedExploration
 import bot.charlies.androiddesign.preview.domain.bootstrap.BootstrapMeta
+import bot.charlies.androiddesign.preview.domain.design.DesignSystemResolver
+import bot.charlies.androiddesign.preview.model.DeviceLiveStateRequest
 import bot.charlies.androiddesign.preview.model.DevicePingResponse
-import java.io.ByteArrayOutputStream
-import java.io.PrintStream
-import java.nio.charset.StandardCharsets
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -142,17 +144,10 @@ class DeviceManagerTest {
         "cmd appops set ${DeviceManager.HOST_PACKAGE} RUN_ANY_IN_BACKGROUND allow" in it
       },
     )
-    // The :sandbox service relaunches HostRenderActivity from the background after the system
-    // destroys it; without this grant Android blocks the launch (BAL_BLOCK).
-    assertTrue(
-      joinedAll.any {
-        "cmd appops set ${DeviceManager.HOST_PACKAGE} SYSTEM_ALERT_WINDOW allow" in it
-      },
-    )
     assertTrue(joinedAll.any { "forward tcp:18999 localabstract:adp-render-sandbox" in it })
     assertTrue(
       joinedAll.any {
-        "am start -W -n ${DeviceManager.HOST_RENDER_ACTIVITY} --ez move_to_back true" in it
+        "am start -W -n ${DeviceManager.LIVE_ACTIVITY}" in it
       },
     )
 
@@ -226,7 +221,7 @@ class DeviceManagerTest {
           pingFn = { DevicePingResponse(ok = true, pid = 11) },
           sleepFn = {},
         )
-      assertIs<DeviceSetupResult.Ready>(dm.ensureDeviceReady(meta, headless = true))
+      assertIs<DeviceSetupResult.Ready>(dm.ensureDeviceReady(meta))
       return cmds
     }
 
@@ -237,7 +232,6 @@ class DeviceManagerTest {
         env[DeviceManager.ANDROID_CLI_ENV]!!,
         "emulator",
         "start",
-        "--headless",
         "Medium_Resizable_API_35",
       ),
       startRes,
@@ -251,148 +245,6 @@ class DeviceManagerTest {
     )
     val startCreated = createCmds.first { "emulator start" in it.joinToString(" ") }
     assertTrue("medium_phone" in startCreated)
-  }
-
-  @Test
-  fun `StartCommand returns exit codes 0, 2, and 3`(@TempDir tmp: Path) {
-    val meta = fakeBootstrap(tmp.resolve("b"), "apk")
-    val envWithBootstrap =
-      fakeToolsEnv(tmp) +
-        mapOf(
-          RuntimeIdentity.BACKEND_ENV to RuntimeIdentity.BACKEND_ANDROID,
-          BootstrapMeta.BOOTSTRAP_DIR_ENV to meta.bootstrapDir.toString(),
-          RuntimeIdentity.SERVER_CP_ENV to meta.bootstrapDir.resolve("server.cp").toString(),
-        )
-
-    // Exit 2 on unknown option.
-    val usageOut = ByteArrayOutputStream()
-    val usageCode =
-      StartCommand(tmp.resolve("c0"), envWithBootstrap)
-        .run(listOf("--bogus"), PrintStream(usageOut), PrintStream(ByteArrayOutputStream()))
-    assertEquals(ClientExitCode.USAGE, usageCode)
-
-    // Exit 3 when bootstrap missing.
-    val notReadyOut = ByteArrayOutputStream()
-    val notReadyCode =
-      StartCommand(tmp.resolve("c1"), emptyMap(), bootstrapLocator = { null })
-        .run(emptyList(), PrintStream(notReadyOut), PrintStream(ByteArrayOutputStream()))
-    assertEquals(ClientExitCode.NOT_READY, notReadyCode)
-    assertTrue("bootstrap_missing" in notReadyOut.toString(StandardCharsets.UTF_8))
-
-    // Exit 2 when --serial is not online.
-    val noAdbsRunner = ExternalCommandRunner { cmd, _, _ ->
-      if (cmd.getOrNull(1) == "devices") CommandOutput(0, "List of devices attached\n")
-      else CommandOutput(0, "")
-    }
-    val dmUnknownSerial =
-      DeviceManager(tmp.resolve("c2"), envWithBootstrap, noAdbsRunner, sleepFn = {})
-    val serialCode =
-      StartCommand(
-          tmp.resolve("c2"),
-          envWithBootstrap,
-          deviceManager = dmUnknownSerial,
-          bootstrapLocator = { meta },
-          startServer = { error("an unknown serial must fail before the server starts") },
-        )
-        .run(
-          listOf("--serial", "emulator-9999"),
-          PrintStream(ByteArrayOutputStream()),
-          PrintStream(ByteArrayOutputStream()),
-        )
-    assertEquals(ClientExitCode.USAGE, serialCode)
-
-    // Exit 0 when device + server are ready.
-    val readyRunner = ExternalCommandRunner { cmd, _, _ ->
-      val j = cmd.joinToString(" ")
-      when {
-        cmd.getOrNull(1) == "devices" ->
-          CommandOutput(0, "List of devices attached\nemulator-5554\tdevice\n")
-        "emu avd name" in j -> CommandOutput(0, "Pixel_10\nOK\n")
-        "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
-        "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
-        "forward --list" in j ->
-          CommandOutput(0, "emulator-5554 tcp:18991 localabstract:adp-render-sandbox\n")
-        else -> CommandOutput(0, "OK\n")
-      }
-    }
-    val readyCache = tmp.resolve("c3")
-    val readyDm =
-      DeviceManager(
-        cacheRoot = readyCache,
-        env = envWithBootstrap,
-        runner = readyRunner,
-        pingFn = { DevicePingResponse(ok = true, pid = 77) },
-        sleepFn = {},
-      )
-    val stubHttp =
-      com.sun.net.httpserver.HttpServer.create(
-        java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0),
-        0,
-      )
-    val id = RuntimeIdentity.compute(envWithBootstrap)
-    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
-    stubHttp.createContext("/api/status") { ex ->
-      val body =
-        bot.charlies.androiddesign.preview.model.PreviewJson.compact.encodeToString(
-          StatusResponse.serializer(),
-          StatusResponse(
-            pid = 999_999_999L,
-            port = stubHttp.address.port,
-            jarVersion = bot.charlies.androiddesign.preview.app.AppInfo.VERSION,
-            startedAt = System.currentTimeMillis(),
-            compileCount = 0,
-            repoRoot = repo.toString(),
-            boardUrl = "http://127.0.0.1:${stubHttp.address.port}",
-            backend = id.backend,
-            runtimeHash = id.runtimeHash,
-            deviceSerial = "emulator-5554",
-            adbForwardPort = 18991,
-          ),
-        )
-      val bytes = body.toByteArray(StandardCharsets.UTF_8)
-      ex.sendResponseHeaders(200, bytes.size.toLong())
-      ex.responseBody.use { it.write(bytes) }
-    }
-    stubHttp.start()
-    try {
-      ServerPaths.writeRecord(
-        ServerPaths.sharedRecordPath(readyCache),
-        ServerRecord(
-          pid = 999_999_999L,
-          port = stubHttp.address.port,
-          viewToken = "vt",
-          clientSecret = "sec",
-          jarVersion = bot.charlies.androiddesign.preview.app.AppInfo.VERSION,
-          startedAt = System.currentTimeMillis(),
-          repoRoot = repo.toString(),
-          backend = id.backend,
-          runtimeHash = id.runtimeHash,
-          deviceSerial = "emulator-5554",
-          apkSha256 = id.apkSha256,
-        ),
-      )
-      val okOut = ByteArrayOutputStream()
-      val okCode =
-        StartCommand(
-            readyCache,
-            envWithBootstrap,
-            deviceManager = readyDm,
-            bootstrapLocator = { meta },
-          )
-          .run(listOf(repo.toString()), PrintStream(okOut), PrintStream(ByteArrayOutputStream()))
-      assertEquals(ClientExitCode.OK, okCode, okOut.toString(StandardCharsets.UTF_8))
-      val jsonStr = okOut.toString(StandardCharsets.UTF_8).trim()
-      val parsedResp =
-        bot.charlies.androiddesign.preview.model.PreviewJson.compact.decodeFromString(
-          StartCommand.StartResponse.serializer(),
-          jsonStr,
-        )
-      assertTrue(parsedResp.ok, jsonStr)
-      assertEquals("emulator-5554", parsedResp.serial)
-      assertEquals(18991, parsedResp.forwardPort)
-    } finally {
-      stubHttp.stop(0)
-    }
   }
 
   @Test
@@ -470,13 +322,13 @@ class DeviceManagerTest {
       )
     val bootRes =
       assertIs<DeviceSetupResult.Ready>(
-        dmBoot.ensureDeviceReady(meta, requestedAvd = "Target_AVD", headless = true),
+        dmBoot.ensureDeviceReady(meta, requestedAvd = "Target_AVD"),
       )
     assertEquals("emulator-5562", bootRes.serial)
     assertEquals("Target_AVD", bootRes.avdName)
     assertTrue(
       cmdsBoot.any {
-        "emulator start --headless Target_AVD" in it.joinToString(" ")
+        "emulator start Target_AVD" in it.joinToString(" ")
       },
     )
 
@@ -568,7 +420,7 @@ class DeviceManagerTest {
           FakeProcess()
         },
       )
-    assertIs<DeviceSetupResult.Ready>(dm.ensureDeviceReady(meta, headless = true))
+    assertIs<DeviceSetupResult.Ready>(dm.ensureDeviceReady(meta))
     assertEquals(
       listOf(
         emulatorBin.toString(),
@@ -577,7 +429,6 @@ class DeviceManagerTest {
         "-gpu",
         "host",
         "-no-snapshot-save",
-        "-no-window",
       ),
       cmds.first { it.first() == emulatorBin.toString() },
     )
@@ -928,7 +779,7 @@ class DeviceManagerTest {
     assertIs<DeviceSetupResult.Ready>(dm.ensureDeviceReady(meta))
     val stopIdx = commands.indexOfFirst { "am force-stop ${DeviceManager.HOST_PACKAGE}" in it }
     val startIdx = commands.indexOfFirst {
-      "am start -W -n ${DeviceManager.HOST_RENDER_ACTIVITY}" in it
+      "am start -W -n ${DeviceManager.LIVE_ACTIVITY}" in it
     }
     assertTrue(stopIdx >= 0, "expected force-stop in $commands")
     assertTrue(startIdx > stopIdx, "expected relaunch after force-stop in $commands")
@@ -995,5 +846,111 @@ class DeviceManagerTest {
       )
     assertTrue(dm.restartSandboxOnSerial("emulator-5554"))
     assertFalse(commands.any { "force-stop" in it })
+  }
+
+  @Test
+  fun `AndroidLiveSessionHost tears down active session cleanly when updateIfActive hits transport IOException`(
+    @TempDir tmp: Path,
+  ) {
+    val meta = fakeBootstrap(tmp.resolve("b"), "apk-live-teardown")
+    val env = fakeToolsEnv(tmp)
+    val repo = tmp.resolve("repo").also { Files.createDirectories(it.resolve(".git")) }
+    val source = repo.resolve("Board.explore.kt").also { Files.writeString(it, "val x = 1\n") }
+    val cache = tmp.resolve("cache")
+    val runner = ExternalCommandRunner { cmd, _, _ ->
+      val j = cmd.joinToString(" ")
+      when {
+        cmd.getOrNull(1) == "devices" ->
+          CommandOutput(0, "List of devices attached\nemulator-5554\tdevice\n")
+        "emu avd name" in j -> CommandOutput(0, "Pixel_Phone\nOK\n")
+        "getprop sys.boot_completed" in j -> CommandOutput(0, "1\n")
+        "pm path" in j -> CommandOutput(0, "package:/data/app/host.apk\n")
+        "forward --list" in j ->
+          CommandOutput(0, "emulator-5554 tcp:18997 localabstract:adp-render-sandbox\n")
+        else -> CommandOutput(0, "OK\n")
+      }
+    }
+    var setLiveCalls = 0
+    var transportClosed = false
+    val fakeTransport =
+      object : DeviceTransport {
+        override fun ping(): DevicePingResponse = DevicePingResponse(pid = 7)
+
+        override fun syncAssets(assetBlobs: Map<String, ByteArray>): Int = 0
+
+        override fun setLive(
+          dexBytes: ByteArray?,
+          request: DeviceLiveStateRequest,
+          assetBlobs: Map<String, ByteArray>,
+        ): Boolean {
+          setLiveCalls++
+          if (setLiveCalls >= 2) throw IOException("device disconnected")
+          return true
+        }
+
+        override fun close() {
+          transportClosed = true
+        }
+      }
+    val host =
+      AndroidLiveSessionHost(
+        meta = meta,
+        cacheRoot = cache,
+        env = env,
+        deviceManagerFactory = {
+          DeviceManager(
+            cacheRoot = cache,
+            env = env,
+            runner = runner,
+            pingFn = { DevicePingResponse(pid = 7) },
+            sleepFn = {},
+          )
+        },
+        pingForwardFn = { DevicePingResponse(pid = 7) },
+        dexLowerer = { _, _, _ ->
+          AndroidExplorationCompiler.DexLowering.Ready(byteArrayOf(1, 2, 3, 4))
+        },
+        transportFactory = { _, _, _ -> fakeTransport },
+      )
+    val entry =
+      CompileEntry(
+        sourcePath = source,
+        designPath = null,
+        contentHash = "hash-1",
+        loaded =
+          LoadedExploration(
+            sourcePath = source,
+            designPath = null,
+            designTheme = null,
+            designSystem = DesignSystemResolver.resolve(null, null),
+            compileMs = 1L,
+            errors = emptyList(),
+          ),
+        fromCache = false,
+        compileCountAtLoad = 1,
+        compiledData =
+          CompiledBoardData(
+            sourceFile = "Board.explore.kt",
+            sourceText = "val x = 1\n",
+            entryClass = "BoardKt",
+            classBytes = mapOf("BoardKt.class" to byteArrayOf(1)),
+            classBundleBytes = byteArrayOf(1),
+            classHash = "cls-1",
+            explorationDir = repo,
+          ),
+      )
+
+    val started = host.startSession(serial = null, avd = null, entry = entry, update = null)
+    val ready = assertIs<LiveSessionStartResult.Ready>(started)
+    assertEquals("emulator-5554", ready.serial)
+    assertTrue(host.isActive)
+
+    // Subsequent update hits IOException from closed emulator/device -> must not throw and must
+    // tear down the active session cleanly.
+    host.updateIfActive(entry, LivePreviewUpdate(direction = "Editorial"))
+    assertTrue(transportClosed)
+    assertFalse(host.isActive)
+    assertNull(host.deviceSerial)
+    assertNull(host.adbForwardPort)
   }
 }

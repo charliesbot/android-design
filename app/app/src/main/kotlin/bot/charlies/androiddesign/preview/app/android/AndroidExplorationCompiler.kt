@@ -334,11 +334,18 @@ object AndroidExplorationCompiler {
     )
   }
 
-  private sealed interface DexLowering {
+  sealed interface DexLowering {
     data class Ready(val dexBytes: ByteArray) : DexLowering
 
     data class Failed(val errors: List<ValidationError>) : DexLowering
   }
+
+  /** Lowers compiled JVM classes to DEX on demand (for opt-in live mode). */
+  fun lowerClassesToDex(
+    fileName: String,
+    classBytes: Map<String, ByteArray>,
+    meta: BootstrapMeta,
+  ): DexLowering = lowerToDex(fileName, classBytes, meta)
 
   private fun lowerToDex(
     fileName: String,

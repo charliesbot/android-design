@@ -32,8 +32,6 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
 
   fun prepare() = worker.prepare()
 
-  fun updateLive(entry: CompileEntry, update: LivePreviewUpdate) = worker.updateLive(entry, update)
-
   override fun close() = worker.close()
 
   fun compile(snapshot: ContentHasher.Snapshot): BackendCompileOutput =
@@ -101,7 +99,7 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
           overlayId = t.overlayId,
           densityScale = densityScale.toFloat(),
           fontScale = 1f,
-          frameFormat = if (wantFrame) FrameFormat.LZ4_RGBA else FrameFormat.NONE,
+          frameFormat = if (wantFrame) FrameFormat.RAW_RGBA else FrameFormat.NONE,
           includeEndFrame = wantFrame,
         )
       }
@@ -156,7 +154,7 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
   }
 
   /**
-   * Renders every target in [targets] as a single view-grouped LZ4 PNG batch for [ReportRenderer],
+   * Renders every target in [targets] as a single view-grouped PNG batch for [ReportRenderer],
    * evaluating overlays against their base screens and returning artifacts in [targets] order
    * without writing cache files.
    */
@@ -177,7 +175,7 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
           overlayId = t.overlayId,
           densityScale = densityScale.toFloat(),
           fontScale = 1f,
-          frameFormat = FrameFormat.LZ4_RGBA,
+          frameFormat = FrameFormat.RAW_RGBA,
           includeEndFrame = true,
         )
       }
@@ -266,14 +264,8 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
   fun renderSingle(entry: CompileEntry, request: SingleRenderRequest): RenderArtifact =
     withCheckLifecycle {
       val surfaceSpec = surfaceSpecFor(entry.surface)
-      val effectiveFormat =
-        if (request.writeFiles && request.frameFormat == FrameFormat.WEBP_LOSSLESS) {
-          FrameFormat.LZ4_RGBA
-        } else {
-          request.frameFormat
-        }
-      val fallbackMime =
-        if (effectiveFormat == FrameFormat.WEBP_LOSSLESS) "image/webp" else "image/png"
+      val effectiveFormat = request.frameFormat
+      val fallbackMime = "image/png"
       val target =
         DeviceRenderTarget(
           direction = request.direction,
@@ -435,7 +427,7 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
           overlayId = spec.overlayId,
           densityScale = densityScale.toFloat(),
           fontScale = 1f,
-          frameFormat = FrameFormat.LZ4_RGBA,
+          frameFormat = FrameFormat.RAW_RGBA,
           includeEndFrame = true,
         )
       }

@@ -143,11 +143,12 @@ A new variant or configuration on an existing page shows up as that page's diff 
 
 A component omitted as `no-compose-api` can become possible on a material3 upgrade. Upgrades already regenerate `scripts/material3-inventory.txt` with `material3_inventory.py`, so the upgrade's inventory diff lists every new public name. On each upgrade, read the added top-level names against the `no-compose-api` omissions and against Material components composed from parts (modal side sheet, full-screen dialog, full-screen date picker): a dedicated composable replaces the composition. Also read them against the in-page variant gaps, which no omission records: today the carousel's uncontained multi-aspect ratio layout and vertical full-screen feeds (listed under Carousel above). A new carousel API means drawing them.
 
-The previewer and compile sandbox both pin the same AndroidX `material3` version in `app/gradle/libs.versions.toml`, so any new composable added there is available in both headless Robolectric and live device renders. A component can join the catalog once its AndroidX `material3` composables ship.
+The previewer and compile sandbox both pin the same AndroidX `material3` version in `app/gradle/libs.versions.toml`, so any new composable added there is available in both layoutlib and live device renders. A component can join the catalog once its AndroidX `material3` composables ship.
 
 ## Links
 
-- [Visual design exploration v6](visual-design-exploration-v6.md): current Code-First Compose exploration architecture
+- [Visual design exploration v7](visual-design-exploration-v7.md): current Code-First Compose exploration architecture
+- [Visual design exploration v6](../archive/visual-design-exploration-v6.md): historical v6 Android Host APK offscreen architecture
 - [Visual design exploration v3](../archive/visual-design-exploration-v3.md): historical v3 previewer fidelity bar and catalog architecture
 - [Material 3 components research](../research/material-3-components.md): the distilled usage rules per component
 - [compose-signatures.md](../../plugin/skills/android-design-explore/references/compose-signatures.md): verified Material 3 and Wear M3 Compose API signatures

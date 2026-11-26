@@ -2,6 +2,7 @@ package bot.charlies.androiddesign.preview.app.server
 
 import bot.charlies.androiddesign.preview.app.AppInfo
 import bot.charlies.androiddesign.preview.app.cli.ReportTheme
+import bot.charlies.androiddesign.preview.app.client.ClientExitCode
 import bot.charlies.androiddesign.preview.model.BoardSurface
 import bot.charlies.androiddesign.preview.model.FrameFormat
 import bot.charlies.androiddesign.preview.model.LayoutNode
@@ -51,14 +52,10 @@ class PreviewHttpServer(
   private val warmBudgetMs: Long = Watchdog.WARM_BUDGET_MS,
   private val worker: RenderWorker,
   private val runtimeIdentity: RuntimeIdentity? = null,
-  private val deviceSerial: String? = null,
-  private val adbForwardPort: Int? = null,
-  private val apkSha256: String? = null,
-  private val ownedEmulatorSerial: String? = null,
+  private val liveSessionHost: LiveSessionHost = NoOpLiveSessionHost,
   private val onWatchdogHalt: () -> Unit = { Runtime.getRuntime().halt(1) },
   private val onProcessExit: (() -> Unit)? = null,
   private val enableFileWatcher: Boolean = true,
-  private val onLaunchLiveActivity: () -> Unit = {},
 ) {
   data class FocusTarget(
     val direction: String,
@@ -323,10 +320,6 @@ class PreviewHttpServer(
       runtimeHash = runtimeIdentity?.runtimeHash,
       sourceDir = runtimeIdentity?.sourceDir,
       backend = executor.name,
-      deviceSerial = deviceSerial,
-      adbForwardPort = adbForwardPort,
-      apkSha256 = apkSha256 ?: runtimeIdentity?.apkSha256,
-      ownedEmulatorSerial = ownedEmulatorSerial,
     )
 
   fun stop(triggerExit: Boolean = false) {
@@ -349,6 +342,7 @@ class PreviewHttpServer(
     }
     httpServer = null
     runCatching { executor.close() }
+    runCatching { liveSessionHost.close() }
     pendingLiveUpdate.set(null)
     liveUpdateExecutor.shutdownNow()
     httpExecutor.shutdownNow()
@@ -511,7 +505,7 @@ class PreviewHttpServer(
           baseCheck = null,
           priority = prio,
           writeFiles = false,
-          frameFormat = FrameFormat.WEBP_LOSSLESS,
+          frameFormat = FrameFormat.RAW_RGBA,
         )
       if (idx == 0) {
         fut.whenComplete { _, _ -> maybeScheduleRecycle() }
@@ -634,8 +628,8 @@ class PreviewHttpServer(
         activeFile = reqRepo?.activeSourcePath?.toString(),
         backend = executor.name,
         runtimeHash = runtimeIdentity?.runtimeHash,
-        deviceSerial = deviceSerial,
-        adbForwardPort = adbForwardPort,
+        deviceSerial = liveSessionHost.deviceSerial,
+        adbForwardPort = liveSessionHost.adbForwardPort,
         activeRepos = repos.values.map { it.repoRoot.toString() }.sorted(),
       )
     sendRawJson(
@@ -710,33 +704,85 @@ class PreviewHttpServer(
 
     val src = targetPath ?: state.activeSourcePath
     val entry = src?.let { renderQueue.latestCompiled(state.repoRoot, it) }
-    if (entry != null && entry.boardMeta != null) {
-      val dir =
-        req.direction
-          ?: state.currentFocus?.direction
-          ?: entry.boardMeta.directions.firstOrNull()?.name
-      val screen =
-        req.screen
-          ?: state.currentFocus?.screen
-          ?: entry.boardMeta.directions.firstOrNull { it.name == dir }?.startScreen
-      val ov = req.overlay ?: state.currentFocus?.overlay
-      runLiveUpdateSync(
-        entry = entry,
-        update =
-          LivePreviewUpdate(
-            direction = dir,
-            screenId = screen,
-            overlayId = ov,
-          ),
-      )
+    val liveUpdate =
+      if (entry != null && entry.boardMeta != null) {
+        val dir =
+          req.direction
+            ?: state.currentFocus?.direction
+            ?: entry.boardMeta.directions.firstOrNull()?.name
+        val screen =
+          req.screen
+            ?: state.currentFocus?.screen
+            ?: entry.boardMeta.directions.firstOrNull { it.name == dir }?.startScreen
+        val ov = req.overlay ?: state.currentFocus?.overlay
+        LivePreviewUpdate(
+          direction = dir,
+          screenId = screen,
+          overlayId = ov,
+        )
+      } else {
+        null
+      }
+
+    if (req.startLive) {
+      when (
+        val started =
+          liveSessionHost.startSession(
+            serial = req.serial,
+            avd = req.avd,
+            entry = entry,
+            update = liveUpdate,
+          )
+      ) {
+        is LiveSessionStartResult.Failed -> {
+          val httpStatus =
+            when (started.exitCode) {
+              ClientExitCode.USAGE -> 400
+              ClientExitCode.NOT_READY -> 503
+              else -> 500
+            }
+          sendJson(
+            exchange,
+            httpStatus,
+            ErrorEnvelope(error = started.error, message = started.message),
+          )
+        }
+        is LiveSessionStartResult.Ready -> {
+          sendRawJson(
+            exchange,
+            200,
+            PreviewJson.compact.encodeToString(
+              LiveFocusResponse.serializer(),
+              LiveFocusResponse(
+                ok = true,
+                repoId = state.repoId,
+                boardUrl = boardUrl(state.repoRoot),
+                deviceSerial = started.serial,
+                adbForwardPort = started.forwardPort,
+              ),
+            ),
+          )
+        }
+      }
+      return
     }
-    if (req.launchActivity) {
-      runCatching { onLaunchLiveActivity() }
+
+    if (liveSessionHost.isActive && entry != null && liveUpdate != null) {
+      runLiveUpdateSync(entry = entry, update = liveUpdate)
     }
     sendRawJson(
       exchange,
       200,
-      """{"ok":true,"repoId":"${state.repoId}","boardUrl":"${boardUrl(state.repoRoot)}"}""",
+      PreviewJson.compact.encodeToString(
+        LiveFocusResponse.serializer(),
+        LiveFocusResponse(
+          ok = true,
+          repoId = state.repoId,
+          boardUrl = boardUrl(state.repoRoot),
+          deviceSerial = liveSessionHost.deviceSerial,
+          adbForwardPort = liveSessionHost.adbForwardPort,
+        ),
+      ),
     )
   }
 
@@ -1251,7 +1297,7 @@ class PreviewHttpServer(
             baseCheck = null,
             priority = QueuePriority.BOARD_FOCUS,
             writeFiles = false,
-            frameFormat = FrameFormat.WEBP_LOSSLESS,
+            frameFormat = FrameFormat.RAW_RGBA,
           )
           .get()
       } else {
@@ -1269,7 +1315,7 @@ class PreviewHttpServer(
           overlayId = overlayId,
           view = effectiveView,
           densityScale = 2,
-          frameFormat = FrameFormat.WEBP_LOSSLESS,
+          frameFormat = FrameFormat.RAW_RGBA,
           fontScale = fontScale,
           seedOverride = req.seed,
           variantOverride = variantOverride?.wire,
@@ -1278,7 +1324,7 @@ class PreviewHttpServer(
       }
 
     liveOwnerRepoId = state.repoId
-    executor.updateLive(
+    scheduleLiveUpdate(
       entry = entry,
       LivePreviewUpdate(
         direction = dir.name,
@@ -1331,7 +1377,7 @@ class PreviewHttpServer(
     liveOwnerRepoId = state.repoId
     state.activeSourcePath?.let { src ->
       renderQueue.latestCompiled(state.repoRoot, src)?.let { entry ->
-        executor.updateLive(
+        scheduleLiveUpdate(
           entry = entry,
           LivePreviewUpdate(
             direction = req.direction,
@@ -1490,13 +1536,13 @@ class PreviewHttpServer(
   }
 
   private fun runLiveUpdateSync(entry: CompileEntry, update: LivePreviewUpdate) {
-    if (closed.get() || replacementSignal.isDone) return
+    if (closed.get() || replacementSignal.isDone || !liveSessionHost.isActive) return
     pendingLiveUpdate.set(null)
     val future =
       try {
         liveUpdateExecutor.submit {
-          if (closed.get() || replacementSignal.isDone) return@submit
-          executor.updateLive(entry, update)
+          if (closed.get() || replacementSignal.isDone || !liveSessionHost.isActive) return@submit
+          runCatching { liveSessionHost.updateIfActive(entry, update) }
         }
       } catch (_: RejectedExecutionException) {
         return
@@ -1512,13 +1558,13 @@ class PreviewHttpServer(
   }
 
   private fun scheduleLiveUpdate(entry: CompileEntry, update: LivePreviewUpdate) {
-    if (closed.get() || replacementSignal.isDone) return
+    if (closed.get() || replacementSignal.isDone || !liveSessionHost.isActive) return
     pendingLiveUpdate.set(entry to update)
     runCatching {
       liveUpdateExecutor.execute {
-        if (closed.get() || replacementSignal.isDone) return@execute
+        if (closed.get() || replacementSignal.isDone || !liveSessionHost.isActive) return@execute
         val next = pendingLiveUpdate.getAndSet(null) ?: return@execute
-        runCatching { executor.updateLive(next.first, next.second) }
+        runCatching { liveSessionHost.updateIfActive(next.first, next.second) }
       }
     }
   }

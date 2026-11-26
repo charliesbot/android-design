@@ -207,12 +207,6 @@ object DeviceWireCodec {
     return SetLiveWireRequest(dexBytes = dexBytes, request = request)
   }
 
-  /** Writes and flushes a [DeviceOp.RECYCLE] request frame. */
-  fun writeRecycleRequest(out: DataOutputStream) {
-    out.writeByte(DeviceOp.RECYCLE)
-    out.flush()
-  }
-
   /** Writes and flushes a [DeviceAckResponse] JSON packet. */
   fun writeAck(out: DataOutputStream, response: DeviceAckResponse) {
     writeJson(out, DeviceAckResponse.serializer(), response)

@@ -11,7 +11,6 @@ dependencies {
   implementation(project(":core:domain"))
   implementation(project(":core:data"))
   implementation(libs.kotlin.compiler.embeddable)
-  implementation(libs.lz4.java)
   testImplementation(kotlin("test"))
   testImplementation(libs.kotlinx.coroutines.test)
 }

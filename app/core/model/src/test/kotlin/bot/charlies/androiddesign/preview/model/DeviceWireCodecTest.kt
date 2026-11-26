@@ -132,13 +132,13 @@ class DeviceWireCodecTest {
         sourceText = "val preview = ...",
         targets =
           listOf(
-            DeviceRenderTarget("Dir", "home", "light", frameFormat = FrameFormat.LZ4_RGBA),
+            DeviceRenderTarget("Dir", "home", "light", frameFormat = FrameFormat.RAW_RGBA),
             DeviceRenderTarget(
               "Dir",
               "home",
               "dark",
               overlayId = "sheet",
-              frameFormat = FrameFormat.WEBP_LOSSLESS,
+              frameFormat = FrameFormat.NONE,
             ),
           ),
       )
@@ -157,7 +157,7 @@ class DeviceWireCodecTest {
               viewName = "light",
               tree = tree,
               hasFrame = true,
-              frameFormat = FrameFormat.LZ4_RGBA,
+              frameFormat = FrameFormat.RAW_RGBA,
             ),
           ),
       )
@@ -169,23 +169,11 @@ class DeviceWireCodecTest {
           viewName = "light",
           overlayId = null,
           isEndFrame = false,
-          format = FrameFormat.LZ4_RGBA,
+          format = FrameFormat.RAW_RGBA,
           widthPx = 411,
           heightPx = 923,
           rawLength = 411 * 923 * 4,
           payload = byteArrayOf(1, 2, 3),
-        ),
-        DeviceWireFrame(
-          direction = "Dir",
-          screen = "home",
-          viewName = "dark",
-          overlayId = "sheet",
-          isEndFrame = true,
-          format = FrameFormat.WEBP_LOSSLESS,
-          widthPx = 411,
-          heightPx = 923,
-          rawLength = 411 * 923 * 4,
-          payload = byteArrayOf(4, 5),
         ),
         DeviceWireFrame(
           direction = "Dir",
@@ -223,7 +211,7 @@ class DeviceWireCodecTest {
   }
 
   @Test
-  fun `SET_LIVE, RECYCLE, and special-character error ack round-trip cleanly`() {
+  fun `SET_LIVE and special-character error ack round-trip cleanly`() {
     val liveReq =
       DeviceLiveStateRequest(dexHash = "h1", entryClass = "C", direction = "Dir", screen = "home")
     val errAck = DeviceAckResponse(ok = false, error = "Line 1\n\"quoted\" \\ backslash")
@@ -233,8 +221,6 @@ class DeviceWireCodecTest {
       DeviceWireCodec.writeAck(out, DeviceAckResponse(ok = true))
       DeviceWireCodec.writeSetLiveRequest(out, byteArrayOf(7), liveReq)
       DeviceWireCodec.writeAck(out, errAck)
-      DeviceWireCodec.writeRecycleRequest(out)
-      DeviceWireCodec.writeAck(out, DeviceAckResponse(ok = true))
     }
 
     assertEquals(DeviceOp.SET_LIVE, DeviceWireCodec.readOpOrNull(inp))
@@ -247,9 +233,6 @@ class DeviceWireCodecTest {
     val live2 = DeviceWireCodec.readSetLiveRequest(inp)
     assertContentEquals(byteArrayOf(7), live2.dexBytes)
     assertEquals(errAck, DeviceWireCodec.readAck(inp))
-
-    assertEquals(DeviceOp.RECYCLE, DeviceWireCodec.readOpOrNull(inp))
-    assertEquals(DeviceAckResponse(ok = true), DeviceWireCodec.readAck(inp))
   }
 
   @Test
