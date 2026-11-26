@@ -53,7 +53,7 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
           surface = BoardSurface.Phone,
           boardName = null,
           boardMeta = null,
-          androidData = null,
+          compiledData = null,
           boardTheme = res.boardTheme,
         )
       is WorkerCompileResult.Ready -> {
@@ -75,7 +75,7 @@ class CheckExecutor(val worker: RenderWorker) : AutoCloseable {
           surface = boardSurface,
           boardName = res.boardMeta.boardName,
           boardMeta = toBoardMeta(res.boardMeta),
-          androidData = res.androidData,
+          compiledData = res.compiledData,
           boardTheme = res.boardTheme,
         )
       }

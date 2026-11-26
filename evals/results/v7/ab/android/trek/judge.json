@@ -1,0 +1,77 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The trip hero photo, Fraunces trek title, Day 1 plan card, packing progress/action, and itinerary stages establish a clear visual hierarchy without unrelated elements competing."
+  },
+  "R-fill": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Only the primary Packing list/Pack next item CTA button and matching Day 1 active accent use a saturated fill against neutral tonal surfaces."
+  },
+  "R-surfaces": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Calm surfaceContainerLow side panes and surfaceContainerHigh cards create distinct grouping while tonal container roles highlight state and key pills."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All interactive controls (back and share icon buttons, full-width primary pill button, FilterChips, and SegmentedListItems) look distinct and tappable with no floating text-only buttons."
+  },
+  "R-font": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Bundled Fraunces gives expressive weight to the Everest Base Camp Trek headline and large section titles while Google Sans Flex handles body/labels and Google Sans Code with tnum handles elevations and counts."
+  },
+  "R-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The layout follows Android Material 3 conventions with a TopAppBar back arrow, tonal share action, edge-to-edge Scaffold content, and SegmentedListItems free of iOS disclosure chevrons or Cancel/Done actions."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Across all five renders (light, dark, foldable, tablet, desktop), all labels, cards, chips, and itinerary rows remain unclipped and non-overlapping."
+  },
+  "R-dark": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "In main-dark.png, all icons, headings, body text, badges, progress indicator, and button labels have strong contrast against dark surfaces and light primary fills."
+  },
+  "R-adaptive": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The layout adapts across breakpoints from a single-column phone view to side-by-side cards and two-column 6-day itinerary on foldable, a two-pane view revealing the Ascent profile and full packing checklist on tablet, and a three-pane layout on desktop."
+  },
+  "R-idea": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The Alpine Journal direction pairs Fraunces editorial titles and monospace elevation/distance readouts with a snowy camp hero, wavy packing progress indicator, Day 1 to Day 6 stage badges, and an elevation bar chart."
+  },
+  "R-semantics": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All section headings apply Modifier.semantics { heading() }, ItineraryRow uses SegmentedListItem(selected = ...), and packing rows use SegmentedListItem with Role.Checkbox semantics and Checkbox(onCheckedChange = null)."
+  },
+  "R-fields": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The proposal contains no text input or search fields."
+  },
+  "R-visibility": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Conditional panes, the ModalBottomSheet, and day-plan transitions use when/if blocks and AnimatedContent rather than zero-alpha hiding."
+  },
+  "R-blur": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The proposal uses no Modifier.blur anywhere."
+  },
+  "R-trek-forms": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Each content type uses a distinct form (cover photo with opaque tertiaryContainer countdown pill, summary card, wavy progress bar, Ascent profile bar chart, and segmented itinerary/checklist rows) and the text over the photo sits on a solid pill for clear legibility."
+  }
+}

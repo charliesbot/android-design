@@ -1,3 +1,6 @@
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.jvm.toolchain.JavaToolchainService
+
 plugins {
   alias(libs.plugins.kotlin.jvm)
   alias(libs.plugins.kotlin.serialization)
@@ -16,10 +19,17 @@ dependencies {
 // `run` gets an empty stdin by default; forward Gradle's own stdin so worker stdio tests work.
 tasks.withType<JavaExec>().configureEach { standardInput = System.`in` }
 
+val java21Launcher =
+  extensions.getByType<JavaToolchainService>().launcherFor {
+    languageVersion.set(JavaLanguageVersion.of(21))
+  }
+
 tasks.test {
   dependsOn(":host:exportBootstrap")
   useJUnitPlatform()
   maxHeapSize = "3072m"
+  systemProperty("adp.java21.bin", java21Launcher.get().executablePath.asFile.absolutePath)
+  systemProperty("adp.repo.root", rootProject.projectDir.parentFile.absolutePath)
   systemProperty("sun.net.http.allowRestrictedHeaders", "true")
   systemProperty(
     "preview.bin",

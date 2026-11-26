@@ -1,0 +1,77 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The album art, Fraunces track title 'Golden Hour', wavy playback slider, and oversized dark-olive Pause FilledIconButton clearly anchor the screen across all window sizes while header and panel actions stay subordinate."
+  },
+  "R-fill": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Only the oversized Play/Pause FilledIconButton carries a strong saturated primary fill, while secondary controls and panels use tonal containers or quiet surfaces."
+  },
+  "R-surfaces": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Calm warm off-white and dark olive-charcoal surfaces frame the player, while tonal surfaceContainerLow/High cards and sheets separate the floating toolbar, Up next strip, Queue, and Credits without competing fills."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Every control reads as a distinct tappable target: header IconButtons, tonal and primary transport buttons, IconToggleButtons inside the floating toolbar with separate selection pills, SegmentedListItems, and sheet close buttons."
+  },
+  "R-font": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The hero track title 'Golden Hour' and panel titleLarge headings use bundled Fraunces serif in bold weight with clear editorial intent, body and label text stay in Google Sans Flex, and timecodes and metadata chips use Google Sans Code with tabular figures."
+  },
+  "R-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Follows Android conventions throughout with edge-to-edge Surface rendering, icon-based minimize and cast controls in the top bar (no Cancel/Done text), and no iOS disclosure chevrons on Queue or Credits rows."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All text is crisp and unclipped across all 20 light, dark, foldable, tablet, and desktop renders, with lyrics wrapping cleanly and modal sheets on phone/foldable properly scoping overlays."
+  },
+  "R-dark": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "In all dark renders (main-dark and the three dark sheet overlays), text, icons, wavy progress track, transport buttons, and list items maintain clear contrast against dark surfaces."
+  },
+  "R-adaptive": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The layout adapts purposefully across every size class: single-pane player on phone, added width-constrained Up next strip on foldable, two-pane player plus side Queue/panel and vertical floating toolbar on tablet, and three-pane Lyrics + Player + Queue/Credits workspace on desktop."
+  },
+  "R-idea": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The 'Botanical Vinyl' direction pairs an olive-forest content palette, Fraunces editorial typography, a live wavy playback progress bar with playhead indicator, and a morphing squircle Play/Pause button."
+  },
+  "R-semantics": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Panel section headings ('Lyrics', 'Queue', 'Credits') carry Modifier.semantics { heading() } and there are no toggling Switch, Checkbox, or RadioButton rows."
+  },
+  "R-fields": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The proposal contains no text input fields or search bars."
+  },
+  "R-visibility": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All conditional UI (the phone/foldable bottom sheet via if, the foldable Up next strip via if, and the tablet/desktop side panels via AnimatedVisibility, AnimatedContent, and if) leaves composition when hidden rather than fading alpha to zero."
+  },
+  "R-blur": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The proposal uses no Modifier.blur anywhere; overlays rely on a scrim and solid tonal sheet surfaces."
+  },
+  "R-music-actions": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Lyrics, Queue, and Credits are presented as three distinct, individually selectable IconToggleButtons inside a HorizontalFloatingToolbar on phone/foldable and a VerticalFloatingToolbar on tablet/desktop."
+  }
+}

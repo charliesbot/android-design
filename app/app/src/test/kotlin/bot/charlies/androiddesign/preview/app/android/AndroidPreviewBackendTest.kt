@@ -307,7 +307,7 @@ class AndroidPreviewBackendTest {
         surface = compiledOut.surface,
         boardName = compiledOut.boardName,
         boardMeta = compiledOut.boardMeta,
-        androidData = compiledOut.androidData,
+        compiledData = compiledOut.compiledData,
       )
 
     val lightView = PhoneSurface.views.first { it.name == "light" }

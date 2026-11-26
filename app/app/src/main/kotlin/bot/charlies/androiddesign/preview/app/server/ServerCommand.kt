@@ -22,7 +22,7 @@ class ServerCommand : Command {
   override val name = "server"
   override val usage =
     "server --repo <dir> [--preferred-port <port>] [--view-token <token>] [--idle-timeout-ms <ms>] " +
-      "[--backend android] [--runtime-hash <hash>] [--device-serial <id>] [--avd <name>] " +
+      "[--backend android|layoutlib] [--runtime-hash <hash>] [--device-serial <id>] [--avd <name>] " +
       "[--headless true|false] [--force-reinstall-apk true|false] [--owned-emulator-serial <id>]"
 
   override fun run(args: List<String>, out: PrintStream, err: PrintStream): Int {
@@ -63,13 +63,16 @@ class ServerCommand : Command {
     val backendMode =
       parsed.flags["--backend"]?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
         ?: RuntimeIdentity.resolveBackend()
-    if (backendMode != RuntimeIdentity.BACKEND_ANDROID) {
+    if (
+      backendMode != RuntimeIdentity.BACKEND_ANDROID &&
+        backendMode != RuntimeIdentity.BACKEND_LAYOUTLIB
+    ) {
       val msg =
         PreviewJson.compact.encodeToString(
           ErrorEnvelope.serializer(),
           ErrorEnvelope(
             error = "invalid_backend",
-            message = "Unsupported backend '$backendMode'; expected 'android'",
+            message = "Unsupported backend '$backendMode'; expected 'android' or 'layoutlib'",
           ),
         )
       out.println(msg)
@@ -87,10 +90,10 @@ class ServerCommand : Command {
     val runtimeIdentity = RuntimeIdentity.compute(env)
     val cacheRoot = ServerPaths.cacheRoot()
 
-    val worker: RenderWorker
     val deviceSerial: String?
     val forwardPort: Int?
     val apkSha256: String?
+    val ownedEmulatorSerial: String?
     val onLaunchLiveActivity: () -> Unit
     val recycleExecutor = Executors.newSingleThreadExecutor { r ->
       Thread(r, "android-design-sandbox-recycle").apply { isDaemon = true }
@@ -104,6 +107,7 @@ class ServerCommand : Command {
     val pendingInheritedSerial = AtomicReference<String?>(inheritedOwnedSerial)
     val emulatorLauncher = AtomicReference<DeviceManager?>(null)
     val runningServer = AtomicReference<PreviewHttpServer?>(null)
+    val runningWorker = AtomicReference<RenderWorker?>(null)
     val emulatorReleased = AtomicBoolean(false)
     val latch = CountDownLatch(1)
     val releaseLaunchedEmulator = {
@@ -123,6 +127,7 @@ class ServerCommand : Command {
       .addShutdownHook(
         Thread {
           runningServer.get()?.stop(triggerExit = false)
+          runCatching { runningWorker.get()?.close() }
           recycleExecutor.shutdownNow()
           releaseLaunchedEmulator()
           latch.countDown()
@@ -145,77 +150,111 @@ class ServerCommand : Command {
           recycleExecutor.shutdownNow()
           return ClientExitCode.NOT_READY
         }
-    val devMgr = DeviceManager(cacheRoot = cacheRoot)
-    emulatorLauncher.set(devMgr)
-    val headless = parsed.flags["--headless"].equals("true", ignoreCase = true)
-    val forceReinstall = parsed.flags["--force-reinstall-apk"].equals("true", ignoreCase = true)
-    out.println("startup: preparing Android device (boot, install, warm-up)")
-    out.flush()
-    val setup =
-      devMgr.ensureDeviceReady(
-        meta = meta,
-        requestedSerial = parsed.flags["--device-serial"],
-        requestedAvd = parsed.flags["--avd"],
-        headless = headless,
-        forceReinstall = forceReinstall,
-      )
-    when (setup) {
-      is DeviceSetupResult.Failed -> {
-        pendingInheritedSerial.getAndSet(null)?.let { serial ->
-          runCatching { devMgr.releaseEmulatorSerial(serial) }
-        }
+
+    val worker: RenderWorker
+    if (backendMode == RuntimeIdentity.BACKEND_LAYOUTLIB) {
+      out.println("startup: starting layoutlib render worker")
+      out.flush()
+      val layoutlibWorker = LayoutlibRenderWorker(meta = meta, env = env)
+      runningWorker.set(layoutlibWorker)
+      try {
+        layoutlibWorker.prepare()
+      } catch (t: Throwable) {
         val msg =
           PreviewJson.compact.encodeToString(
             ErrorEnvelope.serializer(),
-            ErrorEnvelope(error = setup.error, message = setup.message),
+            ErrorEnvelope(
+              error = "worker_start_failed",
+              message = t.message ?: "Failed starting layoutlib render worker",
+            ),
           )
         out.println(msg)
         err.println(msg)
+        runCatching { layoutlibWorker.close() }
         recycleExecutor.shutdownNow()
-        return setup.exitCode
+        return ClientExitCode.NOT_READY
       }
-      is DeviceSetupResult.Ready -> {
-        pendingInheritedSerial.getAndSet(null)?.let { serial ->
-          if (setup.serial == serial) {
-            devMgr.adoptOwnedEmulator(serial)
-          } else {
+      worker = layoutlibWorker
+      deviceSerial = null
+      forwardPort = null
+      apkSha256 = null
+      ownedEmulatorSerial = null
+      onLaunchLiveActivity = {}
+    } else {
+      val devMgr = DeviceManager(cacheRoot = cacheRoot)
+      emulatorLauncher.set(devMgr)
+      val headless = parsed.flags["--headless"].equals("true", ignoreCase = true)
+      val forceReinstall = parsed.flags["--force-reinstall-apk"].equals("true", ignoreCase = true)
+      out.println("startup: preparing Android device (boot, install, warm-up)")
+      out.flush()
+      val setup =
+        devMgr.ensureDeviceReady(
+          meta = meta,
+          requestedSerial = parsed.flags["--device-serial"],
+          requestedAvd = parsed.flags["--avd"],
+          headless = headless,
+          forceReinstall = forceReinstall,
+        )
+      when (setup) {
+        is DeviceSetupResult.Failed -> {
+          pendingInheritedSerial.getAndSet(null)?.let { serial ->
             runCatching { devMgr.releaseEmulatorSerial(serial) }
           }
+          val msg =
+            PreviewJson.compact.encodeToString(
+              ErrorEnvelope.serializer(),
+              ErrorEnvelope(error = setup.error, message = setup.message),
+            )
+          out.println(msg)
+          err.println(msg)
+          recycleExecutor.shutdownNow()
+          return setup.exitCode
         }
-        deviceSerial = setup.serial
-        forwardPort = setup.forwardPort
-        apkSha256 = setup.apkSha256
-        onLaunchLiveActivity = { devMgr.launchLiveActivity(setup.serial) }
-        val currentPort = AtomicInteger(setup.forwardPort)
-        lateinit var transport: AdbTcpDeviceTransport
-        transport =
-          AdbTcpDeviceTransport(
-            connectAndEnsurePort = {
-              val ping = DeviceManager.pingLocalForward(currentPort.get())
-              if (ping != null && ping.ok) {
-                currentPort.get()
-              } else {
-                val refreshed =
-                  devMgr.ensureDeviceReady(meta = meta, requestedSerial = setup.serial)
-                if (refreshed is DeviceSetupResult.Ready) {
-                  currentPort.set(refreshed.forwardPort)
-                  refreshed.forwardPort
-                } else {
+        is DeviceSetupResult.Ready -> {
+          pendingInheritedSerial.getAndSet(null)?.let { serial ->
+            if (setup.serial == serial) {
+              devMgr.adoptOwnedEmulator(serial)
+            } else {
+              runCatching { devMgr.releaseEmulatorSerial(serial) }
+            }
+          }
+          deviceSerial = setup.serial
+          forwardPort = setup.forwardPort
+          apkSha256 = setup.apkSha256
+          onLaunchLiveActivity = { devMgr.launchLiveActivity(setup.serial) }
+          val currentPort = AtomicInteger(setup.forwardPort)
+          lateinit var transport: AdbTcpDeviceTransport
+          transport =
+            AdbTcpDeviceTransport(
+              connectAndEnsurePort = {
+                val ping = DeviceManager.pingLocalForward(currentPort.get())
+                if (ping != null && ping.ok) {
                   currentPort.get()
+                } else {
+                  val refreshed =
+                    devMgr.ensureDeviceReady(meta = meta, requestedSerial = setup.serial)
+                  if (refreshed is DeviceSetupResult.Ready) {
+                    currentPort.set(refreshed.forwardPort)
+                    refreshed.forwardPort
+                  } else {
+                    currentPort.get()
+                  }
                 }
-              }
-            },
-            restartSandboxActivity = { devMgr.restartSandboxOnSerial(setup.serial) },
-          )
-        worker =
-          AndroidRenderWorker(
-            meta = meta,
-            transport = transport,
-            onRecycleRecommended = {
-              recycleExecutor.execute { runCatching { transport.recycle() } }
-            },
-          )
+              },
+              restartSandboxActivity = { devMgr.restartSandboxOnSerial(setup.serial) },
+            )
+          worker =
+            AndroidRenderWorker(
+              meta = meta,
+              transport = transport,
+              onRecycleRecommended = {
+                recycleExecutor.execute { runCatching { transport.recycle() } }
+              },
+            )
+          runningWorker.set(worker)
+        }
       }
+      ownedEmulatorSerial = devMgr.ownedEmulatorSerial()
     }
 
     val server =
@@ -233,7 +272,7 @@ class ServerCommand : Command {
         deviceSerial = deviceSerial,
         adbForwardPort = forwardPort,
         apkSha256 = apkSha256,
-        ownedEmulatorSerial = devMgr.ownedEmulatorSerial(),
+        ownedEmulatorSerial = ownedEmulatorSerial,
         onWatchdogHalt = watchdogHaltAction(releaseLaunchedEmulator),
         onProcessExit = { latch.countDown() },
         onLaunchLiveActivity = onLaunchLiveActivity,
@@ -249,6 +288,8 @@ class ServerCommand : Command {
     } catch (_: InterruptedException) {
       server.stop(triggerExit = false)
     } finally {
+      server.stop(triggerExit = false)
+      runCatching { worker.close() }
       recycleExecutor.shutdownNow()
       releaseLaunchedEmulator()
     }

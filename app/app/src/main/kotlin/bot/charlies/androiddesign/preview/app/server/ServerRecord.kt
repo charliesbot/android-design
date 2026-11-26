@@ -33,12 +33,15 @@ data class RuntimeIdentity(
 ) {
   companion object {
     const val BACKEND_ANDROID = "android"
+    const val BACKEND_LAYOUTLIB = "layoutlib"
     const val BACKEND_ENV = "ANDROID_DESIGN_PREVIEW_BACKEND"
     const val SRC_ENV = "ANDROID_DESIGN_PREVIEW_SRC"
     const val SERVER_CP_ENV = "ANDROID_DESIGN_PREVIEW_SERVER_CP"
+    const val WORKER_CP_ENV = "ANDROID_DESIGN_PREVIEW_WORKER_CP"
     const val RUNTIME_HASH_ENV = "ANDROID_DESIGN_PREVIEW_RUNTIME_HASH"
 
-    fun resolveBackend(env: Map<String, String> = System.getenv()): String = BACKEND_ANDROID
+    fun resolveBackend(env: Map<String, String> = System.getenv()): String =
+      env[BACKEND_ENV]?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: BACKEND_ANDROID
 
     fun compute(
       env: Map<String, String> = System.getenv(),
@@ -61,7 +64,15 @@ data class RuntimeIdentity(
       val serverCpFile =
         env[SERVER_CP_ENV]?.trim()?.takeIf { it.isNotBlank() }?.let(Path::of)
           ?: bootstrapDir?.resolve("server.cp")?.takeIf { Files.isRegularFile(it) }
-      val apkSha = runCatching { meta?.apkSha256OrCompute() }.getOrNull()
+      val workerCpFile =
+        env[WORKER_CP_ENV]?.trim()?.takeIf { it.isNotBlank() }?.let(Path::of)
+          ?: bootstrapDir?.resolve("worker.cp")?.takeIf { Files.isRegularFile(it) }
+      val apkSha =
+        if (backend == BACKEND_LAYOUTLIB) {
+          null
+        } else {
+          runCatching { meta?.apkSha256OrCompute() }.getOrNull()
+        }
 
       val overrideHash = env[RUNTIME_HASH_ENV]?.trim()?.takeIf { it.isNotBlank() }
       val runtimeHash =
@@ -94,6 +105,9 @@ data class RuntimeIdentity(
               feed("apk:$apkSha")
             }
             feedClasspath("cp", serverCpFile)
+            if (backend == BACKEND_LAYOUTLIB) {
+              feedClasspath("worker-cp", workerCpFile)
+            }
             append(digest.digest().joinToString("") { "%02x".format(it) }.take(24))
           }
 

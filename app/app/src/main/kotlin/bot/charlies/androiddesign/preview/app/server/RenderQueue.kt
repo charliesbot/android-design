@@ -62,7 +62,7 @@ data class CompileEntry(
   val surface: BoardSurface = BoardSurface.Phone,
   val boardName: String? = null,
   val boardMeta: BoardMeta? = null,
-  val androidData: AndroidCompiledData? = null,
+  val compiledData: CompiledBoardData? = null,
   val boardTheme: ThemeOverride? = null,
 )
 
@@ -358,7 +358,7 @@ class RenderQueue(
                   surface = output.surface,
                   boardName = output.boardName,
                   boardMeta = output.boardMeta,
-                  androidData = output.androidData,
+                  compiledData = output.compiledData,
                   boardTheme = output.boardTheme,
                 )
               synchronized(cacheLock) {
@@ -598,7 +598,7 @@ class RenderQueue(
     }
     val key = FileCacheKey(canonicalKey(entry.repoRoot), canonicalKey(entry.sourcePath))
     val renderKey = RenderKey(direction, screenId, overlayId, view.name, densityScale)
-    if (entry.androidData == null && entry.boardMeta == null) {
+    if (entry.compiledData == null && entry.boardMeta == null) {
       return CompletableFuture.failedFuture(IllegalStateException("Exploration is not compiled"))
     }
 

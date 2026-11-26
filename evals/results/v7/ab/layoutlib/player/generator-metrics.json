@@ -1,0 +1,34 @@
+{
+  "wall_seconds": 203.0,
+  "turns": 21,
+  "input_tokens": 113318,
+  "cache_read_tokens": 1275153,
+  "cache_creation_tokens": 0,
+  "output_tokens": 33331,
+  "cost": null,
+  "check_calls": 8,
+  "compile_retries": 0,
+  "skill_bytes_read": 60577,
+  "skill_read_calls": 4,
+  "skill_unique_files": 4,
+  "skill_files_read": {
+    "android-design-explore/SKILL.md": {
+      "reads": 1,
+      "bytes": 7773
+    },
+    "android-design-explore/references/compose-signatures.md": {
+      "reads": 1,
+      "bytes": 15764
+    },
+    "android-design/SKILL.md": {
+      "reads": 1,
+      "bytes": 26155
+    },
+    "android-design/references/wear-os.md": {
+      "reads": 1,
+      "bytes": 10885
+    }
+  },
+  "model": "gemini-4-hydrogen-high",
+  "backend": "antigravity"
+}

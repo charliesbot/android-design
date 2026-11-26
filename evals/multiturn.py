@@ -203,7 +203,7 @@ def _sum_optional(values, round_digits=None):
     return int(total) if all(isinstance(v, int) for v in nums) else round(float(total), 2)
 
 
-def aggregate_multiturn(turn_records, *, model=None, commit_sha=None, pipeline='v6', final_checks=None, captured_at=None):
+def aggregate_multiturn(turn_records, *, model=None, commit_sha=None, pipeline='v6', final_checks=None, captured_at=None, backend='claude', render_backend=None):
     """Aggregate per-turn records into session totals and per-turn means/medians."""
     merged_files = {}
     for rec in turn_records:
@@ -243,9 +243,9 @@ def aggregate_multiturn(turn_records, *, model=None, commit_sha=None, pipeline='
     final_checks_pass = None
     if isinstance(final_checks, dict):
         final_checks_pass = all(v.get('pass') is True for v in final_checks.values())
-    return {
+    payload = {
         'pipeline': pipeline,
-        'backend': 'claude',
+        'backend': backend,
         'model': resolved_model,
         'commit_sha': commit_sha,
         'captured_at': captured_at or datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
@@ -256,6 +256,9 @@ def aggregate_multiturn(turn_records, *, model=None, commit_sha=None, pipeline='
         'per_turn': per_turn,
         'turns': turn_records,
     }
+    if render_backend is not None:
+        payload['render_backend'] = render_backend
+    return payload
 
 
 def format_summary(report):
@@ -283,12 +286,71 @@ def format_summary(report):
     return '\n'.join(lines) + '\n'
 
 
-def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout=1200,
-                  binary=None, src=None, bdir=None, backend=DEFAULT_EVAL_BACKEND, cache_dir=None):
+def prepare_turns_manifest(out_dir, max_turns=None):
+    """Write turns.json with formatted prompts for driving multiturn in the current harness."""
     out_dir = Path(out_dir).resolve()
     prepare_multiturn(out_dir)
     revisions = REVISIONS[:max_turns] if max_turns is not None else REVISIONS
     total = len(revisions)
+    turns = []
+    for idx, (title, body) in enumerate(revisions, start=1):
+        prompt = (
+            first_turn_prompt(out_dir, body, total)
+            if idx == 1
+            else followup_turn_prompt(idx, total, title, body)
+        )
+        turns.append({'turn': idx, 'title': title, 'revision': body, 'prompt': prompt})
+    manifest = {
+        'proposal': str(out_dir / 'design' / 'proposal.explore.kt'),
+        'design_md': str(out_dir / 'DESIGN.md'),
+        'total_turns': total,
+        'turns': turns,
+    }
+    (out_dir / 'turns.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    return manifest
+
+
+def evaluate_multiturn_dir(out_dir, *, binary=None, src=None, bdir=None, backend=None, cache_dir=None):
+    """Render and run deterministic checks on an already-edited multiturn directory."""
+    out_dir = Path(out_dir).resolve()
+    resolved_backend = eval_run._resolve_backend(backend)
+    mcp_binary = app_binary() if binary is None else Path(binary)
+    resolved_src = preview_src() if src is None else Path(src)
+    resolved_bdir = bootstrap_dir() if bdir is None else Path(bdir)
+    if bdir is None:
+        server_cp()
+    with preview_server_session(
+        out_dir,
+        mcp_binary,
+        src=resolved_src,
+        bdir=resolved_bdir,
+        backend=resolved_backend,
+        cache_dir=cache_dir,
+        cache_prefix='eval-mt-eval',
+        stopper=eval_run._stop_preview_server,
+    ) as active_cache_dir:
+        images, render_error = eval_run.render(
+            out_dir,
+            binary=mcp_binary,
+            src=resolved_src,
+            bdir=resolved_bdir,
+            cache_dir=active_cache_dir,
+            backend=resolved_backend,
+        )
+    checks = run_checks(out_dir, 'phone')
+    if render_error:
+        checks['C-review'] = {'pass': False, 'detail': render_error}
+    (out_dir / 'checks.json').write_text(json.dumps(checks, indent=2) + '\n')
+    return checks, images
+
+
+def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout=1200,
+                  binary=None, src=None, bdir=None, backend=None, cache_dir=None):
+    out_dir = Path(out_dir).resolve()
+    prepare_multiturn(out_dir)
+    revisions = REVISIONS[:max_turns] if max_turns is not None else REVISIONS
+    total = len(revisions)
+    resolved_backend = eval_run._resolve_backend(backend)
     mcp_binary = app_binary() if binary is None else Path(binary)
     resolved_src = preview_src() if src is None else Path(src)
     resolved_bdir = bootstrap_dir() if bdir is None else Path(bdir)
@@ -303,7 +365,7 @@ def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout
         mcp_binary,
         src=resolved_src,
         bdir=resolved_bdir,
-        backend=backend,
+        backend=resolved_backend,
         cache_dir=cache_dir,
         cache_prefix='eval-mt',
         stopper=eval_run._stop_preview_server,
@@ -320,7 +382,7 @@ def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout
                 mcp_binary=mcp_binary,
                 preview_src=resolved_src,
                 bootstrap_dir=resolved_bdir,
-                preview_backend=backend,
+                preview_backend=resolved_backend,
                 cache_dir=active_cache_dir,
                 client_timeout_ms=120000,
                 resume_session=session_id,
@@ -347,6 +409,7 @@ def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout
             src=resolved_src,
             bdir=resolved_bdir,
             cache_dir=active_cache_dir,
+            backend=resolved_backend,
         )
     checks = run_checks(out_dir, 'phone')
     if render_error:
@@ -359,6 +422,7 @@ def run_multiturn(out_dir, *, model=None, max_turns=None, pipeline='v6', timeout
         commit_sha=_git_head_sha(),
         pipeline=pipeline,
         final_checks=checks,
+        render_backend=resolved_backend,
     )
     report['session_id'] = session_id
     report['rendered_images'] = len(images)
@@ -373,13 +437,26 @@ def main():
     parser.add_argument('--out', required=True, type=Path, help='Output directory for the fixture and turn artifacts')
     parser.add_argument('--model', help='Optional Claude model override')
     parser.add_argument('--turns', type=int, default=len(REVISIONS), help='Number of revision turns to run (default: 10)')
-    parser.add_argument('--pipeline', default='v6', choices=('v4', 'v5', 'v6'), help='Label recorded in the report')
+    parser.add_argument('--pipeline', default='v6', choices=('v4', 'v5', 'v6', 'v7'), help='Label recorded in the report')
+    parser.add_argument('--backend', choices=('android', 'layoutlib'), default=None, help='Render backend (default: ANDROID_DESIGN_PREVIEW_BACKEND or android)')
+    parser.add_argument('--prepare-only', action='store_true', help='Prepare fixture and write turns.json without invoking claude')
+    parser.add_argument('--evaluate-only', action='store_true', help='Render and check an existing prepared directory without invoking claude')
     parser.add_argument('--timeout', type=int, default=1200, help='Per-turn timeout in seconds')
     parser.add_argument('--write-baseline', type=Path, help='Copy aggregated metrics JSON to this committed baseline path')
     args = parser.parse_args()
     if args.turns < 1 or args.turns > len(REVISIONS):
         parser.error(f'--turns must be between 1 and {len(REVISIONS)}')
-    report = run_multiturn(args.out, model=args.model, max_turns=args.turns, pipeline=args.pipeline, timeout=args.timeout)
+    if args.prepare_only and args.evaluate_only:
+        parser.error('Use at most one of --prepare-only and --evaluate-only')
+    if args.prepare_only:
+        manifest = prepare_turns_manifest(args.out, max_turns=args.turns)
+        print(f"Prepared {manifest['total_turns']} turns in {args.out}: {manifest['proposal']}")
+        return 0
+    if args.evaluate_only:
+        checks, images = evaluate_multiturn_dir(args.out, backend=args.backend)
+        print(json.dumps({'rendered_images': len(images), 'checks': checks}, indent=2))
+        return 0 if all(v.get('pass') is True for v in checks.values()) else 1
+    report = run_multiturn(args.out, model=args.model, max_turns=args.turns, pipeline=args.pipeline, timeout=args.timeout, backend=args.backend)
     print(format_summary(report))
     if args.write_baseline:
         args.write_baseline.parent.mkdir(parents=True, exist_ok=True)

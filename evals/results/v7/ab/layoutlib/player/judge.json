@@ -1,0 +1,47 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The large central Pause button with its bright cyan primary fill and progress ring receives the strongest visual emphasis, clearly outranking the smaller tonal skip/volume buttons and leading episode title."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All five actions (skip back, pause, skip forward, volume down, volume up) appear as distinct filled or filled-tonal icon buttons with clear spacing and tappable shapes."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All visible text ('10:08', 'The Long Way Home', 'Slow Radio \u00b7 18:42', and '70%') wraps cleanly without clipping, overlap, or truncation in either render."
+  },
+  "R-wear-round": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All text and all five buttons stay inside the circular watch boundary on both the 204dp and 227dp renders, with visible black margin between every control and the round edge."
+  },
+  "R-wear-glance": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "The non-scrolling screen presents five separate action buttons at once (skip back, pause, skip forward, volume down, volume up), exceeding the ~3-action glanceability limit and vertically crowding the layout so the bottom volume buttons are compressed into ovals against the progress ring."
+  },
+  "R-wear-hero": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The central Pause control and progress ring form the largest hero element, while 'The Long Way Home' leads the top text in semibold white above readable muted secondary text ('Slow Radio \u00b7 18:42')."
+  },
+  "R-wear-sizes": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Both the 204dp small watch and 227dp large watch render cleanly with all core controls intact, and the large watch adds elapsed time ('18:42'), volume percentage ('70%'), and a larger center button without breaking."
+  },
+  "R-wear-color": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The background is pure black, the bright cyan primary color is reserved exclusively for the Pause button and progress indicator arc, and all secondary controls use dark neutral tonal containers."
+  },
+  "R-player-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Pause is the oversized primary control flanked by separate 'replay_10' and 'forward_30' icon buttons with reachable volume down/up buttons below, and both 'The Long Way Home' and 'Slow Radio' are fully readable without truncation."
+  }
+}

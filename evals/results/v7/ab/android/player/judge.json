@@ -1,0 +1,47 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The large central primary-filled pause button with its circular progress ring clearly dominates the visual hierarchy in both watch and watch-large renders, above the supporting title and subdued volume controls."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All five actions (skip back 10s, pause, skip forward 30s, volume down, and volume up) are rendered as distinct circular icon buttons with container fills and clear spacing between targets."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The curved time text, show name, episode title, and status line are all crisp, unclipped, untruncated, and do not overlap any other text or controls in either render."
+  },
+  "R-wear-round": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Every element, including the top episode title, outer skip buttons, and bottom volume buttons, sits comfortably inside the circular safe area with no edge clipping in either 204x204 or 227x227."
+  },
+  "R-wear-glance": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "The non-scrolling screen displays five simultaneous circular action buttons (skip back, pause, skip forward, volume down, and volume up), exceeding the rubric threshold of about three actions at once on a non-scrolling Wear screen."
+  },
+  "R-wear-hero": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The playback status hero (the oversized central pause button and progress indicator) is clearly the largest element on screen, and all title, show, and volume text remains high-contrast and readable."
+  },
+  "R-wear-sizes": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The small watch render is complete without cramping, and the watch-large render cleanly scales up the transport controls while adding the app prefix and elapsed/total time without breaking or dropping content."
+  },
+  "R-wear-color": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The background is pure black, saturated primary fill is reserved for the central pause button (with muted primary text on the show name), and secondary and volume buttons use tonal and neutral container roles."
+  },
+  "R-player-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Pause is clearly larger and more emphasized than the separate skip-back and skip-forward icon buttons, volume controls are present and reachable below, and both \"The Long Way Home\" and \"Slow Radio\" read cleanly without truncation."
+  }
+}

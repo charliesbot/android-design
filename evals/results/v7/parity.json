@@ -1,0 +1,676 @@
+{
+    "generatedAt": "2026-11-26T00:20:21.372103Z",
+    "avd": "Pixel_10_Pro_XL",
+    "toleranceDp": 0.6,
+    "totalTargets": 39,
+    "matchedTargets": 39,
+    "knownDifferenceCount": 15,
+    "unexplainedDifferenceCount": 0,
+    "fixtures": [
+        {
+            "fixture": "proposal",
+            "targetsTotal": 15,
+            "targetsMatched": 15,
+            "endTreesCompared": 0,
+            "maxBoundsDeltaDp": 0.0,
+            "maxInkDeltaDp": 0.0,
+            "maxTouchDeltaDp": 0.0,
+            "knownDifferenceCount": 0,
+            "unexplainedDifferenceCount": 0,
+            "targets": [
+                {
+                    "target": "Editorial split/list/light",
+                    "endTree": false,
+                    "nodesAndroid": 30,
+                    "nodesLayoutlib": 30,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Editorial split/list/dark",
+                    "endTree": false,
+                    "nodesAndroid": 30,
+                    "nodesLayoutlib": 30,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Editorial split/list/foldable",
+                    "endTree": false,
+                    "nodesAndroid": 30,
+                    "nodesLayoutlib": 30,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Editorial split/list/tablet",
+                    "endTree": false,
+                    "nodesAndroid": 47,
+                    "nodesLayoutlib": 47,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Editorial split/list/desktop",
+                    "endTree": false,
+                    "nodesAndroid": 47,
+                    "nodesLayoutlib": 47,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Editorial split/detail/light",
+                    "endTree": false,
+                    "nodesAndroid": 17,
+                    "nodesLayoutlib": 17,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Editorial split/detail/dark",
+                    "endTree": false,
+                    "nodesAndroid": 17,
+                    "nodesLayoutlib": 17,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Editorial split/detail/foldable",
+                    "endTree": false,
+                    "nodesAndroid": 17,
+                    "nodesLayoutlib": 17,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Editorial split/detail/tablet",
+                    "endTree": false,
+                    "nodesAndroid": 47,
+                    "nodesLayoutlib": 47,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Editorial split/detail/desktop",
+                    "endTree": false,
+                    "nodesAndroid": 47,
+                    "nodesLayoutlib": 47,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Quick pantry/pantry/light",
+                    "endTree": false,
+                    "nodesAndroid": 38,
+                    "nodesLayoutlib": 38,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Quick pantry/pantry/dark",
+                    "endTree": false,
+                    "nodesAndroid": 38,
+                    "nodesLayoutlib": 38,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Quick pantry/pantry/foldable",
+                    "endTree": false,
+                    "nodesAndroid": 38,
+                    "nodesLayoutlib": 38,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Quick pantry/pantry/tablet",
+                    "endTree": false,
+                    "nodesAndroid": 38,
+                    "nodesLayoutlib": 38,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Quick pantry/pantry/desktop",
+                    "endTree": false,
+                    "nodesAndroid": 38,
+                    "nodesLayoutlib": 38,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                }
+            ]
+        },
+        {
+            "fixture": "code-settings-bad",
+            "targetsTotal": 5,
+            "targetsMatched": 5,
+            "endTreesCompared": 0,
+            "maxBoundsDeltaDp": 0.0,
+            "maxInkDeltaDp": 0.0,
+            "maxTouchDeltaDp": 0.0,
+            "knownDifferenceCount": 0,
+            "unexplainedDifferenceCount": 0,
+            "targets": [
+                {
+                    "target": "Grouped/settings/light",
+                    "endTree": false,
+                    "nodesAndroid": 37,
+                    "nodesLayoutlib": 37,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Grouped/settings/dark",
+                    "endTree": false,
+                    "nodesAndroid": 37,
+                    "nodesLayoutlib": 37,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Grouped/settings/foldable",
+                    "endTree": false,
+                    "nodesAndroid": 37,
+                    "nodesLayoutlib": 37,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Grouped/settings/tablet",
+                    "endTree": false,
+                    "nodesAndroid": 37,
+                    "nodesLayoutlib": 37,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Grouped/settings/desktop",
+                    "endTree": false,
+                    "nodesAndroid": 37,
+                    "nodesLayoutlib": 37,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                }
+            ]
+        },
+        {
+            "fixture": "code-recipes-bad",
+            "targetsTotal": 5,
+            "targetsMatched": 5,
+            "endTreesCompared": 0,
+            "maxBoundsDeltaDp": 0.0,
+            "maxInkDeltaDp": 0.0,
+            "maxTouchDeltaDp": 0.0,
+            "knownDifferenceCount": 4,
+            "unexplainedDifferenceCount": 0,
+            "targets": [
+                {
+                    "target": "Featured first/discover/light",
+                    "endTree": false,
+                    "nodesAndroid": 24,
+                    "nodesLayoutlib": 24,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "known-difference"
+                },
+                {
+                    "target": "Featured first/discover/dark",
+                    "endTree": false,
+                    "nodesAndroid": 24,
+                    "nodesLayoutlib": 24,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "known-difference"
+                },
+                {
+                    "target": "Featured first/discover/foldable",
+                    "endTree": false,
+                    "nodesAndroid": 24,
+                    "nodesLayoutlib": 24,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "known-difference"
+                },
+                {
+                    "target": "Featured first/discover/tablet",
+                    "endTree": false,
+                    "nodesAndroid": 24,
+                    "nodesLayoutlib": 24,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "known-difference"
+                },
+                {
+                    "target": "Featured first/discover/desktop",
+                    "endTree": false,
+                    "nodesAndroid": 24,
+                    "nodesLayoutlib": 24,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                }
+            ]
+        },
+        {
+            "fixture": "wear",
+            "targetsTotal": 10,
+            "targetsMatched": 10,
+            "endTreesCompared": 2,
+            "maxBoundsDeltaDp": 0.0,
+            "maxInkDeltaDp": 0.0,
+            "maxTouchDeltaDp": 0.0,
+            "knownDifferenceCount": 8,
+            "unexplainedDifferenceCount": 0,
+            "targets": [
+                {
+                    "target": "Wear Fitness/main/watch",
+                    "endTree": false,
+                    "nodesAndroid": 17,
+                    "nodesLayoutlib": 17,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "known-difference"
+                },
+                {
+                    "target": "Wear Fitness/main/watch+end",
+                    "endTree": true,
+                    "nodesAndroid": 15,
+                    "nodesLayoutlib": 15,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "known-difference"
+                },
+                {
+                    "target": "Wear Fitness/main/watch-large",
+                    "endTree": false,
+                    "nodesAndroid": 17,
+                    "nodesLayoutlib": 17,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Wear Fitness/main/watch-large+end",
+                    "endTree": true,
+                    "nodesAndroid": 15,
+                    "nodesLayoutlib": 15,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Wear Fitness/main+confirm/watch",
+                    "endTree": false,
+                    "nodesAndroid": 16,
+                    "nodesLayoutlib": 16,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "known-difference"
+                },
+                {
+                    "target": "Wear Fitness/main+confirm/watch-large",
+                    "endTree": false,
+                    "nodesAndroid": 16,
+                    "nodesLayoutlib": 16,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Wear Fitness/curved/watch",
+                    "endTree": false,
+                    "nodesAndroid": 2,
+                    "nodesLayoutlib": 2,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Wear Fitness/curved/watch-large",
+                    "endTree": false,
+                    "nodesAndroid": 2,
+                    "nodesLayoutlib": 2,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Wear Fitness/date/watch",
+                    "endTree": false,
+                    "nodesAndroid": 1,
+                    "nodesLayoutlib": 1,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "known-difference"
+                },
+                {
+                    "target": "Wear Fitness/date/watch-large",
+                    "endTree": false,
+                    "nodesAndroid": 1,
+                    "nodesLayoutlib": 1,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "known-difference"
+                }
+            ]
+        },
+        {
+            "fixture": "overlays",
+            "targetsTotal": 4,
+            "targetsMatched": 4,
+            "endTreesCompared": 0,
+            "maxBoundsDeltaDp": 0.0,
+            "maxInkDeltaDp": 0.0,
+            "maxTouchDeltaDp": 0.0,
+            "knownDifferenceCount": 2,
+            "unexplainedDifferenceCount": 0,
+            "targets": [
+                {
+                    "target": "Editorial/home/light",
+                    "endTree": false,
+                    "nodesAndroid": 24,
+                    "nodesLayoutlib": 24,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Editorial/home+dialog/light",
+                    "endTree": false,
+                    "nodesAndroid": 27,
+                    "nodesLayoutlib": 27,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "exact"
+                },
+                {
+                    "target": "Editorial/home+sheet/light",
+                    "endTree": false,
+                    "nodesAndroid": 27,
+                    "nodesLayoutlib": 27,
+                    "androidPass": false,
+                    "layoutlibPass": false,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "known-difference"
+                },
+                {
+                    "target": "Editorial/home+popup/light",
+                    "endTree": false,
+                    "nodesAndroid": 27,
+                    "nodesLayoutlib": 27,
+                    "androidPass": true,
+                    "layoutlibPass": true,
+                    "maxBoundsDeltaDp": 0.0,
+                    "maxInkDeltaDp": 0.0,
+                    "maxTouchDeltaDp": 0.0,
+                    "findingsMatched": true,
+                    "classification": "known-difference"
+                }
+            ]
+        }
+    ],
+    "knownDifferences": [
+        {
+            "fixture": "all",
+            "target": "*",
+            "category": "elevation-shadows",
+            "summary": "Pixel elevation shadow blur differs slightly between hardware UI and layoutlib and is excluded from LayoutTree checks."
+        },
+        {
+            "fixture": "code-recipes-bad",
+            "target": "Featured first/discover/light",
+            "category": "software-vs-gpu-blur-pixel-rounding",
+            "summary": "Blur backdrop contrast rounding within 0.05 ratio: [text_42605@L61]: 2.28:1 vs 2.25:1 (needs 4.5:1); [text_2d017@L60]: 2.31:1 vs 2.28:1 (needs 3:1)"
+        },
+        {
+            "fixture": "code-recipes-bad",
+            "target": "Featured first/discover/dark",
+            "category": "software-vs-gpu-blur-pixel-rounding",
+            "summary": "Blur backdrop contrast rounding within 0.05 ratio: [text_42605@L61]: 2.28:1 vs 2.25:1 (needs 4.5:1); [text_2d017@L60]: 2.31:1 vs 2.28:1 (needs 3:1)"
+        },
+        {
+            "fixture": "code-recipes-bad",
+            "target": "Featured first/discover/foldable",
+            "category": "software-vs-gpu-blur-pixel-rounding",
+            "summary": "Blur backdrop contrast rounding within 0.05 ratio: [text_42605@L61]: 1.9:1 vs 1.89:1 (needs 4.5:1)"
+        },
+        {
+            "fixture": "code-recipes-bad",
+            "target": "Featured first/discover/tablet",
+            "category": "software-vs-gpu-blur-pixel-rounding",
+            "summary": "Blur backdrop contrast rounding within 0.05 ratio: [text_42605@L61]: 1.73:1 vs 1.72:1 (needs 4.5:1); [text_2d017@L60]: 1.72:1 vs 1.71:1 (needs 3:1)"
+        },
+        {
+            "fixture": "wear",
+            "target": "Wear Fitness/main/watch",
+            "category": "extractor-text-ordering-nondeterminism",
+            "summary": "node[8](Button/Outdoor Run) text.value varied across emulator sandbox restarts ([Outdoor Run, 5.2 km]); layoutlib='5.2 km'"
+        },
+        {
+            "fixture": "wear",
+            "target": "Wear Fitness/main/watch+end",
+            "category": "extractor-text-ordering-nondeterminism",
+            "summary": "node[6](Button/Outdoor Run) text.value varied across emulator sandbox restarts ([Outdoor Run, 5.2 km]); layoutlib='5.2 km'"
+        },
+        {
+            "fixture": "wear",
+            "target": "Wear Fitness/main+confirm/watch",
+            "category": "extractor-text-ordering-nondeterminism",
+            "summary": "node[7](Button/5.2 km) text.value varied across emulator sandbox restarts ([5.2 km, Outdoor Run]); layoutlib='Outdoor Run'"
+        },
+        {
+            "fixture": "wear",
+            "target": "Wear Fitness/main+confirm/watch",
+            "category": "emulator-finding-nondeterminism",
+            "summary": "Emulator sandbox restarts varied in findings or derived node ID hashes while semantic finding ([contrast(detail=1.65:1, needs 4.5:1, ids=[button_77c42@L53]), contrast(detail=1.03:1, needs 4.5:1, ids=[text_3352@L64]), contrast(detail=1.79:1, needs 4.5:1, ids=[text_132b6@L65])]) matched layoutlib ([contrast(detail=1.65:1, needs 4.5:1, ids=[button_77c42@L53]), contrast(detail=1.03:1, needs 4.5:1, ids=[text_3352@L64]), contrast(detail=1.79:1, needs 4.5:1, ids=[text_132b6@L65])])."
+        },
+        {
+            "fixture": "wear",
+            "target": "Wear Fitness/date/watch",
+            "category": "extractor-text-ordering-nondeterminism",
+            "summary": "node[0](DatePicker/2026) text.value varied across emulator sandbox restarts ([2026, Month]); layoutlib='2024'"
+        },
+        {
+            "fixture": "wear",
+            "target": "Wear Fitness/date/watch",
+            "category": "emulator-finding-nondeterminism",
+            "summary": "Emulator sandbox restarts varied in findings or derived node ID hashes while semantic finding ([round-edge-clipped(detail=reaches 100.1 dp outside the round edge, ids=[datePicker_80008@L88])]) matched layoutlib ([round-edge-clipped(detail=reaches 100.1 dp outside the round edge, ids=[datePicker_418ce@L88])])."
+        },
+        {
+            "fixture": "wear",
+            "target": "Wear Fitness/date/watch-large",
+            "category": "extractor-text-ordering-nondeterminism",
+            "summary": "node[0](DatePicker/Dec) text.value varied across emulator sandbox restarts ([Dec, 22]); layoutlib='Nov'"
+        },
+        {
+            "fixture": "wear",
+            "target": "Wear Fitness/date/watch-large",
+            "category": "emulator-finding-nondeterminism",
+            "summary": "Emulator sandbox restarts varied in findings or derived node ID hashes while semantic finding ([round-edge-clipped(detail=reaches 143.4 dp outside the round edge, ids=[datePicker_d1b8d@L88])]) matched layoutlib ([round-edge-clipped(detail=reaches 143.4 dp outside the round edge, ids=[datePicker_ece97@L88])])."
+        },
+        {
+            "fixture": "overlays",
+            "target": "Editorial/home+sheet/light",
+            "category": "modal-bottom-sheet-nav-inset",
+            "summary": "ModalBottomSheet max vertical delta 36.00 dp without emulator nav bar inset"
+        },
+        {
+            "fixture": "overlays",
+            "target": "Editorial/home+popup/light",
+            "category": "dropdown-menu-popup-positioning",
+            "summary": "DropdownMenu popup positioned cleanly with 0 layoutlib overflow errors (android=Bounds(x=24.0, y=867.0, width=112.0, height=48.0), layoutlib=Bounds(x=24.0, y=819.0, width=112.0, height=48.0), androidPass=true, layoutlibPass=true)"
+        }
+    ],
+    "unexplainedDifferences": []
+}

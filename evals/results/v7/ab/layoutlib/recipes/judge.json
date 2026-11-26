@@ -1,0 +1,77 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The Discover screen leads clearly with the Simmer headline, primary Cook pick action, search bar, featured Shakshuka hero card, category chips, and recipe list, while the detail view highlights the dish photo, title, metadata pills, and save toggle above ingredients and steps."
+  },
+  "R-fill": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Only the single primary Cook pick button on Discover and the active Saved toggle button in the recipe detail use a strong saturated fill, while all other cards, chips, and list rows remain on soft tonal containers."
+  },
+  "R-surfaces": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "A calm warm surface backdrop separates cleanly from surfaceContainerHigh cards, surfaceContainerLow ingredient and step panels, and surfaceContainerLowest in the two-pane detail view without competing colored fills."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Every interactive element renders as a distinct Material control including the filled Cook pick button, SearchBar, FilterChips, clickable photo cards, SegmentedListItems, FilledTonalIconButton back control, FilledTonalToggleButton, and navigation bar or rail items."
+  },
+  "R-font": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Display, headline, and large section titles use bundled Fraunces at a bold editorial serif weight with clear voice, body and list labels use Google Sans Flex, and numeric cook times, ratings, servings, and step numbers use Google Sans Code."
+  },
+  "R-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All screens follow Android Material 3 conventions with edge-to-edge surfaces, no disclosure chevrons on list rows, an arrow_back icon instead of Cancel or Done text, and bottom bar to navigation rail adaptation."
+  },
+  "R-text": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "In main-light, main-dark, main-tablet, and main-desktop, squeezing three compact featured cards into one narrow row causes the second card title to truncate mid-word as \"Miso mushroom ra...\"."
+  },
+  "R-dark": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Both main-dark and main+recipe-detail-dark maintain high contrast and clear legibility across all headings, body copy, dark-surface icons, metadata pills, and light-filled action buttons."
+  },
+  "R-adaptive": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The layout adapts across every size class, moving from a bottom navigation bar and single column on phone to a collapsed rail with two-column grids on foldable, a two-pane list-detail layout on tablet, and an expanded rail with a wider list pane on desktop."
+  },
+  "R-idea": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The Editorial Kitchen concept gives Simmer a cohesive magazine-like cookbook identity through warm terracotta tones, Fraunces editorial headings, Google Sans Code culinary metrics, an asymmetric featured showcase, and paired two-column ingredients and numbered steps."
+  },
+  "R-semantics": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Every section heading carries Modifier.semantics { heading() } and interactive selection or toggle controls use native single-target Material FilterChip and FilledTonalToggleButton components with no nested clickable controls on toggling rows."
+  },
+  "R-fields": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The search field uses rememberTextFieldState() passed via textFieldState to SearchBarDefaults.InputField alongside rememberSearchBarState() rather than any value/onValueChange or plain String query overload."
+  },
+  "R-visibility": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Conditionally shown UI such as the navigation bar, featured grid, clear-search button, back header, and single-pane or two-pane detail transitions uses Kotlin if branches and AnimatedContent rather than alpha hiding."
+  },
+  "R-blur": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No Modifier.blur is used anywhere in the proposal and all text sits cleanly on solid or tonal surfaces rather than over un-scrimmed images."
+  },
+  "R-recipes-browse": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Discover places a Material SearchBar at the top, FilterChips for categories, and photo-first featured recipe cards whose titles sit below the images on readable tonal card surfaces."
+  }
+}

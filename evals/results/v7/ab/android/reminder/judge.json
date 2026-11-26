@@ -1,0 +1,47 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Both today and add screens keep their list headers concise above full-width interactive rows and finish with a single bright mint EdgeButton (Add on today, Save on add) as the clear primary action."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Every reminder row is a full-width CheckboxButton pill, every quick-add option is a full-width RadioButton pill, and each screen uses one distinct bottom EdgeButton with no floating text-only buttons or merged pills."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All visible titles, counts, progress labels, list items, and button labels render cleanly without overlap or clipping inside their containers, with only expected list scrolling at the top or bottom edges."
+  },
+  "R-wear-round": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Headers, active rows, the centered confirmation circle in add+saved, and both Add and Save EdgeButtons respect the circular safe area on 204x204 and 227x227 watches, while scrolling rows curve cleanly in TransformingLazyColumn."
+  },
+  "R-wear-glance": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Each screen focuses on one glanceable task: a simple single-column checklist on today, a short list of single-line quick choices on add, and a centered checkmark circle on add+saved."
+  },
+  "R-wear-hero": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Screen headers (Today and New reminder) are the largest text elements without overshadowing the actionable list rows, while secondary counts (3 left, 1 of 4 done) and row labels remain crisp and high-contrast."
+  },
+  "R-wear-sizes": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Both 204x204 watch renders are uncramped and complete, and the 227x227 watch-large renders preserve all content while adding the 1 of 4 done progress summary on today and the Adding to Today subtitle plus Call Mom option on add."
+  },
+  "R-wear-color": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All screens sit on a pure black background with dark neutral containers for list rows and reserve saturated mint/teal fills for the primary Add and Save EdgeButtons, active selection, and progress status."
+  },
+  "R-reminder-list": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Each reminder in TodayListScreen is a single tappable CheckboxButton row, and Pick up laundry in today/watch and today/watch-large end-of-list renders shows a checked box, strikethrough text, and placement under the Done header while add renders as its own screen."
+  }
+}

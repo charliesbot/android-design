@@ -1,0 +1,77 @@
+{
+  "R-hierarchy": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The Settings controls lead cleanly with grouped section headings, clear segmented rows, and one prominent 'Back up now' primary button, while live preview cards stay secondary in a supporting pane on tablet and desktop."
+  },
+  "R-fill": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Only the primary 'Back up now' filled button uses a strong saturated fill, while rows, cards, and supporting panes stay in calm neutral container tones with small matching switch and slider accents."
+  },
+  "R-surfaces": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Tonal separation between the surface backdrop, surfaceContainerLow preview pane, surfaceContainerHigh segmented rows/cards, and surfaceContainerHighest icon badges clearly groups content without competing fills."
+  },
+  "R-controls": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The top bar back button, connected theme toggle buttons, row switches, text size slider, and 'Back up now' button each look distinct and clearly tappable."
+  },
+  "R-font": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Bundled Fraunces bold gives an intentional editorial voice to the 'Settings' top bar title and titleLarge headings ('Live preview & sync', 'Morning field notes'), while body/labels stay Google Sans Flex and Google Sans Code carries tabular numbers and metadata."
+  },
+  "R-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The screens follow Android conventions with edge-to-edge Scaffold surfaces, a back arrow icon instead of iOS Cancel/Done text buttons, and no disclosure chevrons on list rows."
+  },
+  "R-text": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All titles, supporting labels, slider values, and card metrics render cleanly without clipping, truncation, or overlap across all five screenshots."
+  },
+  "R-dark": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "In settings-dark.png, all text, top bar and leading badge icons, connected toggle buttons, switches, and the mint 'Back up now' button maintain high legibility against dark surfaces."
+  },
+  "R-adaptive": {
+    "pass": false,
+    "votes": "0/1",
+    "reason": "While tablet and desktop adapt into a two-pane layout with the 'Live preview & sync' inspector, settings-foldable.png renders a centered 420dp phone-width column with roughly 142dp empty margins on both sides misaligned with the left-aligned top app bar, pushing 'Last synced' and 'Back up now' below the fold."
+  },
+  "R-idea": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The 'Editorial Ink' direction pairs Fraunces headings, Google Sans Code metadata, ink-green segmented settings groups, and a live Note Preview, Notification Schedule, and Cloud Vault wavy-progress inspector tailored to Jot."
+  },
+  "R-semantics": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "All section headings carry Modifier.semantics { heading() }, and every toggle row uses SegmentedListItem(onClick = onToggle) with Role.Switch and toggleableState while passing onCheckedChange = null to Switch."
+  },
+  "R-fields": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "The proposal contains no text input or search field composables."
+  },
+  "R-visibility": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Conditional layout branches use Kotlin if statements around composables and never hide content in composition via zero alpha."
+  },
+  "R-blur": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "No Modifier.blur is used anywhere in the proposal."
+  },
+  "R-settings-platform": {
+    "pass": true,
+    "votes": "1/1",
+    "reason": "Omitted account management, version, and license rows per the brief, uses switches for on/off settings, a connected FilledTonalToggleButton group for theme selection, and section headings over grouped segmented rows."
+  }
+}
