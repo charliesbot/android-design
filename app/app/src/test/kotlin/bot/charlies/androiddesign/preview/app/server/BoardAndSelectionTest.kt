@@ -21,6 +21,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 
 class BoardAndSelectionTest {
   private fun fakeBoardWorker(): RenderWorker =
@@ -372,6 +376,54 @@ class BoardAndSelectionTest {
       assertTrue(ambiguous.stale, "ambiguous edit must mark selection stale")
       assertEquals("Button", ambiguous.callName)
       assertEquals(listOf("Column"), ambiguous.callChain)
+    } finally {
+      server.stop()
+      tmp.toFile().deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `GET api board serializes empty overlays array on directions without overlays`() {
+    val tmp = createTempDirectory("v6-board-overlays-")
+    val repo = tmp.resolve("repo").also { Files.createDirectories(it) }
+    val source = repo.resolve("board.explore.kt").also { Files.writeString(it, boardSource()) }
+
+    val server =
+      PreviewHttpServer(
+        repoRoot = repo,
+        cacheRoot = tmp.resolve("cache"),
+        preferredPort = 0,
+        worker = fakeBoardWorker(),
+        enableFileWatcher = false,
+      )
+    try {
+      val rec = server.start()
+      val checkBody =
+        PreviewJson.compact.encodeToString(
+          CheckRequest.serializer(),
+          CheckRequest(path = source.toString()),
+        )
+      val (checkStatus, checkResp) =
+        post(
+          rec.port,
+          "/api/check",
+          headers = mapOf("X-Client-Secret" to rec.clientSecret),
+          body = checkBody,
+        )
+      assertEquals(200, checkStatus, checkResp)
+
+      val (boardStatus, boardBody) = get(rec.port, "/api/board?view=${rec.viewToken}", emptyMap())
+      assertEquals(200, boardStatus, boardBody)
+
+      val directions =
+        Json.parseToJsonElement(boardBody)
+          .jsonObject["boardMeta"]!!
+          .jsonObject["directions"]!!
+          .jsonArray
+      assertEquals(2, directions.size)
+      for (dir in directions) {
+        assertEquals(JsonArray(emptyList()), dir.jsonObject["overlays"], boardBody)
+      }
     } finally {
       server.stop()
       tmp.toFile().deleteRecursively()
