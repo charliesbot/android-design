@@ -54,7 +54,7 @@ Components come last; compose from direction and content first:
 4. **Group deliberately by spacing or containers.** Proximity and alignment keep flowing lists open; containers and surface steps group units that read or tap together. On action-list screens (habits, inbox), gather actionable items under one heading and container group, and put completed items as plain rows under their own heading so contained and flat rows stay grouped rather than alternating.
 5. **Vary form by information type.** Match grid to content: hierarchical for editorial/detail, modular for equal items, column for flowing lists ([references/layout.md](references/layout.md)). Vary container forms across groups to avoid the template look.
 6. **Let content set color.** When an image or subject leads, derive screen color from it ([Color](#color)) instead of adding unrelated accents.
-7. **Use blur for focus or depth.** Soften surrounding content (list/picker edges or the part of a photo behind a title) so the lead stays sharp. Blur draws nothing before Android 12 (progressive blur before 13), so keep the screen readable without it ([blur](references/theming.md#blur-shadows-and-gradients)).
+7. **Focus with surface blur (optional).** On scrolling lyrics or pickers (softening edges around a sharp center) or photo-led hero headers (softening the image region behind scrimmed text), apply surface blur ([blur](references/theming.md#blur-shadows-and-gradients)).
 
 For shipped examples (metric card, editorial header, pill hero control), read [references/components.md](references/components.md#patterns-from-shipped-expressive-apps) after choosing the composition.
 
