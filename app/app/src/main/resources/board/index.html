@@ -519,6 +519,10 @@
       return dirs.find((d) => d.name === state.direction) || dirs[0] || null;
     }
 
+    function directionOverlays(dir) {
+      return Array.isArray(dir?.overlays) ? dir.overlays : [];
+    }
+
     function syncControlsFromBoard() {
       const b = state.board;
       if (!b) return;
@@ -555,10 +559,11 @@
       }
 
       if (dir) {
+        const overlays = directionOverlays(dir);
         if (!dir.screens.includes(state.screen)) {
           state.screen = dir.startScreen || dir.screens[0] || null;
         }
-        if (state.overlay && !dir.overlays.some((o) => o.id === state.overlay)) {
+        if (state.overlay && !overlays.some((o) => o.id === state.overlay)) {
           state.overlay = "";
         }
         els.ctrlScreen.innerHTML = "";
@@ -576,7 +581,7 @@
         noneOpt.textContent = "None";
         noneOpt.selected = !state.overlay;
         els.ctrlOverlay.appendChild(noneOpt);
-        for (const ov of dir.overlays) {
+        for (const ov of overlays) {
           const opt = document.createElement("option");
           opt.value = ov.id;
           opt.textContent = ov.screen ? ov.id + " (" + ov.screen + ")" : ov.id;
@@ -682,9 +687,10 @@
           }).catch(() => {});
         }
 
+        const overlays = directionOverlays(dir);
         const meta = document.createElement("div");
         meta.className = "mono card-meta";
-        meta.textContent = "screens: " + dir.screens.join(", ") + (dir.overlays.length ? " | overlays: " + dir.overlays.map((o) => o.id).join(", ") : "");
+        meta.textContent = "screens: " + dir.screens.join(", ") + (overlays.length ? " | overlays: " + overlays.map((o) => o.id).join(", ") : "");
 
         card.append(head, preview, meta);
         els.gridView.appendChild(card);
@@ -744,7 +750,7 @@
         }
       }
 
-      const matchedOverlay = dir.overlays.find((ov) =>
+      const matchedOverlay = directionOverlays(dir).find((ov) =>
         candidates.some((c) => c === ov.id.toLowerCase()),
       );
       if (matchedOverlay) {

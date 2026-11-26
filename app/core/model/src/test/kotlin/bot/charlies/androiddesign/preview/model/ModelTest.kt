@@ -6,6 +6,10 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 
 class ModelTest {
   @Test
@@ -199,5 +203,30 @@ class ModelTest {
       val failure = assertFailsWith<SerializationException>(bad) { decode(bad) }
       assertEquals("Bounds must be [x, y, width, height]", failure.message, bad)
     }
+  }
+
+  @Test
+  fun `direction metadata always encodes overlays array even when empty`() {
+    val dir =
+      DirectionMeta(
+        name = "Editorial",
+        surface = "phone",
+        startScreen = "home",
+        screens = listOf("home"),
+      )
+    val meta = BoardMeta(directions = listOf(dir), views = listOf(Views.Light))
+
+    val compact = PreviewJson.compact.encodeToString(BoardMeta.serializer(), meta)
+    assertTrue("\"overlays\":[]" in compact, "compact JSON omitted empty overlays: $compact")
+    assertEquals(meta, PreviewJson.compact.decodeFromString(BoardMeta.serializer(), compact))
+
+    val pretty = PreviewJson.pretty.encodeToString(BoardMeta.serializer(), meta)
+    val prettyDir =
+      Json.parseToJsonElement(pretty).jsonObject["directions"]!!.jsonArray.single().jsonObject
+    assertEquals(JsonArray(emptyList()), prettyDir["overlays"])
+
+    val legacyJson =
+      """{"directions":[{"name":"Editorial","surface":"phone","startScreen":"home","screens":["home"]}],"views":[{"name":"light","device":"phone","width":411,"height":923,"dark":false,"sizeClass":"compact"}]}"""
+    assertEquals(meta, PreviewJson.compact.decodeFromString(BoardMeta.serializer(), legacyJson))
   }
 }
