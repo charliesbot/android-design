@@ -92,6 +92,8 @@ DropdownMenuPopup(expanded = ..., onDismissRequest = {}) { // submenus: popupPos
   }
 }
 Modifier.clip(MaterialShapes.Cookie9Sided.toShape()) // shapes below
+// Surface blur (androidx.compose.ui.draw.{blur, BlurredEdgeTreatment}; use uniform Modifier.blur in explorations, reserve progressive BlurRadiusSpec in theming.md for app builds)
+Modifier.blur(radius = 2.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded) // or BlurredEdgeTreatment(shape) on clipped cards/images
 
 // Text Fields & Search (state-based TextFieldState; SecureTextField / OutlinedSecureTextField for passwords)
 TextField(state = rememberTextFieldState(), label = { Text(...) }, shape = TextFieldDefaults.roundedShape, colors = TextFieldDefaults.tonalColors(), lineLimits = TextFieldLineLimits.SingleLine)
@@ -144,4 +146,4 @@ ConfirmationDialog(visible = ..., onDismissRequest = {}, curvedText = { confirma
 5. `overflow` & `label-truncated`: keep button/chip/nav labels short (1 to 2 words, single line) and avoid unwrapped multi-badge rows on foldable panes (`FlexBox(config = { wrap(FlexWrap.Wrap); gap(8.dp) })` or compact counts).
 6. `semantics`: tag section headings with `Modifier.semantics { heading() }`; on toggling/selecting rows lift interaction to the row (`Modifier.toggleable`/`selectable` with `role`, or `SegmentedListItem(onClick = ...)` with `Modifier.semantics { role = Role.Switch; toggleableState = ToggleableState(checked) }`) and pass `null` to the child `Switch`/`Checkbox`/`RadioButton`.
 7. `fields`: build text fields and `SearchBarDefaults.InputField` on `TextFieldState` (`rememberTextFieldState()`); use `SecureTextField` or `OutlinedSecureTextField` for passwords (never value-based `onValueChange` or `PasswordVisualTransformation`).
-8. `visibility` & `blur`: show/hide content with `AnimatedVisibility`, `AnimatedContent`, or `if` (never `alpha = 0f` alone); text over blurred images still needs a scrim, gradient, or solid/tonal surface because blur is ignored below Android 12 (progressive `BlurRadiusSpec` blur below Android 13). Imports: `blur` and `BlurredEdgeTreatment` from `androidx.compose.ui.draw`; `BlurRadiusSpec` and `BlurStop` from `androidx.compose.ui.graphics.blur`.
+8. `visibility` & `blur`: show/hide with `AnimatedVisibility`, `AnimatedContent`, or `if` (never `alpha = 0f` alone); back text over blurred photos with a scrim, gradient, or solid/tonal surface.
