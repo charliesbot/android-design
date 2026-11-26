@@ -1,7 +1,7 @@
 {
   "name": "android-design",
   "displayName": "Android Design Preview",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Material 3 Expressive design judgment and live Compose board explorations for Android phone, tablet, desktop, and Wear OS screens.",
   "logo": "assets/logo.svg",
   "suggestedPrompts": [
