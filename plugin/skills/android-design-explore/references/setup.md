@@ -1,21 +1,21 @@
 # Previewer setup
 
-Read this when `android-design-preview` cannot be found (neither on `PATH` nor bundled in the skill's `scripts/` folder) or exits `3` (missing Java or server prerequisites). Tell the user these steps, then wait. Never edit the user's harness config unasked.
+Read this when `android-design-preview` cannot be found (neither on `PATH` nor bundled in `scripts/`) or exits `3` (missing Java or server prerequisites). Give the user these steps and wait.
 
 ## Prerequisites
 
 - **macOS or Linux** (Windows is unsupported)
 - **Java 21+** (JDK on `PATH`, `JAVA_HOME`, `/usr/libexec/java_home -v 21`, or Android Studio's bundled JBR)
 - **Android SDK** (`ANDROID_HOME` or `ANDROID_SDK_ROOT`) and **`git`**
-- **Optional for `open --live`:** `adb` and an Android emulator (`android` CLI) or USB device, only needed when launching opt-in live interaction (`start`, `check`, `tree`, `render`, and plain `open` never boot or contact a device)
+- **Optional for `open --live`:** `adb` and an Android emulator (`android` CLI) or USB device, needed only for opt-in live interaction (`start`, `check`, `tree`, `render`, and plain `open` never boot or contact a device)
 
-On first run, if the cached runtime under `~/.cache/android-design-preview/<version>/` is missing, the bootstrap script sparse-checkouts `app/` from GitHub at tag `v<version>` and runs `./gradlew :host:exportBootstrap` once to build the previewer server/CLI, layoutlib worker bundle, Android Host APK (for live mode), and AndroidX compile bundle locally.
+On first run, if `~/.cache/android-design-preview/<version>/` is missing, the bootstrap script sparse-checkouts `app/` from GitHub at tag `v<version>` and runs `./gradlew :host:exportBootstrap` once to build the previewer server/CLI, layoutlib worker bundle, Android Host APK (for live mode), and AndroidX compile bundle locally.
 
 ## Where `android-design-preview` comes from
 
-The bootstrap script ships inside this skill at `scripts/android-design-preview`, so every install route brings it and agents run it from there. Claude Code also puts it on `PATH` as a bare command through the plugin's `bin/` folder.
+The bootstrap script ships inside this skill at `scripts/android-design-preview`, so every install route brings it. Claude Code also puts it on `PATH` as a bare command through `plugin/bin/`.
 
-If the skill folder is missing `scripts/android-design-preview`, the skill was copied without it: reinstall it from https://github.com/charliesbot/android-design. To type the bare command in your own shell, run `install` once to link it into `~/.local/bin` (which must be on your `PATH`):
+If `scripts/android-design-preview` is missing, reinstall the skill from https://github.com/charliesbot/android-design. To type the bare command in your own shell, run `install` once to link it into `~/.local/bin` (which must be on your `PATH`):
 
 ```sh
 <skill-dir>/scripts/android-design-preview install

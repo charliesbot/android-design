@@ -1,28 +1,14 @@
 # Theming
 
-Theme setup for Material 3 Expressive in Compose: versions, color schemes, typography, shapes, motion, and spacing. API names were checked against androidx sources (material3 1.5.0 stable) in November 2026.
+Theme setup for Material 3 Expressive in Compose: versions, color schemes, typography, shapes, motion, blur, shadows, gradients, and spacing (`androidx.compose.material3` 1.5.0 stable).
 
 ## Versions
 
-- `androidx.compose.material3:material3`: Expressive requires **1.5.0** or later (stable via Compose BOM `2026.11.01`). Older 1.4.0 only has `ShortNavigationBar`, `WideNavigationRail`, and `ModalWideNavigationRail` from this skill.
-- Toolchain: Compose `1.13` / Material 3 `1.5.0` require **Kotlin 2.2+**, **compileSdk 37.1**, and **AGP 9.1+** (AGP 9.4 in turn needs Gradle 9.6). Raise these first if a starter template ships an older SDK or AGP, or dependency metadata checks will fail.
-- Check the newest version in [Maven metadata](https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3/maven-metadata.xml) when upgrading beyond `1.5.0` (Compose Material 2 `androidx.compose.material` is deprecated).
-- Still `@ExperimentalMaterial3ExpressiveApi`: `MaterialShapes`, `RoundedPolygon.toShape()` / `toPath()`, `Morph.toPath()`, `LoadingIndicator`, `ContainedLoadingIndicator`, `LoadingIndicatorDefaults`, and the pull-to-refresh loading indicator. Still `@ExperimentalMaterial3Api`: `AppBarWithSearch`, `carouselParallaxScrollEffect`, sheets (`BottomSheet`, `ModalBottomSheet`, `BottomSheetScaffold`), tooltips.
-- Shape morphing uses `androidx.graphics:graphics-shapes`, which material3 already exposes.
+- `androidx.compose.material3:material3`: **1.5.0+** (Compose BOM `2026.11.01`). (1.4.0 includes only `ShortNavigationBar`, `WideNavigationRail`, and `ModalWideNavigationRail`.)
+- Toolchain: Compose `1.13` / Material 3 `1.5.0` require **Kotlin 2.2+**, **compileSdk 37.1**, and **AGP 9.1+** (AGP 9.4 needs Gradle 9.6). Check [Maven metadata](https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3/maven-metadata.xml) when upgrading beyond `1.5.0`; `androidx.compose.material` (M2) is deprecated.
+- `@ExperimentalMaterial3ExpressiveApi`: `MaterialShapes`, `RoundedPolygon.toShape()` / `toPath()`, `Morph.toPath()`, `LoadingIndicator`, `ContainedLoadingIndicator`, `LoadingIndicatorDefaults`, pull-to-refresh loading indicator. `@ExperimentalMaterial3Api`: `AppBarWithSearch`, `carouselParallaxScrollEffect`, `BottomSheet`, `ModalBottomSheet`, `BottomSheetScaffold`, tooltips. Shape morphing uses `androidx.graphics:graphics-shapes` (exposed by `material3`).
 
 ## Theme
-
-```kotlin
-@Composable fun MaterialExpressiveTheme(
-    colorScheme: ColorScheme? = null,
-    motionScheme: MotionScheme? = null,
-    shapes: Shapes? = null,
-    typography: Typography? = null,
-    content: @Composable () -> Unit,
-)
-```
-
-A typical app theme takes dynamic color where available and falls back to a fixed scheme:
 
 ```kotlin
 @Composable
@@ -42,10 +28,8 @@ fun AppTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> U
 }
 ```
 
-- At the top level, nulls become `expressiveLightColorScheme()`, `MotionScheme.expressive()`, `Shapes()`, and `Typography()`. Nested, nulls inherit from the outer theme.
-- `expressiveLightColorScheme()` is `lightColorScheme()` with more colorful `on*Container` roles. There is no dark counterpart; use `darkColorScheme()` or a generated scheme.
-- Plain `MaterialTheme(...)` still works but defaults to `MotionScheme.standard()`.
-- Material 3 1.5.0 adds `LocalRippleThemeConfiguration` (`androidx.compose.material3:material3-ripple`, supports inset focus rings), `Typography(fontFamily = ...)` to propagate a plain font family to unset roles, and `Text(..., color = { ... })` (`ColorProducer`) for draw-phase color updates without recomposition.
+- Top-level nulls default to `expressiveLightColorScheme()` (no dark counterpart; use `darkColorScheme()` or a generated scheme), `MotionScheme.expressive()`, `Shapes()`, and `Typography()`. Nested themes inherit outer values for nulls; plain `MaterialTheme(...)` defaults to `MotionScheme.standard()`.
+- Material 3 1.5.0 adds `LocalRippleThemeConfiguration` (`androidx.compose.material3:material3-ripple`, inset focus rings), `Typography(fontFamily = ...)` for single-family propagation, and `Text(..., color = { ... })` (`ColorProducer`) for draw-phase color updates.
 
 ## Color schemes
 
@@ -53,65 +37,60 @@ Pick one source per app, plus at most one content-based scheme per screen.
 
 ### Dynamic (wallpaper)
 
-`dynamicLightColorScheme(context)` / `dynamicDarkColorScheme(context)` on API 31+. Google recommends it. Always provide a fallback scheme for older devices.
+`dynamicLightColorScheme(context)` / `dynamicDarkColorScheme(context)` on API 31+ with a fallback scheme for older devices.
 
 ### Brand (seed color)
 
-Compose has no seed or variant API. Two options:
-
-1. **Static export:** generate light and dark schemes in Material Theme Builder from the brand color (or several: primary, secondary, tertiary, neutral) and paste the `lightColorScheme(...)` / `darkColorScheme(...)` values into the theme. Turn on "match color" (color fidelity) when the brand color must appear as-is.
-2. **Runtime generation** with the third-party [MaterialKolor](https://github.com/jordond/MaterialKolor) library (`com.materialkolor:material-kolor`; check its latest version):
+Compose has no built-in seed API. Either export static schemes from Material Theme Builder (enable "match color" for literal brand colors) or generate at runtime with [MaterialKolor](https://github.com/jordond/MaterialKolor) (`com.materialkolor:material-kolor`):
 
 ```kotlin
 val colorScheme = rememberDynamicColorScheme(
     seedColor = BrandColor,
     isDark = dark,
     specVersion = ColorSpec.SpecVersion.SPEC_2025,
-    style = PaletteStyle.TonalSpot, // Material's default; Fidelity when the brand color must appear as-is
-    contrastLevel = rememberSystemContrast(), // see Contrast levels below
+    style = PaletteStyle.TonalSpot, // Material's default; Fidelity when brand color must appear as-is
+    contrastLevel = rememberSystemContrast(),
 )
 ```
 
-Keep the generator's default style. `TonalSpot` is what Material and Theme Builder generate; `Fidelity` keeps primary and secondary tones close to the seed, like Theme Builder's "match color" (observed with MaterialKolor, not a Google rule: its tertiary, like `Content`'s, moves far from the seed's hue). The other styles are scheme variants, not M3 Expressive: `Vibrant` pushes primary chroma to the maximum, and `Expressive` shifts hues away from the seed (in testing, a teal brand gained brown and orange roles) and tints surfaces. Palette variants are color-generation choices, not levels of M3 Expressive. For more color on a screen, use content-based color or give accent roles to more elements that have a job.
-
-A common pattern: brand scheme by default, dynamic color as a user setting.
+Keep `TonalSpot` (or `Fidelity` for literal primary/secondary tones, noting `Fidelity` and `Content` move tertiary away from the seed's hue). Avoid `PaletteStyle.Expressive` (unrelated to M3 Expressive; shifts hues and tints surfaces) and `Vibrant` (maxes primary chroma). A common pattern is brand scheme by default with dynamic color as a user setting.
 
 ### Content-based
 
-Color a contained area from an image on screen (a media player from its album art, cards from their photos). Keep the source image visible where its color is used, limit a screen to two scheme sources, and never recolor semantic colors.
-
-With MaterialKolor, extract a seed from the image and theme just that subtree:
+Color a contained area from a visible on-screen image (limit a screen to two scheme sources; never recolor semantic colors; decode a small thumbnail for extraction):
 
 ```kotlin
 val seed = remember(art) { art.themeColor(fallback = BrandColor) } // com.materialkolor.ktx, on an ImageBitmap
 val scheme = rememberDynamicColorScheme(seedColor = seed, isDark = isSystemInDarkTheme(), style = PaletteStyle.Content, contrastLevel = rememberSystemContrast())
-MaterialExpressiveTheme(colorScheme = scheme) { NowPlaying(...) }
+MaterialExpressiveTheme(colorScheme = scheme) {
+    Surface(color = MaterialTheme.colorScheme.surface) { NowPlaying(...) }
+}
 ```
 
-A nested theme changes `MaterialTheme.colorScheme` but not `LocalContentColor`, so plain `Icon` and `Text` keep the outer scheme's color (black icons on a dark player). Draw the themed subtree inside a `Surface(color = MaterialTheme.colorScheme.surface)`, which sets the matching content color.
-
-Decode a small thumbnail for extraction, not the full image. MaterialKolor 5.x is built with Kotlin 2.4; if it fails to resolve against your Kotlin or Compose versions, pin the latest version that does (4.x for older Kotlin).
+Wrap the nested theme in `Surface(color = MaterialTheme.colorScheme.surface)` so `LocalContentColor` updates alongside `MaterialTheme.colorScheme`. MaterialKolor 5.x targets Kotlin 2.4; use 4.x if compiling on older Kotlin.
 
 ### Roles
 
 | Role | Use |
 | --- | --- |
-| `primary` / `onPrimary` | The most important action and active states |
+| `primary` / `onPrimary` | Most important action and active states |
 | `primaryContainer` / `onPrimaryContainer` | Standout fills (FAB, selected hero element) |
 | `secondary`, `secondaryContainer` | Supporting controls, selection, tonal buttons, filter chips |
 | `tertiary`, `tertiaryContainer` | Contrasting accents: status, badges, progress, delight; vibrant menus (vibrant toolbars use `primaryContainer`) |
 | `error`, `errorContainer` | Errors (static in every scheme) |
-| `surface`, `surfaceContainerLowest` to `surfaceContainerHighest` | Body background, then nested containers by emphasis; nav areas use `surfaceContainer` |
+| `surface`, `surfaceContainerLowest` to `surfaceContainerHighest` | Body background, nested containers by emphasis; nav areas use `surfaceContainer` |
 | `onSurface`, `onSurfaceVariant` | Default text; lower-emphasis text and icons |
-| `outline`, `outlineVariant` | Text field borders; dividers and decorative lines |
-| `inverseSurface`, `inverseOnSurface`, `inversePrimary` | Snackbars and reversed elements |
+| `outline`, `outlineVariant` | Text field borders; dividers and decorative lines only |
+| `inverseSurface`, `inverseOnSurface`, `inversePrimary` | Snackbars and reversed standout elements |
 | `primaryFixed`, `primaryFixedDim` (and secondary, tertiary) | Same tone in light and dark themes |
 
-Pairing and no-alpha rules live in [SKILL.md, Color](../SKILL.md#color). Material itself uses opacity only for state layers (built into components), disabled content (38%), and the `scrim` behind modals. `outlineVariant` is for dividers and decorative lines only, never text or icons.
+Use **role pairs** only (`SKILL.md`, Color). Opacity is reserved for built-in component state layers, disabled content (38%), and modal `scrim`.
 
 ### Extra colors (semantic and categories)
 
-For a Success green, or categories beyond the two category-safe accent containers, Material's answer is a **static color**: one seed that produces four roles (color, on-color, container, on-container) following the same pairing rules. Generate them at runtime so they follow light, dark, and contrast:
+- **Categories:** two categories can use `primaryContainer` and `tertiaryContainer` (skip `secondary`, which shares `primary`'s hue); three or more need unharmonized static colors (`harmonize = false` with well-spaced hue seeds). Color only the badge or icon rather than the whole card, keeping one consistent role per category (`color` + `onColor` when also plotted in charts; `container` + `onContainer` for badges only).
+- **Charts and data graphics:** use solid roles (`primary`, `secondary`, `tertiary`, or static `color`) for 3:1 contrast against the background rather than pale containers.
+- **Contrast for extra colors:** HCT tone difference >= 50 against background for small elements (< 40dp) and >= 40 for larger elements.
 
 ```kotlin
 @Immutable
@@ -131,13 +110,9 @@ fun rememberExtraColor(seed: Color, harmonize: Boolean = true): ExtraColor {
 }
 ```
 
-- Harmonizing shifts the hue slightly toward the scheme's primary while keeping its meaning (a red stays red). Skip it when the color is literal (a brand color, transit line colors) or must stay distinguishable: pass `harmonize = false` for categories, and pick seeds far apart in hue.
-- Contrast for colors outside the scheme roles (category seeds, chart series, widget art): HCT tone difference is the contrast rule. "Smaller elements (less than ¼" or 40 dp) require a tone difference of 50 with their background, larger elements require a tone difference of 40." (Google)
-- Use one role per category across a screen: `color` with an `onColor` glyph when the category also appears in a chart, or `container` with `onContainer` when it only marks badges. Category rules: [SKILL.md, Color](../SKILL.md#color).
-
 ### Contrast levels
 
-Users pick standard, medium, or high contrast in system settings (Android 14+). Dynamic schemes follow it automatically; hand-made and generated schemes don't. For generated schemes, pass the system value to MaterialKolor:
+Dynamic schemes follow Android 14+ system contrast automatically; static exports (export medium/high contrast variants too) and MaterialKolor schemes pass `rememberSystemContrast()`:
 
 ```kotlin
 @Composable
@@ -151,57 +126,51 @@ fun rememberSystemContrast(): Double {
 }
 ```
 
-The brand and content-based snippets above already pass it. For a static Theme Builder export, also export the medium and high contrast schemes and pick one from this value.
-
 ## Typography
 
-- 15 baseline styles plus 15 emphasized ones (`displayLargeEmphasized` ... `labelSmallEmphasized`, 1.5.0 only). Emphasized raises weight: Display, Headline, Body, and Title Large go Regular to Medium; Title Medium/Small and Labels go Medium to Bold.
-- `Typography(fontFamily = ...)` sets one family everywhere. This skill mixes faces by role, so build each style with the `voice` helper ([Building the type scale](#building-the-type-scale)).
-- Change letter spacing and line height to fit a new face, not the scale's sizes: "Avoid changing the type size; this can affect how components render and reflow." (Google) For editorial sizes (a total that fills the top of the screen), define a separate style outside the scale, like `numeralStyle` below.
+- 15 baseline styles plus 15 emphasized ones (`displayLargeEmphasized` ... `labelSmallEmphasized`, 1.5.0+). Emphasized raises weight (Display, Headline, Body, Title Large: Regular to Medium; Title Medium/Small, Labels: Medium to Bold).
+- Adjust letter spacing and line height for custom faces while preserving scale sizes (`numeralStyle` below handles oversized editorial display numerals outside the scale).
+- **Editorial techniques:** contrast two voices on one line for meaning (light condensed origin vs heavy wide destination); repeat decorative cropped/tinted background text readably and hide the graphic with `Modifier.clearAndSetSemantics {}`; align huge numeral + small unit in a `Row` with `Modifier.alignByBaseline()`.
 
 ### Google Sans Flex
 
-Open source on [Google Fonts](https://fonts.google.com/specimen/Google+Sans+Flex) (since November 2025) and this skill's default family: plain text always uses it, and so does every Display, Headline, and Title Large unless you choose a brand face (below). Axes: `wght` 1 to 1000, `wdth` 25 to 151, `opsz` 6 to 144, `slnt` -10 to 0, `GRAD` 0 to 100, `ROND` 0 to 100.
+Open source variable font ([Google Fonts](https://fonts.google.com/specimen/Google+Sans+Flex)); bundle the TTF in `res/font/` (downloadable fonts lack variation settings). Axes: `wght` 1 to 1000, `wdth` 25 to 151, `opsz` 6 to 144, `slnt` -10 to 0, `GRAD` 0 to 100, `ROND` 0 to 100.
 
-Bundle the variable TTF in `res/font/` (downloadable Google Fonts don't carry variation settings).
-
-Voice starting points (tune them to the screen's direction; they are not presets to copy):
+Voice starting points (tune to direction rather than copying literally):
 
 | Voice | Axes (approx.) | Use for |
 | --- | --- | --- |
 | Friendly hero | weight 800 to 900, roundness 100 | The one hero title or number in a warm, playful product |
-| Tall numerals | width 25 to 50; weight 300 off, 800 on | Numbers that fill a card (times, totals, calculators), state through weight |
+| Tall numerals | width 25 to 50; weight 300 off, 800 on | Numbers filling a card (times, totals, calculators), state via weight |
 | Premium display | width 75 to 90, weight 400 to 600 | Elegant headers and editorial titles |
 | Airy display | weight 100 to 300, large sizes only | Calm headers, inactive states |
-| Wide header | width 125 to 151, weight 500 to 700, roundness 0 | Confident section or dialog titles; never in app bars |
-| Loud expressive | width 151, weight 900, slant -10 | Celebrations and the user's own voice; rare |
-| Text | default axes, weight 400 to 500 | Body and labels; don't vary it |
+| Wide header | width 125 to 151, weight 500 to 700, roundness 0 | Confident section or dialog titles; keep out of app bars |
+| Loud expressive | width 151, weight 900, slant -10 | Celebrations and user expression; rare |
+| Text | default axes, weight 400 to 500 | Body and labels; keep axes at default |
 
 ### Brand faces (Display, Headline, and Title Large only)
 
-Optional: one face from the set below on Display, Headline, and Title Large styles, with everything else on Google Sans Flex. A small app bar title and a side sheet title draw in `titleLarge`, so a brand face set only on Display and Headline leaves those headers in the plain face. The face set, one face per proposal, Doto's display-only limit, and keeping Title Medium and Small on Google Sans Flex are this skill's choices, not Google's. All are OFL and bundled as variable TTFs with the previewer app that `android-design-explore` drives, so an exploration never fetches fonts. A real app bundles the variable TTF of each face it uses in `res/font/`. Material calls this the brand typeface (larger styles, "to focus on expression") against the plain typeface (smaller styles, "to focus on readability"); do not use a brand face on Title Medium, Title Small, Body, or Label.
+Optional single face on Display, Headline, and `titleLarge` (small app bars and side sheets use `titleLarge`); keep Title Medium, Title Small, Body, and Label on Google Sans Flex. All faces are OFL and bundled in `res/font/` (and in the previewer).
 
 | Face | File | Axes | Use for | Starting point |
 | --- | --- | --- | --- | --- |
 | Fraunces | `fraunces` | `opsz` 9-144, `wght` 100-900, `SOFT` 0-100, `WONK` 0-1 | Warm editorial serif: food, reading, journaling, heritage | `wght` 600, `SOFT` 100, `WONK` 1 |
 | Bricolage Grotesque | `bricolage_grotesque` | `opsz` 12-96, `wdth` 75-100, `wght` 200-800 | Playful, quirky grotesque: indie, creative tools | `wght` 800, `wdth` 80 to 100 |
 | Big Shoulders Display | `big_shoulders_display` | `wght` 100-900 | Tall condensed poster type: sport, fitness, transit, loud energy | `wght` 800 to 900, tight tracking, line height 1.2x |
-| Doto | `doto` | `ROND` 0-100, `wght` 100-900 | Dot-matrix: timers, music, retro-tech. Display sizes only (36sp and up) | `wght` 700 to 900, `ROND` 100 for round dots |
+| Doto | `doto` | `ROND` 0-100, `wght` 100-900 | Dot-matrix: timers, music, retro-tech. Display sizes only (36sp+) | `wght` 700 to 900, `ROND` 100 for round dots |
 
-Measured line boxes (Pixel_10_Pro_XL emulator, M3 `bodyLarge` base style with the token size and line height): Fraunces, Bricolage Grotesque, and Big Shoulders Display match the token line height at 36/44 and 32/40 (Fraunces 44.7dp at 36/44 from pixel rounding), so no extra vertical room is needed. Doto at 45/52 renders 54dp tall, so leave about 2dp of room around a Doto line. Google Sans Flex, by comparison, renders 52.7dp at 36/44 and 46.7dp at 32/40.
+Doto at 45/52 renders 54dp tall; leave 2dp extra vertical room around Doto lines (the other bundled brand faces match token line heights).
 
-Google Sans Code (`google_sans_code`, `wght` 300-800) is the mono face for numbers and data (timers, tabular values, codes, metadata) at any size, in any proposal.
+Google Sans Code (`google_sans_code`, `wght` 300-800) serves numbers and data (timers, tabular values, codes, metadata) at any size.
 
 ### Building the type scale
 
-Build every style from a bundled face with `voice`. A plain `FontFamily(Font(R.font.google_sans_flex))` draws every weight at 400, because a variable font needs `FontVariation.weight` set per `Font`. Variation settings apply on API 26+.
+Use `voice` so every variable font gets explicit `FontVariation.weight` and `opticalSizing` (API 26+):
 
 ```kotlin
 /**
- * A voice: one bundled variable face at fixed axes. Sets weight and optical size itself (Compose
- * never sets optical size, and Fraunces and Bricolage Grotesque change width without it; faces with
- * no `opsz` axis ignore it). `axes` holds only the face's other axes, such as width, SOFT, or ROND:
- * Compose rejects a repeated axis.
+ * Builds a fixed-axis TextStyle from a bundled variable font. Sets weight and optical size here
+ * because Compose omits optical size by default; pass only extra axes (width, SOFT, ROND) in `axes`.
  */
 fun TextStyle.voice(@FontRes font: Int, weight: Int, vararg axes: FontVariation.Setting) = copy(
     fontFamily = FontFamily(
@@ -222,27 +191,23 @@ private val base = Typography()
 private val soft = arrayOf(FontVariation.Setting("SOFT", 100f), FontVariation.Setting("WONK", 1f))
 
 val AppTypography = base.copy(
-    // Display, Headline, and Title Large: one brand face (Fraunces here) or a Google Sans Flex voice,
-    // such as base.displayLarge.voice(R.font.google_sans_flex, 850, FontVariation.Setting("ROND", 100f)).
-    // Set all six, plus their *Emphasized styles: components read them internally
-    // (a large app bar's title is displaySmall), so a skipped one falls back to the default face.
+    // Set all Display, Headline, and Title Large styles plus their *Emphasized counterparts
+    // so internal component slots (such as large app bars using displaySmall) never fall back.
     displayLarge = base.displayLarge.voice(R.font.fraunces, 600, *soft),
     displayMedium = base.displayMedium.voice(R.font.fraunces, 600, *soft),
     displaySmall = base.displaySmall.voice(R.font.fraunces, 600, *soft),
     headlineLarge = base.headlineLarge.voice(R.font.fraunces, 600, *soft),
     headlineMedium = base.headlineMedium.voice(R.font.fraunces, 600, *soft),
     headlineSmall = base.headlineSmall.voice(R.font.fraunces, 600, *soft),
-    // Title Large is read by small app bars and side sheets, so it takes the brand face too.
     titleLarge = base.titleLarge.voice(R.font.fraunces, 600, *soft),
-    // Title Medium and Small, Body, and Label: always Google Sans Flex at default axes.
+    // Title Medium/Small, Body, and Label: always Google Sans Flex at default axes.
     titleMedium = base.titleMedium.voice(R.font.google_sans_flex, 500),
     bodyLarge = base.bodyLarge.voice(R.font.google_sans_flex, 400),
     bodyMedium = base.bodyMedium.voice(R.font.google_sans_flex, 400),
     labelLarge = base.labelLarge.voice(R.font.google_sans_flex, 500),
-    // ...the remaining Title, Body, and Label styles (titleLargeEmphasized takes the brand face), and every *Emphasized style one weight step heavier
+    // ...remaining Title, Body, Label, and *Emphasized styles (one weight step heavier)
 )
 
-// Voices outside the type scale: tall numerals with state, and numbers and data.
 @Composable
 fun numeralStyle(selected: Boolean) = MaterialTheme.typography.displayLarge
     .voice(R.font.google_sans_flex, if (selected) 800 else 300, FontVariation.width(35f))
@@ -254,47 +219,32 @@ fun dataStyle() = MaterialTheme.typography.bodyMedium
     .copy(fontFeatureSettings = "tnum")
 ```
 
-- Define two or three voices once per app and apply them consistently; don't invent new axis values per screen.
-- State through axes: selected items heavy (700 to 900), unselected light (200 to 300); keep sizes equal so nothing reflows. `FontVariation.grade(...)` changes emphasis without changing width.
-- Each distinct axis combination is a separate font instance; for animated axes (text that widens as a slider moves), step through a small set of values and keep it to a hero moment.
-- Tabular numbers: `style.copy(fontFeatureSettings = "tnum")`.
+- Reuse 2 to 3 voices app-wide; express state through weight (`700` to `900` selected vs `200` to `300` unselected at equal size) or `FontVariation.grade(...)`; step animated axes across a small fixed set in hero moments only.
 
 ## Shapes
 
-`Shapes(extraSmall, small, medium, large, extraLarge, largeIncreased, extraLargeIncreased, extraExtraLarge)`, read as `MaterialTheme.shapes.*`:
+`Shapes(extraSmall, small, medium, large, extraLarge, largeIncreased, extraLargeIncreased, extraExtraLarge)`, read via `MaterialTheme.shapes.*`:
 
 | Token | Default | Typical use |
 | --- | --- | --- |
-| extraSmall | 4dp | Chips, snackbars |
-| small | 8dp | Text fields, menus |
-| medium | 12dp | Cards |
-| large | 16dp | FABs, sheets on large screens |
-| largeIncreased | 20dp | Expressive containers |
-| extraLarge | 28dp | Dialogs, bottom sheets |
-| extraLargeIncreased | 32dp | Expressive hero containers |
-| extraExtraLarge | 48dp | Large hero surfaces |
-
-Change a token to change every component mapped to it; pass `shape` to change one component.
+| `extraSmall` | 4dp | Chips, snackbars |
+| `small` | 8dp | Text fields, menus |
+| `medium` | 12dp | Cards |
+| `large` | 16dp | FABs, large-screen sheets |
+| `largeIncreased` | 20dp | Expressive containers |
+| `extraLarge` | 28dp | Dialogs, bottom sheets |
+| `extraLargeIncreased` | 32dp | Expressive hero containers |
+| `extraExtraLarge` | 48dp | Large hero surfaces |
 
 ### Shape library
 
-`MaterialShapes` (experimental) has 35 `RoundedPolygon`s: Circle, Square, Slanted, Arch, Fan, Arrow, SemiCircle, Oval, Pill, Triangle, Diamond, ClamShell, Pentagon, Gem, Sunny, VerySunny, Cookie4Sided, Cookie6Sided, Cookie7Sided, Cookie9Sided, Cookie12Sided, Ghostish, Clover4Leaf, Clover8Leaf, Burst, SoftBurst, Boom, SoftBoom, Flower, Puffy, PuffyDiamond, PixelCircle, PixelTriangle, Bun, Heart.
+`MaterialShapes` (experimental) provides 35 `RoundedPolygon`s: `Circle`, `Square`, `Slanted`, `Arch`, `Fan`, `Arrow`, `SemiCircle`, `Oval`, `Pill`, `Triangle`, `Diamond`, `ClamShell`, `Pentagon`, `Gem`, `Sunny`, `VerySunny`, `Cookie4Sided`, `Cookie6Sided`, `Cookie7Sided`, `Cookie9Sided`, `Cookie12Sided`, `Ghostish`, `Clover4Leaf`, `Clover8Leaf`, `Burst`, `SoftBurst`, `Boom`, `SoftBoom`, `Flower`, `Puffy`, `PuffyDiamond`, `PixelCircle`, `PixelTriangle`, `Bun`, `Heart`.
 
-Clip with `Modifier.clip(MaterialShapes.Sunny.toShape())` or use as a `Surface` shape:
-
-```kotlin
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-Image(
-    painter = avatar,
-    contentDescription = null,
-    contentScale = ContentScale.Crop,
-    modifier = Modifier.size(96.dp).clip(MaterialShapes.Cookie9Sided.toShape()),
-)
-```
+Use freely as masks on avatars, photos, and album art (`Modifier.clip(MaterialShapes.Cookie9Sided.toShape())`); standalone decorative graphics must depict something from the subject (sun, cloud, record label, rather than arbitrary blobs) in recognizable static colors.
 
 ### Shape morphing
 
-Prefer components that morph on their own (buttons, icon buttons, toggles, button groups, list items, loading indicators). For a custom morph between two library shapes:
+Prefer components that morph natively (buttons, icon buttons, toggles, button groups, list items, loading indicators). For custom morphs:
 
 ```kotlin
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -317,7 +267,7 @@ fun MorphingBadge(done: Boolean, modifier: Modifier = Modifier) {
 
 ## Motion
 
-`MotionScheme` has six specs: `defaultSpatialSpec`, `fastSpatialSpec`, `slowSpatialSpec`, `defaultEffectsSpec`, `fastEffectsSpec`, `slowEffectsSpec`. `MotionScheme.expressive()` and `MotionScheme.standard()` are the presets:
+`MotionScheme` defines `defaultSpatialSpec`, `fastSpatialSpec`, `slowSpatialSpec`, `defaultEffectsSpec`, `fastEffectsSpec`, and `slowEffectsSpec`:
 
 | Spec | Expressive (damping / stiffness) | Standard |
 | --- | --- | --- |
@@ -326,8 +276,7 @@ fun MorphingBadge(done: Boolean, modifier: Modifier = Modifier) {
 | Slow spatial | 0.8 / 200 | 0.9 / 300 |
 | Effects fast / default / slow | 1.0 / 3800, 1600, 800 | same |
 
-- Override one subtree by nesting `MaterialTheme(motionScheme = MotionScheme.standard()) { ... }` (`LocalMotionScheme` was removed).
-- Custom components read specs from the active scheme instead of `tween()`:
+- Override a subtree with `MaterialTheme(motionScheme = MotionScheme.standard()) { ... }` (`LocalMotionScheme` was removed). Keep springs interruptible and read `MaterialTheme.motionScheme.*` instead of `tween()`:
 
 ```kotlin
 val scale by animateFloatAsState(if (pressed) 0.94f else 1f, MaterialTheme.motionScheme.fastSpatialSpec())
@@ -337,7 +286,7 @@ val tint by animateColorAsState(
 )
 ```
 
-- Reduced motion, Google's pattern:
+- **Reduced motion** (drop decorative morphs/parallax; keep meaningful fades):
 
 ```kotlin
 object ReducedMotionScheme : MotionScheme {
@@ -350,20 +299,14 @@ object ReducedMotionScheme : MotionScheme {
 }
 ```
 
-- A custom brand scheme overrides the same six functions with `spring(dampingRatio, stiffness)`; keep effects specs at `Spring.DampingRatioNoBouncy`.
-- Pick the API by the change (Google): `AnimatedVisibility` to show or hide, `AnimatedContent` to swap content in place (fade through by default), `Modifier.animateContentSize()` for size (before any size modifier), `Modifier.animateItem()` for list items, `updateTransition` for properties that move together, `Animatable` for gesture-driven values. Pass a `MotionScheme` spec to each; Google's samples use `tween()` only as API demos.
-- Hide with `AnimatedVisibility`, not an alpha animation: a faded element stays in layout and in the accessibility tree (Google).
-- Animate in the draw phase where possible: lambda modifiers (`offset { }`, `graphicsLayer { }`), `drawBehind` for a changing color, `graphicsLayer { shadowElevation }` for a changing shadow (Google).
-- Container transform is `Modifier.sharedBounds()`; a hero image is `Modifier.sharedElement()`; shared text uses `sharedBounds` with `scaleToBounds()`. Return the theme's spatial spec from `boundsTransform`, keep a bottom bar or FAB above the transition with `renderInSharedTransitionScopeOverlay()`, and don't expect shared elements to cross into a `Dialog` or `ModalBottomSheet` (Google).
+- Custom brand schemes override the same six specs with `spring(dampingRatio, stiffness)` (`Spring.DampingRatioNoBouncy` on effects).
+- **API selection:** `AnimatedVisibility` to show/hide (keeps hidden elements out of layout and accessibility, unlike alpha animations), `AnimatedContent` to swap content, `Modifier.animateContentSize()` before size modifiers, `Modifier.animateItem()` for lists, `updateTransition` for coupled properties, `Animatable` for gestures. Animate in the draw phase via lambda modifiers (`offset { }`, `graphicsLayer { shadowElevation }`, `drawBehind`).
+- **Shared elements:** `Modifier.sharedBounds()` for container transforms, `Modifier.sharedElement()` for hero images, `sharedBounds` + `scaleToBounds()` for text; return the theme's spatial spec from `boundsTransform` and keep bars/FABs above with `renderInSharedTransitionScopeOverlay()` (shared elements cannot cross into `Dialog` or `ModalBottomSheet`).
 
 ## Blur, shadows, and gradients
 
-- **Blur** (Google): softens detail, adds photographic depth of field, and pulls focus to foreground UI, on any screen where focus or depth helps, not only hero moments. `Modifier.blur` needs Android 12 (progressive blur Android 13, `ui` 1.13); older devices draw the content unblurred, so legibility and hierarchy never depend on it. It costs performance, so blur what serves the focus, not every surface. It is a surface blur of the composable's own content, not a backdrop blur of what sits behind it, so it cannot make a frosted or glass panel over other content. Common uses:
-  - Soften list, carousel, or picker edges around a sharp center. The active item still needs its own cue (color, weight, an indicator), because the sharp band vanishes below Android 13.
-  - Blur the part of a hero image behind overlaid text, always with a scrim, gradient, or solid or tonal surface behind the text so it stays readable when blur is absent.
-  - A radial spotlight that follows a drag, such as a reading spotlight moved across a paragraph while the surrounding text blurs.
-- **Progressive blur API:** import `BlurRadiusSpec` and `BlurStop` from `androidx.compose.ui.graphics.blur` (`blur` and `BlurredEdgeTreatment` are in `androidx.compose.ui.draw`), then pass `blurRadiusSpec = BlurRadiusSpec.verticalGradient(...)`, `horizontalGradient`, `linearGradient(start, end)`, or `radialGradient(center, fallOffRadius)`. For a sharp band or several blurred edges, give 2 to 16 `BlurStop(fraction, radius)` stops with `0.dp` across the band. Use the `Modifier.blur { }` block when geometry depends on the layer `size` (a corner-to-corner diagonal); it runs in the layer phase without recomposing. Progressive radii clamp at 150px (about 50dp on a 3x screen), so larger values look no stronger. `radiusX`/`radiusY` give a directional motion blur and both must be above `0.dp`.
-- **Edge treatment:** `BlurredEdgeTreatment(shape)` on images and cards, matching their corner shape; `BlurredEdgeTreatment.Unbounded` for edge fades on scrolling or drawn content (`LazyColumn`, `Canvas`) so the outer items dissolve instead of ending at a hard line.
+- **Blur:** blurs the composable's own surface content (not a backdrop/frosted-glass blur behind it). Requires Android 12 (`Modifier.blur`), Android 13 (`ui` 1.13) for progressive `BlurRadiusSpec`; older devices render unblurred, so keep an active-item cue (color, weight, indicator) and back text over blurred photos with a scrim, gradient, or solid/tonal surface.
+  - **Progressive API:** import `BlurRadiusSpec` and `BlurStop` from `androidx.compose.ui.graphics.blur` (`blur` and `BlurredEdgeTreatment` from `androidx.compose.ui.draw`). Pass `verticalGradient`, `horizontalGradient`, `linearGradient(start, end)`, or `radialGradient(center, fallOffRadius)` with 2 to 16 `BlurStop(fraction, radius)` (`0.dp` across sharp bands; radii clamp at 150px). Use `Modifier.blur { }` when geometry depends on layer `size`. `BlurredEdgeTreatment(shape)` matches card/image corners; `BlurredEdgeTreatment.Unbounded` dissolves scrolling/canvas edges.
 
 ```kotlin
 LazyColumn(
@@ -381,12 +324,12 @@ LazyColumn(
 ) { /* items */ }
 ```
 
-- **Shadows:** Material 3 shows elevation mainly with tonal surface color, so add a shadow only where a component's spec has one (Google). `Modifier.shadow(elevation, shape)` is the Material elevation shadow. `dropShadow()` and `innerShadow()` add radius, spread, color, or a brush and follow any shape, `MaterialShapes` included; `dropShadow` goes before `background`, `innerShadow` after it. Neumorphic, neobrutalist, and stacked "realistic" shadows are not Material; use them only when the direction asks for that look (Google shows them as styles).
-- **Gradients** (Google): for organic multi-point backgrounds use a mesh gradient (`MeshGradientPainter`) instead of stacking radial or linear brushes. `RuntimeShader` brushes need Android 13 and a fallback. A sweep gradient ends on its start color to close seamlessly.
+- **Shadows:** rely primarily on tonal surface elevation; add `Modifier.shadow(elevation, shape)` only where a spec defines it. `dropShadow()` (before `background`) and `innerShadow()` (after `background`) follow any `MaterialShapes` path; reserve neumorphic/neobrutalist shadows for directions that specifically call for them.
+- **Gradients:** use `MeshGradientPainter` for multi-point organic backgrounds (`RuntimeShader` needs Android 13 + fallback); end sweep gradients on their start color.
 
 ## Spacing
 
-Compose has no spacing tokens. Define the 8dp scale once in the theme package and use it everywhere:
+Define the 8dp scale once in the theme package (16dp side margins compact, 24dp medium+; gaps on parents via `Arrangement.spacedBy`):
 
 ```kotlin
 object Spacing {
@@ -399,5 +342,3 @@ object Spacing {
     val xxxl = 48.dp
 }
 ```
-
-Screen margins: 16dp on compact, 24dp on medium and larger. Put padding and gaps on parent layouts (`Arrangement.spacedBy`) instead of margins on children.
