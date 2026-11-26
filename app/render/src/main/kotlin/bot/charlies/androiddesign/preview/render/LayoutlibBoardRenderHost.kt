@@ -170,7 +170,7 @@ internal class LayoutlibBoardRenderHost(private val sdk: PaparazziSdk) : BoardRe
         uiMode = if (isWatch) UiMode.WATCH else UiMode.NORMAL,
         nightMode = if (view.dark) NightMode.NIGHT else NightMode.NOTNIGHT,
         density = Density.create(target.dpi),
-        fontScale = target.effectiveFontScale,
+        fontScale = 1f,
         size =
           when {
             isWatch -> ScreenSize.SMALL

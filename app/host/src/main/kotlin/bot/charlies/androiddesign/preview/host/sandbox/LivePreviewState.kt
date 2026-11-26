@@ -15,7 +15,6 @@ internal class LiveSession(
   val overlayId: String?,
   val designSystem: DesignSystem,
   val dark: Boolean,
-  val fontScale: Float,
   val assetResolver: ((String) -> ImageBitmap?)?,
 )
 

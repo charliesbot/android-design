@@ -56,7 +56,6 @@ Moving up a breakpoint, ask five questions (reflowing controls and revealing con
 ## Density and text
 
 - Density is a user choice, never an automatic breakpoint change; keep menus, dialogs, and snackbars at standard density.
-- Support 200% text scaling: text and line height grow while padding stays fixed; stack side-by-side buttons and allow vertical scrolling when text grows.
 
 ## Grids and max widths
 

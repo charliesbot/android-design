@@ -42,7 +42,7 @@ fun WearAppTheme(content: @Composable () -> Unit) {
 - **Roboto Flex** everywhere. Weight and width are the useful axes: narrow width fits long names and numbers; keep headers away from extreme widths and avoid ultra-light weights at small sizes.
 - Roles: `display*` (hero info/metrics), `title*` (wayfinding), `label*` (inside components), `bodyLarge` to `bodyExtraSmall`, `numeralExtraLarge` to `numeralExtraSmall` (tabular by default, accepts expressive width), `arcLarge/Medium/Small` (curved edge text via `curvedText(text, style = MaterialTheme.typography.arcMedium)` in `CurvedScope`).
 - Minimum sizes: 12sp essential text, 10sp non-essential text. Line height ~1.1x.
-- User font settings step styles by 6% below 20sp; styles at 20sp+ (`display`, `numeral`, `labelLarge`) stay fixed. Design for smallest and largest font settings, Bold text, and long languages so text and controls stay inside the round edge without overlapping.
+- Design for Bold text and long languages so text and controls stay inside the round edge without overlapping.
 - Use `numeral*` for a few unlocalized digits (timer, step count, picker) with tabular spacing whenever digits change.
 
 ## Layout
@@ -50,7 +50,7 @@ fun WearAppTheme(content: @Composable () -> Unit) {
 - **Three sections:** top (optional time text, optional title, optional compact button on long pages), middle (content), bottom (actions, ideally an **edge button**, or empty at journey end). Omit time text on dialogs, confirmations, and pickers; show the scroll indicator only on scrolling screens.
 - **Round safe area:** outer margins (top, bottom, sides) are **percentages**, never fixed dp, and grow where the curve cuts in (top and bottom differ by content). Spacing between elements is fixed dp.
 - **Touch targets:** at least 48 x 48dp with icons centered; pair icons with labels inline where they fit.
-- **Small first (204 to 216dp, test dense layouts at 192dp with large/Bold fonts), add value past 225dp:** past the 225dp breakpoint, reveal more content, extra buttons, or larger targets/text for glanceability without dropping anything the smaller watch showed or pushing content off screen. Fill component width appropriately without scaling fonts up unless graphic.
+- **Small first (204 to 216dp, test dense layouts at 192dp), add value past 225dp:** past the 225dp breakpoint, reveal more content, extra buttons, or larger targets/text for glanceability without dropping anything the smaller watch showed or pushing content off screen. Fill component width appropriately without scaling fonts up unless graphic.
 - **Scrolling screens:** `TransformingLazyColumn` scales and fades items at top/bottom edges. Group long mixed lists with labels (skip labels on single-type lists). Elevate a clear primary action to the top of long pages or close with an edge button. Scroll in one direction only.
 - **Non-scrolling screens** (media, pickers, steppers, timers, dialogs, progress): stretch the middle section to fill height between top and bottom; prefer icon buttons over wide pills and show data graphically (progress ring, large numeral). Use preset dialog, confirmation, stepper, and picker layouts, keeping all content unclipped without scrolling.
 - **Rotary input:** bind the crown to the main value on steppers, pickers, and players.

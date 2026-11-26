@@ -150,8 +150,7 @@ private fun FailurePlaceholder(failure: LiveFailure) {
 private fun LiveBoardCanvas(session: LiveSession) {
   val baseDensity = LocalDensity.current
   val baseConfig = LocalConfiguration.current
-  val effectiveDensity =
-    Density(baseDensity.density, fontScale = session.fontScale.coerceAtLeast(0.5f))
+  val effectiveDensity = Density(baseDensity.density, fontScale = 1f)
   val effectiveConfig =
     remember(baseConfig, session.dark, session.board.surface) {
       Configuration(baseConfig).apply {

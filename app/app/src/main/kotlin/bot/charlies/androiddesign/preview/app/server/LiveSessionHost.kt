@@ -294,7 +294,6 @@ class AndroidLiveSessionHost(
           darkOverride = update.darkOverride,
           seedOverride = update.seedOverride,
           variantOverride = update.variantOverride,
-          fontScale = update.fontScale,
         ),
       assetBlobs = data.assetBlobs,
     )

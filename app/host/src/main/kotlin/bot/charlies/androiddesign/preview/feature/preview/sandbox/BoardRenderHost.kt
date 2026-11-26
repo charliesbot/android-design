@@ -46,7 +46,6 @@ data class RenderTargetRequest(
   val designMd: ThemeOverride? = null,
   val overlayId: String? = null,
   val density: Float = 2f,
-  val fontScale: Float = 1f,
   val darkOverride: Boolean? = null,
   val seedOverride: String? = null,
   val variantOverride: String? = null,
@@ -58,7 +57,6 @@ data class RenderTargetRequest(
 data class PreparedRenderTarget(
   val request: RenderTargetRequest,
   val effectiveView: ViewSpec,
-  val effectiveFontScale: Float,
   val designSystem: DesignSystem,
   val widthPx: Int,
   val heightPx: Int,
@@ -74,7 +72,7 @@ data class PreparedRenderTarget(
   fun createOverrideContext(base: Context): Pair<Context, Configuration> {
     val cfg = Configuration(base.resources.configuration)
     cfg.densityDpi = dpi
-    cfg.fontScale = effectiveFontScale
+    cfg.fontScale = 1f
     cfg.screenWidthDp = effectiveView.width
     cfg.screenHeightDp = effectiveView.height
     cfg.smallestScreenWidthDp = minOf(effectiveView.width, effectiveView.height)
@@ -104,7 +102,6 @@ data class PreparedRenderTarget(
         } else {
           request.view
         }
-      val effectiveFontScale = request.fontScale.coerceAtLeast(0.5f)
       val variant = request.variantOverride?.let { PaletteVariant.fromWire(it) }
       val designSystem =
         request.board.resolveDesignSystem(
@@ -115,7 +112,6 @@ data class PreparedRenderTarget(
       return PreparedRenderTarget(
         request = request,
         effectiveView = effectiveView,
-        effectiveFontScale = effectiveFontScale,
         designSystem = designSystem,
         widthPx = (effectiveView.width * request.density).roundToInt().coerceAtLeast(1),
         heightPx = (effectiveView.height * request.density).roundToInt().coerceAtLeast(1),
@@ -182,7 +178,7 @@ fun RenderBoardContent(
     add(LocalContext provides overrideContext)
     add(LocalConfiguration provides overrideConfig)
     add(
-      LocalDensity provides Density(target.request.density, fontScale = target.effectiveFontScale),
+      LocalDensity provides Density(target.request.density, fontScale = 1f),
     )
     if (navigationEventDispatcherOwner != null) {
       add(LocalNavigationEventDispatcherOwner provides navigationEventDispatcherOwner)

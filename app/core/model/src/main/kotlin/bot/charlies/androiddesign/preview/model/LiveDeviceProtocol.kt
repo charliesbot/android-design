@@ -72,7 +72,6 @@ data class DeviceLiveStateRequest(
   val darkOverride: Boolean? = null,
   val seedOverride: String? = null,
   val variantOverride: String? = null,
-  val fontScale: Float = 1f,
   val assetMap: Map<String, String> = emptyMap(),
   val designTheme: ThemeOverride? = null,
 )
