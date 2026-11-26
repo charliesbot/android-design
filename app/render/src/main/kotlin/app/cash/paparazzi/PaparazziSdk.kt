@@ -59,6 +59,7 @@ import app.cash.paparazzi.internal.PaparazziSavedStateRegistryOwner
 import app.cash.paparazzi.internal.Renderer
 import app.cash.paparazzi.internal.SessionParamsBuilder
 import app.cash.paparazzi.internal.interceptors.EditModeInterceptor
+import app.cash.paparazzi.internal.interceptors.RasterizeSkipAdvice
 import app.cash.paparazzi.internal.parsers.LayoutPullParser
 import com.android.ide.common.rendering.api.Result
 import com.android.ide.common.rendering.api.Result.Status.ERROR_UNKNOWN
@@ -125,6 +126,7 @@ constructor(
   public fun setup() {
     if (!isInitialized) {
       registerViewEditModeInterception()
+      registerRasterizeSkipInterception()
       ByteBuddyAgent.install()
       InterceptorRegistrar.registerMethodInterceptors()
     }
@@ -299,7 +301,10 @@ constructor(
           check(!closed) { "Driver session already closed" }
           withTime(nowNanos) {
             prepareWindows()
-            val result = renderSession.render(true)
+            // Keep Compose layout, animations, and DisplayList recording (View#draw) active while
+            // deferring Skia CPU rasterization (HardwareRenderer#syncAndDrawFrame) to captureFrame.
+            // RenderThread-only animators such as ripples do not advance during settle.
+            val result = withRasterizationSkipped { renderSession.render(true) }
             if (result.status == ERROR_UNKNOWN) throw result.exception
             // Drain resumed continuations so frame-clock awaiters register before reading pending.
             executeHandlerCallbacks()
@@ -542,6 +547,24 @@ constructor(
       "isInEditMode",
       EditModeInterceptor::class.java,
     )
+  }
+
+  private fun registerRasterizeSkipInterception() {
+    InterceptorRegistrar.addMethodAdvice(
+      "android.graphics.HardwareRenderer",
+      "syncAndDrawFrame",
+      RasterizeSkipAdvice::class.java,
+    )
+  }
+
+  private inline fun <T> withRasterizationSkipped(block: () -> T): T {
+    val previous = RasterizeSkipAdvice.SKIP_RASTERIZATION.get()
+    RasterizeSkipAdvice.SKIP_RASTERIZATION.set(true)
+    return try {
+      block()
+    } finally {
+      RasterizeSkipAdvice.SKIP_RASTERIZATION.set(previous)
+    }
   }
 
   private fun forceReleaseComposeReferenceLeaks() {

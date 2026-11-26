@@ -1,6 +1,7 @@
 package app.cash.paparazzi.agent
 
 import net.bytebuddy.ByteBuddy
+import net.bytebuddy.asm.Advice
 import net.bytebuddy.dynamic.ClassFileLocator
 import net.bytebuddy.dynamic.loading.ClassReloadingStrategy
 import net.bytebuddy.implementation.MethodDelegation
@@ -34,6 +35,19 @@ internal object InterceptorRegistrar {
       }
 
       builder.make().load(systemClassLoader, ClassReloadingStrategy.fromInstalledAgent())
+    }
+  }
+
+  fun addMethodAdvice(receiverClass: String, methodName: String, advice: Class<*>) {
+    val typeResolution = systemTypePool.describe(receiverClass)
+    if (!typeResolution.isResolved) return
+
+    methodInterceptors += {
+      byteBuddy
+        .redefine<Any>(typeResolution.resolve(), systemClassFileLocator)
+        .visit(Advice.to(advice).on(ElementMatchers.named(methodName)))
+        .make()
+        .load(systemClassLoader, ClassReloadingStrategy.fromInstalledAgent())
     }
   }
 

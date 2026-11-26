@@ -6,12 +6,15 @@ import android.view.ViewGroup
 import android.view.ViewRootImpl_Accessor
 import android.view.WindowManagerGlobal
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,16 +22,24 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.blur.BlurRadiusSpec
+import androidx.compose.ui.graphics.blur.BlurStop
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -55,11 +66,13 @@ import bot.charlies.androiddesign.preview.feature.preview.theme.ProposalFonts
 import bot.charlies.androiddesign.preview.render.LayoutlibEnvironment
 import com.android.resources.Density
 import com.android.resources.NightMode
+import com.android.resources.ScreenOrientation
 import com.android.resources.ScreenRound
 import com.android.resources.ScreenSize
 import com.android.resources.UiMode
 import java.awt.image.BufferedImage
 import kotlin.math.roundToInt
+import kotlin.system.measureTimeMillis
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -73,6 +86,19 @@ class LayoutlibDriverTest {
         override val navigationEventDispatcher = NavigationEventDispatcher()
       }
   }
+
+  private fun desktopConfig(): DeviceConfig =
+    DeviceConfig(
+      screenWidth = 3840,
+      screenHeight = 2160,
+      xdpi = 320,
+      ydpi = 320,
+      density = Density.XHIGH,
+      nightMode = NightMode.NOTNIGHT,
+      size = ScreenSize.XLARGE,
+      orientation = ScreenOrientation.LANDSCAPE,
+      softButtons = false,
+    )
 
   private fun phoneConfig(widthPx: Int, heightPx: Int): DeviceConfig =
     DeviceConfig(
@@ -411,6 +437,171 @@ class LayoutlibDriverTest {
     assertTrue(
       indicatorPixels > 0,
       "Expected visible Wear scroll indicator pixels along right edge",
+    )
+  }
+
+  @Test
+  fun `draw-phase state updates settle before captureFrame`() {
+    val image =
+      renderSettled(phoneConfig(120, 120)) {
+        var drawReady by remember { mutableStateOf(false) }
+        Box(
+          Modifier.fillMaxSize().drawBehind {
+            drawRect(if (drawReady) Color.Green else Color.Red)
+            if (!drawReady) {
+              drawReady = true
+            }
+          },
+        )
+      }
+    assertEquals(AndroidColor.GREEN, image.getRGB(60, 60))
+  }
+
+  @Test
+  fun `desktop bounded progressive blur settles and renders within warm budget`() {
+    val fourStop16 =
+      BlurRadiusSpec.verticalGradient(
+        stops =
+          listOf(
+            BlurStop(fraction = 0f, radius = 16.dp),
+            BlurStop(fraction = 0.3f, radius = 0.dp),
+            BlurStop(fraction = 0.7f, radius = 0.dp),
+            BlurStop(fraction = 1f, radius = 16.dp),
+          ),
+      )
+
+    @Composable
+    fun LyricsPane(blurSpec: BlurRadiusSpec?) {
+      Box(
+        Modifier.fillMaxSize().background(Color(0xFF0E0D11)),
+        contentAlignment = Alignment.Center,
+      ) {
+        val blurMod =
+          if (blurSpec != null) {
+            Modifier.blur(blurRadiusSpec = blurSpec, edgeTreatment = BlurredEdgeTreatment.Rectangle)
+          } else {
+            Modifier
+          }
+        Column(
+          modifier =
+            Modifier.size(width = 600.dp, height = 800.dp)
+              .then(blurMod)
+              .background(Color(0xFF141218))
+              .padding(24.dp),
+          verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+          val colors =
+            listOf(Color(0xFF381E72), Color(0xFF4F378B), Color(0xFF2B2930), Color(0xFF633B48))
+          repeat(10) { idx ->
+            Surface(
+              color = colors[idx % colors.size],
+              shape = RoundedCornerShape(16.dp),
+              modifier = Modifier.fillMaxWidth(),
+            ) {
+              Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+              ) {
+                Text("Verse line ${idx + 1}", color = Color(0xFFE6E0E9))
+                Text("03:${10 + idx}", color = Color(0xFFCAC4D0))
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Warm up layoutlib and Compose on desktop before timing the blurred pass.
+    val unblurred = renderSettled(desktopConfig()) { LyricsPane(blurSpec = null) }
+    lateinit var blurred: BufferedImage
+    val elapsedMs = measureTimeMillis {
+      blurred = renderSettled(desktopConfig()) { LyricsPane(blurSpec = fourStop16) }
+    }
+
+    assertTrue(
+      elapsedMs < 3_500L,
+      "Expected bounded desktop progressive blur to settle within 3500ms, took ${elapsedMs}ms",
+    )
+
+    var diffPixels = 0
+    for (y in 280 until 760) {
+      for (x in 1320 until 2520) {
+        if (unblurred.getRGB(x, y) != blurred.getRGB(x, y)) {
+          diffPixels++
+        }
+      }
+    }
+    assertTrue(
+      diffPixels > 1_000,
+      "Expected progressive blur pixels in top band to differ from unblurred ($diffPixels px)",
+    )
+  }
+
+  @OptIn(ExperimentalMaterial3Api::class)
+  @Test
+  fun `ModalBottomSheet over progressive blur settles and renders both sheet and blur`() {
+    val baseImage =
+      renderSettled(phoneConfig(600, 800)) {
+        MaterialTheme { Box(Modifier.fillMaxSize().background(Color.White)) }
+      }
+    val fourStop16 =
+      BlurRadiusSpec.verticalGradient(
+        stops =
+          listOf(
+            BlurStop(fraction = 0f, radius = 16.dp),
+            BlurStop(fraction = 0.3f, radius = 0.dp),
+            BlurStop(fraction = 0.7f, radius = 0.dp),
+            BlurStop(fraction = 1f, radius = 16.dp),
+          ),
+      )
+
+    var sheetWindows: List<View> = emptyList()
+    lateinit var sheetImage: BufferedImage
+    val elapsedMs = measureTimeMillis {
+      sheetImage =
+        renderSettled(
+          phoneConfig(600, 800),
+          onBeforeClose = { sheetWindows = it },
+        ) {
+          MaterialTheme {
+            Box(Modifier.fillMaxSize().background(Color.White)) {
+              Column(
+                Modifier.fillMaxSize()
+                  .blur(blurRadiusSpec = fourStop16, edgeTreatment = BlurredEdgeTreatment.Rectangle)
+                  .background(Color(0xFF141218))
+                  .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+              ) {
+                repeat(6) { idx -> Text("Background row $idx", color = Color(0xFFE6E0E9)) }
+              }
+              ModalBottomSheet(
+                onDismissRequest = {},
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+              ) {
+                Column(Modifier.fillMaxWidth().padding(24.dp)) {
+                  Text("Bottom Sheet Title")
+                }
+              }
+            }
+          }
+        }
+    }
+
+    assertTrue(sheetWindows.size >= 2, "Expected secondary window for ModalBottomSheet")
+    assertTrue(sheetWindows.all { it.isInTouchMode }, "All windows must be in touch mode")
+    var sheetDiffs = 0
+    for (y in 450 until sheetImage.height) {
+      for (x in 0 until sheetImage.width) {
+        if (sheetImage.getRGB(x, y) != baseImage.getRGB(x, y)) sheetDiffs++
+      }
+    }
+    assertTrue(
+      sheetDiffs > 1_000,
+      "Expected ModalBottomSheet visible in bottom half ($sheetDiffs px)",
+    )
+    assertTrue(
+      elapsedMs < 3_500L,
+      "Expected ModalBottomSheet over progressive blur to settle within 3500ms, took ${elapsedMs}ms",
     )
   }
 }
