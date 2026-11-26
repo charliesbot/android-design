@@ -19,10 +19,20 @@ claude plugin marketplace add charliesbot/android-design
 claude plugin install android-design@charliesbot-android-design
 ```
 
+**Codex:**
+
+```bash
+codex plugin marketplace add charliesbot/android-design
+```
+
+```bash
+codex plugin add android-design@charliesbot-android-design
+```
+
 **Antigravity:**
 
 ```bash
-agy plugin install https://github.com/charliesbot/android-design/tree/main/plugin
+agy plugin install https://github.com/charliesbot/android-design
 ```
 
 **Standalone skills (`npx skills` or Chai):**
